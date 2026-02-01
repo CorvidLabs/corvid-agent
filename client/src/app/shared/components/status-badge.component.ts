@@ -15,19 +15,20 @@ import { Component, ChangeDetectionStrategy, input, computed } from '@angular/co
         .status-badge {
             display: inline-block;
             padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
+            border: 1px solid;
         }
-        .status-badge--idle { background: #e2e8f0; color: #475569; }
-        .status-badge--running { background: #dcfce7; color: #166534; }
-        .status-badge--paused { background: #fef3c7; color: #92400e; }
-        .status-badge--stopped { background: #f1f5f9; color: #64748b; }
-        .status-badge--error { background: #fecaca; color: #991b1b; }
-        .status-badge--connected { background: #dcfce7; color: #166534; }
-        .status-badge--disconnected { background: #fecaca; color: #991b1b; }
+        .status-badge--idle { background: var(--bg-raised); color: var(--text-secondary); border-color: var(--border-bright); }
+        .status-badge--running { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(0, 255, 136, 0.3); }
+        .status-badge--paused { background: var(--accent-amber-dim); color: var(--accent-amber); border-color: rgba(255, 170, 0, 0.3); }
+        .status-badge--stopped { background: var(--bg-raised); color: var(--text-tertiary); border-color: var(--border); }
+        .status-badge--error { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
+        .status-badge--connected { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(0, 255, 136, 0.3); }
+        .status-badge--disconnected { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
     `,
 })
 export class StatusBadgeComponent {

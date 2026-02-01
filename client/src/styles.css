@@ -1,3 +1,43 @@
+:root {
+    /* Backgrounds */
+    --bg-deep: #0a0a12;
+    --bg-surface: #0f1018;
+    --bg-raised: #161822;
+    --bg-input: #0c0d14;
+    --bg-hover: #1a1c2e;
+
+    /* Borders */
+    --border: #1e2035;
+    --border-bright: #2a2d48;
+
+    /* Text */
+    --text-primary: #e0e0ec;
+    --text-secondary: #7a7d98;
+    --text-tertiary: #4a4d68;
+
+    /* Accents */
+    --accent-cyan: #00e5ff;
+    --accent-cyan-dim: rgba(0, 229, 255, 0.15);
+    --accent-magenta: #ff00aa;
+    --accent-magenta-dim: rgba(255, 0, 170, 0.15);
+    --accent-green: #00ff88;
+    --accent-green-dim: rgba(0, 255, 136, 0.15);
+    --accent-red: #ff3355;
+    --accent-red-dim: rgba(255, 51, 85, 0.15);
+    --accent-amber: #ffaa00;
+    --accent-amber-dim: rgba(255, 170, 0, 0.15);
+
+    /* Glow effects */
+    --glow-cyan: 0 0 8px rgba(0, 229, 255, 0.25);
+    --glow-magenta: 0 0 8px rgba(255, 0, 170, 0.25);
+    --glow-green: 0 0 8px rgba(0, 255, 136, 0.25);
+
+    /* Radius */
+    --radius-sm: 3px;
+    --radius: 6px;
+    --radius-lg: 8px;
+}
+
 *,
 *::before,
 *::after {
@@ -7,11 +47,11 @@
 html, body {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.5;
-    color: #1e293b;
-    background: #f8fafc;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-deep);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -20,11 +60,38 @@ a {
     color: inherit;
 }
 
+/* Focus indicators — high contrast cyan for accessibility */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-    outline: 2px solid #3b82f6;
+    outline: 2px solid var(--accent-cyan);
     outline-offset: 2px;
+    box-shadow: var(--glow-cyan);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-bright);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* Selection */
+::selection {
+    background: var(--accent-cyan-dim);
+    color: var(--accent-cyan);
 }

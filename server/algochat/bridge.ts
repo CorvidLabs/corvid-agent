@@ -88,12 +88,14 @@ export class AlgoChatBridge {
         content: string,
         sendFn: LocalChatSendFn,
     ): Promise<void> {
+        console.log(`[AlgoChat Bridge] handleLocalMessage: agentId=${agentId}, content="${content.slice(0, 50)}"`);
         const agent = getAgent(this.db, agentId);
         if (!agent) {
             console.error(`[AlgoChat Bridge] Agent ${agentId} not found`);
             return;
         }
 
+        console.log(`[AlgoChat Bridge] Agent found: ${agent.name}, echoing inbound message`);
         sendFn('local', content, 'inbound');
 
         const existingSessionId = this.localAgentSessions.get(agentId);
@@ -117,6 +119,7 @@ export class AlgoChatBridge {
 
         // Create a new session
         const projectId = this.getDefaultProjectId();
+        console.log(`[AlgoChat Bridge] Creating new session: projectId=${projectId}, agentId=${agentId}`);
         const session = createSession(this.db, {
             projectId,
             agentId,
@@ -125,6 +128,7 @@ export class AlgoChatBridge {
             source: 'web',
         });
 
+        console.log(`[AlgoChat Bridge] Session created: ${session.id}, starting process`);
         this.localAgentSessions.set(agentId, session.id);
         this.subscribeForLocalResponse(session.id, sendFn);
         this.processManager.startProcess(session, content);
@@ -217,15 +221,23 @@ export class AlgoChatBridge {
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
+            console.log(`[AlgoChat Bridge] Local response event: type=${event.type}, subtype=${event.subtype ?? 'none'}`);
+
             if (event.type === 'assistant' && event.message?.content) {
-                responseBuffer += extractContentText(event.message.content);
+                const text = extractContentText(event.message.content);
+                console.log(`[AlgoChat Bridge] Assistant content chunk: "${text.slice(0, 80)}"`);
+                responseBuffer += text;
             }
 
             if (event.type === 'result' || event.type === 'session_exited') {
                 this.processManager.unsubscribe(sessionId, callback);
+                console.log(`[AlgoChat Bridge] Session ended (${event.type}), response buffer length: ${responseBuffer.length}`);
 
                 if (responseBuffer.trim()) {
+                    console.log(`[AlgoChat Bridge] Sending outbound response: "${responseBuffer.trim().slice(0, 80)}"`);
                     sendFn('local', responseBuffer.trim(), 'outbound');
+                } else {
+                    console.log('[AlgoChat Bridge] No response text to send');
                 }
             }
         };

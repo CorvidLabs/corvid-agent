@@ -51,18 +51,25 @@ import type { StreamEvent } from '../../core/models/ws-message.model';
         .session-view__header {
             display: flex; align-items: center; gap: 1rem;
             padding: 0.75rem 1rem;
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
         }
         .session-view__info { display: flex; align-items: center; gap: 0.75rem; }
-        .session-view__info h2 { margin: 0; font-size: 1.1rem; }
-        .session-view__meta { display: flex; gap: 1rem; font-size: 0.8rem; color: #64748b; margin-left: auto; }
+        .session-view__info h2 { margin: 0; font-size: 1rem; color: var(--text-primary); }
+        .session-view__meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary); margin-left: auto; }
         .session-view__actions { display: flex; gap: 0.5rem; }
-        .btn { padding: 0.375rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; }
-        .btn--primary { background: #3b82f6; color: #fff; }
-        .btn--secondary { background: #e2e8f0; color: #475569; }
-        .btn--danger { background: #ef4444; color: #fff; }
-        .page { padding: 1.5rem; }
+        .btn {
+            padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
+            cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+        .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
+        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
+        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
+        .btn--danger:hover { background: var(--accent-red-dim); box-shadow: 0 0 8px rgba(255, 51, 85, 0.25); }
+        .page { padding: 1.5rem; color: var(--text-primary); }
     `,
 })
 export class SessionViewComponent implements OnInit, OnDestroy {

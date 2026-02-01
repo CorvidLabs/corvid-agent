@@ -34,34 +34,38 @@ import { FormsModule } from '@angular/forms';
             display: flex;
             gap: 0.5rem;
             padding: 0.75rem 1rem;
-            background: #1e293b;
-            border-top: 1px solid #334155;
+            background: var(--bg-surface);
+            border-top: 1px solid var(--border);
         }
         .input-bar__field {
             flex: 1;
             padding: 0.5rem 0.75rem;
-            background: #0f172a;
-            color: #e2e8f0;
-            border: 1px solid #334155;
-            border-radius: 6px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius);
             font-family: inherit;
             font-size: 0.85rem;
             resize: none;
         }
-        .input-bar__field:focus { outline: 2px solid #3b82f6; outline-offset: -1px; }
-        .input-bar__field:disabled { opacity: 0.5; }
+        .input-bar__field:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+        .input-bar__field:disabled { opacity: 0.4; }
         .input-bar__send {
             padding: 0.5rem 1rem;
-            background: #3b82f6;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
+            background: transparent;
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius);
             font-weight: 600;
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            font-family: inherit;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: background 0.15s, box-shadow 0.15s;
         }
-        .input-bar__send:hover { background: #2563eb; }
-        .input-bar__send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .input-bar__send:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
+        .input-bar__send:disabled { opacity: 0.3; cursor: not-allowed; }
     `,
 })
 export class SessionInputComponent {

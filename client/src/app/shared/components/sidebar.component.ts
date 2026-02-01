@@ -47,9 +47,10 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     styles: `
         .sidebar {
             width: 200px;
-            background: #0f172a;
+            background: var(--bg-surface);
             min-height: 100%;
             padding: 1rem 0;
+            border-right: 1px solid var(--border);
         }
         .sidebar__list {
             list-style: none;
@@ -59,19 +60,22 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         .sidebar__link {
             display: block;
             padding: 0.75rem 1.5rem;
-            color: #94a3b8;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 0.9rem;
-            transition: background 0.15s, color 0.15s;
+            font-size: 0.85rem;
+            letter-spacing: 0.03em;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            border-left: 3px solid transparent;
         }
         .sidebar__link:hover {
-            background: #1e293b;
-            color: #e2e8f0;
+            background: var(--bg-hover);
+            color: var(--accent-cyan);
         }
         .sidebar__link--active {
-            color: #f8fafc;
-            background: #1e293b;
-            border-left: 3px solid #3b82f6;
+            color: var(--accent-cyan);
+            background: var(--bg-raised);
+            border-left: 3px solid var(--accent-cyan);
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
         }
     `,
 })

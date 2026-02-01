@@ -94,13 +94,17 @@ function handleClientMessage(
         }
 
         case 'chat_send': {
+            console.log(`[WS] chat_send received: agentId=${msg.agentId}, content="${msg.content.slice(0, 50)}"`);
             const bridge = getBridge();
             if (!bridge) {
+                console.log('[WS] chat_send: bridge is null, AlgoChat not available');
                 sendError(ws, 'AlgoChat is not available');
                 break;
             }
 
             bridge.handleLocalMessage(msg.agentId, msg.content, (participant, content, direction) => {
+                console.log(`[WS] chat_send sendFn: participant=${participant}, direction=${direction}, content="${content.slice(0, 50)}"`);
+
                 const serverMsg: ServerMessage = {
                     type: 'algochat_message',
                     participant,

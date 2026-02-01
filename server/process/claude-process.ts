@@ -50,6 +50,15 @@ export function spawnClaudeProcess(options: ClaudeProcessOptions): ClaudeProcess
     const initialPrompt = prompt ?? (!resume ? session.initialPrompt : undefined);
     if (initialPrompt) {
         sendMessage(initialPrompt);
+        // Close stdin so Claude knows input is complete (especially for --print mode)
+        try {
+            (proc.stdin as unknown as { end(): void }).end();
+        } catch {
+            // Fallback: try closing via Bun's FileSink API
+            try {
+                proc.stdin?.flush();
+            } catch { /* already closed */ }
+        }
     }
 
     // Monitor exit

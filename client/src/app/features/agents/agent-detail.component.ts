@@ -61,18 +61,27 @@ import type { Agent } from '../../core/models/agent.model';
     styles: `
         .page { padding: 1.5rem; }
         .page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-        .page__header h2 { margin: 0; }
-        .page__desc { margin: 0.25rem 0 0; color: #64748b; }
+        .page__header h2 { margin: 0; color: var(--text-primary); }
+        .page__desc { margin: 0.25rem 0 0; color: var(--text-secondary); }
         .page__actions { display: flex; gap: 0.5rem; }
-        .btn { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; }
-        .btn--secondary { background: #e2e8f0; color: #475569; }
-        .btn--danger { background: #ef4444; color: #fff; }
+        .btn {
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
+        }
+        .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
+        .btn--secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
+        .btn--danger:hover { background: var(--accent-red-dim); }
         .detail__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
-        .detail__info dt { font-weight: 600; color: #475569; font-size: 0.85rem; }
-        .detail__info dd { margin: 0; }
+        .detail__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .detail__info dd { margin: 0; color: var(--text-primary); }
         .detail__section { margin-top: 2rem; }
-        .detail__section h3 { margin: 0 0 0.75rem; }
-        .detail__code { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; font-size: 0.8rem; white-space: pre-wrap; overflow-x: auto; }
+        .detail__section h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
+        .detail__code {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 1rem; font-size: 0.8rem; white-space: pre-wrap; overflow-x: auto; color: var(--accent-green);
+        }
     `,
 })
 export class AgentDetailComponent implements OnInit {

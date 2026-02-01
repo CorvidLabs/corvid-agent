@@ -30,22 +30,29 @@ import type { SessionMessage } from '../../core/models/session.model';
             flex: 1;
             overflow-y: auto;
             padding: 1rem;
-            background: #0f172a;
-            color: #e2e8f0;
-            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
             font-size: 0.8rem;
-            line-height: 1.5;
+            line-height: 1.6;
+            background-image: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 229, 255, 0.01) 2px,
+                rgba(0, 229, 255, 0.01) 4px
+            );
         }
-        .output__message { padding: 0.5rem 0; border-bottom: 1px solid #1e293b; }
-        .output__message--user .output__role { color: #60a5fa; }
-        .output__message--assistant .output__role { color: #34d399; }
-        .output__message--system .output__role { color: #fbbf24; }
-        .output__role { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+        .output__message { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+        .output__message--user .output__role { color: var(--accent-cyan); }
+        .output__message--assistant .output__role { color: var(--accent-green); }
+        .output__message--system .output__role { color: var(--accent-amber); }
+        .output__role { font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
         .output__content { margin: 0.25rem 0 0; white-space: pre-wrap; word-break: break-word; }
-        .output__time { font-size: 0.7rem; color: #64748b; }
+        .output__time { font-size: 0.65rem; color: var(--text-tertiary); }
         .output__event { padding: 0.25rem 0; }
-        .output__event-type { color: #94a3b8; font-size: 0.7rem; }
-        .output__event-data { margin: 0; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; }
+        .output__event-type { color: var(--text-secondary); font-size: 0.65rem; letter-spacing: 0.05em; }
+        .output__event-data { margin: 0; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
     `,
 })
 export class SessionOutputComponent implements AfterViewChecked {

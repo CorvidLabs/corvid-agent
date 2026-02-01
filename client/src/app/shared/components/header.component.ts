@@ -24,14 +24,18 @@ import { StatusBadgeComponent } from './status-badge.component';
             justify-content: space-between;
             padding: 0 1.5rem;
             height: 56px;
-            background: #1e293b;
-            color: #f8fafc;
-            border-bottom: 1px solid #334155;
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
         }
         .header__title {
+            font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
             font-size: 1.25rem;
             font-weight: 700;
             margin: 0;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
+            letter-spacing: 0.08em;
         }
         .header__status {
             display: flex;
@@ -39,8 +43,10 @@ import { StatusBadgeComponent } from './status-badge.component';
             gap: 0.5rem;
         }
         .header__label {
-            font-size: 0.8rem;
-            color: #94a3b8;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
     `,
 })

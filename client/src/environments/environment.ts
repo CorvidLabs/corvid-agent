@@ -1,4 +1,8 @@
+const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
+const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+
 export const environment = {
-    apiUrl: 'http://localhost:3000/api',
-    wsUrl: 'ws://localhost:3000/ws',
+    apiUrl: `${protocol}//${host}/api`,
+    wsUrl: `${wsProtocol}//${host}/ws`,
 };

@@ -60,6 +60,8 @@ export class ProcessManager {
         updateSessionPid(this.db, session.id, cp.pid);
         updateSessionStatus(this.db, session.id, 'running');
 
+        console.log(`[ProcessManager] Started process for session ${session.id}, pid=${cp.pid}`);
+
         this.emitEvent(session.id, {
             type: 'session_started',
             session_id: session.id,
@@ -183,6 +185,7 @@ export class ProcessManager {
     }
 
     private handleExit(sessionId: string, code: number | null): void {
+        console.log(`[ProcessManager] Process exited for session ${sessionId}, code=${code}`);
         this.processes.delete(sessionId);
         updateSessionPid(this.db, sessionId, null);
 
