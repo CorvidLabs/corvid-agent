@@ -1,0 +1,23 @@
+{
+  "name": "corvid-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch server/index.ts",
+    "start": "bun server/index.ts",
+    "test": "bun test",
+    "build:client": "cd client && bun run build",
+    "dev:client": "cd client && bun run start"
+  },
+  "optionalDependencies": {
+    "@corvidlabs/ts-algochat": "link:@corvidlabs/ts-algochat"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "algosdk": "^3.5.2"
+  }
+}
