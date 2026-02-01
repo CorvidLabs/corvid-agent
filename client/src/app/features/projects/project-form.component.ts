@@ -2,11 +2,12 @@ import { Component, ChangeDetectionStrategy, inject, signal, input, OnInit } fro
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ProjectService } from '../../core/services/project.service';
+import { DirBrowserComponent } from '../../shared/components/dir-browser.component';
 
 @Component({
     selector: 'app-project-form',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule],
+    imports: [ReactiveFormsModule, DirBrowserComponent],
     template: `
         <div class="page">
             <h2>{{ editId() ? 'Edit Project' : 'New Project' }}</h2>
@@ -19,9 +20,19 @@ import { ProjectService } from '../../core/services/project.service';
 
                 <div class="form__field">
                     <label for="workingDir" class="form__label">Working Directory</label>
-                    <input id="workingDir" formControlName="workingDir" class="form__input"
-                           placeholder="/path/to/project" />
+                    <div class="form__row">
+                        <input id="workingDir" formControlName="workingDir" class="form__input"
+                               placeholder="/path/to/project" />
+                        <button type="button" class="btn btn--secondary" (click)="showBrowser.set(true)">Browse</button>
+                    </div>
                 </div>
+
+                @if (showBrowser()) {
+                    <app-dir-browser
+                        [initialPath]="form.controls.workingDir.value"
+                        (selected)="onDirSelected($event)"
+                        (cancelled)="showBrowser.set(false)" />
+                }
 
                 <div class="form__field">
                     <label for="description" class="form__label">Description</label>
@@ -56,6 +67,8 @@ import { ProjectService } from '../../core/services/project.service';
         }
         .form__input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .form__textarea { resize: vertical; }
+        .form__row { display: flex; gap: 0.5rem; align-items: stretch; }
+        .form__row .form__input { flex: 1; }
         .form__actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
         .btn {
             padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
@@ -76,6 +89,7 @@ export class ProjectFormComponent implements OnInit {
 
     readonly editId = input<string | undefined>(undefined);
     protected readonly saving = signal(false);
+    protected readonly showBrowser = signal(false);
 
     protected readonly form = this.fb.nonNullable.group({
         name: ['', Validators.required],
@@ -115,6 +129,11 @@ export class ProjectFormComponent implements OnInit {
         } finally {
             this.saving.set(false);
         }
+    }
+
+    protected onDirSelected(path: string): void {
+        this.form.controls.workingDir.setValue(path);
+        this.showBrowser.set(false);
     }
 
     onCancel(): void {

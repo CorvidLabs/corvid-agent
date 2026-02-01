@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { handleProjectRoutes } from './projects';
+import { handleProjectRoutes, handleBrowseDirs } from './projects';
 import { handleAgentRoutes } from './agents';
 import { handleSessionRoutes } from './sessions';
 import type { ProcessManager } from '../process/manager';
@@ -27,6 +27,10 @@ export function handleRequest(
             status: 204,
             headers: corsHeaders(),
         });
+    }
+
+    if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
+        return addCorsAsync(handleBrowseDirs(req, url));
     }
 
     const projectResponse = handleProjectRoutes(req, url, db);
