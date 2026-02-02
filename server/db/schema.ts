@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -145,6 +145,28 @@ const MIGRATIONS: Record<number, string[]> = {
     ],
     7: [
         `ALTER TABLE agents ADD COLUMN default_project_id TEXT DEFAULT NULL`,
+    ],
+    8: [
+        `CREATE TABLE IF NOT EXISTS work_tasks (
+            id              TEXT PRIMARY KEY,
+            agent_id        TEXT NOT NULL REFERENCES agents(id),
+            project_id      TEXT NOT NULL REFERENCES projects(id),
+            session_id      TEXT DEFAULT NULL,
+            source          TEXT DEFAULT 'web',
+            source_id       TEXT DEFAULT NULL,
+            requester_info  TEXT DEFAULT '{}',
+            description     TEXT NOT NULL,
+            branch_name     TEXT DEFAULT NULL,
+            status          TEXT DEFAULT 'pending',
+            pr_url          TEXT DEFAULT NULL,
+            summary         TEXT DEFAULT NULL,
+            error           TEXT DEFAULT NULL,
+            created_at      TEXT DEFAULT (datetime('now')),
+            completed_at    TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_agent ON work_tasks(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
     ],
 };
 

@@ -5,9 +5,11 @@ import { FormsModule } from '@angular/forms';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { WorkTaskService } from '../../core/services/work-task.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
+import type { WorkTask } from '../../core/models/work-task.model';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
 
 @Component({
@@ -99,7 +101,7 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
                         </div>
                     }
 
-                    <div class="invoke-form">
+                    <div class="invoke-form" style="margin-bottom: 2rem">
                         <h4>Invoke Another Agent</h4>
                         <select class="invoke-select" [(ngModel)]="invokeTargetId" aria-label="Select target agent">
                             <option value="" disabled>Select target agent...</option>
@@ -120,6 +122,56 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
                             (click)="onInvoke()"
                         >{{ invoking() ? 'Sending...' : 'Send Message' }}</button>
                     </div>
+                </div>
+
+                <div class="detail__section">
+                    <h3>Work Tasks</h3>
+                    <div class="work-form">
+                        <textarea
+                            class="invoke-textarea"
+                            [(ngModel)]="workDescription"
+                            placeholder="Describe the task (e.g. 'Fix the login button alignment')..."
+                            rows="3"
+                            aria-label="Work task description"
+                        ></textarea>
+                        <button
+                            class="btn btn--primary"
+                            [disabled]="!workDescription || creatingWork()"
+                            (click)="onCreateWork()"
+                        >{{ creatingWork() ? 'Starting...' : 'Start Work' }}</button>
+                    </div>
+
+                    @if (workTasks().length === 0) {
+                        <p class="detail__empty">No work tasks yet.</p>
+                    } @else {
+                        <div class="work-tasks-list">
+                            @for (task of workTasks(); track task.id) {
+                                <div class="work-task-row">
+                                    <div class="work-task-row__header">
+                                        <span class="work-task-row__status" [attr.data-status]="task.status">{{ task.status }}</span>
+                                        <span class="work-task-row__source">{{ task.source }}</span>
+                                        <span class="work-task-row__time">{{ task.createdAt | relativeTime }}</span>
+                                    </div>
+                                    <p class="work-task-row__desc">{{ task.description }}</p>
+                                    @if (task.branchName) {
+                                        <p class="work-task-row__branch"><code>{{ task.branchName }}</code></p>
+                                    }
+                                    @if (task.prUrl) {
+                                        <a class="work-task-row__pr" [href]="task.prUrl" target="_blank" rel="noopener">{{ task.prUrl }}</a>
+                                    }
+                                    @if (task.error) {
+                                        <p class="work-task-row__error">{{ task.error }}</p>
+                                    }
+                                    @if (task.sessionId) {
+                                        <a class="work-task-row__session" [routerLink]="['/sessions', task.sessionId]">View Session</a>
+                                    }
+                                    @if (task.status === 'running' || task.status === 'branching') {
+                                        <button class="btn btn--danger btn--sm" (click)="onCancelWork(task.id)">Cancel</button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         } @else {
@@ -187,6 +239,33 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
         }
         .btn--primary:hover:not(:disabled) { background: rgba(0, 229, 255, 0.15); }
         .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn--sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; margin-top: 0.5rem; }
+        .work-form { display: flex; flex-direction: column; gap: 0.5rem; max-width: 500px; margin-bottom: 1rem; }
+        .work-tasks-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .work-task-row {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem; font-size: 0.85rem;
+        }
+        .work-task-row__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+        .work-task-row__status {
+            font-size: 0.7rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            background: var(--bg-raised); color: var(--text-secondary); border: 1px solid var(--border);
+        }
+        .work-task-row__status[data-status="completed"] { color: var(--accent-green); border-color: var(--accent-green); }
+        .work-task-row__status[data-status="running"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .work-task-row__status[data-status="branching"] { color: var(--accent-yellow, #ffc107); border-color: var(--accent-yellow, #ffc107); }
+        .work-task-row__status[data-status="failed"] { color: var(--accent-red); border-color: var(--accent-red); }
+        .work-task-row__source { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .work-task-row__time { font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; }
+        .work-task-row__desc { margin: 0.25rem 0; color: var(--text-primary); }
+        .work-task-row__branch { margin: 0.25rem 0; font-size: 0.75rem; }
+        .work-task-row__branch code { color: var(--accent-cyan); font-size: 0.75rem; }
+        .work-task-row__pr { display: block; font-size: 0.75rem; color: var(--accent-green); text-decoration: none; margin: 0.25rem 0; word-break: break-all; }
+        .work-task-row__pr:hover { text-decoration: underline; }
+        .work-task-row__error { margin: 0.25rem 0; font-size: 0.8rem; color: var(--accent-red); }
+        .work-task-row__session { font-size: 0.75rem; color: var(--accent-cyan); text-decoration: none; }
+        .work-task-row__session:hover { text-decoration: underline; }
     `,
 })
 export class AgentDetailComponent implements OnInit, OnDestroy {
@@ -195,6 +274,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     private readonly agentService = inject(AgentService);
     private readonly projectService = inject(ProjectService);
     private readonly wsService = inject(WebSocketService);
+    private readonly workTaskService = inject(WorkTaskService);
 
     protected readonly agent = signal<Agent | null>(null);
     protected readonly defaultProjectName = signal<string | null>(null);
@@ -202,8 +282,11 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     protected readonly messages = signal<AgentMessage[]>([]);
     protected readonly otherAgents = signal<Agent[]>([]);
     protected readonly invoking = signal(false);
+    protected readonly workTasks = signal<WorkTask[]>([]);
+    protected readonly creatingWork = signal(false);
     protected invokeTargetId = '';
     protected invokeContent = '';
+    protected workDescription = '';
 
     private agentNameCache: Record<string, string> = {};
     private unsubscribeWs: (() => void) | null = null;
@@ -240,10 +323,27 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             this.agentNameCache[a.id] = a.name;
         }
 
-        // Subscribe to live balance and message updates
+        // Load work tasks
+        this.workTaskService.loadTasks(id).then(() => {
+            this.workTasks.set(this.workTaskService.tasks());
+        }).catch(() => {});
+        this.workTaskService.startListening();
+
+        // Subscribe to live balance, message, and work task updates
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
             if (msg.type === 'agent_balance' && msg.agentId === id) {
                 this.walletBalance.set(msg.balance);
+            }
+            if (msg.type === 'work_task_update' && msg.task.agentId === id) {
+                this.workTasks.update((tasks) => {
+                    const idx = tasks.findIndex((t) => t.id === msg.task.id);
+                    if (idx >= 0) {
+                        const copy = [...tasks];
+                        copy[idx] = msg.task;
+                        return copy;
+                    }
+                    return [msg.task, ...tasks];
+                });
             }
             if (msg.type === 'agent_message_update') {
                 const updated = msg.message;
@@ -264,6 +364,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.unsubscribeWs?.();
+        this.workTaskService.stopListening();
     }
 
     async onDelete(): Promise<void> {
@@ -275,6 +376,35 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
 
     protected getAgentName(agentId: string): string {
         return this.agentNameCache[agentId] ?? agentId.slice(0, 8);
+    }
+
+    async onCreateWork(): Promise<void> {
+        const a = this.agent();
+        if (!a || !this.workDescription) return;
+
+        this.creatingWork.set(true);
+        try {
+            const task = await this.workTaskService.createTask({
+                agentId: a.id,
+                description: this.workDescription,
+                projectId: a.defaultProjectId ?? undefined,
+            });
+            this.workTasks.update((tasks) => [task, ...tasks]);
+            this.workDescription = '';
+        } catch {
+            // Error handling via WS
+        } finally {
+            this.creatingWork.set(false);
+        }
+    }
+
+    async onCancelWork(taskId: string): Promise<void> {
+        try {
+            const task = await this.workTaskService.cancelTask(taskId);
+            this.workTasks.update((tasks) => tasks.map((t) => (t.id === taskId ? task : t)));
+        } catch {
+            // Error handling via WS
+        }
     }
 
     async onInvoke(): Promise<void> {

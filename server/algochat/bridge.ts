@@ -18,6 +18,7 @@ import type { AgentWalletService } from './agent-wallet';
 import type { AgentDirectory } from './agent-directory';
 import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
+import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 import { createLogger } from '../lib/logger';
 
@@ -69,6 +70,7 @@ export class AlgoChatBridge {
     private subscriptionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private pskManager: PSKManager | null = null;
     private approvalManager: ApprovalManager | null = null;
+    private workTaskService: WorkTaskService | null = null;
     private fastPollTimer: ReturnType<typeof setInterval> | null = null;
 
     constructor(
@@ -101,6 +103,10 @@ export class AlgoChatBridge {
 
     setApprovalManager(manager: ApprovalManager): void {
         this.approvalManager = manager;
+    }
+
+    setWorkTaskService(service: WorkTaskService): void {
+        this.workTaskService = service;
     }
 
     /**
@@ -282,6 +288,45 @@ export class AlgoChatBridge {
                 } else {
                     this.sendResponse(participant, `Agent "${agentName}" not found`);
                 }
+                return true;
+            }
+
+            case '/work': {
+                const description = parts.slice(1).join(' ');
+                if (!description) {
+                    this.sendResponse(participant, 'Usage: /work <task description>');
+                    return true;
+                }
+
+                if (!this.workTaskService) {
+                    this.sendResponse(participant, 'Work task service not available');
+                    return true;
+                }
+
+                const agentId = this.findAgentForNewConversation();
+                if (!agentId) {
+                    this.sendResponse(participant, 'No agent available for work tasks');
+                    return true;
+                }
+
+                this.workTaskService.create({
+                    agentId,
+                    description,
+                    source: 'algochat',
+                    requesterInfo: { participant },
+                }).then((task) => {
+                    this.sendResponse(participant, `Work task started: ${task.id}\nBranch: ${task.branchName ?? 'creating...'}\nStatus: ${task.status}`);
+
+                    this.workTaskService?.onComplete(task.id, (completed) => {
+                        if (completed.status === 'completed' && completed.prUrl) {
+                            this.sendResponse(participant, `Work task completed!\nPR: ${completed.prUrl}`);
+                        } else {
+                            this.sendResponse(participant, `Work task failed: ${completed.error ?? 'Unknown error'}`);
+                        }
+                    });
+                }).catch((err) => {
+                    this.sendResponse(participant, `Work task error: ${err instanceof Error ? err.message : String(err)}`);
+                });
                 return true;
             }
 

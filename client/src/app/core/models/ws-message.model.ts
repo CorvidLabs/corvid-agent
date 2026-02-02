@@ -5,7 +5,8 @@ export type ClientWsMessage =
     | { type: 'chat_send'; agentId: string; content: string; projectId?: string }
     | { type: 'agent_reward'; agentId: string; microAlgos: number }
     | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
-    | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string };
+    | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
+    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string };
 
 export interface StreamEvent {
     eventType: string;
@@ -26,6 +27,7 @@ export type ServerWsMessage =
     | { type: 'approval_request'; request: ApprovalRequestWire }
     | { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
     | { type: 'council_log'; log: import('./council.model').CouncilLaunchLog }
+    | { type: 'work_task_update'; task: import('./work-task.model').WorkTask }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {

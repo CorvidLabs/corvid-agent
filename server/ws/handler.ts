@@ -4,6 +4,7 @@ import type { ClientMessage, ServerMessage } from '../../shared/ws-protocol';
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { WorkTaskService } from '../work/service';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
@@ -16,6 +17,7 @@ export function createWebSocketHandler(
     processManager: ProcessManager,
     getBridge: () => AlgoChatBridge | null,
     getMessenger?: () => AgentMessenger | null,
+    getWorkTaskService?: () => WorkTaskService | null,
 ) {
     return {
         open(ws: ServerWebSocket<WsData>) {
@@ -42,7 +44,7 @@ export function createWebSocketHandler(
                 return;
             }
 
-            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger);
+            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService);
         },
 
         close(ws: ServerWebSocket<WsData>) {
@@ -63,6 +65,7 @@ function handleClientMessage(
     processManager: ProcessManager,
     getBridge: () => AlgoChatBridge | null,
     getMessenger?: () => AgentMessenger | null,
+    getWorkTaskService?: () => WorkTaskService | null,
 ): void {
     switch (msg.type) {
         case 'subscribe': {
@@ -220,6 +223,32 @@ function handleClientMessage(
                 requestId: msg.requestId,
                 behavior: msg.behavior,
                 message: msg.message,
+            });
+            break;
+        }
+
+        case 'create_work_task': {
+            const workTaskService = getWorkTaskService?.();
+            if (!workTaskService) {
+                sendError(ws, 'Work task service not available');
+                break;
+            }
+
+            workTaskService.create({
+                agentId: msg.agentId,
+                description: msg.description,
+                projectId: msg.projectId,
+            }).then((task) => {
+                const serverMsg: ServerMessage = { type: 'work_task_update', task };
+                ws.send(JSON.stringify(serverMsg));
+
+                // Register for completion update
+                workTaskService.onComplete(task.id, (completedTask) => {
+                    const updateMsg: ServerMessage = { type: 'work_task_update', task: completedTask };
+                    ws.send(JSON.stringify(updateMsg));
+                });
+            }).catch((err) => {
+                sendError(ws, `Work task error: ${err instanceof Error ? err.message : String(err)}`);
             });
             break;
         }

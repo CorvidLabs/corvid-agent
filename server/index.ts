@@ -10,6 +10,7 @@ import { AgentWalletService } from './algochat/agent-wallet';
 import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
+import { WorkTaskService } from './work/service';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
@@ -45,6 +46,7 @@ let algochatBridge: AlgoChatBridge | null = null;
 let agentWalletService: AgentWalletService | null = null;
 let agentMessenger: AgentMessenger | null = null;
 const selfTestService = new SelfTestService(db, processManager);
+const workTaskService = new WorkTaskService(db, processManager);
 
 async function initAlgoChat(): Promise<void> {
     if (!algochatConfig.enabled) {
@@ -65,7 +67,9 @@ async function initAlgoChat(): Promise<void> {
     const agentDirectory = new AgentDirectory(db, agentWalletService);
     algochatBridge.setAgentDirectory(agentDirectory);
     algochatBridge.setApprovalManager(processManager.approvalManager);
+    algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, algochatConfig, service, agentWalletService, agentDirectory, processManager);
+    agentMessenger.setWorkTaskService(workTaskService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -76,7 +80,7 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -116,7 +120,7 @@ const server = Bun.serve<WsData>({
         }
 
         // API routes
-        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, selfTestService);
+        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService);
         if (apiResponse) return apiResponse;
 
         // Serve Angular static files

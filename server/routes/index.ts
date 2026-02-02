@@ -3,10 +3,12 @@ import { handleProjectRoutes, handleBrowseDirs } from './projects';
 import { handleAgentRoutes } from './agents';
 import { handleSessionRoutes } from './sessions';
 import { handleCouncilRoutes } from './councils';
+import { handleWorkTaskRoutes } from './work-tasks';
 import type { ProcessManager } from '../process/manager';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { WorkTaskService } from '../work/service';
 import { listConversations } from '../db/sessions';
 
 function json(data: unknown, status: number = 200): Response {
@@ -23,6 +25,7 @@ export function handleRequest(
     algochatBridge: AlgoChatBridge | null,
     agentWalletService?: AgentWalletService | null,
     agentMessenger?: AgentMessenger | null,
+    workTaskService?: WorkTaskService | null,
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
 ): Response | Promise<Response> | null {
     const url = new URL(req.url);
@@ -50,6 +53,11 @@ export function handleRequest(
 
     const councilResponse = handleCouncilRoutes(req, url, db, processManager);
     if (councilResponse) return addCorsAsync(councilResponse);
+
+    if (workTaskService) {
+        const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService);
+        if (workTaskResponse) return addCorsAsync(workTaskResponse);
+    }
 
     // AlgoChat routes
     if (url.pathname === '/api/algochat/status' && req.method === 'GET') {

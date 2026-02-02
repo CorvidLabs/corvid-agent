@@ -88,6 +88,10 @@ export class WebSocketService {
         this.send({ type: 'approval_response', requestId, behavior, ...(message ? { message } : {}) });
     }
 
+    createWorkTask(agentId: string, description: string, projectId?: string): void {
+        this.send({ type: 'create_work_task', agentId, description, ...(projectId ? { projectId } : {}) });
+    }
+
     onMessage(handler: MessageHandler): () => void {
         this.handlers.add(handler);
         return () => this.handlers.delete(handler);

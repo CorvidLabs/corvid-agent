@@ -14,6 +14,7 @@ import {
     updateAgentMessageStatus,
     getAgentMessage,
 } from '../db/agent-messages';
+import type { WorkTaskService } from '../work/service';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AgentMessenger');
@@ -39,6 +40,7 @@ export class AgentMessenger {
     private agentWalletService: AgentWalletService;
     private agentDirectory: AgentDirectory;
     private processManager: ProcessManager;
+    private workTaskService: WorkTaskService | null = null;
 
     constructor(
         db: Database,
@@ -55,6 +57,10 @@ export class AgentMessenger {
         this.processManager = processManager;
     }
 
+    setWorkTaskService(service: WorkTaskService): void {
+        this.workTaskService = service;
+    }
+
     async invoke(request: AgentInvokeRequest): Promise<AgentInvokeResult> {
         const { fromAgentId, toAgentId, content, projectId } = request;
         const paymentMicro = request.paymentMicro ?? DEFAULT_PAYMENT_MICRO;
@@ -69,6 +75,56 @@ export class AgentMessenger {
 
         const toAgent = getAgent(this.db, toAgentId);
         if (!toAgent) throw new Error(`Target agent ${toAgentId} not found`);
+
+        // Route [WORK] prefix through WorkTaskService
+        if (content.startsWith('[WORK]') && this.workTaskService) {
+            const description = content.slice('[WORK]'.length).trim();
+            if (!description) {
+                throw new Error('[WORK] prefix requires a task description');
+            }
+
+            const agentMessage = createAgentMessage(this.db, {
+                fromAgentId,
+                toAgentId,
+                content,
+                paymentMicro,
+            });
+
+            try {
+                const task = await this.workTaskService.create({
+                    agentId: toAgentId,
+                    description,
+                    projectId,
+                    source: 'agent',
+                    sourceId: agentMessage.id,
+                    requesterInfo: { fromAgentId, fromAgentName: fromAgent.name },
+                });
+
+                updateAgentMessageStatus(this.db, agentMessage.id, 'processing', { sessionId: task.sessionId ?? undefined });
+
+                this.workTaskService.onComplete(task.id, (completed) => {
+                    if (completed.status === 'completed' && completed.prUrl) {
+                        updateAgentMessageStatus(this.db, agentMessage.id, 'completed', {
+                            response: `PR created: ${completed.prUrl}`,
+                        });
+                    } else {
+                        updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
+                            response: completed.error ?? 'Work task failed',
+                        });
+                    }
+                });
+
+                return {
+                    message: getAgentMessage(this.db, agentMessage.id) ?? agentMessage,
+                    sessionId: task.sessionId,
+                };
+            } catch (err) {
+                updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
+                    response: `Work task error: ${err instanceof Error ? err.message : String(err)}`,
+                });
+                throw err;
+            }
+        }
 
         // Create the agent_messages row
         const agentMessage = createAgentMessage(this.db, {

@@ -5,7 +5,8 @@ export type ClientMessage =
     | { type: 'chat_send'; agentId: string; content: string; projectId?: string }
     | { type: 'agent_reward'; agentId: string; microAlgos: number }
     | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
-    | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string };
+    | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
+    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string };
 
 export type ServerMessage =
     | { type: 'session_event'; sessionId: string; event: StreamEvent }
@@ -20,6 +21,7 @@ export type ServerMessage =
     | { type: 'approval_request'; request: { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number } }
     | { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
     | { type: 'council_log'; log: import('./types').CouncilLaunchLog }
+    | { type: 'work_task_update'; task: import('./types').WorkTask }
     | { type: 'error'; message: string };
 
 export interface StreamEvent {
@@ -50,6 +52,9 @@ export function isClientMessage(data: unknown): data is ClientMessage {
         case 'approval_response':
             return typeof msg.requestId === 'string'
                 && (msg.behavior === 'allow' || msg.behavior === 'deny');
+        case 'create_work_task':
+            return typeof msg.agentId === 'string' && typeof msg.description === 'string'
+                && (msg.projectId === undefined || typeof msg.projectId === 'string');
         default:
             return false;
     }
