@@ -93,11 +93,15 @@ install_systemd() {
         sudo useradd --system --no-create-home --shell /usr/sbin/nologin corvid-agent
     fi
 
-    # Create env file directory
+    # Create env file directory with restrictive permissions
     sudo mkdir -p /etc/corvid-agent
+    sudo chmod 700 /etc/corvid-agent
+    sudo chown root:root /etc/corvid-agent
     if [[ ! -f /etc/corvid-agent/env ]]; then
         sudo touch /etc/corvid-agent/env
-        echo "Created /etc/corvid-agent/env — add environment variables there"
+        sudo chmod 600 /etc/corvid-agent/env
+        sudo chown root:root /etc/corvid-agent/env
+        echo "Created /etc/corvid-agent/env (mode 600) — add environment variables there"
     fi
 
     sudo systemctl daemon-reload

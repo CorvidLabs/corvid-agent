@@ -19,9 +19,7 @@ test.describe('Dashboard', () => {
     test('AlgoChat status section renders', async ({ page }) => {
         await page.goto('/dashboard');
 
-        // AlgoChat section should be present (enabled or disabled)
-        const algochatSection = page.locator('.dashboard__algochat');
-        // May or may not exist depending on config — just verify no crash
+        // AlgoChat section may or may not exist depending on config — just verify no crash
         await page.waitForLoadState('networkidle');
     });
 

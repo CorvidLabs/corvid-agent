@@ -193,8 +193,9 @@ function handleClientMessage(
 
                 // Subscribe to status updates for this session
                 if (result.sessionId) {
-                    processManager.subscribe(result.sessionId, (_sessionId, event) => {
+                    const invokeCallback = (_sessionId: string, event: { type: string }) => {
                         if (event.type === 'result' || event.type === 'session_exited') {
+                            processManager.unsubscribe(result.sessionId as string, invokeCallback);
                             // Re-fetch the message to get the final state
                             import('../db/agent-messages').then(({ getAgentMessage }) => {
                                 const updated = getAgentMessage(
@@ -210,7 +211,8 @@ function handleClientMessage(
                                 }
                             });
                         }
-                    });
+                    };
+                    processManager.subscribe(result.sessionId, invokeCallback);
                 }
             }).catch((err) => {
                 sendError(ws, `Invoke error: ${err instanceof Error ? err.message : String(err)}`);

@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 
 test.describe('Sessions', () => {
     test('session list renders', async ({ page, api }) => {
-        const project = await api.seedProject('Session Project');
+        await api.seedProject('Session Project');
 
         await page.goto('/sessions');
         await page.waitForLoadState('networkidle');

@@ -41,7 +41,6 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
 
     const abortController = new AbortController();
     const pseudoPid = nextPseudoPid++;
-    let inputResolve: ((msg: SDKMessage) => void) | null = null;
     let inputDone = false;
 
     const canUseTool: CanUseTool = async (toolName, input, _opts) => {
@@ -192,19 +191,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     function sendMessage(content: string): boolean {
         if (inputDone || abortController.signal.aborted) return false;
 
-        if (inputResolve) {
-            const resolve = inputResolve;
-            inputResolve = null;
-            resolve({
-                type: 'user',
-                message: { role: 'user', content },
-                parent_tool_use_id: null,
-                session_id: session.id,
-            } as SDKMessage);
-            return true;
-        }
-
-        // If no pending read, try streamInput
+        // Stream input to the running query
         q.streamInput((async function* () {
             yield {
                 type: 'user' as const,

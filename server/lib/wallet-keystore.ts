@@ -22,8 +22,6 @@ type KeystoreData = Record<string, KeystoreEntry>;
 
 function readKeystore(): KeystoreData {
     try {
-        const file = Bun.file(KEYSTORE_PATH);
-        // Bun.file doesn't throw on missing file — check size synchronously
         const text = require('node:fs').readFileSync(KEYSTORE_PATH, 'utf-8');
         return JSON.parse(text) as KeystoreData;
     } catch {

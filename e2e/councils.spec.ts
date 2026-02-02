@@ -18,9 +18,9 @@ test.describe('Councils', () => {
     });
 
     test('create council via form and verify it appears in list', async ({ page, api }) => {
-        // Seed agents first
-        const agent1 = await api.seedAgent('Council Agent A');
-        const agent2 = await api.seedAgent('Council Agent B');
+        // Seed agents first (return values unused — seeding is the side-effect)
+        await api.seedAgent('Council Agent A');
+        await api.seedAgent('Council Agent B');
 
         await page.goto('/councils/new');
         await expect(page.locator('h2')).toHaveText('New Council');
@@ -251,7 +251,7 @@ test.describe('Councils', () => {
         const launch = await launchRes.json();
 
         // Trigger review — may succeed (manual) or fail (auto-advance beat us)
-        const reviewRes = await fetch(`http://localhost:3000/api/council-launches/${launch.launchId}/review`, {
+        await fetch(`http://localhost:3000/api/council-launches/${launch.launchId}/review`, {
             method: 'POST',
         });
 

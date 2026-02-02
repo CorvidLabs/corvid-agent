@@ -180,7 +180,7 @@ export class AgentWalletService {
         });
 
         // Sign with master account's secret key
-        const signedTxn = txn.signTxn(this.service.chatAccount.signingKey);
+        const signedTxn = txn.signTxn(this.service.chatAccount.account.sk);
         await this.service.algodClient.sendRawTransaction(signedTxn).do();
     }
 
