@@ -15,6 +15,10 @@ interface AgentRow {
     algochat_enabled: number;
     algochat_auto: number;
     custom_flags: string;
+    default_project_id: string | null;
+    wallet_address: string | null;
+    wallet_mnemonic_encrypted: string | null;
+    wallet_funded_algo: number;
     created_at: string;
     updated_at: string;
 }
@@ -34,6 +38,9 @@ function rowToAgent(row: AgentRow): Agent {
         algochatEnabled: row.algochat_enabled === 1,
         algochatAuto: row.algochat_auto === 1,
         customFlags: JSON.parse(row.custom_flags),
+        defaultProjectId: row.default_project_id ?? null,
+        walletAddress: row.wallet_address ?? null,
+        walletFundedAlgo: row.wallet_funded_algo ?? 0,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -56,8 +63,8 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
     db.query(
         `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
-         algochat_enabled, algochat_auto, custom_flags)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         algochat_enabled, algochat_auto, custom_flags, default_project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -72,6 +79,7 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         input.algochatEnabled ? 1 : 0,
         input.algochatAuto ? 1 : 0,
         customFlags,
+        input.defaultProjectId ?? null,
     );
 
     return getAgent(db, id) as Agent;
@@ -118,6 +126,10 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
         fields.push('custom_flags = ?');
         values.push(JSON.stringify(input.customFlags));
     }
+    if (input.defaultProjectId !== undefined) {
+        fields.push('default_project_id = ?');
+        values.push(input.defaultProjectId);
+    }
 
     if (fields.length === 0) return existing;
 
@@ -131,6 +143,30 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
 export function deleteAgent(db: Database, id: string): boolean {
     const result = db.query('DELETE FROM agents WHERE id = ?').run(id);
     return result.changes > 0;
+}
+
+export function setAgentWallet(
+    db: Database,
+    agentId: string,
+    walletAddress: string,
+    encryptedMnemonic: string,
+): void {
+    db.query(
+        `UPDATE agents SET wallet_address = ?, wallet_mnemonic_encrypted = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(walletAddress, encryptedMnemonic, agentId);
+}
+
+export function getAgentWalletMnemonic(db: Database, agentId: string): string | null {
+    const row = db.query(
+        'SELECT wallet_mnemonic_encrypted FROM agents WHERE id = ?'
+    ).get(agentId) as { wallet_mnemonic_encrypted: string | null } | null;
+    return row?.wallet_mnemonic_encrypted ?? null;
+}
+
+export function addAgentFunding(db: Database, agentId: string, algoAmount: number): void {
+    db.query(
+        `UPDATE agents SET wallet_funded_algo = wallet_funded_algo + ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(algoAmount, agentId);
 }
 
 export function getAlgochatEnabledAgents(db: Database): Agent[] {

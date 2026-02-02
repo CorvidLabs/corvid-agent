@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 8;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -65,6 +65,108 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
         `CREATE INDEX IF NOT EXISTS idx_algochat_participant ON algochat_conversations(participant_addr)`,
+    ],
+    2: [
+        `CREATE TABLE IF NOT EXISTS algochat_psk_state (
+            address           TEXT PRIMARY KEY,
+            initial_psk       BLOB NOT NULL,
+            label             TEXT DEFAULT '',
+            send_counter      INTEGER DEFAULT 0,
+            peer_last_counter INTEGER DEFAULT 0,
+            seen_counters     TEXT DEFAULT '[]',
+            last_round        INTEGER DEFAULT 0,
+            created_at        TEXT DEFAULT (datetime('now')),
+            updated_at        TEXT DEFAULT (datetime('now'))
+        )`,
+    ],
+    3: [
+        `ALTER TABLE agents ADD COLUMN wallet_address TEXT DEFAULT NULL`,
+        `ALTER TABLE agents ADD COLUMN wallet_mnemonic_encrypted TEXT DEFAULT NULL`,
+        `ALTER TABLE agents ADD COLUMN wallet_funded_algo REAL DEFAULT 0`,
+    ],
+    4: [
+        `CREATE TABLE IF NOT EXISTS agent_messages (
+            id              TEXT PRIMARY KEY,
+            from_agent_id   TEXT NOT NULL,
+            to_agent_id     TEXT NOT NULL,
+            content         TEXT NOT NULL,
+            payment_micro   INTEGER DEFAULT 0,
+            txid            TEXT DEFAULT NULL,
+            status          TEXT DEFAULT 'pending',
+            response        TEXT DEFAULT NULL,
+            response_txid   TEXT DEFAULT NULL,
+            session_id      TEXT DEFAULT NULL,
+            created_at      TEXT DEFAULT (datetime('now')),
+            completed_at    TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
+    ],
+    5: [
+        `CREATE TABLE IF NOT EXISTS councils (
+            id                TEXT PRIMARY KEY,
+            name              TEXT NOT NULL,
+            description       TEXT DEFAULT '',
+            chairman_agent_id TEXT DEFAULT NULL REFERENCES agents(id),
+            created_at        TEXT DEFAULT (datetime('now')),
+            updated_at        TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE TABLE IF NOT EXISTS council_members (
+            council_id  TEXT NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
+            agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            sort_order  INTEGER DEFAULT 0,
+            PRIMARY KEY (council_id, agent_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_council_members_council ON council_members(council_id)`,
+        `CREATE TABLE IF NOT EXISTS council_launches (
+            id          TEXT PRIMARY KEY,
+            council_id  TEXT NOT NULL REFERENCES councils(id),
+            project_id  TEXT NOT NULL REFERENCES projects(id),
+            prompt      TEXT NOT NULL,
+            stage       TEXT DEFAULT 'responding',
+            synthesis   TEXT DEFAULT NULL,
+            created_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_council_launches_council ON council_launches(council_id)`,
+        `ALTER TABLE sessions ADD COLUMN council_launch_id TEXT DEFAULT NULL REFERENCES council_launches(id)`,
+        `ALTER TABLE sessions ADD COLUMN council_role TEXT DEFAULT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
+    ],
+    6: [
+        `CREATE TABLE IF NOT EXISTS council_launch_logs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            launch_id   TEXT NOT NULL REFERENCES council_launches(id) ON DELETE CASCADE,
+            level       TEXT DEFAULT 'info',
+            message     TEXT NOT NULL,
+            detail      TEXT DEFAULT NULL,
+            created_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_council_launch_logs_launch ON council_launch_logs(launch_id)`,
+    ],
+    7: [
+        `ALTER TABLE agents ADD COLUMN default_project_id TEXT DEFAULT NULL`,
+    ],
+    8: [
+        `CREATE TABLE IF NOT EXISTS work_tasks (
+            id              TEXT PRIMARY KEY,
+            agent_id        TEXT NOT NULL REFERENCES agents(id),
+            project_id      TEXT NOT NULL REFERENCES projects(id),
+            session_id      TEXT DEFAULT NULL,
+            source          TEXT DEFAULT 'web',
+            source_id       TEXT DEFAULT NULL,
+            requester_info  TEXT DEFAULT '{}',
+            description     TEXT NOT NULL,
+            branch_name     TEXT DEFAULT NULL,
+            status          TEXT DEFAULT 'pending',
+            pr_url          TEXT DEFAULT NULL,
+            summary         TEXT DEFAULT NULL,
+            error           TEXT DEFAULT NULL,
+            created_at      TEXT DEFAULT (datetime('now')),
+            completed_at    TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_agent ON work_tasks(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
     ],
 };
 

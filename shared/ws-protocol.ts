@@ -2,12 +2,26 @@ export type ClientMessage =
     | { type: 'subscribe'; sessionId: string }
     | { type: 'unsubscribe'; sessionId: string }
     | { type: 'send_message'; sessionId: string; content: string }
-    | { type: 'chat_send'; agentId: string; content: string };
+    | { type: 'chat_send'; agentId: string; content: string; projectId?: string }
+    | { type: 'agent_reward'; agentId: string; microAlgos: number }
+    | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
+    | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
+    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string };
 
 export type ServerMessage =
     | { type: 'session_event'; sessionId: string; event: StreamEvent }
     | { type: 'session_status'; sessionId: string; status: string }
     | { type: 'algochat_message'; participant: string; content: string; direction: 'inbound' | 'outbound' }
+    | { type: 'agent_balance'; agentId: string; balance: number; funded: number }
+    | { type: 'chat_stream'; agentId: string; chunk: string; done: boolean }
+    | { type: 'chat_tool_use'; agentId: string; toolName: string; input: string }
+    | { type: 'chat_thinking'; agentId: string; active: boolean }
+    | { type: 'chat_session'; agentId: string; sessionId: string }
+    | { type: 'agent_message_update'; message: import('./types').AgentMessage }
+    | { type: 'approval_request'; request: { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number } }
+    | { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
+    | { type: 'council_log'; log: import('./types').CouncilLaunchLog }
+    | { type: 'work_task_update'; task: import('./types').WorkTask }
     | { type: 'error'; message: string };
 
 export interface StreamEvent {
@@ -28,7 +42,19 @@ export function isClientMessage(data: unknown): data is ClientMessage {
         case 'send_message':
             return typeof msg.sessionId === 'string' && typeof msg.content === 'string';
         case 'chat_send':
-            return typeof msg.agentId === 'string' && typeof msg.content === 'string';
+            return typeof msg.agentId === 'string' && typeof msg.content === 'string'
+                && (msg.projectId === undefined || typeof msg.projectId === 'string');
+        case 'agent_reward':
+            return typeof msg.agentId === 'string' && typeof msg.microAlgos === 'number';
+        case 'agent_invoke':
+            return typeof msg.fromAgentId === 'string' && typeof msg.toAgentId === 'string'
+                && typeof msg.content === 'string';
+        case 'approval_response':
+            return typeof msg.requestId === 'string'
+                && (msg.behavior === 'allow' || msg.behavior === 'deny');
+        case 'create_work_task':
+            return typeof msg.agentId === 'string' && typeof msg.description === 'string'
+                && (msg.projectId === undefined || typeof msg.projectId === 'string');
         default:
             return false;
     }

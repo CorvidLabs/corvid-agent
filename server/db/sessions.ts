@@ -18,6 +18,8 @@ interface SessionRow {
     pid: number | null;
     total_cost_usd: number;
     total_turns: number;
+    council_launch_id: string | null;
+    council_role: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -52,6 +54,8 @@ function rowToSession(row: SessionRow): Session {
         pid: row.pid,
         totalCostUsd: row.total_cost_usd,
         totalTurns: row.total_turns,
+        councilLaunchId: row.council_launch_id ?? null,
+        councilRole: (row.council_role as Session['councilRole']) ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -101,8 +105,8 @@ export function createSession(db: Database, input: CreateSessionInput): Session 
     const id = crypto.randomUUID();
 
     db.query(
-        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, council_launch_id, council_role)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.projectId,
@@ -110,9 +114,18 @@ export function createSession(db: Database, input: CreateSessionInput): Session 
         input.name ?? '',
         input.source ?? 'web',
         input.initialPrompt ?? '',
+        input.councilLaunchId ?? null,
+        input.councilRole ?? null,
     );
 
     return getSession(db, id) as Session;
+}
+
+export function listSessionsByCouncilLaunch(db: Database, launchId: string): Session[] {
+    const rows = db.query(
+        'SELECT * FROM sessions WHERE council_launch_id = ? ORDER BY created_at ASC'
+    ).all(launchId) as SessionRow[];
+    return rows.map(rowToSession);
 }
 
 export function updateSession(db: Database, id: string, input: UpdateSessionInput): Session | null {

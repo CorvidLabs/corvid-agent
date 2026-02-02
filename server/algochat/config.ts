@@ -1,4 +1,13 @@
 import type { AlgoChatNetwork } from '../../shared/types';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('AlgoChatConfig');
+
+export interface PSKContactConfig {
+    address: string;
+    psk: Uint8Array;
+    label?: string;
+}
 
 export interface AlgoChatConfig {
     mnemonic: string | null;
@@ -6,6 +15,7 @@ export interface AlgoChatConfig {
     syncInterval: number;
     defaultAgentId: string | null;
     enabled: boolean;
+    pskContact: PSKContactConfig | null;
 }
 
 export function loadAlgoChatConfig(): AlgoChatConfig {
@@ -18,6 +28,9 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     // When no mnemonic and not explicitly on mainnet, default to localnet
     const network: AlgoChatNetwork = hasMnemonic ? rawNetwork : (rawNetwork === 'mainnet' ? 'mainnet' : 'localnet');
 
+    // Parse PSK exchange URI if provided
+    const pskContact = parsePSKContactFromEnv();
+
     return {
         mnemonic: hasMnemonic ? mnemonic.trim() : null,
         network,
@@ -25,5 +38,38 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
         defaultAgentId: defaultAgentId && defaultAgentId.trim().length > 0 ? defaultAgentId.trim() : null,
         // Enabled if mnemonic is provided, or if we can try localnet
         enabled: hasMnemonic || network === 'localnet',
+        pskContact,
     };
+}
+
+function parsePSKContactFromEnv(): PSKContactConfig | null {
+    const uri = process.env.ALGOCHAT_PSK_URI;
+    if (!uri || uri.trim().length === 0) return null;
+
+    try {
+        // Dynamic import not possible in sync context — parse manually.
+        // URI format: algochat-psk://v1?addr=ADDRESS&psk=BASE64URL_PSK&label=LABEL
+        const url = new URL(uri.trim());
+        const address = url.searchParams.get('addr');
+        const pskBase64 = url.searchParams.get('psk');
+        const label = url.searchParams.get('label') ?? undefined;
+
+        if (!address || !pskBase64) {
+            log.warn('ALGOCHAT_PSK_URI missing addr or psk parameter');
+            return null;
+        }
+
+        // Decode base64url PSK
+        const psk = Uint8Array.from(atob(pskBase64.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+        if (psk.length !== 32) {
+            log.warn(`ALGOCHAT_PSK_URI psk must be 32 bytes, got ${psk.length}`);
+            return null;
+        }
+
+        log.info(`PSK contact configured: ${label ?? address.slice(0, 8)}...`);
+        return { address, psk, label };
+    } catch (err) {
+        log.warn('Failed to parse ALGOCHAT_PSK_URI', { error: err instanceof Error ? err.message : String(err) });
+        return null;
+    }
 }

@@ -2,7 +2,9 @@ import { Component, ChangeDetectionStrategy, inject, signal, input, OnInit } fro
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AgentService } from '../../core/services/agent.service';
+import { ProjectService } from '../../core/services/project.service';
 import type { CreateAgentInput } from '../../core/models/agent.model';
+import type { Project } from '../../core/models/project.model';
 
 @Component({
     selector: 'app-agent-form',
@@ -85,6 +87,16 @@ import type { CreateAgentInput } from '../../core/models/agent.model';
                     </label>
                 </fieldset>
 
+                <div class="form__field">
+                    <label for="defaultProjectId" class="form__label">Default Project</label>
+                    <select id="defaultProjectId" formControlName="defaultProjectId" class="form__input">
+                        <option [ngValue]="null">None (use global default)</option>
+                        @for (project of projects(); track project.id) {
+                            <option [ngValue]="project.id">{{ project.name }}</option>
+                        }
+                    </select>
+                </div>
+
                 <div class="form__actions">
                     <button type="submit" class="btn btn--primary" [disabled]="form.invalid || saving()">
                         {{ saving() ? 'Saving...' : 'Save' }}
@@ -126,10 +138,12 @@ import type { CreateAgentInput } from '../../core/models/agent.model';
 export class AgentFormComponent implements OnInit {
     private readonly fb = inject(FormBuilder);
     private readonly agentService = inject(AgentService);
+    private readonly projectService = inject(ProjectService);
     private readonly router = inject(Router);
 
     readonly editId = input<string | undefined>(undefined);
     protected readonly saving = signal(false);
+    protected readonly projects = signal<Project[]>([]);
 
     protected readonly form = this.fb.nonNullable.group({
         name: ['', Validators.required],
@@ -143,9 +157,13 @@ export class AgentFormComponent implements OnInit {
         maxBudgetUsd: [null as number | null],
         algochatEnabled: [false],
         algochatAuto: [false],
+        defaultProjectId: [null as string | null],
     });
 
     async ngOnInit(): Promise<void> {
+        await this.projectService.loadProjects();
+        this.projects.set(this.projectService.projects());
+
         const id = this.editId();
         if (id) {
             const agent = await this.agentService.getAgent(id);
@@ -161,6 +179,7 @@ export class AgentFormComponent implements OnInit {
                 maxBudgetUsd: agent.maxBudgetUsd,
                 algochatEnabled: agent.algochatEnabled,
                 algochatAuto: agent.algochatAuto,
+                defaultProjectId: agent.defaultProjectId,
             });
         }
     }

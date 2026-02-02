@@ -1,5 +1,8 @@
 import type { Session, Agent, Project } from '../../shared/types';
 import type { ClaudeStreamEvent, ClaudeInputMessage } from './types';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('ClaudeProcess');
 const CLAUDE_BIN = Bun.which('claude') ?? 'claude';
 
 export interface ClaudeProcessOptions {
@@ -15,7 +18,7 @@ export interface ClaudeProcessOptions {
 export interface ClaudeProcess {
     proc: ReturnType<typeof Bun.spawn>;
     pid: number;
-    sendMessage: (content: string) => void;
+    sendMessage: (content: string) => boolean;
     kill: () => void;
 }
 
@@ -23,6 +26,12 @@ export function spawnClaudeProcess(options: ClaudeProcessOptions): ClaudeProcess
     const { session, project, agent, resume, prompt, onEvent, onExit } = options;
 
     const args = buildArgs(session, project, agent, resume, prompt);
+
+    log.debug(`Spawning claude for session ${session.id}`, {
+        cwd: project.workingDir,
+        resume: !!resume,
+        hasPrompt: !!prompt,
+    });
 
     const proc = Bun.spawn([CLAUDE_BIN, ...args], {
         cwd: project.workingDir,
@@ -40,9 +49,12 @@ export function spawnClaudeProcess(options: ClaudeProcessOptions): ClaudeProcess
     // Read stdout line by line for stream-json events
     readStream(proc.stdout, onEvent);
     readStream(proc.stderr, (event) => {
+        const message = typeof event === 'object' && event !== null
+            ? JSON.stringify(event)
+            : String(event);
         onEvent({
             type: 'error',
-            error: { message: String(event), type: 'stderr' },
+            error: { message, type: 'stderr' },
         } as ClaudeStreamEvent);
     });
 
@@ -50,35 +62,42 @@ export function spawnClaudeProcess(options: ClaudeProcessOptions): ClaudeProcess
     const initialPrompt = prompt ?? (!resume ? session.initialPrompt : undefined);
     if (initialPrompt) {
         sendMessage(initialPrompt);
-        // Close stdin so Claude knows input is complete (especially for --print mode)
-        try {
-            (proc.stdin as unknown as { end(): void }).end();
-        } catch {
-            // Fallback: try closing via Bun's FileSink API
-            try {
-                proc.stdin?.flush();
-            } catch { /* already closed */ }
-        }
     }
 
     // Monitor exit
     proc.exited.then((code) => {
         onExit(code);
+    }).catch((err) => {
+        log.error(`Process exited promise rejected for session ${session.id}`, {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        onExit(1);
     });
 
-    function sendMessage(content: string): void {
+    function sendMessage(content: string): boolean {
         const msg: ClaudeInputMessage = {
             type: 'user',
             message: { role: 'user', content },
         };
         const sink = proc.stdin;
-        if (sink) {
-            try {
-                (sink as { write(data: string): void; flush(): void }).write(JSON.stringify(msg) + '\n');
-                (sink as { flush(): void }).flush();
-            } catch {
-                // Process may have exited
-            }
+        if (!sink) {
+            log.warn(`No stdin pipe for pid ${pid}`);
+            return false;
+        }
+
+        try {
+            const payload = JSON.stringify(msg) + '\n';
+            const written = sink.write(payload);
+            sink.flush();
+            log.debug(`Wrote ${written} bytes to stdin for pid ${pid}`, {
+                content: content.slice(0, 80),
+            });
+            return true;
+        } catch (err) {
+            log.warn(`Failed to write to stdin for pid ${pid}`, {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return false;
         }
     }
 
@@ -97,7 +116,6 @@ function buildArgs(
     prompt?: string,
 ): string[] {
     const args: string[] = [
-        '--print',
         '--output-format', 'stream-json',
         '--input-format', 'stream-json',
         '--verbose',
@@ -126,9 +144,7 @@ function buildArgs(
         if (agent.permissionMode && agent.permissionMode !== 'default') {
             args.push('--permission-mode', agent.permissionMode);
         }
-        if (agent.maxBudgetUsd !== null && agent.maxBudgetUsd !== undefined) {
-            args.push('--max-turns-budget', String(agent.maxBudgetUsd));
-        }
+        // --max-budget-usd only works with --print mode, skip for streaming sessions
 
         // Custom flags
         for (const [key, value] of Object.entries(agent.customFlags)) {
@@ -141,7 +157,8 @@ function buildArgs(
     }
 
     if (project.claudeMd) {
-        args.push('--project-context', project.claudeMd);
+        // Append project context to system prompt via --append-system-prompt
+        args.push('--append-system-prompt', project.claudeMd);
     }
 
     // Prompt is sent via stdin in stream-json format (not as positional arg)
