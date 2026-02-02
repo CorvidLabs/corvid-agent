@@ -62,7 +62,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             class="btn btn--secondary btn--sm"
                             [disabled]="!allMembersDone() || triggeringReview()"
                             (click)="onStartReview()"
-                        >{{ triggeringReview() ? 'Starting...' : 'Start Review Now' }}</button>
+                        >{{ triggeringReview() ? 'Starting...' : 'Skip Discussion & Start Review' }}</button>
                     }
                     @if (l.stage === 'discussing') {
                         <span class="auto-label">
