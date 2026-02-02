@@ -146,7 +146,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                     <span class="discussion-msg__time">{{ msg.createdAt | date:'HH:mm:ss' }}</span>
                                     @if (msg.txid) {
                                         <a class="discussion-msg__tx"
-                                           href="https://lora.algokit.io/testnet/transaction/{{ msg.txid }}"
+                                           href="https://lora.algokit.io/{{ explorerNetwork() }}/transaction/{{ msg.txid }}"
                                            target="_blank"
                                            rel="noopener noreferrer"
                                            aria-label="View transaction on chain"
@@ -422,6 +422,11 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         return reviews.length > 0 && reviews.every((s) => s.status !== 'running');
     });
 
+    protected readonly explorerNetwork = computed(() => {
+        const status = this.sessionService.algochatStatus();
+        return status?.network ?? 'testnet';
+    });
+
     async ngOnInit(): Promise<void> {
         const id = this.route.snapshot.paramMap.get('id');
         if (!id) return;
@@ -430,6 +435,9 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         for (const a of this.agentService.agents()) {
             this.agentNameMap[a.id] = a.name;
         }
+
+        // Load AlgoChat status for explorer network URL
+        this.sessionService.loadAlgoChatStatus().catch(() => { /* ignore */ });
 
         await this.loadLaunchData(id);
 

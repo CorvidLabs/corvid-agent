@@ -124,7 +124,7 @@ export class CouncilFormComponent implements OnInit {
     protected readonly form = this.fb.nonNullable.group({
         name: ['', Validators.required],
         description: [''],
-        discussionRounds: [2],
+        discussionRounds: [2, [Validators.min(0), Validators.max(10)]],
     });
 
     protected get selectedAgentsList(): () => Agent[] {
