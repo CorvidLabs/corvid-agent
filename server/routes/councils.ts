@@ -504,6 +504,10 @@ function triggerDiscussion(
 ): void {
     const launch = getCouncilLaunch(db, launchId);
     if (!launch) return;
+    if (launch.stage === 'discussing') {
+        emitLog(db, launchId, 'info', 'Discussion already in progress, skipping');
+        return;
+    }
     if (launch.stage !== 'responding') return;
 
     const council = getCouncil(db, launch.councilId);
@@ -697,19 +701,36 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
     return parts.join('\n\n---\n\n');
 }
 
+const DISCUSSION_SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per round
+
 function waitForSessions(processManager: ProcessManager, sessionIds: string[]): Promise<void> {
     return new Promise<void>((resolve) => {
+        let settled = false;
         const pending = new Set(sessionIds);
         const callbacks = new Map<string, EventCallback>();
 
-        const checkDone = (): void => {
-            if (pending.size > 0) return;
+        const finish = (): void => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
             for (const [sid, cb] of callbacks) {
                 processManager.unsubscribe(sid, cb);
             }
             callbacks.clear();
             resolve();
         };
+
+        const checkDone = (): void => {
+            if (pending.size === 0) finish();
+        };
+
+        // Timeout: resolve even if some sessions are stuck
+        const timer = setTimeout(() => {
+            if (!settled) {
+                log.warn(`waitForSessions timed out with ${pending.size} sessions still pending`);
+                finish();
+            }
+        }, DISCUSSION_SESSION_TIMEOUT_MS);
 
         for (const sessionId of sessionIds) {
             if (!processManager.isRunning(sessionId)) {
@@ -740,13 +761,15 @@ async function sendDiscussionOnChain(
     messageId: number,
     db: Database,
 ): Promise<void> {
-    // Send to all other council members (best-effort)
+    // Send to all other council members (best-effort), store the first successful txid
+    let stored = false;
     for (const toAgentId of allAgentIds) {
         if (toAgentId === fromAgentId) continue;
         try {
             const txid = await agentMessenger.sendOnChainBestEffort(fromAgentId, toAgentId, content);
-            if (txid) {
+            if (txid && !stored) {
                 updateDiscussionMessageTxid(db, messageId, txid);
+                stored = true;
             }
         } catch {
             // Ignore on-chain failures — discussion continues regardless
@@ -761,7 +784,7 @@ function watchSessionsForAutoAdvance(
     processManager: ProcessManager,
     launchId: string,
     sessionIds: string[],
-    role: 'member' | 'reviewer' | 'discusser',
+    role: 'member' | 'reviewer',
     agentMessenger?: AgentMessenger | null,
 ): void {
     const pending = new Set(sessionIds);
