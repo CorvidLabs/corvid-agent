@@ -175,7 +175,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE TABLE IF NOT EXISTS council_discussion_messages (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             launch_id   TEXT NOT NULL REFERENCES council_launches(id) ON DELETE CASCADE,
-            agent_id    TEXT NOT NULL REFERENCES agents(id),
+            agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
             agent_name  TEXT NOT NULL,
             round       INTEGER NOT NULL,
             content     TEXT NOT NULL,

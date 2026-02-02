@@ -405,6 +405,10 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         this.allSessions().filter((s) => s.councilRole === 'reviewer')
     );
 
+    // Note: Discusser sessions (councilRole === 'discusser') are intentionally not displayed
+    // as separate session cards. Their output is captured as CouncilDiscussionMessages and
+    // shown in the discussion timeline instead.
+
     protected readonly stageIndex = computed(() => {
         const l = this.launch();
         if (!l) return 0;

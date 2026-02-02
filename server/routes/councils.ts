@@ -574,7 +574,14 @@ async function runDiscussionRounds(
     totalRounds: number,
     council: import('../../shared/types').Council,
 ): Promise<void> {
+    const discussionStartTime = Date.now();
+
     for (let round = 1; round <= totalRounds; round++) {
+        // Check overall discussion timeout
+        if (Date.now() - discussionStartTime > DISCUSSION_TOTAL_TIMEOUT_MS) {
+            emitLog(db, launchId, 'warn', `Discussion timed out after ${Math.round((Date.now() - discussionStartTime) / 60000)} minutes, skipping remaining rounds`);
+            break;
+        }
         updateCouncilLaunchDiscussionRound(db, launchId, round);
         broadcastStageChange(launchId, 'discussing');
         emitLog(db, launchId, 'info', `Discussion round ${round}/${totalRounds}`);
@@ -615,7 +622,11 @@ async function runDiscussionRounds(
         }
 
         // Wait for all successfully started discusser sessions to finish
-        await waitForSessions(processManager, discusserSessionIds);
+        if (discusserSessionIds.length === 0) {
+            emitLog(db, launchId, 'warn', `No discusser sessions started for round ${round}/${totalRounds}`);
+        } else {
+            await waitForSessions(processManager, discusserSessionIds);
+        }
 
         // Extract responses and store as discussion messages
         for (const agentId of council.agentIds) {
@@ -681,7 +692,7 @@ function buildDiscussionPrompt(
 
     let priorText = '';
     if (priorDiscussion.length > 0) {
-        priorText = `\n\n## Prior Discussion\n\n${formatDiscussionMessages(priorDiscussion)}`;
+        priorText = `\n\n## Prior Discussion (includes all participants, including your own previous messages)\n\n${formatDiscussionMessages(priorDiscussion)}`;
     }
 
     return `You are participating in a council discussion (Round ${round}).
@@ -718,6 +729,7 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
 }
 
 const DISCUSSION_SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per round
+const DISCUSSION_TOTAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max for all rounds combined
 
 function waitForSessions(processManager: ProcessManager, sessionIds: string[]): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -778,26 +790,24 @@ async function sendDiscussionOnChain(
     messageId: number,
     db: Database,
 ): Promise<void> {
-    // Send to all other council members in parallel (best-effort), store the first successful txid
-    let stored = false;
+    // Send to all other council members in parallel (best-effort)
     const sends = allAgentIds
         .filter((id) => id !== fromAgentId)
         .map((toAgentId) =>
             agentMessenger.sendOnChainBestEffort(fromAgentId, toAgentId, content)
-                .then((txid) => {
-                    if (txid && !stored) {
-                        updateDiscussionMessageTxid(db, messageId, txid);
-                        stored = true;
-                    }
-                })
-                .catch(() => {
-                    // Ignore on-chain failures — discussion continues regardless
-                })
+                .catch(() => null as string | null)
         );
 
-    if (sends.length > 0) {
-        await Promise.allSettled(sends);
+    if (sends.length === 0) return;
+
+    // Store the first successful txid using Promise.race to avoid race conditions
+    const firstTxid = await Promise.race(sends);
+    if (firstTxid) {
+        updateDiscussionMessageTxid(db, messageId, firstTxid);
     }
+
+    // Wait for remaining sends to settle; ignore outcomes
+    await Promise.allSettled(sends);
 }
 
 // ─── Auto-advance watcher ─────────────────────────────────────────────────────
