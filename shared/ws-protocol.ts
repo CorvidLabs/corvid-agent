@@ -21,6 +21,7 @@ export type ServerMessage =
     | { type: 'approval_request'; request: { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number } }
     | { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
     | { type: 'council_log'; log: import('./types').CouncilLaunchLog }
+    | { type: 'council_discussion_message'; message: import('./types').CouncilDiscussionMessage }
     | { type: 'work_task_update'; task: import('./types').WorkTask }
     | { type: 'error'; message: string };
 

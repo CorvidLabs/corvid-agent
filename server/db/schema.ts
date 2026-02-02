@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -167,6 +167,23 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_agent ON work_tasks(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
+    ],
+    9: [
+        `ALTER TABLE councils ADD COLUMN discussion_rounds INTEGER DEFAULT 2`,
+        `ALTER TABLE council_launches ADD COLUMN current_discussion_round INTEGER DEFAULT 0`,
+        `ALTER TABLE council_launches ADD COLUMN total_discussion_rounds INTEGER DEFAULT 0`,
+        `CREATE TABLE IF NOT EXISTS council_discussion_messages (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            launch_id   TEXT NOT NULL REFERENCES council_launches(id),
+            agent_id    TEXT NOT NULL REFERENCES agents(id),
+            agent_name  TEXT NOT NULL,
+            round       INTEGER NOT NULL,
+            content     TEXT NOT NULL,
+            txid        TEXT DEFAULT NULL,
+            session_id  TEXT DEFAULT NULL,
+            created_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
     ],
 };
 

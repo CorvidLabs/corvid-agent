@@ -45,7 +45,7 @@ export interface Session {
     totalCostUsd: number;
     totalTurns: number;
     councilLaunchId: string | null;
-    councilRole: 'member' | 'reviewer' | 'chairman' | null;
+    councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -119,7 +119,7 @@ export interface CreateSessionInput {
     initialPrompt?: string;
     source?: SessionSource;
     councilLaunchId?: string;
-    councilRole?: 'member' | 'reviewer' | 'chairman';
+    councilRole?: 'member' | 'reviewer' | 'chairman' | 'discusser';
 }
 
 export interface UpdateSessionInput {
@@ -152,6 +152,7 @@ export interface Council {
     description: string;
     chairmanAgentId: string | null;
     agentIds: string[];
+    discussionRounds: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -161,6 +162,7 @@ export interface CreateCouncilInput {
     description?: string;
     agentIds: string[];
     chairmanAgentId?: string;
+    discussionRounds?: number;
 }
 
 export interface UpdateCouncilInput {
@@ -168,9 +170,10 @@ export interface UpdateCouncilInput {
     description?: string;
     agentIds?: string[];
     chairmanAgentId?: string | null;
+    discussionRounds?: number;
 }
 
-export type CouncilStage = 'responding' | 'reviewing' | 'synthesizing' | 'complete';
+export type CouncilStage = 'responding' | 'discussing' | 'reviewing' | 'synthesizing' | 'complete';
 
 export interface CouncilLaunch {
     id: string;
@@ -180,6 +183,8 @@ export interface CouncilLaunch {
     stage: CouncilStage;
     synthesis: string | null;
     sessionIds: string[];
+    currentDiscussionRound: number;
+    totalDiscussionRounds: number;
     createdAt: string;
 }
 
@@ -196,6 +201,18 @@ export interface CouncilLaunchLog {
     level: CouncilLogLevel;
     message: string;
     detail: string | null;
+    createdAt: string;
+}
+
+export interface CouncilDiscussionMessage {
+    id: number;
+    launchId: string;
+    agentId: string;
+    agentName: string;
+    round: number;
+    content: string;
+    txid: string | null;
+    sessionId: string | null;
     createdAt: string;
 }
 

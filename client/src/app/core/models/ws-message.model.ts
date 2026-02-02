@@ -27,6 +27,7 @@ export type ServerWsMessage =
     | { type: 'approval_request'; request: ApprovalRequestWire }
     | { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
     | { type: 'council_log'; log: import('./council.model').CouncilLaunchLog }
+    | { type: 'council_discussion_message'; message: import('./council.model').CouncilDiscussionMessage }
     | { type: 'work_task_update'; task: import('./work-task.model').WorkTask }
     | { type: 'error'; message: string };
 
