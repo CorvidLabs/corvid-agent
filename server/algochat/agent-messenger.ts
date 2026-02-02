@@ -35,6 +35,7 @@ export interface AgentInvokeResult {
 }
 
 type MessageUpdateCallback = (message: AgentMessage) => void;
+type OnChainSendCallback = (fromAddress: string, toAddress: string, content: string, direction: 'outbound') => void;
 
 export class AgentMessenger {
     private db: Database;
@@ -44,6 +45,7 @@ export class AgentMessenger {
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null = null;
     private messageUpdateListeners = new Set<MessageUpdateCallback>();
+    private onChainSendListeners = new Set<OnChainSendCallback>();
 
     constructor(
         db: Database,
@@ -68,6 +70,18 @@ export class AgentMessenger {
     onMessageUpdate(cb: MessageUpdateCallback): () => void {
         this.messageUpdateListeners.add(cb);
         return () => { this.messageUpdateListeners.delete(cb); };
+    }
+
+    /** Register a callback for on-chain message sends (for Live Feed broadcast). */
+    onChainSend(cb: OnChainSendCallback): () => void {
+        this.onChainSendListeners.add(cb);
+        return () => { this.onChainSendListeners.delete(cb); };
+    }
+
+    private emitOnChainSend(fromAddress: string, toAddress: string, content: string): void {
+        for (const cb of this.onChainSendListeners) {
+            try { cb(fromAddress, toAddress, content, 'outbound'); } catch { /* ignore */ }
+        }
     }
 
     private emitMessageUpdate(messageId: string): void {
@@ -295,6 +309,8 @@ export class AgentMessenger {
             txid: result.txid,
             paymentMicro,
         });
+
+        this.emitOnChainSend(fromAccount.address, toEntry.walletAddress, content);
 
         return result.txid;
     }
