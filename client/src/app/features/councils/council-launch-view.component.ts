@@ -153,7 +153,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                         >tx</a>
                                     }
                                 </div>
-                                <pre class="discussion-msg__content">{{ msg.content }}</pre>
+                                <pre class="discussion-msg__content" tabindex="0">{{ msg.content }}</pre>
                             </div>
                         } @empty {
                             @if (l.stage !== 'discussing') {
@@ -339,7 +339,10 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .discussion-msg__content {
             padding: 0.75rem; font-size: 0.8rem; margin: 0;
             white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
-            line-height: 1.5; max-height: 200px; overflow-y: auto;
+            line-height: 1.5; max-height: 200px; overflow-y: auto; outline: none;
+        }
+        .discussion-msg__content:focus-visible {
+            outline: 2px solid var(--accent-cyan, #22d3ee); outline-offset: -2px;
         }
         .discussion-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: 0.5rem; }
 

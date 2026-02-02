@@ -797,19 +797,19 @@ async function sendDiscussionOnChain(
         .filter((id) => id !== fromAgentId)
         .map((toAgentId) =>
             agentMessenger.sendOnChainBestEffort(fromAgentId, toAgentId, content)
-                .catch(() => null as string | null)
         );
 
     if (sends.length === 0) return;
 
-    // Store the first successful txid using Promise.race to avoid race conditions
-    const firstTxid = await Promise.race(sends);
+    const results = await Promise.allSettled(sends);
+    const firstTxid = results
+        .filter((r): r is PromiseFulfilledResult<string | null> => r.status === 'fulfilled')
+        .map((r) => r.value)
+        .find((v) => v != null);
+
     if (firstTxid) {
         updateDiscussionMessageTxid(db, messageId, firstTxid);
     }
-
-    // Wait for remaining sends to settle; ignore outcomes
-    await Promise.allSettled(sends);
 }
 
 // ─── Auto-advance watcher ─────────────────────────────────────────────────────
