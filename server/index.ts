@@ -76,6 +76,9 @@ async function initAlgoChat(): Promise<void> {
         broadcastAlgoChatMessage(server, participant, content, direction);
     });
 
+    // Publish encryption keys for all existing agent wallets on localnet
+    await agentWalletService.publishAllKeys();
+
     algochatBridge.start();
 }
 
@@ -164,7 +167,15 @@ onCouncilDiscussionMessage((message) => {
 });
 
 // Initialize AlgoChat after server starts
-initAlgoChat().catch((err) => {
+initAlgoChat().then(() => {
+    // Wire agent message broadcasts once messenger is available
+    if (agentMessenger) {
+        agentMessenger.onMessageUpdate((message) => {
+            const msg = JSON.stringify({ type: 'agent_message_update', message });
+            server.publish('algochat', msg);
+        });
+    }
+}).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
 });
 

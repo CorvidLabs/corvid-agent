@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
-import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding } from '../db/agents';
+import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, listAgents } from '../db/agents';
 import { encryptMnemonic, decryptMnemonic } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
 import { createLogger } from '../lib/logger';
@@ -60,6 +60,11 @@ export class AgentWalletService {
                     addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
                     log.info(`Re-funded agent ${agent.name} with ${DEFAULT_FUND_ALGO} ALGO`);
                 }
+                // Ensure key is published on-chain (may already exist)
+                const chatAccount = await this.getAgentChatAccount(agentId);
+                if (chatAccount) {
+                    await this.publishKeyForAccount(chatAccount.account, agent.name);
+                }
             } catch (err) {
                 log.warn('Could not check/refill restored wallet balance', {
                     agentId,
@@ -82,6 +87,9 @@ export class AgentWalletService {
             await this.fundFromDispenser(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
             addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
             log.info(`Funded agent ${agent.name} with ${DEFAULT_FUND_ALGO} ALGO`);
+
+            // Publish encryption key on-chain so other agents can discover us
+            await this.publishKeyForAccount(generated.account, agent.name);
         } catch (err) {
             log.error('Failed to create agent wallet', {
                 agentId,
@@ -163,6 +171,38 @@ export class AgentWalletService {
         if (balance < REFILL_THRESHOLD_MICRO) {
             log.info(`Auto-refilling agent ${agent.name}`, { balance, threshold: REFILL_THRESHOLD_MICRO });
             await this.fundAgent(agentId, REFILL_AMOUNT_MICRO);
+        }
+    }
+
+    /**
+     * Publish encryption keys for all existing agents that have wallets.
+     * Called at startup to ensure keys are discoverable on localnet.
+     */
+    async publishAllKeys(): Promise<void> {
+        if (this.config.network !== 'localnet') return;
+
+        const agents = listAgents(this.db);
+        for (const agent of agents) {
+            if (!agent.walletAddress) continue;
+            const chatAccount = await this.getAgentChatAccount(agent.id);
+            if (chatAccount) {
+                await this.publishKeyForAccount(chatAccount.account, agent.name);
+            }
+        }
+    }
+
+    /** Publish an agent's encryption key on-chain so other agents can discover it. */
+    private async publishKeyForAccount(
+        chatAccount: import('@corvidlabs/ts-algochat').ChatAccount,
+        agentName: string,
+    ): Promise<void> {
+        try {
+            const txid = await this.service.algorandService.publishKey(chatAccount);
+            log.info(`Published encryption key for ${agentName}`, { txid, address: chatAccount.address });
+        } catch (err) {
+            log.warn(`Failed to publish key for ${agentName} (may already exist)`, {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 

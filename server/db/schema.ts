@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 11;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -185,7 +185,13 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
     ],
+    // Migrations 10-11 were fixups for council_launches columns (applied manually on existing DBs)
 };
+
+function hasColumn(db: Database, table: string, column: string): boolean {
+    const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    return cols.some((c) => c.name === column);
+}
 
 export function runMigrations(db: Database): void {
     db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)`);
@@ -202,6 +208,11 @@ export function runMigrations(db: Database): void {
             const statements = MIGRATIONS[v];
             if (!statements) continue;
             for (const sql of statements) {
+                // Skip ALTER TABLE ADD COLUMN if the column already exists
+                const alterMatch = sql.match(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
+                if (alterMatch && hasColumn(db, alterMatch[1], alterMatch[2])) {
+                    continue;
+                }
                 db.exec(sql);
             }
         }
