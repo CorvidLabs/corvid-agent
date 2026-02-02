@@ -174,6 +174,10 @@ initAlgoChat().then(() => {
             const msg = JSON.stringify({ type: 'agent_message_update', message });
             server.publish('algochat', msg);
         });
+        agentMessenger.onChainSend((fromAddress, toAddress, content, direction) => {
+            broadcastAlgoChatMessage(server, fromAddress, content, direction);
+            broadcastAlgoChatMessage(server, toAddress, content, 'inbound');
+        });
     }
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
