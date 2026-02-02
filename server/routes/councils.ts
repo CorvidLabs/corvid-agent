@@ -586,6 +586,9 @@ async function runDiscussionRounds(
         const currentLaunch = getCouncilLaunch(db, launchId);
         const projectId = currentLaunch?.projectId ?? '';
 
+        // Map agentId → sessionId for agents that successfully started
+        const agentSessionMap = new Map<string, string>();
+
         for (const agentId of council.agentIds) {
             const agent = getAgent(db, agentId);
             const agentName = agent?.name ?? agentId.slice(0, 8);
@@ -599,10 +602,11 @@ async function runDiscussionRounds(
                 councilLaunchId: launchId,
                 councilRole: 'discusser' as const,
             });
-            discusserSessionIds.push(session.id);
 
             try {
                 processManager.startProcess(session);
+                discusserSessionIds.push(session.id);
+                agentSessionMap.set(agentId, session.id);
                 emitLog(db, launchId, 'info', `Started discusser session for ${agentName} (R${round})`, session.id);
             } catch (err) {
                 const errMsg = err instanceof Error ? err.message : String(err);
@@ -610,15 +614,27 @@ async function runDiscussionRounds(
             }
         }
 
-        // Wait for all discusser sessions in this round to finish
+        // Wait for all successfully started discusser sessions to finish
         await waitForSessions(processManager, discusserSessionIds);
 
         // Extract responses and store as discussion messages
-        for (let i = 0; i < council.agentIds.length; i++) {
-            const agentId = council.agentIds[i];
-            const sessionId = discusserSessionIds[i];
+        for (const agentId of council.agentIds) {
+            const sessionId = agentSessionMap.get(agentId);
             const agent = getAgent(db, agentId);
             const agentName = agent?.name ?? agentId.slice(0, 8);
+
+            if (!sessionId) {
+                // Session failed to start — insert a placeholder message
+                const discMsg = insertDiscussionMessage(db, {
+                    launchId,
+                    agentId,
+                    agentName,
+                    round,
+                    content: '(agent session failed to start)',
+                });
+                broadcastDiscussionMessage(discMsg);
+                continue;
+            }
 
             const messages = getSessionMessages(db, sessionId);
             const assistantMsgs = messages.filter((m) => m.role === 'assistant');
@@ -727,7 +743,8 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[]): 
         // Timeout: resolve even if some sessions are stuck
         const timer = setTimeout(() => {
             if (!settled) {
-                log.warn(`waitForSessions timed out with ${pending.size} sessions still pending`);
+                const timedOut = Array.from(pending);
+                log.warn(`waitForSessions timed out with ${timedOut.length} sessions still pending: ${timedOut.join(', ')}`);
                 finish();
             }
         }, DISCUSSION_SESSION_TIMEOUT_MS);
@@ -761,19 +778,25 @@ async function sendDiscussionOnChain(
     messageId: number,
     db: Database,
 ): Promise<void> {
-    // Send to all other council members (best-effort), store the first successful txid
+    // Send to all other council members in parallel (best-effort), store the first successful txid
     let stored = false;
-    for (const toAgentId of allAgentIds) {
-        if (toAgentId === fromAgentId) continue;
-        try {
-            const txid = await agentMessenger.sendOnChainBestEffort(fromAgentId, toAgentId, content);
-            if (txid && !stored) {
-                updateDiscussionMessageTxid(db, messageId, txid);
-                stored = true;
-            }
-        } catch {
-            // Ignore on-chain failures — discussion continues regardless
-        }
+    const sends = allAgentIds
+        .filter((id) => id !== fromAgentId)
+        .map((toAgentId) =>
+            agentMessenger.sendOnChainBestEffort(fromAgentId, toAgentId, content)
+                .then((txid) => {
+                    if (txid && !stored) {
+                        updateDiscussionMessageTxid(db, messageId, txid);
+                        stored = true;
+                    }
+                })
+                .catch(() => {
+                    // Ignore on-chain failures — discussion continues regardless
+                })
+        );
+
+    if (sends.length > 0) {
+        await Promise.allSettled(sends);
     }
 }
 
