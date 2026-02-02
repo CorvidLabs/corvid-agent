@@ -48,6 +48,36 @@ export const routes: Routes = [
             import('./features/agents/agent-form.component').then((m) => m.AgentFormComponent),
     },
     {
+        path: 'councils',
+        loadComponent: () =>
+            import('./features/councils/council-list.component').then((m) => m.CouncilListComponent),
+    },
+    {
+        path: 'councils/new',
+        loadComponent: () =>
+            import('./features/councils/council-form.component').then((m) => m.CouncilFormComponent),
+    },
+    {
+        path: 'councils/:id',
+        loadComponent: () =>
+            import('./features/councils/council-detail.component').then((m) => m.CouncilDetailComponent),
+    },
+    {
+        path: 'councils/:id/edit',
+        loadComponent: () =>
+            import('./features/councils/council-form.component').then((m) => m.CouncilFormComponent),
+    },
+    {
+        path: 'council-launches/:id',
+        loadComponent: () =>
+            import('./features/councils/council-launch-view.component').then((m) => m.CouncilLaunchViewComponent),
+    },
+    {
+        path: 'feed',
+        loadComponent: () =>
+            import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
+    },
+    {
         path: 'sessions',
         loadComponent: () =>
             import('./features/sessions/session-list.component').then((m) => m.SessionListComponent),

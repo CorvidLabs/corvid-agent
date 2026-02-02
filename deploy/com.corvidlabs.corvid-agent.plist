@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.corvidlabs.corvid-agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__BUN_PATH__</string>
+        <string>server/index.ts</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WORKING_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PORT</key>
+        <string>3000</string>
+        <key>LOG_LEVEL</key>
+        <string>info</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/corvid-agent.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/corvid-agent.stderr.log</string>
+
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>4096</integer>
+    </dict>
+</dict>
+</plist>

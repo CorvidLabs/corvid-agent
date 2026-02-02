@@ -1,0 +1,37 @@
+[Unit]
+Description=Corvid Agent - AI Agent Management Server
+After=network.target
+
+[Service]
+Type=simple
+User=corvid-agent
+Group=corvid-agent
+WorkingDirectory=__WORKING_DIR__
+ExecStart=__BUN_PATH__ server/index.ts
+Restart=always
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Environment
+Environment=PORT=3000
+Environment=LOG_LEVEL=info
+Environment=NODE_ENV=production
+EnvironmentFile=-/etc/corvid-agent/env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=__WORKING_DIR__
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=corvid-agent
+
+# Resource limits
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

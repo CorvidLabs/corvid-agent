@@ -72,8 +72,24 @@ export class WebSocketService {
         this.send({ type: 'send_message', sessionId, content });
     }
 
-    sendChatMessage(agentId: string, content: string): void {
-        this.send({ type: 'chat_send', agentId, content });
+    sendChatMessage(agentId: string, content: string, projectId?: string): void {
+        this.send({ type: 'chat_send', agentId, content, ...(projectId ? { projectId } : {}) });
+    }
+
+    sendReward(agentId: string, microAlgos: number): void {
+        this.send({ type: 'agent_reward', agentId, microAlgos });
+    }
+
+    sendAgentInvoke(fromAgentId: string, toAgentId: string, content: string, paymentMicro?: number, projectId?: string): void {
+        this.send({ type: 'agent_invoke', fromAgentId, toAgentId, content, ...(paymentMicro ? { paymentMicro } : {}), ...(projectId ? { projectId } : {}) });
+    }
+
+    sendApprovalResponse(requestId: string, behavior: 'allow' | 'deny', message?: string): void {
+        this.send({ type: 'approval_response', requestId, behavior, ...(message ? { message } : {}) });
+    }
+
+    createWorkTask(agentId: string, description: string, projectId?: string): void {
+        this.send({ type: 'create_work_task', agentId, description, ...(projectId ? { projectId } : {}) });
     }
 
     onMessage(handler: MessageHandler): () => void {

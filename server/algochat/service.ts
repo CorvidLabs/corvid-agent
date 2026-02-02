@@ -1,10 +1,17 @@
 import type { AlgoChatConfig } from './config';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('AlgoChat');
 
 // Re-export types used by other modules
 export interface AlgoChatService {
     algorandService: import('@corvidlabs/ts-algochat').AlgorandService;
     chatAccount: import('@corvidlabs/ts-algochat').ChatAccount;
     syncManager: import('@corvidlabs/ts-algochat').SyncManager;
+    /** Raw algod client for submitting transactions */
+    algodClient: import('algosdk').default.Algodv2;
+    /** Raw indexer client for querying transactions (null if no indexer configured) */
+    indexerClient: import('algosdk').default.Indexer | null;
 }
 
 /**
@@ -82,7 +89,7 @@ async function fundFromLocalNetDispenser(
         const signedTxn = txn.signTxn(dispenserAccount.sk);
         await (algodClient as InstanceType<typeof algosdk.Algodv2>).sendRawTransaction(signedTxn).do();
 
-        console.log(`[AlgoChat] Funded ${address} with 100 ALGO from LocalNet dispenser`);
+        log.info(`Funded ${address} with 100 ALGO from LocalNet dispenser`);
     } finally {
         await kmd.releaseWalletHandle(walletHandle);
     }
@@ -103,7 +110,7 @@ async function isLocalNetAvailable(): Promise<boolean> {
 
 export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoChatService | null> {
     if (!config.enabled) {
-        console.log('[AlgoChat] Disabled');
+        log.info('Disabled');
         return null;
     }
 
@@ -129,7 +136,7 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
         if (config.network === 'localnet') {
             const available = await isLocalNetAvailable();
             if (!available) {
-                console.log('[AlgoChat] LocalNet not available — run `algokit localnet start`');
+                log.info('LocalNet not available — run `algokit localnet start`');
                 return null;
             }
         }
@@ -137,38 +144,46 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
         const serviceConfig = parseNetworkPreset(networkPreset);
         const algorandService = new algochat.AlgorandService(serviceConfig);
 
+        // Create raw SDK clients for PSK manager direct access
+        const algosdk = (await import('algosdk')).default;
+        const algodClient = new algosdk.Algodv2(
+            serviceConfig.algodToken,
+            serviceConfig.algodServer,
+            serviceConfig.algodPort ?? '',
+        );
+        const indexerClient = serviceConfig.indexerServer
+            ? new algosdk.Indexer(
+                  serviceConfig.indexerToken,
+                  serviceConfig.indexerServer,
+                  serviceConfig.indexerPort ?? '',
+              )
+            : null;
+
         // Create or restore chat account
         let chatAccount: import('@corvidlabs/ts-algochat').ChatAccount;
 
         if (config.mnemonic) {
             chatAccount = algochat.createChatAccountFromMnemonic(config.mnemonic);
-            console.log(`[AlgoChat] Restored account from mnemonic: ${chatAccount.address}`);
+            log.info(`Restored account from mnemonic`, { address: chatAccount.address });
         } else if (config.network === 'localnet') {
             const generated = algochat.createRandomChatAccount();
             chatAccount = generated.account;
-            console.log(`[AlgoChat] Generated new account: ${chatAccount.address}`);
-            console.log(`[AlgoChat] Mnemonic (save to persist): ${generated.mnemonic}`);
+            log.info(`Generated new account`, { address: chatAccount.address });
+            log.info(`Mnemonic (save to persist): ${generated.mnemonic}`);
 
             // Fund from LocalNet dispenser
-            const algosdk = (await import('algosdk')).default;
-            const algodClient = new algosdk.Algodv2(
-                serviceConfig.algodToken,
-                serviceConfig.algodServer,
-                serviceConfig.algodPort ?? '',
-            );
-
             await fundFromLocalNetDispenser(algodClient, chatAccount.address);
         } else {
-            console.log('[AlgoChat] No mnemonic and not on localnet — cannot initialize');
+            log.info('No mnemonic and not on localnet — cannot initialize');
             return null;
         }
 
         // Publish encryption key so other accounts can discover us
         try {
             const txid = await algorandService.publishKey(chatAccount);
-            console.log(`[AlgoChat] Published encryption key, txid: ${txid}`);
+            log.info(`Published encryption key`, { txid });
         } catch (err) {
-            console.warn('[AlgoChat] Failed to publish key (may already exist):', err);
+            log.warn('Failed to publish key (may already exist)', { error: err instanceof Error ? err.message : String(err) });
         }
 
         // Create SyncManager
@@ -178,11 +193,11 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
             processQueue: true,
         });
 
-        console.log(`[AlgoChat] Initialized on ${config.network} — address: ${chatAccount.address}`);
+        log.info(`Initialized on ${config.network}`, { address: chatAccount.address });
 
-        return { algorandService, chatAccount, syncManager };
+        return { algorandService, chatAccount, syncManager, algodClient, indexerClient };
     } catch (err) {
-        console.error('[AlgoChat] Failed to initialize:', err);
+        log.error('Failed to initialize', { error: err instanceof Error ? err.message : String(err) });
         return null;
     }
 }

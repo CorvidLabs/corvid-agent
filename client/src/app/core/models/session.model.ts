@@ -12,6 +12,8 @@ export interface Session {
     pid: number | null;
     totalCostUsd: number;
     totalTurns: number;
+    councilLaunchId: string | null;
+    councilRole: 'member' | 'reviewer' | 'chairman' | null;
     createdAt: string;
     updatedAt: string;
 }

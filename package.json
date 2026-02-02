@@ -7,6 +7,8 @@
     "dev": "bun --watch server/index.ts",
     "start": "bun server/index.ts",
     "test": "bun test",
+    "test:e2e": "npx playwright test --config=playwright.config.js",
+    "test:e2e:ui": "npx playwright test --config=playwright.config.js --ui",
     "build:client": "cd client && bun run build",
     "dev:client": "cd client && bun run start"
   },
@@ -14,10 +16,13 @@
     "@corvidlabs/ts-algochat": "link:@corvidlabs/ts-algochat"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@types/bun": "latest",
     "typescript": "^5.7.0"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.29",
+    "@anthropic-ai/sdk": "^0.39.0",
     "algosdk": "^3.5.2"
   }
 }
