@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 9;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -185,7 +185,6 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
     ],
-    // Migrations 10-11 were fixups for council_launches columns (applied manually on existing DBs)
 };
 
 function hasColumn(db: Database, table: string, column: string): boolean {
