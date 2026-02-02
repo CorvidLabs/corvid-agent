@@ -334,7 +334,7 @@ export class PSKManager {
         const c = this.contact;
         const seenCountersJson = JSON.stringify([...c.state.seenCounters]);
 
-        this.db.run(
+        this.db.query(
             `INSERT INTO algochat_psk_state (address, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))
              ON CONFLICT(address) DO UPDATE SET
@@ -343,15 +343,14 @@ export class PSKManager {
                 seen_counters = ?6,
                 last_round = ?7,
                 updated_at = datetime('now')`,
-            [
-                c.address,
-                c.initialPSK,
-                c.label,
-                c.state.sendCounter,
-                c.state.peerLastCounter,
-                seenCountersJson,
-                c.lastRound,
-            ],
+        ).run(
+            c.address,
+            c.initialPSK,
+            c.label,
+            c.state.sendCounter,
+            c.state.peerLastCounter,
+            seenCountersJson,
+            c.lastRound,
         );
     }
 }
