@@ -223,6 +223,8 @@ async function handleLaunch(
 
     const launchId = crypto.randomUUID();
     createCouncilLaunch(db, { id: launchId, councilId, projectId, prompt });
+    // Set total discussion rounds upfront so the UI knows from the start
+    updateCouncilLaunchDiscussionRound(db, launchId, 0, council.discussionRounds ?? 2);
 
     emitLog(db, launchId, 'stage', `Council "${council.name}" launched`, `${council.agentIds.length} agents, prompt: "${prompt.slice(0, 100)}"`);
 
@@ -546,8 +548,8 @@ function triggerDiscussion(
         });
     }
 
+    updateCouncilLaunchDiscussionRound(db, launchId, 1, discussionRounds);
     updateCouncilLaunchStage(db, launchId, 'discussing');
-    updateCouncilLaunchDiscussionRound(db, launchId, 0, discussionRounds);
     broadcastStageChange(launchId, 'discussing');
     emitLog(db, launchId, 'stage', `Starting discussion stage`, `${discussionRounds} rounds, ${council.agentIds.length} agents`);
 

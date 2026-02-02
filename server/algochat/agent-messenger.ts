@@ -34,6 +34,8 @@ export interface AgentInvokeResult {
     sessionId: string | null;
 }
 
+type MessageUpdateCallback = (message: AgentMessage) => void;
+
 export class AgentMessenger {
     private db: Database;
     private service: AlgoChatService | null;
@@ -41,6 +43,7 @@ export class AgentMessenger {
     private agentDirectory: AgentDirectory;
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null = null;
+    private messageUpdateListeners = new Set<MessageUpdateCallback>();
 
     constructor(
         db: Database,
@@ -59,6 +62,20 @@ export class AgentMessenger {
 
     setWorkTaskService(service: WorkTaskService): void {
         this.workTaskService = service;
+    }
+
+    /** Register a callback for agent message status changes (for WS broadcast). */
+    onMessageUpdate(cb: MessageUpdateCallback): () => void {
+        this.messageUpdateListeners.add(cb);
+        return () => { this.messageUpdateListeners.delete(cb); };
+    }
+
+    private emitMessageUpdate(messageId: string): void {
+        const updated = getAgentMessage(this.db, messageId);
+        if (!updated) return;
+        for (const cb of this.messageUpdateListeners) {
+            try { cb(updated); } catch { /* ignore */ }
+        }
     }
 
     async invoke(request: AgentInvokeRequest): Promise<AgentInvokeResult> {
@@ -101,6 +118,7 @@ export class AgentMessenger {
                 });
 
                 updateAgentMessageStatus(this.db, agentMessage.id, 'processing', { sessionId: task.sessionId ?? undefined });
+                this.emitMessageUpdate(agentMessage.id);
 
                 this.workTaskService.onComplete(task.id, (completed) => {
                     if (completed.status === 'completed' && completed.prUrl) {
@@ -112,6 +130,7 @@ export class AgentMessenger {
                             response: completed.error ?? 'Work task failed',
                         });
                     }
+                    this.emitMessageUpdate(agentMessage.id);
                 });
 
                 return {
@@ -122,6 +141,7 @@ export class AgentMessenger {
                 updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
                     response: `Work task error: ${err instanceof Error ? err.message : String(err)}`,
                 });
+                this.emitMessageUpdate(agentMessage.id);
                 throw err;
             }
         }
@@ -150,6 +170,7 @@ export class AgentMessenger {
         }
 
         updateAgentMessageStatus(this.db, agentMessage.id, 'sent', { txid: txid ?? undefined });
+        this.emitMessageUpdate(agentMessage.id);
 
         // Create a session for Agent B to process the message
         const resolvedProjectId = projectId ?? toAgent.defaultProjectId ?? this.getDefaultProjectId();
@@ -164,6 +185,7 @@ export class AgentMessenger {
         });
 
         updateAgentMessageStatus(this.db, agentMessage.id, 'processing', { sessionId: session.id });
+        this.emitMessageUpdate(agentMessage.id);
 
         // Subscribe to session events and buffer the response
         this.subscribeForAgentResponse(agentMessage.id, session.id, fromAgentId, toAgentId);
@@ -199,6 +221,7 @@ export class AgentMessenger {
                 const response = responseBuffer.trim();
                 if (!response) {
                     updateAgentMessageStatus(this.db, messageId, 'failed');
+                    this.emitMessageUpdate(messageId);
                     return;
                 }
 
@@ -209,11 +232,13 @@ export class AgentMessenger {
                             response,
                             responseTxid: responseTxid ?? undefined,
                         });
+                        this.emitMessageUpdate(messageId);
                         log.info(`Agent message completed`, { messageId, responseTxid });
                     })
                     .catch((err) => {
                         // Still mark completed even if on-chain response fails
                         updateAgentMessageStatus(this.db, messageId, 'completed', { response });
+                        this.emitMessageUpdate(messageId);
                         log.warn('On-chain response send failed', {
                             messageId,
                             error: err instanceof Error ? err.message : String(err),
