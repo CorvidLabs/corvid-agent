@@ -23,12 +23,15 @@ export interface Agent {
     algochatEnabled: boolean;
     algochatAuto: boolean;
     customFlags: Record<string, string>;
+    defaultProjectId: string | null;
+    walletAddress: string | null;
+    walletFundedAlgo: number;
     createdAt: string;
     updatedAt: string;
 }
 
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'stopped' | 'error';
-export type SessionSource = 'web' | 'algochat';
+export type SessionSource = 'web' | 'algochat' | 'agent';
 
 export interface Session {
     id: string;
@@ -41,6 +44,8 @@ export interface Session {
     pid: number | null;
     totalCostUsd: number;
     totalTurns: number;
+    councilLaunchId: string | null;
+    councilRole: 'member' | 'reviewer' | 'chairman' | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -102,6 +107,7 @@ export interface CreateAgentInput {
     algochatEnabled?: boolean;
     algochatAuto?: boolean;
     customFlags?: Record<string, string>;
+    defaultProjectId?: string | null;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
@@ -112,9 +118,83 @@ export interface CreateSessionInput {
     name?: string;
     initialPrompt?: string;
     source?: SessionSource;
+    councilLaunchId?: string;
+    councilRole?: 'member' | 'reviewer' | 'chairman';
 }
 
 export interface UpdateSessionInput {
     name?: string;
     status?: SessionStatus;
+}
+
+export type AgentMessageStatus = 'pending' | 'sent' | 'processing' | 'completed' | 'failed';
+
+export interface AgentMessage {
+    id: string;
+    fromAgentId: string;
+    toAgentId: string;
+    content: string;
+    paymentMicro: number;
+    txid: string | null;
+    status: AgentMessageStatus;
+    response: string | null;
+    responseTxid: string | null;
+    sessionId: string | null;
+    createdAt: string;
+    completedAt: string | null;
+}
+
+// MARK: - Councils
+
+export interface Council {
+    id: string;
+    name: string;
+    description: string;
+    chairmanAgentId: string | null;
+    agentIds: string[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateCouncilInput {
+    name: string;
+    description?: string;
+    agentIds: string[];
+    chairmanAgentId?: string;
+}
+
+export interface UpdateCouncilInput {
+    name?: string;
+    description?: string;
+    agentIds?: string[];
+    chairmanAgentId?: string | null;
+}
+
+export type CouncilStage = 'responding' | 'reviewing' | 'synthesizing' | 'complete';
+
+export interface CouncilLaunch {
+    id: string;
+    councilId: string;
+    projectId: string;
+    prompt: string;
+    stage: CouncilStage;
+    synthesis: string | null;
+    sessionIds: string[];
+    createdAt: string;
+}
+
+export interface LaunchCouncilInput {
+    projectId: string;
+    prompt: string;
+}
+
+export type CouncilLogLevel = 'info' | 'warn' | 'error' | 'stage';
+
+export interface CouncilLaunchLog {
+    id: number;
+    launchId: string;
+    level: CouncilLogLevel;
+    message: string;
+    detail: string | null;
+    createdAt: string;
 }

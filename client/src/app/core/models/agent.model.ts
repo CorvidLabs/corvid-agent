@@ -14,6 +14,9 @@ export interface Agent {
     algochatEnabled: boolean;
     algochatAuto: boolean;
     customFlags: Record<string, string>;
+    defaultProjectId: string | null;
+    walletAddress: string | null;
+    walletFundedAlgo: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -31,6 +34,7 @@ export interface CreateAgentInput {
     algochatEnabled?: boolean;
     algochatAuto?: boolean;
     customFlags?: Record<string, string>;
+    defaultProjectId?: string | null;
 }
 
 export type UpdateAgentInput = Partial<CreateAgentInput>;

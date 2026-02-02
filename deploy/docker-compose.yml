@@ -1,0 +1,28 @@
+services:
+  corvid-agent:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - db-data:/app/data
+    environment:
+      - PORT=3000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ALGOCHAT_MNEMONIC=${ALGOCHAT_MNEMONIC:-}
+      - ALGORAND_NETWORK=${ALGORAND_NETWORK:-testnet}
+      - ALGOCHAT_SYNC_INTERVAL=${ALGOCHAT_SYNC_INTERVAL:-30000}
+      - ALGOCHAT_DEFAULT_AGENT_ID=${ALGOCHAT_DEFAULT_AGENT_ID:-}
+      - ALGOCHAT_PSK_URI=${ALGOCHAT_PSK_URI:-}
+      - AGENT_TIMEOUT_MS=${AGENT_TIMEOUT_MS:-1800000}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  db-data:

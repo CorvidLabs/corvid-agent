@@ -2,17 +2,39 @@ import { getDb, closeDb } from './db/connection';
 import { handleRequest } from './routes/index';
 import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
+import { onCouncilStageChange, onCouncilLog } from './routes/councils';
 import { loadAlgoChatConfig } from './algochat/config';
 import { initAlgoChatService } from './algochat/service';
 import { AlgoChatBridge } from './algochat/bridge';
+import { AgentWalletService } from './algochat/agent-wallet';
+import { AgentDirectory } from './algochat/agent-directory';
+import { AgentMessenger } from './algochat/agent-messenger';
+import { SelfTestService } from './selftest/service';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { createLogger } from './lib/logger';
+
+const log = createLogger('Server');
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const CLIENT_DIST = join(import.meta.dir, '..', 'client', 'dist', 'client', 'browser');
+const startTime = Date.now();
 
 // Initialize database
 const db = getDb();
+
+// Ensure a project exists for the server's own codebase
+{
+    const { listProjects, createProject } = require('./db/projects');
+    const projects = listProjects(db);
+    const selfProject = projects.find((p: { workingDir: string }) => p.workingDir === process.cwd());
+    if (!selfProject) {
+        createProject(db, {
+            name: 'corvid-agent',
+            workingDir: process.cwd(),
+        });
+    }
+}
 
 // Initialize process manager
 const processManager = new ProcessManager(db);
@@ -20,10 +42,13 @@ const processManager = new ProcessManager(db);
 // Initialize AlgoChat
 const algochatConfig = loadAlgoChatConfig();
 let algochatBridge: AlgoChatBridge | null = null;
+let agentWalletService: AgentWalletService | null = null;
+let agentMessenger: AgentMessenger | null = null;
+const selfTestService = new SelfTestService(db, processManager);
 
 async function initAlgoChat(): Promise<void> {
     if (!algochatConfig.enabled) {
-        console.log('[CorvidAgent] AlgoChat disabled');
+        log.info('AlgoChat disabled');
         return;
     }
 
@@ -31,6 +56,16 @@ async function initAlgoChat(): Promise<void> {
     if (!service) return;
 
     algochatBridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
+
+    // Initialize agent wallet service
+    agentWalletService = new AgentWalletService(db, algochatConfig, service);
+    algochatBridge.setAgentWalletService(agentWalletService);
+
+    // Initialize agent directory and messenger
+    const agentDirectory = new AgentDirectory(db, agentWalletService);
+    algochatBridge.setAgentDirectory(agentDirectory);
+    algochatBridge.setApprovalManager(processManager.approvalManager);
+    agentMessenger = new AgentMessenger(db, algochatConfig, service, agentWalletService, agentDirectory, processManager);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -41,7 +76,7 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -63,8 +98,25 @@ const server = Bun.serve<WsData>({
             return new Response('WebSocket upgrade failed', { status: 400 });
         }
 
+        // Health check endpoint
+        if (url.pathname === '/api/health' && req.method === 'GET') {
+            const health = {
+                status: 'ok',
+                uptime: (Date.now() - startTime) / 1000,
+                activeSessions: processManager.getActiveSessionIds().length,
+                algochat: algochatBridge !== null,
+                timestamp: new Date().toISOString(),
+            };
+            return new Response(JSON.stringify(health), {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
         // API routes
-        const apiResponse = handleRequest(req, db, processManager, algochatBridge);
+        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, selfTestService);
         if (apiResponse) return apiResponse;
 
         // Serve Angular static files
@@ -91,16 +143,40 @@ const server = Bun.serve<WsData>({
     websocket: wsHandler,
 });
 
-// Initialize AlgoChat after server starts
-initAlgoChat().catch((err) => {
-    console.error('Failed to initialize AlgoChat:', err);
+// Broadcast council events to all WebSocket clients
+onCouncilStageChange((launchId, stage, sessionIds) => {
+    const msg = JSON.stringify({ type: 'council_stage_change', launchId, stage, sessionIds });
+    server.publish('council', msg);
 });
 
-console.log(`[CorvidAgent] Server running at http://localhost:${PORT}`);
+onCouncilLog((logEntry) => {
+    const msg = JSON.stringify({ type: 'council_log', log: logEntry });
+    server.publish('council', msg);
+});
+
+// Initialize AlgoChat after server starts
+initAlgoChat().catch((err) => {
+    log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
+});
+
+log.info(`Server running at http://localhost:${PORT}`);
+
+// Global error handlers for 24/7 operation
+process.on('unhandledRejection', (reason) => {
+    log.error('Unhandled rejection', { reason: reason instanceof Error ? reason.message : String(reason) });
+});
+
+process.on('uncaughtException', (err) => {
+    log.error('Uncaught exception, shutting down', { error: err.message, stack: err.stack });
+    processManager.shutdown();
+    algochatBridge?.stop();
+    closeDb();
+    process.exit(1);
+});
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-    console.log('\n[CorvidAgent] Shutting down...');
+    log.info('Shutting down (SIGINT)');
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();
@@ -108,6 +184,7 @@ process.on('SIGINT', () => {
 });
 
 process.on('SIGTERM', () => {
+    log.info('Shutting down (SIGTERM)');
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();

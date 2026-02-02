@@ -8,6 +8,9 @@ import {
     getSessionMessages,
 } from '../db/sessions';
 import type { ProcessManager } from '../process/manager';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('SessionRoutes');
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -85,7 +88,7 @@ async function handleCreate(
         try {
             processManager.startProcess(session);
         } catch (err) {
-            console.error('[Session] Failed to start process:', err);
+            log.error('Failed to start process', { sessionId: session.id, error: err instanceof Error ? err.message : String(err) });
             // Session is still created, just not started
         }
     }

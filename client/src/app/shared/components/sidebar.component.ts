@@ -36,6 +36,22 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/councils"
+                        routerLinkActive="sidebar__link--active">
+                        Councils
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/feed"
+                        routerLinkActive="sidebar__link--active">
+                        Live Feed
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/sessions"
                         routerLinkActive="sidebar__link--active">
                         Sessions

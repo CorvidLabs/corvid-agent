@@ -2,8 +2,11 @@ import type { Database } from 'bun:sqlite';
 import { handleProjectRoutes, handleBrowseDirs } from './projects';
 import { handleAgentRoutes } from './agents';
 import { handleSessionRoutes } from './sessions';
+import { handleCouncilRoutes } from './councils';
 import type { ProcessManager } from '../process/manager';
 import type { AlgoChatBridge } from '../algochat/bridge';
+import type { AgentWalletService } from '../algochat/agent-wallet';
+import type { AgentMessenger } from '../algochat/agent-messenger';
 import { listConversations } from '../db/sessions';
 
 function json(data: unknown, status: number = 200): Response {
@@ -18,6 +21,9 @@ export function handleRequest(
     db: Database,
     processManager: ProcessManager,
     algochatBridge: AlgoChatBridge | null,
+    agentWalletService?: AgentWalletService | null,
+    agentMessenger?: AgentMessenger | null,
+    selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
 ): Response | Promise<Response> | null {
     const url = new URL(req.url);
 
@@ -36,11 +42,14 @@ export function handleRequest(
     const projectResponse = handleProjectRoutes(req, url, db);
     if (projectResponse) return addCorsAsync(projectResponse);
 
-    const agentResponse = handleAgentRoutes(req, url, db);
+    const agentResponse = handleAgentRoutes(req, url, db, agentWalletService, agentMessenger);
     if (agentResponse) return addCorsAsync(agentResponse);
 
     const sessionResponse = handleSessionRoutes(req, url, db, processManager);
     if (sessionResponse) return addCorsAsync(sessionResponse);
+
+    const councilResponse = handleCouncilRoutes(req, url, db, processManager);
+    if (councilResponse) return addCorsAsync(councilResponse);
 
     // AlgoChat routes
     if (url.pathname === '/api/algochat/status' && req.method === 'GET') {
@@ -59,7 +68,38 @@ export function handleRequest(
         return addCors(json(listConversations(db)));
     }
 
+    // Self-test route
+    if (url.pathname === '/api/selftest/run' && req.method === 'POST') {
+        if (!selfTestService) {
+            return addCors(json({ error: 'Self-test service not available' }, 503));
+        }
+        return addCorsAsync(handleSelfTestRun(req, selfTestService));
+    }
+
     return null;
+}
+
+async function handleSelfTestRun(
+    req: Request,
+    selfTestService: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } },
+): Promise<Response> {
+    let testType: 'unit' | 'e2e' | 'all' = 'all';
+    try {
+        const body = await req.json();
+        if (body.testType && ['unit', 'e2e', 'all'].includes(body.testType)) {
+            testType = body.testType;
+        }
+    } catch {
+        // Default to 'all' if no body
+    }
+
+    try {
+        const result = selfTestService.run(testType);
+        return json({ sessionId: result.sessionId });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return json({ error: message }, 500);
+    }
 }
 
 function corsHeaders(): Record<string, string> {
