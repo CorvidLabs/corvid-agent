@@ -2,7 +2,7 @@ import { getDb, closeDb } from './db/connection';
 import { handleRequest } from './routes/index';
 import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
-import { onCouncilStageChange, onCouncilLog } from './routes/councils';
+import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from './routes/councils';
 import { loadAlgoChatConfig } from './algochat/config';
 import { initAlgoChatService } from './algochat/service';
 import { AlgoChatBridge } from './algochat/bridge';
@@ -155,6 +155,11 @@ onCouncilStageChange((launchId, stage, sessionIds) => {
 
 onCouncilLog((logEntry) => {
     const msg = JSON.stringify({ type: 'council_log', log: logEntry });
+    server.publish('council', msg);
+});
+
+onCouncilDiscussionMessage((message) => {
+    const msg = JSON.stringify({ type: 'council_discussion_message', message });
     server.publish('council', msg);
 });
 

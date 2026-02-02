@@ -274,6 +274,19 @@ export class AgentMessenger {
         return result.txid;
     }
 
+    /** Best-effort on-chain message send. Returns txid or null. Never throws. */
+    async sendOnChainBestEffort(
+        fromAgentId: string,
+        toAgentId: string,
+        content: string,
+    ): Promise<string | null> {
+        try {
+            return await this.sendOnChainMessage(fromAgentId, toAgentId, content, 0);
+        } catch {
+            return null;
+        }
+    }
+
     private getDefaultProjectId(): string {
         const { listProjects, createProject } = require('../db/projects');
         const projects = listProjects(this.db);

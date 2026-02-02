@@ -6,6 +6,7 @@ import type {
     UpdateCouncilInput,
     CouncilLaunch,
     CouncilLaunchLog,
+    CouncilDiscussionMessage,
 } from '../models/council.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -90,5 +91,9 @@ export class CouncilService {
 
     async getLaunchLogs(launchId: string): Promise<CouncilLaunchLog[]> {
         return firstValueFrom(this.api.get<CouncilLaunchLog[]>(`/council-launches/${launchId}/logs`));
+    }
+
+    async getDiscussionMessages(launchId: string): Promise<CouncilDiscussionMessage[]> {
+        return firstValueFrom(this.api.get<CouncilDiscussionMessage[]>(`/council-launches/${launchId}/discussion-messages`));
     }
 }

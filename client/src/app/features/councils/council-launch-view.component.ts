@@ -7,7 +7,7 @@ import { SessionService } from '../../core/services/session.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { SessionOutputComponent } from '../sessions/session-output.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
-import type { CouncilLaunch, CouncilLaunchLog } from '../../core/models/council.model';
+import type { CouncilLaunch, CouncilLaunchLog, CouncilDiscussionMessage } from '../../core/models/council.model';
 import type { Session } from '../../core/models/session.model';
 import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.model';
 
@@ -32,16 +32,21 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                         <span class="stage-label">Responding</span>
                     </div>
                     <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 0"></div>
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'reviewing'" [class.stage-step--done]="stageIndex() > 1">
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'discussing'" [class.stage-step--done]="stageIndex() > 1">
+                        <span class="stage-dot"></span>
+                        <span class="stage-label">Discussing</span>
+                    </div>
+                    <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 1"></div>
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'reviewing'" [class.stage-step--done]="stageIndex() > 2">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Reviewing</span>
                     </div>
-                    <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 1"></div>
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'synthesizing'" [class.stage-step--done]="stageIndex() > 2">
+                    <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 2"></div>
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'synthesizing'" [class.stage-step--done]="stageIndex() > 3">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Synthesizing</span>
                     </div>
-                    <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 2"></div>
+                    <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 3"></div>
                     <div class="stage-step" [class.stage-step--active]="l.stage === 'complete'" [class.stage-step--done]="l.stage === 'complete'">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Complete</span>
@@ -51,13 +56,18 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                 <div class="actions">
                     @if (l.stage === 'responding') {
                         @if (allMembersDone()) {
-                            <span class="auto-label">Auto-advancing to review...</span>
+                            <span class="auto-label">Auto-advancing to discussion...</span>
                         }
                         <button
                             class="btn btn--secondary btn--sm"
                             [disabled]="!allMembersDone() || triggeringReview()"
                             (click)="onStartReview()"
                         >{{ triggeringReview() ? 'Starting...' : 'Start Review Now' }}</button>
+                    }
+                    @if (l.stage === 'discussing') {
+                        <span class="auto-label">
+                            Agents are discussing... (Round {{ l.currentDiscussionRound }}/{{ l.totalDiscussionRounds }})
+                        </span>
                     }
                     @if (l.stage === 'reviewing' && hasChairman()) {
                         @if (allReviewsDone()) {
@@ -118,6 +128,40 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                         </div>
                     }
                 </div>
+
+                @if (discussionMessages().length > 0 || l.stage === 'discussing') {
+                    <h3 class="section-title">Discussion</h3>
+                    @if (l.stage === 'discussing') {
+                        <div class="discussion-loading">
+                            <span class="spinner"></span>
+                            <span>Agents are discussing... (Round {{ l.currentDiscussionRound }}/{{ l.totalDiscussionRounds }})</span>
+                        </div>
+                    }
+                    <div class="discussion-timeline" role="log" aria-label="Council discussion">
+                        @for (msg of discussionMessages(); track msg.id) {
+                            <div class="discussion-msg">
+                                <div class="discussion-msg__header">
+                                    <span class="discussion-msg__name">{{ msg.agentName }}</span>
+                                    <span class="discussion-msg__round">R{{ msg.round }}</span>
+                                    <span class="discussion-msg__time">{{ msg.createdAt | date:'HH:mm:ss' }}</span>
+                                    @if (msg.txid) {
+                                        <a class="discussion-msg__tx"
+                                           href="https://lora.algokit.io/testnet/transaction/{{ msg.txid }}"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           aria-label="View transaction on chain"
+                                        >tx</a>
+                                    }
+                                </div>
+                                <pre class="discussion-msg__content">{{ msg.content }}</pre>
+                            </div>
+                        } @empty {
+                            @if (l.stage !== 'discussing') {
+                                <div class="discussion-empty">No discussion messages yet.</div>
+                            }
+                        }
+                    </div>
+                }
 
                 @if (reviewSessions().length > 0) {
                     <h3 class="section-title">Peer Reviews</h3>
@@ -263,6 +307,42 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        .discussion-loading {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.75rem; font-size: 0.8rem; color: var(--accent-cyan);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .discussion-timeline {
+            display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;
+        }
+        .discussion-msg {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .discussion-msg__header {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--bg-raised);
+        }
+        .discussion-msg__name { font-weight: 600; font-size: 0.8rem; color: var(--text-primary); }
+        .discussion-msg__round {
+            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
+            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan);
+            font-weight: 700; text-transform: uppercase;
+        }
+        .discussion-msg__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
+        .discussion-msg__tx {
+            font-size: 0.65rem; padding: 1px 5px; border-radius: var(--radius-sm);
+            background: var(--bg-raised); border: 1px solid var(--border-bright);
+            color: var(--accent-magenta); text-decoration: none; font-weight: 600;
+        }
+        .discussion-msg__tx:hover { background: var(--bg-hover); }
+        .discussion-msg__content {
+            padding: 0.75rem; font-size: 0.8rem; margin: 0;
+            white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
+            line-height: 1.5; max-height: 200px; overflow-y: auto;
+        }
+        .discussion-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: 0.5rem; }
+
         .synthesis {
             margin-top: 1.5rem; border: 1px solid var(--accent-green); border-radius: var(--radius-lg);
             background: var(--bg-surface); box-shadow: 0 0 16px rgba(0, 255, 136, 0.08);
@@ -303,6 +383,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected readonly hasChairman = signal(false);
     protected readonly allSessions = signal<Session[]>([]);
     protected readonly logs = signal<CouncilLaunchLog[]>([]);
+    protected readonly discussionMessages = signal<CouncilDiscussionMessage[]>([]);
     protected readonly logsOpen = signal(true);
     protected readonly triggeringReview = signal(false);
     protected readonly triggeringSynthesis = signal(false);
@@ -327,7 +408,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected readonly stageIndex = computed(() => {
         const l = this.launch();
         if (!l) return 0;
-        const stages = ['responding', 'reviewing', 'synthesizing', 'complete'];
+        const stages = ['responding', 'discussing', 'reviewing', 'synthesizing', 'complete'];
         return stages.indexOf(l.stage);
     });
 
@@ -352,10 +433,15 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
 
         await this.loadLaunchData(id);
 
-        // Load existing logs
+        // Load existing logs and discussion messages
         try {
             const existingLogs = await this.councilService.getLaunchLogs(id);
             this.logs.set(existingLogs);
+        } catch { /* ignore */ }
+
+        try {
+            const existingMessages = await this.councilService.getDiscussionMessages(id);
+            this.discussionMessages.set(existingMessages);
         } catch { /* ignore */ }
 
         // Subscribe to session events for live updates
@@ -378,6 +464,9 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
             }
             if (msg.type === 'council_log' && msg.log.launchId === id) {
                 this.logs.update((prev) => [...prev, msg.log]);
+            }
+            if (msg.type === 'council_discussion_message' && msg.message.launchId === id) {
+                this.discussionMessages.update((prev) => [...prev, msg.message]);
             }
             if (msg.type === 'chat_thinking') {
                 this.setActivity(msg.agentId, msg.active ? 'Thinking...' : '');

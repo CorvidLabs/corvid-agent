@@ -11,12 +11,17 @@ import {
     updateCouncilLaunchStage,
     addCouncilLaunchLog,
     getCouncilLaunchLogs,
+    insertDiscussionMessage,
+    getDiscussionMessages,
+    updateCouncilLaunchDiscussionRound,
+    updateDiscussionMessageTxid,
 } from '../db/councils';
 import { createSession, getSessionMessages, listSessionsByCouncilLaunch } from '../db/sessions';
 import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import type { ProcessManager, EventCallback } from '../process/manager';
-import type { CouncilLogLevel, CouncilLaunchLog } from '../../shared/types';
+import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('CouncilRoutes');
@@ -51,6 +56,20 @@ function broadcastLog(entry: CouncilLaunchLog): void {
     }
 }
 
+type DiscussionMessageCallback = (message: CouncilDiscussionMessage) => void;
+const discussionMessageListeners = new Set<DiscussionMessageCallback>();
+
+export function onCouncilDiscussionMessage(cb: DiscussionMessageCallback): () => void {
+    discussionMessageListeners.add(cb);
+    return () => { discussionMessageListeners.delete(cb); };
+}
+
+function broadcastDiscussionMessage(message: CouncilDiscussionMessage): void {
+    for (const cb of discussionMessageListeners) {
+        try { cb(message); } catch { /* ignore */ }
+    }
+}
+
 /** Persist a log entry and broadcast it to WS clients. */
 function emitLog(db: Database, launchId: string, level: CouncilLogLevel, message: string, detail?: string): void {
     const entry = addCouncilLaunchLog(db, launchId, level, message, detail);
@@ -77,6 +96,7 @@ export function handleCouncilRoutes(
     url: URL,
     db: Database,
     processManager: ProcessManager,
+    agentMessenger?: AgentMessenger | null,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
@@ -113,6 +133,12 @@ export function handleCouncilRoutes(
             return json(getCouncilLaunchLogs(db, launchId));
         }
 
+        if (action === 'discussion-messages' && method === 'GET') {
+            const launch = getCouncilLaunch(db, launchId);
+            if (!launch) return json({ error: 'Not found' }, 404);
+            return json(getDiscussionMessages(db, launchId));
+        }
+
         if (action === 'review' && method === 'POST') {
             return handleReview(db, processManager, launchId);
         }
@@ -144,7 +170,7 @@ export function handleCouncilRoutes(
     }
 
     if (action === 'launch' && method === 'POST') {
-        return handleLaunch(req, db, processManager, id);
+        return handleLaunch(req, db, processManager, id, agentMessenger ?? null);
     }
 
     if (action === 'launches' && method === 'GET') {
@@ -181,6 +207,7 @@ async function handleLaunch(
     db: Database,
     processManager: ProcessManager,
     councilId: string,
+    agentMessenger: AgentMessenger | null,
 ): Promise<Response> {
     const council = getCouncil(db, councilId);
     if (!council) return json({ error: 'Council not found' }, 404);
@@ -223,8 +250,8 @@ async function handleLaunch(
         }
     }
 
-    // Auto-advance: watch for all member sessions to finish, then trigger review
-    watchSessionsForAutoAdvance(db, processManager, launchId, sessionIds, 'member');
+    // Auto-advance: watch for all member sessions to finish, then trigger discussion/review
+    watchSessionsForAutoAdvance(db, processManager, launchId, sessionIds, 'member', agentMessenger);
 
     return json({ launchId, sessionIds }, 201);
 }
@@ -239,7 +266,7 @@ function triggerReview(
     const launch = getCouncilLaunch(db, launchId);
     if (!launch) return { ok: false, error: 'Launch not found', status: 404 };
 
-    if (launch.stage !== 'responding') {
+    if (launch.stage !== 'responding' && launch.stage !== 'discussing') {
         return { ok: false, error: `Cannot start review from stage '${launch.stage}'`, status: 400 };
     }
 
@@ -387,13 +414,19 @@ function triggerSynthesis(
         return `Review by ${agent?.name ?? 'Agent'}:\n${lastMsg?.content ?? '(no review)'}`;
     }).join('\n\n---\n\n');
 
-    const synthesisPrompt = `You are the chairman of a council. Your job is to produce a final, synthesized answer based on the council's responses and peer reviews.
+    // Collect discussion messages if any
+    const discussionMsgs = getDiscussionMessages(db, launchId);
+    const discussionSection = discussionMsgs.length > 0
+        ? `\n\n## Council Discussion\n\n${formatDiscussionMessages(discussionMsgs)}`
+        : '';
+
+    const synthesisPrompt = `You are the chairman of a council. Your job is to produce a final, synthesized answer based on the council's responses, discussion, and peer reviews.
 
 Original question: "${launch.prompt}"
 
 ## Council Responses
 
-${memberResponses}
+${memberResponses}${discussionSection}
 
 ## Peer Reviews
 
@@ -401,7 +434,7 @@ ${reviewSummaries}
 
 ## Your Task
 
-Produce a final, comprehensive answer that incorporates the best elements from all responses and addresses any concerns raised in the reviews. Be thorough and balanced.`;
+Produce a final, comprehensive answer that incorporates the best elements from all responses, discussion points, and addresses any concerns raised in the reviews. Be thorough and balanced.`;
 
     const session = createSession(db, {
         projectId: launch.projectId,
@@ -461,6 +494,266 @@ function handleSynthesize(db: Database, processManager: ProcessManager, launchId
     return json({ launchId, synthesisSessionId: result.synthesisSessionId });
 }
 
+// ─── Discussion orchestration ─────────────────────────────────────────────────
+
+function triggerDiscussion(
+    db: Database,
+    processManager: ProcessManager,
+    agentMessenger: AgentMessenger | null,
+    launchId: string,
+): void {
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch) return;
+    if (launch.stage !== 'responding') return;
+
+    const council = getCouncil(db, launch.councilId);
+    if (!council) return;
+
+    const discussionRounds = council.discussionRounds ?? 2;
+
+    // If 0 rounds, skip directly to review (backward compat)
+    if (discussionRounds === 0) {
+        emitLog(db, launchId, 'info', 'Discussion rounds set to 0, skipping to review');
+        const result = triggerReview(db, processManager, launchId);
+        if (!result.ok) {
+            emitLog(db, launchId, 'warn', `Auto-review failed: ${result.error}`);
+        }
+        return;
+    }
+
+    // Collect member responses
+    const memberSessions = listSessionsByCouncilLaunch(db, launchId)
+        .filter((s) => s.councilRole === 'member');
+
+    const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const memberResponses: { agentId: string; agentName: string; label: string; content: string }[] = [];
+
+    for (let i = 0; i < memberSessions.length; i++) {
+        const session = memberSessions[i];
+        const messages = getSessionMessages(db, session.id);
+        const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+        const lastMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
+        const agent = getAgent(db, session.agentId ?? '');
+        memberResponses.push({
+            agentId: session.agentId ?? '',
+            agentName: agent?.name ?? session.agentId?.slice(0, 8) ?? 'Agent',
+            label: `Response ${labels[i] ?? String(i + 1)}`,
+            content: lastMsg?.content ?? '(no response)',
+        });
+    }
+
+    updateCouncilLaunchStage(db, launchId, 'discussing');
+    updateCouncilLaunchDiscussionRound(db, launchId, 0, discussionRounds);
+    broadcastStageChange(launchId, 'discussing');
+    emitLog(db, launchId, 'stage', `Starting discussion stage`, `${discussionRounds} rounds, ${council.agentIds.length} agents`);
+
+    // Run discussion rounds asynchronously
+    runDiscussionRounds(db, processManager, agentMessenger, launchId, launch.prompt, memberResponses, discussionRounds, council)
+        .catch((err) => {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            emitLog(db, launchId, 'error', 'Discussion rounds failed', errMsg);
+            // Fall through to review anyway
+            const result = triggerReview(db, processManager, launchId);
+            if (!result.ok) {
+                emitLog(db, launchId, 'warn', `Fallback review failed: ${result.error}`);
+            }
+        });
+}
+
+async function runDiscussionRounds(
+    db: Database,
+    processManager: ProcessManager,
+    agentMessenger: AgentMessenger | null,
+    launchId: string,
+    originalPrompt: string,
+    memberResponses: { agentId: string; agentName: string; label: string; content: string }[],
+    totalRounds: number,
+    council: import('../../shared/types').Council,
+): Promise<void> {
+    for (let round = 1; round <= totalRounds; round++) {
+        updateCouncilLaunchDiscussionRound(db, launchId, round);
+        broadcastStageChange(launchId, 'discussing');
+        emitLog(db, launchId, 'info', `Discussion round ${round}/${totalRounds}`);
+
+        const priorDiscussion = getDiscussionMessages(db, launchId);
+        const discusserSessionIds: string[] = [];
+
+        // Get the project ID from the launch
+        const currentLaunch = getCouncilLaunch(db, launchId);
+        const projectId = currentLaunch?.projectId ?? '';
+
+        for (const agentId of council.agentIds) {
+            const agent = getAgent(db, agentId);
+            const agentName = agent?.name ?? agentId.slice(0, 8);
+            const prompt = buildDiscussionPrompt(originalPrompt, memberResponses, priorDiscussion, round);
+
+            const session = createSession(db, {
+                projectId,
+                agentId,
+                name: `Discussion R${round}: ${council.name} - ${agentName}`,
+                initialPrompt: prompt,
+                councilLaunchId: launchId,
+                councilRole: 'discusser' as const,
+            });
+            discusserSessionIds.push(session.id);
+
+            try {
+                processManager.startProcess(session);
+                emitLog(db, launchId, 'info', `Started discusser session for ${agentName} (R${round})`, session.id);
+            } catch (err) {
+                const errMsg = err instanceof Error ? err.message : String(err);
+                emitLog(db, launchId, 'error', `Failed to start discusser for ${agentName}`, errMsg);
+            }
+        }
+
+        // Wait for all discusser sessions in this round to finish
+        await waitForSessions(processManager, discusserSessionIds);
+
+        // Extract responses and store as discussion messages
+        for (let i = 0; i < council.agentIds.length; i++) {
+            const agentId = council.agentIds[i];
+            const sessionId = discusserSessionIds[i];
+            const agent = getAgent(db, agentId);
+            const agentName = agent?.name ?? agentId.slice(0, 8);
+
+            const messages = getSessionMessages(db, sessionId);
+            const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+            const lastMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
+            const content = lastMsg?.content ?? '(no discussion response)';
+
+            const discMsg = insertDiscussionMessage(db, {
+                launchId,
+                agentId,
+                agentName,
+                round,
+                content,
+                sessionId,
+            });
+
+            broadcastDiscussionMessage(discMsg);
+
+            // Best-effort on-chain send (fire-and-forget)
+            if (agentMessenger) {
+                sendDiscussionOnChain(agentMessenger, agentId, council.agentIds, content, discMsg.id, db).catch(() => {
+                    // Ignore on-chain failures
+                });
+            }
+        }
+    }
+
+    // All rounds complete — advance to review
+    emitLog(db, launchId, 'info', `All ${totalRounds} discussion rounds complete, advancing to review`);
+    const result = triggerReview(db, processManager, launchId);
+    if (!result.ok) {
+        emitLog(db, launchId, 'warn', `Post-discussion review failed: ${result.error}`);
+    }
+}
+
+function buildDiscussionPrompt(
+    originalPrompt: string,
+    memberResponses: { agentId: string; agentName: string; label: string; content: string }[],
+    priorDiscussion: CouncilDiscussionMessage[],
+    round: number,
+): string {
+    const responsesText = memberResponses
+        .map((r) => `### ${r.agentName} (${r.label})\n${r.content}`)
+        .join('\n\n---\n\n');
+
+    let priorText = '';
+    if (priorDiscussion.length > 0) {
+        priorText = `\n\n## Prior Discussion\n\n${formatDiscussionMessages(priorDiscussion)}`;
+    }
+
+    return `You are participating in a council discussion (Round ${round}).
+
+## Original Question
+${originalPrompt}
+
+## Member Responses
+${responsesText}${priorText}
+
+## Your Task
+React to the other members' responses. You may:
+- Ask clarifying questions
+- Challenge points you disagree with
+- Build on ideas you find promising
+- Propose alternatives
+
+Keep your response focused and concise.`;
+}
+
+function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string {
+    const byRound = new Map<number, CouncilDiscussionMessage[]>();
+    for (const msg of messages) {
+        const list = byRound.get(msg.round) ?? [];
+        list.push(msg);
+        byRound.set(msg.round, list);
+    }
+
+    const parts: string[] = [];
+    for (const [round, msgs] of [...byRound.entries()].sort((a, b) => a[0] - b[0])) {
+        parts.push(`### Round ${round}\n\n${msgs.map((m) => `**${m.agentName}:** ${m.content}`).join('\n\n')}`);
+    }
+    return parts.join('\n\n---\n\n');
+}
+
+function waitForSessions(processManager: ProcessManager, sessionIds: string[]): Promise<void> {
+    return new Promise<void>((resolve) => {
+        const pending = new Set(sessionIds);
+        const callbacks = new Map<string, EventCallback>();
+
+        const checkDone = (): void => {
+            if (pending.size > 0) return;
+            for (const [sid, cb] of callbacks) {
+                processManager.unsubscribe(sid, cb);
+            }
+            callbacks.clear();
+            resolve();
+        };
+
+        for (const sessionId of sessionIds) {
+            if (!processManager.isRunning(sessionId)) {
+                pending.delete(sessionId);
+                continue;
+            }
+
+            const callback: EventCallback = (sid, event) => {
+                if (sid !== sessionId) return;
+                if (event.type === 'session_exited' || event.type === 'session_stopped') {
+                    pending.delete(sessionId);
+                    checkDone();
+                }
+            };
+            callbacks.set(sessionId, callback);
+            processManager.subscribe(sessionId, callback);
+        }
+
+        checkDone();
+    });
+}
+
+async function sendDiscussionOnChain(
+    agentMessenger: AgentMessenger,
+    fromAgentId: string,
+    allAgentIds: string[],
+    content: string,
+    messageId: number,
+    db: Database,
+): Promise<void> {
+    // Send to all other council members (best-effort)
+    for (const toAgentId of allAgentIds) {
+        if (toAgentId === fromAgentId) continue;
+        try {
+            const txid = await agentMessenger.sendOnChainBestEffort(fromAgentId, toAgentId, content);
+            if (txid) {
+                updateDiscussionMessageTxid(db, messageId, txid);
+            }
+        } catch {
+            // Ignore on-chain failures — discussion continues regardless
+        }
+    }
+}
+
 // ─── Auto-advance watcher ─────────────────────────────────────────────────────
 
 function watchSessionsForAutoAdvance(
@@ -468,7 +761,8 @@ function watchSessionsForAutoAdvance(
     processManager: ProcessManager,
     launchId: string,
     sessionIds: string[],
-    role: 'member' | 'reviewer',
+    role: 'member' | 'reviewer' | 'discusser',
+    agentMessenger?: AgentMessenger | null,
 ): void {
     const pending = new Set(sessionIds);
     const callbacks = new Map<string, EventCallback>();
@@ -487,11 +781,8 @@ function watchSessionsForAutoAdvance(
         if (!launch) return;
 
         if (role === 'member' && launch.stage === 'responding') {
-            emitLog(db, launchId, 'info', 'All member sessions complete, auto-advancing to review');
-            const result = triggerReview(db, processManager, launchId);
-            if (!result.ok) {
-                emitLog(db, launchId, 'warn', `Auto-review failed: ${result.error}`);
-            }
+            emitLog(db, launchId, 'info', 'All member sessions complete, auto-advancing to discussion');
+            triggerDiscussion(db, processManager, agentMessenger ?? null, launchId);
         } else if (role === 'reviewer' && launch.stage === 'reviewing') {
             const council = getCouncil(db, launch.councilId);
             if (council?.chairmanAgentId) {

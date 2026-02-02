@@ -51,7 +51,7 @@ export function handleRequest(
     const sessionResponse = handleSessionRoutes(req, url, db, processManager);
     if (sessionResponse) return addCorsAsync(sessionResponse);
 
-    const councilResponse = handleCouncilRoutes(req, url, db, processManager);
+    const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger);
     if (councilResponse) return addCorsAsync(councilResponse);
 
     if (workTaskService) {
