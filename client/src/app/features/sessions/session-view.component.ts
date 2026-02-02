@@ -1,17 +1,18 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { SessionService } from '../../core/services/session.service';
+import { WebSocketService } from '../../core/services/websocket.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SessionOutputComponent } from './session-output.component';
 import { SessionInputComponent } from './session-input.component';
-import { DecimalPipe } from '@angular/common';
+import { ApprovalDialogComponent, type ApprovalDecision } from './approval-dialog.component';
 import type { Session, SessionMessage } from '../../core/models/session.model';
-import type { StreamEvent } from '../../core/models/ws-message.model';
+import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-message.model';
 
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, DecimalPipe],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent],
     template: `
         @if (session(); as s) {
             <div class="session-view">
@@ -21,12 +22,12 @@ import type { StreamEvent } from '../../core/models/ws-message.model';
                         <app-status-badge [status]="s.status" />
                     </div>
                     <div class="session-view__meta">
-                        @if (s.totalCostUsd > 0) {
-                            <span>Cost: {{ s.totalCostUsd | number:'1.4-4' }} USD</span>
-                        }
                         <span>Turns: {{ s.totalTurns }}</span>
                     </div>
                     <div class="session-view__actions">
+                        <button class="btn btn--secondary" (click)="onCopyLog()">
+                            {{ logCopied() ? 'Copied!' : 'Copy Log' }}
+                        </button>
                         @if (s.status === 'running') {
                             <button class="btn btn--danger" (click)="onStop()">Stop</button>
                         } @else {
@@ -36,12 +37,18 @@ import type { StreamEvent } from '../../core/models/ws-message.model';
                     </div>
                 </div>
 
-                <app-session-output [messages]="messages()" [events]="events()" />
+                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running'" />
 
                 <app-session-input
                     [disabled]="s.status !== 'running'"
                     (messageSent)="onSendMessage($event)" />
             </div>
+
+            @if (pendingApproval(); as approval) {
+                <app-approval-dialog
+                    [request]="approval"
+                    (decided)="onApprovalDecision($event)" />
+            }
         } @else {
             <div class="page"><p>Loading...</p></div>
         }
@@ -76,9 +83,12 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly sessionService = inject(SessionService);
+    private readonly wsService = inject(WebSocketService);
 
     protected readonly session = signal<Session | null>(null);
     protected readonly messages = signal<SessionMessage[]>([]);
+    protected readonly logCopied = signal(false);
+    protected readonly pendingApproval = signal<ApprovalRequestWire | null>(null);
 
     protected readonly events = computed(() => {
         const s = this.session();
@@ -87,6 +97,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     });
 
     private sessionId: string | null = null;
+    private approvalCleanup: (() => void) | null = null;
 
     async ngOnInit(): Promise<void> {
         this.sessionId = this.route.snapshot.paramMap.get('id');
@@ -99,31 +110,83 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         this.messages.set(messages);
 
         this.sessionService.subscribeToSession(this.sessionId);
+
+        // Listen for approval requests targeting this session
+        const sid = this.sessionId;
+        this.approvalCleanup = this.wsService.onMessage((msg) => {
+            if (msg.type === 'approval_request' && msg.request.sessionId === sid) {
+                this.pendingApproval.set(msg.request);
+            }
+        });
     }
 
     ngOnDestroy(): void {
         if (this.sessionId) {
             this.sessionService.unsubscribeFromSession(this.sessionId);
         }
+        this.approvalCleanup?.();
+    }
+
+    protected onApprovalDecision(decision: ApprovalDecision): void {
+        this.pendingApproval.set(null);
+        this.wsService.sendApprovalResponse(decision.requestId, decision.behavior);
     }
 
     protected onSendMessage(content: string): void {
         if (!this.sessionId) return;
         this.sessionService.sendMessage(this.sessionId, content);
+
+        // Immediately show the user's message in the output
+        this.messages.update((msgs) => [
+            ...msgs,
+            {
+                id: Date.now(),
+                sessionId: this.sessionId as string,
+                role: 'user' as const,
+                content,
+                costUsd: 0,
+                timestamp: new Date().toISOString(),
+            },
+        ]);
     }
 
     protected async onStop(): Promise<void> {
         if (!this.sessionId) return;
         await this.sessionService.stopSession(this.sessionId);
-        const session = await this.sessionService.getSession(this.sessionId);
-        this.session.set(session);
+        this.session.update((s) => s ? { ...s, status: 'stopped' } : s);
     }
 
     protected async onResume(): Promise<void> {
         if (!this.sessionId) return;
         await this.sessionService.resumeSession(this.sessionId);
-        const session = await this.sessionService.getSession(this.sessionId);
-        this.session.set(session);
+        this.session.update((s) => s ? { ...s, status: 'running' } : s);
+    }
+
+    protected onCopyLog(): void {
+        const lines: string[] = [];
+
+        for (const msg of this.messages()) {
+            const time = this.formatTime(msg.timestamp);
+            lines.push(`[${time}] ${msg.role.toUpperCase()}: ${msg.content}`);
+        }
+
+        for (const evt of this.events()) {
+            const time = this.formatTime(evt.timestamp);
+            lines.push(`[${time}] EVENT(${evt.eventType}): ${JSON.stringify(evt.data)}`);
+        }
+
+        navigator.clipboard.writeText(lines.join('\n')).then(() => {
+            this.logCopied.set(true);
+            setTimeout(() => this.logCopied.set(false), 2000);
+        });
+    }
+
+    private formatTime(timestamp: string): string {
+        const d = new Date(timestamp);
+        const h = d.getHours().toString().padStart(2, '0');
+        const m = d.getMinutes().toString().padStart(2, '0');
+        const s = d.getSeconds().toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
     }
 
     protected async onDelete(): Promise<void> {

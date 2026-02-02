@@ -2,11 +2,13 @@ import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { WebSocketService } from './websocket.service';
 import type { Session, SessionMessage, CreateSessionInput, AlgoChatStatus } from '../models/session.model';
-import type { ServerWsMessage, StreamEvent } from '../models/ws-message.model';
+import type { ServerWsMessage, StreamEvent, ApprovalRequestWire } from '../models/ws-message.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class SessionService {
+    private static readonly MAX_EVENTS = 500;
+
     private readonly api = inject(ApiService);
     private readonly ws = inject(WebSocketService);
 
@@ -14,6 +16,7 @@ export class SessionService {
     readonly loading = signal(false);
     readonly activeEvents = signal<Map<string, StreamEvent[]>>(new Map());
     readonly algochatStatus = signal<AlgoChatStatus | null>(null);
+    readonly pendingApprovals = signal<Map<string, ApprovalRequestWire>>(new Map());
 
     private cleanupFn: (() => void) | null = null;
 
@@ -46,23 +49,32 @@ export class SessionService {
 
     async createSession(input: CreateSessionInput): Promise<Session> {
         const session = await firstValueFrom(this.api.post<Session>('/sessions', input));
-        await this.loadSessions();
+        this.sessions.update((current) => [session, ...current]);
         return session;
     }
 
     async stopSession(id: string): Promise<void> {
         await firstValueFrom(this.api.post(`/sessions/${id}/stop`));
-        await this.loadSessions();
+        this.sessions.update((current) =>
+            current.map((s) => (s.id === id ? { ...s, status: 'stopped' as Session['status'] } : s)),
+        );
     }
 
     async resumeSession(id: string, prompt?: string): Promise<void> {
         await firstValueFrom(this.api.post(`/sessions/${id}/resume`, { prompt }));
-        await this.loadSessions();
+        this.sessions.update((current) =>
+            current.map((s) => (s.id === id ? { ...s, status: 'running' as Session['status'] } : s)),
+        );
     }
 
     async deleteSession(id: string): Promise<void> {
         await firstValueFrom(this.api.delete(`/sessions/${id}`));
-        await this.loadSessions();
+        this.sessions.update((current) => current.filter((s) => s.id !== id));
+        this.activeEvents.update((current) => {
+            const updated = new Map(current);
+            updated.delete(id);
+            return updated;
+        });
     }
 
     async loadAlgoChatStatus(): Promise<void> {
@@ -76,6 +88,11 @@ export class SessionService {
 
     unsubscribeFromSession(sessionId: string): void {
         this.ws.unsubscribe(sessionId);
+        this.activeEvents.update((current) => {
+            const updated = new Map(current);
+            updated.delete(sessionId);
+            return updated;
+        });
     }
 
     sendMessage(sessionId: string, content: string): void {
@@ -84,15 +101,38 @@ export class SessionService {
 
     private handleWsMessage(msg: ServerWsMessage): void {
         if (msg.type === 'session_event') {
-            const events = new Map(this.activeEvents());
-            const existing = events.get(msg.sessionId) ?? [];
-            events.set(msg.sessionId, [...existing, msg.event]);
-            this.activeEvents.set(events);
+            this.activeEvents.update((current) => {
+                const updated = new Map(current);
+                const existing = updated.get(msg.sessionId) ?? [];
+                const next = [...existing, msg.event];
+                updated.set(
+                    msg.sessionId,
+                    next.length > SessionService.MAX_EVENTS
+                        ? next.slice(next.length - SessionService.MAX_EVENTS)
+                        : next,
+                );
+                return updated;
+            });
         }
 
         if (msg.type === 'session_status') {
-            // Refresh sessions list on status change
-            this.loadSessions();
+            this.sessions.update((current) =>
+                current.map((s) =>
+                    s.id === msg.sessionId ? { ...s, status: msg.status as Session['status'] } : s,
+                ),
+            );
         }
+
+        if (msg.type === 'approval_request') {
+            const approvals = new Map(this.pendingApprovals());
+            approvals.set(msg.request.id, msg.request);
+            this.pendingApprovals.set(approvals);
+        }
+    }
+
+    clearApproval(requestId: string): void {
+        const approvals = new Map(this.pendingApprovals());
+        approvals.delete(requestId);
+        this.pendingApprovals.set(approvals);
     }
 }
