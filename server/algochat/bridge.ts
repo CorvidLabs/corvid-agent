@@ -33,7 +33,7 @@ const PUBLIC_KEY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 export type AlgoChatEventCallback = (
     participant: string,
     content: string,
-    direction: 'inbound' | 'outbound',
+    direction: 'inbound' | 'outbound' | 'status',
     fee?: number,
 ) => void;
 
@@ -494,8 +494,8 @@ export class AlgoChatBridge {
 
         if (reassembled) {
             this.pendingGroupChunks.delete(key);
-            const totalFee = pending.chunks.reduce((sum, c) => {
-                const f = (c as unknown as Record<string, unknown>).fee;
+            const totalFee = pending.chunks.reduce((sum: number, c) => {
+                const f = (c as unknown as Record<string, number | undefined>).fee;
                 return sum + (f != null ? Number(f) : 0);
             }, 0);
             log.info(`Reassembled buffered group message (${contents.length} chunks)`, { round });
@@ -718,7 +718,6 @@ export class AlgoChatBridge {
         let agentQueryCount = 0;
         let currentTextBlock = '';
         let inTextBlock = false;
-        let currentBlockIndex = -1;
 
         const flushTextBlock = () => {
             const text = currentTextBlock.trim();
@@ -759,7 +758,6 @@ export class AlgoChatBridge {
                 if (block?.type === 'text') {
                     inTextBlock = true;
                     currentTextBlock = '';
-                    currentBlockIndex = (event as unknown as { index?: number }).index ?? -1;
                 } else if (block?.type === 'tool_use') {
                     // Flush any pending text before tool use starts
                     if (inTextBlock) flushTextBlock();
