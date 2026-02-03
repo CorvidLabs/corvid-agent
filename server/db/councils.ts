@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import type {
     Council,
+    CouncilDiscussionMessage,
     CouncilLaunch,
     CouncilLaunchLog,
     CouncilLogLevel,
@@ -14,6 +15,7 @@ interface CouncilRow {
     name: string;
     description: string;
     chairman_agent_id: string | null;
+    discussion_rounds: number;
     created_at: string;
     updated_at: string;
 }
@@ -31,6 +33,8 @@ interface CouncilLaunchRow {
     prompt: string;
     stage: string;
     synthesis: string | null;
+    current_discussion_round: number;
+    total_discussion_rounds: number;
     created_at: string;
 }
 
@@ -41,6 +45,7 @@ function rowToCouncil(row: CouncilRow, agentIds: string[]): Council {
         description: row.description,
         chairmanAgentId: row.chairman_agent_id,
         agentIds,
+        discussionRounds: row.discussion_rounds ?? 2,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -55,6 +60,8 @@ function rowToLaunch(row: CouncilLaunchRow, sessionIds: string[]): CouncilLaunch
         stage: row.stage as CouncilStage,
         synthesis: row.synthesis,
         sessionIds,
+        currentDiscussionRound: row.current_discussion_round ?? 0,
+        totalDiscussionRounds: row.total_discussion_rounds ?? 0,
         createdAt: row.created_at,
     };
 }
@@ -84,9 +91,9 @@ export function createCouncil(db: Database, input: CreateCouncilInput): Council 
 
     db.transaction(() => {
         db.query(
-            `INSERT INTO councils (id, name, description, chairman_agent_id)
-             VALUES (?, ?, ?, ?)`
-        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null);
+            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds)
+             VALUES (?, ?, ?, ?, ?)`
+        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2);
 
         for (let i = 0; i < input.agentIds.length; i++) {
             db.query(
@@ -117,6 +124,10 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
         if (input.chairmanAgentId !== undefined) {
             fields.push('chairman_agent_id = ?');
             values.push(input.chairmanAgentId);
+        }
+        if (input.discussionRounds !== undefined) {
+            fields.push('discussion_rounds = ?');
+            values.push(input.discussionRounds);
         }
 
         if (fields.length > 0) {
@@ -246,4 +257,95 @@ export function getCouncilLaunchLogs(db: Database, launchId: string): CouncilLau
         'SELECT * FROM council_launch_logs WHERE launch_id = ? ORDER BY created_at ASC, id ASC'
     ).all(launchId) as CouncilLaunchLogRow[];
     return rows.map(rowToLog);
+}
+
+// MARK: - Council Discussion Messages
+
+interface CouncilDiscussionMessageRow {
+    id: number;
+    launch_id: string;
+    agent_id: string;
+    agent_name: string;
+    round: number;
+    content: string;
+    txid: string | null;
+    session_id: string | null;
+    created_at: string;
+}
+
+function rowToDiscussionMessage(row: CouncilDiscussionMessageRow): CouncilDiscussionMessage {
+    return {
+        id: row.id,
+        launchId: row.launch_id,
+        agentId: row.agent_id,
+        agentName: row.agent_name,
+        round: row.round,
+        content: row.content,
+        txid: row.txid,
+        sessionId: row.session_id,
+        createdAt: row.created_at,
+    };
+}
+
+export function insertDiscussionMessage(
+    db: Database,
+    params: {
+        launchId: string;
+        agentId: string;
+        agentName: string;
+        round: number;
+        content: string;
+        txid?: string | null;
+        sessionId?: string | null;
+    },
+): CouncilDiscussionMessage {
+    const result = db.query(
+        `INSERT INTO council_discussion_messages (launch_id, agent_id, agent_name, round, content, txid, session_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+        params.launchId,
+        params.agentId,
+        params.agentName,
+        params.round,
+        params.content,
+        params.txid ?? null,
+        params.sessionId ?? null,
+    );
+
+    const row = db.query(
+        'SELECT * FROM council_discussion_messages WHERE id = ?'
+    ).get(result.lastInsertRowid) as CouncilDiscussionMessageRow;
+    return rowToDiscussionMessage(row);
+}
+
+export function getDiscussionMessages(db: Database, launchId: string): CouncilDiscussionMessage[] {
+    const rows = db.query(
+        'SELECT * FROM council_discussion_messages WHERE launch_id = ? ORDER BY round ASC, id ASC'
+    ).all(launchId) as CouncilDiscussionMessageRow[];
+    return rows.map(rowToDiscussionMessage);
+}
+
+export function updateCouncilLaunchDiscussionRound(
+    db: Database,
+    launchId: string,
+    round: number,
+    totalRounds?: number,
+): void {
+    if (totalRounds !== undefined) {
+        db.query(
+            'UPDATE council_launches SET current_discussion_round = ?, total_discussion_rounds = ? WHERE id = ?'
+        ).run(round, totalRounds, launchId);
+    } else {
+        db.query(
+            'UPDATE council_launches SET current_discussion_round = ? WHERE id = ?'
+        ).run(round, launchId);
+    }
+}
+
+export function updateDiscussionMessageTxid(
+    db: Database,
+    messageId: number,
+    txid: string,
+): void {
+    db.query('UPDATE council_discussion_messages SET txid = ? WHERE id = ?').run(txid, messageId);
 }

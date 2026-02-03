@@ -1,5 +1,12 @@
+/**
+ * @deprecated All agents now route through the SDK path (sdk-process.ts) so they
+ * receive MCP tools (corvid_*). This CLI spawn path is retained for reference in
+ * case the Claude CLI fixes MCP + streaming support in the future.
+ */
+
 import type { Session, Agent, Project } from '../../shared/types';
 import type { ClaudeStreamEvent, ClaudeInputMessage } from './types';
+// import { join } from 'node:path'; // Needed when --mcp-config CLI support is restored
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ClaudeProcess');
@@ -11,6 +18,7 @@ export interface ClaudeProcessOptions {
     agent: Agent | null;
     resume?: boolean;
     prompt?: string;
+    mcpEnabled?: boolean;
     onEvent: (event: ClaudeStreamEvent) => void;
     onExit: (code: number | null) => void;
 }
@@ -23,9 +31,9 @@ export interface ClaudeProcess {
 }
 
 export function spawnClaudeProcess(options: ClaudeProcessOptions): ClaudeProcess {
-    const { session, project, agent, resume, prompt, onEvent, onExit } = options;
+    const { session, project, agent, resume, prompt, mcpEnabled, onEvent, onExit } = options;
 
-    const args = buildArgs(session, project, agent, resume, prompt);
+    const args = buildArgs(session, project, agent, resume, prompt, mcpEnabled);
 
     log.debug(`Spawning claude for session ${session.id}`, {
         cwd: project.workingDir,
@@ -114,6 +122,7 @@ function buildArgs(
     agent: Agent | null,
     resume?: boolean,
     prompt?: string,
+    mcpEnabled?: boolean,
 ): string[] {
     const args: string[] = [
         '--output-format', 'stream-json',
@@ -142,7 +151,9 @@ function buildArgs(
             args.push('--disallowedTools', agent.disallowedTools);
         }
         if (agent.permissionMode && agent.permissionMode !== 'default') {
-            args.push('--permission-mode', agent.permissionMode);
+            // Map our permission mode names to CLI-accepted values
+            const cliMode = agent.permissionMode === 'full-auto' ? 'bypassPermissions' : agent.permissionMode;
+            args.push('--permission-mode', cliMode);
         }
         // --max-budget-usd only works with --print mode, skip for streaming sessions
 
@@ -160,6 +171,26 @@ function buildArgs(
         // Append project context to system prompt via --append-system-prompt
         args.push('--append-system-prompt', project.claudeMd);
     }
+
+    // MCP server config for corvid agent tools.
+    // NOTE: --mcp-config currently stalls the claude CLI when used with -p or
+    // --input-format stream-json (the MCP init handshake blocks prompt processing).
+    // For now, MCP tools are only injected via the in-process SDK path.
+    // Uncomment this block once the CLI supports MCP + streaming reliably.
+    // if (mcpEnabled && session.agentId) {
+    //     const bunPath = Bun.which('bun') ?? 'bun';
+    //     const mcpConfig = JSON.stringify({
+    //         'corvid-agent-tools': {
+    //             command: bunPath,
+    //             args: [join(import.meta.dir, '..', 'mcp', 'stdio-server.ts')],
+    //             env: {
+    //                 CORVID_AGENT_ID: session.agentId,
+    //                 CORVID_API_URL: `http://localhost:${process.env.PORT ?? '3000'}`,
+    //             },
+    //         },
+    //     });
+    //     args.push('--mcp-config', mcpConfig);
+    // }
 
     // Prompt is sent via stdin in stream-json format (not as positional arg)
 

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 15;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -168,7 +168,69 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
     ],
+    9: [
+        `ALTER TABLE councils ADD COLUMN discussion_rounds INTEGER DEFAULT 2`,
+        `ALTER TABLE council_launches ADD COLUMN current_discussion_round INTEGER DEFAULT 0`,
+        `ALTER TABLE council_launches ADD COLUMN total_discussion_rounds INTEGER DEFAULT 0`,
+        `CREATE TABLE IF NOT EXISTS council_discussion_messages (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            launch_id   TEXT NOT NULL REFERENCES council_launches(id) ON DELETE CASCADE,
+            agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            agent_name  TEXT NOT NULL,
+            round       INTEGER NOT NULL,
+            content     TEXT NOT NULL,
+            txid        TEXT DEFAULT NULL,
+            session_id  TEXT DEFAULT NULL,
+            created_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
+    ],
+    10: [
+        `CREATE TABLE IF NOT EXISTS agent_memories (
+            id          TEXT PRIMARY KEY,
+            agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            key         TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            txid        TEXT DEFAULT NULL,
+            created_at  TEXT DEFAULT (datetime('now')),
+            updated_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
+    ],
+    12: [
+        `ALTER TABLE agent_messages ADD COLUMN thread_id TEXT DEFAULT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
+    ],
+    13: [
+        `CREATE TABLE IF NOT EXISTS daily_spending (
+            date         TEXT PRIMARY KEY,
+            algo_micro   INTEGER DEFAULT 0,
+            api_cost_usd REAL DEFAULT 0.0
+        )`,
+    ],
+    14: [
+        `CREATE TABLE IF NOT EXISTS escalation_queue (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  TEXT NOT NULL,
+            tool_name   TEXT NOT NULL,
+            tool_input  TEXT NOT NULL DEFAULT '{}',
+            status      TEXT DEFAULT 'pending',
+            created_at  TEXT DEFAULT (datetime('now')),
+            resolved_at TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_escalation_queue_status ON escalation_queue(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_escalation_queue_session ON escalation_queue(session_id)`,
+    ],
+    15: [
+        `ALTER TABLE sessions ADD COLUMN total_algo_spent INTEGER DEFAULT 0`,
+    ],
 };
+
+function hasColumn(db: Database, table: string, column: string): boolean {
+    const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    return cols.some((c) => c.name === column);
+}
 
 export function runMigrations(db: Database): void {
     db.exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)`);
@@ -185,6 +247,11 @@ export function runMigrations(db: Database): void {
             const statements = MIGRATIONS[v];
             if (!statements) continue;
             for (const sql of statements) {
+                // Skip ALTER TABLE ADD COLUMN if the column already exists
+                const alterMatch = sql.match(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
+                if (alterMatch && hasColumn(db, alterMatch[1], alterMatch[2])) {
+                    continue;
+                }
                 db.exec(sql);
             }
         }

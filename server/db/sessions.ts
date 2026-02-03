@@ -17,6 +17,7 @@ interface SessionRow {
     initial_prompt: string;
     pid: number | null;
     total_cost_usd: number;
+    total_algo_spent: number;
     total_turns: number;
     council_launch_id: string | null;
     council_role: string | null;
@@ -53,6 +54,7 @@ function rowToSession(row: SessionRow): Session {
         initialPrompt: row.initial_prompt,
         pid: row.pid,
         totalCostUsd: row.total_cost_usd,
+        totalAlgoSpent: row.total_algo_spent ?? 0,
         totalTurns: row.total_turns,
         councilLaunchId: row.council_launch_id ?? null,
         councilRole: (row.council_role as Session['councilRole']) ?? null,
@@ -165,6 +167,12 @@ export function updateSessionCost(db: Database, id: string, costUsd: number, tur
     db.query(
         "UPDATE sessions SET total_cost_usd = ?, total_turns = ?, updated_at = datetime('now') WHERE id = ?"
     ).run(costUsd, turns, id);
+}
+
+export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: number): void {
+    db.query(
+        "UPDATE sessions SET total_algo_spent = total_algo_spent + ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(microAlgos, id);
 }
 
 export function deleteSession(db: Database, id: string): boolean {

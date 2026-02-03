@@ -34,8 +34,8 @@ import { DecimalPipe, SlicePipe } from '@angular/common';
                             <div class="list__item-meta">
                                 <app-status-badge [status]="session.status" />
                                 <span>{{ session.source }}</span>
-                                @if (session.totalCostUsd > 0) {
-                                    <span>{{ session.totalCostUsd | number:'1.4-4' }} USD</span>
+                                @if (session.totalAlgoSpent > 0) {
+                                    <span>{{ session.totalAlgoSpent / 1000000 | number:'1.3-6' }} ALGO</span>
                                 }
                                 <span>{{ session.updatedAt | relativeTime }}</span>
                             </div>

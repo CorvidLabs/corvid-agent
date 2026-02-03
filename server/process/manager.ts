@@ -2,13 +2,18 @@ import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
 import type { ClaudeStreamEvent } from './types';
 import { extractContentText } from './types';
-import { spawnClaudeProcess, type ClaudeProcess } from './claude-process';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
 import { ApprovalManager } from './approval-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
 import { getAgent } from '../db/agents';
 import { getSession, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
+import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { AgentDirectory } from '../algochat/agent-directory';
+import type { AgentWalletService } from '../algochat/agent-wallet';
+import { createCorvidMcpServer } from '../mcp/sdk-tools';
+import type { McpToolContext } from '../mcp/tool-handlers';
+import { recordApiCost } from '../db/spending';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ProcessManager');
@@ -16,9 +21,7 @@ const log = createLogger('ProcessManager');
 const AGENT_TIMEOUT_MS = parseInt(process.env.AGENT_TIMEOUT_MS ?? String(30 * 60 * 1000), 10);
 const MAX_RESTARTS = 3;
 const BACKOFF_BASE_MS = 5000;
-
-/** Permission modes that bypass approval and use the raw CLI spawn path. */
-const BYPASS_MODES = new Set(['bypassPermissions', 'dontAsk', 'acceptEdits', 'full-auto']);
+const STABLE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes uptime resets restart counter
 
 export type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => void;
 
@@ -26,22 +29,55 @@ interface SessionMeta {
     startedAt: number;
     source: string;
     restartCount: number;
+    lastKnownCostUsd: number;
 }
 
 export class ProcessManager {
-    private processes: Map<string, ClaudeProcess | SdkProcess> = new Map();
+    private processes: Map<string, SdkProcess> = new Map();
     private subscribers: Map<string, Set<EventCallback>> = new Map();
     private globalSubscribers: Set<EventCallback> = new Set();
     private sessionMeta: Map<string, SessionMeta> = new Map();
     private db: Database;
     private timeoutTimer: ReturnType<typeof setInterval> | null = null;
+    private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+    private pausedSessions: Set<string> = new Set();
     readonly approvalManager: ApprovalManager;
+
+    // MCP services — set after AlgoChat init
+    private mcpMessenger: AgentMessenger | null = null;
+    private mcpDirectory: AgentDirectory | null = null;
+    private mcpWalletService: AgentWalletService | null = null;
 
     constructor(db: Database) {
         this.db = db;
         this.approvalManager = new ApprovalManager();
+        this.approvalManager.setDatabase(db);
         this.cleanupStaleSessions();
         this.startTimeoutChecker();
+    }
+
+    /** Register MCP-related services so agent sessions get corvid_* tools. */
+    setMcpServices(
+        messenger: AgentMessenger,
+        directory: AgentDirectory,
+        walletService: AgentWalletService,
+    ): void {
+        this.mcpMessenger = messenger;
+        this.mcpDirectory = directory;
+        this.mcpWalletService = walletService;
+        log.info('MCP services registered — agent sessions will receive corvid_* tools');
+    }
+
+    /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
+    private buildMcpContext(agentId: string): McpToolContext | null {
+        if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
+        return {
+            agentId,
+            db: this.db,
+            agentMessenger: this.mcpMessenger,
+            agentDirectory: this.mcpDirectory,
+            agentWalletService: this.mcpWalletService,
+        };
     }
 
     /**
@@ -72,43 +108,21 @@ export class ProcessManager {
         }
 
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
-        const permissionMode = agent?.permissionMode ?? 'default';
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
-        // Dispatch: full-auto / bypassPermissions → raw CLI, others → Agent SDK
-        if (BYPASS_MODES.has(permissionMode)) {
-            this.startCliProcess(session, project, agent, resolvedPrompt);
-        } else {
-            this.startSdkProcessWrapped(session, project, agent, resolvedPrompt);
-        }
-    }
-
-    private startCliProcess(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string): void {
-        let cp: ClaudeProcess;
-        try {
-            cp = spawnClaudeProcess({
-                session,
-                project,
-                agent,
-                prompt,
-                onEvent: (event) => this.handleEvent(session.id, event),
-                onExit: (code) => this.handleExit(session.id, code),
-            });
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error(`Failed to spawn claude for session ${session.id}`, { error: message });
-            updateSessionStatus(this.db, session.id, 'error');
-            this.emitEvent(session.id, {
-                type: 'error',
-                error: { message: `Failed to spawn claude: ${message}`, type: 'spawn_error' },
-            } as ClaudeStreamEvent);
-            return;
-        }
-
-        this.registerProcess(session, cp);
+        // All agents route through SDK path so they receive MCP tools (corvid_*)
+        this.startSdkProcessWrapped(session, project, agent, resolvedPrompt);
     }
 
     private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string): void {
+        // Build MCP servers for this agent session
+        const mcpServers = session.agentId
+            ? (() => {
+                const ctx = this.buildMcpContext(session.agentId);
+                return ctx ? [createCorvidMcpServer(ctx)] : undefined;
+            })()
+            : undefined;
+
         let sp: SdkProcess;
         try {
             sp = startSdkProcess({
@@ -120,6 +134,8 @@ export class ProcessManager {
                 onEvent: (event) => this.handleEvent(session.id, event),
                 onExit: (code) => this.handleExit(session.id, code),
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
+                onApiOutage: () => this.handleApiOutage(session.id),
+                mcpServers,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -135,15 +151,19 @@ export class ProcessManager {
         this.registerProcess(session, sp);
     }
 
-    private registerProcess(session: Session, process: ClaudeProcess | SdkProcess): void {
+    private registerProcess(session: Session, process: SdkProcess): void {
         this.processes.set(session.id, process);
         this.sessionMeta.set(session.id, {
             startedAt: Date.now(),
             source: (session as { source?: string }).source ?? 'web',
             restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
+            lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
         });
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
+
+        // Start stable period timer — resets restart counter after sustained uptime
+        this.startStableTimer(session.id);
 
         log.info(`Started process for session ${session.id}`, { pid: process.pid });
 
@@ -173,72 +193,59 @@ export class ProcessManager {
         if (!project) return;
 
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
-        const permissionMode = agent?.permissionMode ?? 'default';
 
         // Start a fresh process — our session IDs are not Claude conversation IDs,
         // so --resume would fail. Instead, re-send the prompt (or initial prompt).
         const resumePrompt = prompt ?? session.initialPrompt ?? undefined;
 
-        if (BYPASS_MODES.has(permissionMode)) {
-            let cp: ClaudeProcess;
-            try {
-                cp = spawnClaudeProcess({
-                    session,
-                    project,
-                    agent,
-                    prompt: resumePrompt,
-                    onEvent: (event) => this.handleEvent(session.id, event),
-                    onExit: (code) => this.handleExit(session.id, code),
-                });
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                log.error(`Failed to resume claude for session ${session.id}`, { error: message });
-                updateSessionStatus(this.db, session.id, 'error');
-                this.emitEvent(session.id, {
-                    type: 'error',
-                    error: { message: `Failed to resume claude: ${message}`, type: 'spawn_error' },
-                } as ClaudeStreamEvent);
-                return;
-            }
+        const mcpServers = session.agentId
+            ? (() => {
+                const ctx = this.buildMcpContext(session.agentId);
+                return ctx ? [createCorvidMcpServer(ctx)] : undefined;
+            })()
+            : undefined;
 
-            this.processes.set(session.id, cp);
-        } else {
-            let sp: SdkProcess;
-            try {
-                sp = startSdkProcess({
-                    session,
-                    project,
-                    agent,
-                    prompt: resumePrompt ?? '',
-                    approvalManager: this.approvalManager,
-                    onEvent: (event) => this.handleEvent(session.id, event),
-                    onExit: (code) => this.handleExit(session.id, code),
-                    onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
-                });
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                log.error(`Failed to resume SDK process for session ${session.id}`, { error: message });
-                updateSessionStatus(this.db, session.id, 'error');
-                this.emitEvent(session.id, {
-                    type: 'error',
-                    error: { message: `Failed to resume SDK process: ${message}`, type: 'spawn_error' },
-                } as ClaudeStreamEvent);
-                return;
-            }
-
-            this.processes.set(session.id, sp);
+        let sp: SdkProcess;
+        try {
+            sp = startSdkProcess({
+                session,
+                project,
+                agent,
+                prompt: resumePrompt ?? '',
+                approvalManager: this.approvalManager,
+                onEvent: (event) => this.handleEvent(session.id, event),
+                onExit: (code) => this.handleExit(session.id, code),
+                onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
+                onApiOutage: () => this.handleApiOutage(session.id),
+                mcpServers,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(`Failed to resume SDK process for session ${session.id}`, { error: message });
+            updateSessionStatus(this.db, session.id, 'error');
+            this.emitEvent(session.id, {
+                type: 'error',
+                error: { message: `Failed to resume SDK process: ${message}`, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            return;
         }
+
+        this.processes.set(session.id, sp);
 
         this.sessionMeta.set(session.id, {
             startedAt: Date.now(),
             source: (session as { source?: string }).source ?? 'web',
             restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
+            lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
         });
         const proc = this.processes.get(session.id);
         if (proc) {
             updateSessionPid(this.db, session.id, proc.pid);
         }
         updateSessionStatus(this.db, session.id, 'running');
+
+        // Start stable period timer — resets restart counter after sustained uptime
+        this.startStableTimer(session.id);
     }
 
     stopProcess(sessionId: string): void {
@@ -247,6 +254,7 @@ export class ProcessManager {
             cp.kill();
             this.processes.delete(sessionId);
             this.sessionMeta.delete(sessionId);
+            this.clearStableTimer(sessionId);
             this.approvalManager.cancelSession(sessionId);
             updateSessionPid(this.db, sessionId, null);
             updateSessionStatus(this.db, sessionId, 'stopped');
@@ -312,10 +320,60 @@ export class ProcessManager {
             clearInterval(this.timeoutTimer);
             this.timeoutTimer = null;
         }
+        for (const timer of this.stableTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.stableTimers.clear();
         this.approvalManager.shutdown();
         for (const [sessionId] of this.processes) {
             this.stopProcess(sessionId);
         }
+    }
+
+    private handleApiOutage(sessionId: string): void {
+        log.warn(`API outage detected — pausing session ${sessionId} (not counted toward restart budget)`);
+
+        const cp = this.processes.get(sessionId);
+        if (cp) {
+            cp.kill();
+            this.processes.delete(sessionId);
+        }
+
+        this.clearStableTimer(sessionId);
+        this.pausedSessions.add(sessionId);
+        this.approvalManager.cancelSession(sessionId);
+        updateSessionPid(this.db, sessionId, null);
+        updateSessionStatus(this.db, sessionId, 'paused');
+
+        this.emitEvent(sessionId, {
+            type: 'error',
+            error: { message: 'Session paused due to API outage — use POST /api/sessions/:id/resume to restart', type: 'api_outage' },
+        } as ClaudeStreamEvent);
+    }
+
+    resumeSession(sessionId: string): boolean {
+        if (!this.pausedSessions.has(sessionId)) return false;
+
+        this.pausedSessions.delete(sessionId);
+        const session = getSession(this.db, sessionId);
+        if (!session) {
+            log.warn(`Cannot resume session ${sessionId} — not found in DB`);
+            return false;
+        }
+
+        // Reset restart counter for a clean slate after resume
+        const meta = this.sessionMeta.get(sessionId);
+        if (meta) {
+            meta.restartCount = 0;
+        }
+
+        log.info(`Resuming paused session ${sessionId}`);
+        this.resumeProcess(session);
+        return true;
+    }
+
+    isPaused(sessionId: string): boolean {
+        return this.pausedSessions.has(sessionId);
     }
 
     private handleEvent(sessionId: string, event: ClaudeStreamEvent): void {
@@ -335,6 +393,20 @@ export class ProcessManager {
                 event.total_cost_usd,
                 event.num_turns ?? 0,
             );
+
+            // Record daily API cost delta
+            const meta = this.sessionMeta.get(sessionId);
+            if (meta) {
+                const delta = event.total_cost_usd - meta.lastKnownCostUsd;
+                if (delta > 0) {
+                    try {
+                        recordApiCost(this.db, delta);
+                    } catch (err) {
+                        log.warn(`Failed to record API cost`, { error: err instanceof Error ? err.message : String(err) });
+                    }
+                }
+                meta.lastKnownCostUsd = event.total_cost_usd;
+            }
         }
 
         this.emitEvent(sessionId, event);
@@ -344,6 +416,7 @@ export class ProcessManager {
         log.info(`Process exited for session ${sessionId}`, { code });
         const meta = this.sessionMeta.get(sessionId);
         this.processes.delete(sessionId);
+        this.clearStableTimer(sessionId);
         this.approvalManager.cancelSession(sessionId);
         updateSessionPid(this.db, sessionId, null);
 
@@ -421,6 +494,29 @@ export class ProcessManager {
                     error: err instanceof Error ? err.message : String(err),
                 });
             }
+        }
+    }
+
+    private startStableTimer(sessionId: string): void {
+        this.clearStableTimer(sessionId);
+        const timer = setTimeout(() => {
+            this.stableTimers.delete(sessionId);
+            const meta = this.sessionMeta.get(sessionId);
+            if (meta && meta.restartCount > 0) {
+                log.info(`Session ${sessionId} stable for ${STABLE_PERIOD_MS / 1000}s, resetting restart counter`, {
+                    previousCount: meta.restartCount,
+                });
+                meta.restartCount = 0;
+            }
+        }, STABLE_PERIOD_MS);
+        this.stableTimers.set(sessionId, timer);
+    }
+
+    private clearStableTimer(sessionId: string): void {
+        const timer = this.stableTimers.get(sessionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.stableTimers.delete(sessionId);
         }
     }
 

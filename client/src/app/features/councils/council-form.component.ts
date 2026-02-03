@@ -45,6 +45,19 @@ import type { Agent } from '../../core/models/agent.model';
                 </fieldset>
 
                 <div class="form__field">
+                    <label for="discussionRounds" class="form__label">Discussion Rounds</label>
+                    <input
+                        id="discussionRounds"
+                        type="number"
+                        formControlName="discussionRounds"
+                        class="form__input"
+                        min="0"
+                        max="10"
+                    />
+                    <p class="form__hint">Number of agent-to-agent discussion rounds between responding and reviewing. Set to 0 to skip.</p>
+                </div>
+
+                <div class="form__field">
                     <label for="chairman" class="form__label">Chairman (optional)</label>
                     <select id="chairman" class="form__input" [value]="chairmanId()" (change)="onChairmanChange($event)">
                         <option value="">None</option>
@@ -111,6 +124,7 @@ export class CouncilFormComponent implements OnInit {
     protected readonly form = this.fb.nonNullable.group({
         name: ['', Validators.required],
         description: [''],
+        discussionRounds: [2, [Validators.min(0), Validators.max(10)]],
     });
 
     protected get selectedAgentsList(): () => Agent[] {
@@ -132,6 +146,7 @@ export class CouncilFormComponent implements OnInit {
             this.form.patchValue({
                 name: council.name,
                 description: council.description,
+                discussionRounds: council.discussionRounds ?? 2,
             });
             this.selectedAgentIds.set(new Set(council.agentIds));
             this.chairmanId.set(council.chairmanAgentId ?? '');
@@ -168,14 +183,18 @@ export class CouncilFormComponent implements OnInit {
 
             if (id) {
                 await this.councilService.updateCouncil(id, {
-                    ...value,
+                    name: value.name,
+                    description: value.description,
+                    discussionRounds: value.discussionRounds,
                     agentIds,
                     chairmanAgentId: chairmanAgentId ?? null,
                 });
                 this.router.navigate(['/councils', id]);
             } else {
                 const council = await this.councilService.createCouncil({
-                    ...value,
+                    name: value.name,
+                    description: value.description,
+                    discussionRounds: value.discussionRounds,
                     agentIds,
                     chairmanAgentId,
                 });

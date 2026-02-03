@@ -11,9 +11,10 @@ export interface Session {
     initialPrompt: string;
     pid: number | null;
     totalCostUsd: number;
+    totalAlgoSpent: number;
     totalTurns: number;
     councilLaunchId: string | null;
-    councilRole: 'member' | 'reviewer' | 'chairman' | null;
+    councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
     createdAt: string;
     updatedAt: string;
 }
