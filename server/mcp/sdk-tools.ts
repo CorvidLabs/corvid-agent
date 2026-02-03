@@ -4,10 +4,14 @@ import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents } from './tool-handlers';
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
-    return createSdkMcpServer({
-        name: 'corvid-agent-tools',
-        version: '1.0.0',
-        tools: [
+    // Agent-sourced sessions (responding to another agent's message) get
+    // restricted tools: no corvid_send_message to prevent cascading
+    // agent-to-agent conversation loops that burn ALGO indefinitely.
+    const isAgentSession = ctx.sessionSource === 'agent';
+
+    const tools = [
+        // Only allow sending messages from non-agent sessions (web, algochat)
+        ...(!isAgentSession ? [
             tool(
                 'corvid_send_message',
                 'Send a message to another agent and wait for their response. ' +
@@ -21,34 +25,40 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 },
                 async (args) => handleSendMessage(ctx, args),
             ),
-            tool(
-                'corvid_save_memory',
-                'Save a private encrypted note to your memory. ' +
-                'Memories persist across sessions and are stored on-chain for audit. ' +
-                'Use a descriptive key for easy recall later.',
-                {
-                    key: z.string().describe('A short descriptive key for this memory (e.g. "user-preferences", "project-status")'),
-                    content: z.string().describe('The content to remember'),
-                },
-                async (args) => handleSaveMemory(ctx, args),
-            ),
-            tool(
-                'corvid_recall_memory',
-                'Recall previously saved memories. ' +
-                'Provide a key for exact lookup, a query for search, or neither to list recent memories.',
-                {
-                    key: z.string().optional().describe('Exact key to look up'),
-                    query: z.string().optional().describe('Search term to find across keys and content'),
-                },
-                async (args) => handleRecallMemory(ctx, args),
-            ),
-            tool(
-                'corvid_list_agents',
-                'List all available agents you can communicate with. ' +
-                'Shows agent names, IDs, and wallet addresses.',
-                {},
-                async () => handleListAgents(ctx),
-            ),
-        ],
+        ] : []),
+        tool(
+            'corvid_save_memory',
+            'Save a private encrypted note to your memory. ' +
+            'Memories persist across sessions and are stored on-chain for audit. ' +
+            'Use a descriptive key for easy recall later.',
+            {
+                key: z.string().describe('A short descriptive key for this memory (e.g. "user-preferences", "project-status")'),
+                content: z.string().describe('The content to remember'),
+            },
+            async (args) => handleSaveMemory(ctx, args),
+        ),
+        tool(
+            'corvid_recall_memory',
+            'Recall previously saved memories. ' +
+            'Provide a key for exact lookup, a query for search, or neither to list recent memories.',
+            {
+                key: z.string().optional().describe('Exact key to look up'),
+                query: z.string().optional().describe('Search term to find across keys and content'),
+            },
+            async (args) => handleRecallMemory(ctx, args),
+        ),
+        tool(
+            'corvid_list_agents',
+            'List all available agents you can communicate with. ' +
+            'Shows agent names, IDs, and wallet addresses.',
+            {},
+            async () => handleListAgents(ctx),
+        ),
+    ];
+
+    return createSdkMcpServer({
+        name: 'corvid-agent-tools',
+        version: '1.0.0',
+        tools,
     });
 }

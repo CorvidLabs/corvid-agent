@@ -38,6 +38,10 @@ export interface McpToolContext {
     agentDirectory: AgentDirectory;
     agentWalletService: AgentWalletService;
     depth?: number;
+    /** Session source — 'agent' sessions cannot use corvid_send_message. */
+    sessionSource?: string;
+    /** Emit a status message for UI progress updates (e.g. "Querying CorvidLabs..."). */
+    emitStatus?: (message: string) => void;
 }
 
 function textResult(text: string): CallToolResult {
@@ -93,12 +97,16 @@ export async function handleSendMessage(
             thread: args.thread ?? 'new',
         });
 
+        ctx.emitStatus?.(`Querying ${match.agentName}...`);
+
         const { response, threadId } = await ctx.agentMessenger.invokeAndWait({
             fromAgentId: ctx.agentId,
             toAgentId: match.agentId,
             content: args.message,
             threadId: args.thread,
         });
+
+        ctx.emitStatus?.(`Received reply from ${match.agentName}`);
 
         return textResult(`${response}\n\n[thread: ${threadId}]`);
     } catch (err) {

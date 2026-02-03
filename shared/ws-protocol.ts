@@ -11,7 +11,7 @@ export type ClientMessage =
 export type ServerMessage =
     | { type: 'session_event'; sessionId: string; event: StreamEvent }
     | { type: 'session_status'; sessionId: string; status: string }
-    | { type: 'algochat_message'; participant: string; content: string; direction: 'inbound' | 'outbound' }
+    | { type: 'algochat_message'; participant: string; content: string; direction: 'inbound' | 'outbound' | 'status' }
     | { type: 'agent_balance'; agentId: string; balance: number; funded: number }
     | { type: 'chat_stream'; agentId: string; chunk: string; done: boolean }
     | { type: 'chat_tool_use'; agentId: string; toolName: string; input: string }

@@ -80,7 +80,13 @@ async function initAlgoChat(): Promise<void> {
 
     // Initialize agent wallet service on the agent network (localnet for funding/keys)
     agentWalletService = new AgentWalletService(db, agentNetworkConfig, agentService);
-    algochatBridge.setAgentWalletService(agentWalletService);
+
+    // Only let the bridge use agent wallets if both networks match;
+    // otherwise the bridge (testnet) would try to send from wallets
+    // that only have funds on localnet.
+    if (algochatConfig.agentNetwork === algochatConfig.network) {
+        algochatBridge.setAgentWalletService(agentWalletService);
+    }
 
     // Initialize agent directory and messenger on the agent network
     agentDirectory = new AgentDirectory(db, agentWalletService);

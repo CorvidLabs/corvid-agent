@@ -69,7 +69,7 @@ export class ProcessManager {
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
-    private buildMcpContext(agentId: string): McpToolContext | null {
+    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string): McpToolContext | null {
         if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
         return {
             agentId,
@@ -77,6 +77,10 @@ export class ProcessManager {
             agentMessenger: this.mcpMessenger,
             agentDirectory: this.mcpDirectory,
             agentWalletService: this.mcpWalletService,
+            sessionSource,
+            emitStatus: sessionId
+                ? (message: string) => this.emitEvent(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
+                : undefined,
         };
     }
 
@@ -118,7 +122,7 @@ export class ProcessManager {
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;
@@ -200,7 +204,7 @@ export class ProcessManager {
 
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;

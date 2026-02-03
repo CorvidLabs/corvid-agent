@@ -12,7 +12,7 @@ import {
 
 export interface TerminalMessage {
     content: string;
-    direction: 'inbound' | 'outbound';
+    direction: 'inbound' | 'outbound' | 'status';
     timestamp: Date;
 }
 
@@ -30,8 +30,9 @@ export interface ToolEvent {
             <div class="terminal__output" #outputEl role="log" aria-label="Chat messages">
                 @for (msg of messages(); track msg.timestamp) {
                     <div class="terminal__line" [class.terminal__line--inbound]="msg.direction === 'inbound'"
-                         [class.terminal__line--outbound]="msg.direction === 'outbound'">
-                        <span class="terminal__prompt">{{ msg.direction === 'inbound' ? '> ' : 'assistant> ' }}</span>
+                         [class.terminal__line--outbound]="msg.direction === 'outbound'"
+                         [class.terminal__line--status]="msg.direction === 'status'">
+                        <span class="terminal__prompt">{{ msg.direction === 'inbound' ? '> ' : msg.direction === 'status' ? '... ' : 'assistant> ' }}</span>
                         <span class="terminal__text" [innerHTML]="renderMarkdown(msg.content)"></span>
                         <button class="terminal__copy" (click)="copyMessage(msg.content)" aria-label="Copy message">cp</button>
                     </div>
@@ -106,6 +107,8 @@ export interface ToolEvent {
         }
         .terminal__line--inbound .terminal__prompt { color: var(--accent-cyan); }
         .terminal__line--outbound .terminal__prompt { color: #7ee787; }
+        .terminal__line--status .terminal__prompt { color: var(--accent-amber, #ffaa00); }
+        .terminal__line--status { opacity: 0.7; font-style: italic; }
         .terminal__line--streaming { opacity: 0.9; }
         .terminal__prompt { font-weight: 700; user-select: none; }
         .terminal__text { color: #c9d1d9; }

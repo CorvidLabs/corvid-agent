@@ -27,7 +27,7 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
 
-const SUBSCRIPTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const SUBSCRIPTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes (activity resets timer)
 const PUBLIC_KEY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export type AlgoChatEventCallback = (
@@ -707,30 +707,105 @@ export class AlgoChatBridge {
             }
         };
 
+        const resetTimer = () => {
+            this.setSubscriptionTimer(sessionId, () => {
+                log.warn(`Subscription timeout for session ${sessionId}`);
+                sendOnce();
+            });
+        };
+
+        let statusEmitted = false;
+        let agentQueryCount = 0;
+        let currentTextBlock = '';
+        let inTextBlock = false;
+        let currentBlockIndex = -1;
+
+        const flushTextBlock = () => {
+            const text = currentTextBlock.trim();
+            if (text.length > 0) {
+                // Show the agent's intermediate text as a status update
+                // Truncate long blocks to a reasonable preview
+                const preview = text.length > 300
+                    ? text.slice(0, 300) + '...'
+                    : text;
+                this.emitEvent(participant, preview, 'status');
+            }
+            currentTextBlock = '';
+            inTextBlock = false;
+        };
+
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
+            // Emit a "thinking" status once when the agent starts responding
+            if (event.type === 'assistant' && !statusEmitted) {
+                statusEmitted = true;
+                this.emitEvent(participant, 'Agent is processing your message...', 'status');
+            }
+
+            // Forward named status events from tool handlers (e.g. "Querying CorvidLabs...")
+            if ((event as { type: string }).type === 'tool_status') {
+                const message = (event as unknown as { message: string }).message;
+                if (message) {
+                    this.emitEvent(participant, message, 'status');
+                    resetTimer();
+                }
+                return;
+            }
+
+            // Track text content blocks — stream agent's intermediate text to the feed
+            if (event.type === 'content_block_start') {
+                const block = event.content_block;
+                if (block?.type === 'text') {
+                    inTextBlock = true;
+                    currentTextBlock = '';
+                    currentBlockIndex = (event as unknown as { index?: number }).index ?? -1;
+                } else if (block?.type === 'tool_use') {
+                    // Flush any pending text before tool use starts
+                    if (inTextBlock) flushTextBlock();
+                    const toolName = (block as unknown as { name?: string }).name;
+                    if (toolName === 'corvid_send_message') {
+                        agentQueryCount++;
+                    }
+                }
+            }
+
+            // Accumulate streaming text deltas
+            if (event.type === 'content_block_delta' && event.delta?.text && inTextBlock) {
+                currentTextBlock += event.delta.text;
+                resetTimer();
+            }
+
+            // Text block finished — flush it as a status update
+            if (event.type === 'content_block_stop' && inTextBlock) {
+                flushTextBlock();
+            }
+
             if (event.type === 'assistant' && event.message?.content) {
                 responseBuffer += extractContentText(event.message.content);
+                resetTimer(); // Activity detected — reset timeout
             }
 
             // Each 'result' marks end of a turn — save and reset
             if (event.type === 'result') {
+                if (inTextBlock) flushTextBlock();
+                if (agentQueryCount > 0) {
+                    this.emitEvent(participant, `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`, 'status');
+                }
                 lastTurnResponse = responseBuffer;
                 responseBuffer = '';
+                resetTimer(); // Turn completed — reset timeout
             }
 
             // Send only the last turn's response when the session fully exits
             if (event.type === 'session_exited') {
+                if (inTextBlock) flushTextBlock();
                 sendOnce();
             }
         };
 
         this.processManager.subscribe(sessionId, callback);
-        this.setSubscriptionTimer(sessionId, () => {
-            log.warn(`Subscription timeout for session ${sessionId}`);
-            sendOnce();
-        });
+        resetTimer();
     }
 
     private subscribeForLocalResponse(sessionId: string, sendFn: LocalChatSendFn): void {
@@ -970,7 +1045,7 @@ export class AlgoChatBridge {
     private emitEvent(
         participant: string,
         content: string,
-        direction: 'inbound' | 'outbound',
+        direction: 'inbound' | 'outbound' | 'status',
         fee?: number,
     ): void {
         for (const cb of this.eventCallbacks) {

@@ -236,7 +236,8 @@ export class AgentMessenger {
         });
 
         updateAgentMessageStatus(this.db, agentMessage.id, 'processing', { sessionId: session.id });
-        this.emitMessageUpdate(agentMessage.id);
+        // Note: don't emit here — 'sent' already emitted the initial update.
+        // Emitting 'processing' would cause duplicate SEND entries in the feed.
 
         // Track initial on-chain send cost against the new session
         if (txid && paymentMicro > 0) {
