@@ -5,9 +5,9 @@ import { listProjects, getProject, createProject, updateProject, deleteProject }
 import { listAgents, getAgent, createAgent, updateAgent, deleteAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding } from '../db/agents';
 import {
     listSessions,
-    getSession,
+    getSession as _getSession,
     createSession,
-    updateSession,
+    updateSession as _updateSession,
     deleteSession,
     getSessionMessages,
     addSessionMessage,

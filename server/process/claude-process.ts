@@ -121,8 +121,8 @@ function buildArgs(
     project: Project,
     agent: Agent | null,
     resume?: boolean,
-    prompt?: string,
-    mcpEnabled?: boolean,
+    _prompt?: string,
+    _mcpEnabled?: boolean,
 ): string[] {
     const args: string[] = [
         '--output-format', 'stream-json',

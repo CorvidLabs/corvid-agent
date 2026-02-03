@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Project, CreateProjectInput, UpdateProjectInput } from '../../shared/types';
 
 interface ProjectRow {
@@ -80,7 +80,7 @@ export function updateProject(db: Database, id: string, input: UpdateProjectInpu
     fields.push("updated_at = datetime('now')");
     values.push(id);
 
-    db.query(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    db.query(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
     return getProject(db, id);
 }
 

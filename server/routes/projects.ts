@@ -64,7 +64,7 @@ async function handleUpdate(req: Request, db: Database, id: string): Promise<Res
     return project ? json(project) : json({ error: 'Not found' }, 404);
 }
 
-export async function handleBrowseDirs(req: Request, url: URL): Promise<Response> {
+export async function handleBrowseDirs(_req: Request, url: URL): Promise<Response> {
     const rawPath = url.searchParams.get('path') || homedir();
     const showHidden = url.searchParams.get('showHidden') === '1';
     const dirPath = resolve(rawPath);

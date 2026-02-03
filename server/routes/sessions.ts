@@ -19,12 +19,12 @@ function json(data: unknown, status: number = 200): Response {
     });
 }
 
-export function handleSessionRoutes(
+export async function handleSessionRoutes(
     req: Request,
     url: URL,
     db: Database,
     processManager: ProcessManager,
-): Response | null {
+): Promise<Response | null> {
     const path = url.pathname;
     const method = req.method;
 

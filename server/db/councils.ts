@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type {
     Council,
     CouncilDiscussionMessage,
@@ -133,7 +133,7 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
         if (fields.length > 0) {
             fields.push("updated_at = datetime('now')");
             values.push(id);
-            db.query(`UPDATE councils SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+            db.query(`UPDATE councils SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
         }
 
         if (input.agentIds !== undefined) {

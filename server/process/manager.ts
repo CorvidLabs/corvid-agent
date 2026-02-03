@@ -426,7 +426,10 @@ export class ProcessManager {
         this.emitEvent(sessionId, {
             type: 'session_exited',
             session_id: sessionId,
-            result: { cost_usd: 0, duration_ms: 0, num_turns: 0 },
+            result: 'exited',
+            total_cost_usd: 0,
+            duration_ms: 0,
+            num_turns: 0,
         } as ClaudeStreamEvent);
 
         // Auto-restart for AlgoChat sessions on non-zero exit
