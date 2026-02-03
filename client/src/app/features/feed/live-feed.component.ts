@@ -85,7 +85,7 @@ interface FeedEntry {
                              [attr.data-direction]="entry.direction"
                              [class.feed__entry--expanded]="expandedIds().has(entry.id)"
                              [style.border-left-color]="agentColor(entry.colorIndex)"
-                             (click)="toggleExpand(entry.id)">
+                             (click)="entry.direction !== 'agent-processing' && toggleExpand(entry.id)">
                             <div class="feed__meta">
                                 <span class="feed__time">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
                                 <span class="feed__direction" [attr.data-dir]="entry.direction">

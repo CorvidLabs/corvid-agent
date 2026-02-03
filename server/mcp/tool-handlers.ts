@@ -20,9 +20,12 @@ function sendKey(agentId: string, toAgent: string, message: string): string {
     return `${agentId}:${toAgent}:${message.slice(0, 200)}`;
 }
 
+/** Returns true if this key was already sent within the dedup window.
+ *  First call with a given key records it and returns false (allow).
+ *  Subsequent calls within the window return true (duplicate). */
 function isDuplicateSend(key: string): boolean {
     const now = Date.now();
-    // Prune old entries
+    // Prune expired entries
     for (const [k, ts] of recentSends) {
         if (now - ts > DEDUP_WINDOW_MS) recentSends.delete(k);
     }

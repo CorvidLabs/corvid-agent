@@ -9,7 +9,7 @@ import {
     updateConversationRound,
     listConversations,
 } from '../db/sessions';
-import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
+import { getAgent, getAlgochatEnabledAgents, listAgents } from '../db/agents';
 import { createSession } from '../db/sessions';
 import type { ClaudeStreamEvent } from '../process/types';
 import { extractContentText } from '../process/types';
@@ -410,8 +410,17 @@ export class AlgoChatBridge {
             const groupChunks: Map<number, typeof messages> = new Map();
             const regularMessages: typeof messages = [];
 
+            // Collect known agent wallet addresses to filter outbound messages
+            // sent from per-agent wallets (which the sync sees as 'received')
+            const agentWalletAddresses = this.getAgentWalletAddresses();
+
             for (const msg of messages) {
                 if (msg.direction === 'sent') continue;
+
+                // Skip messages sent by our agent wallets (sync sees them as
+                // 'received' because the sender doesn't match the main account)
+                const sender = (msg as unknown as { sender?: string }).sender;
+                if (sender && agentWalletAddresses.has(sender)) continue;
 
                 // Dedup by transaction ID — skip messages we've already processed
                 const txid = (msg as unknown as { id?: string }).id;
@@ -433,14 +442,12 @@ export class AlgoChatBridge {
                 }
             }
 
-            // Prune old txids to prevent unbounded growth (keep last 500)
+            // Prune old txids to prevent unbounded growth (keep last 500).
+            // JS Sets iterate in insertion order, so dropping from the front
+            // removes the oldest entries.
             if (this.processedTxids.size > 500) {
-                const excess = this.processedTxids.size - 500;
-                const iter = this.processedTxids.values();
-                for (let i = 0; i < excess; i++) iter.next();
-                const keep = new Set<string>();
-                for (const v of iter) keep.add(v);
-                this.processedTxids = keep;
+                const all = [...this.processedTxids];
+                this.processedTxids = new Set(all.slice(all.length - 500));
             }
 
             // Reassemble group messages
@@ -589,6 +596,12 @@ export class AlgoChatBridge {
         fee?: number,
     ): Promise<void> {
         log.info(`Message from ${participant}`, { content: content.slice(0, 100), fee });
+
+        // Safety guard: reject raw group chunks that weren't reassembled
+        if (/^\[GRP:\d+\/\d+\]/.test(content)) {
+            log.debug('Skipping raw group chunk in handleIncomingMessage', { content: content.slice(0, 40) });
+            return;
+        }
 
         // Check for approval responses before anything else
         if (this.approvalManager) {
@@ -1038,6 +1051,28 @@ export class AlgoChatBridge {
             workingDir: process.cwd(),
         });
         return project.id;
+    }
+
+    /** Cache of agent wallet addresses, refreshed lazily. */
+    private cachedAgentWallets: Set<string> | null = null;
+    private cachedAgentWalletsAt = 0;
+
+    private getAgentWalletAddresses(): Set<string> {
+        const now = Date.now();
+        // Refresh cache every 60s
+        if (this.cachedAgentWallets && now - this.cachedAgentWalletsAt < 60_000) {
+            return this.cachedAgentWallets;
+        }
+        const agents = listAgents(this.db);
+        const addrs = new Set<string>();
+        for (const a of agents) {
+            if (a.walletAddress) addrs.add(a.walletAddress);
+        }
+        // Also include the main chat account address
+        addrs.add(this.service.chatAccount.address);
+        this.cachedAgentWallets = addrs;
+        this.cachedAgentWalletsAt = now;
+        return addrs;
     }
 
     private emitEvent(
