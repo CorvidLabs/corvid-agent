@@ -419,7 +419,6 @@ export class AlgoChatBridge {
         fee?: number,
     ): Promise<void> {
         log.info(`Message from ${participant}`, { content: content.slice(0, 100), fee });
-        this.emitEvent(participant, content, 'inbound', fee);
 
         // Check for approval responses before anything else
         if (this.approvalManager) {
@@ -447,6 +446,9 @@ export class AlgoChatBridge {
                 return;
             }
         }
+
+        // Emit feed event only for external (non-agent) messages
+        this.emitEvent(participant, content, 'inbound', fee);
 
         // Check for commands first
         if (this.handleCommand(participant, content)) return;
