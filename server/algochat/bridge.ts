@@ -710,6 +710,7 @@ export class AlgoChatBridge {
         const sendOnce = () => {
             if (sent) return;
             sent = true;
+            stopProgressTimer();
             this.processManager.unsubscribe(sessionId, callback);
             this.chainSubscriptions.delete(sessionId);
             this.clearSubscriptionTimer(sessionId);
@@ -728,9 +729,33 @@ export class AlgoChatBridge {
         };
 
         let statusEmitted = false;
+        let ackSent = false;
         let agentQueryCount = 0;
         let currentTextBlock = '';
         let inTextBlock = false;
+        let progressTimer: ReturnType<typeof setInterval> | null = null;
+        const PROGRESS_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+        // Send periodic on-chain progress updates so the user's AlgoChat
+        // client knows the agent is still working
+        const startProgressTimer = () => {
+            if (progressTimer) return;
+            progressTimer = setInterval(() => {
+                if (sent) { stopProgressTimer(); return; }
+                const msg = agentQueryCount > 0
+                    ? `Still working — queried ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''} so far...`
+                    : `Still processing your request...`;
+                this.sendResponse(participant, `[Status] ${msg}`).catch(() => {});
+                this.emitEvent(participant, msg, 'status');
+            }, PROGRESS_INTERVAL_MS);
+        };
+
+        const stopProgressTimer = () => {
+            if (progressTimer) {
+                clearInterval(progressTimer);
+                progressTimer = null;
+            }
+        };
 
         const flushTextBlock = () => {
             const text = currentTextBlock.trim();
@@ -749,10 +774,17 @@ export class AlgoChatBridge {
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
-            // Emit a "thinking" status once when the agent starts responding
+            // Send an immediate on-chain acknowledgment so the user knows
+            // the agent received their message
             if (event.type === 'assistant' && !statusEmitted) {
                 statusEmitted = true;
                 this.emitEvent(participant, 'Agent is processing your message...', 'status');
+
+                if (!ackSent) {
+                    ackSent = true;
+                    this.sendResponse(participant, '[Status] Received your message — working on it now.').catch(() => {});
+startProgressTimer();
+                }
             }
 
             // Forward named status events from tool handlers (e.g. "Querying CorvidLabs...")
@@ -760,7 +792,7 @@ export class AlgoChatBridge {
                 const message = (event as unknown as { message: string }).message;
                 if (message) {
                     this.emitEvent(participant, message, 'status');
-                    resetTimer();
+resetTimer();
                 }
                 return;
             }
@@ -811,6 +843,7 @@ export class AlgoChatBridge {
             // Send only the last turn's response when the session fully exits
             if (event.type === 'session_exited') {
                 if (inTextBlock) flushTextBlock();
+                stopProgressTimer();
                 sendOnce();
             }
         };
