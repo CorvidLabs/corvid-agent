@@ -263,6 +263,41 @@ export class AgentMessenger {
         toAgentId: string,
     ): void {
         let responseBuffer = '';
+        let lastTurnResponse = '';
+        let completed = false;
+
+        const finish = () => {
+            if (completed) return;
+            completed = true;
+            this.processManager.unsubscribe(sessionId, callback);
+
+            const response = (responseBuffer.trim() || lastTurnResponse.trim());
+            if (!response) {
+                updateAgentMessageStatus(this.db, messageId, 'failed');
+                this.emitMessageUpdate(messageId);
+                return;
+            }
+
+            // Send the response back on-chain from B → A
+            this.sendOnChainMessage(toAgentId, fromAgentId, response, 0, messageId, sessionId)
+                .then((responseTxid) => {
+                    updateAgentMessageStatus(this.db, messageId, 'completed', {
+                        response,
+                        responseTxid: responseTxid ?? undefined,
+                    });
+                    this.emitMessageUpdate(messageId);
+                    log.info(`Agent message completed`, { messageId, responseTxid });
+                })
+                .catch((err) => {
+                    // Still mark completed even if on-chain response fails
+                    updateAgentMessageStatus(this.db, messageId, 'completed', { response });
+                    this.emitMessageUpdate(messageId);
+                    log.warn('On-chain response send failed', {
+                        messageId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+        };
 
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
@@ -271,35 +306,15 @@ export class AgentMessenger {
                 responseBuffer += extractContentText(event.message.content);
             }
 
-            if (event.type === 'result' || event.type === 'session_exited') {
-                this.processManager.unsubscribe(sessionId, callback);
+            // Each 'result' marks end of a turn — save and reset
+            if (event.type === 'result') {
+                lastTurnResponse = responseBuffer;
+                responseBuffer = '';
+            }
 
-                const response = responseBuffer.trim();
-                if (!response) {
-                    updateAgentMessageStatus(this.db, messageId, 'failed');
-                    this.emitMessageUpdate(messageId);
-                    return;
-                }
-
-                // Send the response back on-chain from B → A
-                this.sendOnChainMessage(toAgentId, fromAgentId, response, 0, messageId, sessionId)
-                    .then((responseTxid) => {
-                        updateAgentMessageStatus(this.db, messageId, 'completed', {
-                            response,
-                            responseTxid: responseTxid ?? undefined,
-                        });
-                        this.emitMessageUpdate(messageId);
-                        log.info(`Agent message completed`, { messageId, responseTxid });
-                    })
-                    .catch((err) => {
-                        // Still mark completed even if on-chain response fails
-                        updateAgentMessageStatus(this.db, messageId, 'completed', { response });
-                        this.emitMessageUpdate(messageId);
-                        log.warn('On-chain response send failed', {
-                            messageId,
-                            error: err instanceof Error ? err.message : String(err),
-                        });
-                    });
+            // Only finalize when the session fully exits
+            if (event.type === 'session_exited') {
+                finish();
             }
         };
 
@@ -433,13 +448,24 @@ export class AgentMessenger {
 
         return new Promise<{ response: string; threadId: string }>((resolve, reject) => {
             let responseBuffer = '';
+            let lastTurnResponse = '';
             let settled = false;
 
-            const timer = setTimeout(() => {
+            const settle = (response: string | null, error?: string) => {
                 if (settled) return;
                 settled = true;
+                clearTimeout(timer);
                 this.processManager.unsubscribe(sessionId, callback);
-                reject(new Error(`Agent invoke timed out after ${timeoutMs}ms`));
+                if (response) {
+                    resolve({ response, threadId });
+                } else {
+                    reject(new Error(error ?? 'Agent returned empty response'));
+                }
+            };
+
+            const timer = setTimeout(() => {
+                const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                settle(response || null, `Agent invoke timed out after ${timeoutMs}ms`);
             }, timeoutMs);
 
             const callback = (sid: string, event: ClaudeStreamEvent) => {
@@ -449,17 +475,16 @@ export class AgentMessenger {
                     responseBuffer += extractContentText(event.message.content);
                 }
 
-                if (event.type === 'result' || event.type === 'session_exited') {
-                    settled = true;
-                    clearTimeout(timer);
-                    this.processManager.unsubscribe(sessionId, callback);
+                // Each 'result' marks end of a turn — save and reset
+                if (event.type === 'result') {
+                    lastTurnResponse = responseBuffer;
+                    responseBuffer = '';
+                }
 
-                    const response = responseBuffer.trim();
-                    if (response) {
-                        resolve({ response, threadId });
-                    } else {
-                        reject(new Error('Agent returned empty response'));
-                    }
+                // Only resolve when the session fully exits
+                if (event.type === 'session_exited') {
+                    const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                    settle(response || null);
                 }
             };
 
@@ -469,17 +494,8 @@ export class AgentMessenger {
             if (!this.processManager.isRunning(sessionId)) {
                 // Give a brief grace period for final events
                 setTimeout(() => {
-                    if (!settled) {
-                        settled = true;
-                        clearTimeout(timer);
-                        this.processManager.unsubscribe(sessionId, callback);
-                        const response = responseBuffer.trim();
-                        if (response) {
-                            resolve({ response, threadId });
-                        } else {
-                            reject(new Error('Agent session already exited with no response'));
-                        }
-                    }
+                    const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                    settle(response || null, 'Agent session already exited with no response');
                 }, 500);
             }
         });

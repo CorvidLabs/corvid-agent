@@ -58,18 +58,36 @@ async function initAlgoChat(): Promise<void> {
     const service = await initAlgoChatService(algochatConfig);
     if (!service) return;
 
+    // If agent network differs from main network, create a separate service for agents
+    let agentService = service;
+    if (algochatConfig.agentNetwork !== algochatConfig.network) {
+        const agentConfig = { ...algochatConfig, network: algochatConfig.agentNetwork };
+        const localService = await initAlgoChatService(agentConfig);
+        if (localService) {
+            agentService = localService;
+            log.info(`Agent network: ${algochatConfig.agentNetwork} (separate from ${algochatConfig.network})`);
+        } else {
+            log.warn(`Failed to init agent network (${algochatConfig.agentNetwork}), falling back to ${algochatConfig.network}`);
+        }
+    }
+
+    // Use the agent-network config for wallet and messenger operations
+    const agentNetworkConfig = algochatConfig.agentNetwork !== algochatConfig.network
+        ? { ...algochatConfig, network: algochatConfig.agentNetwork }
+        : algochatConfig;
+
     algochatBridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
 
-    // Initialize agent wallet service
-    agentWalletService = new AgentWalletService(db, algochatConfig, service);
+    // Initialize agent wallet service on the agent network (localnet for funding/keys)
+    agentWalletService = new AgentWalletService(db, agentNetworkConfig, agentService);
     algochatBridge.setAgentWalletService(agentWalletService);
 
-    // Initialize agent directory and messenger
+    // Initialize agent directory and messenger on the agent network
     agentDirectory = new AgentDirectory(db, agentWalletService);
     algochatBridge.setAgentDirectory(agentDirectory);
     algochatBridge.setApprovalManager(processManager.approvalManager);
     algochatBridge.setWorkTaskService(workTaskService);
-    agentMessenger = new AgentMessenger(db, algochatConfig, service, agentWalletService, agentDirectory, processManager);
+    agentMessenger = new AgentMessenger(db, agentNetworkConfig, agentService, agentWalletService, agentDirectory, processManager);
     agentMessenger.setWorkTaskService(workTaskService);
 
     // Register MCP services so agent sessions get corvid_* tools
@@ -80,7 +98,7 @@ async function initAlgoChat(): Promise<void> {
         broadcastAlgoChatMessage(server, participant, content, direction);
     });
 
-    // Publish encryption keys for all existing agent wallets on localnet
+    // Publish encryption keys for all existing agent wallets
     await agentWalletService.publishAllKeys();
 
     algochatBridge.start();

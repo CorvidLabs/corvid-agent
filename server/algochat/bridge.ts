@@ -22,6 +22,7 @@ import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
+import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
@@ -69,11 +70,15 @@ export class AlgoChatBridge {
     private localSubscriptions: Map<string, (sid: string, event: ClaudeStreamEvent) => void> = new Map();
     private localSendFns: Map<string, LocalChatSendFn> = new Map();
     private localEventFns: Map<string, LocalChatEventFn> = new Map();
+    private chainSubscriptions: Set<string> = new Set();
+    private processedTxids: Set<string> = new Set();
     private subscriptionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private pskManager: PSKManager | null = null;
     private approvalManager: ApprovalManager | null = null;
     private workTaskService: WorkTaskService | null = null;
     private fastPollTimer: ReturnType<typeof setInterval> | null = null;
+    private discoveryTimer: ReturnType<typeof setInterval> | null = null;
+    private sessionNotificationCallback: ((sid: string, event: ClaudeStreamEvent) => void) | null = null;
 
     constructor(
         db: Database,
@@ -126,8 +131,10 @@ export class AlgoChatBridge {
     }
 
     start(): void {
+        this.seedConversations();
         this.service.syncManager.start();
         this.pskManager?.start(this.config.syncInterval);
+        this.startDiscoveryPolling();
         log.info('Started listening for messages');
     }
 
@@ -135,11 +142,18 @@ export class AlgoChatBridge {
         this.service.syncManager.stop();
         this.pskManager?.stop();
         this.stopFastPolling();
-        // Clear all subscription timers
+        this.stopDiscoveryPolling();
+        // Unsubscribe session notification handler
+        if (this.sessionNotificationCallback) {
+            this.processManager.unsubscribeAll(this.sessionNotificationCallback);
+            this.sessionNotificationCallback = null;
+        }
+        // Clear all subscription timers and chain subscriptions
         for (const timer of this.subscriptionTimers.values()) {
             clearTimeout(timer);
         }
         this.subscriptionTimers.clear();
+        this.chainSubscriptions.clear();
         log.info('Stopped');
     }
 
@@ -392,12 +406,111 @@ export class AlgoChatBridge {
 
     private setupMessageHandler(): void {
         this.service.syncManager.on('onMessagesReceived', (participant, messages) => {
+            // Separate group chunks from regular messages, dedup by txid
+            const groupChunks: Map<number, typeof messages> = new Map();
+            const regularMessages: typeof messages = [];
+
             for (const msg of messages) {
-                this.handleIncomingMessage(participant, msg.content, msg.confirmedRound, (msg as unknown as Record<string, unknown>).fee as number | undefined).catch((err) => {
+                if (msg.direction === 'sent') continue;
+
+                // Dedup by transaction ID — skip messages we've already processed
+                const txid = (msg as unknown as { id?: string }).id;
+                if (txid) {
+                    if (this.processedTxids.has(txid)) {
+                        log.debug('Skipping already-processed txid', { txid });
+                        continue;
+                    }
+                    this.processedTxids.add(txid);
+                }
+
+                const grp = parseGroupPrefix(msg.content);
+                if (grp) {
+                    const round = Number(msg.confirmedRound);
+                    if (!groupChunks.has(round)) groupChunks.set(round, []);
+                    groupChunks.get(round)!.push(msg);
+                } else {
+                    regularMessages.push(msg);
+                }
+            }
+
+            // Prune old txids to prevent unbounded growth (keep last 500)
+            if (this.processedTxids.size > 500) {
+                const excess = this.processedTxids.size - 500;
+                const iter = this.processedTxids.values();
+                for (let i = 0; i < excess; i++) iter.next();
+                const keep = new Set<string>();
+                for (const v of iter) keep.add(v);
+                this.processedTxids = keep;
+            }
+
+            // Reassemble group messages
+            for (const [round, chunks] of groupChunks) {
+                const contents = chunks.map((c) => c.content);
+                const reassembled = reassembleGroupMessage(contents);
+                if (reassembled) {
+                    const totalFee = chunks.reduce((sum, c) => {
+                        const f = (c as unknown as Record<string, unknown>).fee;
+                        return sum + (f != null ? Number(f) : 0);
+                    }, 0);
+                    log.info(`Reassembled group message (${chunks.length} chunks)`, { round });
+                    this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+                        log.error('Error handling group message', { error: err instanceof Error ? err.message : String(err) });
+                    });
+                } else {
+                    log.warn(`Incomplete group message (${chunks.length} chunks), buffering`, { round });
+                    for (const msg of chunks) {
+                        this.bufferGroupChunk(participant, msg);
+                    }
+                }
+            }
+
+            // Process regular messages
+            for (const msg of regularMessages) {
+                const fee = (msg as unknown as Record<string, unknown>).fee;
+                this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), fee != null ? Number(fee) : undefined).catch((err) => {
                     log.error('Error handling message', { error: err instanceof Error ? err.message : String(err) });
                 });
             }
         });
+    }
+
+    /** Buffer for incomplete group chunks that span multiple sync batches. */
+    private pendingGroupChunks: Map<string, { chunks: unknown[]; firstSeen: number }> = new Map();
+
+    private bufferGroupChunk(participant: string, msg: unknown): void {
+        const message = msg as { content: string; confirmedRound: number | bigint; fee?: number };
+        const round = Number(message.confirmedRound);
+        const key = `${participant}:${round}`;
+
+        if (!this.pendingGroupChunks.has(key)) {
+            this.pendingGroupChunks.set(key, { chunks: [], firstSeen: Date.now() });
+        }
+        this.pendingGroupChunks.get(key)!.chunks.push(msg);
+
+        // Try to reassemble
+        const pending = this.pendingGroupChunks.get(key)!;
+        const contents = pending.chunks.map((c) => (c as { content: string }).content);
+        const reassembled = reassembleGroupMessage(contents);
+
+        if (reassembled) {
+            this.pendingGroupChunks.delete(key);
+            const totalFee = pending.chunks.reduce((sum, c) => {
+                const f = (c as unknown as Record<string, unknown>).fee;
+                return sum + (f != null ? Number(f) : 0);
+            }, 0);
+            log.info(`Reassembled buffered group message (${contents.length} chunks)`, { round });
+            this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+                log.error('Error handling buffered group message', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+
+        // Clean up stale buffers (older than 5 minutes)
+        const now = Date.now();
+        for (const [k, v] of this.pendingGroupChunks) {
+            if (now - v.firstSeen > 5 * 60 * 1000) {
+                this.pendingGroupChunks.delete(k);
+            }
+        }
     }
 
     private setupPSKManager(): void {
@@ -419,7 +532,7 @@ export class AlgoChatBridge {
      * notifications back to the originating participant.
      */
     private setupSessionNotifications(): void {
-        this.processManager.subscribeAll((sessionId, event) => {
+        const callback = (sessionId: string, event: ClaudeStreamEvent) => {
             // Forward approval requests for AlgoChat sessions on-chain
             if (event.type === 'approval_request') {
                 const conversations = listConversations(this.db);
@@ -464,7 +577,9 @@ export class AlgoChatBridge {
                 });
                 this.sendResponse(conversation.participantAddr, `[Error: ${event.error.message}]`);
             }
-        });
+        };
+        this.sessionNotificationCallback = callback;
+        this.processManager.subscribeAll(callback);
     }
 
     private async handleIncomingMessage(
@@ -571,7 +686,26 @@ export class AlgoChatBridge {
     }
 
     private subscribeForResponse(sessionId: string, participant: string): void {
+        // Avoid duplicate subscriptions when multiple messages arrive for the same session
+        if (this.chainSubscriptions.has(sessionId)) return;
+        this.chainSubscriptions.add(sessionId);
+
         let responseBuffer = '';
+        let lastTurnResponse = '';
+        let sent = false;
+
+        const sendOnce = () => {
+            if (sent) return;
+            sent = true;
+            this.processManager.unsubscribe(sessionId, callback);
+            this.chainSubscriptions.delete(sessionId);
+            this.clearSubscriptionTimer(sessionId);
+
+            const finalText = (responseBuffer.trim() || lastTurnResponse.trim());
+            if (finalText) {
+                this.sendResponse(participant, finalText);
+            }
+        };
 
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
@@ -580,23 +714,22 @@ export class AlgoChatBridge {
                 responseBuffer += extractContentText(event.message.content);
             }
 
-            if (event.type === 'result' || event.type === 'session_exited') {
-                this.processManager.unsubscribe(sessionId, callback);
-                this.clearSubscriptionTimer(sessionId);
+            // Each 'result' marks end of a turn — save and reset
+            if (event.type === 'result') {
+                lastTurnResponse = responseBuffer;
+                responseBuffer = '';
+            }
 
-                if (responseBuffer.trim()) {
-                    this.sendResponse(participant, responseBuffer.trim());
-                }
+            // Send only the last turn's response when the session fully exits
+            if (event.type === 'session_exited') {
+                sendOnce();
             }
         };
 
         this.processManager.subscribe(sessionId, callback);
         this.setSubscriptionTimer(sessionId, () => {
             log.warn(`Subscription timeout for session ${sessionId}`);
-            this.processManager.unsubscribe(sessionId, callback);
-            if (responseBuffer.trim()) {
-                this.sendResponse(participant, responseBuffer.trim());
-            }
+            sendOnce();
         });
     }
 
@@ -878,6 +1011,79 @@ export class AlgoChatBridge {
             clearInterval(this.fastPollTimer);
             this.fastPollTimer = null;
             log.debug('Stopped fast-polling');
+        }
+    }
+
+    /**
+     * Seed the SyncManager with known conversation participants from the DB
+     * so that fetchAllConversations has something to iterate over.
+     */
+    private seedConversations(): void {
+        const conversations = listConversations(this.db);
+        for (const conv of conversations) {
+            const syncConv = this.service.syncManager.getOrCreateConversation(conv.participantAddr);
+            if (conv.lastRound > 0) {
+                // Use lastRound + 1 because minRound is inclusive and we already
+                // processed the message at lastRound in a previous run
+                syncConv.setLastFetchedRound(conv.lastRound + 1);
+            }
+        }
+        if (conversations.length > 0) {
+            log.info(`Seeded ${conversations.length} conversation(s) from DB`);
+        }
+    }
+
+    /**
+     * Periodically discover new senders by querying the indexer for
+     * incoming transactions from addresses not yet in the SyncManager.
+     */
+    private startDiscoveryPolling(): void {
+        if (this.discoveryTimer) return;
+
+        // Run immediately then on the sync interval
+        this.discoverNewSenders().catch((err) => {
+            log.warn('Discovery error', { error: err instanceof Error ? err.message : String(err) });
+        });
+
+        this.discoveryTimer = setInterval(() => {
+            this.discoverNewSenders().catch((err) => {
+                log.warn('Discovery error', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }, this.config.syncInterval);
+    }
+
+    private stopDiscoveryPolling(): void {
+        if (this.discoveryTimer) {
+            clearInterval(this.discoveryTimer);
+            this.discoveryTimer = null;
+        }
+    }
+
+    private async discoverNewSenders(): Promise<void> {
+        if (!this.service.indexerClient) return;
+
+        const myAddr = this.service.chatAccount.address;
+        const response = await this.service.indexerClient
+            .searchForTransactions()
+            .address(myAddr)
+            .addressRole('receiver')
+            .limit(50)
+            .do();
+
+        const knownParticipants = new Set(
+            this.service.syncManager.getConversations().map((c) => c.participant),
+        );
+
+        const newSenders = new Set<string>();
+        for (const tx of (response as { transactions?: Array<{ sender: string; note?: string }> }).transactions ?? []) {
+            if (tx.sender !== myAddr && tx.note && !knownParticipants.has(tx.sender)) {
+                newSenders.add(tx.sender);
+            }
+        }
+
+        for (const sender of newSenders) {
+            log.info(`Discovered new sender`, { address: sender });
+            this.service.syncManager.getOrCreateConversation(sender);
         }
     }
 }
