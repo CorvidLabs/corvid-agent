@@ -12,6 +12,7 @@ interface AgentMessageRow {
     response: string | null;
     response_txid: string | null;
     session_id: string | null;
+    thread_id: string | null;
     created_at: string;
     completed_at: string | null;
 }
@@ -28,6 +29,7 @@ function rowToAgentMessage(row: AgentMessageRow): AgentMessage {
         response: row.response,
         responseTxid: row.response_txid,
         sessionId: row.session_id,
+        threadId: row.thread_id,
         createdAt: row.created_at,
         completedAt: row.completed_at,
     };
@@ -40,13 +42,14 @@ export function createAgentMessage(
         toAgentId: string;
         content: string;
         paymentMicro?: number;
+        threadId?: string;
     },
 ): AgentMessage {
     const id = crypto.randomUUID();
     db.query(
-        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro)
-         VALUES (?, ?, ?, ?, ?)`
-    ).run(id, params.fromAgentId, params.toAgentId, params.content, params.paymentMicro ?? 0);
+        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id)
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(id, params.fromAgentId, params.toAgentId, params.content, params.paymentMicro ?? 0, params.threadId ?? null);
 
     return getAgentMessage(db, id) as AgentMessage;
 }
@@ -103,9 +106,69 @@ export function listAgentMessages(db: Database, agentId: string): AgentMessage[]
     return rows.map(rowToAgentMessage);
 }
 
+export function listRecentAgentMessages(db: Database, limit: number = 50): AgentMessage[] {
+    const rows = db.query(
+        `SELECT * FROM agent_messages
+         ORDER BY created_at DESC
+         LIMIT ?`
+    ).all(limit) as AgentMessageRow[];
+    return rows.map(rowToAgentMessage);
+}
+
+export function searchAgentMessages(
+    db: Database,
+    options: {
+        limit?: number;
+        offset?: number;
+        search?: string;
+        agentId?: string;
+        threadId?: string;
+    },
+): { messages: AgentMessage[]; total: number } {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (options.search) {
+        conditions.push('(content LIKE ? OR response LIKE ?)');
+        const pattern = `%${options.search}%`;
+        params.push(pattern, pattern);
+    }
+    if (options.agentId) {
+        conditions.push('(from_agent_id = ? OR to_agent_id = ?)');
+        params.push(options.agentId, options.agentId);
+    }
+    if (options.threadId) {
+        conditions.push('thread_id = ?');
+        params.push(options.threadId);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRow = db.query(`SELECT COUNT(*) as cnt FROM agent_messages ${where}`).get(...(params as string[])) as { cnt: number };
+    const total = countRow.cnt;
+
+    const limit = Math.min(options.limit ?? 50, 100);
+    const offset = options.offset ?? 0;
+
+    const rows = db.query(
+        `SELECT * FROM agent_messages ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).all(...(params as string[]), limit, offset) as AgentMessageRow[];
+
+    return { messages: rows.map(rowToAgentMessage), total };
+}
+
 export function getAgentMessageBySessionId(db: Database, sessionId: string): AgentMessage | null {
     const row = db.query(
         'SELECT * FROM agent_messages WHERE session_id = ?'
     ).get(sessionId) as AgentMessageRow | null;
     return row ? rowToAgentMessage(row) : null;
+}
+
+export function getThreadMessages(db: Database, threadId: string): AgentMessage[] {
+    const rows = db.query(
+        `SELECT * FROM agent_messages
+         WHERE thread_id = ?
+         ORDER BY created_at ASC`
+    ).all(threadId) as AgentMessageRow[];
+    return rows.map(rowToAgentMessage);
 }

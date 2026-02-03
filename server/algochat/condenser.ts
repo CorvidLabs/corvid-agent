@@ -12,11 +12,14 @@ export interface CondensationResult {
 /**
  * Condense a message to fit within a byte limit for on-chain transmission.
  * Uses Claude to intelligently summarize content that exceeds the limit.
+ * When a messageId is provided, a DB reference suffix is appended so the
+ * full message can be looked up from the on-chain audit trail.
  * On failure or if already within limits, returns the original content.
  */
 export async function condenseMessage(
     content: string,
     maxBytes: number = 800,
+    messageId?: string,
 ): Promise<CondensationResult> {
     const encoder = new TextEncoder();
     const originalBytes = encoder.encode(content).byteLength;
@@ -25,6 +28,15 @@ export async function condenseMessage(
         return { content, wasCondensed: false, originalBytes, condensedBytes: originalBytes };
     }
 
+    // Build a reference suffix when we have a message ID so on-chain records
+    // can point back to the full content in the database.
+    const refSuffix = messageId
+        ? ` [full: ${originalBytes}B, id:${messageId.slice(0, 8)}]`
+        : '';
+    const refSuffixBytes = encoder.encode(refSuffix).byteLength;
+    // Reserve space for the reference suffix in the condensation target
+    const condenseTarget = maxBytes - refSuffixBytes;
+
     try {
         const { default: Anthropic } = await import('@anthropic-ai/sdk');
         const client = new Anthropic();
@@ -32,7 +44,7 @@ export async function condenseMessage(
         const response = await client.messages.create({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1024,
-            system: `You are a message condenser. Your job is to condense the user's message to fit within ${maxBytes} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
+            system: `You are a message condenser. Your job is to condense the user's message to fit within ${condenseTarget} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
             messages: [
                 { role: 'user', content },
             ],
@@ -46,24 +58,27 @@ export async function condenseMessage(
         const condensedBytes = encoder.encode(condensed).byteLength;
 
         // If Claude's output still exceeds limit, truncate as last resort
-        if (condensedBytes > maxBytes) {
-            const truncated = truncateToBytes(condensed, maxBytes - 3) + '...';
-            const truncatedBytes = encoder.encode(truncated).byteLength;
+        if (condensedBytes > condenseTarget) {
+            const truncated = truncateToBytes(condensed, condenseTarget - 14) + '...';
+            const finalContent = `[condensed] ${truncated}${refSuffix}`;
+            const finalBytes = encoder.encode(finalContent).byteLength;
             log.warn('Condensed output still too large, truncating', { condensedBytes, maxBytes });
             return {
-                content: `[condensed] ${truncated}`,
+                content: finalContent,
                 wasCondensed: true,
                 originalBytes,
-                condensedBytes: truncatedBytes,
+                condensedBytes: finalBytes,
             };
         }
 
-        log.info('Message condensed', { originalBytes, condensedBytes });
+        const finalContent = `[condensed] ${condensed}${refSuffix}`;
+        const finalBytes = encoder.encode(finalContent).byteLength;
+        log.info('Message condensed', { originalBytes, condensedBytes: finalBytes });
         return {
-            content: `[condensed] ${condensed}`,
+            content: finalContent,
             wasCondensed: true,
             originalBytes,
-            condensedBytes,
+            condensedBytes: finalBytes,
         };
     } catch (err) {
         log.error('Condensation failed, truncating as fallback', {
@@ -71,12 +86,13 @@ export async function condenseMessage(
         });
 
         // Fallback: simple truncation
-        const truncated = truncateToBytes(content, maxBytes - 3) + '...';
+        const truncated = truncateToBytes(content, condenseTarget - 3) + '...';
+        const finalContent = truncated + refSuffix;
         return {
-            content: truncated,
+            content: finalContent,
             wasCondensed: true,
             originalBytes,
-            condensedBytes: encoder.encode(truncated).byteLength,
+            condensedBytes: encoder.encode(finalContent).byteLength,
         };
     }
 }
