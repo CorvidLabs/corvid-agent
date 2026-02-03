@@ -12,7 +12,7 @@ export const SELF_TEST_AGENT = {
     name: 'Self-Test Agent',
     systemPrompt: SELF_TEST_PROJECT.claudeMd,
     model: 'claude-sonnet-4-20250514',
-    permissionMode: 'bypassPermissions' as const,
+    permissionMode: 'full-auto' as const,
     allowedTools: 'Bash,Read,Write,Edit,Glob,Grep',
     maxBudgetUsd: 5.0,
     algochatEnabled: false,

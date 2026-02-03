@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../shared/types';
 
 interface AgentRow {
@@ -136,7 +136,7 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
     fields.push("updated_at = datetime('now')");
     values.push(id);
 
-    db.query(`UPDATE agents SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    db.query(`UPDATE agents SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
     return getAgent(db, id);
 }
 

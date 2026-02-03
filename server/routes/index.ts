@@ -21,7 +21,7 @@ function json(data: unknown, status: number = 200): Response {
     });
 }
 
-export function handleRequest(
+export async function handleRequest(
     req: Request,
     db: Database,
     processManager: ProcessManager,
@@ -31,7 +31,7 @@ export function handleRequest(
     workTaskService?: WorkTaskService | null,
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
-): Response | Promise<Response> | null {
+): Promise<Response | null> {
     const url = new URL(req.url);
 
     // CORS headers for dev
@@ -52,7 +52,7 @@ export function handleRequest(
     const agentResponse = handleAgentRoutes(req, url, db, agentWalletService, agentMessenger);
     if (agentResponse) return addCorsAsync(agentResponse);
 
-    const sessionResponse = handleSessionRoutes(req, url, db, processManager);
+    const sessionResponse = await handleSessionRoutes(req, url, db, processManager);
     if (sessionResponse) return addCorsAsync(sessionResponse);
 
     const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger);

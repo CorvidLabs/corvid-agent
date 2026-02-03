@@ -393,7 +393,7 @@ export class AlgoChatBridge {
     private setupMessageHandler(): void {
         this.service.syncManager.on('onMessagesReceived', (participant, messages) => {
             for (const msg of messages) {
-                this.handleIncomingMessage(participant, msg.content, msg.confirmedRound, msg.fee).catch((err) => {
+                this.handleIncomingMessage(participant, msg.content, msg.confirmedRound, (msg as unknown as Record<string, unknown>).fee as number | undefined).catch((err) => {
                     log.error('Error handling message', { error: err instanceof Error ? err.message : String(err) });
                 });
             }
@@ -452,17 +452,17 @@ export class AlgoChatBridge {
             if (event.type === 'session_exited') {
                 log.info(`AlgoChat session completed, notifying participant`, {
                     sessionId,
-                    participant: conversation.participant,
+                    participant: conversation.participantAddr,
                 });
             }
 
             if (event.type === 'error' && event.error?.message) {
                 log.warn(`AlgoChat session error, notifying participant`, {
                     sessionId,
-                    participant: conversation.participant,
+                    participant: conversation.participantAddr,
                     error: event.error.message,
                 });
-                this.sendResponse(conversation.participant, `[Error: ${event.error.message}]`);
+                this.sendResponse(conversation.participantAddr, `[Error: ${event.error.message}]`);
             }
         });
     }

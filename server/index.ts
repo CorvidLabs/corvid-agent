@@ -127,7 +127,7 @@ const server = Bun.serve<WsData>({
         }
 
         // API routes
-        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
+        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
         if (apiResponse) return apiResponse;
 
         // Mobile chat client

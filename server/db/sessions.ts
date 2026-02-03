@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type {
     Session,
     SessionMessage,
@@ -151,7 +151,7 @@ export function updateSession(db: Database, id: string, input: UpdateSessionInpu
     fields.push("updated_at = datetime('now')");
     values.push(id);
 
-    db.query(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    db.query(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
     return getSession(db, id);
 }
 
