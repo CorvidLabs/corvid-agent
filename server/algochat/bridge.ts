@@ -9,7 +9,7 @@ import {
     updateConversationRound,
     listConversations,
 } from '../db/sessions';
-import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
+import { getAgent, getAlgochatEnabledAgents, listAgents } from '../db/agents';
 import { createSession } from '../db/sessions';
 import type { ClaudeStreamEvent } from '../process/types';
 import { extractContentText } from '../process/types';
@@ -22,17 +22,18 @@ import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
+import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
 
-const SUBSCRIPTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const SUBSCRIPTION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes (activity resets timer)
 const PUBLIC_KEY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export type AlgoChatEventCallback = (
     participant: string,
     content: string,
-    direction: 'inbound' | 'outbound',
+    direction: 'inbound' | 'outbound' | 'status',
     fee?: number,
 ) => void;
 
@@ -69,11 +70,15 @@ export class AlgoChatBridge {
     private localSubscriptions: Map<string, (sid: string, event: ClaudeStreamEvent) => void> = new Map();
     private localSendFns: Map<string, LocalChatSendFn> = new Map();
     private localEventFns: Map<string, LocalChatEventFn> = new Map();
+    private chainSubscriptions: Set<string> = new Set();
+    private processedTxids: Set<string> = new Set();
     private subscriptionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private pskManager: PSKManager | null = null;
     private approvalManager: ApprovalManager | null = null;
     private workTaskService: WorkTaskService | null = null;
     private fastPollTimer: ReturnType<typeof setInterval> | null = null;
+    private discoveryTimer: ReturnType<typeof setInterval> | null = null;
+    private sessionNotificationCallback: ((sid: string, event: ClaudeStreamEvent) => void) | null = null;
 
     constructor(
         db: Database,
@@ -126,8 +131,10 @@ export class AlgoChatBridge {
     }
 
     start(): void {
+        this.seedConversations();
         this.service.syncManager.start();
         this.pskManager?.start(this.config.syncInterval);
+        this.startDiscoveryPolling();
         log.info('Started listening for messages');
     }
 
@@ -135,11 +142,18 @@ export class AlgoChatBridge {
         this.service.syncManager.stop();
         this.pskManager?.stop();
         this.stopFastPolling();
-        // Clear all subscription timers
+        this.stopDiscoveryPolling();
+        // Unsubscribe session notification handler
+        if (this.sessionNotificationCallback) {
+            this.processManager.unsubscribeAll(this.sessionNotificationCallback);
+            this.sessionNotificationCallback = null;
+        }
+        // Clear all subscription timers and chain subscriptions
         for (const timer of this.subscriptionTimers.values()) {
             clearTimeout(timer);
         }
         this.subscriptionTimers.clear();
+        this.chainSubscriptions.clear();
         log.info('Stopped');
     }
 
@@ -392,12 +406,118 @@ export class AlgoChatBridge {
 
     private setupMessageHandler(): void {
         this.service.syncManager.on('onMessagesReceived', (participant, messages) => {
+            // Separate group chunks from regular messages, dedup by txid
+            const groupChunks: Map<number, typeof messages> = new Map();
+            const regularMessages: typeof messages = [];
+
+            // Collect known agent wallet addresses to filter outbound messages
+            // sent from per-agent wallets (which the sync sees as 'received')
+            const agentWalletAddresses = this.getAgentWalletAddresses();
+
             for (const msg of messages) {
-                this.handleIncomingMessage(participant, msg.content, msg.confirmedRound, (msg as unknown as Record<string, unknown>).fee as number | undefined).catch((err) => {
+                if (msg.direction === 'sent') continue;
+
+                // Skip messages sent by our agent wallets (sync sees them as
+                // 'received' because the sender doesn't match the main account)
+                const sender = (msg as unknown as { sender?: string }).sender;
+                if (sender && agentWalletAddresses.has(sender)) continue;
+
+                // Dedup by transaction ID — skip messages we've already processed
+                const txid = (msg as unknown as { id?: string }).id;
+                if (txid) {
+                    if (this.processedTxids.has(txid)) {
+                        log.debug('Skipping already-processed txid', { txid });
+                        continue;
+                    }
+                    this.processedTxids.add(txid);
+                }
+
+                const grp = parseGroupPrefix(msg.content);
+                if (grp) {
+                    const round = Number(msg.confirmedRound);
+                    if (!groupChunks.has(round)) groupChunks.set(round, []);
+                    groupChunks.get(round)!.push(msg);
+                } else {
+                    regularMessages.push(msg);
+                }
+            }
+
+            // Prune old txids to prevent unbounded growth (keep last 500).
+            // JS Sets iterate in insertion order, so dropping from the front
+            // removes the oldest entries.
+            if (this.processedTxids.size > 500) {
+                const all = [...this.processedTxids];
+                this.processedTxids = new Set(all.slice(all.length - 500));
+            }
+
+            // Reassemble group messages
+            for (const [round, chunks] of groupChunks) {
+                const contents = chunks.map((c) => c.content);
+                const reassembled = reassembleGroupMessage(contents);
+                if (reassembled) {
+                    const totalFee = chunks.reduce((sum, c) => {
+                        const f = (c as unknown as Record<string, unknown>).fee;
+                        return sum + (f != null ? Number(f) : 0);
+                    }, 0);
+                    log.info(`Reassembled group message (${chunks.length} chunks)`, { round });
+                    this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+                        log.error('Error handling group message', { error: err instanceof Error ? err.message : String(err) });
+                    });
+                } else {
+                    log.warn(`Incomplete group message (${chunks.length} chunks), buffering`, { round });
+                    for (const msg of chunks) {
+                        this.bufferGroupChunk(participant, msg);
+                    }
+                }
+            }
+
+            // Process regular messages
+            for (const msg of regularMessages) {
+                const fee = (msg as unknown as Record<string, unknown>).fee;
+                this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), fee != null ? Number(fee) : undefined).catch((err) => {
                     log.error('Error handling message', { error: err instanceof Error ? err.message : String(err) });
                 });
             }
         });
+    }
+
+    /** Buffer for incomplete group chunks that span multiple sync batches. */
+    private pendingGroupChunks: Map<string, { chunks: unknown[]; firstSeen: number }> = new Map();
+
+    private bufferGroupChunk(participant: string, msg: unknown): void {
+        const message = msg as { content: string; confirmedRound: number | bigint; fee?: number };
+        const round = Number(message.confirmedRound);
+        const key = `${participant}:${round}`;
+
+        if (!this.pendingGroupChunks.has(key)) {
+            this.pendingGroupChunks.set(key, { chunks: [], firstSeen: Date.now() });
+        }
+        this.pendingGroupChunks.get(key)!.chunks.push(msg);
+
+        // Try to reassemble
+        const pending = this.pendingGroupChunks.get(key)!;
+        const contents = pending.chunks.map((c) => (c as { content: string }).content);
+        const reassembled = reassembleGroupMessage(contents);
+
+        if (reassembled) {
+            this.pendingGroupChunks.delete(key);
+            const totalFee = pending.chunks.reduce((sum: number, c) => {
+                const f = (c as unknown as Record<string, number | undefined>).fee;
+                return sum + (f != null ? Number(f) : 0);
+            }, 0);
+            log.info(`Reassembled buffered group message (${contents.length} chunks)`, { round });
+            this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+                log.error('Error handling buffered group message', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+
+        // Clean up stale buffers (older than 5 minutes)
+        const now = Date.now();
+        for (const [k, v] of this.pendingGroupChunks) {
+            if (now - v.firstSeen > 5 * 60 * 1000) {
+                this.pendingGroupChunks.delete(k);
+            }
+        }
     }
 
     private setupPSKManager(): void {
@@ -419,7 +539,7 @@ export class AlgoChatBridge {
      * notifications back to the originating participant.
      */
     private setupSessionNotifications(): void {
-        this.processManager.subscribeAll((sessionId, event) => {
+        const callback = (sessionId: string, event: ClaudeStreamEvent) => {
             // Forward approval requests for AlgoChat sessions on-chain
             if (event.type === 'approval_request') {
                 const conversations = listConversations(this.db);
@@ -464,7 +584,9 @@ export class AlgoChatBridge {
                 });
                 this.sendResponse(conversation.participantAddr, `[Error: ${event.error.message}]`);
             }
-        });
+        };
+        this.sessionNotificationCallback = callback;
+        this.processManager.subscribeAll(callback);
     }
 
     private async handleIncomingMessage(
@@ -474,6 +596,12 @@ export class AlgoChatBridge {
         fee?: number,
     ): Promise<void> {
         log.info(`Message from ${participant}`, { content: content.slice(0, 100), fee });
+
+        // Safety guard: reject raw group chunks that weren't reassembled
+        if (/^\[GRP:\d+\/\d+\]/.test(content)) {
+            log.debug('Skipping raw group chunk in handleIncomingMessage', { content: content.slice(0, 40) });
+            return;
+        }
 
         // Check for approval responses before anything else
         if (this.approvalManager) {
@@ -571,33 +699,124 @@ export class AlgoChatBridge {
     }
 
     private subscribeForResponse(sessionId: string, participant: string): void {
+        // Avoid duplicate subscriptions when multiple messages arrive for the same session
+        if (this.chainSubscriptions.has(sessionId)) return;
+        this.chainSubscriptions.add(sessionId);
+
         let responseBuffer = '';
+        let lastTurnResponse = '';
+        let sent = false;
+
+        const sendOnce = () => {
+            if (sent) return;
+            sent = true;
+            this.processManager.unsubscribe(sessionId, callback);
+            this.chainSubscriptions.delete(sessionId);
+            this.clearSubscriptionTimer(sessionId);
+
+            const finalText = (responseBuffer.trim() || lastTurnResponse.trim());
+            if (finalText) {
+                this.sendResponse(participant, finalText);
+            }
+        };
+
+        const resetTimer = () => {
+            this.setSubscriptionTimer(sessionId, () => {
+                log.warn(`Subscription timeout for session ${sessionId}`);
+                sendOnce();
+            });
+        };
+
+        let statusEmitted = false;
+        let agentQueryCount = 0;
+        let currentTextBlock = '';
+        let inTextBlock = false;
+
+        const flushTextBlock = () => {
+            const text = currentTextBlock.trim();
+            if (text.length > 0) {
+                // Show the agent's intermediate text as a status update
+                // Truncate long blocks to a reasonable preview
+                const preview = text.length > 300
+                    ? text.slice(0, 300) + '...'
+                    : text;
+                this.emitEvent(participant, preview, 'status');
+            }
+            currentTextBlock = '';
+            inTextBlock = false;
+        };
 
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
-            if (event.type === 'assistant' && event.message?.content) {
-                responseBuffer += extractContentText(event.message.content);
+            // Emit a "thinking" status once when the agent starts responding
+            if (event.type === 'assistant' && !statusEmitted) {
+                statusEmitted = true;
+                this.emitEvent(participant, 'Agent is processing your message...', 'status');
             }
 
-            if (event.type === 'result' || event.type === 'session_exited') {
-                this.processManager.unsubscribe(sessionId, callback);
-                this.clearSubscriptionTimer(sessionId);
-
-                if (responseBuffer.trim()) {
-                    this.sendResponse(participant, responseBuffer.trim());
+            // Forward named status events from tool handlers (e.g. "Querying CorvidLabs...")
+            if ((event as { type: string }).type === 'tool_status') {
+                const message = (event as unknown as { message: string }).message;
+                if (message) {
+                    this.emitEvent(participant, message, 'status');
+                    resetTimer();
                 }
+                return;
+            }
+
+            // Track text content blocks — stream agent's intermediate text to the feed
+            if (event.type === 'content_block_start') {
+                const block = event.content_block;
+                if (block?.type === 'text') {
+                    inTextBlock = true;
+                    currentTextBlock = '';
+                } else if (block?.type === 'tool_use') {
+                    // Flush any pending text before tool use starts
+                    if (inTextBlock) flushTextBlock();
+                    const toolName = (block as unknown as { name?: string }).name;
+                    if (toolName === 'corvid_send_message') {
+                        agentQueryCount++;
+                    }
+                }
+            }
+
+            // Accumulate streaming text deltas
+            if (event.type === 'content_block_delta' && event.delta?.text && inTextBlock) {
+                currentTextBlock += event.delta.text;
+                resetTimer();
+            }
+
+            // Text block finished — flush it as a status update
+            if (event.type === 'content_block_stop' && inTextBlock) {
+                flushTextBlock();
+            }
+
+            if (event.type === 'assistant' && event.message?.content) {
+                responseBuffer += extractContentText(event.message.content);
+                resetTimer(); // Activity detected — reset timeout
+            }
+
+            // Each 'result' marks end of a turn — save and reset
+            if (event.type === 'result') {
+                if (inTextBlock) flushTextBlock();
+                if (agentQueryCount > 0) {
+                    this.emitEvent(participant, `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`, 'status');
+                }
+                lastTurnResponse = responseBuffer;
+                responseBuffer = '';
+                resetTimer(); // Turn completed — reset timeout
+            }
+
+            // Send only the last turn's response when the session fully exits
+            if (event.type === 'session_exited') {
+                if (inTextBlock) flushTextBlock();
+                sendOnce();
             }
         };
 
         this.processManager.subscribe(sessionId, callback);
-        this.setSubscriptionTimer(sessionId, () => {
-            log.warn(`Subscription timeout for session ${sessionId}`);
-            this.processManager.unsubscribe(sessionId, callback);
-            if (responseBuffer.trim()) {
-                this.sendResponse(participant, responseBuffer.trim());
-            }
-        });
+        resetTimer();
     }
 
     private subscribeForLocalResponse(sessionId: string, sendFn: LocalChatSendFn): void {
@@ -834,10 +1053,32 @@ export class AlgoChatBridge {
         return project.id;
     }
 
+    /** Cache of agent wallet addresses, refreshed lazily. */
+    private cachedAgentWallets: Set<string> | null = null;
+    private cachedAgentWalletsAt = 0;
+
+    private getAgentWalletAddresses(): Set<string> {
+        const now = Date.now();
+        // Refresh cache every 60s
+        if (this.cachedAgentWallets && now - this.cachedAgentWalletsAt < 60_000) {
+            return this.cachedAgentWallets;
+        }
+        const agents = listAgents(this.db);
+        const addrs = new Set<string>();
+        for (const a of agents) {
+            if (a.walletAddress) addrs.add(a.walletAddress);
+        }
+        // Also include the main chat account address
+        addrs.add(this.service.chatAccount.address);
+        this.cachedAgentWallets = addrs;
+        this.cachedAgentWalletsAt = now;
+        return addrs;
+    }
+
     private emitEvent(
         participant: string,
         content: string,
-        direction: 'inbound' | 'outbound',
+        direction: 'inbound' | 'outbound' | 'status',
         fee?: number,
     ): void {
         for (const cb of this.eventCallbacks) {
@@ -878,6 +1119,79 @@ export class AlgoChatBridge {
             clearInterval(this.fastPollTimer);
             this.fastPollTimer = null;
             log.debug('Stopped fast-polling');
+        }
+    }
+
+    /**
+     * Seed the SyncManager with known conversation participants from the DB
+     * so that fetchAllConversations has something to iterate over.
+     */
+    private seedConversations(): void {
+        const conversations = listConversations(this.db);
+        for (const conv of conversations) {
+            const syncConv = this.service.syncManager.getOrCreateConversation(conv.participantAddr);
+            if (conv.lastRound > 0) {
+                // Use lastRound + 1 because minRound is inclusive and we already
+                // processed the message at lastRound in a previous run
+                syncConv.setLastFetchedRound(conv.lastRound + 1);
+            }
+        }
+        if (conversations.length > 0) {
+            log.info(`Seeded ${conversations.length} conversation(s) from DB`);
+        }
+    }
+
+    /**
+     * Periodically discover new senders by querying the indexer for
+     * incoming transactions from addresses not yet in the SyncManager.
+     */
+    private startDiscoveryPolling(): void {
+        if (this.discoveryTimer) return;
+
+        // Run immediately then on the sync interval
+        this.discoverNewSenders().catch((err) => {
+            log.warn('Discovery error', { error: err instanceof Error ? err.message : String(err) });
+        });
+
+        this.discoveryTimer = setInterval(() => {
+            this.discoverNewSenders().catch((err) => {
+                log.warn('Discovery error', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }, this.config.syncInterval);
+    }
+
+    private stopDiscoveryPolling(): void {
+        if (this.discoveryTimer) {
+            clearInterval(this.discoveryTimer);
+            this.discoveryTimer = null;
+        }
+    }
+
+    private async discoverNewSenders(): Promise<void> {
+        if (!this.service.indexerClient) return;
+
+        const myAddr = this.service.chatAccount.address;
+        const response = await this.service.indexerClient
+            .searchForTransactions()
+            .address(myAddr)
+            .addressRole('receiver')
+            .limit(50)
+            .do();
+
+        const knownParticipants = new Set(
+            this.service.syncManager.getConversations().map((c) => c.participant),
+        );
+
+        const newSenders = new Set<string>();
+        for (const tx of (response as { transactions?: Array<{ sender: string; note?: string }> }).transactions ?? []) {
+            if (tx.sender !== myAddr && tx.note && !knownParticipants.has(tx.sender)) {
+                newSenders.add(tx.sender);
+            }
+        }
+
+        for (const sender of newSenders) {
+            log.info(`Discovered new sender`, { address: sender });
+            this.service.syncManager.getOrCreateConversation(sender);
         }
     }
 }

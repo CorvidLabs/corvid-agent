@@ -12,6 +12,7 @@ export interface PSKContactConfig {
 export interface AlgoChatConfig {
     mnemonic: string | null;
     network: AlgoChatNetwork;
+    agentNetwork: AlgoChatNetwork;
     syncInterval: number;
     defaultAgentId: string | null;
     enabled: boolean;
@@ -21,12 +22,14 @@ export interface AlgoChatConfig {
 export function loadAlgoChatConfig(): AlgoChatConfig {
     const mnemonic = process.env.ALGOCHAT_MNEMONIC ?? null;
     const rawNetwork = (process.env.ALGORAND_NETWORK ?? 'testnet') as AlgoChatNetwork;
+    const rawAgentNetwork = (process.env.AGENT_NETWORK ?? 'localnet') as AlgoChatNetwork;
     const syncInterval = parseInt(process.env.ALGOCHAT_SYNC_INTERVAL ?? '30000', 10);
     const defaultAgentId = process.env.ALGOCHAT_DEFAULT_AGENT_ID ?? null;
     const hasMnemonic = mnemonic !== null && mnemonic.trim().length > 0;
 
     // When no mnemonic and not explicitly on mainnet, default to localnet
     const network: AlgoChatNetwork = hasMnemonic ? rawNetwork : (rawNetwork === 'mainnet' ? 'mainnet' : 'localnet');
+    const agentNetwork: AlgoChatNetwork = rawAgentNetwork;
 
     // Parse PSK exchange URI if provided
     const pskContact = parsePSKContactFromEnv();
@@ -34,6 +37,7 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     return {
         mnemonic: hasMnemonic ? mnemonic.trim() : null,
         network,
+        agentNetwork,
         syncInterval: isNaN(syncInterval) ? 30000 : syncInterval,
         defaultAgentId: defaultAgentId && defaultAgentId.trim().length > 0 ? defaultAgentId.trim() : null,
         // Enabled if mnemonic is provided, or if we can try localnet

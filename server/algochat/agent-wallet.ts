@@ -138,6 +138,20 @@ export class AgentWalletService {
                 agentId,
                 error: err instanceof Error ? err.message : String(err),
             });
+
+            // On localnet, re-create the wallet if decryption fails
+            // (wallet was encrypted with a different key)
+            if (this.config.network === 'localnet') {
+                log.info(`Re-creating wallet for agent ${agentId} on localnet`);
+                try {
+                    return await this.recreateWallet(agentId);
+                } catch (recreateErr) {
+                    log.error('Failed to re-create agent wallet', {
+                        agentId,
+                        error: recreateErr instanceof Error ? recreateErr.message : String(recreateErr),
+                    });
+                }
+            }
             return null;
         }
     }
@@ -189,6 +203,32 @@ export class AgentWalletService {
                 await this.publishKeyForAccount(chatAccount.account, agent.name);
             }
         }
+    }
+
+    /**
+     * Re-create an agent wallet on localnet when the existing encrypted
+     * mnemonic can't be decrypted (encrypted with a different key).
+     * Generates a new wallet, funds it, publishes the key, and returns the account.
+     */
+    private async recreateWallet(agentId: string): Promise<AgentChatAccount | null> {
+        const agent = getAgent(this.db, agentId);
+        if (!agent) return null;
+
+        const algochat = await import('@corvidlabs/ts-algochat');
+        const generated = algochat.createRandomChatAccount();
+        const encrypted = await encryptMnemonic(generated.mnemonic, this.config.mnemonic);
+
+        setAgentWallet(this.db, agentId, generated.account.address, encrypted);
+        saveKeystoreEntry(agent.name, generated.account.address, encrypted);
+        log.info(`Re-created wallet for agent ${agent.name}`, { address: generated.account.address });
+
+        await this.fundFromDispenser(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
+        addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
+        log.info(`Funded agent ${agent.name} with ${DEFAULT_FUND_ALGO} ALGO`);
+
+        await this.publishKeyForAccount(generated.account, agent.name);
+
+        return { address: generated.account.address, account: generated.account };
     }
 
     /** Publish an agent's encryption key on-chain so other agents can discover it. */
