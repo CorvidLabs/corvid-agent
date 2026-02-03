@@ -675,38 +675,49 @@ export class AlgoChatBridge {
                 }
             }
 
-            // Condense message for non-localnet to fit on-chain limits
-            let sendContent = content;
-            if (this.config.network !== 'localnet') {
-                try {
-                    const { condenseMessage } = await import('./condenser');
-                    const result = await condenseMessage(content);
-                    if (result.wasCondensed) {
-                        sendContent = result.content;
-                        log.info('Message condensed for on-chain send', {
-                            originalBytes: result.originalBytes,
-                            condensedBytes: result.condensedBytes,
-                        });
-                    }
-                } catch (err) {
-                    log.warn('Condensation failed, sending original', {
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                }
-            }
-
-            // Standard encrypted send
             const pubKey = await this.getPublicKey(participant);
 
-            const result = await this.service.algorandService.sendMessage(
-                senderAccount,
-                participant,
-                pubKey,
-                sendContent,
-            );
+            // Use group transactions for large messages; fall back to condense+send
+            try {
+                const { sendGroupMessage } = await import('./group-sender');
+                const groupResult = await sendGroupMessage(
+                    this.service,
+                    senderAccount,
+                    participant,
+                    pubKey,
+                    content,
+                );
 
-            log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: result.fee });
-            this.emitEvent(participant, content, 'outbound', result.fee);
+                log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
+                this.emitEvent(participant, content, 'outbound', groupResult.fee);
+            } catch (groupErr) {
+                log.warn('Group send failed, falling back to condense+send', {
+                    error: groupErr instanceof Error ? groupErr.message : String(groupErr),
+                });
+
+                // Fallback: condense then single send
+                let sendContent = content;
+                try {
+                    const { condenseMessage } = await import('./condenser');
+                    const condensed = await condenseMessage(content);
+                    if (condensed.wasCondensed) {
+                        sendContent = condensed.content;
+                    }
+                } catch {
+                    // Use original content
+                }
+
+                const result = await this.service.algorandService.sendMessage(
+                    senderAccount,
+                    participant,
+                    pubKey,
+                    sendContent,
+                );
+
+                const fallbackFee = (result as unknown as { fee?: number }).fee;
+                log.info(`Sent response to ${participant} (condensed fallback)`, { content: content.slice(0, 100), fee: fallbackFee });
+                this.emitEvent(participant, content, 'outbound', fallbackFee);
+            }
         } catch (err) {
             log.error('Failed to send response', { error: err instanceof Error ? err.message : String(err) });
         }
