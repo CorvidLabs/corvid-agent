@@ -17,6 +17,7 @@ import {
 } from '../db/agent-messages';
 import type { WorkTaskService } from '../work/service';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
+import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AgentMessenger');
@@ -237,6 +238,11 @@ export class AgentMessenger {
         updateAgentMessageStatus(this.db, agentMessage.id, 'processing', { sessionId: session.id });
         this.emitMessageUpdate(agentMessage.id);
 
+        // Track initial on-chain send cost against the new session
+        if (txid && paymentMicro > 0) {
+            updateSessionAlgoSpent(this.db, session.id, paymentMicro);
+        }
+
         // Subscribe to session events and buffer the response
         this.subscribeForAgentResponse(agentMessage.id, session.id, fromAgentId, toAgentId);
 
@@ -276,7 +282,7 @@ export class AgentMessenger {
                 }
 
                 // Send the response back on-chain from B → A
-                this.sendOnChainMessage(toAgentId, fromAgentId, response, 0, messageId)
+                this.sendOnChainMessage(toAgentId, fromAgentId, response, 0, messageId, sessionId)
                     .then((responseTxid) => {
                         updateAgentMessageStatus(this.db, messageId, 'completed', {
                             response,
@@ -306,6 +312,7 @@ export class AgentMessenger {
         content: string,
         paymentMicro: number,
         messageId?: string,
+        sessionId?: string,
     ): Promise<string | null> {
         if (!this.service) return null;
 
@@ -372,6 +379,8 @@ export class AgentMessenger {
             });
 
             if (paymentMicro > 0) recordAlgoSpend(this.db, paymentMicro);
+            const fee = result.fee ?? paymentMicro;
+            if (fee > 0 && sessionId) updateSessionAlgoSpent(this.db, sessionId, fee);
             return result.primaryTxid;
         } catch (groupErr) {
             log.warn('Group send failed, falling back to condense+send', {
@@ -398,6 +407,8 @@ export class AgentMessenger {
             });
 
             if (paymentMicro > 0) recordAlgoSpend(this.db, paymentMicro);
+            const fallbackFee = (result as unknown as { fee?: number }).fee ?? paymentMicro;
+            if (fallbackFee > 0 && sessionId) updateSessionAlgoSpent(this.db, sessionId, fallbackFee);
             return result.txid;
         }
     }
