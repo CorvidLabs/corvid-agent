@@ -45,6 +45,7 @@ const algochatConfig = loadAlgoChatConfig();
 let algochatBridge: AlgoChatBridge | null = null;
 let agentWalletService: AgentWalletService | null = null;
 let agentMessenger: AgentMessenger | null = null;
+let agentDirectory: AgentDirectory | null = null;
 const selfTestService = new SelfTestService(db, processManager);
 const workTaskService = new WorkTaskService(db, processManager);
 
@@ -64,12 +65,15 @@ async function initAlgoChat(): Promise<void> {
     algochatBridge.setAgentWalletService(agentWalletService);
 
     // Initialize agent directory and messenger
-    const agentDirectory = new AgentDirectory(db, agentWalletService);
+    agentDirectory = new AgentDirectory(db, agentWalletService);
     algochatBridge.setAgentDirectory(agentDirectory);
     algochatBridge.setApprovalManager(processManager.approvalManager);
     algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, algochatConfig, service, agentWalletService, agentDirectory, processManager);
     agentMessenger.setWorkTaskService(workTaskService);
+
+    // Register MCP services so agent sessions get corvid_* tools
+    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -123,7 +127,7 @@ const server = Bun.serve<WsData>({
         }
 
         // API routes
-        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService);
+        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
         if (apiResponse) return apiResponse;
 
         // Serve Angular static files
@@ -173,10 +177,6 @@ initAlgoChat().then(() => {
         agentMessenger.onMessageUpdate((message) => {
             const msg = JSON.stringify({ type: 'agent_message_update', message });
             server.publish('algochat', msg);
-        });
-        agentMessenger.onChainSend((fromAddress, toAddress, content, direction) => {
-            broadcastAlgoChatMessage(server, fromAddress, content, direction);
-            broadcastAlgoChatMessage(server, toAddress, content, 'inbound');
         });
     }
 }).catch((err) => {
