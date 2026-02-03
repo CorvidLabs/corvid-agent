@@ -20,6 +20,7 @@ import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
+import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
@@ -288,6 +289,59 @@ export class AlgoChatBridge {
                 } else {
                     this.sendResponse(participant, `Agent "${agentName}" not found`);
                 }
+                return true;
+            }
+
+            case '/queue': {
+                const queued = this.processManager.approvalManager.getQueuedRequests();
+                if (queued.length === 0) {
+                    this.sendResponse(participant, 'No pending escalation requests');
+                } else {
+                    const lines = queued.map((q) => `#${q.id}: [${q.toolName}] session=${q.sessionId.slice(0, 8)} (${q.createdAt})`);
+                    this.sendResponse(participant, `Pending escalations:\n${lines.join('\n')}`);
+                }
+                return true;
+            }
+
+            case '/approve': {
+                const queueId = parseInt(parts[1], 10);
+                if (isNaN(queueId)) {
+                    this.sendResponse(participant, 'Usage: /approve <queue-id>');
+                    return true;
+                }
+                const resolved = this.processManager.approvalManager.resolveQueuedRequest(queueId, true);
+                this.sendResponse(participant, resolved
+                    ? `Escalation #${queueId} approved`
+                    : `Escalation #${queueId} not found or already resolved`);
+                return true;
+            }
+
+            case '/deny': {
+                const queueId = parseInt(parts[1], 10);
+                if (isNaN(queueId)) {
+                    this.sendResponse(participant, 'Usage: /deny <queue-id>');
+                    return true;
+                }
+                const resolved = this.processManager.approvalManager.resolveQueuedRequest(queueId, false);
+                this.sendResponse(participant, resolved
+                    ? `Escalation #${queueId} denied`
+                    : `Escalation #${queueId} not found or already resolved`);
+                return true;
+            }
+
+            case '/mode': {
+                const newMode = parts[1]?.toLowerCase();
+                if (!newMode) {
+                    this.sendResponse(participant, `Current mode: ${this.processManager.approvalManager.operationalMode}`);
+                    return true;
+                }
+                const validModes = ['normal', 'queued', 'paused'];
+                if (!validModes.includes(newMode)) {
+                    this.sendResponse(participant, `Invalid mode. Use: ${validModes.join(', ')}`);
+                    return true;
+                }
+                this.processManager.approvalManager.operationalMode = newMode as 'normal' | 'queued' | 'paused';
+                this.sendResponse(participant, `Mode set to: ${newMode}`);
                 return true;
             }
 
@@ -655,6 +709,17 @@ export class AlgoChatBridge {
     }
 
     private async sendResponse(participant: string, content: string): Promise<void> {
+        // Check daily ALGO spending limit (estimate min fee of 1000 microAlgos per txn)
+        try {
+            checkAlgoLimit(this.db, 1000);
+        } catch (err) {
+            log.warn(`On-chain response blocked by spending limit`, {
+                participant,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return;
+        }
+
         try {
             // Route PSK contacts through the PSK manager
             if (this.pskManager && participant === this.pskManager.contactAddress) {
@@ -691,6 +756,7 @@ export class AlgoChatBridge {
                 );
 
                 log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
+                if (groupResult.fee) recordAlgoSpend(this.db, groupResult.fee);
                 this.emitEvent(participant, content, 'outbound', groupResult.fee);
             } catch (groupErr) {
                 log.warn('Group send failed, falling back to condense+send', {
@@ -718,6 +784,7 @@ export class AlgoChatBridge {
 
                 const fallbackFee = (result as unknown as { fee?: number }).fee;
                 log.info(`Sent response to ${participant} (condensed fallback)`, { content: content.slice(0, 100), fee: fallbackFee });
+                if (fallbackFee) recordAlgoSpend(this.db, fallbackFee);
                 this.emitEvent(participant, content, 'outbound', fallbackFee);
             }
         } catch (err) {

@@ -140,6 +140,7 @@ export interface AgentMessage {
     response: string | null;
     responseTxid: string | null;
     sessionId: string | null;
+    threadId: string | null;
     createdAt: string;
     completedAt: string | null;
 }
@@ -214,6 +215,18 @@ export interface CouncilDiscussionMessage {
     txid: string | null;
     sessionId: string | null;
     createdAt: string;
+}
+
+// MARK: - Agent Memories
+
+export interface AgentMemory {
+    id: string;
+    agentId: string;
+    key: string;
+    content: string;
+    txid: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 // MARK: - Work Tasks

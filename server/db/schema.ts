@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 14;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -184,6 +184,43 @@ const MIGRATIONS: Record<number, string[]> = {
             created_at  TEXT DEFAULT (datetime('now'))
         )`,
         `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
+    ],
+    10: [
+        `CREATE TABLE IF NOT EXISTS agent_memories (
+            id          TEXT PRIMARY KEY,
+            agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            key         TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            txid        TEXT DEFAULT NULL,
+            created_at  TEXT DEFAULT (datetime('now')),
+            updated_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
+    ],
+    12: [
+        `ALTER TABLE agent_messages ADD COLUMN thread_id TEXT DEFAULT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
+    ],
+    13: [
+        `CREATE TABLE IF NOT EXISTS daily_spending (
+            date         TEXT PRIMARY KEY,
+            algo_micro   INTEGER DEFAULT 0,
+            api_cost_usd REAL DEFAULT 0.0
+        )`,
+    ],
+    14: [
+        `CREATE TABLE IF NOT EXISTS escalation_queue (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  TEXT NOT NULL,
+            tool_name   TEXT NOT NULL,
+            tool_input  TEXT NOT NULL DEFAULT '{}',
+            status      TEXT DEFAULT 'pending',
+            created_at  TEXT DEFAULT (datetime('now')),
+            resolved_at TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_escalation_queue_status ON escalation_queue(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_escalation_queue_session ON escalation_queue(session_id)`,
     ],
 };
 

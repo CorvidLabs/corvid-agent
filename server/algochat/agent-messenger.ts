@@ -16,6 +16,7 @@ import {
     getThreadMessages,
 } from '../db/agent-messages';
 import type { WorkTaskService } from '../work/service';
+import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AgentMessenger');
@@ -308,6 +309,27 @@ export class AgentMessenger {
     ): Promise<string | null> {
         if (!this.service) return null;
 
+        // Check daily ALGO spending limit before sending
+        if (paymentMicro > 0) {
+            try {
+                checkAlgoLimit(this.db, paymentMicro);
+            } catch (err) {
+                log.warn(`On-chain send blocked by spending limit`, {
+                    fromAgentId,
+                    toAgentId,
+                    paymentMicro,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+                if (messageId) {
+                    updateAgentMessageStatus(this.db, messageId, 'failed', {
+                        response: `Spending limit: ${err instanceof Error ? err.message : String(err)}`,
+                    });
+                    this.emitMessageUpdate(messageId);
+                }
+                return null;
+            }
+        }
+
         const fromAccount = await this.agentWalletService.getAgentChatAccount(fromAgentId);
         if (!fromAccount) {
             log.debug(`No wallet for agent ${fromAgentId}, skipping on-chain send`);
@@ -349,6 +371,7 @@ export class AgentMessenger {
                 paymentMicro,
             });
 
+            if (paymentMicro > 0) recordAlgoSpend(this.db, paymentMicro);
             return result.primaryTxid;
         } catch (groupErr) {
             log.warn('Group send failed, falling back to condense+send', {
@@ -374,6 +397,7 @@ export class AgentMessenger {
                 paymentMicro,
             });
 
+            if (paymentMicro > 0) recordAlgoSpend(this.db, paymentMicro);
             return result.txid;
         }
     }

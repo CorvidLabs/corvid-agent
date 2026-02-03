@@ -11,13 +11,14 @@ import type { AgentMessage } from '../../core/models/agent-message.model';
 interface FeedEntry {
     id: number;
     timestamp: Date;
-    direction: 'inbound' | 'outbound' | 'agent';
+    direction: 'inbound' | 'outbound' | 'agent-send' | 'agent-reply';
     participant: string;
     participantLabel: string;
     content: string;
     agentName: string | null;
     fee: number | null;
     threadId: string | null;
+    colorIndex: number;
 }
 
 @Component({
@@ -77,16 +78,15 @@ interface FeedEntry {
             } @else {
                 <div class="feed__list" #feedList>
                     @for (entry of entries(); track entry.id) {
-                        <div class="feed__entry" [attr.data-direction]="entry.direction">
+                        <div class="feed__entry" [attr.data-direction]="entry.direction" [style.border-left-color]="agentColor(entry.colorIndex)">
                             <div class="feed__meta">
-                                <span class="feed__time">{{ entry.timestamp | date:'HH:mm:ss.SSS' }}</span>
+                                <span class="feed__time">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
                                 <span class="feed__direction" [attr.data-dir]="entry.direction">
-                                    {{ entry.direction === 'inbound' ? 'IN' : entry.direction === 'outbound' ? 'OUT' : 'A2A' }}
+                                    {{ directionLabel(entry.direction) }}
                                 </span>
-                                @if (entry.agentName && entry.direction !== 'agent') {
-                                    <span class="feed__agent">{{ entry.agentName }}</span>
-                                }
-                                <span class="feed__participant" [title]="entry.participant">{{ entry.participantLabel }}</span>
+                                <span class="feed__sender" [style.color]="agentColor(entry.colorIndex)">{{ entry.agentName }}</span>
+                                <span class="feed__arrow">-></span>
+                                <span class="feed__participant" [title]="entry.participant">{{ recipientFrom(entry.participantLabel) }}</span>
                                 @if (entry.threadId) {
                                     <button class="feed__thread" [title]="entry.threadId" (click)="filterByThread(entry.threadId!)">thread:{{ entry.threadId.slice(0, 6) }}</button>
                                 }
@@ -150,21 +150,23 @@ interface FeedEntry {
         }
         .feed__entry[data-direction="inbound"] { border-left-color: var(--accent-cyan); }
         .feed__entry[data-direction="outbound"] { border-left-color: var(--accent-green); }
-        .feed__entry[data-direction="agent"] { border-left-color: var(--accent-magenta); }
+        .feed__entry[data-direction="agent-reply"] { background: var(--bg-surface-alt, rgba(255,255,255,0.02)); }
         .feed__meta {
-            display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap;
+            display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; flex-wrap: wrap;
         }
         .feed__time { font-family: var(--font-mono, monospace); font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
         .feed__direction {
-            font-size: 0.65rem; font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
+            font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: 0.08em;
         }
         .feed__direction[data-dir="inbound"] { color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.2); }
         .feed__direction[data-dir="outbound"] { color: var(--accent-green); background: rgba(0, 255, 136, 0.08); border: 1px solid rgba(0, 255, 136, 0.2); }
-        .feed__direction[data-dir="agent"] { color: var(--accent-magenta); background: rgba(255, 0, 200, 0.08); border: 1px solid rgba(255, 0, 200, 0.2); }
-        .feed__agent { font-weight: 600; color: var(--accent-magenta); font-size: 0.75rem; }
+        .feed__direction[data-dir="agent-send"] { color: #ffa040; background: rgba(255, 160, 64, 0.08); border: 1px solid rgba(255, 160, 64, 0.25); }
+        .feed__direction[data-dir="agent-reply"] { color: #60c0ff; background: rgba(96, 192, 255, 0.08); border: 1px solid rgba(96, 192, 255, 0.25); }
+        .feed__sender { font-weight: 700; font-size: 0.8rem; }
+        .feed__arrow { color: var(--text-secondary); opacity: 0.4; font-size: 0.7rem; }
         .feed__participant {
-            font-family: var(--font-mono, monospace); font-size: 0.7rem; color: var(--text-secondary);
+            font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;
             max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .feed__thread {
@@ -197,10 +199,23 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     protected readonly hasPrevPage = computed(() => this.currentOffset() > 0);
     protected readonly hasNextPage = computed(() => this.currentOffset() + this.pageSize() < this.totalMessages());
 
+    private static readonly AGENT_COLORS = [
+        '#ff6b9d', // pink
+        '#00e5ff', // cyan
+        '#ffa040', // orange
+        '#a78bfa', // violet
+        '#34d399', // emerald
+        '#f472b6', // rose
+        '#60a5fa', // blue
+        '#fbbf24', // amber
+    ];
+
     private unsubscribeWs: (() => void) | null = null;
     private nextId = 0;
     private agentMap: Record<string, Agent> = {};
     private walletToAgent: Record<string, Agent> = {};
+    private agentColorMap: Record<string, number> = {};
+    private nextColorIndex = 0;
     private seenMessageKeys = new Set<string>();
     private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -224,14 +239,16 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 // those are displayed via agent_message_update instead
                 if (this.walletToAgent[msg.participant]) return;
 
+                const name = this.agentNameForAddress(msg.participant);
                 this.addEntry({
                     direction: msg.direction,
                     participant: msg.participant,
                     participantLabel: this.labelForAddress(msg.participant),
                     content: msg.content,
-                    agentName: this.agentNameForAddress(msg.participant),
+                    agentName: name,
                     fee: null,
                     threadId: null,
+                    colorIndex: name ? this.colorIndexForAgent(name) : 0,
                 });
             }
 
@@ -247,25 +264,27 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
 
                 if (m.status === 'sent' || m.status === 'processing') {
                     this.addEntry({
-                        direction: 'agent',
-                        participant: `${fromName} → ${toName}`,
-                        participantLabel: `${fromName} → ${toName}`,
+                        direction: 'agent-send',
+                        participant: `${fromName} \u2192 ${toName}`,
+                        participantLabel: `${fromName} \u2192 ${toName}`,
                         content: m.content,
                         agentName: fromName,
                         fee: m.paymentMicro > 0 ? m.paymentMicro : null,
                         threadId: m.threadId ?? null,
+                        colorIndex: this.colorIndexForAgent(fromName),
                     });
                 }
 
                 if (m.status === 'completed' && m.response) {
                     this.addEntry({
-                        direction: 'agent',
-                        participant: `${toName} → ${fromName}`,
-                        participantLabel: `${toName} → ${fromName}`,
+                        direction: 'agent-reply',
+                        participant: `${toName} \u2192 ${fromName}`,
+                        participantLabel: `${toName} \u2192 ${fromName}`,
                         content: m.response,
                         agentName: toName,
                         fee: null,
                         threadId: m.threadId ?? null,
+                        colorIndex: this.colorIndexForAgent(toName),
                     });
                 }
             }
@@ -275,6 +294,32 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         this.unsubscribeWs?.();
         if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
+    }
+
+    protected agentColor(index: number): string {
+        return LiveFeedComponent.AGENT_COLORS[index % LiveFeedComponent.AGENT_COLORS.length];
+    }
+
+    protected directionLabel(dir: string): string {
+        switch (dir) {
+            case 'inbound': return 'IN';
+            case 'outbound': return 'OUT';
+            case 'agent-send': return 'SEND';
+            case 'agent-reply': return 'REPLY';
+            default: return 'A2A';
+        }
+    }
+
+    protected recipientFrom(label: string): string {
+        const parts = label.split(' \u2192 ');
+        return parts.length > 1 ? parts[1] : label;
+    }
+
+    private colorIndexForAgent(agentName: string): number {
+        if (!(agentName in this.agentColorMap)) {
+            this.agentColorMap[agentName] = this.nextColorIndex++;
+        }
+        return this.agentColorMap[agentName];
     }
 
     protected toggleAutoScroll(): void {
@@ -348,26 +393,28 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 newEntries.push({
                     id: this.nextId++,
                     timestamp: m.createdAt ? new Date(m.createdAt + 'Z') : new Date(),
-                    direction: 'agent',
-                    participant: `${fromName} → ${toName}`,
-                    participantLabel: `${fromName} → ${toName}`,
+                    direction: 'agent-send',
+                    participant: `${fromName} \u2192 ${toName}`,
+                    participantLabel: `${fromName} \u2192 ${toName}`,
                     content: m.content,
                     agentName: fromName,
                     fee: m.paymentMicro > 0 ? m.paymentMicro : null,
                     threadId: m.threadId ?? null,
+                    colorIndex: this.colorIndexForAgent(fromName),
                 });
 
                 if (m.status === 'completed' && m.response) {
                     newEntries.push({
                         id: this.nextId++,
                         timestamp: m.completedAt ? new Date(m.completedAt + 'Z') : new Date(),
-                        direction: 'agent',
-                        participant: `${toName} → ${fromName}`,
-                        participantLabel: `${toName} → ${fromName}`,
+                        direction: 'agent-reply',
+                        participant: `${toName} \u2192 ${fromName}`,
+                        participantLabel: `${toName} \u2192 ${fromName}`,
                         content: m.response,
                         agentName: toName,
                         fee: null,
                         threadId: m.threadId ?? null,
+                        colorIndex: this.colorIndexForAgent(toName),
                     });
                 }
             }
