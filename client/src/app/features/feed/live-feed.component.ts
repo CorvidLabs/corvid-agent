@@ -201,6 +201,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     private nextId = 0;
     private agentMap: Record<string, Agent> = {};
     private walletToAgent: Record<string, Agent> = {};
+    private seenMessageKeys = new Set<string>();
     private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     async ngOnInit(): Promise<void> {
@@ -219,6 +220,10 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             if (this.isFiltered()) return;
 
             if (msg.type === 'algochat_message') {
+                // Skip messages from/to known agent wallet addresses —
+                // those are displayed via agent_message_update instead
+                if (this.walletToAgent[msg.participant]) return;
+
                 this.addEntry({
                     direction: msg.direction,
                     participant: msg.participant,
@@ -235,11 +240,16 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 const fromName = this.agentMap[m.fromAgentId]?.name ?? m.fromAgentId.slice(0, 8);
                 const toName = this.agentMap[m.toAgentId]?.name ?? m.toAgentId.slice(0, 8);
 
+                // Deduplicate: skip if we already have an entry for this message+status
+                const dedupKey = `${m.id}:${m.status}`;
+                if (this.seenMessageKeys.has(dedupKey)) return;
+                this.seenMessageKeys.add(dedupKey);
+
                 if (m.status === 'sent' || m.status === 'processing') {
                     this.addEntry({
                         direction: 'agent',
-                        participant: `${fromName} -> ${toName}`,
-                        participantLabel: `${fromName} -> ${toName}`,
+                        participant: `${fromName} → ${toName}`,
+                        participantLabel: `${fromName} → ${toName}`,
                         content: m.content,
                         agentName: fromName,
                         fee: m.paymentMicro > 0 ? m.paymentMicro : null,
@@ -250,8 +260,8 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 if (m.status === 'completed' && m.response) {
                     this.addEntry({
                         direction: 'agent',
-                        participant: `${toName} -> ${fromName}`,
-                        participantLabel: `${toName} -> ${fromName}`,
+                        participant: `${toName} → ${fromName}`,
+                        participantLabel: `${toName} → ${fromName}`,
                         content: m.response,
                         agentName: toName,
                         fee: null,
@@ -273,6 +283,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
 
     protected onClear(): void {
         this.entries.set([]);
+        this.seenMessageKeys.clear();
         this.searchTerm.set('');
         this.currentOffset.set(0);
         this.activeThreadFilter.set(null);
@@ -327,6 +338,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             this.totalMessages.set(result.total);
 
             this.nextId = 0;
+            this.seenMessageKeys.clear();
             const newEntries: FeedEntry[] = [];
             // Messages come newest-first from API; reverse to show oldest first
             for (const m of [...result.messages].reverse()) {
@@ -337,8 +349,8 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                     id: this.nextId++,
                     timestamp: m.createdAt ? new Date(m.createdAt + 'Z') : new Date(),
                     direction: 'agent',
-                    participant: `${fromName} -> ${toName}`,
-                    participantLabel: `${fromName} -> ${toName}`,
+                    participant: `${fromName} → ${toName}`,
+                    participantLabel: `${fromName} → ${toName}`,
                     content: m.content,
                     agentName: fromName,
                     fee: m.paymentMicro > 0 ? m.paymentMicro : null,
@@ -350,8 +362,8 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                         id: this.nextId++,
                         timestamp: m.completedAt ? new Date(m.completedAt + 'Z') : new Date(),
                         direction: 'agent',
-                        participant: `${toName} -> ${fromName}`,
-                        participantLabel: `${toName} -> ${fromName}`,
+                        participant: `${toName} → ${fromName}`,
+                        participantLabel: `${toName} → ${fromName}`,
                         content: m.response,
                         agentName: toName,
                         fee: null,
