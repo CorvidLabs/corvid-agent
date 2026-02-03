@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -221,6 +221,9 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_escalation_queue_status ON escalation_queue(status)`,
         `CREATE INDEX IF NOT EXISTS idx_escalation_queue_session ON escalation_queue(session_id)`,
+    ],
+    15: [
+        `ALTER TABLE sessions ADD COLUMN total_algo_spent INTEGER DEFAULT 0`,
     ],
 };
 

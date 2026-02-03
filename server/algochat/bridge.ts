@@ -21,6 +21,7 @@ import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
+import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
@@ -756,7 +757,11 @@ export class AlgoChatBridge {
                 );
 
                 log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
-                if (groupResult.fee) recordAlgoSpend(this.db, groupResult.fee);
+                if (groupResult.fee) {
+                    recordAlgoSpend(this.db, groupResult.fee);
+                    const conv = getConversationByParticipant(this.db, participant);
+                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
+                }
                 this.emitEvent(participant, content, 'outbound', groupResult.fee);
             } catch (groupErr) {
                 log.warn('Group send failed, falling back to condense+send', {
@@ -784,7 +789,11 @@ export class AlgoChatBridge {
 
                 const fallbackFee = (result as unknown as { fee?: number }).fee;
                 log.info(`Sent response to ${participant} (condensed fallback)`, { content: content.slice(0, 100), fee: fallbackFee });
-                if (fallbackFee) recordAlgoSpend(this.db, fallbackFee);
+                if (fallbackFee) {
+                    recordAlgoSpend(this.db, fallbackFee);
+                    const conv = getConversationByParticipant(this.db, participant);
+                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, fallbackFee);
+                }
                 this.emitEvent(participant, content, 'outbound', fallbackFee);
             }
         } catch (err) {
