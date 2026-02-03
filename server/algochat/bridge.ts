@@ -20,6 +20,8 @@ import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
+import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
+import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
@@ -291,6 +293,59 @@ export class AlgoChatBridge {
                 return true;
             }
 
+            case '/queue': {
+                const queued = this.processManager.approvalManager.getQueuedRequests();
+                if (queued.length === 0) {
+                    this.sendResponse(participant, 'No pending escalation requests');
+                } else {
+                    const lines = queued.map((q) => `#${q.id}: [${q.toolName}] session=${q.sessionId.slice(0, 8)} (${q.createdAt})`);
+                    this.sendResponse(participant, `Pending escalations:\n${lines.join('\n')}`);
+                }
+                return true;
+            }
+
+            case '/approve': {
+                const queueId = parseInt(parts[1], 10);
+                if (isNaN(queueId)) {
+                    this.sendResponse(participant, 'Usage: /approve <queue-id>');
+                    return true;
+                }
+                const resolved = this.processManager.approvalManager.resolveQueuedRequest(queueId, true);
+                this.sendResponse(participant, resolved
+                    ? `Escalation #${queueId} approved`
+                    : `Escalation #${queueId} not found or already resolved`);
+                return true;
+            }
+
+            case '/deny': {
+                const queueId = parseInt(parts[1], 10);
+                if (isNaN(queueId)) {
+                    this.sendResponse(participant, 'Usage: /deny <queue-id>');
+                    return true;
+                }
+                const resolved = this.processManager.approvalManager.resolveQueuedRequest(queueId, false);
+                this.sendResponse(participant, resolved
+                    ? `Escalation #${queueId} denied`
+                    : `Escalation #${queueId} not found or already resolved`);
+                return true;
+            }
+
+            case '/mode': {
+                const newMode = parts[1]?.toLowerCase();
+                if (!newMode) {
+                    this.sendResponse(participant, `Current mode: ${this.processManager.approvalManager.operationalMode}`);
+                    return true;
+                }
+                const validModes = ['normal', 'queued', 'paused'];
+                if (!validModes.includes(newMode)) {
+                    this.sendResponse(participant, `Invalid mode. Use: ${validModes.join(', ')}`);
+                    return true;
+                }
+                this.processManager.approvalManager.operationalMode = newMode as 'normal' | 'queued' | 'paused';
+                this.sendResponse(participant, `Mode set to: ${newMode}`);
+                return true;
+            }
+
             case '/work': {
                 const description = parts.slice(1).join(' ');
                 if (!description) {
@@ -419,7 +474,6 @@ export class AlgoChatBridge {
         fee?: number,
     ): Promise<void> {
         log.info(`Message from ${participant}`, { content: content.slice(0, 100), fee });
-        this.emitEvent(participant, content, 'inbound', fee);
 
         // Check for approval responses before anything else
         if (this.approvalManager) {
@@ -447,6 +501,9 @@ export class AlgoChatBridge {
                 return;
             }
         }
+
+        // Emit feed event only for external (non-agent) messages
+        this.emitEvent(participant, content, 'inbound', fee);
 
         // Check for commands first
         if (this.handleCommand(participant, content)) return;
@@ -653,6 +710,17 @@ export class AlgoChatBridge {
     }
 
     private async sendResponse(participant: string, content: string): Promise<void> {
+        // Check daily ALGO spending limit (estimate min fee of 1000 microAlgos per txn)
+        try {
+            checkAlgoLimit(this.db, 1000);
+        } catch (err) {
+            log.warn(`On-chain response blocked by spending limit`, {
+                participant,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return;
+        }
+
         try {
             // Route PSK contacts through the PSK manager
             if (this.pskManager && participant === this.pskManager.contactAddress) {
@@ -675,38 +743,59 @@ export class AlgoChatBridge {
                 }
             }
 
-            // Condense message for non-localnet to fit on-chain limits
-            let sendContent = content;
-            if (this.config.network !== 'localnet') {
-                try {
-                    const { condenseMessage } = await import('./condenser');
-                    const result = await condenseMessage(content);
-                    if (result.wasCondensed) {
-                        sendContent = result.content;
-                        log.info('Message condensed for on-chain send', {
-                            originalBytes: result.originalBytes,
-                            condensedBytes: result.condensedBytes,
-                        });
-                    }
-                } catch (err) {
-                    log.warn('Condensation failed, sending original', {
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                }
-            }
-
-            // Standard encrypted send
             const pubKey = await this.getPublicKey(participant);
 
-            const result = await this.service.algorandService.sendMessage(
-                senderAccount,
-                participant,
-                pubKey,
-                sendContent,
-            );
+            // Use group transactions for large messages; fall back to condense+send
+            try {
+                const { sendGroupMessage } = await import('./group-sender');
+                const groupResult = await sendGroupMessage(
+                    this.service,
+                    senderAccount,
+                    participant,
+                    pubKey,
+                    content,
+                );
 
-            log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: result.fee });
-            this.emitEvent(participant, content, 'outbound', result.fee);
+                log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
+                if (groupResult.fee) {
+                    recordAlgoSpend(this.db, groupResult.fee);
+                    const conv = getConversationByParticipant(this.db, participant);
+                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
+                }
+                this.emitEvent(participant, content, 'outbound', groupResult.fee);
+            } catch (groupErr) {
+                log.warn('Group send failed, falling back to condense+send', {
+                    error: groupErr instanceof Error ? groupErr.message : String(groupErr),
+                });
+
+                // Fallback: condense then single send
+                let sendContent = content;
+                try {
+                    const { condenseMessage } = await import('./condenser');
+                    const condensed = await condenseMessage(content);
+                    if (condensed.wasCondensed) {
+                        sendContent = condensed.content;
+                    }
+                } catch {
+                    // Use original content
+                }
+
+                const result = await this.service.algorandService.sendMessage(
+                    senderAccount,
+                    participant,
+                    pubKey,
+                    sendContent,
+                );
+
+                const fallbackFee = (result as unknown as { fee?: number }).fee;
+                log.info(`Sent response to ${participant} (condensed fallback)`, { content: content.slice(0, 100), fee: fallbackFee });
+                if (fallbackFee) {
+                    recordAlgoSpend(this.db, fallbackFee);
+                    const conv = getConversationByParticipant(this.db, participant);
+                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, fallbackFee);
+                }
+                this.emitEvent(participant, content, 'outbound', fallbackFee);
+            }
         } catch (err) {
             log.error('Failed to send response', { error: err instanceof Error ? err.message : String(err) });
         }

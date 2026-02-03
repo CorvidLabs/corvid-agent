@@ -3,10 +3,33 @@ import type { ClaudeStreamEvent } from './types';
 import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
-import { query, type Query, type SDKMessage, type PermissionResult, type CanUseTool } from '@anthropic-ai/claude-agent-sdk';
+import { query, type Query, type SDKMessage, type PermissionResult, type CanUseTool, type McpSdkServerConfigWithInstance, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('SdkProcess');
+
+const API_FAILURE_THRESHOLD = 3;
+
+const API_ERROR_PATTERNS = [
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'fetch failed',
+    'ENOTFOUND',
+    'socket hang up',
+];
+
+function isApiError(error: string): boolean {
+    const lower = error.toLowerCase();
+    // Network errors
+    if (API_ERROR_PATTERNS.some((p) => error.includes(p))) return true;
+    // HTTP 5xx from Anthropic
+    if (/5\d{2}/.test(error) && (lower.includes('anthropic') || lower.includes('api') || lower.includes('server error'))) return true;
+    // Rate limit (429)
+    if (error.includes('429') || lower.includes('rate limit') || lower.includes('too many requests')) return true;
+    // Overloaded
+    if (lower.includes('overloaded') || lower.includes('capacity')) return true;
+    return false;
+}
 
 export interface SdkProcessOptions {
     session: Session;
@@ -17,6 +40,8 @@ export interface SdkProcessOptions {
     onEvent: (event: ClaudeStreamEvent) => void;
     onExit: (code: number | null) => void;
     onApprovalRequest: (request: ApprovalRequestWire) => void;
+    onApiOutage?: () => void;
+    mcpServers?: McpSdkServerConfigWithInstance[];
 }
 
 export interface SdkProcess {
@@ -37,6 +62,8 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         onEvent,
         onExit,
         onApprovalRequest,
+        onApiOutage,
+        mcpServers,
     } = options;
 
     const abortController = new AbortController();
@@ -44,6 +71,12 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     let inputDone = false;
 
     const canUseTool: CanUseTool = async (toolName, input, _opts) => {
+        // Auto-approve tool use for bypass permission modes (full-auto, bypassPermissions, etc.)
+        const BYPASS_MODES = new Set(['bypassPermissions', 'dontAsk', 'acceptEdits', 'full-auto']);
+        if (BYPASS_MODES.has(permissionMode)) {
+            return { behavior: 'allow' as const };
+        }
+
         log.info(`canUseTool called for session ${session.id}`, { toolName, input: JSON.stringify(input).slice(0, 200) });
         const requestId = crypto.randomUUID().slice(0, 8);
         const timeoutMs = approvalManager.getDefaultTimeout(session.source);
@@ -87,15 +120,27 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
 
     // Build SDK options
     const permissionMode = agent?.permissionMode ?? 'default';
+
+    // Map our permission modes to SDK-compatible values.
+    // The SDK doesn't have 'full-auto' — map it to 'bypassPermissions'.
+    const SDK_MODE_MAP: Record<string, import('@anthropic-ai/claude-agent-sdk').PermissionMode> = {
+        'full-auto': 'bypassPermissions',
+    };
+    const sdkPermissionMode = SDK_MODE_MAP[permissionMode] ?? permissionMode as import('@anthropic-ai/claude-agent-sdk').PermissionMode;
+    const needsBypass = sdkPermissionMode === 'bypassPermissions';
+
     const sdkOptions: import('@anthropic-ai/claude-agent-sdk').Options = {
         abortController,
         cwd: project.workingDir,
         canUseTool,
-        permissionMode: permissionMode as import('@anthropic-ai/claude-agent-sdk').PermissionMode,
+        permissionMode: sdkPermissionMode,
+        allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
         env: {
             ...process.env,
             ...project.envVars,
+            // Allow long-running MCP tool calls (e.g. send_message waiting for response)
+            CLAUDE_CODE_STREAM_CLOSE_TIMEOUT: '600000',
         },
     };
 
@@ -141,6 +186,14 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         sdkOptions.settingSources = ['user', 'project'];
     }
 
+    if (mcpServers && mcpServers.length > 0) {
+        const mcpRecord: Record<string, McpServerConfig> = {};
+        for (const server of mcpServers) {
+            mcpRecord[server.name] = server;
+        }
+        sdkOptions.mcpServers = mcpRecord;
+    }
+
     log.debug(`Starting SDK process for session ${session.id}`, {
         cwd: project.workingDir,
         permissionMode,
@@ -161,10 +214,14 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     });
 
     // Consume the async generator in the background
+    let consecutiveApiErrors = 0;
+
     (async () => {
         try {
             for await (const message of q) {
                 log.debug(`SDK message for session ${session.id}`, { type: message.type });
+                // Successful message received — reset API error counter
+                consecutiveApiErrors = 0;
                 const event = mapSdkMessageToEvent(message, session.id);
                 if (event) {
                     onEvent(event);
@@ -178,6 +235,21 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
             }
             const errorMsg = err instanceof Error ? err.message : String(err);
             log.error(`SDK process error for session ${session.id}`, { error: errorMsg });
+
+            // Track consecutive API errors
+            if (isApiError(errorMsg)) {
+                consecutiveApiErrors++;
+                log.warn(`Consecutive API error #${consecutiveApiErrors} for session ${session.id}`, { error: errorMsg });
+
+                if (consecutiveApiErrors >= API_FAILURE_THRESHOLD && onApiOutage) {
+                    log.warn(`API outage detected for session ${session.id} after ${consecutiveApiErrors} consecutive failures`);
+                    onApiOutage();
+                    return; // Don't call onExit — manager handles the pause
+                }
+            } else {
+                consecutiveApiErrors = 0;
+            }
+
             onEvent({
                 type: 'error',
                 error: { message: errorMsg, type: 'sdk_error' },

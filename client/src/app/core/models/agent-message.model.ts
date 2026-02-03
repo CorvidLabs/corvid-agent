@@ -11,6 +11,7 @@ export interface AgentMessage {
     response: string | null;
     responseTxid: string | null;
     sessionId: string | null;
+    threadId: string | null;
     createdAt: string;
     completedAt: string | null;
 }

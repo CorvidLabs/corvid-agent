@@ -46,7 +46,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                         class="sidebar__link"
                         routerLink="/feed"
                         routerLinkActive="sidebar__link--active">
-                        Live Feed
+                        AlgoChat Feed
                     </a>
                 </li>
                 <li>

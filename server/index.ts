@@ -2,7 +2,7 @@ import { getDb, closeDb } from './db/connection';
 import { handleRequest } from './routes/index';
 import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
-import { onCouncilStageChange, onCouncilLog } from './routes/councils';
+import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from './routes/councils';
 import { loadAlgoChatConfig } from './algochat/config';
 import { initAlgoChatService } from './algochat/service';
 import { AlgoChatBridge } from './algochat/bridge';
@@ -45,6 +45,7 @@ const algochatConfig = loadAlgoChatConfig();
 let algochatBridge: AlgoChatBridge | null = null;
 let agentWalletService: AgentWalletService | null = null;
 let agentMessenger: AgentMessenger | null = null;
+let agentDirectory: AgentDirectory | null = null;
 const selfTestService = new SelfTestService(db, processManager);
 const workTaskService = new WorkTaskService(db, processManager);
 
@@ -64,17 +65,23 @@ async function initAlgoChat(): Promise<void> {
     algochatBridge.setAgentWalletService(agentWalletService);
 
     // Initialize agent directory and messenger
-    const agentDirectory = new AgentDirectory(db, agentWalletService);
+    agentDirectory = new AgentDirectory(db, agentWalletService);
     algochatBridge.setAgentDirectory(agentDirectory);
     algochatBridge.setApprovalManager(processManager.approvalManager);
     algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, algochatConfig, service, agentWalletService, agentDirectory, processManager);
     agentMessenger.setWorkTaskService(workTaskService);
 
+    // Register MCP services so agent sessions get corvid_* tools
+    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService);
+
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
         broadcastAlgoChatMessage(server, participant, content, direction);
     });
+
+    // Publish encryption keys for all existing agent wallets on localnet
+    await agentWalletService.publishAllKeys();
 
     algochatBridge.start();
 }
@@ -120,8 +127,18 @@ const server = Bun.serve<WsData>({
         }
 
         // API routes
-        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService);
+        const apiResponse = handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
         if (apiResponse) return apiResponse;
+
+        // Mobile chat client
+        if (url.pathname === '/chat') {
+            const chatPath = join(import.meta.dir, 'public', 'chat.html');
+            if (existsSync(chatPath)) {
+                return new Response(Bun.file(chatPath), {
+                    headers: { 'Content-Type': 'text/html' },
+                });
+            }
+        }
 
         // Serve Angular static files
         if (existsSync(CLIENT_DIST)) {
@@ -158,8 +175,21 @@ onCouncilLog((logEntry) => {
     server.publish('council', msg);
 });
 
+onCouncilDiscussionMessage((message) => {
+    const msg = JSON.stringify({ type: 'council_discussion_message', message });
+    server.publish('council', msg);
+});
+
 // Initialize AlgoChat after server starts
-initAlgoChat().catch((err) => {
+initAlgoChat().then(() => {
+    // Wire agent message broadcasts once messenger is available
+    if (agentMessenger) {
+        agentMessenger.onMessageUpdate((message) => {
+            const msg = JSON.stringify({ type: 'agent_message_update', message });
+            server.publish('algochat', msg);
+        });
+    }
+}).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
 });
 

@@ -31,6 +31,8 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                         <dd>{{ c.agentIds.length }} agent{{ c.agentIds.length !== 1 ? 's' : '' }}</dd>
                         <dt>Chairman</dt>
                         <dd>{{ chairmanName() || 'None' }}</dd>
+                        <dt>Discussion Rounds</dt>
+                        <dd>{{ c.discussionRounds }}</dd>
                         <dt>Created</dt>
                         <dd>{{ c.createdAt | relativeTime }}</dd>
                     </dl>
@@ -149,6 +151,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
             background: var(--bg-raised); color: var(--text-secondary);
         }
         .launch-row__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .launch-row__stage[data-stage="discussing"] { color: #a78bfa; border-color: #a78bfa; }
         .launch-row__stage[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
         .launch-row__stage[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
         .launch-row__stage[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
