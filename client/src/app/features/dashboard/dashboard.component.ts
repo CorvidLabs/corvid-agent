@@ -422,6 +422,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.streamBuffer.set('');
         this.streamDone.set(false);
         this.toolEvents.set([]);
+
+        // Show the user's message immediately in chat
+        this.chatMessages.update((msgs) => [
+            ...msgs,
+            { content, direction: 'inbound' as const, timestamp: new Date() },
+        ]);
+
         this.wsService.sendChatMessage(agentId, content, projectId);
     }
 

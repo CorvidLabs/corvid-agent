@@ -11,7 +11,7 @@ import type { AgentMessage } from '../../core/models/agent-message.model';
 interface FeedEntry {
     id: number;
     timestamp: Date;
-    direction: 'inbound' | 'outbound' | 'agent-send' | 'agent-reply';
+    direction: 'inbound' | 'outbound' | 'agent-send' | 'agent-reply' | 'agent-processing' | 'status';
     participant: string;
     participantLabel: string;
     content: string;
@@ -19,6 +19,8 @@ interface FeedEntry {
     fee: number | null;
     threadId: string | null;
     colorIndex: number;
+    /** Links processing entries to their agent message ID for removal on completion. */
+    messageId?: string;
 }
 
 @Component({
@@ -34,6 +36,7 @@ interface FeedEntry {
                     <button class="btn btn--secondary" (click)="toggleAutoScroll()">
                         Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
                     </button>
+                    <button class="btn btn--secondary" (click)="collapseAll()">Collapse all</button>
                     <button class="btn btn--danger" (click)="onClear()">Clear</button>
                 </div>
             </div>
@@ -78,7 +81,11 @@ interface FeedEntry {
             } @else {
                 <div class="feed__list" #feedList>
                     @for (entry of entries(); track entry.id) {
-                        <div class="feed__entry" [attr.data-direction]="entry.direction" [style.border-left-color]="agentColor(entry.colorIndex)">
+                        <div class="feed__entry"
+                             [attr.data-direction]="entry.direction"
+                             [class.feed__entry--expanded]="expandedIds().has(entry.id)"
+                             [style.border-left-color]="agentColor(entry.colorIndex)"
+                             (click)="entry.direction !== 'agent-processing' && toggleExpand(entry.id)">
                             <div class="feed__meta">
                                 <span class="feed__time">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
                                 <span class="feed__direction" [attr.data-dir]="entry.direction">
@@ -88,13 +95,21 @@ interface FeedEntry {
                                 <span class="feed__arrow">-></span>
                                 <span class="feed__participant" [title]="entry.participant">{{ recipientFrom(entry.participantLabel) }}</span>
                                 @if (entry.threadId) {
-                                    <button class="feed__thread" [title]="entry.threadId" (click)="filterByThread(entry.threadId!)">thread:{{ entry.threadId.slice(0, 6) }}</button>
+                                    <button class="feed__thread" [title]="entry.threadId" (click)="filterByThread(entry.threadId!); $event.stopPropagation()">thread:{{ entry.threadId.slice(0, 6) }}</button>
                                 }
                                 @if (entry.fee !== null && entry.fee > 0) {
                                     <span class="feed__fee">{{ (entry.fee / 1000000).toFixed(4) }} ALGO</span>
                                 }
+                                @if (entry.direction === 'agent-processing') {
+                                    <span class="feed__processing-indicator"><span class="feed__processing-dot"></span> processing...</span>
+                                } @else {
+                                    <span class="feed__preview" [class.feed__preview--hidden]="expandedIds().has(entry.id)">{{ previewText(entry.content) }}</span>
+                                    <span class="feed__toggle">{{ expandedIds().has(entry.id) ? '▾' : '▸' }}</span>
+                                }
                             </div>
-                            <pre class="feed__content">{{ entry.content }}</pre>
+                            @if (expandedIds().has(entry.id)) {
+                                <pre class="feed__content">{{ entry.content }}</pre>
+                            }
                         </div>
                     }
                 </div>
@@ -140,44 +155,76 @@ interface FeedEntry {
         .feed__empty { color: var(--text-secondary); text-align: center; margin-top: 4rem; }
         .feed__hint { font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.6; }
         .feed__list {
-            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem;
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
             scrollbar-width: thin; scrollbar-color: var(--border-bright) transparent;
         }
         .feed__entry {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 0.5rem 0.75rem; font-size: 0.8rem;
+            padding: 0.35rem 0.75rem; font-size: 0.8rem;
             border-left: 3px solid var(--border);
+            cursor: pointer; transition: background 0.1s;
         }
+        .feed__entry:hover { background: var(--bg-hover); }
+        .feed__entry--expanded { background: var(--bg-raised); }
+        .feed__entry--expanded:hover { background: var(--bg-raised); }
         .feed__entry[data-direction="inbound"] { border-left-color: var(--accent-cyan); }
         .feed__entry[data-direction="outbound"] { border-left-color: var(--accent-green); }
-        .feed__entry[data-direction="agent-reply"] { background: var(--bg-surface-alt, rgba(255,255,255,0.02)); }
+        .feed__entry[data-direction="agent-reply"] { }
+        .feed__entry[data-direction="agent-processing"] { border-left-color: #ffa040; background: rgba(255, 160, 64, 0.04); }
+        .feed__entry[data-direction="status"] { border-left-color: var(--accent-amber); opacity: 0.8; }
         .feed__meta {
-            display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; flex-wrap: wrap;
+            display: flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap; overflow: hidden;
         }
-        .feed__time { font-family: var(--font-mono, monospace); font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
+        .feed__time { font-family: var(--font-mono, monospace); font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; flex-shrink: 0; }
         .feed__direction {
             font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm);
-            text-transform: uppercase; letter-spacing: 0.08em;
+            text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
         }
         .feed__direction[data-dir="inbound"] { color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.2); }
         .feed__direction[data-dir="outbound"] { color: var(--accent-green); background: rgba(0, 255, 136, 0.08); border: 1px solid rgba(0, 255, 136, 0.2); }
         .feed__direction[data-dir="agent-send"] { color: #ffa040; background: rgba(255, 160, 64, 0.08); border: 1px solid rgba(255, 160, 64, 0.25); }
         .feed__direction[data-dir="agent-reply"] { color: #60c0ff; background: rgba(96, 192, 255, 0.08); border: 1px solid rgba(96, 192, 255, 0.25); }
-        .feed__sender { font-weight: 700; font-size: 0.8rem; }
-        .feed__arrow { color: var(--text-secondary); opacity: 0.4; font-size: 0.7rem; }
+        .feed__direction[data-dir="agent-processing"] { color: #ffa040; background: rgba(255, 160, 64, 0.08); border: 1px solid rgba(255, 160, 64, 0.25); animation: pulse-bg 2s ease-in-out infinite; }
+        @keyframes pulse-bg { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+        .feed__direction[data-dir="status"] { color: var(--accent-amber); background: rgba(255, 170, 0, 0.08); border: 1px solid rgba(255, 170, 0, 0.2); }
+        .feed__sender { font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
+        .feed__arrow { color: var(--text-secondary); opacity: 0.4; font-size: 0.7rem; flex-shrink: 0; }
         .feed__participant {
-            font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;
-            max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-size: 0.75rem; color: var(--text-secondary); font-weight: 500; flex-shrink: 0;
+            max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .feed__thread {
             font-size: 0.65rem; font-family: var(--font-mono, monospace); color: var(--accent-yellow, #ffd700);
             background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.2);
-            padding: 1px 5px; border-radius: var(--radius-sm); cursor: pointer;
+            padding: 1px 5px; border-radius: var(--radius-sm); cursor: pointer; flex-shrink: 0;
         }
-        .feed__fee { font-size: 0.7rem; color: var(--accent-green); font-weight: 600; }
+        .feed__fee { font-size: 0.7rem; color: var(--accent-green); font-weight: 600; flex-shrink: 0; }
+        .feed__preview {
+            flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
+        }
+        .feed__preview--hidden { display: none; }
+        .feed__toggle {
+            flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
+            user-select: none;
+        }
         .feed__content {
-            margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
-            font-size: 0.8rem; line-height: 1.4; max-height: 300px; overflow-y: auto;
+            margin: 0.4rem 0 0 0; white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
+            font-size: 0.78rem; line-height: 1.5; max-height: 600px; overflow-y: auto;
+            padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .feed__processing-indicator {
+            display: flex; align-items: center; gap: 0.4rem;
+            font-size: 0.75rem; color: #ffa040; font-style: italic; margin-left: 0.25rem;
+        }
+        .feed__processing-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: #ffa040;
+            animation: processing-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes processing-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
         }
     `,
 })
@@ -188,6 +235,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     private readonly feedList = viewChild<ElementRef<HTMLElement>>('feedList');
 
     protected readonly entries = signal<FeedEntry[]>([]);
+    protected readonly expandedIds = signal<Set<number>>(new Set());
     protected readonly autoScroll = signal(true);
     protected readonly searchTerm = signal('');
     protected readonly currentOffset = signal(0);
@@ -262,7 +310,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 if (this.seenMessageKeys.has(dedupKey)) return;
                 this.seenMessageKeys.add(dedupKey);
 
-                if (m.status === 'sent' || m.status === 'processing') {
+                if (m.status === 'sent') {
                     this.addEntry({
                         direction: 'agent-send',
                         participant: `${fromName} \u2192 ${toName}`,
@@ -275,7 +323,25 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                     });
                 }
 
+                if (m.status === 'processing') {
+                    // Remove any existing 'sent' entry for same message to avoid duplication
+                    this.removeEntriesByMessageId(m.id);
+                    this.addEntry({
+                        direction: 'agent-processing',
+                        participant: `${toName}`,
+                        participantLabel: `${fromName} \u2192 ${toName}`,
+                        content: m.content,
+                        agentName: toName,
+                        fee: null,
+                        threadId: m.threadId ?? null,
+                        colorIndex: this.colorIndexForAgent(toName),
+                        messageId: m.id,
+                    });
+                }
+
                 if (m.status === 'completed' && m.response) {
+                    // Remove the processing indicator for this message
+                    this.removeEntriesByMessageId(m.id);
                     this.addEntry({
                         direction: 'agent-reply',
                         participant: `${toName} \u2192 ${fromName}`,
@@ -285,6 +351,20 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                         fee: null,
                         threadId: m.threadId ?? null,
                         colorIndex: this.colorIndexForAgent(toName),
+                    });
+                }
+
+                if (m.status === 'failed') {
+                    this.removeEntriesByMessageId(m.id);
+                    this.addEntry({
+                        direction: 'status',
+                        participant: `${fromName} \u2192 ${toName}`,
+                        participantLabel: `${fromName} \u2192 ${toName}`,
+                        content: `Message failed: ${m.content.slice(0, 80)}`,
+                        agentName: fromName,
+                        fee: null,
+                        threadId: m.threadId ?? null,
+                        colorIndex: this.colorIndexForAgent(fromName),
                     });
                 }
             }
@@ -306,6 +386,8 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             case 'outbound': return 'OUT';
             case 'agent-send': return 'SEND';
             case 'agent-reply': return 'REPLY';
+            case 'agent-processing': return 'WORKING';
+            case 'status': return 'STATUS';
             default: return 'A2A';
         }
     }
@@ -313,6 +395,27 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     protected recipientFrom(label: string): string {
         const parts = label.split(' \u2192 ');
         return parts.length > 1 ? parts[1] : label;
+    }
+
+    protected previewText(content: string): string {
+        const oneLine = content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        return oneLine.length > 120 ? oneLine.slice(0, 120) + '...' : oneLine;
+    }
+
+    protected toggleExpand(id: number): void {
+        this.expandedIds.update((set) => {
+            const next = new Set(set);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }
+
+    protected collapseAll(): void {
+        this.expandedIds.set(new Set());
     }
 
     private colorIndexForAgent(agentName: string): number {
@@ -328,6 +431,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
 
     protected onClear(): void {
         this.entries.set([]);
+        this.expandedIds.set(new Set());
         this.seenMessageKeys.clear();
         this.searchTerm.set('');
         this.currentOffset.set(0);
@@ -403,6 +507,22 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                     colorIndex: this.colorIndexForAgent(fromName),
                 });
 
+                if (m.status === 'processing') {
+                    newEntries.push({
+                        id: this.nextId++,
+                        timestamp: new Date(),
+                        direction: 'agent-processing',
+                        participant: `${toName}`,
+                        participantLabel: `${fromName} \u2192 ${toName}`,
+                        content: m.content,
+                        agentName: toName,
+                        fee: null,
+                        threadId: m.threadId ?? null,
+                        colorIndex: this.colorIndexForAgent(toName),
+                        messageId: m.id,
+                    });
+                }
+
                 if (m.status === 'completed' && m.response) {
                     newEntries.push({
                         id: this.nextId++,
@@ -447,6 +567,10 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
         if (agent) return agent.name;
         if (address === 'local') return 'Local UI';
         return address.slice(0, 8) + '...' + address.slice(-4);
+    }
+
+    private removeEntriesByMessageId(messageId: string): void {
+        this.entries.update((list) => list.filter((e) => e.messageId !== messageId));
     }
 
     private agentNameForAddress(address: string): string | null {

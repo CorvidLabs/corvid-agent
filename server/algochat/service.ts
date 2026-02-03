@@ -165,6 +165,18 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
         if (config.mnemonic) {
             chatAccount = algochat.createChatAccountFromMnemonic(config.mnemonic);
             log.info(`Restored account from mnemonic`, { address: chatAccount.address });
+
+            // On localnet, ensure the restored account is funded
+            if (config.network === 'localnet') {
+                try {
+                    const info = await algodClient.accountInformation(chatAccount.address).do();
+                    if (Number(info.amount ?? 0) === 0) {
+                        await fundFromLocalNetDispenser(algodClient, chatAccount.address);
+                    }
+                } catch {
+                    // Best-effort funding; key publish will fail if unfunded
+                }
+            }
         } else if (config.network === 'localnet') {
             const generated = algochat.createRandomChatAccount();
             chatAccount = generated.account;

@@ -299,7 +299,7 @@ export function broadcastAlgoChatMessage(
     server: { publish: (topic: string, data: string) => void },
     participant: string,
     content: string,
-    direction: 'inbound' | 'outbound',
+    direction: 'inbound' | 'outbound' | 'status',
 ): void {
     const msg: ServerMessage = {
         type: 'algochat_message',
