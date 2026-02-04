@@ -997,57 +997,67 @@ resetTimer();
 
             const pubKey = await this.getPublicKey(participant);
 
-            // Use group transactions for large messages; fall back to condense+send
-            try {
-                const { sendGroupMessage } = await import('./group-sender');
-                const groupResult = await sendGroupMessage(
-                    this.service,
-                    senderAccount,
-                    participant,
-                    pubKey,
-                    content,
-                );
+            // For external users (non-agents), always condense to a single
+            // transaction. External AlgoChat clients can't reassemble [GRP:]
+            // chunks. For agent-to-agent we can use group transactions since
+            // the bridge handles reassembly.
+            const isExternalUser = !this.agentDirectory?.findAgentByAddress(participant);
 
-                log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
-                if (groupResult.fee) {
-                    recordAlgoSpend(this.db, groupResult.fee);
-                    const conv = getConversationByParticipant(this.db, participant);
-                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
-                }
-                this.emitEvent(participant, content, 'outbound', groupResult.fee);
-            } catch (groupErr) {
-                log.warn('Group send failed, falling back to condense+send', {
-                    error: groupErr instanceof Error ? groupErr.message : String(groupErr),
-                });
-
-                // Fallback: condense then single send
-                let sendContent = content;
+            if (!isExternalUser) {
+                // Agent-to-agent: use group transactions (bridge reassembles)
                 try {
-                    const { condenseMessage } = await import('./condenser');
-                    const condensed = await condenseMessage(content);
-                    if (condensed.wasCondensed) {
-                        sendContent = condensed.content;
+                    const { sendGroupMessage } = await import('./group-sender');
+                    const groupResult = await sendGroupMessage(
+                        this.service,
+                        senderAccount,
+                        participant,
+                        pubKey,
+                        content,
+                    );
+
+                    log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
+                    if (groupResult.fee) {
+                        recordAlgoSpend(this.db, groupResult.fee);
+                        const conv = getConversationByParticipant(this.db, participant);
+                        if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
                     }
-                } catch {
-                    // Use original content
+                    this.emitEvent(participant, content, 'outbound', groupResult.fee);
+                    return;
+                } catch (groupErr) {
+                    log.warn('Group send to agent failed, falling back to condense', {
+                        error: groupErr instanceof Error ? groupErr.message : String(groupErr),
+                    });
                 }
-
-                const result = await this.service.algorandService.sendMessage(
-                    senderAccount,
-                    participant,
-                    pubKey,
-                    sendContent,
-                );
-
-                const fallbackFee = (result as unknown as { fee?: number }).fee;
-                log.info(`Sent response to ${participant} (condensed fallback)`, { content: content.slice(0, 100), fee: fallbackFee });
-                if (fallbackFee) {
-                    recordAlgoSpend(this.db, fallbackFee);
-                    const conv = getConversationByParticipant(this.db, participant);
-                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, fallbackFee);
-                }
-                this.emitEvent(participant, content, 'outbound', fallbackFee);
             }
+
+            // Condense to single transaction (for external users, or as fallback)
+            let sendContent = content;
+            try {
+                const { condenseMessage } = await import('./condenser');
+                const condensed = await condenseMessage(content);
+                if (condensed.wasCondensed) {
+                    sendContent = condensed.content;
+                    log.info(`Condensed response for external user`, { originalLen: content.length, condensedLen: sendContent.length });
+                }
+            } catch {
+                // Use original content
+            }
+
+            const result = await this.service.algorandService.sendMessage(
+                senderAccount,
+                participant,
+                pubKey,
+                sendContent,
+            );
+
+            const fee = (result as unknown as { fee?: number }).fee;
+            log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee, condensed: sendContent !== content });
+            if (fee) {
+                recordAlgoSpend(this.db, fee);
+                const conv = getConversationByParticipant(this.db, participant);
+                if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, fee);
+            }
+            this.emitEvent(participant, content, 'outbound', fee);
         } catch (err) {
             log.error('Failed to send response', { error: err instanceof Error ? err.message : String(err) });
         }
