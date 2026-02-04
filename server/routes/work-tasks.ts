@@ -29,9 +29,7 @@ export function handleWorkTaskRoutes(
     // POST /api/work-tasks/:id/cancel — cancel a running task
     const cancelMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/cancel$/);
     if (cancelMatch && method === 'POST') {
-        const task = workTaskService.cancelTask(cancelMatch[1]);
-        if (!task) return json({ error: 'Work task not found' }, 404);
-        return json(task);
+        return handleCancel(cancelMatch[1], workTaskService);
     }
 
     // GET /api/work-tasks/:id — get single
@@ -43,6 +41,12 @@ export function handleWorkTaskRoutes(
     }
 
     return null;
+}
+
+async function handleCancel(taskId: string, workTaskService: WorkTaskService): Promise<Response> {
+    const task = await workTaskService.cancelTask(taskId);
+    if (!task) return json({ error: 'Work task not found' }, 404);
+    return json(task);
 }
 
 async function handleCreate(req: Request, workTaskService: WorkTaskService): Promise<Response> {

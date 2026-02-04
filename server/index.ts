@@ -48,6 +48,7 @@ let agentMessenger: AgentMessenger | null = null;
 let agentDirectory: AgentDirectory | null = null;
 const selfTestService = new SelfTestService(db, processManager);
 const workTaskService = new WorkTaskService(db, processManager);
+workTaskService.recoverStaleTasks();
 
 async function initAlgoChat(): Promise<void> {
     if (!algochatConfig.enabled) {

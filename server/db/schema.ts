@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -236,6 +236,10 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
         `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
+    ],
+    17: [
+        `ALTER TABLE work_tasks ADD COLUMN original_branch TEXT DEFAULT NULL`,
+        `ALTER TABLE work_tasks ADD COLUMN iteration_count INTEGER DEFAULT 0`,
     ],
 };
 
