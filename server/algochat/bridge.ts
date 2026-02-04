@@ -23,6 +23,7 @@ import { formatApprovalForChain, parseApprovalResponse } from './approval-format
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
+import { saveAlgoChatMessage } from '../db/algochat-messages';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
@@ -703,7 +704,10 @@ export class AlgoChatBridge {
         if (this.chainSubscriptions.has(sessionId)) return;
         this.chainSubscriptions.add(sessionId);
 
-        let responseBuffer = '';
+        // We only send the LAST text block from the last turn. Earlier text
+        // blocks are intermediate explanations (tool call reasoning, etc.)
+        // and would clutter the on-chain response.
+        let lastTextBlock = '';
         let lastTurnResponse = '';
         let sent = false;
 
@@ -715,7 +719,7 @@ export class AlgoChatBridge {
             this.chainSubscriptions.delete(sessionId);
             this.clearSubscriptionTimer(sessionId);
 
-            const finalText = (responseBuffer.trim() || lastTurnResponse.trim());
+            const finalText = (lastTextBlock.trim() || lastTurnResponse.trim());
             if (finalText) {
                 this.sendResponse(participant, finalText);
             }
@@ -734,7 +738,20 @@ export class AlgoChatBridge {
         let currentTextBlock = '';
         let inTextBlock = false;
         let progressTimer: ReturnType<typeof setInterval> | null = null;
+        let ackDelayTimer: ReturnType<typeof setTimeout> | null = null;
+        const startedAt = Date.now();
+
+        // How long to wait before sending the on-chain ack. If the response
+        // arrives within this window we skip the ack entirely.
+        const ACK_DELAY_MS = 10_000; // 10 seconds
         const PROGRESS_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+        const cancelAckDelay = () => {
+            if (ackDelayTimer) {
+                clearTimeout(ackDelayTimer);
+                ackDelayTimer = null;
+            }
+        };
 
         // Send periodic on-chain progress updates so the user's AlgoChat
         // client knows the agent is still working
@@ -757,9 +774,21 @@ export class AlgoChatBridge {
             }
         };
 
+        // Actually send the on-chain ack and start progress timer
+        const sendAckNow = () => {
+            if (ackSent || sent) return;
+            ackSent = true;
+            this.sendResponse(participant, '[Status] Received your message — working on it now.').catch(() => {});
+            startProgressTimer();
+        };
+
         const flushTextBlock = () => {
             const text = currentTextBlock.trim();
             if (text.length > 0) {
+                // Keep track of the latest text block — this overwrites
+                // previous ones so we only send the final one on-chain.
+                lastTextBlock = text;
+
                 // Show the agent's intermediate text as a status update
                 // Truncate long blocks to a reasonable preview
                 const preview = text.length > 300
@@ -774,16 +803,14 @@ export class AlgoChatBridge {
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
-            // Send an immediate on-chain acknowledgment so the user knows
-            // the agent received their message
+            // On first assistant event, show a local status and schedule
+            // the on-chain ack after a delay (skip if we finish quickly)
             if (event.type === 'assistant' && !statusEmitted) {
                 statusEmitted = true;
                 this.emitEvent(participant, 'Agent is processing your message...', 'status');
 
-                if (!ackSent) {
-                    ackSent = true;
-                    this.sendResponse(participant, '[Status] Received your message — working on it now.').catch(() => {});
-startProgressTimer();
+                if (!ackSent && !ackDelayTimer) {
+                    ackDelayTimer = setTimeout(sendAckNow, ACK_DELAY_MS);
                 }
             }
 
@@ -792,7 +819,13 @@ startProgressTimer();
                 const message = (event as unknown as { message: string }).message;
                 if (message) {
                     this.emitEvent(participant, message, 'status');
-resetTimer();
+                    // Agent is calling other agents — this will take a while,
+                    // send the ack immediately
+                    if (!ackSent) {
+                        cancelAckDelay();
+                        sendAckNow();
+                    }
+                    resetTimer();
                 }
                 return;
             }
@@ -809,6 +842,11 @@ resetTimer();
                     const toolName = (block as unknown as { name?: string }).name;
                     if (toolName === 'corvid_send_message') {
                         agentQueryCount++;
+                        // Agent-to-agent call means longer processing — send ack now
+                        if (!ackSent) {
+                            cancelAckDelay();
+                            sendAckNow();
+                        }
                     }
                 }
             }
@@ -824,25 +862,29 @@ resetTimer();
                 flushTextBlock();
             }
 
-            if (event.type === 'assistant' && event.message?.content) {
-                responseBuffer += extractContentText(event.message.content);
+            if (event.type === 'assistant') {
                 resetTimer(); // Activity detected — reset timeout
             }
 
-            // Each 'result' marks end of a turn — save and reset
+            // Each 'result' marks end of a turn — save last text block and reset
             if (event.type === 'result') {
                 if (inTextBlock) flushTextBlock();
-                if (agentQueryCount > 0) {
+                // Only show synthesizing status if we've been working long enough
+                const elapsed = Date.now() - startedAt;
+                if (agentQueryCount > 0 && elapsed > ACK_DELAY_MS) {
                     this.emitEvent(participant, `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`, 'status');
                 }
-                lastTurnResponse = responseBuffer;
-                responseBuffer = '';
+                if (lastTextBlock.trim()) {
+                    lastTurnResponse = lastTextBlock;
+                }
+                lastTextBlock = '';
                 resetTimer(); // Turn completed — reset timeout
             }
 
             // Send only the last turn's response when the session fully exits
             if (event.type === 'session_exited') {
                 if (inTextBlock) flushTextBlock();
+                cancelAckDelay();
                 stopProgressTimer();
                 sendOnce();
             }
@@ -997,50 +1039,39 @@ resetTimer();
 
             const pubKey = await this.getPublicKey(participant);
 
-            // For external users (non-agents), always condense to a single
-            // transaction. External AlgoChat clients can't reassemble [GRP:]
-            // chunks. For agent-to-agent we can use group transactions since
-            // the bridge handles reassembly.
-            const isExternalUser = !this.agentDirectory?.findAgentByAddress(participant);
+            // Use group transactions for all recipients. External AlgoChat
+            // clients that support [GRP:] reassembly will show the full message;
+            // for short messages that fit in a single txn, sendGroupMessage
+            // automatically falls back to a standard single send.
+            try {
+                const { sendGroupMessage } = await import('./group-sender');
+                const groupResult = await sendGroupMessage(
+                    this.service,
+                    senderAccount,
+                    participant,
+                    pubKey,
+                    content,
+                );
 
-            if (!isExternalUser) {
-                // Agent-to-agent: use group transactions (bridge reassembles)
-                try {
-                    const { sendGroupMessage } = await import('./group-sender');
-                    const groupResult = await sendGroupMessage(
-                        this.service,
-                        senderAccount,
-                        participant,
-                        pubKey,
-                        content,
-                    );
-
-                    log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
-                    if (groupResult.fee) {
-                        recordAlgoSpend(this.db, groupResult.fee);
-                        const conv = getConversationByParticipant(this.db, participant);
-                        if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
-                    }
-                    this.emitEvent(participant, content, 'outbound', groupResult.fee);
-                    return;
-                } catch (groupErr) {
-                    log.warn('Group send to agent failed, falling back to condense', {
-                        error: groupErr instanceof Error ? groupErr.message : String(groupErr),
-                    });
+                log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
+                if (groupResult.fee) {
+                    recordAlgoSpend(this.db, groupResult.fee);
+                    const conv = getConversationByParticipant(this.db, participant);
+                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
                 }
+                this.emitEvent(participant, content, 'outbound', groupResult.fee);
+                return;
+            } catch (groupErr) {
+                log.warn('Group send failed, falling back to single txn', {
+                    error: groupErr instanceof Error ? groupErr.message : String(groupErr),
+                });
             }
 
-            // Condense to single transaction (for external users, or as fallback)
+            // Fallback: single transaction (truncates if needed)
             let sendContent = content;
-            try {
-                const { condenseMessage } = await import('./condenser');
-                const condensed = await condenseMessage(content);
-                if (condensed.wasCondensed) {
-                    sendContent = condensed.content;
-                    log.info(`Condensed response for external user`, { originalLen: content.length, condensedLen: sendContent.length });
-                }
-            } catch {
-                // Use original content
+            const encoded = new TextEncoder().encode(content);
+            if (encoded.byteLength > 850) {
+                sendContent = new TextDecoder().decode(encoded.slice(0, 840)) + '...';
             }
 
             const result = await this.service.algorandService.sendMessage(
@@ -1051,7 +1082,7 @@ resetTimer();
             );
 
             const fee = (result as unknown as { fee?: number }).fee;
-            log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee, condensed: sendContent !== content });
+            log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee });
             if (fee) {
                 recordAlgoSpend(this.db, fee);
                 const conv = getConversationByParticipant(this.db, participant);
@@ -1124,6 +1155,13 @@ resetTimer();
         direction: 'inbound' | 'outbound' | 'status',
         fee?: number,
     ): void {
+        // Persist to DB so messages survive page refresh
+        try {
+            saveAlgoChatMessage(this.db, { participant, content, direction, fee });
+        } catch (err) {
+            log.warn('Failed to persist algochat message', { error: err instanceof Error ? err.message : String(err) });
+        }
+
         for (const cb of this.eventCallbacks) {
             try {
                 cb(participant, content, direction, fee);

@@ -12,7 +12,7 @@ import type { Project } from '../../core/models/project.model';
     imports: [ReactiveFormsModule],
     template: `
         <div class="page">
-            <h2>{{ editId() ? 'Edit Agent' : 'New Agent' }}</h2>
+            <h2>{{ id() ? 'Edit Agent' : 'New Agent' }}</h2>
 
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
                 <div class="form__field">
@@ -141,7 +141,7 @@ export class AgentFormComponent implements OnInit {
     private readonly projectService = inject(ProjectService);
     private readonly router = inject(Router);
 
-    readonly editId = input<string | undefined>(undefined);
+    readonly id = input<string | undefined>(undefined);
     protected readonly saving = signal(false);
     protected readonly projects = signal<Project[]>([]);
 
@@ -164,7 +164,7 @@ export class AgentFormComponent implements OnInit {
         await this.projectService.loadProjects();
         this.projects.set(this.projectService.projects());
 
-        const id = this.editId();
+        const id = this.id();
         if (id) {
             const agent = await this.agentService.getAgent(id);
             this.form.patchValue({
@@ -190,7 +190,7 @@ export class AgentFormComponent implements OnInit {
 
         try {
             const value = this.form.getRawValue() as unknown as CreateAgentInput;
-            const id = this.editId();
+            const id = this.id();
 
             if (id) {
                 await this.agentService.updateAgent(id, value);

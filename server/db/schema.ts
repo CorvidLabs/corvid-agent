@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -224,6 +224,18 @@ const MIGRATIONS: Record<number, string[]> = {
     ],
     15: [
         `ALTER TABLE sessions ADD COLUMN total_algo_spent INTEGER DEFAULT 0`,
+    ],
+    16: [
+        `CREATE TABLE IF NOT EXISTS algochat_messages (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            participant TEXT NOT NULL,
+            content     TEXT NOT NULL,
+            direction   TEXT NOT NULL DEFAULT 'inbound',
+            fee         INTEGER DEFAULT 0,
+            created_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
     ],
 };
 
