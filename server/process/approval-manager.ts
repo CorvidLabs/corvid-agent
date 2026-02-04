@@ -14,6 +14,7 @@ interface PendingRequest {
     request: ApprovalRequest;
     resolve: (response: ApprovalResponse) => void;
     timer: ReturnType<typeof setTimeout>;
+    senderAddress?: string;
 }
 
 /**
@@ -49,7 +50,7 @@ export class ApprovalManager {
         return source === 'algochat' ? DEFAULT_TIMEOUT_ALGOCHAT_MS : DEFAULT_TIMEOUT_WEB_MS;
     }
 
-    createRequest(request: ApprovalRequest): Promise<ApprovalResponse> {
+    createRequest(request: ApprovalRequest, senderAddress?: string): Promise<ApprovalResponse> {
         // In paused mode, immediately deny all requests
         if (this._operationalMode === 'paused') {
             log.info(`Approval request ${request.id} immediately denied (paused mode)`);
@@ -90,7 +91,7 @@ export class ApprovalManager {
                 }
             }, request.timeoutMs);
 
-            this.pending.set(request.id, { request, resolve, timer });
+            this.pending.set(request.id, { request, resolve, timer, senderAddress });
             log.debug(`Created approval request ${request.id}`, {
                 sessionId: request.sessionId,
                 toolName: request.toolName,
@@ -164,10 +165,23 @@ export class ApprovalManager {
      * Resolve a pending request by matching a short ID prefix.
      * Used by AlgoChat where users reply with abbreviated IDs.
      */
-    resolveByShortId(shortId: string, partial: { behavior: 'allow' | 'deny'; message?: string }): boolean {
+    resolveByShortId(
+        shortId: string,
+        partial: { behavior: 'allow' | 'deny'; message?: string },
+        senderAddress?: string,
+    ): boolean {
         const lower = shortId.toLowerCase();
-        for (const [id] of this.pending) {
+        for (const [id, entry] of this.pending) {
             if (id.toLowerCase().startsWith(lower)) {
+                // Verify sender matches the original request sender (if tracked)
+                if (entry.senderAddress && senderAddress && entry.senderAddress !== senderAddress) {
+                    log.warn(`Approval response from wrong sender`, {
+                        expected: entry.senderAddress,
+                        actual: senderAddress,
+                        shortId,
+                    });
+                    return false;
+                }
                 return this.resolveRequest(id, {
                     requestId: id,
                     behavior: partial.behavior,
@@ -177,6 +191,18 @@ export class ApprovalManager {
         }
         log.debug(`No pending approval matching short ID "${shortId}"`);
         return false;
+    }
+
+    /**
+     * Associate a sender address with an existing pending request.
+     * Used by AlgoChat to mark which on-chain participant should be
+     * allowed to respond to the approval.
+     */
+    setSenderAddress(requestId: string, senderAddress: string): void {
+        const entry = this.pending.get(requestId);
+        if (entry) {
+            entry.senderAddress = senderAddress;
+        }
     }
 
     getPendingForSession(sessionId: string): ApprovalRequest[] {

@@ -14,6 +14,8 @@ const LEVEL_LABELS: Record<LogLevel, string> = {
     error: 'ERROR',
 };
 
+const LOG_FORMAT = (process.env.LOG_FORMAT ?? 'text').toLowerCase();
+
 function getMinLevel(): LogLevel {
     const env = process.env.LOG_LEVEL?.toLowerCase();
     if (env && env in LEVEL_ORDER) return env as LogLevel;
@@ -26,6 +28,19 @@ function formatContext(ctx?: Record<string, unknown>): string {
 }
 
 function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<string, unknown>): string {
+    if (LOG_FORMAT === 'json') {
+        const entry: Record<string, unknown> = {
+            timestamp: new Date().toISOString(),
+            level,
+            module,
+            message: msg,
+        };
+        if (ctx && Object.keys(ctx).length > 0) {
+            Object.assign(entry, ctx);
+        }
+        return JSON.stringify(entry);
+    }
+
     const ts = new Date().toISOString();
     return `${ts} ${LEVEL_LABELS[level]} [${module}] ${msg}${formatContext(ctx)}`;
 }

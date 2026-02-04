@@ -97,7 +97,10 @@ async function initAlgoChat(): Promise<void> {
     agentMessenger.setWorkTaskService(workTaskService);
 
     // Register MCP services so agent sessions get corvid_* tools
-    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService);
+    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
+        serverMnemonic: algochatConfig.mnemonic,
+        network: agentNetworkConfig.network,
+    });
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -143,10 +146,7 @@ const server = Bun.serve<WsData>({
                 timestamp: new Date().toISOString(),
             };
             return new Response(JSON.stringify(health), {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
+                headers: { 'Content-Type': 'application/json' },
             });
         }
 

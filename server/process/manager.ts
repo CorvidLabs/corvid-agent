@@ -47,6 +47,7 @@ export class ProcessManager {
     private mcpMessenger: AgentMessenger | null = null;
     private mcpDirectory: AgentDirectory | null = null;
     private mcpWalletService: AgentWalletService | null = null;
+    private mcpEncryptionConfig: { serverMnemonic?: string | null; network?: string } = {};
 
     constructor(db: Database) {
         this.db = db;
@@ -61,10 +62,12 @@ export class ProcessManager {
         messenger: AgentMessenger,
         directory: AgentDirectory,
         walletService: AgentWalletService,
+        encryptionConfig?: { serverMnemonic?: string | null; network?: string },
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
         this.mcpWalletService = walletService;
+        this.mcpEncryptionConfig = encryptionConfig ?? {};
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -78,6 +81,8 @@ export class ProcessManager {
             agentDirectory: this.mcpDirectory,
             agentWalletService: this.mcpWalletService,
             sessionSource,
+            serverMnemonic: this.mcpEncryptionConfig.serverMnemonic,
+            network: this.mcpEncryptionConfig.network,
             emitStatus: sessionId
                 ? (message: string) => this.emitEvent(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
                 : undefined,
