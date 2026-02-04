@@ -13,6 +13,7 @@ import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { checkWsAuth } from './lib/auth';
 import { createLogger } from './lib/logger';
 
 const log = createLogger('Server');
@@ -101,7 +102,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    });
+    }, workTaskService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -130,6 +131,9 @@ const server = Bun.serve<WsData>({
 
         // WebSocket upgrade
         if (url.pathname === '/ws') {
+            const wsAuthResponse = checkWsAuth(req, url);
+            if (wsAuthResponse) return wsAuthResponse;
+
             const upgraded = server.upgrade(req, {
                 data: { subscriptions: new Map() },
             });

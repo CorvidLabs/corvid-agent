@@ -11,9 +11,10 @@ import { getSession, updateSessionPid, updateSessionStatus, updateSessionCost, a
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
+import type { WorkTaskService } from '../work/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
-import { recordApiCost } from '../db/spending';
+import { recordApiCost, checkApiLimit } from '../db/spending';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ProcessManager');
@@ -22,6 +23,13 @@ const AGENT_TIMEOUT_MS = parseInt(process.env.AGENT_TIMEOUT_MS ?? String(30 * 60
 const MAX_RESTARTS = 3;
 const BACKOFF_BASE_MS = 5000;
 const STABLE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes uptime resets restart counter
+
+// Auto-resume backoff: 5min → 15min → 45min → cap at 60min
+const AUTO_RESUME_CHECK_MS = 60_000; // Check every minute
+const AUTO_RESUME_BASE_MS = 5 * 60 * 1000; // 5 minutes
+const AUTO_RESUME_MULTIPLIER = 3;
+const AUTO_RESUME_CAP_MS = 60 * 60 * 1000; // 1 hour max
+const AUTO_RESUME_MAX_ATTEMPTS = 10;
 
 export type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => void;
 
@@ -32,6 +40,12 @@ interface SessionMeta {
     lastKnownCostUsd: number;
 }
 
+interface PausedSessionInfo {
+    pausedAt: number;
+    resumeAttempts: number;
+    nextResumeAt: number;
+}
+
 export class ProcessManager {
     private processes: Map<string, SdkProcess> = new Map();
     private subscribers: Map<string, Set<EventCallback>> = new Map();
@@ -40,7 +54,8 @@ export class ProcessManager {
     private db: Database;
     private timeoutTimer: ReturnType<typeof setInterval> | null = null;
     private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-    private pausedSessions: Set<string> = new Set();
+    private pausedSessions: Map<string, PausedSessionInfo> = new Map();
+    private autoResumeTimer: ReturnType<typeof setInterval> | null = null;
     readonly approvalManager: ApprovalManager;
 
     // MCP services — set after AlgoChat init
@@ -48,6 +63,7 @@ export class ProcessManager {
     private mcpDirectory: AgentDirectory | null = null;
     private mcpWalletService: AgentWalletService | null = null;
     private mcpEncryptionConfig: { serverMnemonic?: string | null; network?: string } = {};
+    private mcpWorkTaskService: WorkTaskService | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -55,6 +71,7 @@ export class ProcessManager {
         this.approvalManager.setDatabase(db);
         this.cleanupStaleSessions();
         this.startTimeoutChecker();
+        this.startAutoResumeChecker();
     }
 
     /** Register MCP-related services so agent sessions get corvid_* tools. */
@@ -63,11 +80,13 @@ export class ProcessManager {
         directory: AgentDirectory,
         walletService: AgentWalletService,
         encryptionConfig?: { serverMnemonic?: string | null; network?: string },
+        workTaskService?: WorkTaskService,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
         this.mcpWalletService = walletService;
         this.mcpEncryptionConfig = encryptionConfig ?? {};
+        this.mcpWorkTaskService = workTaskService ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -83,6 +102,7 @@ export class ProcessManager {
             sessionSource,
             serverMnemonic: this.mcpEncryptionConfig.serverMnemonic,
             network: this.mcpEncryptionConfig.network,
+            workTaskService: this.mcpWorkTaskService ?? undefined,
             emitStatus: sessionId
                 ? (message: string) => this.emitEvent(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
                 : undefined,
@@ -105,6 +125,20 @@ export class ProcessManager {
     startProcess(session: Session, prompt?: string): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
+        }
+
+        // Enforce daily API budget before starting a new session
+        try {
+            checkApiLimit(this.db, 0);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.warn(`Budget limit reached, refusing to start session ${session.id}`, { error: message });
+            updateSessionStatus(this.db, session.id, 'error');
+            this.emitEvent(session.id, {
+                type: 'error',
+                error: { message, type: 'budget_error' },
+            } as ClaudeStreamEvent);
+            return;
         }
 
         const project = getProject(this.db, session.projectId);
@@ -329,10 +363,15 @@ export class ProcessManager {
             clearInterval(this.timeoutTimer);
             this.timeoutTimer = null;
         }
+        if (this.autoResumeTimer) {
+            clearInterval(this.autoResumeTimer);
+            this.autoResumeTimer = null;
+        }
         for (const timer of this.stableTimers.values()) {
             clearTimeout(timer);
         }
         this.stableTimers.clear();
+        this.pausedSessions.clear();
         this.approvalManager.shutdown();
         for (const [sessionId] of this.processes) {
             this.stopProcess(sessionId);
@@ -349,14 +388,19 @@ export class ProcessManager {
         }
 
         this.clearStableTimer(sessionId);
-        this.pausedSessions.add(sessionId);
+        const now = Date.now();
+        this.pausedSessions.set(sessionId, {
+            pausedAt: now,
+            resumeAttempts: 0,
+            nextResumeAt: now + AUTO_RESUME_BASE_MS,
+        });
         this.approvalManager.cancelSession(sessionId);
         updateSessionPid(this.db, sessionId, null);
         updateSessionStatus(this.db, sessionId, 'paused');
 
         this.emitEvent(sessionId, {
             type: 'error',
-            error: { message: 'Session paused due to API outage — use POST /api/sessions/:id/resume to restart', type: 'api_outage' },
+            error: { message: `Session paused due to API outage — auto-resume in ${AUTO_RESUME_BASE_MS / 60_000}min`, type: 'api_outage' },
         } as ClaudeStreamEvent);
     }
 
@@ -383,6 +427,10 @@ export class ProcessManager {
 
     isPaused(sessionId: string): boolean {
         return this.pausedSessions.has(sessionId);
+    }
+
+    getPausedSessionIds(): string[] {
+        return [...this.pausedSessions.keys()];
     }
 
     private handleEvent(sessionId: string, event: ClaudeStreamEvent): void {
@@ -415,6 +463,21 @@ export class ProcessManager {
                     }
                 }
                 meta.lastKnownCostUsd = event.total_cost_usd;
+
+                // Mid-session budget enforcement: stop session if daily limit exceeded
+                try {
+                    checkApiLimit(this.db, 0);
+                } catch {
+                    log.warn(`Daily budget exceeded mid-session — stopping session ${sessionId}`, {
+                        sessionCost: event.total_cost_usd,
+                    });
+                    this.emitEvent(sessionId, {
+                        type: 'error',
+                        error: { message: 'Session stopped: daily API budget exhausted', type: 'budget_error' },
+                    } as ClaudeStreamEvent);
+                    this.stopProcess(sessionId);
+                    return;
+                }
             }
         }
 
@@ -547,5 +610,96 @@ export class ProcessManager {
                 }
             }
         }, 60_000);
+    }
+
+    /** Quick connectivity check to the Anthropic API. Returns true if reachable. */
+    private async checkApiHealth(): Promise<boolean> {
+        try {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: '{}',
+                signal: AbortSignal.timeout(10_000),
+            });
+            // Any response (even 401/422) means the API is reachable.
+            // Only network errors or timeouts indicate an outage.
+            return response.status < 500;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Periodically attempt to resume paused sessions with exponential backoff.
+     * Backoff: 5min → 15min → 45min → cap at 60min, max 10 attempts then give up.
+     * Checks API health before resuming to avoid burning attempts on a still-down API.
+     */
+    private startAutoResumeChecker(): void {
+        this.autoResumeTimer = setInterval(() => {
+            if (this.pausedSessions.size === 0) return;
+
+            const now = Date.now();
+            const dueSessionIds: string[] = [];
+
+            for (const [sessionId, info] of this.pausedSessions) {
+                if (now < info.nextResumeAt) continue;
+
+                if (info.resumeAttempts >= AUTO_RESUME_MAX_ATTEMPTS) {
+                    log.warn(`Giving up auto-resume for session ${sessionId} after ${info.resumeAttempts} attempts`);
+                    this.pausedSessions.delete(sessionId);
+                    updateSessionStatus(this.db, sessionId, 'error');
+                    this.emitEvent(sessionId, {
+                        type: 'error',
+                        error: { message: `Auto-resume abandoned after ${info.resumeAttempts} attempts`, type: 'auto_resume_exhausted' },
+                    } as ClaudeStreamEvent);
+                    continue;
+                }
+
+                // Check budget before attempting resume
+                try {
+                    checkApiLimit(this.db, 0);
+                } catch {
+                    log.debug(`Skipping auto-resume for ${sessionId} — budget exhausted`);
+                    continue;
+                }
+
+                dueSessionIds.push(sessionId);
+            }
+
+            if (dueSessionIds.length === 0) return;
+
+            // Check API health once for all due sessions (avoid redundant requests)
+            this.checkApiHealth().then((healthy) => {
+                if (!healthy) {
+                    log.debug(`API health check failed — deferring auto-resume for ${dueSessionIds.length} session(s)`);
+                    // Don't increment attempt counter — API is still down
+                    return;
+                }
+
+                for (const sessionId of dueSessionIds) {
+                    const info = this.pausedSessions.get(sessionId);
+                    if (!info) continue; // May have been manually resumed
+
+                    info.resumeAttempts++;
+                    const backoffMs = Math.min(
+                        AUTO_RESUME_BASE_MS * Math.pow(AUTO_RESUME_MULTIPLIER, info.resumeAttempts),
+                        AUTO_RESUME_CAP_MS,
+                    );
+                    info.nextResumeAt = Date.now() + backoffMs;
+
+                    log.info(`Auto-resuming paused session ${sessionId}`, {
+                        attempt: info.resumeAttempts,
+                        nextRetryMin: Math.round(backoffMs / 60_000),
+                    });
+
+                    const resumed = this.resumeSession(sessionId);
+                    if (!resumed) {
+                        log.warn(`Auto-resume failed for session ${sessionId}`);
+                    }
+                }
+            }).catch((err) => {
+                log.warn('Auto-resume health check error', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }, AUTO_RESUME_CHECK_MS);
     }
 }

@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { ApprovalRequest, ApprovalResponse } from './approval-types';
-import { enqueueRequest, resolveRequest as resolveEscalation, getPendingRequests, type EscalationRequest } from '../db/escalation-queue';
+import { enqueueRequest, resolveRequest as resolveEscalation, getPendingRequests, expireOldRequests, type EscalationRequest } from '../db/escalation-queue';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ApprovalManager');
@@ -27,11 +27,15 @@ interface QueuedResolver {
     requestId: string;
 }
 
+const ESCALATION_EXPIRY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const ESCALATION_MAX_AGE_HOURS = 24;
+
 export class ApprovalManager {
     private pending: Map<string, PendingRequest> = new Map();
     private queuedResolvers: Map<number, QueuedResolver> = new Map();
     private _operationalMode: OperationalMode = 'normal';
     private db: Database | null = null;
+    private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
     get operationalMode(): OperationalMode {
         return this._operationalMode;
@@ -44,6 +48,41 @@ export class ApprovalManager {
 
     setDatabase(db: Database): void {
         this.db = db;
+        this.startExpiryTimer();
+    }
+
+    /** Expire stale escalation requests on startup and every hour. */
+    private startExpiryTimer(): void {
+        if (!this.db) return;
+
+        // Expire on boot
+        this.runExpiry();
+
+        this.expiryTimer = setInterval(() => this.runExpiry(), ESCALATION_EXPIRY_INTERVAL_MS);
+    }
+
+    private runExpiry(): void {
+        if (!this.db) return;
+        const expired = expireOldRequests(this.db, ESCALATION_MAX_AGE_HOURS);
+        if (expired > 0) {
+            log.info(`Expired ${expired} stale escalation request(s)`);
+
+            // Resolve any in-memory resolvers for expired requests so blocked
+            // SDK processes aren't stuck forever
+            for (const [queueId, resolver] of this.queuedResolvers) {
+                // Check if this queued request was expired — its DB status is now 'expired'
+                const dbRequests = getPendingRequests(this.db);
+                const stillPending = dbRequests.some((r) => r.id === queueId);
+                if (!stillPending) {
+                    this.queuedResolvers.delete(queueId);
+                    resolver.resolve({
+                        requestId: resolver.requestId,
+                        behavior: 'deny',
+                        message: 'Escalation request expired',
+                    });
+                }
+            }
+        }
     }
 
     getDefaultTimeout(source: string): number {
@@ -246,6 +285,11 @@ export class ApprovalManager {
     }
 
     shutdown(): void {
+        if (this.expiryTimer) {
+            clearInterval(this.expiryTimer);
+            this.expiryTimer = null;
+        }
+
         for (const [id, entry] of this.pending) {
             clearTimeout(entry.timer);
             entry.resolve({

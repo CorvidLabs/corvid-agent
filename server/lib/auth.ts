@@ -6,6 +6,11 @@
 
 const API_KEY = process.env.API_KEY?.trim() || null;
 
+/** Whether API key auth is enabled. */
+export function isAuthEnabled(): boolean {
+    return API_KEY !== null;
+}
+
 /**
  * Check whether the request is authenticated.
  * Returns null if auth passes, or a 401 Response if it fails.
@@ -31,4 +36,30 @@ export function checkAuth(req: Request, url: URL): Response | null {
     }
 
     return null;
+}
+
+/**
+ * Check whether a WebSocket upgrade request is authenticated.
+ * WebSocket clients cannot set Authorization headers, so we accept
+ * the token as a `?token=` query parameter or via the Authorization header.
+ * Returns null if auth passes, or a 401 Response if it fails.
+ */
+export function checkWsAuth(req: Request, url: URL): Response | null {
+    if (!API_KEY) return null; // No API key configured — allow all
+
+    // Check query parameter first (standard for WS auth)
+    const token = url.searchParams.get('token');
+    if (token === API_KEY) return null;
+
+    // Fall back to Authorization header (some clients support it)
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (match && match[1] === API_KEY) return null;
+    }
+
+    return new Response(JSON.stringify({ error: 'WebSocket authentication required' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+    });
 }

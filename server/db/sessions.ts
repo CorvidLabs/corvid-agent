@@ -246,3 +246,7 @@ export function createConversation(
 export function updateConversationRound(db: Database, id: string, lastRound: number): void {
     db.query('UPDATE algochat_conversations SET last_round = ? WHERE id = ?').run(lastRound, id);
 }
+
+export function updateConversationSession(db: Database, id: string, sessionId: string): void {
+    db.query('UPDATE algochat_conversations SET session_id = ? WHERE id = ?').run(sessionId, id);
+}

@@ -254,6 +254,13 @@ export class AlgoChatBridge {
         this.processManager.startProcess(session, content);
     }
 
+    /** Check if a participant is authorized to run privileged commands. */
+    private isOwner(participant: string): boolean {
+        // If no owner addresses configured, allow all (backward compatible)
+        if (this.config.ownerAddresses.size === 0) return true;
+        return this.config.ownerAddresses.has(participant);
+    }
+
     /**
      * Handle commands from AlgoChat messages.
      * Returns true if the message was handled as a command.
@@ -264,6 +271,14 @@ export class AlgoChatBridge {
 
         const parts = trimmed.split(/\s+/);
         const command = parts[0].toLowerCase();
+
+        // Privileged commands require owner authorization
+        const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent']);
+        if (PRIVILEGED_COMMANDS.has(command) && !this.isOwner(participant)) {
+            log.warn('Unauthorized command attempt', { participant, command });
+            this.sendResponse(participant, `Unauthorized: ${command} requires owner access`);
+            return true;
+        }
 
         switch (command) {
             case '/status': {
