@@ -9,6 +9,7 @@ AI agent orchestration platform with on-chain messaging via Algorand.
 - **AlgoChat** -- on-chain messaging and group transactions via Algorand
 - **Mobile chat client** -- responsive Angular UI with real-time WebSocket updates
 - **MCP tools** -- extensible tool system using the Model Context Protocol
+- **Agent memories** -- encrypted on-chain persistent memory with search
 - **Work tasks** -- persistent task tracking with SQLite
 
 ## Tech Stack
@@ -39,9 +40,11 @@ The server starts at `http://localhost:3000`.
 server/          Bun HTTP + WebSocket server, agent process management
   algochat/      AlgoChat on-chain messaging layer
   db/            SQLite schema and queries
+  lib/           Auth, crypto, logging, rate-limiting, and wallet utilities
   mcp/           MCP tool server
   process/       Agent lifecycle management
   routes/        REST API routes
+  selftest/      Built-in self-test suite
   work/          Task/work item management
   ws/            WebSocket handlers
 client/          Angular 21 SPA (standalone components, signals)
@@ -68,6 +71,8 @@ Copy `.env.example` to `.env` and fill in your values. Bun loads `.env` automati
 bun test                 # unit tests
 bun run test:e2e         # Playwright e2e (requires AlgoKit localnet)
 ```
+
+CI runs automatically on push and pull requests via GitHub Actions (`.github/workflows/ci.yml`).
 
 ## Deployment
 
