@@ -49,17 +49,18 @@ function isProtectedPath(filePath: string): boolean {
     return PROTECTED_SUBSTRINGS.some((p) => normalized.includes(p));
 }
 
-function extractFilePathFromInput(input: Record<string, unknown>): string | null {
-    // Write / Edit / MultiEdit all use `file_path` (or `files` for MultiEdit)
-    if (typeof input.file_path === 'string') return input.file_path;
+function extractFilePathsFromInput(input: Record<string, unknown>): string[] {
+    // Write / Edit use `file_path`; MultiEdit uses `files` array — return ALL paths
+    const paths: string[] = [];
+    if (typeof input.file_path === 'string') paths.push(input.file_path);
     if (Array.isArray(input.files)) {
         for (const f of input.files) {
             if (typeof f === 'object' && f !== null && typeof (f as { file_path?: string }).file_path === 'string') {
-                return (f as { file_path: string }).file_path;
+                paths.push((f as { file_path: string }).file_path);
             }
         }
     }
-    return null;
+    return paths;
 }
 
 // Environment variables safe to pass to agent subprocesses.
@@ -178,10 +179,11 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         const inputObj = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
         const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit']);
         if (FILE_TOOLS.has(toolName)) {
-            const filePath = extractFilePathFromInput(inputObj);
-            if (filePath && isProtectedPath(filePath)) {
-                log.warn(`Blocked ${toolName} on protected path`, { sessionId: session.id, filePath });
-                return { behavior: 'deny' as const, message: `Cannot modify protected file: ${filePath}` };
+            const filePaths = extractFilePathsFromInput(inputObj);
+            const blocked = filePaths.find(isProtectedPath);
+            if (blocked) {
+                log.warn(`Blocked ${toolName} on protected path`, { sessionId: session.id, filePath: blocked });
+                return { behavior: 'deny' as const, message: `Cannot modify protected file: ${blocked}` };
             }
         }
         if (toolName === 'Bash') {
