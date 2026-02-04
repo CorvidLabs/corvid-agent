@@ -47,6 +47,7 @@ export interface Session {
     totalTurns: number;
     councilLaunchId: string | null;
     councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
+    workDir: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -121,6 +122,7 @@ export interface CreateSessionInput {
     source?: SessionSource;
     councilLaunchId?: string;
     councilRole?: 'member' | 'reviewer' | 'chairman' | 'discusser';
+    workDir?: string;
 }
 
 export interface UpdateSessionInput {
@@ -232,7 +234,7 @@ export interface AgentMemory {
 
 // MARK: - Work Tasks
 
-export type WorkTaskStatus = 'pending' | 'branching' | 'running' | 'completed' | 'failed';
+export type WorkTaskStatus = 'pending' | 'branching' | 'running' | 'validating' | 'completed' | 'failed';
 export type WorkTaskSource = 'web' | 'algochat' | 'agent';
 
 export interface WorkTask {
@@ -249,6 +251,9 @@ export interface WorkTask {
     prUrl: string | null;
     summary: string | null;
     error: string | null;
+    originalBranch: string | null;
+    worktreeDir: string | null;
+    iterationCount: number;
     createdAt: string;
     completedAt: string | null;
 }

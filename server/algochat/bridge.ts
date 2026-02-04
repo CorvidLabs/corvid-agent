@@ -254,6 +254,13 @@ export class AlgoChatBridge {
         this.processManager.startProcess(session, content);
     }
 
+    /** Check if a participant is authorized to run privileged commands. */
+    private isOwner(participant: string): boolean {
+        // If no owner addresses configured, allow all (backward compatible)
+        if (this.config.ownerAddresses.size === 0) return true;
+        return this.config.ownerAddresses.has(participant);
+    }
+
     /**
      * Handle commands from AlgoChat messages.
      * Returns true if the message was handled as a command.
@@ -264,6 +271,14 @@ export class AlgoChatBridge {
 
         const parts = trimmed.split(/\s+/);
         const command = parts[0].toLowerCase();
+
+        // Privileged commands require owner authorization
+        const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent']);
+        if (PRIVILEGED_COMMANDS.has(command) && !this.isOwner(participant)) {
+            log.warn('Unauthorized command attempt', { participant, command });
+            this.sendResponse(participant, `Unauthorized: ${command} requires owner access`);
+            return true;
+        }
 
         switch (command) {
             case '/status': {
@@ -547,6 +562,9 @@ export class AlgoChatBridge {
                 const conversation = conversations.find((c) => c.sessionId === sessionId);
                 if (conversation) {
                     const approvalEvent = event as unknown as { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number };
+                    // Register the expected responder so resolveByShortId can verify sender
+                    this.approvalManager?.setSenderAddress(approvalEvent.id, conversation.participantAddr);
+
                     this.sendApprovalRequest(conversation.participantAddr, {
                         id: approvalEvent.id,
                         sessionId: approvalEvent.sessionId,
@@ -608,9 +626,11 @@ export class AlgoChatBridge {
         if (this.approvalManager) {
             const approvalResponse = parseApprovalResponse(content);
             if (approvalResponse) {
-                const resolved = this.approvalManager.resolveByShortId(approvalResponse.shortId, {
-                    behavior: approvalResponse.behavior,
-                });
+                const resolved = this.approvalManager.resolveByShortId(
+                    approvalResponse.shortId,
+                    { behavior: approvalResponse.behavior },
+                    participant,
+                );
                 if (resolved) {
                     log.info(`Resolved approval via AlgoChat`, {
                         shortId: approvalResponse.shortId,
@@ -693,6 +713,37 @@ export class AlgoChatBridge {
                         this.processManager.resumeProcess(session, content);
                     }
                 }
+            } else {
+                // Conversation exists but has no active session — create a new one
+                const agentId = conversation.agentId ?? this.findAgentForNewConversation();
+                if (!agentId) {
+                    log.info('No agent available for existing conversation, ignoring message');
+                } else {
+                    const agent = getAgent(this.db, agentId);
+                    if (agent) {
+                        const { updateConversationSession } = await import('../db/sessions');
+                        const session = createSession(this.db, {
+                            projectId: agent.defaultProjectId ?? this.getDefaultProjectId(),
+                            agentId,
+                            name: `AlgoChat: ${participant.slice(0, 8)}...`,
+                            initialPrompt: content,
+                            source: 'algochat',
+                        });
+                        updateConversationSession(this.db, conversation.id, session.id);
+                        conversation.sessionId = session.id;
+
+                        this.subscribeForResponse(session.id, participant);
+                        try {
+                            this.processManager.startProcess(session, content);
+                        } catch (err) {
+                            log.error('Failed to start process for existing conversation', {
+                                sessionId: session.id,
+                                error: err instanceof Error ? err.message : String(err),
+                            });
+                            this.sendResponse(participant, `[Error: Failed to start agent session]`);
+                        }
+                    }
+                }
             }
         }
 
@@ -708,6 +759,7 @@ export class AlgoChatBridge {
         // blocks are intermediate explanations (tool call reasoning, etc.)
         // and would clutter the on-chain response.
         let lastTextBlock = '';
+        let lastAssistantText = '';
         let lastTurnResponse = '';
         let sent = false;
 
@@ -719,7 +771,8 @@ export class AlgoChatBridge {
             this.chainSubscriptions.delete(sessionId);
             this.clearSubscriptionTimer(sessionId);
 
-            const finalText = (lastTextBlock.trim() || lastTurnResponse.trim());
+            // Prefer streamed text block > last turn response > full assistant text
+            const finalText = (lastTextBlock.trim() || lastTurnResponse.trim() || lastAssistantText.trim());
             if (finalText) {
                 this.sendResponse(participant, finalText);
             }
@@ -862,8 +915,16 @@ export class AlgoChatBridge {
                 flushTextBlock();
             }
 
-            if (event.type === 'assistant') {
-                resetTimer(); // Activity detected — reset timeout
+            // Capture assistant message content as fallback in case content_block
+            // streaming events don't fire (e.g. non-streaming SDK responses)
+            if (event.type === 'assistant' && event.message?.content) {
+                const text = extractContentText(event.message.content);
+                if (text.trim()) {
+                    lastAssistantText = text;
+                }
+                resetTimer();
+            } else if (event.type === 'assistant') {
+                resetTimer();
             }
 
             // Each 'result' marks end of a turn — save last text block and reset
@@ -874,10 +935,14 @@ export class AlgoChatBridge {
                 if (agentQueryCount > 0 && elapsed > ACK_DELAY_MS) {
                     this.emitEvent(participant, `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`, 'status');
                 }
+                // Prefer the last streamed text block; fall back to full assistant text
                 if (lastTextBlock.trim()) {
                     lastTurnResponse = lastTextBlock;
+                } else if (lastAssistantText.trim()) {
+                    lastTurnResponse = lastAssistantText;
                 }
                 lastTextBlock = '';
+                lastAssistantText = '';
                 resetTimer(); // Turn completed — reset timeout
             }
 

@@ -13,6 +13,7 @@ import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { checkWsAuth } from './lib/auth';
 import { createLogger } from './lib/logger';
 
 const log = createLogger('Server');
@@ -48,6 +49,7 @@ let agentMessenger: AgentMessenger | null = null;
 let agentDirectory: AgentDirectory | null = null;
 const selfTestService = new SelfTestService(db, processManager);
 const workTaskService = new WorkTaskService(db, processManager);
+workTaskService.recoverStaleTasks();
 
 async function initAlgoChat(): Promise<void> {
     if (!algochatConfig.enabled) {
@@ -97,7 +99,10 @@ async function initAlgoChat(): Promise<void> {
     agentMessenger.setWorkTaskService(workTaskService);
 
     // Register MCP services so agent sessions get corvid_* tools
-    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService);
+    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
+        serverMnemonic: algochatConfig.mnemonic,
+        network: agentNetworkConfig.network,
+    }, workTaskService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -126,6 +131,9 @@ const server = Bun.serve<WsData>({
 
         // WebSocket upgrade
         if (url.pathname === '/ws') {
+            const wsAuthResponse = checkWsAuth(req, url);
+            if (wsAuthResponse) return wsAuthResponse;
+
             const upgraded = server.upgrade(req, {
                 data: { subscriptions: new Map() },
             });
@@ -143,10 +151,7 @@ const server = Bun.serve<WsData>({
                 timestamp: new Date().toISOString(),
             };
             return new Response(JSON.stringify(health), {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
+                headers: { 'Content-Type': 'application/json' },
             });
         }
 

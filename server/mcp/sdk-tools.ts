@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask } from './tool-handlers';
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
     // Agent-sourced sessions (responding to another agent's message) get
@@ -54,6 +54,19 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
             {},
             async () => handleListAgents(ctx),
         ),
+        ...(ctx.workTaskService ? [
+            tool(
+                'corvid_create_work_task',
+                'Create a work task that spawns a new agent session on a dedicated branch. ' +
+                'The agent will implement the described changes, run validation, and open a PR. ' +
+                'Use this to propose code improvements or fixes to the codebase.',
+                {
+                    description: z.string().describe('A clear description of the work to be done'),
+                    project_id: z.string().optional().describe('Project ID to work on. Omit to use the agent default project.'),
+                },
+                async (args) => handleCreateWorkTask(ctx, args),
+            ),
+        ] : []),
     ];
 
     return createSdkMcpServer({

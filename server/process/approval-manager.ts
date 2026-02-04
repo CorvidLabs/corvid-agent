@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { ApprovalRequest, ApprovalResponse } from './approval-types';
-import { enqueueRequest, resolveRequest as resolveEscalation, getPendingRequests, type EscalationRequest } from '../db/escalation-queue';
+import { enqueueRequest, resolveRequest as resolveEscalation, getPendingRequests, expireOldRequests, type EscalationRequest } from '../db/escalation-queue';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ApprovalManager');
@@ -14,6 +14,7 @@ interface PendingRequest {
     request: ApprovalRequest;
     resolve: (response: ApprovalResponse) => void;
     timer: ReturnType<typeof setTimeout>;
+    senderAddress?: string;
 }
 
 /**
@@ -26,11 +27,15 @@ interface QueuedResolver {
     requestId: string;
 }
 
+const ESCALATION_EXPIRY_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const ESCALATION_MAX_AGE_HOURS = 24;
+
 export class ApprovalManager {
     private pending: Map<string, PendingRequest> = new Map();
     private queuedResolvers: Map<number, QueuedResolver> = new Map();
     private _operationalMode: OperationalMode = 'normal';
     private db: Database | null = null;
+    private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
     get operationalMode(): OperationalMode {
         return this._operationalMode;
@@ -43,13 +48,48 @@ export class ApprovalManager {
 
     setDatabase(db: Database): void {
         this.db = db;
+        this.startExpiryTimer();
+    }
+
+    /** Expire stale escalation requests on startup and every hour. */
+    private startExpiryTimer(): void {
+        if (!this.db) return;
+
+        // Expire on boot
+        this.runExpiry();
+
+        this.expiryTimer = setInterval(() => this.runExpiry(), ESCALATION_EXPIRY_INTERVAL_MS);
+    }
+
+    private runExpiry(): void {
+        if (!this.db) return;
+        const expired = expireOldRequests(this.db, ESCALATION_MAX_AGE_HOURS);
+        if (expired > 0) {
+            log.info(`Expired ${expired} stale escalation request(s)`);
+
+            // Resolve any in-memory resolvers for expired requests so blocked
+            // SDK processes aren't stuck forever
+            for (const [queueId, resolver] of this.queuedResolvers) {
+                // Check if this queued request was expired — its DB status is now 'expired'
+                const dbRequests = getPendingRequests(this.db);
+                const stillPending = dbRequests.some((r) => r.id === queueId);
+                if (!stillPending) {
+                    this.queuedResolvers.delete(queueId);
+                    resolver.resolve({
+                        requestId: resolver.requestId,
+                        behavior: 'deny',
+                        message: 'Escalation request expired',
+                    });
+                }
+            }
+        }
     }
 
     getDefaultTimeout(source: string): number {
         return source === 'algochat' ? DEFAULT_TIMEOUT_ALGOCHAT_MS : DEFAULT_TIMEOUT_WEB_MS;
     }
 
-    createRequest(request: ApprovalRequest): Promise<ApprovalResponse> {
+    createRequest(request: ApprovalRequest, senderAddress?: string): Promise<ApprovalResponse> {
         // In paused mode, immediately deny all requests
         if (this._operationalMode === 'paused') {
             log.info(`Approval request ${request.id} immediately denied (paused mode)`);
@@ -90,7 +130,7 @@ export class ApprovalManager {
                 }
             }, request.timeoutMs);
 
-            this.pending.set(request.id, { request, resolve, timer });
+            this.pending.set(request.id, { request, resolve, timer, senderAddress });
             log.debug(`Created approval request ${request.id}`, {
                 sessionId: request.sessionId,
                 toolName: request.toolName,
@@ -164,10 +204,23 @@ export class ApprovalManager {
      * Resolve a pending request by matching a short ID prefix.
      * Used by AlgoChat where users reply with abbreviated IDs.
      */
-    resolveByShortId(shortId: string, partial: { behavior: 'allow' | 'deny'; message?: string }): boolean {
+    resolveByShortId(
+        shortId: string,
+        partial: { behavior: 'allow' | 'deny'; message?: string },
+        senderAddress?: string,
+    ): boolean {
         const lower = shortId.toLowerCase();
-        for (const [id] of this.pending) {
+        for (const [id, entry] of this.pending) {
             if (id.toLowerCase().startsWith(lower)) {
+                // Verify sender matches the original request sender (if tracked)
+                if (entry.senderAddress && senderAddress && entry.senderAddress !== senderAddress) {
+                    log.warn(`Approval response from wrong sender`, {
+                        expected: entry.senderAddress,
+                        actual: senderAddress,
+                        shortId,
+                    });
+                    return false;
+                }
                 return this.resolveRequest(id, {
                     requestId: id,
                     behavior: partial.behavior,
@@ -177,6 +230,18 @@ export class ApprovalManager {
         }
         log.debug(`No pending approval matching short ID "${shortId}"`);
         return false;
+    }
+
+    /**
+     * Associate a sender address with an existing pending request.
+     * Used by AlgoChat to mark which on-chain participant should be
+     * allowed to respond to the approval.
+     */
+    setSenderAddress(requestId: string, senderAddress: string): void {
+        const entry = this.pending.get(requestId);
+        if (entry) {
+            entry.senderAddress = senderAddress;
+        }
     }
 
     getPendingForSession(sessionId: string): ApprovalRequest[] {
@@ -220,6 +285,11 @@ export class ApprovalManager {
     }
 
     shutdown(): void {
+        if (this.expiryTimer) {
+            clearInterval(this.expiryTimer);
+            this.expiryTimer = null;
+        }
+
         for (const [id, entry] of this.pending) {
             clearTimeout(entry.timer);
             entry.resolve({
