@@ -139,6 +139,10 @@ export function handleCouncilRoutes(
             return json(getDiscussionMessages(db, launchId));
         }
 
+        if (action === 'abort' && method === 'POST') {
+            return handleAbort(db, processManager, launchId);
+        }
+
         if (action === 'review' && method === 'POST') {
             return handleReview(db, processManager, launchId);
         }
@@ -494,6 +498,52 @@ function handleSynthesize(db: Database, processManager: ProcessManager, launchId
     const result = triggerSynthesis(db, processManager, launchId);
     if (!result.ok) return json({ error: result.error }, result.status);
     return json({ launchId, synthesisSessionId: result.synthesisSessionId });
+}
+
+function handleAbort(db: Database, processManager: ProcessManager, launchId: string): Response {
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch) return json({ error: 'Launch not found' }, 404);
+    if (launch.stage === 'complete') return json({ error: 'Launch already complete' }, 400);
+
+    emitLog(db, launchId, 'warn', `Council manually ended from stage '${launch.stage}'`);
+
+    // Kill all running sessions for this launch
+    const allSessions = listSessionsByCouncilLaunch(db, launchId);
+    let killed = 0;
+    for (const session of allSessions) {
+        if (processManager.isRunning(session.id)) {
+            processManager.stopProcess(session.id);
+            killed++;
+        }
+    }
+    emitLog(db, launchId, 'info', `Stopped ${killed} running session(s)`);
+
+    // Aggregate whatever responses exist (prefer reviews > member responses)
+    const reviewSessions = allSessions.filter((s) => s.councilRole === 'reviewer');
+    const memberSessions = allSessions.filter((s) => s.councilRole === 'member');
+    const sourceSessions = reviewSessions.length > 0 ? reviewSessions : memberSessions;
+
+    const parts: string[] = [];
+    for (const session of sourceSessions) {
+        const messages = getSessionMessages(db, session.id);
+        const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+        const lastMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
+        if (lastMsg?.content) {
+            const agent = getAgent(db, session.agentId ?? '');
+            const label = agent?.name ?? session.agentId?.slice(0, 8) ?? 'Agent';
+            parts.push(`### ${label}\n\n${lastMsg.content}`);
+        }
+    }
+
+    const synthesis = parts.length > 0
+        ? `[Council ended manually]\n\n${parts.join('\n\n---\n\n')}`
+        : '[Council ended manually] (No responses were produced)';
+
+    updateCouncilLaunchStage(db, launchId, 'complete', synthesis);
+    emitLog(db, launchId, 'stage', 'Council ended manually', `Aggregated ${parts.length} response(s)`);
+    broadcastStageChange(launchId, 'complete');
+
+    return json({ ok: true, killed, aggregated: parts.length });
 }
 
 // ─── Discussion orchestration ─────────────────────────────────────────────────

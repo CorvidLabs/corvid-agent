@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
@@ -14,7 +14,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
 @Component({
     selector: 'app-council-launch-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DatePipe, DecimalPipe, SessionOutputComponent, StatusBadgeComponent],
+    imports: [RouterLink, DatePipe, SessionOutputComponent, StatusBadgeComponent],
     template: `
         @if (launch(); as l) {
             <div class="page">
@@ -27,27 +27,27 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                 </div>
 
                 <div class="stage-bar">
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'responding'" [class.stage-step--done]="stageIndex() > 0">
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'responding'" [class.stage-step--done]="stageIndex() > 0" [attr.data-stage]="'responding'">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Responding</span>
                     </div>
                     <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 0"></div>
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'discussing'" [class.stage-step--done]="stageIndex() > 1">
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'discussing'" [class.stage-step--done]="stageIndex() > 1" [attr.data-stage]="'discussing'">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Discussing</span>
                     </div>
                     <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 1"></div>
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'reviewing'" [class.stage-step--done]="stageIndex() > 2">
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'reviewing'" [class.stage-step--done]="stageIndex() > 2" [attr.data-stage]="'reviewing'">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Reviewing</span>
                     </div>
                     <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 2"></div>
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'synthesizing'" [class.stage-step--done]="stageIndex() > 3">
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'synthesizing'" [class.stage-step--done]="stageIndex() > 3" [attr.data-stage]="'synthesizing'">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Synthesizing</span>
                     </div>
                     <div class="stage-connector" [class.stage-connector--done]="stageIndex() > 3"></div>
-                    <div class="stage-step" [class.stage-step--active]="l.stage === 'complete'" [class.stage-step--done]="l.stage === 'complete'">
+                    <div class="stage-step" [class.stage-step--active]="l.stage === 'complete'" [class.stage-step--done]="l.stage === 'complete'" [attr.data-stage]="'complete'">
                         <span class="stage-dot"></span>
                         <span class="stage-label">Complete</span>
                     </div>
@@ -79,6 +79,13 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             (click)="onSynthesize()"
                         >{{ triggeringSynthesis() ? 'Starting...' : 'Synthesize Now' }}</button>
                     }
+                    @if (l.stage !== 'complete') {
+                        <button
+                            class="btn btn--danger btn--sm"
+                            [disabled]="aborting()"
+                            (click)="onAbort()"
+                        >{{ aborting() ? 'Ending...' : 'End Council' }}</button>
+                    }
                     <button class="btn btn--secondary btn--sm" (click)="logsOpen.set(!logsOpen())">
                         {{ logsOpen() ? 'Hide' : 'Show' }} Logs ({{ logs().length }})
                     </button>
@@ -102,29 +109,32 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                 }
 
                 <h3 class="section-title">Member Responses</h3>
-                <div class="grid">
+                <div class="feed-list">
                     @for (session of memberSessions(); track session.id) {
-                        <div class="grid-card">
-                            <div class="grid-card__header">
-                                <span class="grid-card__name">{{ getAgentName(session.agentId) }}</span>
-                                <app-status-badge [status]="session.status" />
-                                @if (session.totalCostUsd > 0) {
-                                    <span class="grid-card__cost">{{ session.totalCostUsd | number:'1.4-4' }} USD</span>
+                        <div class="feed-entry"
+                             [class.feed-entry--expanded]="expandedSessions().has(session.id)"
+                             [style.border-left-color]="agentColor(session.agentId)"
+                             (click)="toggleSession(session.id)">
+                            <div class="feed-meta">
+                                @if (session.status === 'running') {
+                                    <span class="processing-dot"></span>
                                 }
+                                <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
+                                <app-status-badge [status]="session.status" />
+                                                                @if (!expandedSessions().has(session.id)) {
+                                    <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
+                                }
+                                <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                             </div>
-                            @if (session.status === 'running') {
-                                <div class="grid-card__loading">
-                                    <span class="spinner"></span>
-                                    <span>{{ getActivity(session.agentId) || 'Agent is responding...' }}</span>
+                            @if (expandedSessions().has(session.id)) {
+                                <div class="feed-content" (click)="$event.stopPropagation()">
+                                    <app-session-output
+                                        [messages]="getMessages(session.id)"
+                                        [events]="getEvents(session.id)"
+                                        [isRunning]="session.status === 'running'"
+                                    />
                                 </div>
                             }
-                            <div class="grid-card__output">
-                                <app-session-output
-                                    [messages]="getMessages(session.id)"
-                                    [events]="getEvents(session.id)"
-                                    [isRunning]="session.status === 'running'"
-                                />
-                            </div>
                         </div>
                     }
                 </div>
@@ -133,31 +143,41 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                     <h3 class="section-title">Discussion</h3>
                     @if (l.stage === 'discussing') {
                         <div class="discussion-loading">
-                            <span class="spinner"></span>
+                            <span class="processing-dot"></span>
                             <span>Agents are discussing... (Round {{ l.currentDiscussionRound }}/{{ l.totalDiscussionRounds }})</span>
                         </div>
                     }
-                    <div class="discussion-timeline" role="log" aria-label="Council discussion">
+                    <div class="feed-list" role="log" aria-label="Council discussion">
                         @for (msg of discussionMessages(); track msg.id) {
-                            <div class="discussion-msg">
-                                <div class="discussion-msg__header">
-                                    <span class="discussion-msg__name">{{ msg.agentName }}</span>
-                                    <span class="discussion-msg__round">R{{ msg.round }}</span>
-                                    <span class="discussion-msg__time">{{ msg.createdAt | date:'HH:mm:ss' }}</span>
+                            <div class="feed-entry"
+                                 [class.feed-entry--expanded]="expandedDiscussion().has(msg.id)"
+                                 [style.border-left-color]="agentColor(msg.agentName)"
+                                 (click)="toggleDiscussion(msg.id)">
+                                <div class="feed-meta">
+                                    <span class="feed-name" [style.color]="agentColor(msg.agentName)">{{ msg.agentName }}</span>
+                                    <span class="feed-badge">R{{ msg.round }}</span>
+                                    <span class="feed-time">{{ msg.createdAt | date:'HH:mm:ss' }}</span>
                                     @if (msg.txid) {
-                                        <a class="discussion-msg__tx"
+                                        <a class="feed-tx"
                                            href="https://lora.algokit.io/{{ explorerNetwork() }}/transaction/{{ msg.txid }}"
                                            target="_blank"
                                            rel="noopener noreferrer"
                                            aria-label="View transaction on chain"
+                                           (click)="$event.stopPropagation()"
                                         >tx</a>
                                     }
+                                    @if (!expandedDiscussion().has(msg.id)) {
+                                        <span class="feed-preview">{{ previewText(msg.content) }}</span>
+                                    }
+                                    <span class="feed-toggle">{{ expandedDiscussion().has(msg.id) ? '&#9662;' : '&#9656;' }}</span>
                                 </div>
-                                <pre class="discussion-msg__content" tabindex="0">{{ msg.content }}</pre>
+                                @if (expandedDiscussion().has(msg.id)) {
+                                    <pre class="feed-content feed-content--text" (click)="$event.stopPropagation()">{{ msg.content }}</pre>
+                                }
                             </div>
                         } @empty {
                             @if (l.stage !== 'discussing') {
-                                <div class="discussion-empty">No discussion messages yet.</div>
+                                <div class="feed-empty">No discussion messages yet.</div>
                             }
                         }
                     </div>
@@ -165,29 +185,32 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
 
                 @if (reviewSessions().length > 0) {
                     <h3 class="section-title">Peer Reviews</h3>
-                    <div class="grid">
+                    <div class="feed-list">
                         @for (session of reviewSessions(); track session.id) {
-                            <div class="grid-card">
-                                <div class="grid-card__header">
-                                    <span class="grid-card__name">{{ getAgentName(session.agentId) }}</span>
-                                    <app-status-badge [status]="session.status" />
-                                    @if (session.totalCostUsd > 0) {
-                                        <span class="grid-card__cost">{{ session.totalCostUsd | number:'1.4-4' }} USD</span>
+                            <div class="feed-entry"
+                                 [class.feed-entry--expanded]="expandedSessions().has(session.id)"
+                                 [style.border-left-color]="agentColor(session.agentId)"
+                                 (click)="toggleSession(session.id)">
+                                <div class="feed-meta">
+                                    @if (session.status === 'running') {
+                                        <span class="processing-dot"></span>
                                     }
+                                    <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
+                                    <app-status-badge [status]="session.status" />
+                                    @if (!expandedSessions().has(session.id)) {
+                                        <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
+                                    }
+                                    <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                                 </div>
-                                @if (session.status === 'running') {
-                                    <div class="grid-card__loading">
-                                        <span class="spinner"></span>
-                                        <span>{{ getActivity(session.agentId) || 'Reviewing responses...' }}</span>
+                                @if (expandedSessions().has(session.id)) {
+                                    <div class="feed-content" (click)="$event.stopPropagation()">
+                                        <app-session-output
+                                            [messages]="getMessages(session.id)"
+                                            [events]="getEvents(session.id)"
+                                            [isRunning]="session.status === 'running'"
+                                        />
                                     </div>
                                 }
-                                <div class="grid-card__output">
-                                    <app-session-output
-                                        [messages]="getMessages(session.id)"
-                                        [events]="getEvents(session.id)"
-                                        [isRunning]="session.status === 'running'"
-                                    />
-                                </div>
                             </div>
                         }
                     </div>
@@ -227,6 +250,9 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
         .btn--secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn--danger { background: transparent; color: var(--accent-red, #f87171); border-color: var(--accent-red, #f87171); }
+        .btn--danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.1); }
+        .btn--danger:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
 
         .auto-label {
@@ -238,6 +264,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             50% { opacity: 0.5; }
         }
 
+        /* Stage bar with per-stage colors */
         .stage-bar {
             display: flex; align-items: center; gap: 0; margin-bottom: 1.5rem;
             padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -247,13 +274,23 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-bright);
             background: transparent; transition: all 0.2s;
         }
-        .stage-step--active .stage-dot { border-color: var(--accent-cyan); background: var(--accent-cyan); box-shadow: 0 0 8px rgba(0, 229, 255, 0.4); }
         .stage-step--done .stage-dot { border-color: var(--accent-green); background: var(--accent-green); }
         .stage-label { font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
-        .stage-step--active .stage-label { color: var(--accent-cyan); }
         .stage-step--done .stage-label { color: var(--accent-green); }
         .stage-connector { flex: 1; height: 2px; background: var(--border); margin: 0 0.5rem; min-width: 20px; }
         .stage-connector--done { background: var(--accent-green); }
+
+        /* Per-stage active colors */
+        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; box-shadow: 0 0 8px rgba(0, 229, 255, 0.4); }
+        .stage-step--active[data-stage="responding"] .stage-label { color: #00e5ff; }
+        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.4); }
+        .stage-step--active[data-stage="discussing"] .stage-label { color: #fbbf24; }
+        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; box-shadow: 0 0 8px rgba(167, 139, 250, 0.4); }
+        .stage-step--active[data-stage="reviewing"] .stage-label { color: #a78bfa; }
+        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; box-shadow: 0 0 8px rgba(244, 114, 182, 0.4); }
+        .stage-step--active[data-stage="synthesizing"] .stage-label { color: #f472b6; }
+        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); box-shadow: 0 0 8px rgba(0, 255, 136, 0.4); }
+        .stage-step--active[data-stage="complete"] .stage-label { color: var(--accent-green); }
 
         .actions { margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
         .section-title { margin: 1.5rem 0 0.75rem; color: var(--text-primary); }
@@ -277,74 +314,69 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .log-detail { color: var(--text-tertiary); }
         .log-empty { color: var(--text-tertiary); padding: 0.5rem; text-align: center; }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-            gap: 1rem;
+        /* Feed-style compact layout */
+        .feed-list {
+            display: flex; flex-direction: column; gap: 2px;
         }
-        .grid-card {
-            display: flex; flex-direction: column;
-            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-            overflow: hidden;
+        .feed-entry {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.35rem 0.75rem; font-size: 0.8rem;
+            border-left: 3px solid var(--border);
+            cursor: pointer; transition: background 0.1s;
         }
-        .grid-card__header {
-            display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem;
-            border-bottom: 1px solid var(--border); background: var(--bg-raised);
+        .feed-entry:hover { background: var(--bg-hover); }
+        .feed-entry--expanded { background: var(--bg-raised); }
+        .feed-entry--expanded:hover { background: var(--bg-raised); }
+        .feed-meta {
+            display: flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap; overflow: hidden;
         }
-        .grid-card__name { font-weight: 600; font-size: 0.85rem; color: var(--text-primary); }
-        .grid-card__cost { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
-        .grid-card__output { height: 300px; overflow-y: auto; display: flex; flex-direction: column; }
+        .feed-name { font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
+        .feed-preview {
+            flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
+        }
+        .feed-toggle {
+            flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
+            user-select: none;
+        }
+        .feed-content {
+            max-height: 600px; overflow-y: auto;
+            margin: 0.4rem 0 0 0;
+        }
+        .feed-content--text {
+            white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
+            font-size: 0.78rem; line-height: 1.5;
+            padding: 0.5rem; background: var(--bg-deep); border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .feed-badge {
+            font-size: 0.65rem; padding: 1px 6px; border-radius: 9999px;
+            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan);
+            font-weight: 700; text-transform: uppercase; flex-shrink: 0;
+        }
+        .feed-time { font-size: 0.7rem; color: var(--text-tertiary); flex-shrink: 0; }
+        .feed-tx {
+            font-size: 0.65rem; padding: 1px 5px; border-radius: var(--radius-sm);
+            background: var(--bg-raised); border: 1px solid var(--border-bright);
+            color: var(--accent-magenta); text-decoration: none; font-weight: 600; flex-shrink: 0;
+        }
+        .feed-tx:hover { background: var(--bg-hover); }
+        .feed-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: 0.5rem; }
 
-        .grid-card__loading {
-            display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.5rem 1rem; font-size: 0.75rem; color: var(--accent-cyan);
-            border-bottom: 1px solid var(--border); background: var(--bg-surface);
+        .processing-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: #00e5ff; flex-shrink: 0;
+            animation: processing-pulse 1.5s ease-in-out infinite;
         }
-        .spinner {
-            width: 14px; height: 14px; border: 2px solid var(--border-bright);
-            border-top-color: var(--accent-cyan); border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        @keyframes processing-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
         .discussion-loading {
             display: flex; align-items: center; gap: 0.5rem;
             padding: 0.75rem; font-size: 0.8rem; color: var(--accent-cyan);
             animation: pulse 1.5s ease-in-out infinite;
         }
-        .discussion-timeline {
-            display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem;
-        }
-        .discussion-msg {
-            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
-            overflow: hidden;
-        }
-        .discussion-msg__header {
-            display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--bg-raised);
-        }
-        .discussion-msg__name { font-weight: 600; font-size: 0.8rem; color: var(--text-primary); }
-        .discussion-msg__round {
-            font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
-            background: var(--accent-cyan-dim, rgba(0, 229, 255, 0.1)); color: var(--accent-cyan);
-            font-weight: 700; text-transform: uppercase;
-        }
-        .discussion-msg__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
-        .discussion-msg__tx {
-            font-size: 0.65rem; padding: 1px 5px; border-radius: var(--radius-sm);
-            background: var(--bg-raised); border: 1px solid var(--border-bright);
-            color: var(--accent-magenta); text-decoration: none; font-weight: 600;
-        }
-        .discussion-msg__tx:hover { background: var(--bg-hover); }
-        .discussion-msg__content {
-            padding: 0.75rem; font-size: 0.8rem; margin: 0;
-            white-space: pre-wrap; word-break: break-word; color: var(--text-primary);
-            line-height: 1.5; max-height: 200px; overflow-y: auto; outline: none;
-        }
-        .discussion-msg__content:focus-visible {
-            outline: 2px solid var(--accent-cyan, #22d3ee); outline-offset: -2px;
-        }
-        .discussion-empty { color: var(--text-tertiary); font-size: 0.8rem; padding: 0.5rem; }
 
         .synthesis {
             margin-top: 1.5rem; border: 1px solid var(--accent-green); border-radius: var(--radius-lg);
@@ -382,6 +414,11 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     private readonly sessionService = inject(SessionService);
     private readonly wsService = inject(WebSocketService);
 
+    private static readonly AGENT_COLORS = [
+        '#ff6b9d', '#00e5ff', '#ffa040', '#a78bfa',
+        '#34d399', '#f472b6', '#60a5fa', '#fbbf24',
+    ];
+
     protected readonly launch = signal<CouncilLaunch | null>(null);
     protected readonly hasChairman = signal(false);
     protected readonly allSessions = signal<Session[]>([]);
@@ -390,9 +427,14 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected readonly logsOpen = signal(true);
     protected readonly triggeringReview = signal(false);
     protected readonly triggeringSynthesis = signal(false);
+    protected readonly aborting = signal(false);
+    protected readonly expandedSessions = signal<Set<string>>(new Set());
+    protected readonly expandedDiscussion = signal<Set<number>>(new Set());
 
     private agentNameMap: Record<string, string> = {};
     private agentIdBySession: Record<string, string> = {};
+    private agentColorMap: Record<string, number> = {};
+    private nextColorIndex = 0;
     private sessionMessages = signal<Map<string, import('../../core/models/session.model').SessionMessage[]>>(new Map());
     private sessionEvents = signal<Map<string, StreamEvent[]>>(new Map());
     protected readonly agentActivity = signal<Map<string, string>>(new Map());
@@ -517,6 +559,53 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         return this.agentNameMap[agentId] ?? agentId.slice(0, 8);
     }
 
+    protected agentColor(agentKey: string | null): string {
+        if (!agentKey) return '#666';
+        const name = this.agentNameMap[agentKey] ?? agentKey;
+        if (!(name in this.agentColorMap)) {
+            this.agentColorMap[name] = this.nextColorIndex++;
+        }
+        const idx = this.agentColorMap[name];
+        return CouncilLaunchViewComponent.AGENT_COLORS[idx % CouncilLaunchViewComponent.AGENT_COLORS.length];
+    }
+
+    protected previewText(content: string): string {
+        const oneLine = content.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        return oneLine.length > 120 ? oneLine.slice(0, 120) + '...' : oneLine;
+    }
+
+    protected getPreviewText(sessionId: string): string {
+        const messages = this.sessionMessages().get(sessionId) ?? [];
+        const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+        const lastMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
+        if (!lastMsg?.content) return '';
+        return this.previewText(lastMsg.content);
+    }
+
+    protected toggleSession(sessionId: string): void {
+        this.expandedSessions.update((set) => {
+            const next = new Set(set);
+            if (next.has(sessionId)) {
+                next.delete(sessionId);
+            } else {
+                next.add(sessionId);
+            }
+            return next;
+        });
+    }
+
+    protected toggleDiscussion(id: number): void {
+        this.expandedDiscussion.update((set) => {
+            const next = new Set(set);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    }
+
     protected getActivity(agentId: string | null): string {
         if (!agentId) return '';
         return this.agentActivity().get(agentId) ?? '';
@@ -573,6 +662,19 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
             await this.loadLaunchData(l.id);
         } finally {
             this.triggeringSynthesis.set(false);
+        }
+    }
+
+    protected async onAbort(): Promise<void> {
+        const l = this.launch();
+        if (!l) return;
+        if (!confirm('End this council? Running sessions will be stopped and existing responses will be aggregated.')) return;
+        this.aborting.set(true);
+        try {
+            await this.councilService.abortLaunch(l.id);
+            await this.loadLaunchData(l.id);
+        } finally {
+            this.aborting.set(false);
         }
     }
 
