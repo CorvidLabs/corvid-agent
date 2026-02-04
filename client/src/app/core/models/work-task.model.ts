@@ -16,6 +16,7 @@ export interface WorkTask {
     summary: string | null;
     error: string | null;
     originalBranch: string | null;
+    worktreeDir: string | null;
     iterationCount: number;
     createdAt: string;
     completedAt: string | null;

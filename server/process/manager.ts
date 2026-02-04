@@ -685,11 +685,11 @@ export class ProcessManager {
                     const info = this.pausedSessions.get(sessionId);
                     if (!info) continue; // May have been manually resumed
 
-                    info.resumeAttempts++;
                     const backoffMs = Math.min(
                         AUTO_RESUME_BASE_MS * Math.pow(AUTO_RESUME_MULTIPLIER, info.resumeAttempts),
                         AUTO_RESUME_CAP_MS,
                     );
+                    info.resumeAttempts++;
                     info.nextResumeAt = Date.now() + backoffMs;
 
                     log.info(`Auto-resuming paused session ${sessionId}`, {
