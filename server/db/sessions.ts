@@ -21,6 +21,7 @@ interface SessionRow {
     total_turns: number;
     council_launch_id: string | null;
     council_role: string | null;
+    work_dir: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -58,6 +59,7 @@ function rowToSession(row: SessionRow): Session {
         totalTurns: row.total_turns,
         councilLaunchId: row.council_launch_id ?? null,
         councilRole: (row.council_role as Session['councilRole']) ?? null,
+        workDir: row.work_dir ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -107,8 +109,8 @@ export function createSession(db: Database, input: CreateSessionInput): Session 
     const id = crypto.randomUUID();
 
     db.query(
-        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, council_launch_id, council_role)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, council_launch_id, council_role, work_dir)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.projectId,
@@ -118,6 +120,7 @@ export function createSession(db: Database, input: CreateSessionInput): Session 
         input.initialPrompt ?? '',
         input.councilLaunchId ?? null,
         input.councilRole ?? null,
+        input.workDir ?? null,
     );
 
     return getSession(db, id) as Session;

@@ -158,6 +158,11 @@ export class ProcessManager {
     }
 
     private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string): void {
+        // Use session-level workDir override (e.g. git worktree for work tasks)
+        const effectiveProject = session.workDir
+            ? { ...project, workingDir: session.workDir }
+            : project;
+
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
@@ -170,7 +175,7 @@ export class ProcessManager {
         try {
             sp = startSdkProcess({
                 session,
-                project,
+                project: effectiveProject,
                 agent,
                 prompt,
                 approvalManager: this.approvalManager,

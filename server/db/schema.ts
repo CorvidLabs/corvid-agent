@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -240,6 +240,10 @@ const MIGRATIONS: Record<number, string[]> = {
     17: [
         `ALTER TABLE work_tasks ADD COLUMN original_branch TEXT DEFAULT NULL`,
         `ALTER TABLE work_tasks ADD COLUMN iteration_count INTEGER DEFAULT 0`,
+    ],
+    18: [
+        `ALTER TABLE work_tasks ADD COLUMN worktree_dir TEXT DEFAULT NULL`,
+        `ALTER TABLE sessions ADD COLUMN work_dir TEXT DEFAULT NULL`,
     ],
 };
 

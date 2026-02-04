@@ -16,6 +16,7 @@ interface WorkTaskRow {
     summary: string | null;
     error: string | null;
     original_branch: string | null;
+    worktree_dir: string | null;
     iteration_count: number;
     created_at: string;
     completed_at: string | null;
@@ -44,6 +45,7 @@ function rowToWorkTask(row: WorkTaskRow): WorkTask {
         summary: row.summary,
         error: row.error,
         originalBranch: row.original_branch,
+        worktreeDir: row.worktree_dir,
         iterationCount: row.iteration_count ?? 0,
         createdAt: row.created_at,
         completedAt: row.completed_at,
@@ -146,6 +148,7 @@ export function updateWorkTaskStatus(
         summary?: string;
         error?: string;
         originalBranch?: string;
+        worktreeDir?: string;
         iterationCount?: number;
     },
 ): void {
@@ -175,6 +178,10 @@ export function updateWorkTaskStatus(
     if (extra?.originalBranch !== undefined) {
         fields.push('original_branch = ?');
         values.push(extra.originalBranch);
+    }
+    if (extra?.worktreeDir !== undefined) {
+        fields.push('worktree_dir = ?');
+        values.push(extra.worktreeDir);
     }
     if (extra?.iterationCount !== undefined) {
         fields.push('iteration_count = ?');
