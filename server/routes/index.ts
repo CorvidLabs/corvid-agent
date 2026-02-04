@@ -13,6 +13,7 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { WorkTaskService } from '../work/service';
 import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
+import { searchAlgoChatMessages } from '../db/algochat-messages';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -101,15 +102,25 @@ export async function handleRequest(
         return addCorsAsync(handleSetOperationalMode(req, processManager));
     }
 
-    // Feed history — returns recent agent messages for the AlgoChat Feed
+    // Feed history — returns recent agent messages AND algochat messages for the AlgoChat Feed
     if (url.pathname === '/api/feed/history' && req.method === 'GET') {
         const limit = Number(url.searchParams.get('limit') ?? '50');
         const offset = Number(url.searchParams.get('offset') ?? '0');
         const search = url.searchParams.get('search') ?? undefined;
         const agentId = url.searchParams.get('agentId') ?? undefined;
         const threadId = url.searchParams.get('threadId') ?? undefined;
-        const result = searchAgentMessages(db, { limit, offset, search, agentId, threadId });
-        return addCors(json({ messages: result.messages, total: result.total, limit, offset }));
+
+        const agentResult = searchAgentMessages(db, { limit, offset, search, agentId, threadId });
+        const algochatResult = searchAlgoChatMessages(db, { limit, offset, search });
+
+        return addCors(json({
+            messages: agentResult.messages,
+            algochatMessages: algochatResult.messages,
+            total: agentResult.total,
+            algochatTotal: algochatResult.total,
+            limit,
+            offset,
+        }));
     }
 
     // AlgoChat routes

@@ -511,15 +511,30 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             const threadId = this.activeThreadFilter();
             if (threadId) params.set('threadId', threadId);
 
+            interface AlgoChatMsg {
+                id: number;
+                participant: string;
+                content: string;
+                direction: 'inbound' | 'outbound' | 'status';
+                fee: number;
+                createdAt: string;
+            }
+
             const result = await firstValueFrom(
-                this.api.get<{ messages: AgentMessage[]; total: number }>(`/feed/history?${params}`),
+                this.api.get<{
+                    messages: AgentMessage[];
+                    algochatMessages?: AlgoChatMsg[];
+                    total: number;
+                    algochatTotal?: number;
+                }>(`/feed/history?${params}`),
             );
-            this.totalMessages.set(result.total);
+            this.totalMessages.set(result.total + (result.algochatTotal ?? 0));
 
             this.nextId = 0;
             this.seenMessageKeys.clear();
+
+            // Build entries from agent messages (agent-to-agent)
             const newEntries: FeedEntry[] = [];
-            // Messages come newest-first from API; reverse to show oldest first
             for (const m of [...result.messages].reverse()) {
                 const fromName = this.agentMap[m.fromAgentId]?.name ?? m.fromAgentId.slice(0, 8);
                 const toName = this.agentMap[m.toAgentId]?.name ?? m.toAgentId.slice(0, 8);
@@ -568,6 +583,65 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                     });
                 }
             }
+
+            // Build entries from algochat messages (external user IN/OUT/status)
+            for (const ac of [...(result.algochatMessages ?? [])].reverse()) {
+                if (this.walletToAgent[ac.participant]) continue; // skip agent-wallet messages
+
+                const userLabel = this.labelForAddress(ac.participant);
+                const handlingAgent = this.findAgentForParticipant(ac.participant);
+                const agentLabel = handlingAgent?.name ?? 'Agent';
+
+                if (ac.direction === 'inbound') {
+                    newEntries.push({
+                        id: this.nextId++,
+                        timestamp: ac.createdAt ? new Date(ac.createdAt + 'Z') : new Date(),
+                        direction: 'inbound',
+                        participant: ac.participant,
+                        participantLabel: `${userLabel} \u2192 ${agentLabel}`,
+                        content: ac.content,
+                        agentName: userLabel,
+                        fee: ac.fee > 0 ? ac.fee : null,
+                        threadId: null,
+                        colorIndex: this.colorIndexForAgent(userLabel),
+                    });
+                } else if (ac.direction === 'outbound') {
+                    newEntries.push({
+                        id: this.nextId++,
+                        timestamp: ac.createdAt ? new Date(ac.createdAt + 'Z') : new Date(),
+                        direction: 'outbound',
+                        participant: ac.participant,
+                        participantLabel: `${agentLabel} \u2192 ${userLabel}`,
+                        content: ac.content,
+                        agentName: agentLabel,
+                        fee: ac.fee > 0 ? ac.fee : null,
+                        threadId: null,
+                        colorIndex: this.colorIndexForAgent(agentLabel),
+                    });
+                } else {
+                    newEntries.push({
+                        id: this.nextId++,
+                        timestamp: ac.createdAt ? new Date(ac.createdAt + 'Z') : new Date(),
+                        direction: 'status',
+                        participant: ac.participant,
+                        participantLabel: agentLabel,
+                        content: ac.content,
+                        agentName: agentLabel,
+                        fee: null,
+                        threadId: null,
+                        colorIndex: this.colorIndexForAgent(agentLabel),
+                    });
+                }
+            }
+
+            // Sort all entries by timestamp so agent and algochat messages interleave correctly
+            newEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            // Re-assign IDs after sort
+            this.nextId = 0;
+            for (const entry of newEntries) {
+                entry.id = this.nextId++;
+            }
+
             this.entries.set(newEntries);
         } catch {
             // History unavailable — rely on real-time WebSocket only

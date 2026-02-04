@@ -10,7 +10,7 @@ import { DirBrowserComponent } from '../../shared/components/dir-browser.compone
     imports: [ReactiveFormsModule, DirBrowserComponent],
     template: `
         <div class="page">
-            <h2>{{ editId() ? 'Edit Project' : 'New Project' }}</h2>
+            <h2>{{ id() ? 'Edit Project' : 'New Project' }}</h2>
 
             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form">
                 <div class="form__field">
@@ -87,7 +87,7 @@ export class ProjectFormComponent implements OnInit {
     private readonly projectService = inject(ProjectService);
     private readonly router = inject(Router);
 
-    readonly editId = input<string | undefined>(undefined);
+    readonly id = input<string | undefined>(undefined);
     protected readonly saving = signal(false);
     protected readonly showBrowser = signal(false);
 
@@ -99,7 +99,7 @@ export class ProjectFormComponent implements OnInit {
     });
 
     async ngOnInit(): Promise<void> {
-        const id = this.editId();
+        const id = this.id();
         if (id) {
             const project = await this.projectService.getProject(id);
             this.form.patchValue({
@@ -117,7 +117,7 @@ export class ProjectFormComponent implements OnInit {
 
         try {
             const value = this.form.getRawValue();
-            const id = this.editId();
+            const id = this.id();
 
             if (id) {
                 await this.projectService.updateProject(id, value);
