@@ -4,7 +4,15 @@
  * a Bearer token in the Authorization header.
  */
 
+import { timingSafeEqual } from 'node:crypto';
+
 const API_KEY = process.env.API_KEY?.trim() || null;
+
+/** Constant-time string comparison to prevent timing attacks. */
+function safeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 /** Whether API key auth is enabled. */
 export function isAuthEnabled(): boolean {
@@ -28,7 +36,7 @@ export function checkAuth(req: Request, url: URL): Response | null {
     }
 
     const match = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!match || match[1] !== API_KEY) {
+    if (!match || !safeEqual(match[1], API_KEY)) {
         return new Response(JSON.stringify({ error: 'Invalid API key' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' },
@@ -49,13 +57,13 @@ export function checkWsAuth(req: Request, url: URL): Response | null {
 
     // Check query parameter first (standard for WS auth)
     const token = url.searchParams.get('token');
-    if (token === API_KEY) return null;
+    if (token && safeEqual(token, API_KEY)) return null;
 
     // Fall back to Authorization header (some clients support it)
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
         const match = authHeader.match(/^Bearer\s+(.+)$/i);
-        if (match && match[1] === API_KEY) return null;
+        if (match && safeEqual(match[1], API_KEY)) return null;
     }
 
     return new Response(JSON.stringify({ error: 'WebSocket authentication required' }), {

@@ -72,7 +72,7 @@ Both must pass. Work tasks auto-validate with these commands and will iterate up
 
 ### Database Migrations
 
-Add table creation / migration SQL in `server/db/connection.ts` inside the migration chain.
+Add table creation / migration SQL in `server/db/schema.ts` inside the `MIGRATIONS` object.
 
 ### API Endpoints
 
@@ -83,10 +83,10 @@ Add route handlers in `server/routes/` and register in `server/routes/index.ts`.
 Agents can create work tasks via `corvid_create_work_task` to propose codebase improvements:
 
 1. Agent calls `corvid_create_work_task` with a description
-2. Service creates a git branch, starts a new agent session
+2. Service creates a git worktree with a new branch, starts a new agent session
 3. Agent implements changes, commits, runs validation
 4. On validation pass, agent creates a PR
 5. On validation fail, up to 3 iteration attempts are made
-6. Original branch is restored after completion
+6. Worktree is cleaned up after completion (branch persists for PR review)
 
 Rate limited to 5 work tasks per agent per day. Protected files cannot be modified even in full-auto mode.
