@@ -287,17 +287,47 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 // those are displayed via agent_message_update instead
                 if (this.walletToAgent[msg.participant]) return;
 
-                const name = this.agentNameForAddress(msg.participant);
-                this.addEntry({
-                    direction: msg.direction,
-                    participant: msg.participant,
-                    participantLabel: this.labelForAddress(msg.participant),
-                    content: msg.content,
-                    agentName: name,
-                    fee: null,
-                    threadId: null,
-                    colorIndex: name ? this.colorIndexForAgent(name) : 0,
-                });
+                const userLabel = this.labelForAddress(msg.participant);
+                const handlingAgent = this.findAgentForParticipant(msg.participant);
+                const agentLabel = handlingAgent?.name ?? 'Agent';
+
+                if (msg.direction === 'inbound') {
+                    // External user sent a message to our agent
+                    this.addEntry({
+                        direction: 'inbound',
+                        participant: msg.participant,
+                        participantLabel: `${userLabel} \u2192 ${agentLabel}`,
+                        content: msg.content,
+                        agentName: userLabel,
+                        fee: null,
+                        threadId: null,
+                        colorIndex: this.colorIndexForAgent(userLabel),
+                    });
+                } else if (msg.direction === 'outbound') {
+                    // Our agent sent a response to the external user
+                    this.addEntry({
+                        direction: 'outbound',
+                        participant: msg.participant,
+                        participantLabel: `${agentLabel} \u2192 ${userLabel}`,
+                        content: msg.content,
+                        agentName: agentLabel,
+                        fee: null,
+                        threadId: null,
+                        colorIndex: this.colorIndexForAgent(agentLabel),
+                    });
+                } else {
+                    // Status messages
+                    this.addEntry({
+                        direction: 'status',
+                        participant: msg.participant,
+                        participantLabel: agentLabel,
+                        content: msg.content,
+                        agentName: agentLabel,
+                        fee: null,
+                        threadId: null,
+                        colorIndex: this.colorIndexForAgent(agentLabel),
+                    });
+                }
             }
 
             if (msg.type === 'agent_message_update') {
@@ -571,6 +601,13 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
 
     private removeEntriesByMessageId(messageId: string): void {
         this.entries.update((list) => list.filter((e) => e.messageId !== messageId));
+    }
+
+    /** Find which agent handles conversations with an external participant. */
+    private findAgentForParticipant(_address: string): Agent | null {
+        // For now, use the first agent with AlgoChat enabled (most setups have one primary agent)
+        const agents = this.agentService.agents();
+        return agents.find((a) => a.algochatEnabled) ?? agents[0] ?? null;
     }
 
     private agentNameForAddress(address: string): string | null {
