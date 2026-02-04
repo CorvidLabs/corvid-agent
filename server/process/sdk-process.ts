@@ -8,6 +8,109 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('SdkProcess');
 
+// Paths that agents must never modify, even in full-auto mode.
+// Uses basename matching to avoid false positives (e.g. "manager.ts" matching "task-manager.ts").
+const PROTECTED_BASENAMES = new Set([
+    'spending.ts',
+    'sdk-process.ts',
+    'manager.ts',
+    'sdk-tools.ts',
+    'tool-handlers.ts',
+    'CLAUDE.md',
+    'schema.ts',
+    'package.json',
+]);
+
+// Paths matched by substring (for files/dirs without unique basenames).
+const PROTECTED_SUBSTRINGS = [
+    '.env',
+    'corvid-agent.db',
+    'wallet-keystore.json',
+    'server/index.ts',
+    'server/algochat/bridge.ts',
+    'server/algochat/config.ts',
+    'server/lib/auth.ts',
+    'server/selftest/',
+];
+
+// Shell operators/commands that indicate write/destructive file operations.
+const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e)/;
+
+function isProtectedPath(filePath: string): boolean {
+    // Normalize to forward slashes for cross-platform matching
+    const normalized = filePath.replace(/\\/g, '/');
+    const basename = normalized.split('/').pop() ?? '';
+
+    // Exact basename match (e.g. "manager.ts" only matches ".../server/process/manager.ts",
+    // not ".../task-manager.ts")
+    if (PROTECTED_BASENAMES.has(basename)) return true;
+
+    // Substring match for paths without unique basenames
+    return PROTECTED_SUBSTRINGS.some((p) => normalized.includes(p));
+}
+
+function extractFilePathFromInput(input: Record<string, unknown>): string | null {
+    // Write / Edit / MultiEdit all use `file_path` (or `files` for MultiEdit)
+    if (typeof input.file_path === 'string') return input.file_path;
+    if (Array.isArray(input.files)) {
+        for (const f of input.files) {
+            if (typeof f === 'object' && f !== null && typeof (f as { file_path?: string }).file_path === 'string') {
+                return (f as { file_path: string }).file_path;
+            }
+        }
+    }
+    return null;
+}
+
+// Environment variables safe to pass to agent subprocesses.
+// Everything else (ALGOCHAT_MNEMONIC, WALLET_ENCRYPTION_KEY, API_KEY, etc.) is excluded.
+const ENV_ALLOWLIST = new Set([
+    'PATH',
+    'HOME',
+    'USER',
+    'SHELL',
+    'TERM',
+    'LANG',
+    'LC_ALL',
+    'LC_CTYPE',
+    'TMPDIR',
+    'XDG_CONFIG_HOME',
+    'XDG_DATA_HOME',
+    'XDG_CACHE_HOME',
+    'ANTHROPIC_API_KEY',
+    'CLAUDE_CODE_STREAM_CLOSE_TIMEOUT',
+    // Node/Bun runtime
+    'NODE_ENV',
+    'NODE_PATH',
+    'BUN_INSTALL',
+    // Git
+    'GIT_AUTHOR_NAME',
+    'GIT_AUTHOR_EMAIL',
+    'GIT_COMMITTER_NAME',
+    'GIT_COMMITTER_EMAIL',
+    'GH_TOKEN',
+    'GITHUB_TOKEN',
+    // Editor (for Claude Code)
+    'EDITOR',
+    'VISUAL',
+]);
+
+function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, string> {
+    const safe: Record<string, string> = {};
+    for (const key of ENV_ALLOWLIST) {
+        if (process.env[key]) {
+            safe[key] = process.env[key] as string;
+        }
+    }
+    // Project-specific env vars are intentional — owner configured them per-project
+    if (projectEnvVars) {
+        Object.assign(safe, projectEnvVars);
+    }
+    // Always set the MCP stream timeout
+    safe.CLAUDE_CODE_STREAM_CLOSE_TIMEOUT = '600000';
+    return safe;
+}
+
 const API_FAILURE_THRESHOLD = 3;
 
 const API_ERROR_PATTERNS = [
@@ -71,6 +174,29 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     let inputDone = false;
 
     const canUseTool: CanUseTool = async (toolName, input, _opts) => {
+        // Protected path check — runs BEFORE bypass modes so even full-auto agents are blocked
+        const inputObj = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+        const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit']);
+        if (FILE_TOOLS.has(toolName)) {
+            const filePath = extractFilePathFromInput(inputObj);
+            if (filePath && isProtectedPath(filePath)) {
+                log.warn(`Blocked ${toolName} on protected path`, { sessionId: session.id, filePath });
+                return { behavior: 'deny' as const, message: `Cannot modify protected file: ${filePath}` };
+            }
+        }
+        if (toolName === 'Bash') {
+            const command = typeof inputObj.command === 'string' ? inputObj.command : '';
+            if (BASH_WRITE_OPERATORS.test(command)) {
+                // Extract potential file paths from the command and check each
+                const tokens = command.split(/\s+/);
+                const matchedPath = tokens.find((t) => isProtectedPath(t));
+                if (matchedPath) {
+                    log.warn('Blocked Bash write to protected path', { sessionId: session.id, command: command.slice(0, 200), matchedPath });
+                    return { behavior: 'deny' as const, message: `Cannot modify protected files via shell commands: ${matchedPath}` };
+                }
+            }
+        }
+
         // Auto-approve tool use for bypass permission modes (full-auto, bypassPermissions, etc.)
         const BYPASS_MODES = new Set(['bypassPermissions', 'dontAsk', 'acceptEdits', 'full-auto']);
         if (BYPASS_MODES.has(permissionMode)) {
@@ -136,12 +262,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         permissionMode: sdkPermissionMode,
         allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
-        env: {
-            ...process.env,
-            ...project.envVars,
-            // Allow long-running MCP tool calls (e.g. send_message waiting for response)
-            CLAUDE_CODE_STREAM_CLOSE_TIMEOUT: '600000',
-        },
+        env: buildSafeEnv(project.envVars),
     };
 
     if (agent?.model) {

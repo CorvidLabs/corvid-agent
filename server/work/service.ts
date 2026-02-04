@@ -1,3 +1,4 @@
+import { resolve, dirname } from 'node:path';
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTask, CreateWorkTaskInput } from '../../shared/types';
@@ -7,16 +8,19 @@ import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import {
-    createWorkTask,
+    createWorkTaskAtomic,
     getWorkTask,
     updateWorkTaskStatus,
     listWorkTasks as dbListWorkTasks,
+    cleanupStaleWorkTasks,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WorkTaskService');
 
 const PR_URL_REGEX = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/;
+
+const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10);
 
 type CompletionCallback = (task: WorkTask) => void;
 
@@ -28,6 +32,32 @@ export class WorkTaskService {
     constructor(db: Database, processManager: ProcessManager) {
         this.db = db;
         this.processManager = processManager;
+    }
+
+    /**
+     * Recover tasks left in active states from a previous unclean shutdown.
+     * Marks them as failed and attempts to restore their original branches.
+     */
+    async recoverStaleTasks(): Promise<void> {
+        const staleTasks = cleanupStaleWorkTasks(this.db);
+        if (staleTasks.length === 0) return;
+
+        log.info('Recovering stale work tasks', { count: staleTasks.length });
+
+        for (const task of staleTasks) {
+            if (task.worktreeDir) {
+                await this.cleanupWorktree(task.id);
+            }
+        }
+    }
+
+    /**
+     * Resolve the base directory for git worktrees.
+     * Defaults to a `.corvid-worktrees` sibling directory next to the project.
+     */
+    private getWorktreeBaseDir(projectWorkingDir: string): string {
+        return process.env.WORKTREE_BASE_DIR
+            ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
     }
 
     async create(input: CreateWorkTaskInput): Promise<WorkTask> {
@@ -52,17 +82,8 @@ export class WorkTaskService {
             throw new Error(`Project ${projectId} has no workingDir`);
         }
 
-        // Check for concurrent tasks on the same project
-        const existingTasks = dbListWorkTasks(this.db);
-        const concurrentTask = existingTasks.find(
-            (t) => t.projectId === projectId && (t.status === 'branching' || t.status === 'running'),
-        );
-        if (concurrentTask) {
-            throw new Error(`Another task is already ${concurrentTask.status} on project ${projectId} (task ${concurrentTask.id})`);
-        }
-
-        // Insert work_tasks row
-        const task = createWorkTask(this.db, {
+        // Atomic insert — fails if a concurrent active task exists on this project
+        const task = createWorkTaskAtomic(this.db, {
             agentId: input.agentId,
             projectId,
             description: input.description,
@@ -70,6 +91,9 @@ export class WorkTaskService {
             sourceId: input.sourceId,
             requesterInfo: input.requesterInfo,
         });
+        if (!task) {
+            throw new Error(`Another task is already active on project ${projectId}`);
+        }
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId });
 
@@ -83,69 +107,55 @@ export class WorkTaskService {
         // Update status to branching
         updateWorkTaskStatus(this.db, task.id, 'branching');
 
-        // Check for dirty working directory
-        try {
-            const statusProc = Bun.spawn(['git', 'status', '--porcelain'], {
-                cwd: project.workingDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const statusOutput = await new Response(statusProc.stdout).text();
-            await statusProc.exited;
+        // Create git worktree (isolated directory — does not touch the main working tree)
+        const worktreeBase = this.getWorktreeBaseDir(project.workingDir);
+        const worktreeDir = resolve(worktreeBase, task.id);
 
-            if (statusOutput.trim()) {
-                updateWorkTaskStatus(this.db, task.id, 'failed', {
-                    error: `Working directory is dirty. Please commit or stash changes first.\n${statusOutput.trim()}`,
-                });
-                const failed = getWorkTask(this.db, task.id);
-                return failed ?? task;
-            }
-        } catch (err) {
-            updateWorkTaskStatus(this.db, task.id, 'failed', {
-                error: `Failed to check git status: ${err instanceof Error ? err.message : String(err)}`,
-            });
-            const failed = getWorkTask(this.db, task.id);
-            return failed ?? task;
-        }
-
-        // Create git branch
         try {
-            const branchProc = Bun.spawn(['git', 'checkout', '-b', branchName], {
-                cwd: project.workingDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const stderr = await new Response(branchProc.stderr).text();
-            const exitCode = await branchProc.exited;
+            const worktreeProc = Bun.spawn(
+                ['git', 'worktree', 'add', '-b', branchName, worktreeDir],
+                {
+                    cwd: project.workingDir,
+                    stdout: 'pipe',
+                    stderr: 'pipe',
+                },
+            );
+            const stderr = await new Response(worktreeProc.stderr).text();
+            const exitCode = await worktreeProc.exited;
 
             if (exitCode !== 0) {
                 updateWorkTaskStatus(this.db, task.id, 'failed', {
-                    error: `Failed to create branch: ${stderr.trim()}`,
+                    error: `Failed to create worktree: ${stderr.trim()}`,
                 });
                 const failed = getWorkTask(this.db, task.id);
                 return failed ?? task;
             }
         } catch (err) {
             updateWorkTaskStatus(this.db, task.id, 'failed', {
-                error: `Failed to create branch: ${err instanceof Error ? err.message : String(err)}`,
+                error: `Failed to create worktree: ${err instanceof Error ? err.message : String(err)}`,
             });
             const failed = getWorkTask(this.db, task.id);
             return failed ?? task;
         }
 
-        // Update status to running
-        updateWorkTaskStatus(this.db, task.id, 'running', { branchName });
+        // Update status to running with iteration count 1
+        updateWorkTaskStatus(this.db, task.id, 'running', {
+            branchName,
+            worktreeDir,
+            iterationCount: 1,
+        });
 
         // Build work prompt
         const prompt = this.buildWorkPrompt(branchName, input.description);
 
-        // Create session
+        // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
             projectId,
             agentId: input.agentId,
             name: `Work: ${input.description.slice(0, 60)}`,
             initialPrompt: prompt,
             source: input.source ?? 'web',
+            workDir: worktreeDir,
         });
 
         updateWorkTaskStatus(this.db, task.id, 'running', { sessionId: session.id, branchName });
@@ -156,7 +166,12 @@ export class WorkTaskService {
         // Start the process
         this.processManager.startProcess(session, prompt);
 
-        log.info('Work task running', { taskId: task.id, sessionId: session.id, branchName });
+        log.info('Work task running', {
+            taskId: task.id,
+            sessionId: session.id,
+            branchName,
+            worktreeDir,
+        });
 
         const updated = getWorkTask(this.db, task.id);
         return updated ?? task;
@@ -170,7 +185,7 @@ export class WorkTaskService {
         return dbListWorkTasks(this.db, agentId);
     }
 
-    cancelTask(id: string): WorkTask | null {
+    async cancelTask(id: string): Promise<WorkTask | null> {
         const task = getWorkTask(this.db, id);
         if (!task) return null;
 
@@ -179,6 +194,10 @@ export class WorkTaskService {
         }
 
         updateWorkTaskStatus(this.db, id, 'failed', { error: 'Cancelled by user' });
+
+        // Clean up worktree
+        await this.cleanupWorktree(id);
+
         return getWorkTask(this.db, id);
     }
 
@@ -205,44 +224,234 @@ export class WorkTaskService {
                 this.processManager.unsubscribe(sessionId, callback);
 
                 const fullOutput = responseBuffer.trim();
-                const prMatch = fullOutput.match(PR_URL_REGEX);
 
-                if (prMatch) {
-                    const prUrl = prMatch[0];
-                    // Extract a summary from the last portion of output
-                    const summary = fullOutput.slice(-500).trim();
-                    updateWorkTaskStatus(this.db, taskId, 'completed', { prUrl, summary });
-                    log.info('Work task completed with PR', { taskId, prUrl });
-                } else {
-                    updateWorkTaskStatus(this.db, taskId, 'failed', {
-                        error: 'Session completed but no PR URL was found in output',
-                        summary: fullOutput.slice(-500).trim(),
-                    });
-                    log.warn('Work task completed without PR URL', { taskId });
-                }
-
-                // Notify callbacks
-                const task = getWorkTask(this.db, taskId);
-                if (task) {
-                    const callbacks = this.completionCallbacks.get(taskId);
-                    if (callbacks) {
-                        for (const cb of callbacks) {
-                            try {
-                                cb(task);
-                            } catch (err) {
-                                log.error('Completion callback error', {
-                                    taskId,
-                                    error: err instanceof Error ? err.message : String(err),
-                                });
-                            }
-                        }
-                        this.completionCallbacks.delete(taskId);
-                    }
-                }
+                // Run post-session validation
+                this.handleSessionEnd(taskId, fullOutput);
             }
         };
 
         this.processManager.subscribe(sessionId, callback);
+    }
+
+    private async handleSessionEnd(taskId: string, sessionOutput: string): Promise<void> {
+        const task = getWorkTask(this.db, taskId);
+        if (!task || !task.projectId) return;
+
+        // Use the worktree directory for validation (or fall back to project dir)
+        const validationDir = task.worktreeDir ?? getProject(this.db, task.projectId)?.workingDir;
+        if (!validationDir) {
+            await this.finalizeTask(taskId, sessionOutput);
+            return;
+        }
+
+        // Set status to validating
+        updateWorkTaskStatus(this.db, taskId, 'validating');
+        log.info('Running post-session validation', { taskId });
+
+        const validation = await this.runValidation(validationDir);
+        const iteration = task.iterationCount || 1;
+
+        if (validation.passed) {
+            log.info('Validation passed', { taskId, iteration });
+            await this.finalizeTask(taskId, sessionOutput);
+            return;
+        }
+
+        log.warn('Validation failed', { taskId, iteration, maxIterations: WORK_MAX_ITERATIONS });
+
+        if (iteration >= WORK_MAX_ITERATIONS) {
+            // Max iterations reached — fail the task
+            updateWorkTaskStatus(this.db, taskId, 'failed', {
+                error: `Validation failed after ${iteration} iteration(s):\n${validation.output.slice(0, 2000)}`,
+                summary: sessionOutput.slice(-500).trim(),
+            });
+            await this.cleanupWorktree(taskId);
+            this.notifyCallbacks(taskId);
+            return;
+        }
+
+        // Spawn a follow-up iteration — increment iteration count in DB
+        updateWorkTaskStatus(this.db, taskId, 'running', { iterationCount: iteration + 1 });
+
+        const branchName = task.branchName ?? 'unknown';
+        const iterationPrompt = this.buildIterationPrompt(branchName, validation.output);
+
+        const session = createSession(this.db, {
+            projectId: task.projectId,
+            agentId: task.agentId,
+            name: `Work iteration ${iteration + 1}: ${task.description.slice(0, 40)}`,
+            initialPrompt: iterationPrompt,
+            source: task.source,
+            workDir: task.worktreeDir ?? undefined,
+        });
+
+        updateWorkTaskStatus(this.db, taskId, 'running', { sessionId: session.id });
+
+        // Subscribe and start the new session
+        this.subscribeForCompletion(taskId, session.id);
+        this.processManager.startProcess(session, iterationPrompt);
+
+        log.info('Spawned iteration session', {
+            taskId,
+            sessionId: session.id,
+            iteration: iteration + 1,
+        });
+    }
+
+    private async finalizeTask(taskId: string, sessionOutput: string): Promise<void> {
+        const prMatch = sessionOutput.match(PR_URL_REGEX);
+
+        if (prMatch) {
+            const prUrl = prMatch[0];
+            const summary = sessionOutput.slice(-500).trim();
+            updateWorkTaskStatus(this.db, taskId, 'completed', { prUrl, summary });
+            log.info('Work task completed with PR', { taskId, prUrl });
+        } else {
+            updateWorkTaskStatus(this.db, taskId, 'failed', {
+                error: 'Session completed but no PR URL was found in output',
+                summary: sessionOutput.slice(-500).trim(),
+            });
+            log.warn('Work task completed without PR URL', { taskId });
+        }
+
+        // Clean up the worktree (the branch persists for PR purposes)
+        await this.cleanupWorktree(taskId);
+
+        // Notify callbacks
+        this.notifyCallbacks(taskId);
+    }
+
+    private notifyCallbacks(taskId: string): void {
+        const task = getWorkTask(this.db, taskId);
+        if (task) {
+            const callbacks = this.completionCallbacks.get(taskId);
+            if (callbacks) {
+                for (const cb of callbacks) {
+                    try {
+                        cb(task);
+                    } catch (err) {
+                        log.error('Completion callback error', {
+                            taskId,
+                            error: err instanceof Error ? err.message : String(err),
+                        });
+                    }
+                }
+                this.completionCallbacks.delete(taskId);
+            }
+        }
+    }
+
+    private async runValidation(workingDir: string): Promise<{ passed: boolean; output: string }> {
+        const outputs: string[] = [];
+        let passed = true;
+
+        // Run TypeScript check
+        try {
+            const tscProc = Bun.spawn(['bunx', 'tsc', '--noEmit', '--skipLibCheck'], {
+                cwd: workingDir,
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+            const tscStdout = await new Response(tscProc.stdout).text();
+            const tscStderr = await new Response(tscProc.stderr).text();
+            const tscExit = await tscProc.exited;
+
+            const tscOutput = (tscStdout + tscStderr).trim();
+            if (tscExit !== 0) {
+                passed = false;
+                outputs.push(`=== TypeScript Check Failed (exit ${tscExit}) ===\n${tscOutput}`);
+            } else {
+                outputs.push('=== TypeScript Check Passed ===');
+            }
+        } catch (err) {
+            passed = false;
+            outputs.push(`=== TypeScript Check Error ===\n${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        // Run tests
+        try {
+            const testProc = Bun.spawn(['bun', 'test'], {
+                cwd: workingDir,
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+            const testStdout = await new Response(testProc.stdout).text();
+            const testStderr = await new Response(testProc.stderr).text();
+            const testExit = await testProc.exited;
+
+            const testOutput = (testStdout + testStderr).trim();
+            if (testExit !== 0) {
+                passed = false;
+                outputs.push(`=== Tests Failed (exit ${testExit}) ===\n${testOutput}`);
+            } else {
+                outputs.push('=== Tests Passed ===');
+            }
+        } catch (err) {
+            passed = false;
+            outputs.push(`=== Test Runner Error ===\n${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        return { passed, output: outputs.join('\n\n') };
+    }
+
+    private buildIterationPrompt(branchName: string, validationOutput: string): string {
+        return `You are on branch "${branchName}". A previous session made changes but validation failed.
+
+## Validation Errors
+\`\`\`
+${validationOutput}
+\`\`\`
+
+## Instructions
+1. Read the errors above carefully.
+2. Fix the TypeScript and/or test failures on this branch.
+3. Commit your fixes with clear messages.
+4. Verify your changes work:
+   bunx tsc --noEmit --skipLibCheck
+   bun test
+   Fix any remaining issues.
+5. If a PR already exists, push your fixes. If not, create one:
+   gh pr create --title "<concise title>" --body "<summary of changes>"
+6. Output the PR URL as the final line of your response.
+
+Important: You MUST ensure all validation passes and output the PR URL.`;
+    }
+
+    /**
+     * Remove the git worktree for a task. The branch itself is kept
+     * (it's needed for PRs and review).
+     */
+    private async cleanupWorktree(taskId: string): Promise<void> {
+        const task = getWorkTask(this.db, taskId);
+        if (!task?.worktreeDir) return;
+
+        const project = getProject(this.db, task.projectId);
+        if (!project?.workingDir) return;
+
+        try {
+            const proc = Bun.spawn(
+                ['git', 'worktree', 'remove', '--force', task.worktreeDir],
+                {
+                    cwd: project.workingDir,
+                    stdout: 'pipe',
+                    stderr: 'pipe',
+                },
+            );
+            const stderr = await new Response(proc.stderr).text();
+            const exitCode = await proc.exited;
+
+            if (exitCode !== 0) {
+                log.warn('Failed to remove worktree', { taskId, worktreeDir: task.worktreeDir, stderr: stderr.trim() });
+            } else {
+                log.info('Removed worktree', { taskId, worktreeDir: task.worktreeDir });
+            }
+        } catch (err) {
+            log.warn('Error removing worktree', {
+                taskId,
+                worktreeDir: task.worktreeDir,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     private buildWorkPrompt(branchName: string, description: string): string {
@@ -255,9 +464,13 @@ ${description}
 1. Explore the codebase as needed to understand the context.
 2. Implement the changes on this branch.
 3. Commit with clear, descriptive messages as you go.
-4. When done, create a PR:
+4. Verify your changes work:
+   bunx tsc --noEmit --skipLibCheck
+   bun test
+   Fix any issues before creating the PR.
+5. When done, create a PR:
    gh pr create --title "<concise title>" --body "<summary of changes>"
-5. Output the PR URL as the final line of your response.
+6. Output the PR URL as the final line of your response.
 
 Important: You MUST create a PR when finished. The PR URL will be captured to report back to the requester.`;
     }

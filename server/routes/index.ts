@@ -14,6 +14,9 @@ import type { WorkTaskService } from '../work/service';
 import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
 import { searchAlgoChatMessages } from '../db/algochat-messages';
+import { backupDatabase } from '../db/backup';
+import { checkAuth } from '../lib/auth';
+import { checkRateLimit } from '../lib/rate-limit';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -34,34 +37,45 @@ export async function handleRequest(
     agentDirectory?: AgentDirectory | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
+    const requestOrigin = req.headers.get('Origin');
 
-    // CORS headers for dev
+    // CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
-            headers: corsHeaders(),
+            headers: corsHeaders(requestOrigin),
         });
     }
 
+    // Rate limiting
+    const rateLimitResponse = checkRateLimit(req);
+    if (rateLimitResponse) return addCors(rateLimitResponse, requestOrigin);
+
+    // API key authentication (if API_KEY env var is set)
+    if (url.pathname.startsWith('/api/')) {
+        const authResponse = checkAuth(req, url);
+        if (authResponse) return addCors(authResponse, requestOrigin);
+    }
+
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
-        return addCorsAsync(handleBrowseDirs(req, url));
+        return addCorsAsync(handleBrowseDirs(req, url), requestOrigin);
     }
 
     const projectResponse = handleProjectRoutes(req, url, db);
-    if (projectResponse) return addCorsAsync(projectResponse);
+    if (projectResponse) return addCorsAsync(projectResponse, requestOrigin);
 
     const agentResponse = handleAgentRoutes(req, url, db, agentWalletService, agentMessenger);
-    if (agentResponse) return addCorsAsync(agentResponse);
+    if (agentResponse) return addCorsAsync(agentResponse, requestOrigin);
 
     const sessionResponse = await handleSessionRoutes(req, url, db, processManager);
-    if (sessionResponse) return addCorsAsync(sessionResponse);
+    if (sessionResponse) return addCorsAsync(sessionResponse, requestOrigin);
 
     const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger);
-    if (councilResponse) return addCorsAsync(councilResponse);
+    if (councilResponse) return addCorsAsync(councilResponse, requestOrigin);
 
     if (workTaskService) {
         const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService);
-        if (workTaskResponse) return addCorsAsync(workTaskResponse);
+        if (workTaskResponse) return addCorsAsync(workTaskResponse, requestOrigin);
     }
 
     // MCP API routes (used by stdio server subprocess)
@@ -69,7 +83,7 @@ export async function handleRequest(
         ? { db, agentMessenger, agentDirectory, agentWalletService }
         : null;
     const mcpResponse = handleMcpApiRoutes(req, url, mcpDeps);
-    if (mcpResponse) return addCorsAsync(mcpResponse);
+    if (mcpResponse) return addCorsAsync(mcpResponse, requestOrigin);
 
     // Resume a paused session (e.g. after API outage)
     const resumeMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/resume$/);
@@ -77,29 +91,29 @@ export async function handleRequest(
         const sessionId = resumeMatch[1];
         const resumed = processManager.resumeSession(sessionId);
         if (resumed) {
-            return addCors(json({ ok: true, message: `Session ${sessionId} resumed` }));
+            return addCors(json({ ok: true, message: `Session ${sessionId} resumed` }), requestOrigin);
         }
-        return addCors(json({ error: `Session ${sessionId} is not paused` }, 400));
+        return addCors(json({ error: `Session ${sessionId} is not paused` }, 400), requestOrigin);
     }
 
     // Escalation queue — list pending requests
     if (url.pathname === '/api/escalation-queue' && req.method === 'GET') {
         const requests = processManager.approvalManager.getQueuedRequests();
-        return addCors(json({ requests }));
+        return addCors(json({ requests }), requestOrigin);
     }
 
     // Escalation queue — resolve a request
     const escalationMatch = url.pathname.match(/^\/api\/escalation-queue\/(\d+)\/resolve$/);
     if (escalationMatch && req.method === 'POST') {
-        return addCorsAsync(handleEscalationResolve(req, processManager, parseInt(escalationMatch[1], 10)));
+        return addCorsAsync(handleEscalationResolve(req, processManager, parseInt(escalationMatch[1], 10)), requestOrigin);
     }
 
     // Operational mode — get/set
     if (url.pathname === '/api/operational-mode' && req.method === 'GET') {
-        return addCors(json({ mode: processManager.approvalManager.operationalMode }));
+        return addCors(json({ mode: processManager.approvalManager.operationalMode }), requestOrigin);
     }
     if (url.pathname === '/api/operational-mode' && req.method === 'POST') {
-        return addCorsAsync(handleSetOperationalMode(req, processManager));
+        return addCorsAsync(handleSetOperationalMode(req, processManager), requestOrigin);
     }
 
     // Feed history — returns recent agent messages AND algochat messages for the AlgoChat Feed
@@ -120,7 +134,7 @@ export async function handleRequest(
             algochatTotal: algochatResult.total,
             limit,
             offset,
-        }));
+        }), requestOrigin);
     }
 
     // AlgoChat routes
@@ -133,19 +147,30 @@ export async function handleRequest(
                 syncInterval: 30000,
                 activeConversations: 0,
             };
-        return addCors(json(status));
+        return addCors(json(status), requestOrigin);
     }
 
     if (url.pathname === '/api/algochat/conversations' && req.method === 'POST') {
-        return addCors(json(listConversations(db)));
+        return addCors(json(listConversations(db)), requestOrigin);
+    }
+
+    // Database backup (requires API key auth if configured)
+    if (url.pathname === '/api/backup' && req.method === 'POST') {
+        try {
+            const result = backupDatabase(db);
+            return addCors(json(result), requestOrigin);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return addCors(json({ error: `Backup failed: ${message}` }, 500), requestOrigin);
+        }
     }
 
     // Self-test route
     if (url.pathname === '/api/selftest/run' && req.method === 'POST') {
         if (!selfTestService) {
-            return addCors(json({ error: 'Self-test service not available' }, 503));
+            return addCors(json({ error: 'Self-test service not available' }, 503), requestOrigin);
         }
-        return addCorsAsync(handleSelfTestRun(req, selfTestService));
+        return addCorsAsync(handleSelfTestRun(req, selfTestService), requestOrigin);
     }
 
     return null;
@@ -174,16 +199,26 @@ async function handleSelfTestRun(
     }
 }
 
-function corsHeaders(): Record<string, string> {
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://localhost:4200')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+function corsHeaders(requestOrigin?: string | null): Record<string, string> {
+    let origin = ALLOWED_ORIGINS[0] ?? 'http://localhost:3000';
+    if (requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin)) {
+        origin = requestOrigin;
+    }
     return {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Vary': 'Origin',
     };
 }
 
-function addCors(response: Response): Response {
-    const headers = corsHeaders();
+function addCors(response: Response, requestOrigin?: string | null): Response {
+    const headers = corsHeaders(requestOrigin);
     for (const [key, value] of Object.entries(headers)) {
         response.headers.set(key, value);
     }
@@ -225,7 +260,7 @@ async function handleSetOperationalMode(
     }
 }
 
-async function addCorsAsync(response: Response | Promise<Response>): Promise<Response> {
+async function addCorsAsync(response: Response | Promise<Response>, requestOrigin?: string | null): Promise<Response> {
     const resolved = await response;
-    return addCors(resolved);
+    return addCors(resolved, requestOrigin);
 }

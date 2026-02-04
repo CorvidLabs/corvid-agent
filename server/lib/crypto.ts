@@ -1,14 +1,22 @@
 /**
  * Mnemonic encryption/decryption using AES-256-GCM via Web Crypto API.
  * Key is derived from WALLET_ENCRYPTION_KEY env var, or from the server mnemonic on localnet.
+ *
+ * Format (v2): base64( salt(16) + iv(12) + ciphertext )
+ * Legacy (v1): base64( iv(12) + ciphertext ) — static salt, 100k iterations
  */
 
 const ALGORITHM = 'AES-GCM';
 const KEY_LENGTH = 256;
 const IV_LENGTH = 12;
+const SALT_LENGTH = 16;
 const TAG_LENGTH = 128;
 
-async function deriveKey(passphrase: string): Promise<CryptoKey> {
+const CURRENT_ITERATIONS = 600_000;
+const LEGACY_ITERATIONS = 100_000;
+const LEGACY_SALT = 'corvid-agent-wallet-encryption';
+
+async function deriveKey(passphrase: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
         'raw',
@@ -21,8 +29,8 @@ async function deriveKey(passphrase: string): Promise<CryptoKey> {
     return crypto.subtle.deriveKey(
         {
             name: 'PBKDF2',
-            salt: encoder.encode('corvid-agent-wallet-encryption'),
-            iterations: 100_000,
+            salt: salt.buffer as ArrayBuffer,
+            iterations,
             hash: 'SHA-256',
         },
         keyMaterial,
@@ -32,9 +40,18 @@ async function deriveKey(passphrase: string): Promise<CryptoKey> {
     );
 }
 
-function getEncryptionPassphrase(serverMnemonic?: string | null): string {
+function getEncryptionPassphrase(network?: string, serverMnemonic?: string | null): string {
     const envKey = process.env.WALLET_ENCRYPTION_KEY;
     if (envKey && envKey.trim().length > 0) return envKey.trim();
+
+    // On non-localnet, require an explicit encryption key
+    if (network && network !== 'localnet') {
+        throw new Error(
+            `WALLET_ENCRYPTION_KEY must be set for ${network}. ` +
+            'This key encrypts wallet mnemonics at rest. Generate one with: openssl rand -hex 32',
+        );
+    }
+
     if (serverMnemonic && serverMnemonic.trim().length > 0) return serverMnemonic.trim();
     return 'corvid-agent-localnet-default-key';
 }
@@ -42,10 +59,12 @@ function getEncryptionPassphrase(serverMnemonic?: string | null): string {
 export async function encryptMnemonic(
     plaintext: string,
     serverMnemonic?: string | null,
+    network?: string,
 ): Promise<string> {
-    const passphrase = getEncryptionPassphrase(serverMnemonic);
-    const key = await deriveKey(passphrase);
+    const passphrase = getEncryptionPassphrase(network, serverMnemonic);
 
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+    const key = await deriveKey(passphrase, salt, CURRENT_ITERATIONS);
     const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
     const encoder = new TextEncoder();
 
@@ -55,10 +74,11 @@ export async function encryptMnemonic(
         encoder.encode(plaintext),
     );
 
-    // Concatenate iv + ciphertext and encode as base64
-    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
-    combined.set(iv);
-    combined.set(new Uint8Array(ciphertext), iv.length);
+    // v2 format: salt(16) + iv(12) + ciphertext
+    const combined = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+    combined.set(salt);
+    combined.set(iv, salt.length);
+    combined.set(new Uint8Array(ciphertext), salt.length + iv.length);
 
     return btoa(String.fromCharCode(...combined));
 }
@@ -66,14 +86,36 @@ export async function encryptMnemonic(
 export async function decryptMnemonic(
     encrypted: string,
     serverMnemonic?: string | null,
+    network?: string,
 ): Promise<string> {
-    const passphrase = getEncryptionPassphrase(serverMnemonic);
-    const key = await deriveKey(passphrase);
-
+    const passphrase = getEncryptionPassphrase(network, serverMnemonic);
     const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
+
+    // Try v2 format first: salt(16) + iv(12) + ciphertext
+    if (combined.length >= SALT_LENGTH + IV_LENGTH + 1) {
+        try {
+            const salt = combined.slice(0, SALT_LENGTH);
+            const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+            const ciphertext = combined.slice(SALT_LENGTH + IV_LENGTH);
+
+            const key = await deriveKey(passphrase, salt, CURRENT_ITERATIONS);
+            const decrypted = await crypto.subtle.decrypt(
+                { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+                key,
+                ciphertext,
+            );
+            return new TextDecoder().decode(decrypted);
+        } catch {
+            // Fall through to legacy format
+        }
+    }
+
+    // Legacy v1 format: iv(12) + ciphertext, static salt, 100k iterations
+    const legacySalt = new TextEncoder().encode(LEGACY_SALT);
     const iv = combined.slice(0, IV_LENGTH);
     const ciphertext = combined.slice(IV_LENGTH);
 
+    const key = await deriveKey(passphrase, legacySalt, LEGACY_ITERATIONS);
     const decrypted = await crypto.subtle.decrypt(
         { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
         key,
@@ -81,4 +123,28 @@ export async function decryptMnemonic(
     );
 
     return new TextDecoder().decode(decrypted);
+}
+
+/**
+ * Encrypt arbitrary content for on-chain storage (e.g. agent memories).
+ * Uses the same AES-256-GCM scheme with the agent's encryption passphrase.
+ */
+export async function encryptMemoryContent(
+    plaintext: string,
+    serverMnemonic?: string | null,
+    network?: string,
+): Promise<string> {
+    // Reuse the same encryption path — output is base64
+    return encryptMnemonic(plaintext, serverMnemonic, network);
+}
+
+/**
+ * Decrypt content that was encrypted with encryptMemoryContent.
+ */
+export async function decryptMemoryContent(
+    encrypted: string,
+    serverMnemonic?: string | null,
+    network?: string,
+): Promise<string> {
+    return decryptMnemonic(encrypted, serverMnemonic, network);
 }

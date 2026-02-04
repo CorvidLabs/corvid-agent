@@ -16,6 +16,11 @@ ENV PORT=3000
 ENV LOG_LEVEL=info
 ENV NODE_ENV=production
 
+# Run as non-root user
+RUN addgroup --system corvid && adduser --system --ingroup corvid corvid
+RUN chown -R corvid:corvid /app
+USER corvid
+
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

@@ -2,8 +2,10 @@ import type { Database } from 'bun:sqlite';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
+import type { WorkTaskService } from '../work/service';
 import { saveMemory, recallMemory, searchMemories, listMemories, updateMemoryTxid } from '../db/agent-memories';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { encryptMemoryContent } from '../lib/crypto';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('McpToolHandlers');
@@ -45,6 +47,12 @@ export interface McpToolContext {
     sessionSource?: string;
     /** Emit a status message for UI progress updates (e.g. "Querying CorvidLabs..."). */
     emitStatus?: (message: string) => void;
+    /** Server mnemonic for encryption (from AlgoChat config). */
+    serverMnemonic?: string | null;
+    /** Network name for encryption key policy (localnet allows default key). */
+    network?: string;
+    /** Work task service for creating agent work tasks. */
+    workTaskService?: WorkTaskService;
 }
 
 function textResult(text: string): CallToolResult {
@@ -130,11 +138,13 @@ export async function handleSaveMemory(
             content: args.content,
         });
 
-        // Fire-and-forget: store on-chain for audit trail
-        ctx.agentMessenger.sendOnChainToSelf(
-            ctx.agentId,
-            `[MEMORY:${args.key}] ${args.content}`,
-        ).then((txid) => {
+        // Fire-and-forget: store encrypted on-chain for audit trail
+        encryptMemoryContent(args.content, ctx.serverMnemonic, ctx.network).then((encrypted) => {
+            return ctx.agentMessenger.sendOnChainToSelf(
+                ctx.agentId,
+                `[MEMORY:${args.key}] ${encrypted}`,
+            );
+        }).then((txid) => {
             if (txid) {
                 updateMemoryTxid(ctx.db, memory.id, txid);
             }
@@ -209,5 +219,56 @@ export async function handleListAgents(
         const message = err instanceof Error ? err.message : String(err);
         log.error('MCP list_agents failed', { error: message });
         return errorResult(`Failed to list agents: ${message}`);
+    }
+}
+
+// Rate limiter for corvid_create_work_task: max 5 per agent per day (persisted via DB)
+const WORK_TASK_MAX_PER_DAY = 5;
+
+function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
+    const row = db.query(
+        `SELECT COUNT(*) as count FROM work_tasks WHERE agent_id = ? AND date(created_at) = date('now')`
+    ).get(agentId) as { count: number } | null;
+    return (row?.count ?? 0) < WORK_TASK_MAX_PER_DAY;
+}
+
+export async function handleCreateWorkTask(
+    ctx: McpToolContext,
+    args: { description: string; project_id?: string },
+): Promise<CallToolResult> {
+    if (!ctx.workTaskService) {
+        return errorResult('Work task service is not available.');
+    }
+
+    if (!checkWorkTaskRateLimit(ctx.db, ctx.agentId)) {
+        return errorResult(`Rate limit exceeded: maximum ${WORK_TASK_MAX_PER_DAY} work tasks per day.`);
+    }
+
+    try {
+        ctx.emitStatus?.('Creating work task...');
+
+        const task = await ctx.workTaskService.create({
+            agentId: ctx.agentId,
+            description: args.description,
+            projectId: args.project_id,
+            source: 'agent',
+        });
+
+        log.info('MCP create_work_task succeeded', {
+            agentId: ctx.agentId,
+            taskId: task.id,
+            status: task.status,
+        });
+
+        return textResult(
+            `Work task created.\n` +
+            `  ID: ${task.id}\n` +
+            `  Status: ${task.status}\n` +
+            `  Branch: ${task.branchName ?? '(pending)'}`,
+        );
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('MCP create_work_task failed', { error: message });
+        return errorResult(`Failed to create work task: ${message}`);
     }
 }

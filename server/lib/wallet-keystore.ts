@@ -31,7 +31,9 @@ function readKeystore(): KeystoreData {
 
 function writeKeystore(data: KeystoreData): void {
     try {
-        require('node:fs').writeFileSync(KEYSTORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+        const fs = require('node:fs');
+        fs.writeFileSync(KEYSTORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+        fs.chmodSync(KEYSTORE_PATH, 0o600);
     } catch (err) {
         log.error('Failed to write wallet keystore', {
             path: KEYSTORE_PATH,

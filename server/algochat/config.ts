@@ -17,6 +17,8 @@ export interface AlgoChatConfig {
     defaultAgentId: string | null;
     enabled: boolean;
     pskContact: PSKContactConfig | null;
+    /** Algorand addresses authorized to run privileged commands (/stop, /approve, /deny, /mode, /work). */
+    ownerAddresses: Set<string>;
 }
 
 export function loadAlgoChatConfig(): AlgoChatConfig {
@@ -34,6 +36,9 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     // Parse PSK exchange URI if provided
     const pskContact = parsePSKContactFromEnv();
 
+    // Parse owner addresses (comma-separated Algorand addresses)
+    const ownerAddresses = parseOwnerAddresses();
+
     return {
         mnemonic: hasMnemonic ? mnemonic.trim() : null,
         network,
@@ -43,7 +48,25 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
         // Enabled if mnemonic is provided, or if we can try localnet
         enabled: hasMnemonic || network === 'localnet',
         pskContact,
+        ownerAddresses,
     };
+}
+
+function parseOwnerAddresses(): Set<string> {
+    const raw = process.env.ALGOCHAT_OWNER_ADDRESSES ?? '';
+    const addresses = new Set<string>();
+    for (const addr of raw.split(',')) {
+        const trimmed = addr.trim();
+        if (trimmed.length > 0) {
+            addresses.add(trimmed);
+        }
+    }
+    if (addresses.size > 0) {
+        log.info(`Owner addresses configured: ${addresses.size}`);
+    } else {
+        log.warn('No ALGOCHAT_OWNER_ADDRESSES set — all on-chain commands are open to any sender');
+    }
+    return addresses;
 }
 
 function parsePSKContactFromEnv(): PSKContactConfig | null {

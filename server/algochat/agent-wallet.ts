@@ -77,7 +77,7 @@ export class AgentWalletService {
         try {
             const algochat = await import('@corvidlabs/ts-algochat');
             const generated = algochat.createRandomChatAccount();
-            const encrypted = await encryptMnemonic(generated.mnemonic, this.config.mnemonic);
+            const encrypted = await encryptMnemonic(generated.mnemonic, this.config.mnemonic, this.config.network);
 
             setAgentWallet(this.db, agentId, generated.account.address, encrypted);
             saveKeystoreEntry(agent.name, generated.account.address, encrypted);
@@ -128,7 +128,7 @@ export class AgentWalletService {
         if (!encrypted) return null;
 
         try {
-            const mnemonic = await decryptMnemonic(encrypted, this.config.mnemonic);
+            const mnemonic = await decryptMnemonic(encrypted, this.config.mnemonic, this.config.network);
             const algochat = await import('@corvidlabs/ts-algochat');
             const account = algochat.createChatAccountFromMnemonic(mnemonic);
 
