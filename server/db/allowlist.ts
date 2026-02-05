@@ -52,8 +52,8 @@ export function removeFromAllowlist(db: Database, address: string): boolean {
 /** Returns true if the address is allowed to message agents.
  *  If the allowlist is empty, all addresses are allowed (open mode). */
 export function isAllowed(db: Database, address: string): boolean {
-    const count = db.query('SELECT COUNT(*) as cnt FROM algochat_allowlist').get() as { cnt: number };
-    if (count.cnt === 0) return true;
     const row = db.query('SELECT 1 FROM algochat_allowlist WHERE address = ? LIMIT 1').get(address);
-    return row != null;
+    if (row != null) return true;
+    const count = db.query('SELECT COUNT(*) as cnt FROM algochat_allowlist').get() as { cnt: number };
+    return count.cnt === 0;
 }
