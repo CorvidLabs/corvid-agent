@@ -5,6 +5,7 @@ import { handleSessionRoutes } from './sessions';
 import { handleCouncilRoutes } from './councils';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleMcpApiRoutes } from './mcp-api';
+import { handleAllowlistRoutes } from './allowlist';
 import type { ProcessManager } from '../process/manager';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
@@ -66,6 +67,9 @@ export async function handleRequest(
 
     const agentResponse = handleAgentRoutes(req, url, db, agentWalletService, agentMessenger);
     if (agentResponse) return addCorsAsync(agentResponse, requestOrigin);
+
+    const allowlistResponse = handleAllowlistRoutes(req, url, db);
+    if (allowlistResponse) return addCorsAsync(allowlistResponse, requestOrigin);
 
     const sessionResponse = await handleSessionRoutes(req, url, db, processManager);
     if (sessionResponse) return addCorsAsync(sessionResponse, requestOrigin);
