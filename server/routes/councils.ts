@@ -345,12 +345,13 @@ function triggerReview(
     return { ok: true, reviewSessionIds };
 }
 
-function finishWithAggregatedSynthesis(db: Database, launchId: string): void {
-    const allSessions = listSessionsByCouncilLaunch(db, launchId);
+/**
+ * Collect the last assistant response from each source session, labelled by agent name.
+ * Prefers reviewer sessions over member sessions when both exist.
+ */
+function aggregateSessionResponses(db: Database, allSessions: ReturnType<typeof listSessionsByCouncilLaunch>): string[] {
     const reviewSessions = allSessions.filter((s) => s.councilRole === 'reviewer');
     const memberSessions = allSessions.filter((s) => s.councilRole === 'member');
-
-    // Prefer review content; fall back to member responses
     const sourceSessions = reviewSessions.length > 0 ? reviewSessions : memberSessions;
 
     const parts: string[] = [];
@@ -364,6 +365,12 @@ function finishWithAggregatedSynthesis(db: Database, launchId: string): void {
             parts.push(`### ${label}\n\n${lastMsg.content}`);
         }
     }
+    return parts;
+}
+
+function finishWithAggregatedSynthesis(db: Database, launchId: string): void {
+    const allSessions = listSessionsByCouncilLaunch(db, launchId);
+    const parts = aggregateSessionResponses(db, allSessions);
 
     const synthesis = parts.length > 0
         ? parts.join('\n\n---\n\n')
@@ -519,21 +526,7 @@ function handleAbort(db: Database, processManager: ProcessManager, launchId: str
     emitLog(db, launchId, 'info', `Stopped ${killed} running session(s)`);
 
     // Aggregate whatever responses exist (prefer reviews > member responses)
-    const reviewSessions = allSessions.filter((s) => s.councilRole === 'reviewer');
-    const memberSessions = allSessions.filter((s) => s.councilRole === 'member');
-    const sourceSessions = reviewSessions.length > 0 ? reviewSessions : memberSessions;
-
-    const parts: string[] = [];
-    for (const session of sourceSessions) {
-        const messages = getSessionMessages(db, session.id);
-        const assistantMsgs = messages.filter((m) => m.role === 'assistant');
-        const lastMsg = assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1] : null;
-        if (lastMsg?.content) {
-            const agent = getAgent(db, session.agentId ?? '');
-            const label = agent?.name ?? session.agentId?.slice(0, 8) ?? 'Agent';
-            parts.push(`### ${label}\n\n${lastMsg.content}`);
-        }
-    }
+    const parts = aggregateSessionResponses(db, allSessions);
 
     const synthesis = parts.length > 0
         ? `[Council ended manually]\n\n${parts.join('\n\n---\n\n')}`
