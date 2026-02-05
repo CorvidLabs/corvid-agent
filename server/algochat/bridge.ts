@@ -24,6 +24,7 @@ import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { saveAlgoChatMessage } from '../db/algochat-messages';
+import { isAllowed } from '../db/allowlist';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatBridge');
@@ -649,6 +650,12 @@ export class AlgoChatBridge {
                 log.info('Agent-to-agent message — handled by AgentMessenger', { senderAgentId });
                 return;
             }
+        }
+
+        // Allowlist filtering — if allowlist has entries, only listed addresses get through
+        if (!isAllowed(this.db, participant)) {
+            log.info('Participant not in allowlist, ignoring', { address: participant });
+            return;
         }
 
         // Emit feed event only for external (non-agent) messages
@@ -1331,6 +1338,7 @@ export class AlgoChatBridge {
         const newSenders = new Set<string>();
         for (const tx of (response as { transactions?: Array<{ sender: string; note?: string }> }).transactions ?? []) {
             if (tx.sender !== myAddr && tx.note && !knownParticipants.has(tx.sender)) {
+                if (!isAllowed(this.db, tx.sender)) continue;
                 newSenders.add(tx.sender);
             }
         }

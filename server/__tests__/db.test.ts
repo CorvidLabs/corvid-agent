@@ -24,6 +24,14 @@ import {
     listCouncilLaunches,
     updateCouncilLaunchStage,
 } from '../db/councils';
+import {
+    listAllowlist,
+    getAllowlistEntry,
+    addToAllowlist,
+    updateAllowlistEntry,
+    removeFromAllowlist,
+    isAllowed,
+} from '../db/allowlist';
 
 let db: Database;
 
@@ -401,5 +409,73 @@ describe('Council Launches', () => {
         expect(sessions).toHaveLength(2);
         expect(sessions.map(s => s.id)).toContain(s1.id);
         expect(sessions.map(s => s.id)).toContain(s2.id);
+    });
+});
+
+describe('Allowlist CRUD', () => {
+    const ADDR1 = 'A'.repeat(58).replace(/A/g, (_, i) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[i % 32]);
+    const ADDR2 = 'B'.repeat(58).replace(/B/g, (_, i) => 'ZABCDEFGHIJKLMNOPQRSTUVWXY234567'[i % 32]);
+
+    test('list returns empty initially', () => {
+        expect(listAllowlist(db)).toEqual([]);
+    });
+
+    test('add and get entry', () => {
+        const entry = addToAllowlist(db, ADDR1, 'Alice');
+        expect(entry.address).toBe(ADDR1);
+        expect(entry.label).toBe('Alice');
+        expect(entry.createdAt).toBeTruthy();
+
+        const fetched = getAllowlistEntry(db, ADDR1);
+        expect(fetched).not.toBeNull();
+        expect(fetched!.label).toBe('Alice');
+    });
+
+    test('add without label defaults to empty string', () => {
+        const entry = addToAllowlist(db, ADDR1);
+        expect(entry.label).toBe('');
+    });
+
+    test('add duplicate address updates label', () => {
+        addToAllowlist(db, ADDR1, 'Old');
+        const updated = addToAllowlist(db, ADDR1, 'New');
+        expect(updated.label).toBe('New');
+        expect(listAllowlist(db)).toHaveLength(1);
+    });
+
+    test('update entry label', () => {
+        addToAllowlist(db, ADDR1, 'Original');
+        const updated = updateAllowlistEntry(db, ADDR1, 'Updated');
+        expect(updated).not.toBeNull();
+        expect(updated!.label).toBe('Updated');
+    });
+
+    test('update non-existent entry returns null', () => {
+        expect(updateAllowlistEntry(db, ADDR1, 'label')).toBeNull();
+    });
+
+    test('remove entry', () => {
+        addToAllowlist(db, ADDR1);
+        expect(removeFromAllowlist(db, ADDR1)).toBe(true);
+        expect(getAllowlistEntry(db, ADDR1)).toBeNull();
+        expect(removeFromAllowlist(db, ADDR1)).toBe(false);
+    });
+
+    test('isAllowed returns true when allowlist is empty (open mode)', () => {
+        expect(isAllowed(db, ADDR1)).toBe(true);
+        expect(isAllowed(db, ADDR2)).toBe(true);
+    });
+
+    test('isAllowed returns true only for listed addresses when non-empty', () => {
+        addToAllowlist(db, ADDR1);
+        expect(isAllowed(db, ADDR1)).toBe(true);
+        expect(isAllowed(db, ADDR2)).toBe(false);
+    });
+
+    test('isAllowed returns true again after removing last entry', () => {
+        addToAllowlist(db, ADDR1);
+        expect(isAllowed(db, ADDR2)).toBe(false);
+        removeFromAllowlist(db, ADDR1);
+        expect(isAllowed(db, ADDR2)).toBe(true);
     });
 });
