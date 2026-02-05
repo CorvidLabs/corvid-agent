@@ -133,7 +133,7 @@ export class DockerExecutor {
                 cwd: this.getProjectRoot()
             });
 
-            const buildOutput = await new Response(buildResult.stdout).text();
+            await new Response(buildResult.stdout).text(); // drain stdout
             const buildError = await new Response(buildResult.stderr).text();
             const buildExitCode = await buildResult.exited;
 

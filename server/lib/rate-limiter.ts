@@ -49,6 +49,7 @@ export class RateLimiter {
     private operationCounts: Map<string, OperationCount> = new Map();
     private rateLimits: Map<string, RateLimitRule> = new Map();
     private activeSessions: Map<string, Set<string>> = new Map(); // agentId -> Set<sessionId>
+    private cleanupTimerHandle: ReturnType<typeof setInterval> | null = null;
 
     // Window size for operations per minute (in milliseconds)
     private readonly MINUTE_WINDOW = 60 * 1000;
@@ -517,9 +518,19 @@ export class RateLimiter {
      */
     private startCleanupTimer(): void {
         // Clean up every 5 minutes
-        setInterval(() => {
+        this.cleanupTimerHandle = setInterval(() => {
             this.cleanup();
         }, 5 * 60 * 1000);
+    }
+
+    /**
+     * Stop cleanup timer and release resources
+     */
+    destroy(): void {
+        if (this.cleanupTimerHandle) {
+            clearInterval(this.cleanupTimerHandle);
+            this.cleanupTimerHandle = null;
+        }
     }
 
     private cleanup(): void {

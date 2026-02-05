@@ -59,8 +59,8 @@ export class AlgoRetryService {
         this.db = db;
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.setupDatabase();
-        this.startRetryLoop();
         this.loadPendingTransactions();
+        this.startRetryLoop();
     }
 
     private setupDatabase(): void {

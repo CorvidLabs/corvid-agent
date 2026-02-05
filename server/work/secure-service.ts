@@ -1,12 +1,8 @@
-import { resolve, dirname } from 'node:path';
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTask, CreateWorkTaskInput } from '../../shared/types';
-import type { ClaudeStreamEvent } from '../process/types';
-import { extractContentText } from '../process/types';
 import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
-import { createSession } from '../db/sessions';
 import {
     createWorkTaskAtomic,
     getWorkTask,
@@ -14,7 +10,7 @@ import {
     listWorkTasks as dbListWorkTasks,
     cleanupStaleWorkTasks,
 } from '../db/work-tasks';
-import { DockerExecutor, type DockerExecutionResult } from './docker-executor';
+import { DockerExecutor } from './docker-executor';
 import { RateLimiter, type RateLimitStatus } from '../lib/rate-limiter';
 import { AlgoRetryService } from '../algochat/retry-service';
 import { createLogger } from '../lib/logger';
@@ -22,7 +18,6 @@ import { createLogger } from '../lib/logger';
 const log = createLogger('SecureWorkTaskService');
 
 const PR_URL_REGEX = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/;
-const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10);
 
 type CompletionCallback = (task: WorkTask) => void;
 
@@ -63,7 +58,6 @@ const DEFAULT_CONFIG: SecureWorkTaskConfig = {
  */
 export class SecureWorkTaskService {
     private db: Database;
-    private processManager: ProcessManager;
     private dockerExecutor: DockerExecutor;
     private rateLimiter: RateLimiter;
     private retryService: AlgoRetryService;
@@ -72,11 +66,10 @@ export class SecureWorkTaskService {
 
     constructor(
         db: Database,
-        processManager: ProcessManager,
+        _processManager: ProcessManager,
         config: Partial<SecureWorkTaskConfig> = {}
     ) {
         this.db = db;
-        this.processManager = processManager;
         this.config = { ...DEFAULT_CONFIG, ...config };
 
         // Initialize security services
@@ -312,9 +305,9 @@ export class SecureWorkTaskService {
      */
     private async executeLegacy(
         task: WorkTask,
-        branchName: string,
-        description: string,
-        project: any
+        _branchName: string,
+        _description: string,
+        _project: any
     ): Promise<WorkTask> {
         // This would implement the original worktree-based execution
         // Only used if Docker sandboxing is disabled
@@ -450,7 +443,6 @@ The sandbox environment will automatically terminate after the configured timeou
             },
             rateLimiting: {
                 enabled: this.config.enableRateLimiting,
-                ...this.config.enableRateLimiting ? this.rateLimiter.getRetryStats?.() || {} : {}
             },
             retryService: {
                 enabled: this.config.enableRetryLogic,

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { RateLimiter, type RateLimitStatus } from '../lib/rate-limiter';
+import { RateLimiter } from '../lib/rate-limiter';
 import { AlgoRetryService } from '../algochat/retry-service';
 import { DockerExecutor } from '../work/docker-executor';
 import { SecureMemoryManager } from '../lib/secure-memory';

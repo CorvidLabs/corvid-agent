@@ -247,7 +247,7 @@ export class SecureMemoryManager {
     /**
      * Simulate decryption (placeholder for actual implementation)
      */
-    private static simulateDecryption(encrypted: string, key: string): string {
+    private static simulateDecryption(encrypted: string, _key: string): string {
         // TODO: Replace with actual AES decryption
         // This is just a placeholder
         return encrypted.replace('encrypted_', '');
@@ -257,7 +257,7 @@ export class SecureMemoryManager {
 /**
  * Decorator for automatically zeroing function parameters
  */
-export function zeroOnReturn(target: any, propertyName: string, descriptor: PropertyDescriptor) {
+export function zeroOnReturn(_target: any, _propertyName: string, descriptor: PropertyDescriptor) {
     const method = descriptor.value;
 
     descriptor.value = function (...args: any[]) {
