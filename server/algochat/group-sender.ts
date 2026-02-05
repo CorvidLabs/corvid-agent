@@ -27,20 +27,23 @@ export interface GroupSendResult {
  * (up to 13 bytes for 2-digit indices) per chunk.
  */
 const GROUP_PREFIX_MAX_BYTES = 13; // e.g. "[GRP:99/99]"
-const MAX_PLAINTEXT_PER_CHUNK = PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE - GROUP_PREFIX_MAX_BYTES;
 
 /**
- * Split a message into chunks that each fit in one AlgoChat envelope.
+ * Split a message into chunks that each fit in one envelope.
  * Each chunk is prefixed with `[GRP:index/total]` so the receiver can reassemble.
  * If the message fits in a single chunk, no prefix is added.
+ *
+ * @param maxPayload — max plaintext bytes per envelope (defaults to AlgoChat standard).
  */
-function splitMessage(content: string): string[] {
+export function splitMessage(content: string, maxPayload?: number): string[] {
+    const singleMax = maxPayload ?? (PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE);
+    const multiMax = (maxPayload ?? (PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE)) - GROUP_PREFIX_MAX_BYTES;
+
     const encoder = new TextEncoder();
     const contentBytes = encoder.encode(content).byteLength;
 
     // Single chunk — no prefix needed
-    const singleChunkMax = PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE;
-    if (contentBytes <= singleChunkMax) {
+    if (contentBytes <= singleMax) {
         return [content];
     }
 
@@ -53,13 +56,13 @@ function splitMessage(content: string): string[] {
         let chunkBytes = encoder.encode(chunk).byteLength;
 
         // Binary search for the right cut point
-        if (chunkBytes > MAX_PLAINTEXT_PER_CHUNK) {
+        if (chunkBytes > multiMax) {
             let low = 0;
             let high = remaining.length;
             while (low < high) {
                 const mid = Math.floor((low + high + 1) / 2);
                 const candidateBytes = encoder.encode(remaining.slice(0, mid)).byteLength;
-                if (candidateBytes <= MAX_PLAINTEXT_PER_CHUNK) {
+                if (candidateBytes <= multiMax) {
                     low = mid;
                 } else {
                     high = mid - 1;

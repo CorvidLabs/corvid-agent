@@ -1075,6 +1075,49 @@ export class AlgoChatBridge {
         }
     }
 
+    /** Split content into byte-limited chunks for PSK sends, breaking at newlines when possible. */
+    private splitPskContent(content: string, maxBytes: number): string[] {
+        const encoder = new TextEncoder();
+        if (encoder.encode(content).byteLength <= maxBytes) {
+            return [content];
+        }
+
+        const chunks: string[] = [];
+        let remaining = content;
+
+        while (remaining.length > 0) {
+            if (encoder.encode(remaining).byteLength <= maxBytes) {
+                chunks.push(remaining);
+                break;
+            }
+
+            // Binary search for the max character count that fits in maxBytes
+            let low = 0;
+            let high = remaining.length;
+            while (low < high) {
+                const mid = Math.floor((low + high + 1) / 2);
+                if (encoder.encode(remaining.slice(0, mid)).byteLength <= maxBytes) {
+                    low = mid;
+                } else {
+                    high = mid - 1;
+                }
+            }
+
+            // Try to break at a newline within the last 20% for readability
+            let cut = low;
+            const searchStart = Math.floor(low * 0.8);
+            const lastNewline = remaining.lastIndexOf('\n', low);
+            if (lastNewline >= searchStart) {
+                cut = lastNewline + 1;
+            }
+
+            chunks.push(remaining.slice(0, cut));
+            remaining = remaining.slice(cut);
+        }
+
+        return chunks;
+    }
+
     private async sendResponse(participant: string, content: string): Promise<void> {
         // Check daily ALGO spending limit (estimate min fee of 1000 microAlgos per txn)
         try {
