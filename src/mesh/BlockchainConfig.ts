@@ -38,8 +38,8 @@ export interface BlockchainMeshConfig {
  * Default configuration for localnet blockchain messaging
  */
 export const DEFAULT_BLOCKCHAIN_MESH_CONFIG: BlockchainMeshConfig = {
-  preferBlockchain: true,
-  localnetOnly: true,
+  preferBlockchain: false,
+  localnetOnly: false,
 
   localnet: {
     algodHost: 'http://localhost',

@@ -636,9 +636,19 @@ export class MeshAgentMessenger extends AgentMessenger {
     }
 
     /**
-     * Get default project ID (inherited method access)
+     * Get default project ID from agent directory
      */
     private getDefaultProjectId(): string {
-        return this['getDefaultProjectId']();
+        // Access the parent class's db to query for a default project
+        const db = (this as any).db;
+        if (db) {
+            try {
+                const row = db.query('SELECT id FROM projects ORDER BY created_at DESC LIMIT 1').get() as any;
+                if (row) return row.id;
+            } catch {
+                // Fall through to default
+            }
+        }
+        return 'default';
     }
 }

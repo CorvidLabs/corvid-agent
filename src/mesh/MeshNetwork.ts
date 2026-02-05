@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
 import Redis from 'ioredis';
-import { AlgorandService } from '../algorand/AlgorandService';
+import { MeshMeshAlgorandService } from '../blockchain/MeshMeshAlgorandService';
 import { AgentInfo } from '../types/agent';
 import { Logger } from '../utils/Logger';
 
 export interface MeshNetworkConfig {
   nodeId: string;
   redis?: Redis;
-  algorand?: AlgorandService;
+  algorand?: MeshMeshAlgorandService;
   logger: Logger;
 }
 
@@ -25,7 +25,7 @@ export interface RoutingTable {
 export class MeshNetwork extends EventEmitter {
   private nodeId: string;
   private redis: Redis;
-  private algorand: AlgorandService | undefined;
+  private algorand: MeshAlgorandService | undefined;
   private logger: Logger;
 
   private localAgents = new Map<string, AgentInfo>();
@@ -153,11 +153,16 @@ export class MeshNetwork extends EventEmitter {
 
       for (const [agentId, data] of Object.entries(agentData)) {
         try {
-          const agentInfo: AgentInfo = JSON.parse(data);
+          const parsed = JSON.parse(data);
+          // Convert ISO string back to Date after JSON deserialization
+          const agentInfo: AgentInfo = {
+            ...parsed,
+            lastSeen: new Date(parsed.lastSeen)
+          };
 
           // Filter by capabilities if specified
           if (capabilities && capabilities.length > 0) {
-            const hasCapabilities = capabilities.some(cap =>
+            const hasCapabilities = capabilities.every(cap =>
               agentInfo.capabilities.includes(cap)
             );
             if (!hasCapabilities) continue;

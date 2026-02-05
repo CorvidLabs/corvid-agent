@@ -777,7 +777,7 @@ export class AlgoChatBridge {
 
             // Track completion milestone
             const totalElapsed = Date.now() - startedAt;
-            progressHistory.push({
+            trackProgress({
                 type: 'milestone',
                 action: 'response_completed',
                 timestamp: Date.now(),
@@ -816,7 +816,15 @@ export class AlgoChatBridge {
             timestamp: number;
             details?: string;
         }
+        const MAX_PROGRESS_HISTORY = 100;
         const progressHistory: ProgressAction[] = [];
+        const trackProgress = (action: ProgressAction) => {
+            trackProgress(action);
+            // Sliding window to prevent unbounded memory growth in long sessions
+            if (progressHistory.length > MAX_PROGRESS_HISTORY) {
+                progressHistory.splice(0, progressHistory.length - MAX_PROGRESS_HISTORY);
+            }
+        };
         let lastProgressUpdate = startedAt;
         let toolsUsed: Set<string> = new Set();
         let agentsQueried: Set<string> = new Set();
@@ -917,7 +925,7 @@ export class AlgoChatBridge {
             ackSent = true;
 
             // Track acknowledgment milestone
-            progressHistory.push({
+            trackProgress({
                 type: 'milestone',
                 action: 'request_acknowledged',
                 timestamp: Date.now(),
@@ -937,7 +945,7 @@ export class AlgoChatBridge {
 
                 // Track meaningful text for progress summaries
                 if (text.length > 50) { // Only track substantial text blocks
-                    progressHistory.push({
+                    trackProgress({
                         type: 'text_block',
                         action: 'reasoning',
                         timestamp: Date.now(),
@@ -965,7 +973,7 @@ export class AlgoChatBridge {
                 statusEmitted = true;
 
                 // Track processing milestone
-                progressHistory.push({
+                trackProgress({
                     type: 'milestone',
                     action: 'processing_started',
                     timestamp: Date.now(),
@@ -986,7 +994,7 @@ export class AlgoChatBridge {
                     this.emitEvent(participant, message, 'status');
 
                     // Track status action for progress summaries
-                    progressHistory.push({
+                    trackProgress({
                         type: 'milestone',
                         action: 'status_update',
                         timestamp: Date.now(),
@@ -1018,7 +1026,7 @@ export class AlgoChatBridge {
                     if (toolName) {
                         // Track tool usage for progress summaries
                         toolsUsed.add(toolName);
-                        progressHistory.push({
+                        trackProgress({
                             type: 'tool_use',
                             action: toolName,
                             timestamp: Date.now()
@@ -1030,7 +1038,7 @@ export class AlgoChatBridge {
                             const toolInput = (block as unknown as { input?: { to_agent?: string } }).input;
                             if (toolInput?.to_agent) {
                                 agentsQueried.add(toolInput.to_agent);
-                                progressHistory.push({
+                                trackProgress({
                                     type: 'agent_query',
                                     action: toolInput.to_agent,
                                     timestamp: Date.now()
@@ -1074,7 +1082,7 @@ export class AlgoChatBridge {
                 if (inTextBlock) flushTextBlock();
 
                 // Track turn completion milestone
-                progressHistory.push({
+                trackProgress({
                     type: 'milestone',
                     action: 'turn_completed',
                     timestamp: Date.now(),
@@ -1087,7 +1095,7 @@ export class AlgoChatBridge {
                     const synthesizingMsg = `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`;
 
                     // Track synthesis milestone
-                    progressHistory.push({
+                    trackProgress({
                         type: 'milestone',
                         action: 'synthesis_started',
                         timestamp: Date.now(),

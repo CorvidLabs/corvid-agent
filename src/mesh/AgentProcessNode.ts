@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { AgentMessenger } from '../algochat/AgentMessenger';
+import { AgentMessenger } from '../../server/algochat/agent-messenger';
 import { PeerChannel } from './PeerChannel';
 import { MeshNetwork } from './MeshNetwork';
 import { AgentInfo } from '../types/agent';

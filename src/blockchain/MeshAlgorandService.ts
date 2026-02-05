@@ -104,7 +104,7 @@ export class MeshAlgorandService {
       ];
 
       // Create account from private key (this would be the agent's wallet)
-      const account = algosdk.mnemonicToSecretKey(process.env.AGENT_MNEMONIC || '');
+      const account = this.getAgentAccount();
 
       // Create application call transaction
       const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
@@ -155,7 +155,7 @@ export class MeshAlgorandService {
         new TextEncoder().encode(JSON.stringify(updateData))
       ];
 
-      const account = algosdk.mnemonicToSecretKey(process.env.AGENT_MNEMONIC || '');
+      const account = this.getAgentAccount();
 
       const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
         from: account.addr,
@@ -270,7 +270,7 @@ export class MeshAlgorandService {
         new TextEncoder().encode(agentId)
       ];
 
-      const account = algosdk.mnemonicToSecretKey(process.env.AGENT_MNEMONIC || '');
+      const account = this.getAgentAccount();
 
       const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
         from: account.addr,
@@ -319,7 +319,7 @@ export class MeshAlgorandService {
         new TextEncoder().encode(JSON.stringify(topologyData))
       ];
 
-      const account = algosdk.mnemonicToSecretKey(process.env.AGENT_MNEMONIC || '');
+      const account = this.getAgentAccount();
 
       const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
         from: account.addr,
@@ -435,6 +435,21 @@ export class MeshAlgorandService {
     }
 
     throw new Error(`Transaction confirmation timeout: ${txId}`);
+  }
+
+  /**
+   * Get and validate the agent's Algorand account from the mnemonic environment variable.
+   * Throws a descriptive error if AGENT_MNEMONIC is missing or empty.
+   */
+  private getAgentAccount(): algosdk.Account {
+    const mnemonic = process.env.AGENT_MNEMONIC;
+    if (!mnemonic || mnemonic.trim().length === 0) {
+      throw new Error(
+        'AGENT_MNEMONIC environment variable is not set or is empty. ' +
+        'This is required for blockchain transactions.'
+      );
+    }
+    return algosdk.mnemonicToSecretKey(mnemonic);
   }
 
   /**

@@ -55,6 +55,9 @@ export class PeerChannel extends EventEmitter {
     lastRefill: Date.now()
   };
 
+  // Rate limiter interval handle
+  private rateLimiterInterval: NodeJS.Timeout | null = null;
+
   // Connection health
   private healthcheck = {
     lastPing: null as Date | null,
@@ -333,7 +336,7 @@ export class PeerChannel extends EventEmitter {
    * Set up rate limiter refill
    */
   private setupRateLimiter(): void {
-    setInterval(() => {
+    this.rateLimiterInterval = setInterval(() => {
       this.checkRateLimit(); // This will refill tokens
     }, 1000);
   }
@@ -390,6 +393,12 @@ export class PeerChannel extends EventEmitter {
     if (!this.isConnected) return;
 
     try {
+      // Clear rate limiter interval
+      if (this.rateLimiterInterval) {
+        clearInterval(this.rateLimiterInterval);
+        this.rateLimiterInterval = null;
+      }
+
       // Clear health check
       if (this.healthcheck.pingInterval) {
         clearInterval(this.healthcheck.pingInterval);

@@ -35,6 +35,11 @@ export type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => voi
 
 // After this many user messages in a single process lifetime, kill and restart
 // through the capped resume path to keep context size manageable.
+//
+// Rationale: Each "turn" (user message + assistant response + tool calls) grows
+// the in-context prompt significantly. Empirically, ~8 turns keeps most sessions
+// well under context-window limits while leaving headroom for tool outputs,
+// system messages, and safety buffers. Revisit if model context windows change.
 const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
 
 interface SessionMeta {
