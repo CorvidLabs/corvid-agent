@@ -769,6 +769,7 @@ export class AlgoChatBridge {
         let lastAssistantText = '';
         let lastTurnResponse = '';
         let sent = false;
+        const startedAt = Date.now();
 
         const sendOnce = () => {
             if (sent) return;
@@ -821,7 +822,6 @@ export class AlgoChatBridge {
         let agentsQueried: Set<string> = new Set();
         let progressTimer: ReturnType<typeof setInterval> | null = null;
         let ackDelayTimer: ReturnType<typeof setTimeout> | null = null;
-        const startedAt = Date.now();
 
         // How long to wait before sending the on-chain ack. If the response
         // arrives within this window we skip the ack entirely.
