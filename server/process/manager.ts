@@ -242,15 +242,17 @@ export class ProcessManager {
 
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
-        // Persist the new prompt so future resumes include it in history
-        if (prompt) {
-            addSessionMessage(this.db, session.id, 'user', prompt);
-        }
-
         // Start a fresh process — our session IDs are not Claude conversation IDs,
         // so --resume would fail. Build a prompt that includes conversation history
         // so the agent has context from prior exchanges.
         const resumePrompt = this.buildResumePrompt(session, prompt);
+
+        // Persist the new prompt after building the resume prompt to avoid
+        // duplication (buildResumePrompt fetches history from DB, then appends
+        // the new prompt separately)
+        if (prompt) {
+            addSessionMessage(this.db, session.id, 'user', prompt);
+        }
 
         const mcpServers = session.agentId
             ? (() => {
@@ -304,10 +306,9 @@ export class ProcessManager {
 
     private buildResumePrompt(session: Session, newPrompt?: string): string {
         const messages = getSessionMessages(this.db, session.id);
-        const currentPrompt = newPrompt ?? session.initialPrompt ?? '';
 
         // No history — just use the prompt as-is
-        if (messages.length === 0) return currentPrompt;
+        if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
 
         // Build a conversation history block (cap at last 20 messages to stay within limits)
         const recent = messages.slice(-20);
@@ -320,15 +321,23 @@ export class ProcessManager {
                 return `[${role}]: ${text}`;
             });
 
-        return [
+        const instruction = newPrompt
+            ? 'The following is the conversation history from this session. Use it for context when responding to the new message.'
+            : 'The following is the conversation history from this session. The session was interrupted — continue the conversation based on the history above.';
+
+        const parts = [
             '<conversation_history>',
-            'The following is the conversation history from this session. Use it for context when responding to the new message.',
+            instruction,
             '',
             ...historyLines,
             '</conversation_history>',
-            '',
-            currentPrompt,
-        ].join('\n');
+        ];
+
+        if (newPrompt) {
+            parts.push('', newPrompt);
+        }
+
+        return parts.join('\n');
     }
 
     stopProcess(sessionId: string): void {
