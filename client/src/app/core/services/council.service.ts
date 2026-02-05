@@ -73,6 +73,10 @@ export class CouncilService {
         return firstValueFrom(this.api.get<CouncilLaunch[]>('/council-launches'));
     }
 
+    async abortLaunch(launchId: string): Promise<{ ok: boolean }> {
+        return firstValueFrom(this.api.post<{ ok: boolean }>(`/council-launches/${launchId}/abort`));
+    }
+
     async triggerReview(launchId: string): Promise<{ launchId: string; reviewSessionIds: string[] }> {
         return firstValueFrom(
             this.api.post<{ launchId: string; reviewSessionIds: string[] }>(
