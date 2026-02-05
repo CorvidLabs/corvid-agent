@@ -13,7 +13,11 @@ function json(data: unknown, status: number = 200): Response {
     });
 }
 
-const ALGORAND_ADDRESS_RE = /^[A-Z2-7]{58}$/;
+let _algosdk: typeof import('algosdk').default | null = null;
+async function getAlgosdk() {
+    if (!_algosdk) _algosdk = (await import('algosdk')).default;
+    return _algosdk;
+}
 
 export function handleAllowlistRoutes(
     req: Request,
@@ -34,7 +38,7 @@ export function handleAllowlistRoutes(
     const match = path.match(/^\/api\/allowlist\/([^/]+)$/);
     if (!match) return null;
 
-    const address = decodeURIComponent(match[1]);
+    const address = decodeURIComponent(match[1]).toUpperCase();
 
     if (method === 'PUT') {
         return handleUpdate(req, db, address);
@@ -59,8 +63,9 @@ async function handleAdd(req: Request, db: Database): Promise<Response> {
         return json({ error: 'address is required' }, 400);
     }
     const address = body.address.trim().toUpperCase();
-    if (!ALGORAND_ADDRESS_RE.test(address)) {
-        return json({ error: 'Invalid Algorand address (expected 58-character base32 string)' }, 400);
+    const algosdk = await getAlgosdk();
+    if (!algosdk.isValidAddress(address)) {
+        return json({ error: 'Invalid Algorand address' }, 400);
     }
     const entry = addToAllowlist(db, address, typeof body.label === 'string' ? body.label : undefined);
     return json(entry, 201);
