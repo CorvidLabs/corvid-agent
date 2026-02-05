@@ -73,6 +73,11 @@ export const routes: Routes = [
             import('./features/councils/council-launch-view.component').then((m) => m.CouncilLaunchViewComponent),
     },
     {
+        path: 'allowlist',
+        loadComponent: () =>
+            import('./features/allowlist/allowlist.component').then((m) => m.AllowlistComponent),
+    },
+    {
         path: 'feed',
         loadComponent: () =>
             import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),

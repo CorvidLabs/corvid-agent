@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -244,6 +244,13 @@ const MIGRATIONS: Record<number, string[]> = {
     18: [
         `ALTER TABLE work_tasks ADD COLUMN worktree_dir TEXT DEFAULT NULL`,
         `ALTER TABLE sessions ADD COLUMN work_dir TEXT DEFAULT NULL`,
+    ],
+    19: [
+        `CREATE TABLE IF NOT EXISTS algochat_allowlist (
+            address    TEXT PRIMARY KEY,
+            label      TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
     ],
 };
 
