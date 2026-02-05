@@ -114,14 +114,19 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                         <div class="feed-entry"
                              [class.feed-entry--expanded]="expandedSessions().has(session.id)"
                              [style.border-left-color]="agentColor(session.agentId)"
-                             (click)="toggleSession(session.id)">
+                             tabindex="0"
+                             role="button"
+                             [attr.aria-expanded]="expandedSessions().has(session.id)"
+                             (click)="toggleSession(session.id)"
+                             (keydown.enter)="toggleSession(session.id)"
+                             (keydown.space)="$event.preventDefault(); toggleSession(session.id)">
                             <div class="feed-meta">
                                 @if (session.status === 'running') {
                                     <span class="processing-dot"></span>
                                 }
                                 <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                 <app-status-badge [status]="session.status" />
-                                                                @if (!expandedSessions().has(session.id)) {
+                                @if (!expandedSessions().has(session.id)) {
                                     <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
                                 }
                                 <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
@@ -152,7 +157,12 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             <div class="feed-entry"
                                  [class.feed-entry--expanded]="expandedDiscussion().has(msg.id)"
                                  [style.border-left-color]="agentColor(msg.agentName)"
-                                 (click)="toggleDiscussion(msg.id)">
+                                 tabindex="0"
+                                 role="button"
+                                 [attr.aria-expanded]="expandedDiscussion().has(msg.id)"
+                                 (click)="toggleDiscussion(msg.id)"
+                                 (keydown.enter)="toggleDiscussion(msg.id)"
+                                 (keydown.space)="$event.preventDefault(); toggleDiscussion(msg.id)">
                                 <div class="feed-meta">
                                     <span class="feed-name" [style.color]="agentColor(msg.agentName)">{{ msg.agentName }}</span>
                                     <span class="feed-badge">R{{ msg.round }}</span>
@@ -190,7 +200,12 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             <div class="feed-entry"
                                  [class.feed-entry--expanded]="expandedSessions().has(session.id)"
                                  [style.border-left-color]="agentColor(session.agentId)"
-                                 (click)="toggleSession(session.id)">
+                                 tabindex="0"
+                                 role="button"
+                                 [attr.aria-expanded]="expandedSessions().has(session.id)"
+                                 (click)="toggleSession(session.id)"
+                                 (keydown.enter)="toggleSession(session.id)"
+                                 (keydown.space)="$event.preventDefault(); toggleSession(session.id)">
                                 <div class="feed-meta">
                                     @if (session.status === 'running') {
                                         <span class="processing-dot"></span>
