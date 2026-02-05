@@ -7,7 +7,7 @@ import { ApprovalManager } from './approval-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
 import { getAgent } from '../db/agents';
-import { getSession, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
+import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
@@ -243,8 +243,9 @@ export class ProcessManager {
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
         // Start a fresh process — our session IDs are not Claude conversation IDs,
-        // so --resume would fail. Instead, re-send the prompt (or initial prompt).
-        const resumePrompt = prompt ?? session.initialPrompt ?? undefined;
+        // so --resume would fail. Build a prompt that includes conversation history
+        // so the agent has context from prior exchanges.
+        const resumePrompt = this.buildResumePrompt(session, prompt);
 
         const mcpServers = session.agentId
             ? (() => {
@@ -294,6 +295,33 @@ export class ProcessManager {
 
         // Start stable period timer — resets restart counter after sustained uptime
         this.startStableTimer(session.id);
+    }
+
+    private buildResumePrompt(session: Session, newPrompt?: string): string {
+        const messages = getSessionMessages(this.db, session.id);
+        const currentPrompt = newPrompt ?? session.initialPrompt ?? '';
+
+        // No history — just use the prompt as-is
+        if (messages.length === 0) return currentPrompt;
+
+        // Build a conversation history block (cap at last 20 messages to stay within limits)
+        const recent = messages.slice(-20);
+        const historyLines = recent.map((m) => {
+            const role = m.role === 'user' ? 'User' : 'Assistant';
+            // Truncate very long messages to keep the prompt reasonable
+            const text = m.content.length > 2000 ? m.content.slice(0, 2000) + '...' : m.content;
+            return `[${role}]: ${text}`;
+        });
+
+        return [
+            '<conversation_history>',
+            'The following is the conversation history from this session. Use it for context when responding to the new message.',
+            '',
+            ...historyLines,
+            '</conversation_history>',
+            '',
+            currentPrompt,
+        ].join('\n');
     }
 
     stopProcess(sessionId: string): void {
