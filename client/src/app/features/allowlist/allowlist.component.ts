@@ -36,6 +36,10 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
                     (click)="add()">Add</button>
             </div>
 
+            @if (error()) {
+                <p class="error">{{ error() }}</p>
+            }
+
             @if (allowlistService.loading()) {
                 <p>Loading...</p>
             } @else if (allowlistService.entries().length === 0) {
@@ -100,6 +104,7 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
         .btn--danger:hover { background: rgba(255, 68, 68, 0.1); }
         .btn--small { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
         .btn--ghost { border-color: var(--border); color: var(--text-secondary); }
+        .error { color: var(--accent-red, #f44); font-size: 0.85rem; margin-bottom: 1rem; }
         .empty { color: var(--text-tertiary); }
         .list { display: flex; flex-direction: column; gap: 0.5rem; }
         .list__item {
@@ -123,6 +128,7 @@ export class AllowlistComponent implements OnInit {
     readonly newLabel = signal('');
     readonly editingAddress = signal<string | null>(null);
     readonly editLabel = signal('');
+    readonly error = signal<string | null>(null);
 
     ngOnInit(): void {
         this.allowlistService.loadEntries();
@@ -135,9 +141,15 @@ export class AllowlistComponent implements OnInit {
     async add(): Promise<void> {
         const address = this.newAddress().trim();
         if (!address) return;
-        await this.allowlistService.addEntry(address, this.newLabel().trim() || undefined);
-        this.newAddress.set('');
-        this.newLabel.set('');
+        this.error.set(null);
+        try {
+            await this.allowlistService.addEntry(address, this.newLabel().trim() || undefined);
+            this.newAddress.set('');
+            this.newLabel.set('');
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to add address';
+            this.error.set(msg);
+        }
     }
 
     startEdit(entry: { address: string; label: string }): void {
@@ -146,12 +158,24 @@ export class AllowlistComponent implements OnInit {
     }
 
     async saveLabel(address: string): Promise<void> {
-        await this.allowlistService.updateEntry(address, this.editLabel());
-        this.editingAddress.set(null);
+        this.error.set(null);
+        try {
+            await this.allowlistService.updateEntry(address, this.editLabel());
+            this.editingAddress.set(null);
+        } catch {
+            this.error.set('Failed to update label');
+            await this.allowlistService.loadEntries();
+        }
     }
 
     async remove(address: string): Promise<void> {
         if (!confirm(`Remove ${address} from the allowlist?`)) return;
-        await this.allowlistService.removeEntry(address);
+        this.error.set(null);
+        try {
+            await this.allowlistService.removeEntry(address);
+        } catch {
+            this.error.set('Failed to remove address');
+            await this.allowlistService.loadEntries();
+        }
     }
 }

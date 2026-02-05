@@ -1090,8 +1090,22 @@ export class AlgoChatBridge {
         try {
             // Route PSK contacts through the PSK manager
             if (this.pskManager && participant === this.pskManager.contactAddress) {
-                await this.pskManager.sendMessage(content);
-                log.info(`Sent PSK response to ${participant}`, { content: content.slice(0, 100) });
+                // PSK has an 878-byte payload limit per transaction.
+                // Split oversized messages into sequential sends with a delay
+                // between each so they land in different blocks (preserving order).
+                const PSK_MAX_BYTES = 800;
+                const PSK_INTER_CHUNK_DELAY_MS = 4500;
+                const chunks = this.splitPskContent(content, PSK_MAX_BYTES);
+                for (let i = 0; i < chunks.length; i++) {
+                    if (i > 0) {
+                        await new Promise((r) => setTimeout(r, PSK_INTER_CHUNK_DELAY_MS));
+                    }
+                    await this.pskManager.sendMessage(chunks[i]);
+                }
+                log.info(`Sent PSK response to ${participant}`, {
+                    content: content.slice(0, 100),
+                    chunks: chunks.length,
+                });
                 this.emitEvent(participant, content, 'outbound');
                 return;
             }
