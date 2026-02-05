@@ -122,12 +122,11 @@ export async function sendGroupMessage(
     const algosdk = (await import('algosdk')).default;
     const params = await service.algodClient.getTransactionParams().do();
 
-    // Send chunks in reverse order so external clients that display
-    // transactions newest-first (reverse chronological) show the chunks
-    // in the correct reading order (1/3, 2/3, 3/3 top-to-bottom).
-    // The bridge reassembles by sorting on the [GRP:N/M] index, so
-    // transmission order doesn't matter for agent-to-agent.
-    const orderedChunks = [...chunks].reverse();
+    // Send chunks in natural order (1/N, 2/N, ..., N/N).
+    // The bridge reassembles by sorting on the [GRP:N/M] index regardless
+    // of transmission order, and external clients vary in display order,
+    // so natural order is the safest default.
+    const orderedChunks = chunks;
 
     // Build one payment transaction per chunk
     const transactions: InstanceType<typeof algosdk.Transaction>[] = [];
