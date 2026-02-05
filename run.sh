@@ -6,8 +6,8 @@ RESTART_CODE=42
 
 while true; do
     echo "[run.sh] Starting server..."
+    EXIT_CODE=0
     bun run server/index.ts || EXIT_CODE=$?
-    EXIT_CODE=${EXIT_CODE:-0}
 
     if [ "$EXIT_CODE" -eq "$RESTART_CODE" ]; then
         echo "[run.sh] Restart requested (exit $RESTART_CODE). Restarting..."

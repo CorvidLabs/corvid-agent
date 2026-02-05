@@ -4,6 +4,7 @@ import { RateLimiter } from '../lib/rate-limiter';
 import { AlgoRetryService } from '../algochat/retry-service';
 import { DockerExecutor } from '../work/docker-executor';
 import { SecureMemoryManager } from '../lib/secure-memory';
+import { SecureWorkTaskService } from '../work/secure-service';
 
 // Test database setup
 let testDb: Database;
@@ -242,6 +243,129 @@ describe('Secure Memory Management', () => {
         buffer2.zero();
 
         expect(true).toBe(true);
+    });
+});
+
+describe('SecureWorkTaskService', () => {
+    let serviceDb: Database;
+    let secureService: SecureWorkTaskService;
+
+    beforeAll(() => {
+        // Create a separate in-memory DB with full schema for SecureWorkTaskService
+        serviceDb = new Database(':memory:');
+
+        // Create the minimal schema needed for SecureWorkTaskService
+        serviceDb.exec(`
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                working_dir TEXT NOT NULL,
+                claude_md TEXT DEFAULT '',
+                env_vars TEXT DEFAULT '{}',
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS agents (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                system_prompt TEXT DEFAULT '',
+                append_prompt TEXT DEFAULT '',
+                model TEXT DEFAULT '',
+                allowed_tools TEXT DEFAULT '',
+                disallowed_tools TEXT DEFAULT '',
+                permission_mode TEXT DEFAULT 'default',
+                max_budget_usd REAL DEFAULT NULL,
+                algochat_enabled INTEGER DEFAULT 0,
+                algochat_auto INTEGER DEFAULT 0,
+                custom_flags TEXT DEFAULT '{}',
+                default_project_id TEXT DEFAULT NULL,
+                wallet_address TEXT DEFAULT NULL,
+                wallet_mnemonic_encrypted TEXT DEFAULT NULL,
+                wallet_funded_algo REAL DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS work_tasks (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                session_id TEXT DEFAULT NULL,
+                source TEXT DEFAULT 'web',
+                source_id TEXT DEFAULT NULL,
+                requester_info TEXT DEFAULT '{}',
+                description TEXT NOT NULL,
+                branch_name TEXT DEFAULT NULL,
+                status TEXT DEFAULT 'pending',
+                pr_url TEXT DEFAULT NULL,
+                summary TEXT DEFAULT NULL,
+                error TEXT DEFAULT NULL,
+                original_branch TEXT DEFAULT NULL,
+                worktree_dir TEXT DEFAULT NULL,
+                iteration_count INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                completed_at TEXT DEFAULT NULL
+            );
+        `);
+
+        // Insert test fixtures
+        serviceDb.exec(`
+            INSERT INTO projects (id, name, working_dir) VALUES ('proj-1', 'Test Project', '/tmp/test-project');
+            INSERT INTO agents (id, name, default_project_id) VALUES ('agent-1', 'TestAgent', 'proj-1');
+        `);
+
+        // Instantiate with sandboxing disabled (Docker not available in CI)
+        const mockProcessManager = {} as any; // ProcessManager is not used after constructor fix
+        secureService = new SecureWorkTaskService(serviceDb, mockProcessManager, {
+            enableSandboxing: false,
+            enableRateLimiting: true,
+            enableRetryLogic: true,
+        });
+    });
+
+    afterAll(() => {
+        serviceDb.close();
+    });
+
+    it('should instantiate without throwing', () => {
+        expect(secureService).toBeDefined();
+    });
+
+    it('should list tasks (empty initially)', () => {
+        const tasks = secureService.listTasks();
+        expect(Array.isArray(tasks)).toBe(true);
+        expect(tasks.length).toBe(0);
+    });
+
+    it('should return null for non-existent task', () => {
+        const task = secureService.getTask('nonexistent');
+        expect(task).toBeNull();
+    });
+
+    it('should return rate limit status for an agent', () => {
+        const status = secureService.getAgentRateLimitStatus('agent-1');
+        expect(status).toHaveProperty('rateLimitingEnabled', true);
+        expect(status).toHaveProperty('usage');
+    });
+
+    it('should return security stats', () => {
+        const stats = secureService.getSecurityStats();
+        expect(stats).toHaveProperty('sandboxing');
+        expect(stats).toHaveProperty('rateLimiting');
+        expect(stats).toHaveProperty('retryService');
+        expect(stats.sandboxing.enabled).toBe(false);
+        expect(stats.rateLimiting.enabled).toBe(true);
+    });
+
+    it('should cancel a non-existent task gracefully', async () => {
+        const result = await secureService.cancelTask('nonexistent');
+        expect(result).toBeNull();
+    });
+
+    it('should register completion callbacks without throwing', () => {
+        const callback = () => {};
+        expect(() => secureService.onComplete('any-task', callback)).not.toThrow();
     });
 });
 

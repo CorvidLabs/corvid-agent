@@ -85,7 +85,7 @@ export class SecureMemoryManager {
         const buffer = this.createSecureBuffer(hex.length / 2);
 
         for (let i = 0; i < hex.length; i += 2) {
-            buffer.data[i / 2] = parseInt(hex.substr(i, 2), 16);
+            buffer.data[i / 2] = parseInt(hex.substring(i, i + 2), 16);
         }
 
         return buffer;
@@ -157,12 +157,14 @@ export class SecureMemoryManager {
     }
 
     /**
-     * Utility for wallet operations with automatic key cleanup
+     * Utility for wallet operations with automatic key cleanup.
+     * Note: The callback receives a SecureBuffer rather than a plain string
+     * to avoid leaving sensitive data in V8's string pool.
      */
     static async withPrivateKey<T>(
         encryptedMnemonic: string,
         decryptionKey: string,
-        fn: (mnemonic: string) => Promise<T> | T
+        fn: (mnemonic: SecureBuffer) => Promise<T> | T
     ): Promise<T> {
         const decryptionBuffer = this.fromString(decryptionKey);
         let mnemonicBuffer: SecureBuffer | null = null;
@@ -173,9 +175,8 @@ export class SecureMemoryManager {
             const decryptedMnemonic = this.simulateDecryption(encryptedMnemonic, decryptionKey);
             mnemonicBuffer = this.fromString(decryptedMnemonic);
 
-            // Execute the function with the decrypted mnemonic
-            const mnemonic = this.toString(mnemonicBuffer);
-            const result = await fn(mnemonic);
+            // Execute the function with the secure buffer (not a plain string)
+            const result = await fn(mnemonicBuffer);
 
             return result;
         } finally {
@@ -255,22 +256,41 @@ export class SecureMemoryManager {
 }
 
 /**
- * Decorator for automatically zeroing function parameters
+ * Decorator for automatically zeroing function parameters.
+ * Handles both sync and async methods correctly — for async methods,
+ * buffers are zeroed after the promise resolves or rejects.
  */
 export function zeroOnReturn(_target: any, _propertyName: string, descriptor: PropertyDescriptor) {
     const method = descriptor.value;
 
     descriptor.value = function (...args: any[]) {
-        try {
-            return method.apply(this, args);
-        } finally {
-            // Zero any SecureBuffer arguments
+        const zeroArgs = () => {
             for (const arg of args) {
                 if (arg && typeof arg.zero === 'function') {
                     arg.zero();
                 }
             }
+        };
+
+        let result: any;
+        try {
+            result = method.apply(this, args);
+        } catch (err) {
+            zeroArgs();
+            throw err;
         }
+
+        // If the result is a promise (async method), defer zeroing until settled
+        if (result && typeof result.then === 'function') {
+            return result.then(
+                (val: any) => { zeroArgs(); return val; },
+                (err: any) => { zeroArgs(); throw err; }
+            );
+        }
+
+        // Synchronous method — zero immediately
+        zeroArgs();
+        return result;
     };
 
     return descriptor;

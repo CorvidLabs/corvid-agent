@@ -59,6 +59,8 @@ export class AlgoRetryService {
         this.db = db;
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.setupDatabase();
+        // Load pending transactions BEFORE starting the retry loop to avoid
+        // a race where the loop processes an empty map on first tick.
         this.loadPendingTransactions();
         this.startRetryLoop();
     }
@@ -173,26 +175,21 @@ export class AlgoRetryService {
     }
 
     /**
-     * Check if a transaction has been confirmed
+     * Check if a transaction has been confirmed on the Algorand blockchain.
+     *
+     * TODO: Integrate with actual algod client. The implementation should:
+     *   const txInfo = await this.algodClient.pendingTransactionInformation(txid).do();
+     *   if (txInfo['confirmed-round'] > 0) return 'confirmed';
+     *   if (txInfo['pool-error']) return 'failed';
+     *   return 'pending';
+     *
+     * For now, this is a stub that always returns 'pending' so the retry
+     * loop will attempt resubmission up to maxRetries. This is safer than
+     * the previous random simulation which could falsely mark txns as confirmed.
      */
     async checkTransactionStatus(txid: string): Promise<TransactionStatus> {
-        // This would integrate with the actual Algorand client
-        // For now, simulate confirmation check
         try {
-            // TODO: Replace with actual algod.pendingTransactionInformation(txid)
-            // const txInfo = await this.algodClient.pendingTransactionInformation(txid);
-            // if (txInfo['confirmed-round'] > 0) {
-            //     return 'confirmed';
-            // }
-            // if (txInfo['pool-error']) {
-            //     return 'failed';
-            // }
-
-            // Simulate 80% success rate for demo
-            if (Math.random() < 0.8) {
-                return 'confirmed';
-            }
-
+            log.debug('Transaction status check (stub — always pending until algod integrated)', { txid });
             return 'pending';
         } catch (error) {
             log.warn('Failed to check transaction status', {
@@ -344,28 +341,23 @@ export class AlgoRetryService {
     }
 
     private async resubmitMessageTransaction(tx: PendingTransaction): Promise<string | null> {
-        // TODO: Integrate with actual AlgoChat message sending
-        // This would call back into the AlgoChat bridge to resend the message
-        log.debug('Resubmitting message transaction', { id: tx.id });
-
-        // Simulate transaction submission
-        return 'retry_' + crypto.randomUUID().slice(0, 8);
+        // TODO: Integrate with actual AlgoChat message sending.
+        // This should call back into the AlgoChat bridge to resend the message
+        // using tx.payload as the message content.
+        log.warn('resubmitMessageTransaction stub — not yet integrated with AlgoChat bridge', { id: tx.id });
+        return null; // Return null to indicate resubmission not available yet
     }
 
     private async resubmitKeyPublication(tx: PendingTransaction): Promise<string | null> {
         // TODO: Integrate with key publication service
-        log.debug('Resubmitting key publication', { id: tx.id });
-
-        // Simulate transaction submission
-        return 'retry_key_' + crypto.randomUUID().slice(0, 8);
+        log.warn('resubmitKeyPublication stub — not yet integrated', { id: tx.id });
+        return null;
     }
 
     private async resubmitWalletFunding(tx: PendingTransaction): Promise<string | null> {
         // TODO: Integrate with wallet funding service
-        log.debug('Resubmitting wallet funding', { id: tx.id });
-
-        // Simulate transaction submission
-        return 'retry_fund_' + crypto.randomUUID().slice(0, 8);
+        log.warn('resubmitWalletFunding stub — not yet integrated', { id: tx.id });
+        return null;
     }
 
     /**

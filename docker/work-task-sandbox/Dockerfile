@@ -22,22 +22,19 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | g
 # Create work directory
 WORKDIR /workspace
 
-# Copy package files first for better layer caching
-COPY package*.json bun.lockb* ./
-COPY client/package*.json ./client/
+# Only copy package files needed for dependency installation.
+# The actual project source is bind-mounted at runtime as read-only,
+# so we do NOT copy the full source tree into the image.
+COPY package.json bun.lockb ./
 
-# Install dependencies as root, then change ownership
-RUN bun install --frozen-lockfile
-RUN cd client && bun install --frozen-lockfile
-
-# Copy source code
-COPY . .
+# Install dependencies as root
+RUN bun install --frozen-lockfile || bun install
 
 # Set proper ownership for the workspace
 RUN chown -R corvidworker:corvidworker /workspace
 
-# Remove sensitive files that should never be accessible in sandbox
-RUN rm -f .env* server/db/*.db* wallet-keystore.json
+# Remove any sensitive files that might have been pulled in by dependencies
+RUN rm -f .env* *.db* wallet-keystore.json
 
 # Switch to non-root user
 USER corvidworker

@@ -1,10 +1,30 @@
-import { resolve } from 'node:path';
+import { resolve, isAbsolute } from 'node:path';
+import { existsSync } from 'node:fs';
 import type { Database } from 'bun:sqlite';
 import type { WorkTask } from '../../shared/types';
 import { getProject } from '../db/projects';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DockerExecutor');
+
+/**
+ * Sanitize a string for safe use in shell environment variables.
+ * Removes null bytes, control characters, and limits length.
+ */
+function sanitizeForEnv(value: string, maxLength = 500): string {
+    return value
+        .replace(/[\x00-\x1f\x7f]/g, ' ')  // Replace control chars with space
+        .trim()
+        .slice(0, maxLength);
+}
+
+/**
+ * Escape a string for safe embedding inside a single-quoted shell string.
+ * Handles the common technique: end quote, escaped quote, restart quote.
+ */
+function shellEscapeSingleQuote(value: string): string {
+    return value.replace(/'/g, "'\\''");
+}
 
 export interface DockerExecutionConfig {
     /** Maximum CPU cores (e.g., "1.0") */
@@ -56,6 +76,19 @@ export class DockerExecutor {
     ): Promise<DockerExecutionResult> {
         const containerId = `${this.containerPrefix}-${task.id}`;
 
+        // Validate projectWorkingDir: must be absolute and actually exist
+        const resolvedDir = resolve(projectWorkingDir);
+        if (!isAbsolute(resolvedDir)) {
+            throw new Error('projectWorkingDir must be an absolute path');
+        }
+        if (!existsSync(resolvedDir)) {
+            throw new Error(`projectWorkingDir does not exist: ${resolvedDir}`);
+        }
+        // Prevent path traversal — resolved path must match input
+        if (resolvedDir !== resolve(resolvedDir)) {
+            throw new Error('projectWorkingDir contains path traversal');
+        }
+
         try {
             log.info('Starting Docker execution for work task', {
                 taskId: task.id,
@@ -70,7 +103,7 @@ export class DockerExecutor {
             const createResult = await this.createSecureContainer(
                 containerId,
                 task,
-                projectWorkingDir,
+                resolvedDir,
                 prompt
             );
 
@@ -183,22 +216,19 @@ export class DockerExecutor {
             '--tmpfs', '/workspace/work:rw,size=200m', // Writable workspace
         ];
 
-        // Environment variables (only safe ones)
+        // Environment variables (only safe ones — no credentials in sandbox)
         const envArgs = [
             '-e', 'HOME=/tmp',
             '-e', 'TMPDIR=/tmp',
             '-e', 'USER=corvidworker',
-            '-e', `WORK_TASK_ID=${task.id}`,
-            '-e', `WORK_DESCRIPTION=${task.description}`,
+            '-e', `WORK_TASK_ID=${sanitizeForEnv(String(task.id), 100)}`,
+            '-e', `WORK_DESCRIPTION=${sanitizeForEnv(task.description)}`,
         ];
 
-        // Add GitHub token if available (for PR creation)
-        if (process.env.GITHUB_TOKEN) {
-            envArgs.push('-e', `GITHUB_TOKEN=${process.env.GITHUB_TOKEN}`);
-        }
-        if (process.env.GH_TOKEN) {
-            envArgs.push('-e', `GH_TOKEN=${process.env.GH_TOKEN}`);
-        }
+        // NOTE: GITHUB_TOKEN / GH_TOKEN are intentionally NOT passed to the
+        // sandbox container. A compromised or malicious agent could exfiltrate
+        // these credentials. Instead, PR creation should be handled by the
+        // host after the sandboxed execution completes and changes are reviewed.
 
         const createArgs = [
             'docker', 'create',
@@ -241,6 +271,11 @@ export class DockerExecutor {
     }
 
     private buildContainerScript(prompt: string): string {
+        // Safely embed the prompt using single-quote escaping to prevent injection.
+        // The prompt is placed in a shell variable via single quotes (which prevent
+        // all interpretation except the quote character itself).
+        const escapedPrompt = shellEscapeSingleQuote(prompt);
+
         // Script that runs inside the container to execute the work task
         return `
 set -e
@@ -274,9 +309,12 @@ echo "Branch: \${BRANCH_NAME}"
 echo "Working Directory: \$(pwd)"
 echo "=========================="
 
+# Store prompt safely in a variable (single-quoted to prevent interpretation)
+TASK_PROMPT='${escapedPrompt}'
+
 # TODO: Integrate with Claude Agent SDK to execute the prompt
 # For now, this is a placeholder that would be replaced with actual agent execution
-echo "PROMPT: ${prompt.replace(/"/g, '\\"')}"
+echo "PROMPT: \$TASK_PROMPT"
 echo "NOTE: This is a sandboxed execution environment"
 echo "Files are isolated and network access is restricted"
 

@@ -77,8 +77,14 @@ export class SecureWorkTaskService {
         this.rateLimiter = new RateLimiter(db);
         this.retryService = new AlgoRetryService(db);
 
-        // Perform security health checks
-        this.performSecurityHealthCheck();
+        // Perform security health checks asynchronously.
+        // We intentionally fire-and-forget here since the constructor cannot
+        // be async, but we catch and log any errors to avoid unhandled rejections.
+        this.performSecurityHealthCheck().catch(err => {
+            log.error('Security health check failed during startup', {
+                error: err instanceof Error ? err.message : String(err)
+            });
+        });
     }
 
     private async performSecurityHealthCheck(): Promise<void> {
@@ -301,7 +307,12 @@ export class SecureWorkTaskService {
     }
 
     /**
-     * Legacy execution method (less secure, for fallback only)
+     * Legacy execution method (less secure, for fallback only).
+     *
+     * TODO: Integrate with the original WorkTaskService execution path
+     * so that disabling sandboxing still allows task execution (with
+     * appropriate security warnings). For now, we fail gracefully with
+     * a clear message rather than silently failing.
      */
     private async executeLegacy(
         task: WorkTask,
@@ -309,12 +320,13 @@ export class SecureWorkTaskService {
         _description: string,
         _project: any
     ): Promise<WorkTask> {
-        // This would implement the original worktree-based execution
-        // Only used if Docker sandboxing is disabled
-        log.warn('Using legacy execution - security risk', { taskId: task.id });
+        log.error('Legacy execution attempted but not yet integrated', {
+            taskId: task.id,
+            hint: 'Enable Docker sandboxing or integrate with WorkTaskService for legacy path'
+        });
 
         updateWorkTaskStatus(this.db, task.id, 'failed', {
-            error: 'Legacy execution not implemented in secure service - use sandboxing'
+            error: 'Legacy execution not yet integrated in secure service. Enable Docker sandboxing (enableSandboxing: true) or use the standard WorkTaskService.'
         });
 
         return getWorkTask(this.db, task.id) ?? task;

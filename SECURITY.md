@@ -1,6 +1,8 @@
 # CorvidAgent Security Architecture
 
-This document describes the comprehensive security hardening implemented in CorvidAgent Phase 0, addressing critical vulnerabilities and implementing defense-in-depth security measures.
+This document describes the security hardening implemented in CorvidAgent Phase 0, addressing critical vulnerabilities and implementing defense-in-depth security measures.
+
+> **Integration Status (Phase 0):** The security components below are implemented as standalone modules with well-defined interfaces. They are **not yet integrated** into the main application's `WorkTaskService`. The existing code in `server/index.ts` still uses the original `WorkTaskService`. Integration into the main application flow is planned for Phase 1. The `SecureWorkTaskService` demonstrates how the components compose together but is not yet wired into the application.
 
 ## Security Threat Model
 
@@ -160,9 +162,11 @@ interface RetryConfig {
 
 #### Retry Flow
 1. **Submit transaction** - Store pending transaction with retry metadata
-2. **Confirmation check** - Poll for transaction confirmation
-3. **Retry logic** - Resubmit with exponential backoff if failed
+2. **Confirmation check** - Poll for transaction confirmation (stub: requires algod integration)
+3. **Retry logic** - Resubmit with exponential backoff if failed (stub: requires AlgoChat bridge integration)
 4. **State tracking** - Mark as confirmed/failed/expired
+
+> **Note:** Transaction confirmation and resubmission are currently stubs. They require integration with the Algorand `algod` client and the AlgoChat bridge respectively. The retry loop, backoff logic, and persistence layer are fully implemented.
 
 #### Database Schema
 ```sql
@@ -417,7 +421,7 @@ const retryStats = retryService.getRetryStats();
 ## Security Best Practices
 
 ### For Developers
-1. **Always use secure services** - Prefer `SecureWorkTaskService` over legacy service
+1. **Use secure services when integrated** - Once `SecureWorkTaskService` is wired into the application, prefer it over the legacy service
 2. **Test security features** - Include security tests in all new features
 3. **Audit logging** - Log all security-relevant events
 4. **Memory protection** - Use `SecureMemoryManager` for sensitive data
@@ -443,7 +447,8 @@ const retryStats = retryService.getRetryStats();
 5. **Formal verification** - Mathematical proofs of security properties
 
 ### Security Roadmap
-- **Phase 1** (Completed): Core security hardening
+- **Phase 0** (Current): Core security modules implemented as standalone components
+- **Phase 1** (Next): Integrate security modules into main application flow, add algod/AlgoChat bridge integration
 - **Phase 2** (Future): Advanced threat detection
 - **Phase 3** (Future): Zero-trust implementation
 - **Phase 4** (Future): Formal security verification
