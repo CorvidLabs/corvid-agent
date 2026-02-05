@@ -13,6 +13,8 @@ function json(data: unknown, status: number = 200): Response {
     });
 }
 
+const ALGORAND_ADDRESS_RE = /^[A-Z2-7]{58}$/;
+
 export function handleAllowlistRoutes(
     req: Request,
     url: URL,
@@ -47,19 +49,33 @@ export function handleAllowlistRoutes(
 }
 
 async function handleAdd(req: Request, db: Database): Promise<Response> {
-    const body = await req.json();
+    let body: Record<string, unknown>;
+    try {
+        body = await req.json();
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
     if (!body.address || typeof body.address !== 'string') {
         return json({ error: 'address is required' }, 400);
     }
-    const entry = addToAllowlist(db, body.address.trim(), body.label);
+    const address = body.address.trim().toUpperCase();
+    if (!ALGORAND_ADDRESS_RE.test(address)) {
+        return json({ error: 'Invalid Algorand address (expected 58-character base32 string)' }, 400);
+    }
+    const entry = addToAllowlist(db, address, typeof body.label === 'string' ? body.label : undefined);
     return json(entry, 201);
 }
 
 async function handleUpdate(req: Request, db: Database, address: string): Promise<Response> {
-    const body = await req.json();
+    let body: Record<string, unknown>;
+    try {
+        body = await req.json();
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
     if (body.label === undefined) {
         return json({ error: 'label is required' }, 400);
     }
-    const entry = updateAllowlistEntry(db, address, body.label);
+    const entry = updateAllowlistEntry(db, address, String(body.label));
     return entry ? json(entry) : json({ error: 'Not found' }, 404);
 }
