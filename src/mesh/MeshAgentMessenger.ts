@@ -12,6 +12,7 @@ import { MeshNetwork } from './MeshNetwork';
 import { AgentInfo } from '../types/agent';
 import { Logger } from '../utils/Logger';
 import { createLogger } from '../../server/lib/logger';
+import { BlockchainMeshConfig, createBlockchainConfig, validateBlockchainConfig } from './BlockchainConfig';
 
 export interface MeshInvokeRequest {
     fromAgentId: string;
@@ -22,6 +23,7 @@ export interface MeshInvokeRequest {
     threadId?: string;
     routePreference?: 'direct' | 'blockchain' | 'auto';
     requireAck?: boolean;
+    useLocalnet?: boolean; // Force localnet blockchain usage
 }
 
 export interface MeshInvokeResult {
@@ -41,6 +43,9 @@ export class MeshAgentMessenger extends AgentMessenger {
     private processNodes = new Map<string, AgentProcessNode>();
     private logger: Logger;
     private isInitialized = false;
+    private preferBlockchain: boolean;
+    private localnetOnly: boolean;
+    private blockchainConfig: BlockchainMeshConfig;
 
     constructor(
         db: Database,
@@ -53,11 +58,24 @@ export class MeshAgentMessenger extends AgentMessenger {
             nodeId?: string;
             redis?: any;
             algorand?: any;
+            preferBlockchain?: boolean; // Prefer blockchain routing over mesh
+            localnetOnly?: boolean; // Use only localnet blockchain
+            blockchainConfig?: Partial<BlockchainMeshConfig>; // Blockchain-specific configuration
         }
     ) {
         super(db, config, service, agentWalletService, agentDirectory, processManager);
 
         this.logger = createLogger('MeshAgentMessenger');
+
+        // Initialize blockchain-first configuration
+        this.blockchainConfig = createBlockchainConfig(meshNetworkConfig?.blockchainConfig);
+        this.preferBlockchain = meshNetworkConfig?.preferBlockchain ?? this.blockchainConfig.preferBlockchain;
+        this.localnetOnly = meshNetworkConfig?.localnetOnly ?? this.blockchainConfig.localnetOnly;
+
+        // Validate configuration
+        if (!validateBlockchainConfig(this.blockchainConfig)) {
+            this.logger.warn('Invalid blockchain configuration, some features may not work correctly');
+        }
 
         // Initialize mesh network
         this.meshNetwork = new MeshNetwork({
@@ -123,29 +141,41 @@ export class MeshAgentMessenger extends AgentMessenger {
 
     /**
      * Enhanced invoke with mesh networking support
+     * UPDATED: Now defaults to blockchain-first routing
      */
     public async meshInvoke(request: MeshInvokeRequest): Promise<MeshInvokeResult> {
         await this.ensureInitialized();
 
-        const { fromAgentId, toAgentId, routePreference = 'auto' } = request;
+        const { fromAgentId, toAgentId, routePreference = 'auto', useLocalnet } = request;
+
+        // Override preference if useLocalnet is specified
+        let actualPreference = routePreference;
+        if (useLocalnet === true) {
+            actualPreference = 'blockchain';
+        } else if (useLocalnet === false) {
+            actualPreference = 'direct';
+        }
 
         // Determine routing strategy
-        const route = await this.determineRoute(fromAgentId, toAgentId, routePreference);
+        const route = await this.determineRoute(fromAgentId, toAgentId, actualPreference);
 
         switch (route) {
-            case 'mesh_direct':
-                return await this.invokeThroughMesh(request);
-
             case 'blockchain':
-                const legacyResult = await super.invoke(request);
+                this.logger.info(`Routing via blockchain/localnet: ${fromAgentId} -> ${toAgentId}`);
+                const blockchainResult = await super.invoke(request);
                 return {
-                    ...legacyResult,
+                    ...blockchainResult,
                     route: 'blockchain',
                     meshDelivered: false
                 };
 
+            case 'mesh_direct':
+                this.logger.info(`Routing via mesh network: ${fromAgentId} -> ${toAgentId}`);
+                return await this.invokeThroughMesh(request);
+
             case 'process_manager':
             default:
+                this.logger.info(`Routing via process manager: ${fromAgentId} -> ${toAgentId}`);
                 const pmResult = await super.invoke(request);
                 return {
                     ...pmResult,
@@ -229,22 +259,33 @@ export class MeshAgentMessenger extends AgentMessenger {
 
     /**
      * Determine the best route for agent communication
+     * UPDATED: Now primarily uses localnet blockchain for routing
      */
     private async determineRoute(
         fromAgentId: string,
         toAgentId: string,
         preference: 'direct' | 'blockchain' | 'auto'
     ): Promise<'mesh_direct' | 'blockchain' | 'process_manager'> {
+        if (preference === 'direct') {
+            // Force mesh routing only when explicitly requested
+            return 'mesh_direct';
+        }
+
         if (preference === 'blockchain') {
             return 'blockchain';
         }
 
-        if (preference === 'direct') {
-            // Force mesh routing even if not optimal
-            return 'mesh_direct';
+        // Auto routing - prioritize blockchain first (localnet)
+
+        // Check if blockchain/localnet is available
+        const blockchainAvailable = await this.isBlockchainAvailable();
+
+        if (blockchainAvailable) {
+            this.logger.debug(`Using blockchain routing for ${fromAgentId} -> ${toAgentId}`);
+            return 'blockchain';
         }
 
-        // Auto routing - choose based on availability and network health
+        // Fallback to mesh if blockchain unavailable
         const sourceNode = this.processNodes.get(fromAgentId);
         const targetInMesh = await this.findAgentInMesh(toAgentId);
 
@@ -253,12 +294,71 @@ export class MeshAgentMessenger extends AgentMessenger {
 
             // Use mesh if network is healthy
             if (meshHealth.totalNodes > 1 && !meshHealth.partitionDetected) {
+                this.logger.info(`Blockchain unavailable, using mesh routing for ${fromAgentId} -> ${toAgentId}`);
                 return 'mesh_direct';
             }
         }
 
-        // Default to traditional routing
+        // Final fallback to process manager
+        this.logger.info(`Using process manager routing for ${fromAgentId} -> ${toAgentId}`);
         return 'process_manager';
+    }
+
+    /**
+     * Check if blockchain/localnet is available for messaging
+     */
+    private async isBlockchainAvailable(): Promise<boolean> {
+        try {
+            // If blockchain routing is not preferred, return false early
+            if (!this.preferBlockchain) {
+                this.logger.debug('Blockchain routing not preferred');
+                return false;
+            }
+
+            // Check if AlgoChatService is available and healthy
+            const service = this['service'];
+            if (!service) {
+                this.logger.debug('AlgoChatService not available');
+                return false;
+            }
+
+            // For localnet-only mode, check if localnet is configured
+            if (this.blockchainConfig.localnetOnly) {
+                const config = this['config'];
+                const localnetHost = this.blockchainConfig.localnet.algodHost;
+                const isLocalnet = localnetHost.includes('localhost') ||
+                                 localnetHost.includes('127.0.0.1') ||
+                                 config?.algorandNode?.includes('localhost') ||
+                                 config?.algorandNode?.includes('127.0.0.1') ||
+                                 config?.network === 'localnet';
+
+                if (!isLocalnet) {
+                    this.logger.debug('Localnet-only mode enabled but not connected to localnet', {
+                        configuredHost: localnetHost,
+                        serviceConfig: config?.algorandNode
+                    });
+                    return false;
+                }
+            }
+
+            // Additional health check for localnet
+            // This assumes we can access the service to verify connectivity
+            if (this.localnetOnly && service) {
+                try {
+                    // Quick connectivity test - this would need to be implemented
+                    // in the AlgoChatService to ping the localnet node
+                    return true; // Assume available for now
+                } catch (healthError) {
+                    this.logger.warn('Localnet health check failed:', healthError);
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (error) {
+            this.logger.warn('Blockchain availability check failed:', error);
+            return false;
+        }
     }
 
     /**
@@ -459,8 +559,32 @@ export class MeshAgentMessenger extends AgentMessenger {
                 connectionStats: node.getConnectionStats()
             })),
             topology: this.meshNetwork.getTopology(),
-            isInitialized: this.isInitialized
+            isInitialized: this.isInitialized,
+            routing: {
+                preferBlockchain: this.preferBlockchain,
+                localnetOnly: this.localnetOnly,
+                blockchainAvailable: this.getBlockchainStatus()
+            }
         };
+    }
+
+    /**
+     * Get current blockchain/localnet status
+     */
+    private getBlockchainStatus(): boolean {
+        try {
+            const service = this['service'];
+            const config = this['config'];
+
+            return !!(service && (
+                !this.localnetOnly ||
+                config?.algorandNode?.includes('localhost') ||
+                config?.algorandNode?.includes('127.0.0.1') ||
+                config?.network === 'localnet'
+            ));
+        } catch {
+            return false;
+        }
     }
 
     /**

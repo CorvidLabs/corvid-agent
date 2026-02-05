@@ -86,6 +86,138 @@ describe('Mesh Networking Integration', () => {
     });
   });
 
+  describe('Blockchain-First Routing', () => {
+    let blockchainMeshMessenger: MeshAgentMessenger;
+
+    beforeEach(async () => {
+      // Create messenger with blockchain-first configuration
+      blockchainMeshMessenger = new MeshAgentMessenger(
+        mockDB,
+        { ...mockConfig, algorandNode: 'http://localhost:4001', network: 'localnet' },
+        { sendMessage: jest.fn().mockResolvedValue(true) } as any, // Mock service
+        mockAgentWalletService,
+        mockAgentDirectory,
+        mockProcessManager,
+        {
+          preferBlockchain: true,
+          localnetOnly: true,
+          blockchainConfig: {
+            localnet: {
+              algodHost: 'http://localhost',
+              algodPort: 4001,
+              algodToken: 'test-token'
+            }
+          }
+        }
+      );
+
+      await blockchainMeshMessenger.initializeMesh();
+      await blockchainMeshMessenger.registerAgentForMesh(agent1Info);
+      await blockchainMeshMessenger.registerAgentForMesh(agent2Info);
+    });
+
+    afterEach(async () => {
+      await blockchainMeshMessenger.shutdownMesh();
+    });
+
+    it('should prefer blockchain routing for auto preference', async () => {
+      const request = {
+        fromAgentId: 'agent-1',
+        toAgentId: 'agent-2',
+        content: 'Hello via blockchain!',
+        routePreference: 'auto' as const
+      };
+
+      // Mock parent invoke method for blockchain routing
+      jest.spyOn(blockchainMeshMessenger as any, 'invoke').mockResolvedValue({
+        message: { id: 'msg-123', content: 'blockchain message' },
+        sessionId: 'session-123'
+      });
+
+      const result = await blockchainMeshMessenger.meshInvoke(request);
+
+      expect(result.route).toBe('blockchain');
+      expect(result.meshDelivered).toBe(false);
+    });
+
+    it('should detect localnet availability correctly', () => {
+      const stats = blockchainMeshMessenger.getMeshStats();
+
+      expect(stats.routing.preferBlockchain).toBe(true);
+      expect(stats.routing.localnetOnly).toBe(true);
+      expect(stats.routing.blockchainAvailable).toBe(true);
+    });
+
+    it('should force blockchain when useLocalnet is true', async () => {
+      const request = {
+        fromAgentId: 'agent-1',
+        toAgentId: 'agent-2',
+        content: 'Force localnet message',
+        routePreference: 'direct' as const, // Would normally go to mesh
+        useLocalnet: true
+      };
+
+      // Mock parent invoke method
+      jest.spyOn(blockchainMeshMessenger as any, 'invoke').mockResolvedValue({
+        message: { id: 'msg-123' },
+        sessionId: 'session-123'
+      });
+
+      const result = await blockchainMeshMessenger.meshInvoke(request);
+
+      expect(result.route).toBe('blockchain');
+    });
+
+    it('should fallback to mesh when blockchain is disabled', async () => {
+      const noBlockchainMessenger = new MeshAgentMessenger(
+        mockDB,
+        mockConfig,
+        null, // No blockchain service
+        mockAgentWalletService,
+        mockAgentDirectory,
+        mockProcessManager,
+        {
+          preferBlockchain: false,
+          localnetOnly: false
+        }
+      );
+
+      await noBlockchainMessenger.initializeMesh();
+      await noBlockchainMessenger.registerAgentForMesh(agent1Info);
+
+      // Mock mesh discovery
+      jest.spyOn(noBlockchainMessenger as any, 'findAgentInMesh').mockResolvedValue(agent2Info);
+
+      // Mock mesh network health
+      jest.spyOn(noBlockchainMessenger as any, 'meshNetwork').mockReturnValue({
+        getNetworkHealth: () => ({
+          totalNodes: 2,
+          partitionDetected: false
+        }),
+        discoverAgents: jest.fn().mockResolvedValue([agent2Info])
+      });
+
+      const processNode = (noBlockchainMessenger as any).processNodes.get('agent-1');
+      if (processNode) {
+        jest.spyOn(processNode, 'sendToPeer').mockResolvedValue();
+      }
+
+      const request = {
+        fromAgentId: 'agent-1',
+        toAgentId: 'agent-2',
+        content: 'Fallback to mesh',
+        routePreference: 'auto' as const
+      };
+
+      const result = await noBlockchainMessenger.meshInvoke(request);
+
+      expect(result.route).toBe('mesh_direct');
+      expect(result.meshDelivered).toBe(true);
+
+      await noBlockchainMessenger.shutdownMesh();
+    });
+  });
+
   describe('Direct Mesh Communication', () => {
     beforeEach(async () => {
       await meshMessenger.registerAgentForMesh(agent1Info);
