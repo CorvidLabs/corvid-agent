@@ -33,11 +33,22 @@ const AUTO_RESUME_MAX_ATTEMPTS = 10;
 
 export type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => void;
 
+// After this many user messages in a single process lifetime, kill and restart
+// through the capped resume path to keep context size manageable.
+//
+// Rationale: Each "turn" (user message + assistant response + tool calls) grows
+// the in-context prompt significantly. Empirically, ~8 turns keeps most sessions
+// well under context-window limits while leaving headroom for tool outputs,
+// system messages, and safety buffers. Revisit if model context windows change.
+const MAX_TURNS_BEFORE_CONTEXT_RESET = 8;
+
 interface SessionMeta {
     startedAt: number;
     source: string;
     restartCount: number;
     lastKnownCostUsd: number;
+    /** Number of user messages sent to this live process instance. */
+    turnCount: number;
 }
 
 interface PausedSessionInfo {
@@ -206,6 +217,7 @@ export class ProcessManager {
             source: (session as { source?: string }).source ?? 'web',
             restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
             lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
+            turnCount: 0,
         });
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
@@ -230,11 +242,23 @@ export class ProcessManager {
 
     resumeProcess(session: Session, prompt?: string): void {
         if (this.processes.has(session.id)) {
-            // Process still running, send message instead
-            if (prompt) {
-                this.sendMessage(session.id, prompt);
+            const meta = this.sessionMeta.get(session.id);
+            if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
+                // Context has grown too large — kill process so it restarts
+                // through buildResumePrompt with the capped message window.
+                log.info(`Context reset: killing session ${session.id} after ${meta.turnCount} turns`);
+                const cp = this.processes.get(session.id);
+                cp?.kill();
+                this.processes.delete(session.id);
+                updateSessionPid(this.db, session.id, null);
+                // Fall through to restart below
+            } else {
+                // Process still running, send message instead
+                if (prompt) {
+                    this.sendMessage(session.id, prompt);
+                }
+                return;
             }
-            return;
         }
 
         const project = getProject(this.db, session.projectId);
@@ -293,6 +317,7 @@ export class ProcessManager {
             source: (session as { source?: string }).source ?? 'web',
             restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
             lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
+            turnCount: 0,
         });
         const proc = this.processes.get(session.id);
         if (proc) {
@@ -369,6 +394,11 @@ export class ProcessManager {
         }
 
         addSessionMessage(this.db, sessionId, 'user', content);
+
+        // Track turns for context reset
+        const meta = this.sessionMeta.get(sessionId);
+        if (meta) meta.turnCount++;
+
         return true;
     }
 

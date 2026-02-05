@@ -769,10 +769,21 @@ export class AlgoChatBridge {
         let lastAssistantText = '';
         let lastTurnResponse = '';
         let sent = false;
+        const startedAt = Date.now();
 
         const sendOnce = () => {
             if (sent) return;
             sent = true;
+
+            // Track completion milestone
+            const totalElapsed = Date.now() - startedAt;
+            trackProgress({
+                type: 'milestone',
+                action: 'response_completed',
+                timestamp: Date.now(),
+                details: `Total time: ${Math.round(totalElapsed / 1000)}s, tools: ${toolsUsed.size}, agents: ${agentsQueried.size}`
+            });
+
             stopProgressTimer();
             this.processManager.unsubscribe(sessionId, callback);
             this.chainSubscriptions.delete(sessionId);
@@ -797,9 +808,28 @@ export class AlgoChatBridge {
         let agentQueryCount = 0;
         let currentTextBlock = '';
         let inTextBlock = false;
+
+        // Enhanced progress tracking
+        interface ProgressAction {
+            type: 'tool_use' | 'agent_query' | 'text_block' | 'milestone';
+            action: string;
+            timestamp: number;
+            details?: string;
+        }
+        const MAX_PROGRESS_HISTORY = 100;
+        const progressHistory: ProgressAction[] = [];
+        const trackProgress = (action: ProgressAction) => {
+            trackProgress(action);
+            // Sliding window to prevent unbounded memory growth in long sessions
+            if (progressHistory.length > MAX_PROGRESS_HISTORY) {
+                progressHistory.splice(0, progressHistory.length - MAX_PROGRESS_HISTORY);
+            }
+        };
+        let lastProgressUpdate = startedAt;
+        let toolsUsed: Set<string> = new Set();
+        let agentsQueried: Set<string> = new Set();
         let progressTimer: ReturnType<typeof setInterval> | null = null;
         let ackDelayTimer: ReturnType<typeof setTimeout> | null = null;
-        const startedAt = Date.now();
 
         // How long to wait before sending the on-chain ack. If the response
         // arrives within this window we skip the ack entirely.
@@ -813,15 +843,70 @@ export class AlgoChatBridge {
             }
         };
 
+        // Generate progress summary from recent actions
+        const generateProgressSummary = (): string => {
+            const now = Date.now();
+            const elapsed = Math.round((now - startedAt) / 1000);
+            const recentActions = progressHistory.filter(a => a.timestamp > lastProgressUpdate);
+
+            let summary = `Still working (${elapsed}s elapsed)`;
+
+            // Add what we've been doing
+            const recentSummary: string[] = [];
+
+            if (recentActions.length > 0) {
+                const toolActions = recentActions.filter(a => a.type === 'tool_use');
+                const agentActions = recentActions.filter(a => a.type === 'agent_query');
+                const textActions = recentActions.filter(a => a.type === 'text_block');
+
+                if (toolActions.length > 0) {
+                    const uniqueTools = [...new Set(toolActions.map(a => a.action))];
+                    recentSummary.push(`used ${uniqueTools.join(', ')}`);
+                }
+
+                if (agentActions.length > 0) {
+                    const uniqueAgents = [...new Set(agentActions.map(a => a.action))];
+                    recentSummary.push(`queried ${uniqueAgents.join(', ')}`);
+                }
+
+                if (textActions.length > 0) {
+                    const lastText = textActions[textActions.length - 1];
+                    if (lastText.details && lastText.details.length > 0) {
+                        const preview = lastText.details.length > 60
+                            ? lastText.details.slice(0, 60) + '...'
+                            : lastText.details;
+                        recentSummary.push(`working on: ${preview}`);
+                    }
+                }
+            }
+
+            // Overall progress
+            if (toolsUsed.size > 0 || agentsQueried.size > 0) {
+                const progress: string[] = [];
+                if (toolsUsed.size > 0) {
+                    progress.push(`${toolsUsed.size} tool${toolsUsed.size > 1 ? 's' : ''}`);
+                }
+                if (agentsQueried.size > 0) {
+                    progress.push(`${agentsQueried.size} agent${agentsQueried.size > 1 ? 's' : ''}`);
+                }
+                summary += ` — used ${progress.join(' and ')}`;
+            }
+
+            if (recentSummary.length > 0) {
+                summary += ` — recently ${recentSummary.join(', ')}`;
+            }
+
+            lastProgressUpdate = now;
+            return summary;
+        };
+
         // Send periodic on-chain progress updates so the user's AlgoChat
         // client knows the agent is still working
         const startProgressTimer = () => {
             if (progressTimer) return;
             progressTimer = setInterval(() => {
                 if (sent) { stopProgressTimer(); return; }
-                const msg = agentQueryCount > 0
-                    ? `Still working — queried ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''} so far...`
-                    : `Still processing your request...`;
+                const msg = generateProgressSummary();
                 this.sendResponse(participant, `[Status] ${msg}`).catch(() => {});
                 this.emitEvent(participant, msg, 'status');
             }, PROGRESS_INTERVAL_MS);
@@ -838,6 +923,15 @@ export class AlgoChatBridge {
         const sendAckNow = () => {
             if (ackSent || sent) return;
             ackSent = true;
+
+            // Track acknowledgment milestone
+            trackProgress({
+                type: 'milestone',
+                action: 'request_acknowledged',
+                timestamp: Date.now(),
+                details: 'Processing request'
+            });
+
             this.sendResponse(participant, '[Status] Received your message — working on it now.').catch(() => {});
             startProgressTimer();
         };
@@ -848,6 +942,16 @@ export class AlgoChatBridge {
                 // Keep track of the latest text block — this overwrites
                 // previous ones so we only send the final one on-chain.
                 lastTextBlock = text;
+
+                // Track meaningful text for progress summaries
+                if (text.length > 50) { // Only track substantial text blocks
+                    trackProgress({
+                        type: 'text_block',
+                        action: 'reasoning',
+                        timestamp: Date.now(),
+                        details: text
+                    });
+                }
 
                 // Show the agent's intermediate text as a status update
                 // Truncate long blocks to a reasonable preview
@@ -867,6 +971,15 @@ export class AlgoChatBridge {
             // the on-chain ack after a delay (skip if we finish quickly)
             if (event.type === 'assistant' && !statusEmitted) {
                 statusEmitted = true;
+
+                // Track processing milestone
+                trackProgress({
+                    type: 'milestone',
+                    action: 'processing_started',
+                    timestamp: Date.now(),
+                    details: 'Agent began processing'
+                });
+
                 this.emitEvent(participant, 'Agent is processing your message...', 'status');
 
                 if (!ackSent && !ackDelayTimer) {
@@ -879,6 +992,15 @@ export class AlgoChatBridge {
                 const message = (event as unknown as { message: string }).message;
                 if (message) {
                     this.emitEvent(participant, message, 'status');
+
+                    // Track status action for progress summaries
+                    trackProgress({
+                        type: 'milestone',
+                        action: 'status_update',
+                        timestamp: Date.now(),
+                        details: message
+                    });
+
                     // Agent is calling other agents — this will take a while,
                     // send the ack immediately
                     if (!ackSent) {
@@ -900,12 +1022,33 @@ export class AlgoChatBridge {
                     // Flush any pending text before tool use starts
                     if (inTextBlock) flushTextBlock();
                     const toolName = (block as unknown as { name?: string }).name;
-                    if (toolName === 'corvid_send_message') {
-                        agentQueryCount++;
-                        // Agent-to-agent call means longer processing — send ack now
-                        if (!ackSent) {
-                            cancelAckDelay();
-                            sendAckNow();
+
+                    if (toolName) {
+                        // Track tool usage for progress summaries
+                        toolsUsed.add(toolName);
+                        trackProgress({
+                            type: 'tool_use',
+                            action: toolName,
+                            timestamp: Date.now()
+                        });
+
+                        if (toolName === 'corvid_send_message') {
+                            agentQueryCount++;
+                            // Try to extract agent name from tool input
+                            const toolInput = (block as unknown as { input?: { to_agent?: string } }).input;
+                            if (toolInput?.to_agent) {
+                                agentsQueried.add(toolInput.to_agent);
+                                trackProgress({
+                                    type: 'agent_query',
+                                    action: toolInput.to_agent,
+                                    timestamp: Date.now()
+                                });
+                            }
+                            // Agent-to-agent call means longer processing — send ack now
+                            if (!ackSent) {
+                                cancelAckDelay();
+                                sendAckNow();
+                            }
                         }
                     }
                 }
@@ -937,10 +1080,29 @@ export class AlgoChatBridge {
             // Each 'result' marks end of a turn — save last text block and reset
             if (event.type === 'result') {
                 if (inTextBlock) flushTextBlock();
+
+                // Track turn completion milestone
+                trackProgress({
+                    type: 'milestone',
+                    action: 'turn_completed',
+                    timestamp: Date.now(),
+                    details: `Completed turn with ${agentQueryCount} agent queries`
+                });
+
                 // Only show synthesizing status if we've been working long enough
                 const elapsed = Date.now() - startedAt;
                 if (agentQueryCount > 0 && elapsed > ACK_DELAY_MS) {
-                    this.emitEvent(participant, `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`, 'status');
+                    const synthesizingMsg = `Synthesizing response from ${agentQueryCount} agent${agentQueryCount > 1 ? 's' : ''}...`;
+
+                    // Track synthesis milestone
+                    trackProgress({
+                        type: 'milestone',
+                        action: 'synthesis_started',
+                        timestamp: Date.now(),
+                        details: synthesizingMsg
+                    });
+
+                    this.emitEvent(participant, synthesizingMsg, 'status');
                 }
                 // Prefer the last streamed text block; fall back to full assistant text
                 if (lastTextBlock.trim()) {
@@ -1073,6 +1235,49 @@ export class AlgoChatBridge {
             clearTimeout(timer);
             this.subscriptionTimers.delete(sessionId);
         }
+    }
+
+    /** Split content into byte-limited chunks for PSK sends, breaking at newlines when possible. */
+    private splitPskContent(content: string, maxBytes: number): string[] {
+        const encoder = new TextEncoder();
+        if (encoder.encode(content).byteLength <= maxBytes) {
+            return [content];
+        }
+
+        const chunks: string[] = [];
+        let remaining = content;
+
+        while (remaining.length > 0) {
+            if (encoder.encode(remaining).byteLength <= maxBytes) {
+                chunks.push(remaining);
+                break;
+            }
+
+            // Binary search for the max character count that fits in maxBytes
+            let low = 0;
+            let high = remaining.length;
+            while (low < high) {
+                const mid = Math.floor((low + high + 1) / 2);
+                if (encoder.encode(remaining.slice(0, mid)).byteLength <= maxBytes) {
+                    low = mid;
+                } else {
+                    high = mid - 1;
+                }
+            }
+
+            // Try to break at a newline within the last 20% for readability
+            let cut = low;
+            const searchStart = Math.floor(low * 0.8);
+            const lastNewline = remaining.lastIndexOf('\n', low);
+            if (lastNewline >= searchStart) {
+                cut = lastNewline + 1;
+            }
+
+            chunks.push(remaining.slice(0, cut));
+            remaining = remaining.slice(cut);
+        }
+
+        return chunks;
     }
 
     private async sendResponse(participant: string, content: string): Promise<void> {
