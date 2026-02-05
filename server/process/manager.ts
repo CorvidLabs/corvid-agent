@@ -242,6 +242,11 @@ export class ProcessManager {
 
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
+        // Persist the new prompt so future resumes include it in history
+        if (prompt) {
+            addSessionMessage(this.db, session.id, 'user', prompt);
+        }
+
         // Start a fresh process — our session IDs are not Claude conversation IDs,
         // so --resume would fail. Build a prompt that includes conversation history
         // so the agent has context from prior exchanges.
@@ -306,12 +311,14 @@ export class ProcessManager {
 
         // Build a conversation history block (cap at last 20 messages to stay within limits)
         const recent = messages.slice(-20);
-        const historyLines = recent.map((m) => {
-            const role = m.role === 'user' ? 'User' : 'Assistant';
-            // Truncate very long messages to keep the prompt reasonable
-            const text = m.content.length > 2000 ? m.content.slice(0, 2000) + '...' : m.content;
-            return `[${role}]: ${text}`;
-        });
+        const historyLines = recent
+            .filter((m) => m.role === 'user' || m.role === 'assistant')
+            .map((m) => {
+                const role = m.role === 'user' ? 'User' : 'Assistant';
+                // Truncate very long messages to keep the prompt reasonable
+                const text = m.content.length > 2000 ? m.content.slice(0, 2000) + '...' : m.content;
+                return `[${role}]: ${text}`;
+            });
 
         return [
             '<conversation_history>',
