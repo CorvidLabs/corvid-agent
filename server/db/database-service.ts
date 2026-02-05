@@ -77,19 +77,23 @@ class SQLiteWrapper implements DatabaseConnection {
  * PostgreSQL database wrapper (placeholder for future implementation)
  */
 class PostgreSQLWrapper implements DatabaseConnection {
+    // @ts-ignore - Unused parameters in placeholder implementation
     constructor(private connectionString: string) {
         // TODO: Implement PostgreSQL connection
         throw new Error('PostgreSQL support not yet implemented');
     }
 
+    // @ts-ignore - Unused parameters in placeholder implementation
     query(sql: string, params: any[] = []): QueryResult {
         throw new Error('PostgreSQL support not yet implemented');
     }
 
+    // @ts-ignore - Unused parameters in placeholder implementation
     exec(sql: string): void {
         throw new Error('PostgreSQL support not yet implemented');
     }
 
+    // @ts-ignore - Unused parameters in placeholder implementation
     transaction<T>(fn: () => T): T {
         throw new Error('PostgreSQL support not yet implemented');
     }
