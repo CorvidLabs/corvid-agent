@@ -410,7 +410,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         if (select.value) {
             this.agentService.getBalance(select.value).then((info) => {
                 this.agentBalance.set(info.balance);
-            }).catch(() => {});
+            }).catch(() => {
+                // Reset to 0 on failure so the UI doesn't show a stale balance
+                this.agentBalance.set(0);
+            });
         }
     }
 

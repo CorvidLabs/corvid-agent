@@ -141,17 +141,18 @@ export class SessionLifecycleManager {
      * Clean up sessions that have exceeded their TTL
      */
     private async cleanupExpiredSessions(): Promise<number> {
-        const cutoffTime = Date.now() - this.config.sessionTtlMs;
+        const ttlSeconds = Math.round(this.config.sessionTtlMs / 1000);
 
-        // Find expired sessions
+        // Find expired sessions — compare in SQLite's datetime domain since
+        // updated_at stores ISO strings from datetime('now'), not epoch millis.
         const expiredSessions = this.db.query(`
             SELECT id, project_id, status
             FROM sessions
             WHERE status IN ('idle', 'completed', 'error', 'stopped')
-            AND updated_at < ?
+            AND updated_at < datetime('now', '-' || ? || ' seconds')
             ORDER BY updated_at ASC
             LIMIT 100
-        `).all(cutoffTime) as Array<{ id: string; project_id: string; status: string }>;
+        `).all(ttlSeconds) as Array<{ id: string; project_id: string; status: string }>;
 
         if (expiredSessions.length === 0) {
             return 0;
@@ -187,7 +188,7 @@ export class SessionLifecycleManager {
         deleteTransaction();
 
         log.info(`Cleaned up ${expiredSessions.length} expired sessions`, {
-            oldestSessionAge: Math.round((Date.now() - cutoffTime) / (60 * 60 * 1000)),
+            ttlDays: Math.round(ttlSeconds / (24 * 60 * 60)),
             projectsAffected: new Set(expiredSessions.map(s => s.project_id)).size,
         });
 
@@ -290,7 +291,7 @@ export class SessionLifecycleManager {
 
         const oldestResult = this.db.query(`
             SELECT MIN(created_at) as oldest FROM sessions
-        `).get() as { oldest: number | null };
+        `).get() as { oldest: string | null };
 
         const sessionsByStatus: Record<string, number> = {};
         for (const { status, count } of statusResults) {
@@ -301,7 +302,7 @@ export class SessionLifecycleManager {
             activeSessions: this.activeSessionCount,
             totalSessions: totalResult.count,
             sessionsByStatus,
-            oldestSessionAge: oldestResult.oldest ? Date.now() - oldestResult.oldest : 0,
+            oldestSessionAge: oldestResult.oldest ? Date.now() - new Date(oldestResult.oldest + 'Z').getTime() : 0,
         };
     }
 

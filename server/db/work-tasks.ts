@@ -201,21 +201,25 @@ export function updateWorkTaskStatus(
  * Returns the list of affected tasks (for branch restoration).
  */
 export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
-    // First, fetch the stale tasks so we can return them
-    const staleRows = db.query(
-        `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
-    ).all() as WorkTaskRow[];
+    // Wrap SELECT→UPDATE in a transaction to prevent a race where a task
+    // starts between the read and the status update.
+    const cleanup = db.transaction(() => {
+        const staleRows = db.query(
+            `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
+        ).all() as WorkTaskRow[];
 
-    if (staleRows.length === 0) return [];
+        if (staleRows.length === 0) return [];
 
-    // Mark them all as failed
-    db.query(
-        `UPDATE work_tasks
-         SET status = 'failed', error = 'Interrupted by server restart', completed_at = datetime('now')
-         WHERE status IN ('branching', 'running', 'validating')`
-    ).run();
+        db.query(
+            `UPDATE work_tasks
+             SET status = 'failed', error = 'Interrupted by server restart', completed_at = datetime('now')
+             WHERE status IN ('branching', 'running', 'validating')`
+        ).run();
 
-    return staleRows.map(rowToWorkTask);
+        return staleRows.map(rowToWorkTask);
+    });
+
+    return cleanup();
 }
 
 export function listWorkTasks(db: Database, agentId?: string): WorkTask[] {
