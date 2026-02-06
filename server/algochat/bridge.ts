@@ -16,6 +16,7 @@ import { extractContentText } from '../process/types';
 import { PSKManager } from './psk';
 import type { AgentWalletService } from './agent-wallet';
 import type { AgentDirectory } from './agent-directory';
+import type { AgentMessenger } from './agent-messenger';
 import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
@@ -34,6 +35,8 @@ import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { saveAlgoChatMessage } from '../db/algochat-messages';
 import { isAllowed } from '../db/allowlist';
 import { createLogger } from '../lib/logger';
+import { listCouncils, createCouncil, getCouncilLaunch } from '../db/councils';
+import { launchCouncil, onCouncilStageChange } from '../routes/councils';
 
 const log = createLogger('AlgoChatBridge');
 
@@ -86,6 +89,7 @@ export class AlgoChatBridge {
     private pskManager: PSKManager | null = null;
     private approvalManager: ApprovalManager | null = null;
     private workTaskService: WorkTaskService | null = null;
+    private agentMessengerRef: AgentMessenger | null = null;
     private fastPollTimer: ReturnType<typeof setInterval> | null = null;
     private discoveryTimer: ReturnType<typeof setInterval> | null = null;
     private sessionNotificationCallback: ((sid: string, event: ClaudeStreamEvent) => void) | null = null;
@@ -124,6 +128,10 @@ export class AlgoChatBridge {
 
     setWorkTaskService(service: WorkTaskService): void {
         this.workTaskService = service;
+    }
+
+    setAgentMessenger(messenger: AgentMessenger): void {
+        this.agentMessengerRef = messenger;
     }
 
     /**
@@ -287,7 +295,7 @@ export class AlgoChatBridge {
         const command = parts[0].toLowerCase();
 
         // Privileged commands require owner authorization
-        const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent']);
+        const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent', '/council']);
         if (PRIVILEGED_COMMANDS.has(command) && !this.isOwner(participant)) {
             log.warn('Unauthorized command attempt', { participant, command });
             this.sendResponse(participant, `Unauthorized: ${command} requires owner access`);
@@ -464,8 +472,138 @@ export class AlgoChatBridge {
                 return true;
             }
 
+            case '/council': {
+                this.handleCouncilCommand(participant, parts).catch((err) => {
+                    this.sendResponse(participant, `Council error: ${err instanceof Error ? err.message : String(err)}`);
+                });
+                return true;
+            }
+
             default:
                 return false;
+        }
+    }
+
+    /**
+     * Handle the `/council` command from AlgoChat.
+     *
+     * Usage:
+     *   /council <prompt>                       — auto-create council with all enabled agents
+     *   /council MyCouncilName -- <prompt>      — use existing council by name
+     */
+    private async handleCouncilCommand(participant: string, parts: string[]): Promise<void> {
+        const rest = parts.slice(1).join(' ').trim();
+        if (!rest) {
+            this.sendResponse(participant, 'Usage:\n  /council <prompt>\n  /council <CouncilName> -- <prompt>');
+            return;
+        }
+
+        // Parse: "/council CouncilName -- prompt" or "/council prompt"
+        const doubleDashIdx = rest.indexOf('--');
+        let councilName: string | null = null;
+        let prompt: string;
+
+        if (doubleDashIdx >= 0) {
+            councilName = rest.slice(0, doubleDashIdx).trim();
+            prompt = rest.slice(doubleDashIdx + 2).trim();
+        } else {
+            prompt = rest;
+        }
+
+        if (!prompt) {
+            this.sendResponse(participant, 'Please provide a prompt for the council.');
+            return;
+        }
+
+        // Resolve or auto-create the council
+        let councilId: string;
+        let councilLabel: string;
+
+        if (councilName) {
+            // Find existing council by name
+            const councils = listCouncils(this.db);
+            const match = councils.find((c) => c.name.toLowerCase() === councilName!.toLowerCase());
+            if (!match) {
+                const available = councils.map((c) => c.name).join(', ');
+                this.sendResponse(participant, `Council "${councilName}" not found.\nAvailable: ${available || 'none'}`);
+                return;
+            }
+            councilId = match.id;
+            councilLabel = match.name;
+        } else {
+            // Auto-create council with all algochat-enabled agents
+            const agents = getAlgochatEnabledAgents(this.db);
+            if (agents.length === 0) {
+                this.sendResponse(participant, 'No AlgoChat-enabled agents available for council.');
+                return;
+            }
+            const agentIds = agents.map((a) => a.id);
+            const chairmanId = agents[0].id; // First agent becomes chairman
+            const council = createCouncil(this.db, {
+                name: `AlgoChat Council ${new Date().toISOString().slice(0, 16)}`,
+                description: 'Auto-created from AlgoChat /council command',
+                agentIds,
+                chairmanAgentId: chairmanId,
+                discussionRounds: 2,
+            });
+            councilId = council.id;
+            councilLabel = council.name;
+        }
+
+        // Resolve project ID
+        const { listProjects, createProject } = require('../db/projects');
+        const projects = listProjects(this.db);
+        let projectId: string;
+        if (projects.length > 0) {
+            projectId = projects[0].id;
+        } else {
+            const project = createProject(this.db, { name: 'AlgoChat Default', workingDir: process.cwd() });
+            projectId = project.id;
+        }
+
+        // Launch the council
+        this.sendResponse(participant, `Launching council "${councilLabel}"...\nPrompt: ${prompt.slice(0, 200)}`);
+
+        try {
+            const result = launchCouncil(
+                this.db,
+                this.processManager,
+                councilId,
+                projectId,
+                prompt,
+                this.agentMessengerRef,
+            );
+
+            this.sendResponse(participant, `Council launched! (${result.sessionIds.length} agents responding)\nLaunch ID: ${result.launchId.slice(0, 8)}...`);
+
+            // Monitor stage changes and relay progress + final synthesis on-chain
+            const unsubscribe = onCouncilStageChange((launchId, stage) => {
+                if (launchId !== result.launchId) return;
+
+                if (stage === 'discussing') {
+                    this.sendResponse(participant, `[Council] Agents are now discussing...`);
+                } else if (stage === 'reviewing') {
+                    this.sendResponse(participant, `[Council] Peer review stage started.`);
+                } else if (stage === 'synthesizing') {
+                    this.sendResponse(participant, `[Council] Chairman is synthesizing final answer...`);
+                } else if (stage === 'complete') {
+                    unsubscribe();
+                    // Fetch the synthesis and send it back
+                    const launch = getCouncilLaunch(this.db, result.launchId);
+                    if (launch?.synthesis) {
+                        const MAX_SYNTHESIS_LENGTH = 3000;
+                        const synthesis = launch.synthesis.length > MAX_SYNTHESIS_LENGTH
+                            ? launch.synthesis.slice(0, MAX_SYNTHESIS_LENGTH) + '\n\n[Truncated — view full synthesis on dashboard]'
+                            : launch.synthesis;
+                        this.sendResponse(participant, `[Council Complete]\n\n${synthesis}`);
+                    } else {
+                        this.sendResponse(participant, `[Council Complete] No synthesis produced.`);
+                    }
+                }
+            });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.sendResponse(participant, `Council launch failed: ${msg}`);
         }
     }
 
