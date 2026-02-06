@@ -4,6 +4,7 @@ node_modules/
 *.db-wal
 wallet-keystore.json
 .env
+.jwt-secret
 dist/
 test-results/
 AppState/

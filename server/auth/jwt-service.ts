@@ -1,12 +1,73 @@
 import { createLogger } from '../lib/logger';
 import type { Database } from 'bun:sqlite';
+import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { join } from 'node:path';
 
 const log = createLogger('JWTService');
 
 // JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'corvid-agent-jwt-secret-change-in-production';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '24h';
 const REFRESH_TOKEN_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || '30d';
+
+const HARDCODED_DEFAULT_SECRET = 'corvid-agent-jwt-secret-change-in-production';
+const JWT_SECRET_FILE = join(process.cwd(), '.jwt-secret');
+
+/**
+ * Resolve the JWT secret with the following priority:
+ * 1. JWT_SECRET environment variable (explicit configuration)
+ * 2. .jwt-secret file (auto-generated persistent secret)
+ * 3. Generate a new random secret and persist to .jwt-secret
+ * Falls back to hardcoded default only if file operations fail (with warning)
+ */
+function resolveJwtSecret(): string {
+    // 1. Environment variable takes priority
+    if (process.env.JWT_SECRET) {
+        if (process.env.JWT_SECRET === HARDCODED_DEFAULT_SECRET) {
+            log.warn('JWT_SECRET is set to the default hardcoded value. This is insecure for production use.');
+        }
+        return process.env.JWT_SECRET;
+    }
+
+    // 2. Try to load from .jwt-secret file
+    if (existsSync(JWT_SECRET_FILE)) {
+        try {
+            const secret = readFileSync(JWT_SECRET_FILE, 'utf-8').trim();
+            if (secret.length >= 32) {
+                log.info('Loaded JWT secret from .jwt-secret file');
+                return secret;
+            }
+            log.warn('JWT secret file exists but contains insufficient entropy, regenerating');
+        } catch (error) {
+            log.warn('Failed to read .jwt-secret file', {
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    // 3. Generate a new random 256-bit secret and persist it
+    try {
+        const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+        const secret = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        writeFileSync(JWT_SECRET_FILE, secret, { mode: 0o600 });
+        // Ensure permissions are set correctly (in case writeFileSync mode is ignored)
+        try {
+            chmodSync(JWT_SECRET_FILE, 0o600);
+        } catch {
+            // chmod may fail on some platforms, continue anyway
+        }
+
+        log.info('Generated and stored new JWT secret in .jwt-secret file');
+        return secret;
+    } catch (error) {
+        log.warn('Failed to generate/store JWT secret file, falling back to hardcoded default. THIS IS INSECURE.', {
+            error: error instanceof Error ? error.message : String(error)
+        });
+        return HARDCODED_DEFAULT_SECRET;
+    }
+}
+
+const JWT_SECRET = resolveJwtSecret();
 
 export interface User {
     id: string;
@@ -32,6 +93,7 @@ export interface LoginResult {
     refreshToken: string;
     user: User;
     expiresAt: number;
+    mustChangePassword?: boolean;
 }
 
 export interface RefreshResult {
@@ -66,9 +128,17 @@ export class JWTService {
                     role TEXT NOT NULL CHECK (role IN ('admin', 'agent_operator', 'viewer')),
                     created_at INTEGER NOT NULL,
                     last_login_at INTEGER,
-                    is_active INTEGER NOT NULL DEFAULT 1
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    must_change_password INTEGER NOT NULL DEFAULT 0
                 )
             `);
+
+            // Add must_change_password column if it doesn't exist (migration for existing DBs)
+            try {
+                this.db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
+            } catch {
+                // Column already exists, ignore
+            }
 
             // User project access table
             this.db.exec(`
@@ -139,11 +209,14 @@ export class JWTService {
             const defaultEmail = 'admin@corvid-agent.local';
             const defaultPassword = 'admin123'; // Should be changed immediately
 
-            await this.createUser(defaultEmail, defaultPassword, 'admin');
+            const user = await this.createUser(defaultEmail, defaultPassword, 'admin');
+
+            // Force password change on first login for default admin
+            this.db.query('UPDATE users SET must_change_password = 1 WHERE id = ?').run(user.id);
 
             log.warn('Created default admin user', {
                 email: defaultEmail,
-                message: 'Please change the default password immediately'
+                message: 'Password change will be required on first login'
             });
         }
     }
@@ -158,8 +231,8 @@ export class JWTService {
 
         try {
             this.db.query(`
-                INSERT INTO users (id, email, password_hash, role, created_at, is_active)
-                VALUES (?, ?, ?, ?, ?, 1)
+                INSERT INTO users (id, email, password_hash, role, created_at, is_active, must_change_password)
+                VALUES (?, ?, ?, ?, ?, 1, 0)
             `).run(userId, email, passwordHash, role, now);
 
             const user: User = {
@@ -188,7 +261,7 @@ export class JWTService {
         try {
             // Find user
             const user = this.db.query(`
-                SELECT id, email, password_hash, role, created_at, last_login_at, is_active
+                SELECT id, email, password_hash, role, created_at, last_login_at, is_active, must_change_password
                 FROM users
                 WHERE email = ? AND is_active = 1
             `).get(email) as {
@@ -199,6 +272,7 @@ export class JWTService {
                 created_at: number;
                 last_login_at: number | null;
                 is_active: number;
+                must_change_password: number;
             } | null;
 
             if (!user) {
@@ -206,11 +280,27 @@ export class JWTService {
                 throw new Error('Invalid credentials');
             }
 
-            // Verify password
+            // Verify password (supports both legacy SHA-256 and new argon2 hashes)
             const isValidPassword = await this.verifyPassword(password, user.password_hash);
             if (!isValidPassword) {
                 await this.logAuthAction(user.id, 'login_failed', 'auth', false, ipAddress, userAgent, 'Invalid password');
                 throw new Error('Invalid credentials');
+            }
+
+            // Migrate legacy SHA-256 hash to argon2 on successful login
+            if (this.isLegacySha256Hash(user.password_hash)) {
+                try {
+                    const newHash = await this.hashPassword(password);
+                    this.db.query('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
+                    log.info('Migrated password hash from SHA-256 to argon2id', { userId: user.id });
+                    await this.logAuthAction(user.id, 'password_hash_migrated', 'users', true);
+                } catch (migrationError) {
+                    // Non-fatal: log and continue, user can still authenticate
+                    log.warn('Failed to migrate password hash', {
+                        userId: user.id,
+                        error: migrationError instanceof Error ? migrationError.message : String(migrationError)
+                    });
+                }
             }
 
             // Update last login
@@ -235,6 +325,8 @@ export class JWTService {
             const token = await this.signToken(authToken);
             const refreshToken = await this.generateRefreshToken(user.id);
 
+            const mustChangePassword = user.must_change_password === 1;
+
             const result: LoginResult = {
                 token,
                 refreshToken,
@@ -247,11 +339,17 @@ export class JWTService {
                     isActive: true,
                 },
                 expiresAt: authToken.expiresAt,
+                mustChangePassword: mustChangePassword || undefined,
             };
 
             await this.logAuthAction(user.id, 'login_success', 'auth', true, ipAddress, userAgent);
 
-            log.info('User logged in', { userId: user.id, email: user.email, projectCount: projectIds.length });
+            log.info('User logged in', {
+                userId: user.id,
+                email: user.email,
+                projectCount: projectIds.length,
+                mustChangePassword,
+            });
             return result;
         } catch (error) {
             log.error('Login failed', {
@@ -263,10 +361,50 @@ export class JWTService {
     }
 
     /**
+     * Change a user's password (requires old password verification)
+     */
+    async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
+        // Get user
+        const user = this.db.query(`
+            SELECT id, password_hash FROM users WHERE id = ? AND is_active = 1
+        `).get(userId) as { id: string; password_hash: string } | null;
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        // Verify old password
+        const isValidOld = await this.verifyPassword(oldPassword, user.password_hash);
+        if (!isValidOld) {
+            await this.logAuthAction(userId, 'password_change_failed', 'users', false, undefined, undefined, 'Invalid old password');
+            throw new Error('Invalid old password');
+        }
+
+        // Validate new password
+        if (newPassword.length < 8) {
+            throw new Error('New password must be at least 8 characters');
+        }
+
+        if (newPassword === oldPassword) {
+            throw new Error('New password must be different from old password');
+        }
+
+        // Hash and store new password
+        const newHash = await this.hashPassword(newPassword);
+        this.db.query('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(newHash, userId);
+
+        // Revoke all existing refresh tokens (force re-login with new password)
+        this.db.query('UPDATE refresh_tokens SET is_revoked = 1 WHERE user_id = ?').run(userId);
+
+        await this.logAuthAction(userId, 'password_changed', 'users', true);
+        log.info('Password changed', { userId });
+    }
+
+    /**
      * Refresh an access token using a refresh token
      */
     async refreshToken(refreshTokenValue: string): Promise<RefreshResult> {
-        const tokenHash = await this.hashPassword(refreshTokenValue);
+        const tokenHash = await this.hashTokenForLookup(refreshTokenValue);
 
         const refreshTokenRecord = this.db.query(`
             SELECT rt.id, rt.user_id, rt.expires_at, u.email, u.role, u.is_active
@@ -358,7 +496,7 @@ export class JWTService {
      */
     async logout(userId: string, refreshToken?: string): Promise<void> {
         if (refreshToken) {
-            const tokenHash = await this.hashPassword(refreshToken);
+            const tokenHash = await this.hashTokenForLookup(refreshToken);
             this.db.query('UPDATE refresh_tokens SET is_revoked = 1 WHERE token_hash = ?').run(tokenHash);
         }
 
@@ -409,22 +547,76 @@ export class JWTService {
     }
 
     /**
-     * Hash a password or token
+     * Check if a hash is a legacy SHA-256 hash (64 hex chars, no $ prefix)
+     * Argon2 hashes start with '$argon2'
      */
-    private async hashPassword(password: string): Promise<string> {
-        // Simple hash (use bcrypt or similar in production)
-        const encoder = new TextEncoder();
-        const data = encoder.encode(password + JWT_SECRET);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    private isLegacySha256Hash(hash: string): boolean {
+        return /^[0-9a-f]{64}$/.test(hash);
     }
 
     /**
-     * Verify a password against its hash
+     * Hash a password using argon2id via Bun.password
+     * Automatically handles per-password salting and produces constant-time-comparable hashes
+     */
+    private async hashPassword(password: string): Promise<string> {
+        return await Bun.password.hash(password, {
+            algorithm: 'argon2id',
+            memoryCost: 65536,  // 64 MiB
+            timeCost: 3,
+        });
+    }
+
+    /**
+     * Verify a password against its hash (supports both argon2 and legacy SHA-256)
+     * Uses constant-time comparison for argon2 hashes via Bun.password.verify
      */
     private async verifyPassword(password: string, hash: string): Promise<boolean> {
-        const computedHash = await this.hashPassword(password);
-        return computedHash === hash;
+        // Handle legacy SHA-256 hashes for backward compatibility
+        if (this.isLegacySha256Hash(hash)) {
+            return await this.verifyLegacySha256(password, hash);
+        }
+
+        // Modern argon2id verification (constant-time comparison built in)
+        try {
+            return await Bun.password.verify(password, hash);
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Verify against legacy SHA-256 hash format (for migration purposes only)
+     * This uses the old algorithm: SHA-256(password + old_secret)
+     */
+    private async verifyLegacySha256(password: string, hash: string): Promise<boolean> {
+        // The legacy hash used the JWT_SECRET at the time of hashing.
+        // We try both the current secret and the hardcoded default for migration.
+        const secretsToTry = [JWT_SECRET];
+        if (JWT_SECRET !== HARDCODED_DEFAULT_SECRET) {
+            secretsToTry.push(HARDCODED_DEFAULT_SECRET);
+        }
+
+        for (const secret of secretsToTry) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password + secret);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const computedHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            if (computedHash === hash) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Hash a token for DB lookup using SHA-256 (not a password hash - just for indexing)
+     * Refresh tokens are high-entropy random values, so SHA-256 is appropriate here.
+     */
+    private async hashTokenForLookup(token: string): Promise<string> {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(token);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
     /**
@@ -433,7 +625,7 @@ export class JWTService {
     private async generateRefreshToken(userId: string): Promise<string> {
         const tokenId = crypto.randomUUID();
         const tokenValue = tokenId + ':' + crypto.randomUUID();
-        const tokenHash = await this.hashPassword(tokenValue);
+        const tokenHash = await this.hashTokenForLookup(tokenValue);
         const expiresAt = Date.now() + this.parseExpiration(REFRESH_TOKEN_EXPIRATION);
 
         this.db.query(`

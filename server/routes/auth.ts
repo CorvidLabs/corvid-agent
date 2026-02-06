@@ -43,6 +43,9 @@ export function createAuthRoutes(config: AuthRoutesConfig) {
                     case '/register':
                         return await handleRegister(request);
 
+                    case '/change-password':
+                        return await handleChangePassword(request);
+
                     default:
                         return new Response(JSON.stringify({
                             error: { message: 'Auth endpoint not found', type: 'not_found', code: 404 }
@@ -252,6 +255,62 @@ export function createAuthRoutes(config: AuthRoutesConfig) {
             status: 200,
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
+    }
+
+    /**
+     * POST /api/auth/change-password
+     */
+    async function handleChangePassword(request: Request): Promise<Response> {
+        if (request.method !== 'POST') {
+            return new Response(JSON.stringify({
+                error: { message: 'Method not allowed', type: 'method_not_allowed', code: 405 }
+            }), {
+                status: 405,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
+        }
+
+        // Authenticate user
+        const user = await authMiddleware.authenticate(request);
+        if (!user) {
+            return new Response(JSON.stringify({
+                error: { message: 'Authentication required', type: 'authentication_error', code: 401 }
+            }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
+        }
+
+        const body = await request.json() as { oldPassword: string; newPassword: string };
+
+        if (!body.oldPassword || !body.newPassword) {
+            return new Response(JSON.stringify({
+                error: { message: 'Old password and new password are required', type: 'validation_error', code: 400 }
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
+        }
+
+        try {
+            await jwtService.changePassword(user.userId, body.oldPassword, body.newPassword);
+
+            return new Response(JSON.stringify({
+                success: true,
+                message: 'Password changed successfully. Please log in again.',
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Password change failed';
+            return new Response(JSON.stringify({
+                error: { message, type: 'validation_error', code: 400 }
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
+        }
     }
 
     /**
