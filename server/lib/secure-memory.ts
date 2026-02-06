@@ -2,6 +2,17 @@ import { createLogger } from './logger';
 
 const log = createLogger('SecureMemory');
 
+// AES-256-GCM encryption constants
+const ALGORITHM = 'AES-GCM';
+const KEY_LENGTH = 256;
+const IV_LENGTH = 12; // 96 bits, recommended for GCM
+const SALT_LENGTH = 16; // 128 bits
+const TAG_LENGTH = 128; // bits
+const PBKDF2_ITERATIONS = 600_000;
+
+/** Prefix used by the legacy "encryption" stub — used only for migration detection. */
+const LEGACY_PREFIX = 'encrypted_';
+
 export interface SecureBuffer {
     data: Uint8Array;
     zero(): void;
@@ -170,9 +181,7 @@ export class SecureMemoryManager {
         let mnemonicBuffer: SecureBuffer | null = null;
 
         try {
-            // TODO: Integrate with actual encryption/decryption
-            // For now, simulate decryption
-            const decryptedMnemonic = this.simulateDecryption(encryptedMnemonic, decryptionKey);
+            const decryptedMnemonic = await this.decrypt(encryptedMnemonic, decryptionKey);
             mnemonicBuffer = this.fromString(decryptedMnemonic);
 
             // Execute the function with the secure buffer (not a plain string)
@@ -245,13 +254,124 @@ export class SecureMemoryManager {
         }
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  AES-256-GCM Encryption / Decryption
+    // ────────────────────────────────────────────────────────────────
+
     /**
-     * Simulate decryption (placeholder for actual implementation)
+     * Derive an AES-256 CryptoKey from a passphrase and salt using PBKDF2.
      */
-    private static simulateDecryption(encrypted: string, _key: string): string {
-        // TODO: Replace with actual AES decryption
-        // This is just a placeholder
-        return encrypted.replace('encrypted_', '');
+    private static async deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(passphrase),
+            'PBKDF2',
+            false,
+            ['deriveKey'],
+        );
+
+        return crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt.buffer as ArrayBuffer,
+                iterations: PBKDF2_ITERATIONS,
+                hash: 'SHA-256',
+            },
+            keyMaterial,
+            { name: ALGORITHM, length: KEY_LENGTH },
+            false,
+            ['encrypt', 'decrypt'],
+        );
+    }
+
+    /**
+     * Encrypt plaintext with AES-256-GCM.
+     *
+     * Output format (base64-encoded):  salt(16) || iv(12) || ciphertext+tag
+     *
+     * A fresh random salt and IV are generated for every call, so identical
+     * plaintexts always produce different ciphertexts.
+     */
+    static async encrypt(plaintext: string, passphrase: string): Promise<string> {
+        const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+        const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+        const key = await this.deriveKey(passphrase, salt);
+
+        const encoder = new TextEncoder();
+        const ciphertext = await crypto.subtle.encrypt(
+            { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+            key,
+            encoder.encode(plaintext),
+        );
+
+        // Combine: salt || iv || ciphertext (includes GCM auth tag)
+        const combined = new Uint8Array(SALT_LENGTH + IV_LENGTH + ciphertext.byteLength);
+        combined.set(salt, 0);
+        combined.set(iv, SALT_LENGTH);
+        combined.set(new Uint8Array(ciphertext), SALT_LENGTH + IV_LENGTH);
+
+        // Zero intermediate buffers
+        salt.fill(0);
+        iv.fill(0);
+
+        return btoa(String.fromCharCode(...combined));
+    }
+
+    /**
+     * Decrypt ciphertext that was produced by {@link encrypt}.
+     *
+     * Also handles **legacy** data that used the old `encrypted_` prefix stub.
+     * Legacy data is returned as-is (with the prefix stripped) so callers can
+     * re-encrypt it with real encryption at their convenience.
+     *
+     * @throws {Error} On authentication failure (wrong key or tampered data).
+     */
+    static async decrypt(encrypted: string, passphrase: string): Promise<string> {
+        // ── Legacy migration: detect old "encrypted_" prefix format ──
+        if (encrypted.startsWith(LEGACY_PREFIX)) {
+            log.warn(
+                'Decrypting legacy encrypted_ prefix data — this format provides NO ' +
+                'cryptographic security. Re-encrypt with SecureMemoryManager.encrypt().',
+            );
+            return encrypted.slice(LEGACY_PREFIX.length);
+        }
+
+        // ── Real AES-256-GCM decryption ──
+        let combined: Uint8Array;
+        try {
+            combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
+        } catch {
+            throw new Error('Invalid ciphertext: not valid base64');
+        }
+
+        const minLength = SALT_LENGTH + IV_LENGTH + 1; // at least 1 byte of ciphertext
+        if (combined.length < minLength) {
+            throw new Error('Invalid ciphertext: data too short');
+        }
+
+        const salt = combined.slice(0, SALT_LENGTH);
+        const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+        const ciphertext = combined.slice(SALT_LENGTH + IV_LENGTH);
+
+        const key = await this.deriveKey(passphrase, salt);
+
+        try {
+            const decrypted = await crypto.subtle.decrypt(
+                { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+                key,
+                ciphertext,
+            );
+
+            return new TextDecoder().decode(decrypted);
+        } catch {
+            throw new Error('Decryption failed: wrong key or tampered ciphertext');
+        } finally {
+            // Zero sensitive intermediates
+            salt.fill(0);
+            iv.fill(0);
+            combined.fill(0);
+        }
     }
 }
 
