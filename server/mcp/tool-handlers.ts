@@ -53,6 +53,8 @@ export interface McpToolContext {
     network?: string;
     /** Work task service for creating agent work tasks. */
     workTaskService?: WorkTaskService;
+    /** Extend the current session's timeout by the given ms. */
+    extendTimeout?: (additionalMs: number) => boolean;
 }
 
 function textResult(text: string): CallToolResult {
@@ -221,6 +223,26 @@ export async function handleListAgents(
         log.error('MCP list_agents failed', { error: message });
         return errorResult(`Failed to list agents: ${message}`);
     }
+}
+
+export async function handleExtendTimeout(
+    ctx: McpToolContext,
+    args: { minutes: number },
+): Promise<CallToolResult> {
+    if (!ctx.extendTimeout) {
+        return errorResult('Timeout extension is not available for this session.');
+    }
+
+    const minutes = Math.max(1, Math.min(args.minutes, 120));
+    const ms = minutes * 60 * 1000;
+    const ok = ctx.extendTimeout(ms);
+
+    if (!ok) {
+        return errorResult('Failed to extend timeout — session may have already ended.');
+    }
+
+    log.info(`Session timeout extended by ${minutes} minutes`, { agentId: ctx.agentId });
+    return textResult(`Timeout extended by ${minutes} minutes.`);
 }
 
 // Rate limiter for corvid_create_work_task: max 5 per agent per day (persisted via DB)
