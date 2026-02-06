@@ -32,7 +32,7 @@ for port in 4001 4002 8980; do
         # Kill any stale listener on this port
         lsof -ti ":${port}" 2>/dev/null | xargs -r kill 2>/dev/null || true
         sleep 0.1
-        socat "TCP-LISTEN:${port},reuseaddr,fork" "TCP:${MAC_HOST}:${port}" &
+        socat "TCP-LISTEN:${port},reuseaddr,fork" "TCP:${MAC_HOST}:${port}" 2>/dev/null &
         SOCAT_PIDS+=($!)
         echo "[run.sh] Forwarding localhost:${port} → ${MAC_HOST}:${port}"
     else
