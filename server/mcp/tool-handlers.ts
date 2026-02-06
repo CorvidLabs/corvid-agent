@@ -43,7 +43,7 @@ export interface McpToolContext {
     agentDirectory: AgentDirectory;
     agentWalletService: AgentWalletService;
     depth?: number;
-    /** Session source — 'agent' sessions cannot use corvid_send_message. */
+    /** Session source — 'web', 'algochat', or 'agent'. */
     sessionSource?: string;
     /** Emit a status message for UI progress updates (e.g. "Querying CorvidLabs..."). */
     emitStatus?: (message: string) => void;
@@ -115,6 +115,7 @@ export async function handleSendMessage(
             toAgentId: match.agentId,
             content: args.message,
             threadId: args.thread,
+            depth: depth + 1,
         });
 
         ctx.emitStatus?.(`Received reply from ${match.agentName}`);

@@ -31,6 +31,8 @@ export interface AgentInvokeRequest {
     paymentMicro?: number;
     projectId?: string;
     threadId?: string;
+    /** Invocation depth for preventing infinite agent-to-agent chains. */
+    depth?: number;
 }
 
 export interface AgentInvokeResult {
@@ -247,8 +249,8 @@ export class AgentMessenger {
         // Subscribe to session events and buffer the response
         this.subscribeForAgentResponse(agentMessage.id, session.id, fromAgentId, toAgentId);
 
-        // Start the session process
-        this.processManager.startProcess(session, prompt);
+        // Start the session process (pass depth for invoke chain limiting)
+        this.processManager.startProcess(session, prompt, { depth: request.depth });
 
         const updatedMessage = getAgentMessage(this.db, agentMessage.id);
         return {
