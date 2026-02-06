@@ -2,13 +2,14 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy } from '@
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './shared/components/header.component';
 import { SidebarComponent } from './shared/components/sidebar.component';
+import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
 
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, HeaderComponent, SidebarComponent],
+    imports: [RouterOutlet, HeaderComponent, SidebarComponent, ToastContainerComponent],
     template: `
         <div class="app-layout">
             <app-header />
@@ -19,6 +20,7 @@ import { SessionService } from './core/services/session.service';
                 </main>
             </div>
         </div>
+        <app-toast-container />
     `,
     styles: `
         .app-layout {

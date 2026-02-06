@@ -22,6 +22,7 @@ interface SessionRow {
     council_launch_id: string | null;
     council_role: string | null;
     work_dir: string | null;
+    credits_consumed: number;
     created_at: string;
     updated_at: string;
 }
@@ -60,6 +61,7 @@ function rowToSession(row: SessionRow): Session {
         councilLaunchId: row.council_launch_id ?? null,
         councilRole: (row.council_role as Session['councilRole']) ?? null,
         workDir: row.work_dir ?? null,
+        creditsConsumed: row.credits_consumed ?? 0,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -252,4 +254,14 @@ export function updateConversationRound(db: Database, id: string, lastRound: num
 
 export function updateConversationSession(db: Database, id: string, sessionId: string): void {
     db.query('UPDATE algochat_conversations SET session_id = ? WHERE id = ?').run(sessionId, id);
+}
+
+/**
+ * Look up the participant wallet address for a session (via algochat_conversations).
+ */
+export function getParticipantForSession(db: Database, sessionId: string): string | null {
+    const row = db.query(
+        'SELECT participant_addr FROM algochat_conversations WHERE session_id = ?'
+    ).get(sessionId) as { participant_addr: string } | null;
+    return row?.participant_addr ?? null;
 }

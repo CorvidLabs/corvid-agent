@@ -15,6 +15,8 @@ import type { WorkTaskService } from '../work/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost, checkApiLimit } from '../db/spending';
+import { deductTurnCredits, getCreditConfig } from '../db/credits';
+import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ProcessManager');
@@ -23,6 +25,10 @@ const AGENT_TIMEOUT_MS = parseInt(process.env.AGENT_TIMEOUT_MS ?? String(30 * 60
 const MAX_RESTARTS = 3;
 const BACKOFF_BASE_MS = 5000;
 const STABLE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes uptime resets restart counter
+
+// Orphan pruning: every 5 minutes, clean subscriber/pausedSession entries
+// that reference sessions with no active process.
+const ORPHAN_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
 
 // Auto-resume backoff: 5min → 15min → 45min → cap at 60min
 const AUTO_RESUME_CHECK_MS = 60_000; // Check every minute
@@ -68,6 +74,7 @@ export class ProcessManager {
     private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private pausedSessions: Map<string, PausedSessionInfo> = new Map();
     private autoResumeTimer: ReturnType<typeof setInterval> | null = null;
+    private orphanPruneTimer: ReturnType<typeof setInterval> | null = null;
     readonly approvalManager: ApprovalManager;
 
     // MCP services — set after AlgoChat init
@@ -84,6 +91,7 @@ export class ProcessManager {
         this.cleanupStaleSessions();
         this.startTimeoutChecker();
         this.startAutoResumeChecker();
+        this.startOrphanPruner();
     }
 
     /** Register MCP-related services so agent sessions get corvid_* tools. */
@@ -380,19 +388,57 @@ export class ProcessManager {
         const cp = this.processes.get(sessionId);
         if (cp) {
             cp.kill();
-            this.processes.delete(sessionId);
-            this.sessionMeta.delete(sessionId);
-            this.clearStableTimer(sessionId);
-            this.clearSessionTimeout(sessionId);
-            this.approvalManager.cancelSession(sessionId);
             updateSessionPid(this.db, sessionId, null);
             updateSessionStatus(this.db, sessionId, 'stopped');
 
+            // Emit before cleanup so subscribers still receive the event
             this.emitEvent(sessionId, {
                 type: 'session_stopped',
                 session_id: sessionId,
             } as ClaudeStreamEvent);
+
+            this.cleanupSessionState(sessionId);
         }
+    }
+
+    /**
+     * Remove all in-memory state for a session. Idempotent — safe to call
+     * multiple times or for sessions that have already been partially cleaned.
+     *
+     * This is the single source of truth for memory cleanup. All exit paths
+     * (stopProcess, handleExit, shutdown) should funnel through here.
+     */
+    cleanupSessionState(sessionId: string): void {
+        this.processes.delete(sessionId);
+        this.sessionMeta.delete(sessionId);
+        this.subscribers.delete(sessionId);
+        this.pausedSessions.delete(sessionId);
+        this.clearStableTimer(sessionId);
+        this.clearSessionTimeout(sessionId);
+        this.approvalManager.cancelSession(sessionId);
+    }
+
+    /**
+     * Get a snapshot of in-memory Map sizes for monitoring / testing.
+     */
+    getMemoryStats(): {
+        processes: number;
+        subscribers: number;
+        sessionMeta: number;
+        pausedSessions: number;
+        sessionTimeouts: number;
+        stableTimers: number;
+        globalSubscribers: number;
+    } {
+        return {
+            processes: this.processes.size,
+            subscribers: this.subscribers.size,
+            sessionMeta: this.sessionMeta.size,
+            pausedSessions: this.pausedSessions.size,
+            sessionTimeouts: this.sessionTimeouts.size,
+            stableTimers: this.stableTimers.size,
+            globalSubscribers: this.globalSubscribers.size,
+        };
     }
 
     sendMessage(sessionId: string, content: string): boolean {
@@ -458,6 +504,22 @@ export class ProcessManager {
             clearInterval(this.autoResumeTimer);
             this.autoResumeTimer = null;
         }
+        if (this.orphanPruneTimer) {
+            clearInterval(this.orphanPruneTimer);
+            this.orphanPruneTimer = null;
+        }
+        this.approvalManager.shutdown();
+
+        // Kill all running processes first (stopProcess also calls cleanupSessionState)
+        for (const [sessionId] of this.processes) {
+            this.stopProcess(sessionId);
+        }
+
+        // Final sweep: clear any remaining entries (e.g. subscribers for
+        // sessions that were never started but had subscriptions registered)
+        this.subscribers.clear();
+        this.pausedSessions.clear();
+        this.sessionMeta.clear();
         for (const timer of this.stableTimers.values()) {
             clearTimeout(timer);
         }
@@ -466,11 +528,6 @@ export class ProcessManager {
             clearTimeout(timer);
         }
         this.sessionTimeouts.clear();
-        this.pausedSessions.clear();
-        this.approvalManager.shutdown();
-        for (const [sessionId] of this.processes) {
-            this.stopProcess(sessionId);
-        }
     }
 
     private handleApiOutage(sessionId: string): void {
@@ -483,6 +540,8 @@ export class ProcessManager {
         }
 
         this.clearStableTimer(sessionId);
+        this.clearSessionTimeout(sessionId);
+        this.subscribers.delete(sessionId);
         const now = Date.now();
         this.pausedSessions.set(sessionId, {
             pausedAt: now,
@@ -573,6 +632,39 @@ export class ProcessManager {
                     this.stopProcess(sessionId);
                     return;
                 }
+
+                // ── Credit system: deduct credits for AlgoChat sessions ──
+                if (meta.source === 'algochat') {
+                    const participantAddr = getParticipantForSession(this.db, sessionId);
+                    if (participantAddr) {
+                        const result = deductTurnCredits(this.db, participantAddr, sessionId);
+                        if (!result.success) {
+                            log.warn(`Credits exhausted mid-session — pausing session ${sessionId}`, {
+                                participantAddr: participantAddr.slice(0, 8) + '...',
+                            });
+                            this.emitEvent(sessionId, {
+                                type: 'error',
+                                error: {
+                                    message: `Session paused: credits exhausted. Send ALGO to resume. Use /credits to check balance.`,
+                                    type: 'credits_exhausted',
+                                },
+                            } as ClaudeStreamEvent);
+                            this.stopProcess(sessionId);
+                            return;
+                        }
+                        if (result.isLow) {
+                            const config = getCreditConfig(this.db);
+                            log.info(`Low credits warning for session ${sessionId}`, {
+                                remaining: result.creditsRemaining,
+                                threshold: config.lowCreditThreshold,
+                            });
+                            this.emitEvent(sessionId, {
+                                type: 'system',
+                                message: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
+                            } as unknown as ClaudeStreamEvent);
+                        }
+                    }
+                }
             }
         }
 
@@ -582,15 +674,12 @@ export class ProcessManager {
     private handleExit(sessionId: string, code: number | null): void {
         log.info(`Process exited for session ${sessionId}`, { code });
         const meta = this.sessionMeta.get(sessionId);
-        this.processes.delete(sessionId);
-        this.clearStableTimer(sessionId);
-        this.clearSessionTimeout(sessionId);
-        this.approvalManager.cancelSession(sessionId);
         updateSessionPid(this.db, sessionId, null);
 
         const status = code === 0 ? 'idle' : 'error';
         updateSessionStatus(this.db, sessionId, status);
 
+        // Emit before cleanup so subscribers still receive the exit event
         this.emitEvent(sessionId, {
             type: 'session_exited',
             session_id: sessionId,
@@ -600,11 +689,19 @@ export class ProcessManager {
             num_turns: 0,
         } as ClaudeStreamEvent);
 
-        // Auto-restart for AlgoChat sessions on non-zero exit
+        // Auto-restart for AlgoChat sessions on non-zero exit.
+        // attemptRestart needs meta, so we extract it before cleanup.
         if (code !== 0 && meta?.source === 'algochat') {
+            // Clean everything except sessionMeta (attemptRestart needs it)
+            this.processes.delete(sessionId);
+            this.subscribers.delete(sessionId);
+            this.pausedSessions.delete(sessionId);
+            this.clearStableTimer(sessionId);
+            this.clearSessionTimeout(sessionId);
+            this.approvalManager.cancelSession(sessionId);
             this.attemptRestart(sessionId, meta);
         } else {
-            this.sessionMeta.delete(sessionId);
+            this.cleanupSessionState(sessionId);
         }
     }
 
@@ -836,5 +933,49 @@ export class ProcessManager {
                 log.warn('Auto-resume health check error', { error: err instanceof Error ? err.message : String(err) });
             });
         }, AUTO_RESUME_CHECK_MS);
+    }
+
+    /**
+     * Periodic safety-net: prune subscriber and pausedSession entries that
+     * reference sessions with no active process. This catches any entries that
+     * slipped through the normal exit paths (e.g. due to unhandled exceptions,
+     * race conditions between concurrent operations, or bugs in callback cleanup).
+     *
+     * Runs every ORPHAN_PRUNE_INTERVAL_MS. Deliberately conservative — only
+     * removes entries where the session has no process AND is not paused (waiting
+     * for auto-resume).
+     */
+    private startOrphanPruner(): void {
+        this.orphanPruneTimer = setInterval(() => {
+            let pruned = 0;
+
+            // Prune subscriber entries for sessions with no active process
+            // and no paused entry (paused sessions may still receive events
+            // when they resume).
+            for (const sessionId of this.subscribers.keys()) {
+                if (!this.processes.has(sessionId) && !this.pausedSessions.has(sessionId)) {
+                    this.subscribers.delete(sessionId);
+                    pruned++;
+                }
+            }
+
+            // Prune sessionMeta for sessions with no active process and not
+            // scheduled for restart (restartCount handled by attemptRestart timeout).
+            for (const sessionId of this.sessionMeta.keys()) {
+                if (!this.processes.has(sessionId) && !this.pausedSessions.has(sessionId)) {
+                    this.sessionMeta.delete(sessionId);
+                    pruned++;
+                }
+            }
+
+            if (pruned > 0) {
+                log.info(`Orphan pruner cleaned ${pruned} stale entries`, {
+                    subscribers: this.subscribers.size,
+                    sessionMeta: this.sessionMeta.size,
+                    pausedSessions: this.pausedSessions.size,
+                    processes: this.processes.size,
+                });
+            }
+        }, ORPHAN_PRUNE_INTERVAL_MS);
     }
 }
