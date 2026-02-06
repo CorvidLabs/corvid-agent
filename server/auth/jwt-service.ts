@@ -3,8 +3,18 @@ import type { Database } from 'bun:sqlite';
 
 const log = createLogger('JWTService');
 
-// JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'corvid-agent-jwt-secret-change-in-production';
+// JWT configuration — JWT_SECRET is REQUIRED in production.
+// In development (NODE_ENV !== 'production'), a default is used with a warning.
+const DEV_SECRET = 'corvid-dev-jwt-secret-NOT-FOR-PRODUCTION';
+const JWT_SECRET = (() => {
+    const secret = process.env.JWT_SECRET?.trim();
+    if (secret) return secret;
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET environment variable is required in production. Set it in your .env file.');
+    }
+    log.warn('JWT_SECRET not set — using insecure dev default. Set JWT_SECRET in .env for production.');
+    return DEV_SECRET;
+})();
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '24h';
 const REFRESH_TOKEN_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || '30d';
 
@@ -130,21 +140,35 @@ export class JWTService {
     }
 
     /**
-     * Create default admin user if no users exist
+     * Create default admin user if no users exist.
+     * Uses ADMIN_PASSWORD env var if set, otherwise generates a random password
+     * and logs it once at startup.
      */
     private async createDefaultAdmin(): Promise<void> {
         const userCount = this.db.query('SELECT COUNT(*) as count FROM users').get() as { count: number };
 
         if (userCount.count === 0) {
             const defaultEmail = 'admin@corvid-agent.local';
-            const defaultPassword = 'admin123'; // Should be changed immediately
+            const defaultPassword = process.env.ADMIN_PASSWORD?.trim()
+                || crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+            const passwordSource = process.env.ADMIN_PASSWORD ? 'ADMIN_PASSWORD env var' : 'auto-generated';
 
             await this.createUser(defaultEmail, defaultPassword, 'admin');
 
-            log.warn('Created default admin user', {
-                email: defaultEmail,
-                message: 'Please change the default password immediately'
-            });
+            if (!process.env.ADMIN_PASSWORD) {
+                log.warn('========================================================');
+                log.warn('  DEFAULT ADMIN ACCOUNT CREATED');
+                log.warn(`  Email:    ${defaultEmail}`);
+                log.warn(`  Password: ${defaultPassword}`);
+                log.warn('  Save this password — it will NOT be shown again.');
+                log.warn('  Or set ADMIN_PASSWORD in .env before first run.');
+                log.warn('========================================================');
+            } else {
+                log.info('Default admin user created', {
+                    email: defaultEmail,
+                    passwordSource,
+                });
+            }
         }
     }
 
