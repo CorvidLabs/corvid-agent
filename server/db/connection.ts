@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { chmodSync, existsSync } from 'node:fs';
 import { runMigrations } from './schema';
+import { initCreditConfigFromEnv } from './credits';
 
 let db: Database | null = null;
 
@@ -21,6 +22,7 @@ export function getDb(path: string = 'corvid-agent.db'): Database {
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
+    initCreditConfigFromEnv(db);
 
     setDbFilePermissions(path);
 

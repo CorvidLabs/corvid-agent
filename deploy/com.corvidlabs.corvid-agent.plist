@@ -27,6 +27,13 @@
     <key>RunAtLoad</key>
     <true/>
 
+    <!--
+        Restart policy: restart on non-zero exit only.
+        ThrottleInterval prevents crash-loop CPU burn — launchd will wait at
+        least this many seconds before restarting after a failure.
+        Note: launchd has no equivalent to systemd's StartLimitBurst, so a
+        persistently broken config will still restart every 30s. Monitor logs.
+    -->
     <key>KeepAlive</key>
     <dict>
         <key>SuccessfulExit</key>
@@ -34,7 +41,7 @@
     </dict>
 
     <key>ThrottleInterval</key>
-    <integer>5</integer>
+    <integer>30</integer>
 
     <key>StandardOutPath</key>
     <string>__LOG_DIR__/corvid-agent.stdout.log</string>

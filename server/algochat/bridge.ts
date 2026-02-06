@@ -21,6 +21,14 @@ import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
+import {
+    getBalance,
+    purchaseCredits,
+    maybeGrantFirstTimeCredits,
+    canStartSession,
+    getCreditConfig,
+    getTransactionHistory,
+} from '../db/credits';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { saveAlgoChatMessage } from '../db/algochat-messages';
@@ -377,6 +385,41 @@ export class AlgoChatBridge {
                 return true;
             }
 
+            case '/credits': {
+                const balance = getBalance(this.db, participant);
+                const config = getCreditConfig(this.db);
+                const lines = [
+                    `💰 Credit Balance:`,
+                    `  Available: ${balance.available} credits`,
+                    `  Reserved: ${balance.reserved} credits`,
+                    `  Total: ${balance.credits} credits`,
+                    `  Purchased: ${balance.totalPurchased} | Used: ${balance.totalConsumed}`,
+                    ``,
+                    `📊 Rates:`,
+                    `  1 ALGO = ${config.creditsPerAlgo} credits`,
+                    `  1 turn = ${config.creditsPerTurn} credit(s)`,
+                    `  1 agent message = ${config.creditsPerAgentMessage} credit(s)`,
+                    ``,
+                    `Send ALGO to this address to purchase credits.`,
+                ];
+                this.sendResponse(participant, lines.join('\n'));
+                return true;
+            }
+
+            case '/history': {
+                const limit = parseInt(parts[1], 10) || 10;
+                const transactions = getTransactionHistory(this.db, participant, Math.min(limit, 20));
+                if (transactions.length === 0) {
+                    this.sendResponse(participant, 'No credit transactions yet.');
+                    return true;
+                }
+                const lines = transactions.map((t) =>
+                    `${t.type === 'purchase' || t.type === 'grant' ? '+' : '-'}${t.amount} [${t.type}] → bal:${t.balanceAfter} (${t.createdAt})`
+                );
+                this.sendResponse(participant, `📜 Recent Transactions:\n${lines.join('\n')}`);
+                return true;
+            }
+
             case '/work': {
                 const description = parts.slice(1).join(' ');
                 if (!description) {
@@ -661,8 +704,61 @@ export class AlgoChatBridge {
         // Emit feed event only for external (non-agent) messages
         this.emitEvent(participant, content, 'inbound', fee);
 
+        // ── Credit system: detect payments and convert to credits ─────────
+        // Any ALGO sent above minimum transaction fee gets converted to credits.
+        // The fee field from AlgoChat represents the total payment amount.
+        const MIN_TXFEE_MICRO = 1000; // Minimum Algorand txn fee
+        if (fee && fee > MIN_TXFEE_MICRO) {
+            const paymentMicro = fee - MIN_TXFEE_MICRO; // Subtract base fee
+            if (paymentMicro > 0) {
+                const creditsAdded = purchaseCredits(this.db, participant, paymentMicro);
+                if (creditsAdded > 0) {
+                    const balance = getBalance(this.db, participant);
+                    log.info('Credits purchased from ALGO payment', {
+                        participant: participant.slice(0, 8) + '...',
+                        paymentMicro,
+                        creditsAdded,
+                        newBalance: balance.available,
+                    });
+                    // Don't send a separate message for small purchases bundled with a chat message
+                    // Only notify for explicit large payments (> 0.1 ALGO)
+                    if (paymentMicro >= 100_000) {
+                        this.sendResponse(participant,
+                            `💰 +${creditsAdded} credits purchased! Balance: ${balance.available} credits`
+                        );
+                    }
+                }
+            }
+        }
+
+        // Grant first-time credits if this is a new wallet
+        const firstTimeCredits = maybeGrantFirstTimeCredits(this.db, participant);
+        if (firstTimeCredits > 0) {
+            const balance = getBalance(this.db, participant);
+            this.sendResponse(participant,
+                `🎉 Welcome! You've received ${firstTimeCredits} free credits to get started.\n` +
+                `Balance: ${balance.available} credits\n` +
+                `Use /credits to check balance, send ALGO to buy more.`
+            );
+        }
+
         // Check for commands first
         if (this.handleCommand(participant, content)) return;
+
+        // ── Credit check: ensure participant has credits before proceeding ──
+        const creditCheck = canStartSession(this.db, participant);
+        if (!creditCheck.allowed) {
+            log.info('Insufficient credits, blocking message', {
+                participant: participant.slice(0, 8) + '...',
+                credits: creditCheck.credits,
+            });
+            this.sendResponse(participant,
+                `⚠️ Insufficient credits (${creditCheck.credits} remaining).\n` +
+                `Send ALGO to purchase credits (1 ALGO = ${getCreditConfig(this.db).creditsPerAlgo} credits).\n` +
+                `Use /credits to check your balance.`
+            );
+            return;
+        }
 
         // Auto micro-fund agent wallet on localnet for incoming messages
         if (this.config.network === 'localnet' && this.agentWalletService) {

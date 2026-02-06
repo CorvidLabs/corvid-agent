@@ -1,0 +1,58 @@
+# === Secrets & credentials ===
+.env
+.env.*
+!.env.example
+wallet-keystore.json
+
+# === Database files ===
+*.db
+*.db-shm
+*.db-wal
+backups/
+
+# === Git ===
+.git
+.gitignore
+
+# === Dependencies (rebuilt in container) ===
+node_modules
+
+# === Build artifacts ===
+dist/
+build/
+test-results/
+coverage/
+.nyc_output/
+
+# === Development / IDE ===
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# === CI/CD & deploy configs (not needed in image) ===
+.github/
+deploy/
+docker/
+docs/
+e2e/
+
+# === Documentation ===
+*.md
+LICENSE
+
+# === macOS artifacts ===
+.claude/
+AppState/
+
+# === Work task scratch space ===
+.corvid-worktrees/
+
+# === Misc development files ===
+run.sh
+jest.config.js
+playwright.config.js
+bunfig.toml
+tsconfig.json
