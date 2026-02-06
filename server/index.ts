@@ -228,7 +228,13 @@ log.info(`Server running at http://localhost:${PORT}`);
 
 // Global error handlers for 24/7 operation
 process.on('unhandledRejection', (reason) => {
-    log.error('Unhandled rejection', { reason: reason instanceof Error ? reason.message : String(reason) });
+    const message = reason instanceof Error ? reason.message : String(reason);
+    // Abort errors are expected when killing sessions — downgrade to debug
+    if (message === 'Operation aborted' || message === 'The operation was aborted' || (reason instanceof Error && reason.name === 'AbortError')) {
+        log.debug('Unhandled rejection (abort — expected during session cleanup)', { reason: message });
+        return;
+    }
+    log.error('Unhandled rejection', { reason: message });
 });
 
 process.on('uncaughtException', (err) => {

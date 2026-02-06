@@ -64,6 +64,7 @@ export class ProcessManager {
     private sessionMeta: Map<string, SessionMeta> = new Map();
     private db: Database;
     private timeoutTimer: ReturnType<typeof setInterval> | null = null;
+    private sessionTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private pausedSessions: Map<string, PausedSessionInfo> = new Map();
     private autoResumeTimer: ReturnType<typeof setInterval> | null = null;
@@ -225,6 +226,9 @@ export class ProcessManager {
         // Start stable period timer — resets restart counter after sustained uptime
         this.startStableTimer(session.id);
 
+        // Start per-session timeout — fires exactly at AGENT_TIMEOUT_MS
+        this.startSessionTimeout(session.id);
+
         log.info(`Started process for session ${session.id}`, { pid: process.pid });
 
         this.emitEvent(session.id, {
@@ -327,6 +331,9 @@ export class ProcessManager {
 
         // Start stable period timer — resets restart counter after sustained uptime
         this.startStableTimer(session.id);
+
+        // Start per-session timeout — fires exactly at AGENT_TIMEOUT_MS
+        this.startSessionTimeout(session.id);
     }
 
     private buildResumePrompt(session: Session, newPrompt?: string): string {
@@ -372,6 +379,7 @@ export class ProcessManager {
             this.processes.delete(sessionId);
             this.sessionMeta.delete(sessionId);
             this.clearStableTimer(sessionId);
+            this.clearSessionTimeout(sessionId);
             this.approvalManager.cancelSession(sessionId);
             updateSessionPid(this.db, sessionId, null);
             updateSessionStatus(this.db, sessionId, 'stopped');
@@ -450,6 +458,10 @@ export class ProcessManager {
             clearTimeout(timer);
         }
         this.stableTimers.clear();
+        for (const timer of this.sessionTimeouts.values()) {
+            clearTimeout(timer);
+        }
+        this.sessionTimeouts.clear();
         this.pausedSessions.clear();
         this.approvalManager.shutdown();
         for (const [sessionId] of this.processes) {
@@ -568,6 +580,7 @@ export class ProcessManager {
         const meta = this.sessionMeta.get(sessionId);
         this.processes.delete(sessionId);
         this.clearStableTimer(sessionId);
+        this.clearSessionTimeout(sessionId);
         this.approvalManager.cancelSession(sessionId);
         updateSessionPid(this.db, sessionId, null);
 
@@ -674,6 +687,35 @@ export class ProcessManager {
         }
     }
 
+    private startSessionTimeout(sessionId: string): void {
+        this.clearSessionTimeout(sessionId);
+        const timer = setTimeout(() => {
+            this.sessionTimeouts.delete(sessionId);
+            if (!this.processes.has(sessionId)) return;
+            const meta = this.sessionMeta.get(sessionId);
+            const elapsed = meta ? Date.now() - meta.startedAt : AGENT_TIMEOUT_MS;
+            log.warn(`Session ${sessionId} exceeded timeout`, {
+                elapsedMs: elapsed,
+                timeoutMs: AGENT_TIMEOUT_MS,
+            });
+            this.stopProcess(sessionId);
+        }, AGENT_TIMEOUT_MS);
+        this.sessionTimeouts.set(sessionId, timer);
+    }
+
+    private clearSessionTimeout(sessionId: string): void {
+        const timer = this.sessionTimeouts.get(sessionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.sessionTimeouts.delete(sessionId);
+        }
+    }
+
+    /**
+     * Polling fallback: catches sessions that somehow survive past their
+     * per-session timeout (e.g. timer was lost due to a bug). Runs every 60s
+     * as a safety net — the per-session setTimeout is the primary mechanism.
+     */
     private startTimeoutChecker(): void {
         this.timeoutTimer = setInterval(() => {
             const now = Date.now();
@@ -681,7 +723,7 @@ export class ProcessManager {
                 if (!this.processes.has(sessionId)) continue;
                 const elapsed = now - meta.startedAt;
                 if (elapsed > AGENT_TIMEOUT_MS) {
-                    log.warn(`Session ${sessionId} exceeded timeout`, {
+                    log.warn(`Session ${sessionId} exceeded timeout (fallback checker)`, {
                         elapsedMs: elapsed,
                         timeoutMs: AGENT_TIMEOUT_MS,
                     });
