@@ -641,7 +641,8 @@ async function runDiscussionRounds(
         // Map agentId → sessionId for agents that successfully started
         const agentSessionMap = new Map<string, string>();
 
-        for (const agentId of council.agentIds) {
+        for (let i = 0; i < council.agentIds.length; i++) {
+            const agentId = council.agentIds[i];
             const agent = getAgent(db, agentId);
             const agentName = agent?.name ?? agentId.slice(0, 8);
             const prompt = buildDiscussionPrompt(originalPrompt, memberResponses, priorDiscussion, round);
@@ -663,6 +664,11 @@ async function runDiscussionRounds(
             } catch (err) {
                 const errMsg = err instanceof Error ? err.message : String(err);
                 emitLog(db, launchId, 'error', `Failed to start discusser for ${agentName}`, errMsg);
+            }
+
+            // Stagger process spawns to avoid overwhelming the API
+            if (i < council.agentIds.length - 1) {
+                await new Promise((r) => setTimeout(r, 500));
             }
         }
 
@@ -806,12 +812,9 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[]): 
             }
         }, DISCUSSION_SESSION_TIMEOUT_MS);
 
+        // Subscribe FIRST, then check isRunning — this closes the race window
+        // where a process exits between the isRunning check and subscribe call.
         for (const sessionId of sessionIds) {
-            if (!processManager.isRunning(sessionId)) {
-                pending.delete(sessionId);
-                continue;
-            }
-
             const callback: EventCallback = (sid, event) => {
                 if (sid !== sessionId) return;
                 if (event.type === 'session_exited' || event.type === 'session_stopped') {
@@ -821,6 +824,11 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[]): 
             };
             callbacks.set(sessionId, callback);
             processManager.subscribe(sessionId, callback);
+
+            // If the process already exited before we subscribed, handle it now
+            if (!processManager.isRunning(sessionId)) {
+                pending.delete(sessionId);
+            }
         }
 
         checkDone();
@@ -909,12 +917,9 @@ function watchSessionsForAutoAdvance(
         }
     };
 
+    // Subscribe FIRST, then check isRunning — closes the race window where
+    // a process exits between the isRunning check and the subscribe call.
     for (const sessionId of sessionIds) {
-        if (!processManager.isRunning(sessionId)) {
-            pending.delete(sessionId);
-            continue;
-        }
-
         const callback: EventCallback = (sid, event) => {
             if (sid !== sessionId) return;
             if (event.type === 'session_exited' || event.type === 'session_stopped') {
@@ -928,6 +933,11 @@ function watchSessionsForAutoAdvance(
 
         callbacks.set(sessionId, callback);
         processManager.subscribe(sessionId, callback);
+
+        // If the process already exited before we subscribed, handle it now
+        if (!processManager.isRunning(sessionId)) {
+            pending.delete(sessionId);
+        }
     }
 
     checkAllDone();
