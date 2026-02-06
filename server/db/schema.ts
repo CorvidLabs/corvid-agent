@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 20;
+const SCHEMA_VERSION = 21;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -299,6 +299,10 @@ const MIGRATIONS: Record<number, string[]> = {
 
         // Track credits consumed per session
         `ALTER TABLE sessions ADD COLUMN credits_consumed INTEGER DEFAULT 0`,
+    ],
+    21: [
+        // MCP tool permission scoping: null = default safe set, JSON array = explicit list
+        `ALTER TABLE agents ADD COLUMN mcp_tool_permissions TEXT DEFAULT NULL`,
     ],
 };
 

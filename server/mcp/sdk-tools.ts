@@ -2,6 +2,21 @@ import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig } from './tool-handlers';
+import { getAgent } from '../db/agents';
+
+/** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
+const DEFAULT_ALLOWED_TOOLS = new Set([
+    'corvid_send_message',
+    'corvid_save_memory',
+    'corvid_recall_memory',
+    'corvid_list_agents',
+    'corvid_extend_timeout',
+    'corvid_check_credits',
+    'corvid_create_work_task',
+]);
+
+/** Tools that require an explicit grant in mcp_tool_permissions. */
+// corvid_grant_credits, corvid_credit_config
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
     const tools = [
@@ -101,9 +116,15 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         ] : []),
     ];
 
+    // Filter tools by agent's mcp_tool_permissions
+    const agent = getAgent(ctx.db, ctx.agentId);
+    const permissions = agent?.mcpToolPermissions;
+    const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
+    const filteredTools = tools.filter((t) => allowedSet.has(t.name));
+
     return createSdkMcpServer({
         name: 'corvid-agent-tools',
         version: '1.0.0',
-        tools,
+        tools: filteredTools,
     });
 }
