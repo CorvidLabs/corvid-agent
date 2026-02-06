@@ -103,7 +103,7 @@ export class ProcessManager {
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
-    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string): McpToolContext | null {
+    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number): McpToolContext | null {
         if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
         return {
             agentId,
@@ -111,6 +111,7 @@ export class ProcessManager {
             agentMessenger: this.mcpMessenger,
             agentDirectory: this.mcpDirectory,
             agentWalletService: this.mcpWalletService,
+            depth,
             sessionSource,
             serverMnemonic: this.mcpEncryptionConfig.serverMnemonic,
             network: this.mcpEncryptionConfig.network,
@@ -134,7 +135,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -166,10 +167,10 @@ export class ProcessManager {
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
         // All agents route through SDK path so they receive MCP tools (corvid_*)
-        this.startSdkProcessWrapped(session, project, agent, resolvedPrompt);
+        this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth);
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number): void {
         // Use session-level workDir override (e.g. git worktree for work tasks)
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -178,7 +179,7 @@ export class ProcessManager {
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;

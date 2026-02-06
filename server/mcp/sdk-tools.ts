@@ -4,28 +4,20 @@ import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask } from './tool-handlers';
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
-    // Agent-sourced sessions (responding to another agent's message) get
-    // restricted tools: no corvid_send_message to prevent cascading
-    // agent-to-agent conversation loops that burn ALGO indefinitely.
-    const isAgentSession = ctx.sessionSource === 'agent';
-
     const tools = [
-        // Only allow sending messages from non-agent sessions (web, algochat)
-        ...(!isAgentSession ? [
-            tool(
-                'corvid_send_message',
-                'Send a message to another agent and wait for their response. ' +
-                'Use corvid_list_agents first to discover available agents. ' +
-                'The target agent will start a session, process your message, and return a response. ' +
-                'To continue an existing conversation, pass the thread ID returned from a previous message.',
-                {
-                    to_agent: z.string().describe('Agent name or ID to message'),
-                    message: z.string().describe('The message to send'),
-                    thread: z.string().optional().describe('Thread ID to continue a conversation. Omit to start new.'),
-                },
-                async (args) => handleSendMessage(ctx, args),
-            ),
-        ] : []),
+        tool(
+            'corvid_send_message',
+            'Send a message to another agent and wait for their response. ' +
+            'Use corvid_list_agents first to discover available agents. ' +
+            'The target agent will start a session, process your message, and return a response. ' +
+            'To continue an existing conversation, pass the thread ID returned from a previous message.',
+            {
+                to_agent: z.string().describe('Agent name or ID to message'),
+                message: z.string().describe('The message to send'),
+                thread: z.string().optional().describe('Thread ID to continue a conversation. Omit to start new.'),
+            },
+            async (args) => handleSendMessage(ctx, args),
+        ),
         tool(
             'corvid_save_memory',
             'Save a private encrypted note to your memory. ' +
