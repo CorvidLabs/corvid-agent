@@ -311,8 +311,10 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             this.walletBalance.set(balanceInfo.balance);
         }
 
-        // Load messages
-        this.agentService.getMessages(id).then((msgs) => this.messages.set(msgs)).catch(() => {});
+        // Load messages — on failure, leave messages empty rather than silently failing
+        this.agentService.getMessages(id).then((msgs) => this.messages.set(msgs)).catch(() => {
+            this.messages.set([]);
+        });
 
         // Load other agents for invoke form
         await this.agentService.loadAgents();
@@ -323,10 +325,12 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             this.agentNameCache[a.id] = a.name;
         }
 
-        // Load work tasks
+        // Load work tasks — on failure, leave tasks empty rather than silently failing
         this.workTaskService.loadTasks(id).then(() => {
             this.workTasks.set(this.workTaskService.tasks());
-        }).catch(() => {});
+        }).catch(() => {
+            this.workTasks.set([]);
+        });
         this.workTaskService.startListening();
 
         // Subscribe to live balance, message, and work task updates

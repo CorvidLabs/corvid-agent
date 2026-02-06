@@ -11,6 +11,7 @@ import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
+import { SessionLifecycleManager } from './process/session-lifecycle';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkWsAuth } from './lib/auth';
@@ -40,6 +41,9 @@ const db = getDb();
 
 // Initialize process manager
 const processManager = new ProcessManager(db);
+
+// Initialize session lifecycle manager for automatic cleanup of expired sessions
+const sessionLifecycle = new SessionLifecycleManager(db);
 
 // Initialize AlgoChat
 const algochatConfig = loadAlgoChatConfig();
@@ -224,6 +228,9 @@ initAlgoChat().then(() => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
 });
 
+// Start session lifecycle cleanup after server is running
+sessionLifecycle.start();
+
 log.info(`Server running at http://localhost:${PORT}`);
 
 // Global error handlers for 24/7 operation
@@ -239,6 +246,7 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (err) => {
     log.error('Uncaught exception, shutting down', { error: err.message, stack: err.stack });
+    sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();
@@ -248,6 +256,7 @@ process.on('uncaughtException', (err) => {
 // Graceful shutdown
 process.on('SIGINT', () => {
     log.info('Shutting down (SIGINT)');
+    sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();
@@ -256,6 +265,7 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
     log.info('Shutting down (SIGTERM)');
+    sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();

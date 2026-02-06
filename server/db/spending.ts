@@ -24,18 +24,26 @@ function ensureRow(db: Database, date: string): void {
 
 export function recordAlgoSpend(db: Database, microAlgos: number): void {
     const date = today();
-    ensureRow(db, date);
-    db.query(
-        `UPDATE daily_spending SET algo_micro = algo_micro + ? WHERE date = ?`
-    ).run(microAlgos, date);
+    // Wrap INSERT OR IGNORE + UPDATE atomically to prevent race between
+    // concurrent async operations that could both try to initialize the row.
+    const record = db.transaction(() => {
+        ensureRow(db, date);
+        db.query(
+            `UPDATE daily_spending SET algo_micro = algo_micro + ? WHERE date = ?`
+        ).run(microAlgos, date);
+    });
+    record();
 }
 
 export function recordApiCost(db: Database, usd: number): void {
     const date = today();
-    ensureRow(db, date);
-    db.query(
-        `UPDATE daily_spending SET api_cost_usd = api_cost_usd + ? WHERE date = ?`
-    ).run(usd, date);
+    const record = db.transaction(() => {
+        ensureRow(db, date);
+        db.query(
+            `UPDATE daily_spending SET api_cost_usd = api_cost_usd + ? WHERE date = ?`
+        ).run(usd, date);
+    });
+    record();
 }
 
 export function getDailyTotals(db: Database): DailyTotals {
@@ -52,15 +60,20 @@ export function getDailyTotals(db: Database): DailyTotals {
 }
 
 export function checkAlgoLimit(db: Database, additionalMicro: number): void {
-    const totals = getDailyTotals(db);
-    const projected = totals.algoMicro + additionalMicro;
-    if (projected > DAILY_ALGO_LIMIT_MICRO) {
-        const limitAlgo = (DAILY_ALGO_LIMIT_MICRO / 1_000_000).toFixed(6);
-        const currentAlgo = (totals.algoMicro / 1_000_000).toFixed(6);
-        const message = `Daily ALGO spending limit reached: ${currentAlgo}/${limitAlgo} ALGO`;
-        log.warn(message);
-        throw new Error(message);
-    }
+    // Read totals inside a transaction so the limit check is consistent
+    // with the current spending state — prevents TOCTOU race.
+    const check = db.transaction(() => {
+        const totals = getDailyTotals(db);
+        const projected = totals.algoMicro + additionalMicro;
+        if (projected > DAILY_ALGO_LIMIT_MICRO) {
+            const limitAlgo = (DAILY_ALGO_LIMIT_MICRO / 1_000_000).toFixed(6);
+            const currentAlgo = (totals.algoMicro / 1_000_000).toFixed(6);
+            const message = `Daily ALGO spending limit reached: ${currentAlgo}/${limitAlgo} ALGO`;
+            log.warn(message);
+            throw new Error(message);
+        }
+    });
+    check();
 }
 
 export function getSpendingLimits(): { algoMicro: number } {
