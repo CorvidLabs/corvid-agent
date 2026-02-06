@@ -14,7 +14,7 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
-import { recordApiCost, checkApiLimit } from '../db/spending';
+import { recordApiCost } from '../db/spending';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
@@ -149,20 +149,6 @@ export class ProcessManager {
     startProcess(session: Session, prompt?: string, options?: { depth?: number }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
-        }
-
-        // Enforce daily API budget before starting a new session
-        try {
-            checkApiLimit(this.db, 0);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.warn(`Budget limit reached, refusing to start session ${session.id}`, { error: message });
-            updateSessionStatus(this.db, session.id, 'error');
-            this.emitEvent(session.id, {
-                type: 'error',
-                error: { message, type: 'budget_error' },
-            } as ClaudeStreamEvent);
-            return;
         }
 
         const project = getProject(this.db, session.projectId);
@@ -618,21 +604,6 @@ export class ProcessManager {
                 }
                 meta.lastKnownCostUsd = event.total_cost_usd;
 
-                // Mid-session budget enforcement: stop session if daily limit exceeded
-                try {
-                    checkApiLimit(this.db, 0);
-                } catch {
-                    log.warn(`Daily budget exceeded mid-session — stopping session ${sessionId}`, {
-                        sessionCost: event.total_cost_usd,
-                    });
-                    this.emitEvent(sessionId, {
-                        type: 'error',
-                        error: { message: 'Session stopped: daily API budget exhausted', type: 'budget_error' },
-                    } as ClaudeStreamEvent);
-                    this.stopProcess(sessionId);
-                    return;
-                }
-
                 // ── Credit system: deduct credits for AlgoChat sessions ──
                 if (meta.source === 'algochat') {
                     const participantAddr = getParticipantForSession(this.db, sessionId);
@@ -884,14 +855,6 @@ export class ProcessManager {
                         type: 'error',
                         error: { message: `Auto-resume abandoned after ${info.resumeAttempts} attempts`, type: 'auto_resume_exhausted' },
                     } as ClaudeStreamEvent);
-                    continue;
-                }
-
-                // Check budget before attempting resume
-                try {
-                    checkApiLimit(this.db, 0);
-                } catch {
-                    log.debug(`Skipping auto-resume for ${sessionId} — budget exhausted`);
                     continue;
                 }
 

@@ -4,7 +4,7 @@ import { createLogger } from '../lib/logger';
 const log = createLogger('SpendingTracker');
 
 const DAILY_ALGO_LIMIT_MICRO = parseInt(process.env.DAILY_ALGO_LIMIT_MICRO ?? '10000000', 10); // 10 ALGO
-const DAILY_API_LIMIT_USD = parseFloat(process.env.DAILY_API_LIMIT_USD ?? '50.00');
+
 
 interface DailyTotals {
     date: string;
@@ -63,16 +63,6 @@ export function checkAlgoLimit(db: Database, additionalMicro: number): void {
     }
 }
 
-export function checkApiLimit(db: Database, additionalUsd: number): void {
-    const totals = getDailyTotals(db);
-    const projected = totals.apiCostUsd + additionalUsd;
-    if (projected > DAILY_API_LIMIT_USD) {
-        const message = `Daily API spending limit reached: $${totals.apiCostUsd.toFixed(2)}/$${DAILY_API_LIMIT_USD.toFixed(2)}`;
-        log.warn(message);
-        throw new Error(message);
-    }
-}
-
-export function getSpendingLimits(): { algoMicro: number; apiUsd: number } {
-    return { algoMicro: DAILY_ALGO_LIMIT_MICRO, apiUsd: DAILY_API_LIMIT_USD };
+export function getSpendingLimits(): { algoMicro: number } {
+    return { algoMicro: DAILY_ALGO_LIMIT_MICRO };
 }
