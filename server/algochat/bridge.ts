@@ -819,7 +819,7 @@ export class AlgoChatBridge {
         const MAX_PROGRESS_HISTORY = 100;
         const progressHistory: ProgressAction[] = [];
         const trackProgress = (action: ProgressAction) => {
-            trackProgress(action);
+            progressHistory.push(action);
             // Sliding window to prevent unbounded memory growth in long sessions
             if (progressHistory.length > MAX_PROGRESS_HISTORY) {
                 progressHistory.splice(0, progressHistory.length - MAX_PROGRESS_HISTORY);

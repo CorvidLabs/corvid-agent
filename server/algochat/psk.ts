@@ -56,6 +56,8 @@ export class PSKManager {
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private callbacks: Set<PSKMessageCallback> = new Set();
     private processedTxids: Set<string> = new Set();
+    /** Cached X25519 encryption public key of the contact, learned from received envelopes. */
+    private contactEncryptionKey: Uint8Array | null = null;
 
     constructor(
         db: Database,
@@ -141,8 +143,9 @@ export class PSKManager {
         // Derive PSK at current counter
         const currentPSK = algochat.derivePSKAtCounter(this.contact.initialPSK, counter);
 
-        // Get recipient public key
-        const recipientPubKey = await this.service.algorandService.discoverPublicKey(this.contact.address);
+        // Use cached encryption key from received envelopes, fall back to indexer discovery
+        const recipientPubKey = this.contactEncryptionKey
+            ?? await this.service.algorandService.discoverPublicKey(this.contact.address);
 
         // Encrypt
         const envelope = algochat.encryptPSKMessage(
@@ -250,6 +253,12 @@ export class PSKManager {
                     if (!decrypted) {
                         log.warn(`Failed to decrypt message`, { txid: tx.id });
                         continue;
+                    }
+
+                    // Cache the contact's encryption public key from the envelope
+                    if (!this.contactEncryptionKey && envelope.senderPublicKey) {
+                        this.contactEncryptionKey = envelope.senderPublicKey;
+                        log.info('Cached contact encryption key from received envelope');
                     }
 
                     // Record receive (update counter state)
