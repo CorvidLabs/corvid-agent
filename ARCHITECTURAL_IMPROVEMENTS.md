@@ -209,9 +209,9 @@ New tables added for authentication:
 JWT_SECRET=your-production-secret
 CORS_ORIGIN=https://your-domain.com
 
-# Default admin created automatically
+# Default admin created on first run.
 # Email: admin@corvid-agent.local
-# Password: REDACTED_PASSWORD (change immediately)
+# Password: set ADMIN_PASSWORD in .env, or check startup logs for the auto-generated password.
 ```
 
 ### 3. Database Migration (Future)

@@ -58,6 +58,9 @@ e2e/             Playwright end-to-end tests
 | `ALGORAND_NETWORK` | Algorand network (`localnet`, `testnet`, `mainnet`) | `testnet` |
 | `ALGOCHAT_SYNC_INTERVAL` | Polling interval for on-chain messages (ms) | `30000` |
 | `ALGOCHAT_DEFAULT_AGENT_ID` | Default agent ID for AlgoChat | -- |
+| `JWT_SECRET` | **Required in production.** Generate with `openssl rand -hex 32` | dev default |
+| `ADMIN_PASSWORD` | Password for default admin account (auto-generated if unset) | random |
+| `API_KEY` | API key for programmatic access (unset = no key auth) | -- |
 | `PORT` | HTTP server port | `3000` |
 
 Copy `.env.example` to `.env` and fill in your values. Bun loads `.env` automatically.
@@ -78,6 +81,14 @@ See the `deploy/` directory for production configurations:
 - `com.corvidlabs.corvid-agent.plist` -- macOS LaunchAgent
 - `daemon.sh` -- helper script
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for responsible disclosure.
+
 ## License
 
-MIT
+[MIT](LICENSE)
