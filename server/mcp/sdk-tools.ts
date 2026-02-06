@@ -116,11 +116,15 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         ] : []),
     ];
 
-    // Filter tools by agent's mcp_tool_permissions
-    const agent = getAgent(ctx.db, ctx.agentId);
-    const permissions = agent?.mcpToolPermissions;
-    const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
-    const filteredTools = tools.filter((t) => allowedSet.has(t.name));
+    // Local (web) sessions get all tools — permission scoping only applies to
+    // remote sessions (algochat, agent-to-agent) where untrusted input is possible.
+    let filteredTools = tools;
+    if (ctx.sessionSource !== 'web') {
+        const agent = getAgent(ctx.db, ctx.agentId);
+        const permissions = agent?.mcpToolPermissions;
+        const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
+        filteredTools = tools.filter((t) => allowedSet.has(t.name));
+    }
 
     return createSdkMcpServer({
         name: 'corvid-agent-tools',
