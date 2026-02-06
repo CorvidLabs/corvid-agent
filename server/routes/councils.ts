@@ -206,24 +206,29 @@ async function handleUpdateCouncil(req: Request, db: Database, id: string): Prom
 
 // ─── Launch handler ───────────────────────────────────────────────────────────
 
-async function handleLaunch(
-    req: Request,
+/** Launch result returned by the extracted launchCouncil() helper. */
+export interface LaunchCouncilResult {
+    launchId: string;
+    sessionIds: string[];
+}
+
+/**
+ * Core council launch logic extracted for reuse by both the REST API and
+ * the AlgoChat `/council` command.
+ */
+export function launchCouncil(
     db: Database,
     processManager: ProcessManager,
     councilId: string,
+    projectId: string,
+    prompt: string,
     agentMessenger: AgentMessenger | null,
-): Promise<Response> {
+): LaunchCouncilResult {
     const council = getCouncil(db, councilId);
-    if (!council) return json({ error: 'Council not found' }, 404);
-
-    const body = await req.json();
-    const { projectId, prompt } = body;
-    if (!projectId || !prompt) {
-        return json({ error: 'projectId and prompt are required' }, 400);
-    }
+    if (!council) throw new Error('Council not found');
 
     const project = getProject(db, projectId);
-    if (!project) return json({ error: 'Project not found' }, 404);
+    if (!project) throw new Error('Project not found');
 
     const launchId = crypto.randomUUID();
     createCouncilLaunch(db, { id: launchId, councilId, projectId, prompt });
@@ -259,7 +264,31 @@ async function handleLaunch(
     // Auto-advance: watch for all member sessions to finish, then trigger discussion/review
     watchSessionsForAutoAdvance(db, processManager, launchId, sessionIds, 'member', agentMessenger);
 
-    return json({ launchId, sessionIds }, 201);
+    return { launchId, sessionIds };
+}
+
+async function handleLaunch(
+    req: Request,
+    db: Database,
+    processManager: ProcessManager,
+    councilId: string,
+    agentMessenger: AgentMessenger | null,
+): Promise<Response> {
+    const body = await req.json();
+    const { projectId, prompt } = body;
+    if (!projectId || !prompt) {
+        return json({ error: 'projectId and prompt are required' }, 400);
+    }
+
+    try {
+        const result = launchCouncil(db, processManager, councilId, projectId, prompt, agentMessenger);
+        return json(result, 201);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Preserve proper HTTP status codes for not-found errors
+        const isNotFound = msg === 'Council not found' || msg === 'Project not found';
+        return json({ error: msg }, isNotFound ? 404 : 400);
+    }
 }
 
 // ─── Extracted stage-transition logic ─────────────────────────────────────────

@@ -103,6 +103,7 @@ async function initAlgoChat(): Promise<void> {
     algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, agentNetworkConfig, agentService, agentWalletService, agentDirectory, processManager);
     agentMessenger.setWorkTaskService(workTaskService);
+    algochatBridge.setAgentMessenger(agentMessenger);
 
     // Register MCP services so agent sessions get corvid_* tools
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
