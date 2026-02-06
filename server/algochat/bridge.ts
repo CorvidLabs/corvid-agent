@@ -203,7 +203,12 @@ export class AlgoChatBridge {
 
         // Auto micro-fund agent wallet on localnet (fire-and-forget)
         if (this.config.network === 'localnet' && agent.walletAddress && this.agentWalletService) {
-            this.agentWalletService.fundAgent(agentId, 10_000).catch(() => {});
+            this.agentWalletService.fundAgent(agentId, 10_000).catch((err) => {
+                log.warn('Failed to micro-fund agent wallet (local message)', {
+                    agentId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
         }
 
         // Update the sendFn so responses go to the current WS connection
@@ -670,7 +675,13 @@ export class AlgoChatBridge {
             if (conversation?.agentId) {
                 const agentForFund = getAgent(this.db, conversation.agentId);
                 if (agentForFund?.walletAddress) {
-                    this.agentWalletService.fundAgent(conversation.agentId, 10_000).catch(() => {});
+                    this.agentWalletService.fundAgent(conversation.agentId, 10_000).catch((err) => {
+                        log.warn('Failed to micro-fund agent wallet (incoming message)', {
+                            agentId: conversation.agentId,
+                            participant,
+                            error: err instanceof Error ? err.message : String(err),
+                        });
+                    });
                 }
             }
         }
@@ -907,7 +918,13 @@ export class AlgoChatBridge {
             progressTimer = setInterval(() => {
                 if (sent) { stopProgressTimer(); return; }
                 const msg = generateProgressSummary();
-                this.sendResponse(participant, `[Status] ${msg}`).catch(() => {});
+                this.sendResponse(participant, `[Status] ${msg}`).catch((err) => {
+                    log.warn('Failed to send progress update', {
+                        participant,
+                        sessionId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
                 this.emitEvent(participant, msg, 'status');
             }, PROGRESS_INTERVAL_MS);
         };
@@ -932,7 +949,13 @@ export class AlgoChatBridge {
                 details: 'Processing request'
             });
 
-            this.sendResponse(participant, '[Status] Received your message — working on it now.').catch(() => {});
+            this.sendResponse(participant, '[Status] Received your message — working on it now.').catch((err) => {
+                log.warn('Failed to send acknowledgment', {
+                    participant,
+                    sessionId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
             startProgressTimer();
         };
 
@@ -1285,8 +1308,13 @@ export class AlgoChatBridge {
         try {
             checkAlgoLimit(this.db, 1000);
         } catch (err) {
-            log.warn(`On-chain response blocked by spending limit`, {
+            const conversation = getConversationByParticipant(this.db, participant);
+            log.warn(`On-chain response blocked by spending limit — dead letter`, {
                 participant,
+                conversationId: conversation?.id ?? null,
+                sessionId: conversation?.sessionId ?? null,
+                contentLength: content.length,
+                contentPreview: content.slice(0, 200),
                 error: err instanceof Error ? err.message : String(err),
             });
             return;
@@ -1381,7 +1409,19 @@ export class AlgoChatBridge {
             }
             this.emitEvent(participant, content, 'outbound', fee);
         } catch (err) {
-            log.error('Failed to send response', { error: err instanceof Error ? err.message : String(err) });
+            // Dead-letter logging: capture full context for failed message sends
+            // so they can be investigated and potentially retried.
+            const conversation = getConversationByParticipant(this.db, participant);
+            log.error('Failed to send response — dead letter', {
+                participant,
+                conversationId: conversation?.id ?? null,
+                sessionId: conversation?.sessionId ?? null,
+                agentId: conversation?.agentId ?? null,
+                contentLength: content.length,
+                contentPreview: content.slice(0, 200),
+                error: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined,
+            });
         }
     }
 
