@@ -274,9 +274,6 @@ async function handleLaunch(
     councilId: string,
     agentMessenger: AgentMessenger | null,
 ): Promise<Response> {
-    const council = getCouncil(db, councilId);
-    if (!council) return json({ error: 'Council not found' }, 404);
-
     const body = await req.json();
     const { projectId, prompt } = body;
     if (!projectId || !prompt) {
@@ -288,7 +285,9 @@ async function handleLaunch(
         return json(result, 201);
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return json({ error: msg }, 400);
+        // Preserve proper HTTP status codes for not-found errors
+        const isNotFound = msg === 'Council not found' || msg === 'Project not found';
+        return json({ error: msg }, isNotFound ? 404 : 400);
     }
 }
 

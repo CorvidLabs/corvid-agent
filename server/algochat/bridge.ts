@@ -550,16 +550,8 @@ export class AlgoChatBridge {
             councilLabel = council.name;
         }
 
-        // Resolve project ID
-        const { listProjects, createProject } = require('../db/projects');
-        const projects = listProjects(this.db);
-        let projectId: string;
-        if (projects.length > 0) {
-            projectId = projects[0].id;
-        } else {
-            const project = createProject(this.db, { name: 'AlgoChat Default', workingDir: process.cwd() });
-            projectId = project.id;
-        }
+        // Resolve project ID (reuse existing helper)
+        const projectId = this.getDefaultProjectId();
 
         // Launch the council
         this.sendResponse(participant, `Launching council "${councilLabel}"...\nPrompt: ${prompt.slice(0, 200)}`);
@@ -576,7 +568,21 @@ export class AlgoChatBridge {
 
             this.sendResponse(participant, `Council launched! (${result.sessionIds.length} agents responding)\nLaunch ID: ${result.launchId.slice(0, 8)}...`);
 
-            // Monitor stage changes and relay progress + final synthesis on-chain
+            // Monitor stage changes and relay progress + final synthesis on-chain.
+            // Safety timeout prevents the listener from leaking if the council
+            // pipeline crashes before reaching the 'complete' stage.
+            const COUNCIL_LISTENER_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes
+
+            const cleanup = () => {
+                clearTimeout(safetyTimer);
+                unsubscribe();
+            };
+
+            const safetyTimer = setTimeout(() => {
+                log.warn('Council stage listener timed out, cleaning up', { launchId: result.launchId });
+                unsubscribe();
+            }, COUNCIL_LISTENER_TIMEOUT_MS);
+
             const unsubscribe = onCouncilStageChange((launchId, stage) => {
                 if (launchId !== result.launchId) return;
 
@@ -587,7 +593,7 @@ export class AlgoChatBridge {
                 } else if (stage === 'synthesizing') {
                     this.sendResponse(participant, `[Council] Chairman is synthesizing final answer...`);
                 } else if (stage === 'complete') {
-                    unsubscribe();
+                    cleanup();
                     // Fetch the synthesis and send it back
                     const launch = getCouncilLaunch(this.db, result.launchId);
                     if (launch?.synthesis) {
