@@ -1,15 +1,19 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { NotificationService } from './notification.service';
 import type { ClientWsMessage, ServerWsMessage, StreamEvent } from '../models/ws-message.model';
 
 type MessageHandler = (msg: ServerWsMessage) => void;
 
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
+    private readonly notifications = inject(NotificationService);
+
     private ws: WebSocket | null = null;
     private handlers = new Set<MessageHandler>();
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private subscribedSessions = new Set<string>();
+    private wasConnected = false;
 
     readonly connected = signal(false);
     readonly connectionStatus = computed(() => this.connected() ? 'connected' : 'disconnected');
@@ -24,6 +28,10 @@ export class WebSocketService {
 
         this.ws.onopen = () => {
             this.connected.set(true);
+            if (this.wasConnected) {
+                this.notifications.success('Reconnected to server');
+            }
+            this.wasConnected = true;
             // Re-subscribe to any sessions
             for (const sessionId of this.subscribedSessions) {
                 this.send({ type: 'subscribe', sessionId });
@@ -33,6 +41,10 @@ export class WebSocketService {
         this.ws.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data) as ServerWsMessage;
+                // Surface server-side error messages as notifications
+                if (msg.type === 'error') {
+                    this.notifications.error(msg.message);
+                }
                 for (const handler of this.handlers) {
                     handler(msg);
                 }
@@ -43,6 +55,12 @@ export class WebSocketService {
 
         this.ws.onclose = () => {
             this.connected.set(false);
+            if (this.wasConnected) {
+                this.notifications.warning(
+                    'Connection lost',
+                    'Attempting to reconnect...',
+                );
+            }
             this.scheduleReconnect();
         };
 

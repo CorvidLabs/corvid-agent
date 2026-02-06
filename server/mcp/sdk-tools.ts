@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig } from './tool-handlers';
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
     const tools = [
@@ -55,6 +55,36 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 minutes: z.number().describe('Number of additional minutes to request (1-120)'),
             },
             async (args) => handleExtendTimeout(ctx, args),
+        ),
+        tool(
+            'corvid_check_credits',
+            'Check the credit balance for a wallet address. Credits are purchased with ALGO ' +
+            'and consumed per conversation turn. Use this to check how many credits a user has remaining.',
+            {
+                wallet_address: z.string().optional().describe('Wallet address to check. Omit to see your own agent wallet.'),
+            },
+            async (args) => handleCheckCredits(ctx, args),
+        ),
+        tool(
+            'corvid_grant_credits',
+            'Grant free credits to a wallet address. Use this for promotions, rewards, or compensating users. ' +
+            'Maximum 1,000,000 credits per grant.',
+            {
+                wallet_address: z.string().describe('Wallet address to grant credits to'),
+                amount: z.number().describe('Number of credits to grant'),
+                reason: z.string().optional().describe('Reason for the grant (e.g. "welcome_bonus", "compensation")'),
+            },
+            async (args) => handleGrantCredits(ctx, args),
+        ),
+        tool(
+            'corvid_credit_config',
+            'View or update credit system configuration. Without arguments, shows current config. ' +
+            'With key and value, updates a config setting.',
+            {
+                key: z.string().optional().describe('Config key to update (e.g. "credits_per_algo", "low_credit_threshold")'),
+                value: z.string().optional().describe('New value for the config key'),
+            },
+            async (args) => handleCreditConfig(ctx, args),
         ),
         ...(ctx.workTaskService ? [
             tool(

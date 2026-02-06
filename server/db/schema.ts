@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 19;
+const SCHEMA_VERSION = 20;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -251,6 +251,54 @@ const MIGRATIONS: Record<number, string[]> = {
             label      TEXT DEFAULT '',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )`,
+    ],
+    20: [
+        // Credit ledger: tracks ALGO-based message credits per wallet address
+        `CREATE TABLE IF NOT EXISTS credit_ledger (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            wallet_address  TEXT NOT NULL,
+            credits         INTEGER NOT NULL DEFAULT 0,
+            reserved        INTEGER NOT NULL DEFAULT 0,
+            total_purchased INTEGER NOT NULL DEFAULT 0,
+            total_consumed  INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_ledger_wallet ON credit_ledger(wallet_address)`,
+
+        // Transaction log for all credit operations (purchases, deductions, reserves)
+        `CREATE TABLE IF NOT EXISTS credit_transactions (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            wallet_address  TEXT NOT NULL,
+            type            TEXT NOT NULL,
+            amount          INTEGER NOT NULL,
+            balance_after   INTEGER NOT NULL,
+            reference       TEXT DEFAULT NULL,
+            txid            TEXT DEFAULT NULL,
+            session_id      TEXT DEFAULT NULL,
+            created_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_credit_txn_wallet ON credit_transactions(wallet_address)`,
+        `CREATE INDEX IF NOT EXISTS idx_credit_txn_type ON credit_transactions(type)`,
+        `CREATE INDEX IF NOT EXISTS idx_credit_txn_session ON credit_transactions(session_id)`,
+
+        // Credit configuration table (exchange rates, thresholds)
+        `CREATE TABLE IF NOT EXISTS credit_config (
+            key         TEXT PRIMARY KEY,
+            value       TEXT NOT NULL,
+            updated_at  TEXT DEFAULT (datetime('now'))
+        )`,
+
+        // Insert default configuration values
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_algo', '1000')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('low_credit_threshold', '50')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('reserve_per_group_message', '10')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_turn', '1')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_agent_message', '5')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('free_credits_on_first_message', '100')`,
+
+        // Track credits consumed per session
+        `ALTER TABLE sessions ADD COLUMN credits_consumed INTEGER DEFAULT 0`,
     ],
 };
 

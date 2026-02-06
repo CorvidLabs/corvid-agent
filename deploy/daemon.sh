@@ -45,6 +45,14 @@ install_launchd() {
         -e "s|__LOG_DIR__|$log_dir|g" \
         "$plist_src" > "$plist_dst"
 
+    # Install log rotation config (newsyslog picks this up automatically)
+    local newsyslog_src="$SCRIPT_DIR/corvid-agent.newsyslog.conf"
+    local newsyslog_dst="/etc/newsyslog.d/corvid-agent.conf"
+    if [[ -f "$newsyslog_src" ]]; then
+        sed "s|__LOG_DIR__|$log_dir|g" "$newsyslog_src" | sudo tee "$newsyslog_dst" > /dev/null
+        echo "Installed log rotation: $newsyslog_dst"
+    fi
+
     # Load the service
     launchctl bootout "gui/$(id -u)/com.corvidlabs.corvid-agent" 2>/dev/null || true
     launchctl bootstrap "gui/$(id -u)" "$plist_dst"
@@ -59,6 +67,7 @@ uninstall_launchd() {
     local plist_dst="$HOME/Library/LaunchAgents/com.corvidlabs.corvid-agent.plist"
     launchctl bootout "gui/$(id -u)/com.corvidlabs.corvid-agent" 2>/dev/null || true
     rm -f "$plist_dst"
+    sudo rm -f /etc/newsyslog.d/corvid-agent.conf 2>/dev/null || true
     echo "Uninstalled launchd service"
 }
 
