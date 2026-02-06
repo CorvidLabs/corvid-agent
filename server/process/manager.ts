@@ -119,6 +119,9 @@ export class ProcessManager {
             emitStatus: sessionId
                 ? (message: string) => this.emitEvent(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
                 : undefined,
+            extendTimeout: sessionId
+                ? (additionalMs: number) => this.extendTimeout(sessionId, additionalMs)
+                : undefined,
         };
     }
 
@@ -688,20 +691,30 @@ export class ProcessManager {
         }
     }
 
-    private startSessionTimeout(sessionId: string): void {
+    private startSessionTimeout(sessionId: string, timeoutMs: number = AGENT_TIMEOUT_MS): void {
         this.clearSessionTimeout(sessionId);
         const timer = setTimeout(() => {
             this.sessionTimeouts.delete(sessionId);
             if (!this.processes.has(sessionId)) return;
             const meta = this.sessionMeta.get(sessionId);
-            const elapsed = meta ? Date.now() - meta.startedAt : AGENT_TIMEOUT_MS;
+            const elapsed = meta ? Date.now() - meta.startedAt : timeoutMs;
             log.warn(`Session ${sessionId} exceeded timeout`, {
                 elapsedMs: elapsed,
-                timeoutMs: AGENT_TIMEOUT_MS,
+                timeoutMs,
             });
             this.stopProcess(sessionId);
-        }, AGENT_TIMEOUT_MS);
+        }, timeoutMs);
         this.sessionTimeouts.set(sessionId, timer);
+    }
+
+    /** Extend a running session's timeout. Returns false if session not found. */
+    extendTimeout(sessionId: string, additionalMs: number): boolean {
+        if (!this.processes.has(sessionId)) return false;
+        const maxTimeout = AGENT_TIMEOUT_MS * 4; // Cap at 4x default (2 hours at 30min default)
+        const clamped = Math.min(additionalMs, maxTimeout);
+        log.info(`Session ${sessionId} timeout extended`, { additionalMs: clamped });
+        this.startSessionTimeout(sessionId, clamped);
+        return true;
     }
 
     private clearSessionTimeout(sessionId: string): void {

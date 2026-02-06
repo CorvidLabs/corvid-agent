@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout } from './tool-handlers';
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
     const tools = [
@@ -45,6 +45,16 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
             'Shows agent names, IDs, and wallet addresses.',
             {},
             async () => handleListAgents(ctx),
+        ),
+        tool(
+            'corvid_extend_timeout',
+            'Request more time for your current session. Call this when you anticipate needing ' +
+            'longer than the default timeout (e.g. multi-agent conversations, complex tasks). ' +
+            'Maximum extension is 120 minutes. You can call this multiple times.',
+            {
+                minutes: z.number().describe('Number of additional minutes to request (1-120)'),
+            },
+            async (args) => handleExtendTimeout(ctx, args),
         ),
         ...(ctx.workTaskService ? [
             tool(
