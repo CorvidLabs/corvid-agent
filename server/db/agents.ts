@@ -16,6 +16,7 @@ interface AgentRow {
     algochat_auto: number;
     custom_flags: string;
     default_project_id: string | null;
+    mcp_tool_permissions: string | null;
     wallet_address: string | null;
     wallet_mnemonic_encrypted: string | null;
     wallet_funded_algo: number;
@@ -39,6 +40,7 @@ function rowToAgent(row: AgentRow): Agent {
         algochatAuto: row.algochat_auto === 1,
         customFlags: JSON.parse(row.custom_flags),
         defaultProjectId: row.default_project_id ?? null,
+        mcpToolPermissions: row.mcp_tool_permissions ? JSON.parse(row.mcp_tool_permissions) : null,
         walletAddress: row.wallet_address ?? null,
         walletFundedAlgo: row.wallet_funded_algo ?? 0,
         createdAt: row.created_at,
@@ -60,11 +62,13 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
     const id = crypto.randomUUID();
     const customFlags = JSON.stringify(input.customFlags ?? {});
 
+    const mcpToolPermissions = input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null;
+
     db.query(
         `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
-         algochat_enabled, algochat_auto, custom_flags, default_project_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -80,6 +84,7 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         input.algochatAuto ? 1 : 0,
         customFlags,
         input.defaultProjectId ?? null,
+        mcpToolPermissions,
     );
 
     return getAgent(db, id) as Agent;
@@ -129,6 +134,10 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
     if (input.defaultProjectId !== undefined) {
         fields.push('default_project_id = ?');
         values.push(input.defaultProjectId);
+    }
+    if (input.mcpToolPermissions !== undefined) {
+        fields.push('mcp_tool_permissions = ?');
+        values.push(input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null);
     }
 
     if (fields.length === 0) return existing;

@@ -24,6 +24,7 @@ export interface Agent {
     algochatAuto: boolean;
     customFlags: Record<string, string>;
     defaultProjectId: string | null;
+    mcpToolPermissions: string[] | null;
     walletAddress: string | null;
     walletFundedAlgo: number;
     createdAt: string;
@@ -111,6 +112,7 @@ export interface CreateAgentInput {
     algochatAuto?: boolean;
     customFlags?: Record<string, string>;
     defaultProjectId?: string | null;
+    mcpToolPermissions?: string[] | null;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
