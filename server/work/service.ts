@@ -138,6 +138,38 @@ export class WorkTaskService {
             return failed ?? task;
         }
 
+        // Install dependencies in the worktree (worktrees don't share node_modules)
+        try {
+            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile'], {
+                cwd: worktreeDir,
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+            const installStderr = await new Response(installProc.stderr).text();
+            const installExit = await installProc.exited;
+
+            if (installExit !== 0) {
+                log.warn('bun install failed in worktree, retrying without --frozen-lockfile', {
+                    taskId: task.id,
+                    stderr: installStderr.trim(),
+                });
+                // Retry without frozen lockfile in case the lock is out of date
+                const retryProc = Bun.spawn(['bun', 'install'], {
+                    cwd: worktreeDir,
+                    stdout: 'pipe',
+                    stderr: 'pipe',
+                });
+                await new Response(retryProc.stdout).text();
+                await retryProc.exited;
+            }
+        } catch (err) {
+            log.warn('Failed to install dependencies in worktree', {
+                taskId: task.id,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            // Non-fatal — the agent session may still succeed if deps are available
+        }
+
         // Update status to running with iteration count 1
         updateWorkTaskStatus(this.db, task.id, 'running', {
             branchName,
@@ -344,6 +376,31 @@ export class WorkTaskService {
     private async runValidation(workingDir: string): Promise<{ passed: boolean; output: string }> {
         const outputs: string[] = [];
         let passed = true;
+
+        // Ensure dependencies are installed before validation
+        try {
+            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile'], {
+                cwd: workingDir,
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+            await new Response(installProc.stdout).text();
+            await new Response(installProc.stderr).text();
+            const installExit = await installProc.exited;
+
+            if (installExit !== 0) {
+                // Retry without frozen lockfile
+                const retryProc = Bun.spawn(['bun', 'install'], {
+                    cwd: workingDir,
+                    stdout: 'pipe',
+                    stderr: 'pipe',
+                });
+                await new Response(retryProc.stdout).text();
+                await retryProc.exited;
+            }
+        } catch (_err) {
+            // Non-fatal — if install fails, tsc/tests will report the real errors
+        }
 
         // Run TypeScript check
         try {
