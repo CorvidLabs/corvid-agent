@@ -6,17 +6,20 @@ Agent orchestration platform — manages Claude agent sessions with MCP tools, A
 
 ```
 server/          — Bun server (API, WebSocket, process management)
-  process/       — Session lifecycle, SDK integration, approval flow
-  mcp/           — MCP tool definitions and handlers (corvid_* tools)
   algochat/      — On-chain messaging, wallets, agent directory
-  db/            — SQLite via bun:sqlite (sessions, agents, projects, spending)
-  work/          — Work task service (branch, run agent, validate, PR)
+  councils/      — Multi-agent council deliberation and voting
+  db/            — SQLite via bun:sqlite (sessions, agents, projects, spending, credits)
+  lib/           — Shared utilities (logger, crypto, validation)
+  mcp/           — MCP tool definitions and handlers (corvid_* tools)
+  process/       — Session lifecycle, SDK integration, approval flow
   routes/        — HTTP API routes
-  ws/            — WebSocket handler
-  lib/           — Shared utilities (logger, crypto)
   selftest/      — Self-test service
-client/          — Angular frontend
+  work/          — Work task service (branch, run agent, validate, PR)
+  ws/            — WebSocket handler
+client/          — Angular 21 mobile-first dashboard
 shared/          — Shared TypeScript types (server + client)
+deploy/          — Dockerfile, docker-compose, systemd, macOS LaunchAgent
+e2e/             — Playwright end-to-end tests
 ```
 
 ## Tech Stack
