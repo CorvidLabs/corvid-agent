@@ -243,6 +243,37 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             <p class="synthesis__warning">No synthesis was produced for this council launch.</p>
                         }
                     </div>
+
+                    @if (l.synthesis) {
+                        <div class="council-chat">
+                            <h3 class="section-title">Chat with Council</h3>
+                            @if (chatSessionId()) {
+                                <div class="council-chat__output">
+                                    <app-session-output
+                                        [messages]="getChatMessages()"
+                                        [events]="getChatEvents()"
+                                        [isRunning]="chatRunning()"
+                                    />
+                                </div>
+                            }
+                            <div class="council-chat__input">
+                                <input
+                                    class="council-chat__field"
+                                    type="text"
+                                    placeholder="Ask a follow-up question about the council's decision..."
+                                    [value]="chatInput()"
+                                    (input)="chatInput.set($any($event.target).value)"
+                                    (keydown.enter)="onSendChat()"
+                                    [disabled]="chatSending()"
+                                />
+                                <button
+                                    class="btn btn--primary btn--sm"
+                                    (click)="onSendChat()"
+                                    [disabled]="chatSending() || !chatInput().trim()"
+                                >{{ chatSending() ? 'Sending...' : 'Send' }}</button>
+                            </div>
+                        </div>
+                    }
                 }
             </div>
         } @else {
@@ -261,13 +292,11 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
-        .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
-        .btn--secondary:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--danger { background: transparent; color: var(--accent-red, #f87171); border-color: var(--accent-red, #f87171); }
         .btn--danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.1); }
-        .btn--danger:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
 
         .auto-label {
@@ -287,7 +316,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .stage-step { display: flex; align-items: center; gap: 0.5rem; }
         .stage-dot {
             width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-bright);
-            background: transparent; transition: all 0.2s;
+            background: transparent;
         }
         .stage-step--done .stage-dot { border-color: var(--accent-green); background: var(--accent-green); }
         .stage-label { font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
@@ -295,16 +324,15 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .stage-connector { flex: 1; height: 2px; background: var(--border); margin: 0 0.5rem; min-width: 20px; }
         .stage-connector--done { background: var(--accent-green); }
 
-        /* Per-stage active colors */
-        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; box-shadow: 0 0 8px rgba(0, 229, 255, 0.4); }
+        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; box-shadow: 0 0 8px #00e5ff66; }
         .stage-step--active[data-stage="responding"] .stage-label { color: #00e5ff; }
-        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.4); }
+        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; box-shadow: 0 0 8px #fbbf2466; }
         .stage-step--active[data-stage="discussing"] .stage-label { color: #fbbf24; }
-        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; box-shadow: 0 0 8px rgba(167, 139, 250, 0.4); }
+        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; box-shadow: 0 0 8px #a78bfa66; }
         .stage-step--active[data-stage="reviewing"] .stage-label { color: #a78bfa; }
-        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; box-shadow: 0 0 8px rgba(244, 114, 182, 0.4); }
+        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; box-shadow: 0 0 8px #f472b666; }
         .stage-step--active[data-stage="synthesizing"] .stage-label { color: #f472b6; }
-        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); box-shadow: 0 0 8px rgba(0, 255, 136, 0.4); }
+        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); box-shadow: 0 0 8px #00ff8866; }
         .stage-step--active[data-stage="complete"] .stage-label { color: var(--accent-green); }
 
         .actions { margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
@@ -420,6 +448,13 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             padding: 1rem 1.25rem; margin: 0; font-size: 0.85rem;
             color: var(--accent-yellow, #fbbf24); font-style: italic;
         }
+
+        .council-chat { margin-top: 1.5rem; }
+        .council-chat__output { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 0.75rem; max-height: 500px; overflow-y: auto; }
+        .council-chat__input { display: flex; gap: 0.5rem; align-items: center; }
+        .council-chat__field { flex: 1; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-bright); background: var(--bg-surface); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; outline: none; }
+        .council-chat__field:focus { border-color: var(--accent-cyan); }
+        .council-chat__field:disabled { opacity: 0.5; }
     `,
 })
 export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
@@ -445,6 +480,10 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected readonly aborting = signal(false);
     protected readonly expandedSessions = signal<Set<string>>(new Set());
     protected readonly expandedDiscussion = signal<Set<number>>(new Set());
+    protected readonly chatSessionId = signal<string | null>(null);
+    protected readonly chatInput = signal('');
+    protected readonly chatSending = signal(false);
+    protected readonly chatRunning = signal(false);
 
     private agentNameMap: Record<string, string> = {};
     private agentIdBySession: Record<string, string> = {};
@@ -530,6 +569,19 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
             }
             if (msg.type === 'session_status') {
                 this.refreshSessions();
+                // Track chat session status
+                const chatId = this.chatSessionId();
+                if (chatId && msg.sessionId === chatId) {
+                    this.chatRunning.set(msg.status === 'running');
+                    // Refresh chat messages when session completes
+                    if (msg.status !== 'running') {
+                        this.sessionService.getMessages(chatId).then((msgs) => {
+                            const map = new Map(this.sessionMessages());
+                            map.set(chatId, msgs);
+                            this.sessionMessages.set(map);
+                        }).catch(() => {});
+                    }
+                }
             }
             if (msg.type === 'council_stage_change' && msg.launchId === id) {
                 this.loadLaunchData(id);
@@ -566,6 +618,10 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         }
         for (const session of this.allSessions()) {
             this.sessionService.unsubscribeFromSession(session.id);
+        }
+        const chatId = this.chatSessionId();
+        if (chatId) {
+            this.sessionService.unsubscribeFromSession(chatId);
         }
     }
 
@@ -693,6 +749,40 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         }
     }
 
+    protected getChatMessages(): import('../../core/models/session.model').SessionMessage[] {
+        const id = this.chatSessionId();
+        return id ? (this.sessionMessages().get(id) ?? []) : [];
+    }
+
+    protected getChatEvents(): StreamEvent[] {
+        const id = this.chatSessionId();
+        return id ? (this.sessionEvents().get(id) ?? []) : [];
+    }
+
+    protected async onSendChat(): Promise<void> {
+        const l = this.launch();
+        const message = this.chatInput().trim();
+        if (!l || !message) return;
+
+        this.chatSending.set(true);
+        try {
+            const result = await this.councilService.chatWithCouncil(l.id, message);
+            this.chatInput.set('');
+            this.chatSessionId.set(result.sessionId);
+            this.chatRunning.set(true);
+
+            // Subscribe to session events for live streaming
+            this.sessionService.subscribeToSession(result.sessionId);
+
+            // Refresh launch data to get the chat_session_id persisted
+            if (result.created) {
+                await this.loadLaunchData(l.id);
+            }
+        } finally {
+            this.chatSending.set(false);
+        }
+    }
+
     private async loadLaunchData(launchId: string): Promise<void> {
         const launch = await this.councilService.getCouncilLaunch(launchId);
         this.launch.set(launch);
@@ -722,6 +812,19 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
                 this.agentIdBySession[session.id] = session.agentId;
             }
             this.sessionService.subscribeToSession(session.id);
+        }
+
+        // Initialize chat session if one exists
+        if (launch.chatSessionId) {
+            this.chatSessionId.set(launch.chatSessionId);
+            this.sessionService.subscribeToSession(launch.chatSessionId);
+            try {
+                const chatSession = await this.sessionService.getSession(launch.chatSessionId);
+                this.chatRunning.set(chatSession.status === 'running');
+                const chatMsgs = await this.sessionService.getMessages(launch.chatSessionId);
+                messagesMap.set(launch.chatSessionId, chatMsgs);
+                this.sessionMessages.set(new Map(messagesMap));
+            } catch { /* ignore */ }
         }
     }
 

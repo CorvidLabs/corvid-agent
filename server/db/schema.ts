@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 21;
+const SCHEMA_VERSION = 22;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -303,6 +303,10 @@ const MIGRATIONS: Record<number, string[]> = {
     21: [
         // MCP tool permission scoping: null = default safe set, JSON array = explicit list
         `ALTER TABLE agents ADD COLUMN mcp_tool_permissions TEXT DEFAULT NULL`,
+    ],
+    22: [
+        // Follow-up chat session for completed council launches
+        `ALTER TABLE council_launches ADD COLUMN chat_session_id TEXT DEFAULT NULL`,
     ],
 };
 

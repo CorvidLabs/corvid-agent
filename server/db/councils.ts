@@ -35,6 +35,7 @@ interface CouncilLaunchRow {
     synthesis: string | null;
     current_discussion_round: number;
     total_discussion_rounds: number;
+    chat_session_id: string | null;
     created_at: string;
 }
 
@@ -62,6 +63,7 @@ function rowToLaunch(row: CouncilLaunchRow, sessionIds: string[]): CouncilLaunch
         sessionIds,
         currentDiscussionRound: row.current_discussion_round ?? 0,
         totalDiscussionRounds: row.total_discussion_rounds ?? 0,
+        chatSessionId: row.chat_session_id ?? null,
         createdAt: row.created_at,
     };
 }
@@ -356,4 +358,12 @@ export function updateDiscussionMessageTxid(
     txid: string,
 ): void {
     db.query('UPDATE council_discussion_messages SET txid = ? WHERE id = ?').run(txid, messageId);
+}
+
+export function updateCouncilLaunchChatSession(
+    db: Database,
+    launchId: string,
+    chatSessionId: string,
+): void {
+    db.query('UPDATE council_launches SET chat_session_id = ? WHERE id = ?').run(chatSessionId, launchId);
 }
