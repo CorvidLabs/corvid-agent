@@ -226,23 +226,6 @@ export const McpRecallMemorySchema = z.object({
     query: z.string().optional(),
 });
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-export const LoginSchema = z.object({
-    email: z.string().min(1, 'Email is required'),
-    password: z.string().min(1, 'Password is required'),
-});
-
-export const RefreshTokenSchema = z.object({
-    refreshToken: z.string().min(1, 'Refresh token is required'),
-});
-
-export const RegisterSchema = z.object({
-    email: z.string().min(1, 'Email is required'),
-    password: z.string().min(1, 'Password is required'),
-    role: z.enum(['admin', 'agent_operator', 'viewer'], { message: 'Invalid role' }),
-});
-
 // ─── Misc routes (index.ts) ───────────────────────────────────────────────────
 
 export const EscalationResolveSchema = z.object({

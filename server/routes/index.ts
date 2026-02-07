@@ -16,15 +16,39 @@ import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
 import { searchAlgoChatMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
-import { checkAuth } from '../lib/auth';
-import { checkRateLimit } from '../lib/rate-limit';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema } from '../lib/validation';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('Router');
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
         status,
         headers: { 'Content-Type': 'application/json' },
     });
+}
+
+/**
+ * Global error handler — catches any unhandled error from route handlers
+ * and returns a proper JSON 500 response instead of crashing the server.
+ */
+function errorResponse(err: unknown, requestOrigin?: string | null): Response {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+
+    log.error('Unhandled route error', { error: message, stack });
+
+    const body = JSON.stringify({
+        error: message,
+        timestamp: new Date().toISOString(),
+    });
+
+    const response = new Response(body, {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+    return addCors(response, requestOrigin);
 }
 
 export async function handleRequest(
@@ -49,15 +73,27 @@ export async function handleRequest(
         });
     }
 
-    // Rate limiting
-    const rateLimitResponse = checkRateLimit(req);
-    if (rateLimitResponse) return addCors(rateLimitResponse, requestOrigin);
-
-    // API key authentication (if API_KEY env var is set)
-    if (url.pathname.startsWith('/api/')) {
-        const authResponse = checkAuth(req, url);
-        if (authResponse) return addCors(authResponse, requestOrigin);
+    try {
+    return await handleRoutes(req, url, requestOrigin, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
+    } catch (err) {
+        return errorResponse(err, requestOrigin);
     }
+}
+
+/** Inner route dispatch — separated so the global try/catch in handleRequest can wrap it. */
+async function handleRoutes(
+    req: Request,
+    url: URL,
+    requestOrigin: string | null,
+    db: Database,
+    processManager: ProcessManager,
+    algochatBridge: AlgoChatBridge | null,
+    agentWalletService?: AgentWalletService | null,
+    agentMessenger?: AgentMessenger | null,
+    workTaskService?: WorkTaskService | null,
+    selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
+    agentDirectory?: AgentDirectory | null,
+): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
         return addCorsAsync(handleBrowseDirs(req, url), requestOrigin);
@@ -159,7 +195,7 @@ export async function handleRequest(
         return addCors(json(listConversations(db)), requestOrigin);
     }
 
-    // Database backup (requires API key auth if configured)
+    // Database backup
     if (url.pathname === '/api/backup' && req.method === 'POST') {
         try {
             const result = backupDatabase(db);

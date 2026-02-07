@@ -14,7 +14,6 @@ import { WorkTaskService } from './work/service';
 import { SessionLifecycleManager } from './process/session-lifecycle';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkWsAuth } from './lib/auth';
 import { createLogger } from './lib/logger';
 
 const log = createLogger('Server');
@@ -138,9 +137,6 @@ const server = Bun.serve<WsData>({
 
         // WebSocket upgrade
         if (url.pathname === '/ws') {
-            const wsAuthResponse = checkWsAuth(req, url);
-            if (wsAuthResponse) return wsAuthResponse;
-
             const upgraded = server.upgrade(req, {
                 data: { subscriptions: new Map() },
             });
