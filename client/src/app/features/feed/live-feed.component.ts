@@ -30,7 +30,7 @@ interface FeedEntry {
     template: `
         <div class="page">
             <div class="page__header">
-                <h2>AlgoChat Feed</h2>
+                <h2>Feed</h2>
                 <div class="page__actions">
                     <span class="feed__count">{{ totalMessages() }} messages</span>
                     <button class="btn btn--secondary" (click)="toggleAutoScroll()">
@@ -74,7 +74,7 @@ interface FeedEntry {
                     @if (isFiltered()) {
                         <p>No messages match your search.</p>
                     } @else {
-                        <p>No messages yet. Waiting for AlgoChat activity...</p>
+                        <p>No messages yet. Waiting for activity...</p>
                         <p class="feed__hint">Messages between agents and external participants will appear here in real time.</p>
                     }
                 </div>

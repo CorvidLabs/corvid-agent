@@ -10,7 +10,14 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 import { TerminalChatComponent, type TerminalMessage, type ToolEvent } from '../../shared/components/terminal-chat.component';
 import { ApiService } from '../../core/services/api.service';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { Agent } from '../../core/models/agent.model';
 import { firstValueFrom } from 'rxjs';
+
+interface AgentSummary {
+    agent: Agent;
+    balance: number;
+    messageCount: number;
+}
 
 @Component({
     selector: 'app-dashboard',
@@ -46,6 +53,51 @@ import { firstValueFrom } from 'rxjs';
                     <p class="card__count">{{ runningSessions().length }}</p>
                 </div>
             </div>
+
+            @if (agentSummaries().length > 0) {
+                <div class="dashboard__agents">
+                    <h3>Agents</h3>
+                    <div class="agents-grid">
+                        @for (summary of agentSummaries(); track summary.agent.id) {
+                            <a class="agent-card" [routerLink]="['/agents', summary.agent.id]">
+                                <div class="agent-card__header">
+                                    <span class="agent-card__name">{{ summary.agent.name }}</span>
+                                    <div class="agent-card__badges">
+                                        @if (summary.agent.algochatEnabled) {
+                                            <span class="agent-badge agent-badge--algochat">AlgoChat</span>
+                                        }
+                                        @if (summary.agent.algochatAuto) {
+                                            <span class="agent-badge agent-badge--auto">Auto</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="agent-card__stats">
+                                    <div class="agent-stat">
+                                        <span class="agent-stat__value" [class.agent-stat__value--zero]="summary.balance === 0">{{ (summary.balance / 1000000).toFixed(4) }}</span>
+                                        <span class="agent-stat__label">ALGO</span>
+                                    </div>
+                                    <div class="agent-stat">
+                                        <span class="agent-stat__value">{{ summary.messageCount }}</span>
+                                        <span class="agent-stat__label">Messages</span>
+                                    </div>
+                                    <div class="agent-stat">
+                                        <span class="agent-stat__value agent-stat__value--model">{{ summary.agent.model || 'default' }}</span>
+                                        <span class="agent-stat__label">Model</span>
+                                    </div>
+                                </div>
+                                @if (summary.agent.walletAddress) {
+                                    <div class="agent-card__wallet">
+                                        <code>{{ summary.agent.walletAddress.slice(0, 8) }}...{{ summary.agent.walletAddress.slice(-4) }}</code>
+                                    </div>
+                                }
+                                @if (summary.agent.description) {
+                                    <div class="agent-card__desc">{{ summary.agent.description }}</div>
+                                }
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
 
             <div class="dashboard__selftest">
                 <button
@@ -270,6 +322,114 @@ import { firstValueFrom } from 'rxjs';
             white-space: nowrap;
         }
         .chat-tip-btn:hover { background: rgba(80, 227, 194, 0.1); }
+        .dashboard__agents { margin-bottom: 2rem; }
+        .dashboard__agents h3 { margin: 0 0 0.75rem; }
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+        .agent-card {
+            display: block;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+        .agent-card:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.1);
+        }
+        .agent-card__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        .agent-card__name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .agent-card__badges {
+            display: flex;
+            gap: 0.35rem;
+        }
+        .agent-badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .agent-badge--algochat {
+            color: var(--accent-magenta);
+            background: rgba(255, 0, 170, 0.08);
+            border: 1px solid rgba(255, 0, 170, 0.25);
+        }
+        .agent-badge--auto {
+            color: var(--accent-green);
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+        }
+        .agent-card__stats {
+            display: flex;
+            gap: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .agent-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .agent-stat__value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.15);
+        }
+        .agent-stat__value--zero {
+            color: var(--text-tertiary);
+            text-shadow: none;
+        }
+        .agent-stat__value--model {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-shadow: none;
+            font-family: var(--font-mono, monospace);
+            line-height: 1.6;
+        }
+        .agent-stat__label {
+            font-size: 0.6rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .agent-card__wallet {
+            margin-bottom: 0.35rem;
+        }
+        .agent-card__wallet code {
+            font-size: 0.65rem;
+            padding: 1px 5px;
+            color: var(--text-tertiary);
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+        .agent-card__desc {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .dashboard__selftest { margin-bottom: 1.5rem; }
         .selftest-btn {
             padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
@@ -321,12 +481,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly agentBalance = signal(0);
     protected readonly chatSessionId = signal<string | null>(null);
     protected readonly selfTestRunning = signal(false);
+    protected readonly agentSummaries = signal<AgentSummary[]>([]);
 
     private unsubscribeWs: (() => void) | null = null;
 
     ngOnInit(): void {
         this.projectService.loadProjects();
-        this.agentService.loadAgents();
+        this.agentService.loadAgents().then(() => this.loadAgentSummaries());
         this.sessionService.loadSessions();
         this.sessionService.loadAlgoChatStatus();
         this.councilService.loadCouncils();
@@ -354,8 +515,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
                     },
                 ]);
             }
-            if (msg.type === 'agent_balance' && msg.agentId === this.selectedAgentId()) {
-                this.agentBalance.set(msg.balance);
+            if (msg.type === 'agent_balance') {
+                if (msg.agentId === this.selectedAgentId()) {
+                    this.agentBalance.set(msg.balance);
+                }
+                // Update agent summaries with new balance
+                this.agentSummaries.update((summaries) =>
+                    summaries.map((s) =>
+                        s.agent.id === msg.agentId ? { ...s, balance: msg.balance } : s,
+                    ),
+                );
             }
             if (msg.type === 'chat_stream' && msg.agentId === this.selectedAgentId()) {
                 if (msg.done) {
@@ -458,6 +627,33 @@ export class DashboardComponent implements OnInit, OnDestroy {
         } finally {
             this.selfTestRunning.set(false);
         }
+    }
+
+    private async loadAgentSummaries(): Promise<void> {
+        const agents = this.agentService.agents();
+        if (agents.length === 0) return;
+
+        const summaries: AgentSummary[] = await Promise.all(
+            agents.map(async (agent) => {
+                let balance = 0;
+                let messageCount = 0;
+                try {
+                    const balanceInfo = await this.agentService.getBalance(agent.id);
+                    balance = balanceInfo.balance;
+                } catch {
+                    // Agent may not have a wallet
+                }
+                try {
+                    const messages = await this.agentService.getMessages(agent.id);
+                    messageCount = messages.length;
+                } catch {
+                    // Messages may not be available
+                }
+                return { agent, balance, messageCount };
+            }),
+        );
+
+        this.agentSummaries.set(summaries);
     }
 
     private async loadActiveCouncilLaunches(): Promise<void> {
