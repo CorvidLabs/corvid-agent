@@ -37,6 +37,8 @@ import { SessionService } from './core/services/session.service';
         .app-layout__content {
             flex: 1;
             overflow-y: auto;
+            min-height: 0;
+            position: relative;
             background: var(--bg-deep);
         }
     `,

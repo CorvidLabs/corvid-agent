@@ -54,7 +54,13 @@ import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-mess
         }
     `,
     styles: `
-        .session-view { display: flex; flex-direction: column; height: 100%; }
+        :host {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            inset: 0;
+        }
+        .session-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
         .session-view__header {
             display: flex; align-items: center; gap: 1rem;
             padding: 0.75rem 1rem;
