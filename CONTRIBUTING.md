@@ -40,16 +40,18 @@ bun run build:client
 server/           # Bun HTTP server, routes, and core logic
   algochat/       # On-chain messaging bridge
   db/             # SQLite database access layer
-  councils/       # Multi-agent council deliberation
-  lib/            # Shared utilities (logger, auth, db)
+  lib/            # Shared utilities (logger, crypto, validation)
   mcp/            # MCP tool server
+  middleware/     # HTTP/WS auth, CORS, startup security checks
   process/        # Claude Agent SDK process management
   routes/         # REST API route handlers
+  selftest/       # Self-test service
+  work/           # Work task service (branch, agent, validate, PR)
+  ws/             # WebSocket handler
 client/           # Angular 21 mobile-first UI
 shared/           # Types and constants shared between server and client
 e2e/              # Playwright end-to-end tests
-deploy/           # Deployment configs (systemd, launchd)
-docker/           # Dockerfile and docker-compose
+deploy/           # Deployment configs (Docker, systemd, launchd)
 ```
 
 ## Making Changes
