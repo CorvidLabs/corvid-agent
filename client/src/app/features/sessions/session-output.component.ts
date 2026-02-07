@@ -1,7 +1,8 @@
-import { Component, ChangeDetectionStrategy, input, ElementRef, viewChild, AfterViewChecked, computed, booleanAttribute } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, ElementRef, viewChild, AfterViewChecked, computed, booleanAttribute, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import type { StreamEvent } from '../../core/models/ws-message.model';
 import type { SessionMessage } from '../../core/models/session.model';
+import { renderMarkdown } from '../../shared/utils/markdown';
 
 interface ParsedEvent {
     kind: 'assistant' | 'user' | 'tool_use' | 'tool_result' | 'system' | 'result' | 'error' | 'raw' | 'tool_group';
@@ -22,7 +23,14 @@ interface ParsedEvent {
                     <span class="prompt">{{ msg.role === 'user' ? '>' : msg.role === 'assistant' ? '<' : '#' }}</span>
                     <span class="label">{{ msg.role }}</span>
                     <span class="time">{{ msg.timestamp | date:'HH:mm:ss' }}</span>
-                    <pre class="text">{{ msg.content }}</pre>
+                    @if (msg.role === 'assistant') {
+                        <span class="text md-content" [innerHTML]="renderMd(msg.content)"></span>
+                    } @else {
+                        <pre class="text">{{ msg.content }}</pre>
+                    }
+                    <button class="copy-btn" (click)="copyToClipboard(msg.content, 'msg-' + msg.id)" [attr.aria-label]="'Copy message'">
+                        {{ copiedId() === 'msg-' + msg.id ? '✓' : 'cp' }}
+                    </button>
                 </div>
             }
 
@@ -72,12 +80,18 @@ interface ParsedEvent {
                             @case ('assistant') {
                                 <span class="prompt">&lt;</span>
                                 <span class="label">claude</span>
-                                <pre class="text">{{ evt.content }}</pre>
+                                <span class="text md-content" [innerHTML]="renderMd(evt.content)"></span>
+                                <button class="copy-btn" (click)="copyToClipboard(evt.content, 'evt-' + $index)" [attr.aria-label]="'Copy message'">
+                                    {{ copiedId() === 'evt-' + $index ? '✓' : 'cp' }}
+                                </button>
                             }
                             @case ('user') {
                                 <span class="prompt">&gt;</span>
                                 <span class="label">user</span>
                                 <pre class="text">{{ evt.content }}</pre>
+                                <button class="copy-btn" (click)="copyToClipboard(evt.content, 'usr-' + $index)" [attr.aria-label]="'Copy message'">
+                                    {{ copiedId() === 'usr-' + $index ? '✓' : 'cp' }}
+                                </button>
                             }
                             @case ('tool_use') {
                                 <span class="prompt">$</span>
@@ -296,6 +310,111 @@ interface ParsedEvent {
             min-height: 1.2em;
         }
 
+        /* Copy button */
+        .copy-btn {
+            flex-shrink: 0;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            font-family: inherit;
+            font-size: 0.6rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: opacity 0.15s, color 0.15s;
+            align-self: flex-start;
+            margin-top: 2px;
+        }
+        @media (hover: hover) {
+            .copy-btn { opacity: 0; }
+            .line:hover .copy-btn { opacity: 1; }
+            .copy-btn:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+        }
+        @media (hover: none) {
+            .copy-btn { opacity: 0.4; }
+            .copy-btn:active { opacity: 1; }
+        }
+
+        /* Markdown content */
+        .md-content {
+            white-space: normal;
+            word-break: break-word;
+            flex: 1;
+            min-width: 0;
+        }
+        .md-content :global(.md-h) { font-weight: 700; color: var(--text-primary); margin: 0.5em 0 0.25em; }
+        .md-content :global(.md-h1) { font-size: 1.1em; }
+        .md-content :global(.md-h2) { font-size: 1em; }
+        .md-content :global(.md-h3) { font-size: 0.95em; color: var(--accent-cyan); }
+        .md-content :global(.md-h4),
+        .md-content :global(.md-h5),
+        .md-content :global(.md-h6) { font-size: 0.9em; color: var(--text-secondary); }
+
+        .md-content :global(code) {
+            background: var(--bg-surface);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            color: #f0883e;
+        }
+        .md-content :global(.md-codeblock) {
+            background: var(--bg-surface);
+            padding: 0.75rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            margin: 0.5rem 0;
+            font-size: 0.8em;
+        }
+        .md-content :global(.md-codeblock code) {
+            background: none;
+            padding: 0;
+            color: var(--text-primary);
+        }
+        .md-content :global(strong) { color: var(--text-primary); font-weight: 700; }
+        .md-content :global(em) { font-style: italic; }
+        .md-content :global(del) { text-decoration: line-through; opacity: 0.6; }
+        .md-content :global(.md-link) { color: var(--accent-cyan); text-decoration: underline; }
+        .md-content :global(.md-link:hover) { color: var(--text-primary); }
+        .md-content :global(.md-blockquote) {
+            border-left: 3px solid var(--accent-cyan);
+            padding: 0.25rem 0.75rem;
+            margin: 0.5rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        .md-content :global(.md-hr) {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 0.75rem 0;
+        }
+        .md-content :global(.md-list) {
+            margin: 0.25rem 0;
+            padding-left: 1.5rem;
+        }
+        .md-content :global(.md-list li) {
+            margin: 0.15rem 0;
+        }
+        .md-content :global(.md-table) {
+            border-collapse: collapse;
+            margin: 0.5rem 0;
+            font-size: 0.85em;
+            width: 100%;
+        }
+        .md-content :global(.md-table th),
+        .md-content :global(.md-table td) {
+            border: 1px solid var(--border);
+            padding: 0.3rem 0.5rem;
+        }
+        .md-content :global(.md-table th) {
+            background: var(--bg-surface);
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .md-content :global(.md-table td) {
+            color: var(--text-secondary);
+        }
+
         .load-more {
             display: block;
             width: 100%;
@@ -322,6 +441,9 @@ export class SessionOutputComponent implements AfterViewChecked {
     readonly messages = input<SessionMessage[]>([]);
     readonly events = input<StreamEvent[]>([]);
     readonly isRunning = input(false, { transform: booleanAttribute });
+
+    /** Tracks which message's copy button should show "✓" */
+    protected readonly copiedId = signal<string | null>(null);
 
     private readonly outputContainer = viewChild<ElementRef<HTMLDivElement>>('outputContainer');
 
@@ -361,6 +483,19 @@ export class SessionOutputComponent implements AfterViewChecked {
 
     protected showAllEvents(): void {
         this.showAll = true;
+    }
+
+    /** Render markdown content to HTML. */
+    protected renderMd(text: string): string {
+        return renderMarkdown(text);
+    }
+
+    /** Copy text to clipboard and flash a "✓" on the button. */
+    protected copyToClipboard(text: string, id?: string): void {
+        navigator.clipboard.writeText(text).then(() => {
+            this.copiedId.set(id ?? text.slice(0, 20));
+            setTimeout(() => this.copiedId.set(null), 1500);
+        });
     }
 
     private parseEvents(events: StreamEvent[]): ParsedEvent[] {

@@ -9,6 +9,7 @@ import {
     ViewChild,
     AfterViewChecked,
 } from '@angular/core';
+import { renderMarkdown } from '../utils/markdown';
 
 export interface TerminalMessage {
     content: string;
@@ -34,7 +35,9 @@ export interface ToolEvent {
                          [class.terminal__line--status]="msg.direction === 'status'">
                         <span class="terminal__prompt">{{ msg.direction === 'inbound' ? '> ' : msg.direction === 'status' ? '... ' : 'assistant> ' }}</span>
                         <span class="terminal__text" [innerHTML]="renderMarkdown(msg.content)"></span>
-                        <button class="terminal__copy" (click)="copyMessage(msg.content)" aria-label="Copy message">cp</button>
+                        <button class="terminal__copy" (click)="copyMessage(msg.content, $index)" aria-label="Copy message">
+                            {{ copiedIdx() === $index ? '✓' : 'cp' }}
+                        </button>
                     </div>
                 }
                 @for (tool of toolEvents(); track tool.timestamp) {
@@ -134,6 +137,38 @@ export interface ToolEvent {
             color: #c9d1d9;
         }
         .terminal__text :global(strong) { color: #f0f6fc; font-weight: 600; }
+        .terminal__text :global(em) { font-style: italic; }
+        .terminal__text :global(del) { text-decoration: line-through; opacity: 0.6; }
+        .terminal__text :global(.md-h) { font-weight: 700; color: #f0f6fc; margin: 0.4em 0 0.2em; }
+        .terminal__text :global(.md-h1) { font-size: 1.1em; }
+        .terminal__text :global(.md-h2) { font-size: 1em; }
+        .terminal__text :global(.md-h3) { font-size: 0.95em; color: var(--accent-cyan, #58a6ff); }
+        .terminal__text :global(.md-link) { color: var(--accent-cyan, #58a6ff); text-decoration: underline; }
+        .terminal__text :global(.md-link:hover) { color: #f0f6fc; }
+        .terminal__text :global(.md-blockquote) {
+            border-left: 3px solid var(--accent-cyan, #58a6ff);
+            padding: 0.2rem 0.6rem;
+            margin: 0.4rem 0;
+            color: #8b949e;
+            font-style: italic;
+        }
+        .terminal__text :global(.md-hr) { border: none; border-top: 1px solid #30363d; margin: 0.5rem 0; }
+        .terminal__text :global(.md-list) { margin: 0.25rem 0; padding-left: 1.5rem; }
+        .terminal__text :global(.md-list li) { margin: 0.1rem 0; }
+        .terminal__text :global(.md-codeblock) {
+            background: #161b22;
+            padding: 0.75rem;
+            border-radius: var(--radius, 6px);
+            border: 1px solid #30363d;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+        }
+        .terminal__text :global(.md-codeblock code) { background: none; padding: 0; color: #c9d1d9; }
+        .terminal__text :global(.md-table) { border-collapse: collapse; margin: 0.4rem 0; font-size: 0.9em; }
+        .terminal__text :global(.md-table th),
+        .terminal__text :global(.md-table td) { border: 1px solid #30363d; padding: 0.25rem 0.5rem; }
+        .terminal__text :global(.md-table th) { background: #161b22; font-weight: 700; color: #f0f6fc; }
+        .terminal__text :global(.md-table td) { color: #c9d1d9; }
         .terminal__copy {
             position: absolute;
             top: 0;
@@ -288,12 +323,17 @@ export class TerminalChatComponent implements AfterViewChecked {
         }
     }
 
-    protected copyMessage(content: string): void {
-        navigator.clipboard.writeText(content);
+    protected readonly copiedIdx = signal<number | null>(null);
+
+    protected copyMessage(content: string, idx: number): void {
+        navigator.clipboard.writeText(content).then(() => {
+            this.copiedIdx.set(idx);
+            setTimeout(() => this.copiedIdx.set(null), 1500);
+        });
     }
 
     protected renderMarkdown(text: string): string {
-        return renderLightMarkdown(text);
+        return renderMarkdown(text);
     }
 
     private send(): void {
@@ -309,30 +349,3 @@ export class TerminalChatComponent implements AfterViewChecked {
     }
 }
 
-/**
- * Lightweight markdown renderer for terminal chat.
- * Handles: bold, inline code, code blocks, line breaks.
- */
-function renderLightMarkdown(text: string): string {
-    // Escape HTML
-    let html = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-    // Code blocks (```...```)
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
-        return `<pre><code>${code.trim()}</code></pre>`;
-    });
-
-    // Inline code (`...`)
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Bold (**...**)
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-    // Line breaks
-    html = html.replace(/\n/g, '<br>');
-
-    return html;
-}
