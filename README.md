@@ -59,7 +59,9 @@ e2e/             Playwright end-to-end tests
 | `ALGOCHAT_SYNC_INTERVAL` | Polling interval for on-chain messages (ms) | `30000` |
 | `ALGOCHAT_DEFAULT_AGENT_ID` | Default agent ID for AlgoChat | -- |
 | `ALGOCHAT_OWNER_ADDRESSES` | Comma-separated Algorand addresses authorized for admin commands | -- (open) |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude agents | -- |
 | `PORT` | HTTP server port | `3000` |
+| `BIND_HOST` | Bind address (`127.0.0.1` for localhost, `0.0.0.0` for Docker/VM) | `127.0.0.1` |
 
 Copy `.env.example` to `.env` and fill in your values. Bun loads `.env` automatically.
 
