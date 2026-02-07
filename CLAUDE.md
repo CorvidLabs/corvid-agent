@@ -40,7 +40,7 @@ Uses basename matching for unique filenames and substring matching for paths.
 **Path-protected:**
 - `.env`, `corvid-agent.db`, `wallet-keystore.json`
 - `server/index.ts`, `server/algochat/bridge.ts`, `server/algochat/config.ts`
-- `server/lib/auth.ts`, `server/selftest/`
+- `server/selftest/`
 
 ## Verification
 
@@ -89,4 +89,4 @@ Agents can create work tasks via `corvid_create_work_task` to propose codebase i
 5. On validation fail, up to 3 iteration attempts are made
 6. Worktree is cleaned up after completion (branch persists for PR review)
 
-Rate limited to 5 work tasks per agent per day. Protected files cannot be modified even in full-auto mode.
+Protected files cannot be modified even in full-auto mode.
