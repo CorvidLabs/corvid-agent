@@ -10,6 +10,7 @@ server/          — Bun server (API, WebSocket, process management)
   db/            — SQLite via bun:sqlite (sessions, agents, projects, spending, credits)
   lib/           — Shared utilities (logger, crypto, validation)
   mcp/           — MCP tool definitions and handlers (corvid_* tools)
+  middleware/    — HTTP/WS auth, CORS, startup security checks
   process/       — Session lifecycle, SDK integration, approval flow
   routes/        — HTTP API routes
   selftest/      — Self-test service
