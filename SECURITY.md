@@ -33,7 +33,7 @@ CorvidAgent runs as a **local sandbox** — on your machine, in a VM, or on a pr
 
 ### What's NOT protected (by design)
 
-- **Dashboard API** (`localhost:3000`): Open on localhost. Only you have access to your machine. If deploying on a shared server, add a reverse proxy with auth.
+- **Dashboard API** (`localhost:3000`): Binds to `127.0.0.1` by default, so only local processes can reach it. If deploying on a shared server, add a reverse proxy with auth (see [Deploying on a Server](#deploying-on-a-server)).
 - **Agent sessions**: Run locally with your own AI provider credentials.
 
 ## Spending Protection
@@ -58,9 +58,12 @@ Configure via `DAILY_ALGO_LIMIT_MICRO` in `.env`.
 
 If you run CorvidAgent on a public server instead of localhost:
 
-1. Put a reverse proxy (nginx/caddy) in front with authentication
-2. Set `ALGOCHAT_OWNER_ADDRESSES` to restrict admin commands
-3. Use the allowlist to control who can message your agents
-4. The API itself has no auth — the proxy handles that
+1. **Set `BIND_HOST`**: The server binds to `127.0.0.1` (localhost only) by default. For Docker or VM deployments where you need external access, set `BIND_HOST=0.0.0.0` in your `.env` — but **always** put a reverse proxy with authentication in front.
+2. Put a reverse proxy (nginx/caddy) in front with authentication
+3. Set `ALGOCHAT_OWNER_ADDRESSES` to restrict admin commands
+4. Use the allowlist to control who can message your agents
+5. The API itself has no auth — the proxy handles that
+
+> **Why localhost-only by default?** The dashboard API has no built-in authentication. Binding to `127.0.0.1` ensures only local processes can reach it, which is the primary access-control mechanism for single-machine deployments.
 
 The `deploy/` directory has example configs for systemd, Docker, and macOS launchd.

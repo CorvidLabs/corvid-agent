@@ -9,6 +9,7 @@ services:
       - db-data:/app/data
     environment:
       - PORT=3000
+      - BIND_HOST=0.0.0.0
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - ALGOCHAT_MNEMONIC=${ALGOCHAT_MNEMONIC:-}
       - ALGORAND_NETWORK=${ALGORAND_NETWORK:-testnet}
