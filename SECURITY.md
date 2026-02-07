@@ -31,9 +31,13 @@ CorvidAgent runs as a **local sandbox** — on your machine, in a VM, or on a pr
 - **Allowlist**: Optional — restrict which addresses can message your agents.
 - **Encryption**: Messages are encrypted with X25519 (via ts-algochat PSK mode).
 
-### What's NOT protected (by design)
+### Dashboard API authentication
 
-- **Dashboard API** (`localhost:3000`): Binds to `127.0.0.1` by default, so only local processes can reach it. If deploying on a shared server, add a reverse proxy with auth (see [Deploying on a Server](#deploying-on-a-server)).
+- **Localhost mode** (default): `BIND_HOST=127.0.0.1` -- no API key required. Only local processes can reach the API.
+- **Network mode**: Set `API_KEY` in `.env`. All HTTP routes require `Authorization: Bearer <key>` and WebSocket upgrades require `?key=<key>` or a Bearer header. The server **refuses to start** if `BIND_HOST` is non-localhost and no `API_KEY` is set.
+- **CORS**: Configure `ALLOWED_ORIGINS` (comma-separated) to restrict browser access. Defaults to `*` on localhost.
+- **Health endpoint**: `/api/health` is always public for monitoring probes.
+- **Timing-safe comparison**: API key validation uses constant-time comparison to prevent timing attacks.
 - **Agent sessions**: Run locally with your own AI provider credentials.
 
 ## Spending Protection
@@ -58,13 +62,14 @@ Configure via `DAILY_ALGO_LIMIT_MICRO` in `.env`.
 
 If you run CorvidAgent on a public server instead of localhost:
 
-1. **Set `BIND_HOST`**: The server binds to `127.0.0.1` (localhost only) by default. For Docker or VM deployments where you need external access, set `BIND_HOST=0.0.0.0` in your `.env` — but **always** put a reverse proxy with authentication in front.
-2. Put a reverse proxy (nginx/caddy) in front with authentication
-3. Set `ALGOCHAT_OWNER_ADDRESSES` to restrict admin commands
-4. Use the allowlist to control who can message your agents
-5. The API itself has no auth — the proxy handles that
+1. **Set `API_KEY`** in `.env` -- the server enforces Bearer auth on all routes when this is set. The server will **refuse to start** if bound to a non-localhost address without an `API_KEY`.
+2. **Set `BIND_HOST=0.0.0.0`** for Docker or VM deployments where you need external access.
+3. Optionally add a reverse proxy (nginx/caddy) for TLS termination.
+4. Set `ALGOCHAT_OWNER_ADDRESSES` to restrict admin commands.
+5. Use the allowlist to control who can message your agents.
+6. Set `ALLOWED_ORIGINS` to restrict CORS to your domain(s).
 
-> **Why localhost-only by default?** The dashboard API has no built-in authentication. Binding to `127.0.0.1` ensures only local processes can reach it, which is the primary access-control mechanism for single-machine deployments.
+> **Why localhost-only by default?** Binding to `127.0.0.1` ensures only local processes can reach the API without needing an API key, which is the safest default for single-machine deployments.
 
 The `deploy/` directory has example configs for systemd, Docker, and macOS launchd.
 
