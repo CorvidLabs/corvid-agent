@@ -42,7 +42,6 @@ server/           # Bun HTTP server, routes, and core logic
   db/             # SQLite database access layer
   lib/            # Shared utilities (logger, crypto, validation)
   mcp/            # MCP tool server
-  middleware/     # HTTP/WS auth, CORS, startup security checks
   process/        # Claude Agent SDK process management
   routes/         # REST API route handlers
   selftest/       # Self-test service
