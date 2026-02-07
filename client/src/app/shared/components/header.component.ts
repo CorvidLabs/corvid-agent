@@ -193,6 +193,7 @@ export class HeaderComponent implements OnInit {
     /** Emits when hamburger is clicked */
     readonly hamburgerClick = output<void>();
 
+
     protected readonly currentNetwork = signal<AlgoChatNetwork>('testnet');
     protected readonly switching = signal(false);
 
