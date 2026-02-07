@@ -279,11 +279,11 @@ export class AlgoChatBridge {
     /** Check if a participant is authorized to run privileged commands. Fail-closed: returns false when no owners configured. */
     private isOwner(participant: string): boolean {
         if (this.config.ownerAddresses.size === 0) {
-            log.warn('Privileged command rejected — no owner addresses configured', { participant: participant.slice(0, 8) });
+            log.warn('Owner check failed — no owner addresses configured', { participant: participant.slice(0, 8) });
             return false;
         }
         if (!this.config.ownerAddresses.has(participant)) {
-            log.warn('Privileged command rejected — sender not in owner list', { participant: participant.slice(0, 8) });
+            log.debug('Non-owner address', { participant: participant.slice(0, 8) });
             return false;
         }
         return true;
@@ -848,6 +848,12 @@ export class AlgoChatBridge {
                 log.info('Agent-to-agent message — handled by AgentMessenger', { senderAgentId });
                 return;
             }
+        }
+
+        // Owner-only mode: only respond to wallets in ALGOCHAT_OWNER_ADDRESSES
+        if (!this.isOwner(participant)) {
+            log.info('Ignoring message from non-owner address', { address: participant.slice(0, 8) + '...' });
+            return;
         }
 
         // Allowlist filtering — if allowlist has entries, only listed addresses get through
