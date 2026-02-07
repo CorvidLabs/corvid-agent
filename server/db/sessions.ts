@@ -181,8 +181,12 @@ export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: num
 }
 
 export function deleteSession(db: Database, id: string): boolean {
-    db.query('DELETE FROM session_messages WHERE session_id = ?').run(id);
-    const result = db.query('DELETE FROM sessions WHERE id = ?').run(id);
+    const result = db.transaction(() => {
+        // Clean up dependent records
+        db.query('DELETE FROM session_messages WHERE session_id = ?').run(id);
+        db.query('UPDATE algochat_conversations SET session_id = NULL WHERE session_id = ?').run(id);
+        return db.query('DELETE FROM sessions WHERE id = ?').run(id);
+    })();
     return result.changes > 0;
 }
 

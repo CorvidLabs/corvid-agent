@@ -150,8 +150,39 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
 }
 
 export function deleteAgent(db: Database, id: string): boolean {
-    const result = db.query('DELETE FROM agents WHERE id = ?').run(id);
-    return result.changes > 0;
+    const existing = getAgent(db, id);
+    if (!existing) return false;
+
+    db.transaction(() => {
+        // Delete dependent records that reference this agent
+        // Order matters: delete children before parents
+
+        // work_tasks (required FK, no cascade)
+        db.query('DELETE FROM work_tasks WHERE agent_id = ?').run(id);
+
+        // agent_messages (from/to agent, no explicit FK but logically linked)
+        db.query('DELETE FROM agent_messages WHERE from_agent_id = ? OR to_agent_id = ?').run(id, id);
+
+        // Nullify optional FKs rather than delete entire records
+        db.query('UPDATE councils SET chairman_agent_id = NULL WHERE chairman_agent_id = ?').run(id);
+        db.query('UPDATE algochat_conversations SET agent_id = NULL WHERE agent_id = ?').run(id);
+
+        // session_messages (child of sessions that reference this agent)
+        db.query(`DELETE FROM session_messages WHERE session_id IN
+            (SELECT id FROM sessions WHERE agent_id = ?)`).run(id);
+
+        // sessions (optional FK but still blocks deletion)
+        db.query('DELETE FROM sessions WHERE agent_id = ?').run(id);
+
+        // The following have ON DELETE CASCADE and will auto-delete:
+        //   agent_memories, council_members, council_discussion_messages
+        // But we delete the agent itself which triggers those cascades
+
+        // Finally delete the agent
+        db.query('DELETE FROM agents WHERE id = ?').run(id);
+    })();
+
+    return true;
 }
 
 export function setAgentWallet(
