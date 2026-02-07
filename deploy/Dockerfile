@@ -13,6 +13,8 @@ COPY shared/ shared/
 COPY client/dist/ client/dist/
 
 ENV PORT=3000
+# WARNING: 0.0.0.0 binds to all interfaces. In production, use a reverse
+# proxy with TLS and set BIND_HOST=127.0.0.1 at runtime.
 ENV BIND_HOST=0.0.0.0
 ENV LOG_LEVEL=info
 ENV NODE_ENV=production
