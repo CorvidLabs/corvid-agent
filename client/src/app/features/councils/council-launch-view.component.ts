@@ -341,7 +341,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .log-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
             padding: 0.5rem; margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto;
-            font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.6;
+            font-family: 'Dogica Pixel', 'Dogica', monospace; font-size: 0.75rem; line-height: 1.6;
         }
         .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 2px; }
         .log-entry:hover { background: var(--bg-hover); }

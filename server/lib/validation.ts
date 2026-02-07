@@ -239,3 +239,7 @@ export const OperationalModeSchema = z.object({
 export const SelfTestSchema = z.object({
     testType: z.enum(['unit', 'e2e', 'all']).optional().default('all'),
 });
+
+export const SwitchNetworkSchema = z.object({
+    network: z.enum(['testnet', 'mainnet'], { message: 'network must be testnet or mainnet' }),
+});

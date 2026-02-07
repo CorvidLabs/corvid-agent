@@ -132,7 +132,7 @@ interface ParsedEvent {
             padding: 0.75rem 1rem;
             background: var(--bg-deep);
             color: var(--text-primary);
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-family: 'Dogica Pixel', 'Dogica', monospace;
             font-size: 0.8rem;
             line-height: 1.6;
             background-image: repeating-linear-gradient(
