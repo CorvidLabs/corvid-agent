@@ -1,4 +1,5 @@
 import type { AlgoChatNetwork } from '../../shared/types';
+import { isValidAddress } from 'algosdk';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatConfig');
@@ -52,16 +53,8 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     };
 }
 
-/**
- * Synchronous format check for Algorand addresses.
- * Algorand addresses are 58-character base32 strings (A-Z, 2-7).
- * This does NOT verify the checksum — only that the string is plausibly an address.
- */
-export function isPlausibleAlgorandAddress(addr: string): boolean {
-    return /^[A-Z2-7]{58}$/.test(addr);
-}
-
-function parseOwnerAddresses(network: AlgoChatNetwork): Set<string> {
+/** Exported for testing. */
+export function parseOwnerAddresses(network: AlgoChatNetwork): Set<string> {
     const raw = process.env.ALGOCHAT_OWNER_ADDRESSES ?? '';
     const addresses = new Set<string>();
     for (const addr of raw.split(',')) {
@@ -71,8 +64,8 @@ function parseOwnerAddresses(network: AlgoChatNetwork): Set<string> {
         // Normalize to uppercase for case-insensitive matching
         const normalized = trimmed.toUpperCase();
 
-        if (!isPlausibleAlgorandAddress(normalized)) {
-            log.error(`Invalid owner address skipped (not a 58-char base32 Algorand address): ${trimmed}`);
+        if (!isValidAddress(normalized)) {
+            log.error(`Invalid owner address skipped (failed Algorand address checksum validation): "${trimmed}"`);
             continue;
         }
         addresses.add(normalized);
