@@ -12,7 +12,7 @@
     "dev:client": "cd client && bun run start"
   },
   "optionalDependencies": {
-    "@corvidlabs/ts-algochat": "link:@corvidlabs/ts-algochat"
+    "@corvidlabs/ts-algochat": "^0.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.1",
