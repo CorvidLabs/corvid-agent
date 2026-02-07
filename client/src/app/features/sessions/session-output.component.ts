@@ -118,8 +118,16 @@ interface ParsedEvent {
         </div>
     `,
     styles: `
+        :host {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
         .terminal {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             padding: 0.75rem 1rem;
             background: var(--bg-deep);
