@@ -1,0 +1,189 @@
+diff --git a/dist/blockchain/discovery.js b/dist/blockchain/discovery.js
+index f53cea8ee0cda2347b3696937664d3a9717d3c21..48263496983c726583a3b46fe5634fcb0c8aa0cd 100644
+--- a/dist/blockchain/discovery.js
++++ b/dist/blockchain/discovery.js
+@@ -3,7 +3,14 @@
+  *
+  * Functions for discovering and verifying encryption keys on the blockchain.
+  */
++import algosdk from 'algosdk';
+ import { verifyEncryptionKey } from '../crypto';
++/**
++ * Decodes an Algorand address string to extract the 32-byte Ed25519 public key.
++ */
++function decodeAlgorandAddress(address) {
++    return algosdk.Address.fromString(address).publicKey;
++}
+ /**
+  * Parse a key announcement from a transaction note.
+  *
+@@ -62,10 +69,9 @@ export async function discoverEncryptionKey(indexer, address, searchDepth = 100)
+         if (!tx.note || tx.note.length < 32) {
+             continue;
+         }
+-        // Try to parse as key announcement
+-        // Note: For proper verification, we'd need the Ed25519 public key
+-        // from the Algorand address, which requires decoding the address
+-        const key = parseKeyAnnouncement(tx.note);
++        // Decode the Algorand address to get the Ed25519 public key for verification
++        const ed25519PublicKey = decodeAlgorandAddress(address);
++        const key = parseKeyAnnouncement(tx.note, ed25519PublicKey);
+         if (key !== undefined) {
+             return key;
+         }
+diff --git a/dist/services/algorand.service.d.ts b/dist/services/algorand.service.d.ts
+index fcfafc69a882327e12f821f6a79988f056f81e4a..f29d0d35e18d7486f6554b3d9fde8f8785a7bb81 100644
+--- a/dist/services/algorand.service.d.ts
++++ b/dist/services/algorand.service.d.ts
+@@ -17,6 +17,9 @@ export interface ChatAccount {
+     address: string;
+     account: algosdk.Account;
+     encryptionKeys: X25519KeyPair;
++    /** The Ed25519 public key derived from the account (32 bytes).
++     *  Used for signature verification. Extracted from the Algorand address. */
++    ed25519PublicKey: Uint8Array;
+ }
+ export declare class AlgorandService {
+     private algodClient;
+diff --git a/dist/services/mnemonic.service.js b/dist/services/mnemonic.service.js
+index 723a495d7b02e3374145c540b8e231e1db2a787b..88c1926d9ab1b83c24c5560b1625c0962f296ff5 100644
+--- a/dist/services/mnemonic.service.js
++++ b/dist/services/mnemonic.service.js
+@@ -5,6 +5,7 @@
+  */
+ import algosdk from 'algosdk';
+ import { deriveEncryptionKeys } from '../crypto';
++import { getPublicKey } from '../crypto/signature';
+ /**
+  * Creates a ChatAccount from an Algorand mnemonic
+  */
+@@ -16,10 +17,13 @@ export function createChatAccountFromMnemonic(mnemonic) {
+     const seed = account.sk.slice(0, 32);
+     // Derive X25519 encryption keys
+     const encryptionKeys = deriveEncryptionKeys(seed);
++    // Derive the Ed25519 public key from the seed (NOT a copy of the seed)
++    const ed25519PublicKey = getPublicKey(seed);
+     return {
+         address: account.addr.toString(),
+         account,
+         encryptionKeys,
++        ed25519PublicKey,
+     };
+ }
+ /**
+@@ -30,11 +34,14 @@ export function createRandomChatAccount() {
+     const mnemonic = algosdk.secretKeyToMnemonic(account.sk);
+     const seed = account.sk.slice(0, 32);
+     const encryptionKeys = deriveEncryptionKeys(seed);
++    // Derive the Ed25519 public key properly from the seed
++    const ed25519PublicKey = getPublicKey(seed);
+     return {
+         account: {
+             address: account.addr.toString(),
+             account,
+             encryptionKeys,
++            ed25519PublicKey,
+         },
+         mnemonic,
+     };
+diff --git a/src/blockchain/discovery.ts b/src/blockchain/discovery.ts
+index f347d9001aa799a59b5144e754a31c85d7a088fb..8d2c24dd6c96a18a665efd57b2f073de8cea2c85 100644
+--- a/src/blockchain/discovery.ts
++++ b/src/blockchain/discovery.ts
+@@ -4,10 +4,23 @@
+  * Functions for discovering and verifying encryption keys on the blockchain.
+  */
+ 
++import algosdk from 'algosdk';
+ import type { DiscoveredKey } from '../models/types';
+ import type { IndexerClient } from './interfaces';
+ import { verifyEncryptionKey } from '../crypto';
+ 
++/**
++ * Decodes an Algorand address string to extract the 32-byte Ed25519 public key.
++ *
++ * Algorand addresses are Base32-encoded: 32 bytes public key + 4 bytes checksum.
++ *
++ * @param address The Algorand address string (58 characters)
++ * @returns The 32-byte Ed25519 public key
++ */
++function decodeAlgorandAddress(address: string): Uint8Array {
++    return algosdk.Address.fromString(address).publicKey;
++}
++
+ /**
+  * Parse a key announcement from a transaction note.
+  *
+@@ -80,10 +93,9 @@ export async function discoverEncryptionKey(
+             continue;
+         }
+ 
+-        // Try to parse as key announcement
+-        // Note: For proper verification, we'd need the Ed25519 public key
+-        // from the Algorand address, which requires decoding the address
+-        const key = parseKeyAnnouncement(tx.note);
++        // Decode the Algorand address to get the Ed25519 public key for verification
++        const ed25519PublicKey = decodeAlgorandAddress(address);
++        const key = parseKeyAnnouncement(tx.note, ed25519PublicKey);
+         if (key !== undefined) {
+             return key;
+         }
+diff --git a/src/services/algorand.service.ts b/src/services/algorand.service.ts
+index 272b3fabe7f2047ec594970353bcd158dead617f..12eb59cad97fb1263ad309d86638ab509b2f530d 100644
+--- a/src/services/algorand.service.ts
++++ b/src/services/algorand.service.ts
+@@ -22,6 +22,9 @@ export interface ChatAccount {
+     address: string;
+     account: algosdk.Account;
+     encryptionKeys: X25519KeyPair;
++    /** The Ed25519 public key derived from the account (32 bytes).
++     *  Used for signature verification. Extracted from the Algorand address. */
++    ed25519PublicKey: Uint8Array;
+ }
+ 
+ /** Indexer transaction response shape (subset of fields we use) */
+diff --git a/src/services/mnemonic.service.ts b/src/services/mnemonic.service.ts
+index 5291a671862a8a41de59f2b1e7c6d5bd38902f5e..7aa3fcc0e816707e949c2ce2c0e57a6dcb631545 100644
+--- a/src/services/mnemonic.service.ts
++++ b/src/services/mnemonic.service.ts
+@@ -6,6 +6,7 @@
+ 
+ import algosdk from 'algosdk';
+ import { deriveEncryptionKeys } from '../crypto';
++import { getPublicKey } from '../crypto/signature';
+ import type { ChatAccount } from './algorand.service';
+ 
+ /**
+@@ -22,10 +23,16 @@ export function createChatAccountFromMnemonic(mnemonic: string): ChatAccount {
+     // Derive X25519 encryption keys
+     const encryptionKeys = deriveEncryptionKeys(seed);
+ 
++    // Derive the Ed25519 public key from the seed (NOT a copy of the seed).
++    // The Ed25519 public key is used for signature verification and is
++    // extracted from the Algorand address (which is the Base32-encoded public key).
++    const ed25519PublicKey = getPublicKey(seed);
++
+     return {
+         address: account.addr.toString(),
+         account,
+         encryptionKeys,
++        ed25519PublicKey,
+     };
+ }
+ 
+@@ -39,11 +46,15 @@ export function createRandomChatAccount(): { account: ChatAccount; mnemonic: str
+     const seed = account.sk.slice(0, 32);
+     const encryptionKeys = deriveEncryptionKeys(seed);
+ 
++    // Derive the Ed25519 public key properly from the seed
++    const ed25519PublicKey = getPublicKey(seed);
++
+     return {
+         account: {
+             address: account.addr.toString(),
+             account,
+             encryptionKeys,
++            ed25519PublicKey,
+         },
+         mnemonic,
+     };
