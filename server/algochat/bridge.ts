@@ -732,7 +732,7 @@ export class AlgoChatBridge {
     private setupPSKManager(): void {
         if (!this.config.pskContact) return;
 
-        this.pskManager = new PSKManager(this.db, this.service, this.config.pskContact);
+        this.pskManager = new PSKManager(this.db, this.service, this.config.pskContact, this.config.network);
 
         this.pskManager.onMessage((msg) => {
             this.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound).catch((err) => {

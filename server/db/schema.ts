@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 22;
+const SCHEMA_VERSION = 23;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -307,6 +307,29 @@ const MIGRATIONS: Record<number, string[]> = {
     22: [
         // Follow-up chat session for completed council launches
         `ALTER TABLE council_launches ADD COLUMN chat_session_id TEXT DEFAULT NULL`,
+    ],
+    23: [
+        // Make algochat_psk_state network-aware so PSK counters/lastRound are per-network.
+        // Recreate the table with (address, network) composite primary key.
+        `CREATE TABLE IF NOT EXISTS algochat_psk_state_v2 (
+            address           TEXT NOT NULL,
+            network           TEXT NOT NULL DEFAULT 'testnet',
+            initial_psk       BLOB NOT NULL,
+            label             TEXT DEFAULT '',
+            send_counter      INTEGER DEFAULT 0,
+            peer_last_counter INTEGER DEFAULT 0,
+            seen_counters     TEXT DEFAULT '[]',
+            last_round        INTEGER DEFAULT 0,
+            created_at        TEXT DEFAULT (datetime('now')),
+            updated_at        TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (address, network)
+        )`,
+        // Migrate existing rows (assume they belong to 'testnet' since that was the only network used)
+        `INSERT OR IGNORE INTO algochat_psk_state_v2 (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, created_at, updated_at)
+         SELECT address, 'testnet', initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, created_at, updated_at
+         FROM algochat_psk_state`,
+        `DROP TABLE IF EXISTS algochat_psk_state`,
+        `ALTER TABLE algochat_psk_state_v2 RENAME TO algochat_psk_state`,
     ],
 };
 

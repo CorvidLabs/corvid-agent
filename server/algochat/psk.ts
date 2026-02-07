@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import type { PSKContactConfig } from './config';
 import type { AlgoChatService } from './service';
 import type { PSKState } from '@corvidlabs/ts-algochat';
+import type { AlgoChatNetwork } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('PSK');
@@ -26,6 +27,7 @@ interface PSKContactEntry {
 
 interface PSKStateRow {
     address: string;
+    network: string;
     initial_psk: Uint8Array;
     label: string;
     send_counter: number;
@@ -52,6 +54,7 @@ interface IndexerSearchResponse {
 export class PSKManager {
     private db: Database;
     private service: AlgoChatService;
+    private network: AlgoChatNetwork;
     private contact: PSKContactEntry;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private callbacks: Set<PSKMessageCallback> = new Set();
@@ -63,17 +66,20 @@ export class PSKManager {
         db: Database,
         service: AlgoChatService,
         pskConfig: PSKContactConfig,
+        network: AlgoChatNetwork,
     ) {
         this.db = db;
         this.service = service;
+        this.network = network;
 
         // Try to restore state from DB, otherwise create fresh
         const restored = this.loadState(pskConfig.address);
         if (restored) {
             this.contact = restored;
             log.info(
-                `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}...`,
+                `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}... on ${network}`,
                 {
+                    network,
                     sendCounter: restored.state.sendCounter,
                     peerLastCounter: restored.state.peerLastCounter,
                     lastRound: restored.lastRound,
@@ -88,7 +94,7 @@ export class PSKManager {
                 lastRound: 0,
             };
             this.saveState();
-            log.info(`Initialized new contact: ${pskConfig.label ?? pskConfig.address.slice(0, 8)}...`);
+            log.info(`Initialized new contact: ${pskConfig.label ?? pskConfig.address.slice(0, 8)}... on ${network}`);
         }
     }
 
@@ -317,8 +323,8 @@ export class PSKManager {
 
     private loadState(address: string): PSKContactEntry | null {
         const row = this.db.query(
-            'SELECT * FROM algochat_psk_state WHERE address = ?',
-        ).get(address) as PSKStateRow | null;
+            'SELECT * FROM algochat_psk_state WHERE address = ? AND network = ?',
+        ).get(address, this.network) as PSKStateRow | null;
 
         if (!row) return null;
 
@@ -344,16 +350,17 @@ export class PSKManager {
         const seenCountersJson = JSON.stringify([...c.state.seenCounters]);
 
         this.db.query(
-            `INSERT INTO algochat_psk_state (address, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))
-             ON CONFLICT(address) DO UPDATE SET
-                send_counter = ?4,
-                peer_last_counter = ?5,
-                seen_counters = ?6,
-                last_round = ?7,
+            `INSERT INTO algochat_psk_state (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))
+             ON CONFLICT(address, network) DO UPDATE SET
+                send_counter = ?5,
+                peer_last_counter = ?6,
+                seen_counters = ?7,
+                last_round = ?8,
                 updated_at = datetime('now')`,
         ).run(
             c.address,
+            this.network,
             c.initialPSK,
             c.label,
             c.state.sendCounter,
