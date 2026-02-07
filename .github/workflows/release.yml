@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ── Run the full CI suite before releasing ──────────────────────
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  # ── Build & push Docker image ───────────────────────────────────
+  docker:
+    name: Docker
+    needs: ci
+    uses: ./.github/workflows/docker-publish.yml
+    permissions:
+      contents: read
+      packages: write
+
+  # ── Create GitHub Release ───────────────────────────────────────
+  release:
+    name: GitHub Release
+    needs: [ci, docker]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          if echo "$TAG" | grep -qE '-(alpha|beta|rc)'; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          # Find the previous tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v' | grep -v "^${TAG}$" | head -n1)
+          if [ -z "$PREV_TAG" ]; then
+            # No previous tag — use all commits
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo "## What's Changed"
+            echo ""
+            git log "$RANGE" --pretty=format:"* %s (%h)" --no-merges
+            echo ""
+            echo ""
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...$TAG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.version }}
+          name: ${{ steps.tag.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          generate_release_notes: false
