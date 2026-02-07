@@ -57,6 +57,26 @@ workTaskService.recoverStaleTasks().catch((err) =>
     log.error('Failed to recover stale work tasks', { error: err instanceof Error ? err.message : String(err) }),
 );
 
+async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
+    log.info(`Switching AlgoChat network to ${network}`);
+
+    // Stop existing services
+    if (algochatBridge) {
+        algochatBridge.stop();
+        algochatBridge = null;
+    }
+    agentWalletService = null;
+    agentMessenger = null;
+    agentDirectory = null;
+
+    // Update the config
+    (algochatConfig as { network: string }).network = network;
+
+    // Reinitialize
+    await initAlgoChat();
+    log.info(`Network switched to ${network}`);
+}
+
 async function initAlgoChat(): Promise<void> {
     if (!algochatConfig.enabled) {
         log.info('AlgoChat disabled');
@@ -161,7 +181,7 @@ const server = Bun.serve<WsData>({
         }
 
         // API routes
-        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
+        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork);
         if (apiResponse) return apiResponse;
 
         // Mobile chat client

@@ -85,7 +85,7 @@ export interface ToolEvent {
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             background: #0d1117;
-            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-family: 'Dogica Pixel', 'Dogica', monospace;
             font-size: 0.8rem;
             line-height: 1.6;
             overflow: hidden;

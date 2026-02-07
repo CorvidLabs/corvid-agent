@@ -16,7 +16,7 @@ import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
 import { searchAlgoChatMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
-import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('Router');
@@ -43,6 +43,8 @@ function errorResponse(err: unknown): Response {
     return response;
 }
 
+export type NetworkSwitchFn = (network: 'testnet' | 'mainnet') => Promise<void>;
+
 export async function handleRequest(
     req: Request,
     db: Database,
@@ -53,6 +55,7 @@ export async function handleRequest(
     workTaskService?: WorkTaskService | null,
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
+    networkSwitchFn?: NetworkSwitchFn | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
 
@@ -62,7 +65,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory);
+        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn);
         if (response) addCors(response);
         return response;
     } catch (err) {
@@ -82,6 +85,7 @@ async function handleRoutes(
     workTaskService?: WorkTaskService | null,
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
+    networkSwitchFn?: NetworkSwitchFn | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -178,6 +182,22 @@ async function handleRoutes(
                 activeConversations: 0,
             };
         return json(status);
+    }
+
+    // Switch AlgoChat network (testnet <-> mainnet)
+    if (url.pathname === '/api/algochat/network' && req.method === 'POST') {
+        if (!networkSwitchFn) {
+            return json({ error: 'Network switching not available' }, 503);
+        }
+        try {
+            const data = await parseBodyOrThrow(req, SwitchNetworkSchema);
+            await networkSwitchFn(data.network);
+            return json({ ok: true, network: data.network });
+        } catch (err) {
+            if (err instanceof ValidationError) return json({ error: err.message }, 400);
+            const message = err instanceof Error ? err.message : String(err);
+            return json({ error: message }, 500);
+        }
     }
 
     if (url.pathname === '/api/algochat/conversations' && req.method === 'POST') {

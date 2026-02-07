@@ -1,6 +1,10 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { SessionService } from '../../core/services/session.service';
+import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from './status-badge.component';
+import { firstValueFrom } from 'rxjs';
+import type { AlgoChatNetwork } from '../../core/models/session.model';
 
 @Component({
     selector: 'app-header',
@@ -11,9 +15,29 @@ import { StatusBadgeComponent } from './status-badge.component';
             <div class="header__brand">
                 <h1 class="header__title">CorvidAgent</h1>
             </div>
-            <div class="header__status">
-                <span class="header__label">WebSocket:</span>
-                <app-status-badge [status]="wsService.connectionStatus()" />
+            <div class="header__controls">
+                <div class="header__network" role="group" aria-label="Network selector">
+                    <button
+                        class="network-btn"
+                        [class.network-btn--active]="currentNetwork() === 'testnet'"
+                        [class.network-btn--testnet]="currentNetwork() === 'testnet'"
+                        [disabled]="switching()"
+                        (click)="switchNetwork('testnet')"
+                        aria-label="Switch to testnet"
+                    >TESTNET</button>
+                    <button
+                        class="network-btn"
+                        [class.network-btn--active]="currentNetwork() === 'mainnet'"
+                        [class.network-btn--mainnet]="currentNetwork() === 'mainnet'"
+                        [disabled]="switching()"
+                        (click)="switchNetwork('mainnet')"
+                        aria-label="Switch to mainnet"
+                    >MAINNET</button>
+                </div>
+                <div class="header__status">
+                    <span class="header__label">WS:</span>
+                    <app-status-badge [status]="wsService.connectionStatus()" />
+                </div>
             </div>
         </header>
     `,
@@ -29,7 +53,7 @@ import { StatusBadgeComponent } from './status-badge.component';
             border-bottom: 1px solid var(--border);
         }
         .header__title {
-            font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+            font-family: 'Dogica Pixel', 'Dogica', monospace;
             font-size: 1.25rem;
             font-weight: 700;
             margin: 0;
@@ -37,19 +61,102 @@ import { StatusBadgeComponent } from './status-badge.component';
             text-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
             letter-spacing: 0.08em;
         }
+        .header__controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .header__network {
+            display: flex;
+            gap: 0;
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .network-btn {
+            padding: 0.3rem 0.6rem;
+            font-family: inherit;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+            text-transform: uppercase;
+        }
+        .network-btn:hover:not(:disabled):not(.network-btn--active) {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+        .network-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .network-btn--active.network-btn--testnet {
+            background: rgba(74, 144, 217, 0.15);
+            color: #4a90d9;
+            box-shadow: inset 0 0 8px rgba(74, 144, 217, 0.2);
+        }
+        .network-btn--active.network-btn--mainnet {
+            background: rgba(80, 227, 194, 0.15);
+            color: #50e3c2;
+            box-shadow: inset 0 0 8px rgba(80, 227, 194, 0.2);
+        }
         .header__status {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
         .header__label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
     `,
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnInit {
     protected readonly wsService = inject(WebSocketService);
+    private readonly sessionService = inject(SessionService);
+    private readonly apiService = inject(ApiService);
+
+    protected readonly currentNetwork = signal<AlgoChatNetwork>('testnet');
+    protected readonly switching = signal(false);
+
+    ngOnInit(): void {
+        this.loadNetwork();
+    }
+
+    private async loadNetwork(): Promise<void> {
+        try {
+            await this.sessionService.loadAlgoChatStatus();
+            const status = this.sessionService.algochatStatus();
+            if (status?.network) {
+                this.currentNetwork.set(status.network);
+            }
+        } catch {
+            // Ignore — will show default
+        }
+    }
+
+    protected async switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
+        if (network === this.currentNetwork() || this.switching()) return;
+
+        this.switching.set(true);
+        try {
+            await firstValueFrom(
+                this.apiService.post<{ ok: boolean; network: string }>('/algochat/network', { network }),
+            );
+            this.currentNetwork.set(network);
+            // Reload status to reflect new state
+            await this.sessionService.loadAlgoChatStatus();
+        } catch (err) {
+            // Revert on failure — network didn't actually change
+            console.error('Failed to switch network:', err);
+        } finally {
+            this.switching.set(false);
+        }
+    }
 }
