@@ -13,6 +13,7 @@ COPY shared/ shared/
 COPY client/dist/ client/dist/
 
 ENV PORT=3000
+ENV BIND_HOST=0.0.0.0
 ENV LOG_LEVEL=info
 ENV NODE_ENV=production
 
