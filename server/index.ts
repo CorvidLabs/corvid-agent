@@ -19,6 +19,7 @@ import { createLogger } from './lib/logger';
 const log = createLogger('Server');
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 const CLIENT_DIST = join(import.meta.dir, '..', 'client', 'dist', 'client', 'browser');
 const startTime = Date.now();
 
@@ -131,6 +132,7 @@ interface WsData {
 // Start server
 const server = Bun.serve<WsData>({
     port: PORT,
+    hostname: BIND_HOST,
 
     async fetch(req, server) {
         const url = new URL(req.url);
@@ -228,7 +230,7 @@ initAlgoChat().then(() => {
 // Start session lifecycle cleanup after server is running
 sessionLifecycle.start();
 
-log.info(`Server running at http://localhost:${PORT}`);
+log.info(`Server running at http://${BIND_HOST}:${PORT}`);
 
 // Global error handlers for 24/7 operation
 process.on('unhandledRejection', (reason) => {
