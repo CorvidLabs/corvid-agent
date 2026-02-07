@@ -85,6 +85,29 @@ export function updateProject(db: Database, id: string, input: UpdateProjectInpu
 }
 
 export function deleteProject(db: Database, id: string): boolean {
-    const result = db.query('DELETE FROM projects WHERE id = ?').run(id);
-    return result.changes > 0;
+    const existing = getProject(db, id);
+    if (!existing) return false;
+
+    db.transaction(() => {
+        // Delete dependent records that reference this project
+        // Order matters: delete children before parents
+
+        // council_launches -> also cascades to council_launch_logs & council_discussion_messages
+        db.query('DELETE FROM council_launches WHERE project_id = ?').run(id);
+
+        // work_tasks
+        db.query('DELETE FROM work_tasks WHERE project_id = ?').run(id);
+
+        // session_messages (child of sessions)
+        db.query(`DELETE FROM session_messages WHERE session_id IN
+            (SELECT id FROM sessions WHERE project_id = ?)`).run(id);
+
+        // sessions
+        db.query('DELETE FROM sessions WHERE project_id = ?').run(id);
+
+        // Finally delete the project itself
+        db.query('DELETE FROM projects WHERE id = ?').run(id);
+    })();
+
+    return true;
 }

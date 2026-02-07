@@ -150,7 +150,15 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
 }
 
 export function deleteCouncil(db: Database, id: string): boolean {
-    const result = db.query('DELETE FROM councils WHERE id = ?').run(id);
+    const result = db.transaction(() => {
+        // council_launch_logs and council_discussion_messages cascade from council_launches
+        // Sessions may reference council_launches via council_launch_id
+        db.query(`UPDATE sessions SET council_launch_id = NULL WHERE council_launch_id IN
+            (SELECT id FROM council_launches WHERE council_id = ?)`).run(id);
+        db.query('DELETE FROM council_launches WHERE council_id = ?').run(id);
+        // council_members has ON DELETE CASCADE, handled automatically
+        return db.query('DELETE FROM councils WHERE id = ?').run(id);
+    })();
     return result.changes > 0;
 }
 
