@@ -192,6 +192,7 @@ export interface CouncilLaunch {
     sessionIds: string[];
     currentDiscussionRound: number;
     totalDiscussionRounds: number;
+    chatSessionId: string | null;
     createdAt: string;
 }
 

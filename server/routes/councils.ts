@@ -15,8 +15,9 @@ import {
     getDiscussionMessages,
     updateCouncilLaunchDiscussionRound,
     updateDiscussionMessageTxid,
+    updateCouncilLaunchChatSession,
 } from '../db/councils';
-import { createSession, getSessionMessages, listSessionsByCouncilLaunch } from '../db/sessions';
+import { createSession, getSession, getSessionMessages, listSessionsByCouncilLaunch } from '../db/sessions';
 import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import type { ProcessManager, EventCallback } from '../process/manager';
@@ -150,6 +151,10 @@ export function handleCouncilRoutes(
 
         if (action === 'synthesize' && method === 'POST') {
             return handleSynthesize(db, processManager, launchId);
+        }
+
+        if (action === 'chat' && method === 'POST') {
+            return handleCouncilChat(req, db, processManager, launchId);
         }
     }
 
@@ -568,6 +573,84 @@ function handleAbort(db: Database, processManager: ProcessManager, launchId: str
     broadcastStageChange(launchId, 'complete');
 
     return json({ ok: true, killed, aggregated: parts.length });
+}
+
+// ─── Follow-up chat ───────────────────────────────────────────────────────────
+
+async function handleCouncilChat(
+    req: Request,
+    db: Database,
+    processManager: ProcessManager,
+    launchId: string,
+): Promise<Response> {
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch) return json({ error: 'Launch not found' }, 404);
+    if (launch.stage !== 'complete') return json({ error: 'Council must be complete before chatting' }, 400);
+    if (!launch.synthesis) return json({ error: 'No synthesis available to chat about' }, 400);
+
+    let body: { message: string };
+    try {
+        const raw = await req.json();
+        if (!raw?.message || typeof raw.message !== 'string' || raw.message.trim().length === 0) {
+            return json({ error: 'message is required' }, 400);
+        }
+        body = { message: raw.message.trim() };
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const council = getCouncil(db, launch.councilId);
+
+    // If a chat session already exists, resume it with the new message
+    if (launch.chatSessionId) {
+        const existingSession = getSession(db, launch.chatSessionId);
+        if (existingSession) {
+            processManager.resumeProcess(existingSession, body.message);
+            return json({ sessionId: existingSession.id, created: false });
+        }
+    }
+
+    // Pick the chairman agent, or fall back to first council member
+    const chatAgentId = council?.chairmanAgentId ?? council?.agentIds[0] ?? null;
+
+    // Collect discussion context
+    const discussionMsgs = getDiscussionMessages(db, launchId);
+    const discussionSection = discussionMsgs.length > 0
+        ? `\n\n## Council Discussion\n\n${formatDiscussionMessages(discussionMsgs)}`
+        : '';
+
+    const systemContext = `You are a council advisor. A council has completed deliberation and produced a final decision. Your role is to answer follow-up questions about this decision, explain the reasoning, and discuss implications.
+
+## Original Question
+${launch.prompt}
+
+## Council Decision
+${launch.synthesis}${discussionSection}
+
+## Instructions
+Answer the user's questions about the council's decision. Draw from the synthesis, discussion, and original prompt to provide thorough, helpful responses. If the user asks about something not covered by the council's deliberation, you may offer your own analysis while noting it goes beyond what the council discussed.`;
+
+    const chatPrompt = `${systemContext}\n\n---\n\nUser question: ${body.message}`;
+
+    const session = createSession(db, {
+        projectId: launch.projectId,
+        agentId: chatAgentId ?? undefined,
+        name: `Council Chat: ${launch.prompt.slice(0, 50)}${launch.prompt.length > 50 ? '...' : ''}`,
+        initialPrompt: chatPrompt,
+        councilLaunchId: launchId,
+        councilRole: 'chairman',
+    });
+
+    updateCouncilLaunchChatSession(db, launchId, session.id);
+
+    try {
+        processManager.startProcess(session);
+    } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        return json({ error: `Failed to start chat session: ${errMsg}` }, 500);
+    }
+
+    return json({ sessionId: session.id, created: true }, 201);
 }
 
 // ─── Discussion orchestration ─────────────────────────────────────────────────

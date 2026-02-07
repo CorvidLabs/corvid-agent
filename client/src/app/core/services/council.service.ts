@@ -100,4 +100,13 @@ export class CouncilService {
     async getDiscussionMessages(launchId: string): Promise<CouncilDiscussionMessage[]> {
         return firstValueFrom(this.api.get<CouncilDiscussionMessage[]>(`/council-launches/${launchId}/discussion-messages`));
     }
+
+    async chatWithCouncil(launchId: string, message: string): Promise<{ sessionId: string; created: boolean }> {
+        return firstValueFrom(
+            this.api.post<{ sessionId: string; created: boolean }>(
+                `/council-launches/${launchId}/chat`,
+                { message },
+            ),
+        );
+    }
 }
