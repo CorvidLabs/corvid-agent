@@ -5,6 +5,7 @@ import {
     updateAllowlistEntry,
     removeFromAllowlist,
 } from '../db/allowlist';
+import { parseBodyOrThrow, ValidationError, AddAllowlistSchema, UpdateAllowlistSchema } from '../lib/validation';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -53,34 +54,30 @@ export function handleAllowlistRoutes(
 }
 
 async function handleAdd(req: Request, db: Database): Promise<Response> {
-    let body: Record<string, unknown>;
     try {
-        body = await req.json();
-    } catch {
-        return json({ error: 'Invalid JSON body' }, 400);
+        const data = await parseBodyOrThrow(req, AddAllowlistSchema);
+
+        const address = data.address.trim().toUpperCase();
+        const algosdk = await getAlgosdk();
+        if (!algosdk.isValidAddress(address)) {
+            return json({ error: 'Invalid Algorand address' }, 400);
+        }
+        const entry = addToAllowlist(db, address, data.label);
+        return json(entry, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
-    if (!body.address || typeof body.address !== 'string') {
-        return json({ error: 'address is required' }, 400);
-    }
-    const address = body.address.trim().toUpperCase();
-    const algosdk = await getAlgosdk();
-    if (!algosdk.isValidAddress(address)) {
-        return json({ error: 'Invalid Algorand address' }, 400);
-    }
-    const entry = addToAllowlist(db, address, typeof body.label === 'string' ? body.label : undefined);
-    return json(entry, 201);
 }
 
 async function handleUpdate(req: Request, db: Database, address: string): Promise<Response> {
-    let body: Record<string, unknown>;
     try {
-        body = await req.json();
-    } catch {
-        return json({ error: 'Invalid JSON body' }, 400);
+        const data = await parseBodyOrThrow(req, UpdateAllowlistSchema);
+
+        const entry = updateAllowlistEntry(db, address, String(data.label));
+        return entry ? json(entry) : json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
-    if (body.label === undefined) {
-        return json({ error: 'label is required' }, 400);
-    }
-    const entry = updateAllowlistEntry(db, address, String(body.label));
-    return entry ? json(entry) : json({ error: 'Not found' }, 404);
 }

@@ -3,6 +3,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { listProjects, getProject, createProject, updateProject, deleteProject } from '../db/projects';
+import { parseBodyOrThrow, ValidationError, CreateProjectSchema, UpdateProjectSchema } from '../lib/validation';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -50,18 +51,25 @@ export function handleProjectRoutes(
 }
 
 async function handleCreate(req: Request, db: Database): Promise<Response> {
-    const body = await req.json();
-    if (!body.name || !body.workingDir) {
-        return json({ error: 'name and workingDir are required' }, 400);
+    try {
+        const data = await parseBodyOrThrow(req, CreateProjectSchema);
+        const project = createProject(db, data);
+        return json(project, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
-    const project = createProject(db, body);
-    return json(project, 201);
 }
 
 async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
-    const body = await req.json();
-    const project = updateProject(db, id, body);
-    return project ? json(project) : json({ error: 'Not found' }, 404);
+    try {
+        const data = await parseBodyOrThrow(req, UpdateProjectSchema);
+        const project = updateProject(db, id, data);
+        return project ? json(project) : json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
+    }
 }
 
 export async function handleBrowseDirs(_req: Request, url: URL): Promise<Response> {

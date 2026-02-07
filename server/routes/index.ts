@@ -18,6 +18,7 @@ import { searchAlgoChatMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
 import { checkAuth } from '../lib/auth';
 import { checkRateLimit } from '../lib/rate-limit';
+import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema } from '../lib/validation';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -184,20 +185,14 @@ async function handleSelfTestRun(
     req: Request,
     selfTestService: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } },
 ): Promise<Response> {
-    let testType: 'unit' | 'e2e' | 'all' = 'all';
     try {
-        const body = await req.json();
-        if (body.testType && ['unit', 'e2e', 'all'].includes(body.testType)) {
-            testType = body.testType;
-        }
-    } catch {
-        // Default to 'all' if no body
-    }
+        const data = await parseBodyOrThrow(req, SelfTestSchema);
+        const testType = data?.testType ?? 'all';
 
-    try {
         const result = selfTestService.run(testType);
         return json({ sessionId: result.sessionId });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const message = err instanceof Error ? err.message : String(err);
         return json({ error: message }, 500);
     }
@@ -235,15 +230,16 @@ async function handleEscalationResolve(
     queueId: number,
 ): Promise<Response> {
     try {
-        const body = await req.json() as { approved?: boolean };
-        const approved = body.approved === true;
-        const resolved = processManager.approvalManager.resolveQueuedRequest(queueId, approved);
+        const data = await parseBodyOrThrow(req, EscalationResolveSchema);
+
+        const resolved = processManager.approvalManager.resolveQueuedRequest(queueId, data.approved);
         if (resolved) {
-            return json({ ok: true, message: `Escalation #${queueId} ${approved ? 'approved' : 'denied'}` });
+            return json({ ok: true, message: `Escalation #${queueId} ${data.approved ? 'approved' : 'denied'}` });
         }
         return json({ error: `Escalation #${queueId} not found or already resolved` }, 404);
-    } catch {
-        return json({ error: 'Invalid request body' }, 400);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
 }
 
@@ -252,15 +248,13 @@ async function handleSetOperationalMode(
     processManager: ProcessManager,
 ): Promise<Response> {
     try {
-        const body = await req.json() as { mode?: string };
-        const validModes = ['normal', 'queued', 'paused'];
-        if (!body.mode || !validModes.includes(body.mode)) {
-            return json({ error: `Invalid mode. Must be one of: ${validModes.join(', ')}` }, 400);
-        }
-        processManager.approvalManager.operationalMode = body.mode as 'normal' | 'queued' | 'paused';
-        return json({ ok: true, mode: body.mode });
-    } catch {
-        return json({ error: 'Invalid request body' }, 400);
+        const data = await parseBodyOrThrow(req, OperationalModeSchema);
+
+        processManager.approvalManager.operationalMode = data.mode;
+        return json({ ok: true, mode: data.mode });
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
 }
 

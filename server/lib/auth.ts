@@ -1,12 +1,45 @@
 /**
- * Optional API key authentication.
- * When API_KEY env var is set, all /api/ routes (except /api/health) require
- * a Bearer token in the Authorization header.
+ * API key authentication.
+ *
+ * Auth behaviour by environment:
+ *
+ * | API_KEY set? | NODE_ENV=production | Result                                      |
+ * |--------------|---------------------|---------------------------------------------|
+ * | Yes          | any                 | Bearer token required on all /api/ routes   |
+ * | No           | production          | Server refuses to start (enforced elsewhere)|
+ * | No           | development/test    | WARNING logged, requests allowed             |
+ *
+ * Public paths (always unauthenticated):
+ *   - /api/health
+ *   - /api/auth/login
+ *   - /api/auth/refresh
  */
 
 import { timingSafeEqual } from 'node:crypto';
+import { createLogger } from './logger';
+
+const log = createLogger('Auth');
 
 const API_KEY = process.env.API_KEY?.trim() || null;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Log auth status once at startup
+if (!API_KEY) {
+    if (IS_PRODUCTION) {
+        log.error('API_KEY is not set — all API routes are UNPROTECTED in production! Set API_KEY to secure your instance.');
+    } else {
+        log.warn('API_KEY is not set — API routes are open. Set API_KEY in .env for production use.');
+    }
+} else {
+    log.info('API key authentication enabled');
+}
+
+/** Public paths that never require authentication. */
+const PUBLIC_PATHS = new Set([
+    '/api/health',
+    '/api/auth/login',
+    '/api/auth/refresh',
+]);
 
 /** Constant-time string comparison to prevent timing attacks. */
 function safeEqual(a: string, b: string): boolean {
@@ -24,8 +57,11 @@ export function isAuthEnabled(): boolean {
  * Returns null if auth passes, or a 401 Response if it fails.
  */
 export function checkAuth(req: Request, url: URL): Response | null {
-    if (!API_KEY) return null; // No API key configured — allow all
-    if (url.pathname === '/api/health') return null; // Health check is always public
+    // Public paths are always allowed
+    if (PUBLIC_PATHS.has(url.pathname)) return null;
+
+    // If no API key configured, allow in dev but warn
+    if (!API_KEY) return null;
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {

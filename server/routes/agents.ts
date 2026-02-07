@@ -3,6 +3,7 @@ import { listAgents, getAgent, createAgent, updateAgent, deleteAgent } from '../
 import { listAgentMessages } from '../db/agent-messages';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema } from '../lib/validation';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -80,20 +81,22 @@ async function handleCreate(
     db: Database,
     agentWalletService?: AgentWalletService | null,
 ): Promise<Response> {
-    const body = await req.json();
-    if (!body.name) {
-        return json({ error: 'name is required' }, 400);
-    }
-    const agent = createAgent(db, body);
+    try {
+        const data = await parseBodyOrThrow(req, CreateAgentSchema);
+        const agent = createAgent(db, data);
 
-    // Auto-create wallet on localnet if AlgoChat is available
-    if (agentWalletService) {
-        agentWalletService.ensureWallet(agent.id).catch(() => {
-            // Fire and forget — wallet creation failure is non-blocking
-        });
-    }
+        // Auto-create wallet on localnet if AlgoChat is available
+        if (agentWalletService) {
+            agentWalletService.ensureWallet(agent.id).catch(() => {
+                // Fire and forget — wallet creation failure is non-blocking
+            });
+        }
 
-    return json(agent, 201);
+        return json(agent, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
+    }
 }
 
 async function handleBalance(
@@ -126,22 +129,28 @@ async function handleFund(
     if (!agent) return json({ error: 'Not found' }, 404);
     if (!agent.walletAddress) return json({ error: 'Agent has no wallet' }, 400);
 
-    const body = await req.json();
-    const microAlgos = Number(body.microAlgos);
-    if (!microAlgos || microAlgos < 1000 || microAlgos > 100_000_000) {
-        return json({ error: 'microAlgos must be between 1000 and 100000000' }, 400);
+    try {
+        const data = await parseBodyOrThrow(req, FundAgentSchema);
+
+        await agentWalletService.fundAgent(agentId, data.microAlgos);
+        const balance = await agentWalletService.getBalance(agent.walletAddress);
+
+        return json({ balance, address: agent.walletAddress, funded: data.microAlgos / 1_000_000 });
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
-
-    await agentWalletService.fundAgent(agentId, microAlgos);
-    const balance = await agentWalletService.getBalance(agent.walletAddress);
-
-    return json({ balance, address: agent.walletAddress, funded: microAlgos / 1_000_000 });
 }
 
 async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
-    const body = await req.json();
-    const agent = updateAgent(db, id, body);
-    return agent ? json(agent) : json({ error: 'Not found' }, 404);
+    try {
+        const data = await parseBodyOrThrow(req, UpdateAgentSchema);
+        const agent = updateAgent(db, id, data);
+        return agent ? json(agent) : json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
+    }
 }
 
 async function handleInvoke(
@@ -157,19 +166,15 @@ async function handleInvoke(
     const fromAgent = getAgent(db, fromAgentId);
     if (!fromAgent) return json({ error: 'Source agent not found' }, 404);
 
-    const body = await req.json();
-    const { toAgentId, content, paymentMicro, projectId } = body;
-    if (!toAgentId || !content) {
-        return json({ error: 'toAgentId and content are required' }, 400);
-    }
-
     try {
+        const data = await parseBodyOrThrow(req, InvokeAgentSchema);
+
         const result = await agentMessenger.invoke({
             fromAgentId,
-            toAgentId,
-            content,
-            paymentMicro,
-            projectId,
+            toAgentId: data.toAgentId,
+            content: data.content,
+            paymentMicro: data.paymentMicro,
+            projectId: data.projectId,
         });
 
         return json({
@@ -178,6 +183,7 @@ async function handleInvoke(
             sessionId: result.sessionId,
         }, 201);
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const message = err instanceof Error ? err.message : String(err);
         return json({ error: message }, 400);
     }

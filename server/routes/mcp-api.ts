@@ -5,6 +5,7 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents } from '../mcp/tool-handlers';
+import { parseBodyOrThrow, ValidationError, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema } from '../lib/validation';
 
 function extractResultText(result: CallToolResult): string {
     const first = result.content[0];
@@ -65,15 +66,13 @@ export function handleMcpApiRoutes(
 
 async function handleSendMessageRoute(req: Request, deps: McpApiDeps): Promise<Response> {
     try {
-        const body = await req.json() as { agentId?: string; toAgent?: string; message?: string };
-        if (!body.agentId || !body.toAgent || !body.message) {
-            return json({ error: 'Missing required fields: agentId, toAgent, message' }, 400);
-        }
+        const data = await parseBodyOrThrow(req, McpSendMessageSchema);
 
-        const ctx = buildContext(deps, body.agentId);
-        const result = await handleSendMessage(ctx, { to_agent: body.toAgent, message: body.message });
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleSendMessage(ctx, { to_agent: data.toAgent, message: data.message });
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const message = err instanceof Error ? err.message : String(err);
         return json({ error: message }, 500);
     }
@@ -81,15 +80,13 @@ async function handleSendMessageRoute(req: Request, deps: McpApiDeps): Promise<R
 
 async function handleSaveMemoryRoute(req: Request, deps: McpApiDeps): Promise<Response> {
     try {
-        const body = await req.json() as { agentId?: string; key?: string; content?: string };
-        if (!body.agentId || !body.key || !body.content) {
-            return json({ error: 'Missing required fields: agentId, key, content' }, 400);
-        }
+        const data = await parseBodyOrThrow(req, McpSaveMemorySchema);
 
-        const ctx = buildContext(deps, body.agentId);
-        const result = await handleSaveMemory(ctx, { key: body.key, content: body.content });
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleSaveMemory(ctx, { key: data.key, content: data.content });
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const message = err instanceof Error ? err.message : String(err);
         return json({ error: message }, 500);
     }
@@ -97,15 +94,13 @@ async function handleSaveMemoryRoute(req: Request, deps: McpApiDeps): Promise<Re
 
 async function handleRecallMemoryRoute(req: Request, deps: McpApiDeps): Promise<Response> {
     try {
-        const body = await req.json() as { agentId?: string; key?: string; query?: string };
-        if (!body.agentId) {
-            return json({ error: 'Missing required field: agentId' }, 400);
-        }
+        const data = await parseBodyOrThrow(req, McpRecallMemorySchema);
 
-        const ctx = buildContext(deps, body.agentId);
-        const result = await handleRecallMemory(ctx, { key: body.key, query: body.query });
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleRecallMemory(ctx, { key: data.key, query: data.query });
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const message = err instanceof Error ? err.message : String(err);
         return json({ error: message }, 500);
     }

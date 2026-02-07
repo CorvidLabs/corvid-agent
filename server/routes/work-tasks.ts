@@ -1,4 +1,5 @@
 import type { WorkTaskService } from '../work/service';
+import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
 
 function json(data: unknown, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -51,22 +52,20 @@ async function handleCancel(taskId: string, workTaskService: WorkTaskService): P
 
 async function handleCreate(req: Request, workTaskService: WorkTaskService): Promise<Response> {
     try {
-        const body = await req.json();
-        if (!body.agentId || !body.description) {
-            return json({ error: 'agentId and description are required' }, 400);
-        }
+        const data = await parseBodyOrThrow(req, CreateWorkTaskSchema);
 
         const task = await workTaskService.create({
-            agentId: body.agentId,
-            description: body.description,
-            projectId: body.projectId,
-            source: body.source ?? 'web',
-            sourceId: body.sourceId,
-            requesterInfo: body.requesterInfo,
+            agentId: data.agentId,
+            description: data.description,
+            projectId: data.projectId,
+            source: data.source,
+            sourceId: data.sourceId,
+            requesterInfo: data.requesterInfo,
         });
 
         return json(task, 201);
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const message = err instanceof Error ? err.message : String(err);
         return json({ error: message }, 400);
     }

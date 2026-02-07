@@ -74,34 +74,11 @@ class SQLiteWrapper implements DatabaseConnection {
 }
 
 /**
- * PostgreSQL database wrapper (placeholder for future implementation)
+ * PostgreSQL support is planned but not yet implemented.
+ * The DatabaseConnection interface above defines the contract — implement
+ * a PostgreSQLWrapper class against it when needed (e.g. using `pg` or `postgres`).
+ * See ARCHITECTURAL_IMPROVEMENTS.md for the migration roadmap.
  */
-class PostgreSQLWrapper implements DatabaseConnection {
-    // @ts-ignore - Unused parameters in placeholder implementation
-    constructor(private connectionString: string) {
-        // TODO: Implement PostgreSQL connection
-        throw new Error('PostgreSQL support not yet implemented');
-    }
-
-    // @ts-ignore - Unused parameters in placeholder implementation
-    query(sql: string, params: any[] = []): QueryResult {
-        throw new Error('PostgreSQL support not yet implemented');
-    }
-
-    // @ts-ignore - Unused parameters in placeholder implementation
-    exec(sql: string): void {
-        throw new Error('PostgreSQL support not yet implemented');
-    }
-
-    // @ts-ignore - Unused parameters in placeholder implementation
-    transaction<T>(fn: () => T): T {
-        throw new Error('PostgreSQL support not yet implemented');
-    }
-
-    close(): void {
-        // TODO: Close PostgreSQL connection
-    }
-}
 
 /**
  * Database service that supports dual-write for migrations
@@ -121,10 +98,10 @@ export class DatabaseService {
             }
             this.primary = new SQLiteWrapper(primaryDb);
         } else if (config.type === 'postgres') {
-            if (!config.connectionString) {
-                throw new Error('PostgreSQL connection string required');
-            }
-            this.primary = new PostgreSQLWrapper(config.connectionString);
+            throw new Error(
+                'PostgreSQL support is not yet implemented. ' +
+                'See ARCHITECTURAL_IMPROVEMENTS.md for the migration roadmap.',
+            );
         } else {
             throw new Error(`Unsupported database type: ${config.type}`);
         }
@@ -148,7 +125,10 @@ export class DatabaseService {
             if (!secondaryConfig.connectionString) {
                 throw new Error('Secondary PostgreSQL connection string required');
             }
-            this.secondary = new PostgreSQLWrapper(secondaryConfig.connectionString);
+            throw new Error(
+                'PostgreSQL support is not yet implemented. ' +
+                'See ARCHITECTURAL_IMPROVEMENTS.md for the migration roadmap.',
+            );
         }
 
         this.dualWriteMode = true;

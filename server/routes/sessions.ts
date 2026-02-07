@@ -9,6 +9,7 @@ import {
 } from '../db/sessions';
 import type { ProcessManager } from '../process/manager';
 import { createLogger } from '../lib/logger';
+import { parseBodyOrThrow, ValidationError, CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema } from '../lib/validation';
 
 const log = createLogger('SessionRoutes');
 
@@ -78,28 +79,35 @@ async function handleCreate(
     db: Database,
     processManager: ProcessManager,
 ): Promise<Response> {
-    const body = await req.json();
-    if (!body.projectId) {
-        return json({ error: 'projectId is required' }, 400);
-    }
-    const session = createSession(db, body);
+    try {
+        const data = await parseBodyOrThrow(req, CreateSessionSchema);
+        const session = createSession(db, data);
 
-    if (body.initialPrompt) {
-        try {
-            processManager.startProcess(session);
-        } catch (err) {
-            log.error('Failed to start process', { sessionId: session.id, error: err instanceof Error ? err.message : String(err) });
-            // Session is still created, just not started
+        if (data.initialPrompt) {
+            try {
+                processManager.startProcess(session);
+            } catch (err) {
+                log.error('Failed to start process', { sessionId: session.id, error: err instanceof Error ? err.message : String(err) });
+                // Session is still created, just not started
+            }
         }
-    }
 
-    return json(session, 201);
+        return json(session, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
+    }
 }
 
 async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
-    const body = await req.json();
-    const session = updateSession(db, id, body);
-    return session ? json(session) : json({ error: 'Not found' }, 404);
+    try {
+        const data = await parseBodyOrThrow(req, UpdateSessionSchema);
+        const session = updateSession(db, id, data);
+        return session ? json(session) : json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
+    }
 }
 
 function handleStop(
@@ -123,7 +131,13 @@ async function handleResume(
     const session = getSession(db, id);
     if (!session) return json({ error: 'Not found' }, 404);
 
-    const body = await req.json().catch(() => ({}));
-    processManager.resumeProcess(session, body.prompt);
+    let prompt: string | undefined;
+    try {
+        const data = await parseBodyOrThrow(req, ResumeSessionSchema);
+        prompt = data?.prompt;
+    } catch {
+        // Empty body is fine for resume
+    }
+    processManager.resumeProcess(session, prompt);
     return json({ ok: true });
 }
