@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { JWTService } from '../auth/jwt-service';
 import { AuthMiddleware, createErrorResponse, handleCORS, corsHeaders } from '../auth/middleware';
 import { createLogger } from '../lib/logger';
+import { parseBodyOrThrow, ValidationError, LoginSchema, RefreshTokenSchema, RegisterSchema } from '../lib/validation';
 
 const log = createLogger('AuthRoutes');
 
@@ -52,6 +53,14 @@ export function createAuthRoutes(config: AuthRoutesConfig) {
                         });
                 }
             } catch (error) {
+                if (error instanceof ValidationError) {
+                    return new Response(JSON.stringify({
+                        error: { message: error.message, type: 'validation_error', code: 400 }
+                    }), {
+                        status: 400,
+                        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+                    });
+                }
                 log.error('Auth route error', {
                     path,
                     error: error instanceof Error ? error.message : String(error)
@@ -74,21 +83,12 @@ export function createAuthRoutes(config: AuthRoutesConfig) {
             });
         }
 
-        const body = await request.json() as { email: string; password: string };
-
-        if (!body.email || !body.password) {
-            return new Response(JSON.stringify({
-                error: { message: 'Email and password are required', type: 'validation_error', code: 400 }
-            }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders }
-            });
-        }
+        const data = await parseBodyOrThrow(request, LoginSchema);
 
         const ipAddress = authMiddleware.getClientIP(request);
         const userAgent = authMiddleware.getUserAgent(request);
 
-        const result = await jwtService.login(body.email, body.password, ipAddress, userAgent);
+        const result = await jwtService.login(data.email, data.password, ipAddress, userAgent);
 
         return new Response(JSON.stringify({
             success: true,
@@ -112,18 +112,9 @@ export function createAuthRoutes(config: AuthRoutesConfig) {
             });
         }
 
-        const body = await request.json() as { refreshToken: string };
+        const data = await parseBodyOrThrow(request, RefreshTokenSchema);
 
-        if (!body.refreshToken) {
-            return new Response(JSON.stringify({
-                error: { message: 'Refresh token is required', type: 'validation_error', code: 400 }
-            }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders }
-            });
-        }
-
-        const result = await jwtService.refreshToken(body.refreshToken);
+        const result = await jwtService.refreshToken(data.refreshToken);
 
         return new Response(JSON.stringify({
             success: true,
@@ -281,31 +272,9 @@ export function createAuthRoutes(config: AuthRoutesConfig) {
         // Check if user is admin
         authMiddleware.requirePermission(user, '*');
 
-        const body = await request.json() as {
-            email: string;
-            password: string;
-            role: 'admin' | 'agent_operator' | 'viewer';
-        };
+        const data = await parseBodyOrThrow(request, RegisterSchema);
 
-        if (!body.email || !body.password || !body.role) {
-            return new Response(JSON.stringify({
-                error: { message: 'Email, password, and role are required', type: 'validation_error', code: 400 }
-            }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders }
-            });
-        }
-
-        if (!['admin', 'agent_operator', 'viewer'].includes(body.role)) {
-            return new Response(JSON.stringify({
-                error: { message: 'Invalid role', type: 'validation_error', code: 400 }
-            }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders }
-            });
-        }
-
-        const newUser = await jwtService.createUser(body.email, body.password, body.role);
+        const newUser = await jwtService.createUser(data.email, data.password, data.role);
 
         return new Response(JSON.stringify({
             success: true,

@@ -312,13 +312,18 @@ echo "=========================="
 # Store prompt safely in a variable (single-quoted to prevent interpretation)
 TASK_PROMPT='${escapedPrompt}'
 
-# TODO: Integrate with Claude Agent SDK to execute the prompt
-# For now, this is a placeholder that would be replaced with actual agent execution
+# ── STUB: Agent execution not yet integrated ──
+# The sandbox container, resource limits, and network isolation are production-ready.
+# What's missing: running the Claude Agent SDK inside the container to actually
+# process TASK_PROMPT. The integration should:
+#   1. Install claude-agent-sdk in the sandbox image
+#   2. Invoke: claude-agent --prompt "\$TASK_PROMPT" --working-dir /workspace/work
+#   3. Capture the agent's git diff / commits as the work output
+#
+# Until then, this container logs the prompt and exits cleanly.
 echo "PROMPT: \$TASK_PROMPT"
-echo "NOTE: This is a sandboxed execution environment"
+echo "STATUS: sandbox-only (agent execution not yet integrated)"
 echo "Files are isolated and network access is restricted"
-
-# Exit with success for now
 exit 0
 `;
     }

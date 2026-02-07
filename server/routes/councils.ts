@@ -23,6 +23,7 @@ import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
 
 const log = createLogger('CouncilRoutes');
 
@@ -187,21 +188,25 @@ export function handleCouncilRoutes(
 // ─── CRUD handlers ────────────────────────────────────────────────────────────
 
 async function handleCreateCouncil(req: Request, db: Database): Promise<Response> {
-    const body = await req.json();
-    if (!body.name) {
-        return json({ error: 'name is required' }, 400);
+    try {
+        const data = await parseBodyOrThrow(req, CreateCouncilSchema);
+        const council = createCouncil(db, data);
+        return json(council, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
     }
-    if (!Array.isArray(body.agentIds) || body.agentIds.length === 0) {
-        return json({ error: 'agentIds must be a non-empty array' }, 400);
-    }
-    const council = createCouncil(db, body);
-    return json(council, 201);
 }
 
 async function handleUpdateCouncil(req: Request, db: Database, id: string): Promise<Response> {
-    const body = await req.json();
-    const council = updateCouncil(db, id, body);
-    return council ? json(council) : json({ error: 'Not found' }, 404);
+    try {
+        const data = await parseBodyOrThrow(req, UpdateCouncilSchema);
+        const council = updateCouncil(db, id, data);
+        return council ? json(council) : json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        throw err;
+    }
 }
 
 // ─── Launch handler ───────────────────────────────────────────────────────────
@@ -274,16 +279,13 @@ async function handleLaunch(
     councilId: string,
     agentMessenger: AgentMessenger | null,
 ): Promise<Response> {
-    const body = await req.json();
-    const { projectId, prompt } = body;
-    if (!projectId || !prompt) {
-        return json({ error: 'projectId and prompt are required' }, 400);
-    }
-
     try {
-        const result = launchCouncil(db, processManager, councilId, projectId, prompt, agentMessenger);
+        const data = await parseBodyOrThrow(req, LaunchCouncilSchema);
+
+        const result = launchCouncil(db, processManager, councilId, data.projectId, data.prompt, agentMessenger);
         return json(result, 201);
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.message }, 400);
         const msg = err instanceof Error ? err.message : String(err);
         // Preserve proper HTTP status codes for not-found errors
         const isNotFound = msg === 'Council not found' || msg === 'Project not found';

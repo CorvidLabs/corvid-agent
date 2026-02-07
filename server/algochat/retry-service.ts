@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
+import { NotImplementedError } from '../lib/errors';
 
 const log = createLogger('AlgoRetryService');
 
@@ -340,24 +341,28 @@ export class AlgoRetryService {
         }
     }
 
-    private async resubmitMessageTransaction(tx: PendingTransaction): Promise<string | null> {
-        // TODO: Integrate with actual AlgoChat message sending.
-        // This should call back into the AlgoChat bridge to resend the message
-        // using tx.payload as the message content.
-        log.warn('resubmitMessageTransaction stub — not yet integrated with AlgoChat bridge', { id: tx.id });
-        return null; // Return null to indicate resubmission not available yet
+    private async resubmitMessageTransaction(_tx: PendingTransaction): Promise<string | null> {
+        // Requires AlgoChat bridge integration — see ARCHITECTURAL_IMPROVEMENTS.md
+        throw new NotImplementedError(
+            'resubmitMessageTransaction',
+            'Needs AlgoChat bridge callback to resend message from tx.payload',
+        );
     }
 
-    private async resubmitKeyPublication(tx: PendingTransaction): Promise<string | null> {
-        // TODO: Integrate with key publication service
-        log.warn('resubmitKeyPublication stub — not yet integrated', { id: tx.id });
-        return null;
+    private async resubmitKeyPublication(_tx: PendingTransaction): Promise<string | null> {
+        // Requires key publication service integration
+        throw new NotImplementedError(
+            'resubmitKeyPublication',
+            'Needs key publication service to republish agent key',
+        );
     }
 
-    private async resubmitWalletFunding(tx: PendingTransaction): Promise<string | null> {
-        // TODO: Integrate with wallet funding service
-        log.warn('resubmitWalletFunding stub — not yet integrated', { id: tx.id });
-        return null;
+    private async resubmitWalletFunding(_tx: PendingTransaction): Promise<string | null> {
+        // Requires wallet funding service integration
+        throw new NotImplementedError(
+            'resubmitWalletFunding',
+            'Needs wallet funding service to resubmit funding txn',
+        );
     }
 
     /**
