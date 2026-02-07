@@ -51,7 +51,7 @@ All API routes validate input with Zod schemas (`server/lib/validation.ts`):
 
 ## Testing
 
-167 tests covering:
+122 tests covering:
 - Database CRUD operations and schema validation
 - All Zod schemas and parse helpers
 - API route integration (malformed input, CRUD)
