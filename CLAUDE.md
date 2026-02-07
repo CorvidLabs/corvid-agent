@@ -7,7 +7,6 @@ Agent orchestration platform — manages Claude agent sessions with MCP tools, A
 ```
 server/          — Bun server (API, WebSocket, process management)
   algochat/      — On-chain messaging, wallets, agent directory
-  councils/      — Multi-agent council deliberation and voting
   db/            — SQLite via bun:sqlite (sessions, agents, projects, spending, credits)
   lib/           — Shared utilities (logger, crypto, validation)
   mcp/           — MCP tool definitions and handlers (corvid_* tools)

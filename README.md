@@ -39,9 +39,11 @@ The server starts at `http://localhost:3000`.
 server/          Bun HTTP + WebSocket server, agent process management
   algochat/      AlgoChat on-chain messaging layer
   db/            SQLite schema and queries
+  lib/           Shared utilities (logger, crypto, validation)
   mcp/           MCP tool server
   process/       Agent lifecycle management
   routes/        REST API routes
+  selftest/      Self-test service
   work/          Task/work item management
   ws/            WebSocket handlers
 client/          Angular 21 SPA (standalone components, signals)
@@ -59,7 +61,6 @@ e2e/             Playwright end-to-end tests
 | `ALGOCHAT_SYNC_INTERVAL` | Polling interval for on-chain messages (ms) | `30000` |
 | `ALGOCHAT_DEFAULT_AGENT_ID` | Default agent ID for AlgoChat | -- |
 | `ALGOCHAT_OWNER_ADDRESSES` | Comma-separated Algorand addresses authorized for admin commands | -- (open) |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude agents | -- |
 | `PORT` | HTTP server port | `3000` |
 | `BIND_HOST` | Bind address (`127.0.0.1` for localhost, `0.0.0.0` for Docker/VM) | `127.0.0.1` |
 

@@ -67,3 +67,16 @@ If you run CorvidAgent on a public server instead of localhost:
 > **Why localhost-only by default?** The dashboard API has no built-in authentication. Binding to `127.0.0.1` ensures only local processes can reach it, which is the primary access-control mechanism for single-machine deployments.
 
 The `deploy/` directory has example configs for systemd, Docker, and macOS launchd.
+
+## Reporting a Vulnerability
+
+If you discover a security vulnerability, **do not open a public issue**.
+
+Instead, please report it privately via [GitHub Security Advisories](https://github.com/CorvidLabs/corvid-agent/security/advisories/new) or email the maintainers directly.
+
+Include:
+- A description of the vulnerability and its potential impact
+- Steps to reproduce
+- Any suggested fix (optional but appreciated)
+
+We aim to acknowledge reports within 48 hours and provide a fix or mitigation plan within 7 days.
