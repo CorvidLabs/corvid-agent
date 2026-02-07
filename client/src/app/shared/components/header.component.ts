@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, input, OnInit, output } from '@angular/core';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { SessionService } from '../../core/services/session.service';
 import { ApiService } from '../../core/services/api.service';
@@ -13,6 +13,18 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
     template: `
         <header class="header" role="banner">
             <div class="header__brand">
+                <button
+                    class="header__hamburger"
+                    (click)="hamburgerClick.emit()"
+                    [attr.aria-expanded]="sidebarOpen()"
+                    aria-label="Toggle navigation"
+                    #hamburgerBtn>
+                    <span class="header__hamburger-icon" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </button>
                 <h1 class="header__title">CorvidAgent</h1>
             </div>
             <div class="header__controls">
@@ -51,6 +63,11 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             background: var(--bg-surface);
             color: var(--text-primary);
             border-bottom: 1px solid var(--border);
+        }
+        .header__brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
         .header__title {
             font-family: 'Dogica Pixel', 'Dogica', monospace;
@@ -115,12 +132,67 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+
+        /* ── Hamburger button ── */
+        .header__hamburger {
+            display: none;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius, 4px);
+            padding: 0.4rem;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            align-items: center;
+            justify-content: center;
+        }
+        .header__hamburger:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
+        }
+        .header__hamburger-icon {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 18px;
+        }
+        .header__hamburger-icon span {
+            display: block;
+            height: 2px;
+            width: 100%;
+            background: var(--text-secondary);
+            border-radius: 1px;
+            transition: background 0.15s;
+        }
+
+        /* Show hamburger only on mobile */
+        @media (max-width: 767px) {
+            .header__hamburger {
+                display: flex;
+            }
+            .header {
+                padding: 0 1rem;
+            }
+            .header__title {
+                font-size: 1rem;
+            }
+            .header__label {
+                display: none;
+            }
+        }
     `,
 })
 export class HeaderComponent implements OnInit {
     protected readonly wsService = inject(WebSocketService);
     private readonly sessionService = inject(SessionService);
     private readonly apiService = inject(ApiService);
+
+    /** Receives sidebar open state from parent for aria-expanded binding */
+    readonly sidebarOpen = input(false);
+
+    /** Emits when hamburger is clicked */
+    readonly hamburgerClick = output<void>();
+
 
     protected readonly currentNetwork = signal<AlgoChatNetwork>('testnet');
     protected readonly switching = signal(false);

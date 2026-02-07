@@ -89,11 +89,12 @@ export interface ToolEvent {
             font-size: 0.8rem;
             line-height: 1.6;
             overflow: hidden;
+            height: 100%;
         }
         .terminal__output {
             flex: 1;
             padding: 1rem;
-            max-height: 500px;
+            min-height: 0;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: var(--border) transparent;
@@ -145,11 +146,19 @@ export interface ToolEvent {
             padding: 1px 4px;
             border-radius: 3px;
             cursor: pointer;
-            opacity: 0;
             transition: opacity 0.15s;
         }
-        .terminal__line:hover .terminal__copy { opacity: 1; }
-        .terminal__copy:hover { color: #c9d1d9; border-color: #484f58; }
+        /* Hover devices: hidden until line hover (existing behavior) */
+        @media (hover: hover) {
+            .terminal__copy { opacity: 0; }
+            .terminal__line:hover .terminal__copy { opacity: 1; }
+            .terminal__copy:hover { color: #c9d1d9; border-color: #484f58; }
+        }
+        /* Touch devices: always subtly visible, full opacity on tap */
+        @media (hover: none) {
+            .terminal__copy { opacity: 0.4; }
+            .terminal__copy:active { opacity: 1; }
+        }
         .terminal__cursor {
             display: inline-block;
             width: 7px;
