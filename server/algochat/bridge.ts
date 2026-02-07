@@ -33,7 +33,6 @@ import {
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { saveAlgoChatMessage } from '../db/algochat-messages';
-import { isAllowed } from '../db/allowlist';
 import { createLogger } from '../lib/logger';
 import { listCouncils, createCouncil, getCouncilLaunch } from '../db/councils';
 import { launchCouncil, onCouncilStageChange } from '../routes/councils';
@@ -851,14 +850,9 @@ export class AlgoChatBridge {
         }
 
         // Owner-only mode: only respond to wallets in ALGOCHAT_OWNER_ADDRESSES
+        // This is the sole access control gate — the database allowlist is not used.
         if (!this.isOwner(participant)) {
             log.info('Ignoring message from non-owner address', { address: participant.slice(0, 8) + '...' });
-            return;
-        }
-
-        // Allowlist filtering — if allowlist has entries, only listed addresses get through
-        if (!isAllowed(this.db, participant)) {
-            log.info('Participant not in allowlist, ignoring', { address: participant });
             return;
         }
 
@@ -1849,7 +1843,7 @@ export class AlgoChatBridge {
         const newSenders = new Set<string>();
         for (const tx of (response as { transactions?: Array<{ sender: string; note?: string }> }).transactions ?? []) {
             if (tx.sender !== myAddr && tx.note && !knownParticipants.has(tx.sender)) {
-                if (!isAllowed(this.db, tx.sender)) continue;
+                if (!this.isOwner(tx.sender)) continue;
                 newSenders.add(tx.sender);
             }
         }
