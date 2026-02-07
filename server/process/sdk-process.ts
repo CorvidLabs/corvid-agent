@@ -29,7 +29,6 @@ const PROTECTED_SUBSTRINGS = [
     'server/index.ts',
     'server/algochat/bridge.ts',
     'server/algochat/config.ts',
-    'server/lib/auth.ts',
     'server/selftest/',
 ];
 
