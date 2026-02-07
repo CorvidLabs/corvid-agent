@@ -276,11 +276,17 @@ export class AlgoChatBridge {
         this.processManager.startProcess(session, content);
     }
 
-    /** Check if a participant is authorized to run privileged commands. */
+    /** Check if a participant is authorized to run privileged commands. Fail-closed: returns false when no owners configured. */
     private isOwner(participant: string): boolean {
-        // If no owner addresses configured, allow all (backward compatible)
-        if (this.config.ownerAddresses.size === 0) return true;
-        return this.config.ownerAddresses.has(participant);
+        if (this.config.ownerAddresses.size === 0) {
+            log.warn('Privileged command rejected — no owner addresses configured', { participant: participant.slice(0, 8) });
+            return false;
+        }
+        if (!this.config.ownerAddresses.has(participant)) {
+            log.warn('Privileged command rejected — sender not in owner list', { participant: participant.slice(0, 8) });
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -297,7 +303,7 @@ export class AlgoChatBridge {
         // Privileged commands require owner authorization
         const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent', '/council']);
         if (PRIVILEGED_COMMANDS.has(command) && !this.isOwner(participant)) {
-            log.warn('Unauthorized command attempt', { participant, command });
+            log.warn('Unauthorized command attempt', { participant: participant.slice(0, 8), command });
             this.sendResponse(participant, `Unauthorized: ${command} requires owner access`);
             return true;
         }
