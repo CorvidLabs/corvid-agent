@@ -37,7 +37,7 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     const pskContact = parsePSKContactFromEnv();
 
     // Parse owner addresses (comma-separated Algorand addresses)
-    const ownerAddresses = parseOwnerAddresses();
+    const ownerAddresses = parseOwnerAddresses(network);
 
     return {
         mnemonic: hasMnemonic ? mnemonic.trim() : null,
@@ -52,19 +52,38 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     };
 }
 
-function parseOwnerAddresses(): Set<string> {
+/**
+ * Synchronous format check for Algorand addresses.
+ * Algorand addresses are 58-character base32 strings (A-Z, 2-7).
+ * This does NOT verify the checksum — only that the string is plausibly an address.
+ */
+export function isPlausibleAlgorandAddress(addr: string): boolean {
+    return /^[A-Z2-7]{58}$/.test(addr);
+}
+
+function parseOwnerAddresses(network: AlgoChatNetwork): Set<string> {
     const raw = process.env.ALGOCHAT_OWNER_ADDRESSES ?? '';
     const addresses = new Set<string>();
     for (const addr of raw.split(',')) {
         const trimmed = addr.trim();
-        if (trimmed.length > 0) {
-            addresses.add(trimmed);
+        if (trimmed.length === 0) continue;
+
+        // Normalize to uppercase for case-insensitive matching
+        const normalized = trimmed.toUpperCase();
+
+        if (!isPlausibleAlgorandAddress(normalized)) {
+            log.error(`Invalid owner address skipped (not a 58-char base32 Algorand address): ${trimmed}`);
+            continue;
         }
+        addresses.add(normalized);
     }
     if (addresses.size > 0) {
         log.info(`Owner addresses configured: ${addresses.size}`);
+    } else if (network === 'mainnet') {
+        log.error('FATAL: No valid ALGOCHAT_OWNER_ADDRESSES on mainnet — refusing to start with open privileged commands');
+        process.exit(1);
     } else {
-        log.warn('No ALGOCHAT_OWNER_ADDRESSES set — all on-chain commands are open to any sender');
+        log.warn(`No ALGOCHAT_OWNER_ADDRESSES set on ${network} — privileged commands (/stop, /approve, /deny, /mode, /work, /agent, /council) are disabled`);
     }
     return addresses;
 }
