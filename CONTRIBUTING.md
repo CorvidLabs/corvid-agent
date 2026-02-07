@@ -39,7 +39,7 @@ bun run build:client
 ```
 server/           # Bun HTTP server, routes, and core logic
   algochat/       # On-chain messaging bridge
-  auth/           # JWT authentication service
+  db/             # SQLite database access layer
   councils/       # Multi-agent council deliberation
   lib/            # Shared utilities (logger, auth, db)
   mcp/            # MCP tool server
