@@ -828,10 +828,16 @@ async function runDiscussionRounds(
 
             broadcastDiscussionMessage(discMsg);
 
-            // Best-effort on-chain send (fire-and-forget)
+            // Best-effort on-chain send (fire-and-forget, but log failures)
             if (agentMessenger) {
-                sendDiscussionOnChain(agentMessenger, agentId, council.agentIds, content, discMsg.id, db).catch(() => {
-                    // Ignore on-chain failures
+                sendDiscussionOnChain(agentMessenger, agentId, council.agentIds, content, discMsg.id, db).catch((err) => {
+                    log.error('Failed to send discussion message on-chain', {
+                        launchId,
+                        agentId,
+                        messageId: discMsg.id,
+                        round,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
                 });
             }
         }
