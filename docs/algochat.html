@@ -94,20 +94,66 @@
           <span class="terminal__dot terminal__dot--green"></span>
           <span class="terminal__label">message flow</span>
         </div>
-        <pre class="terminal__body"><code>
-<span class="accent-cyan">  Human</span>                    <span class="accent-magenta">AlgoChat Bridge</span>              <span class="accent-green">Agent</span>
-    │                           │                          │
-    │  <span class="t-comment">Algorand Txn (hex)</span>      │                          │
-    │──────────────────────────▶│                          │
-    │                           │  <span class="t-comment">Parse &amp; decrypt</span>        │
-    │                           │─────────────────────────▶│
-    │                           │                          │
-    │                           │  <span class="t-comment">Agent response</span>         │
-    │                           │◀─────────────────────────│
-    │  <span class="t-comment">Algorand Txn (PSK)</span>      │                          │
-    │◀──────────────────────────│                          │
-    │                           │                          │
-</code></pre>
+        <div class="flow-diagram">
+          <!-- Column headers -->
+          <div class="flow-header">
+            <span class="flow-header__col accent-cyan">Human</span>
+            <span class="flow-header__col accent-magenta">AlgoChat Bridge</span>
+            <span class="flow-header__col accent-green">Agent</span>
+          </div>
+
+          <!-- Step 1: Human → Bridge -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--right" style="position: relative;">
+                <span class="flow-step__label">Algorand Txn (hex)</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+          </div>
+
+          <!-- Step 2: Bridge → Agent -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--right" style="position: relative;">
+                <span class="flow-step__label">Parse &amp; decrypt</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+          </div>
+
+          <!-- Step 3: Agent → Bridge -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--left" style="position: relative;">
+                <span class="flow-step__label">Agent response</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+          </div>
+
+          <!-- Step 4: Bridge → Human -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--left" style="position: relative;">
+                <span class="flow-step__label">Algorand Txn (PSK)</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+          </div>
+        </div>
       </div>
 
       <div class="grid grid--2">
