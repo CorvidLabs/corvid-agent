@@ -34,13 +34,8 @@ import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
-import {
-    getBalance,
-    purchaseCredits,
-    maybeGrantFirstTimeCredits,
-    canStartSession,
-    getCreditConfig,
-} from '../db/credits';
+// Credit functions — will be used when guest access is enabled
+// import { getBalance, purchaseCredits, maybeGrantFirstTimeCredits, canStartSession, getCreditConfig } from '../db/credits';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
 
@@ -346,12 +341,12 @@ export class AlgoChatBridge {
                 const contents = chunks.map((c) => c.content);
                 const reassembled = reassembleGroupMessage(contents);
                 if (reassembled) {
-                    const totalFee = chunks.reduce((sum, c) => {
-                        const f = (c as unknown as Record<string, unknown>).fee;
-                        return sum + (f != null ? Number(f) : 0);
+                    const totalAmount = chunks.reduce((sum, c) => {
+                        const a = (c as unknown as Record<string, unknown>).amount;
+                        return sum + (a != null ? Number(a) : 0);
                     }, 0);
                     log.info(`Reassembled group message (${chunks.length} chunks)`, { round });
-                    this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+                    this.handleIncomingMessage(participant, reassembled, round, totalAmount || undefined).catch((err) => {
                         log.error('Error handling group message', { error: err instanceof Error ? err.message : String(err) });
                     });
                 } else {
@@ -364,8 +359,8 @@ export class AlgoChatBridge {
 
             // Process regular messages
             for (const msg of regularMessages) {
-                const fee = (msg as unknown as Record<string, unknown>).fee;
-                this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), fee != null ? Number(fee) : undefined).catch((err) => {
+                const amount = (msg as unknown as Record<string, unknown>).amount;
+                this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), amount != null ? Number(amount) : undefined).catch((err) => {
                     log.error('Error handling message', { error: err instanceof Error ? err.message : String(err) });
                 });
             }
@@ -389,12 +384,12 @@ export class AlgoChatBridge {
 
         if (reassembled) {
             this.pendingGroupChunks.delete(key);
-            const totalFee = pending.chunks.reduce((sum: number, c) => {
-                const f = (c as unknown as Record<string, number | undefined>).fee;
-                return sum + (f != null ? Number(f) : 0);
+            const totalAmount = pending.chunks.reduce((sum: number, c) => {
+                const a = (c as unknown as Record<string, number | undefined>).amount;
+                return sum + (a != null ? Number(a) : 0);
             }, 0);
             log.info(`Reassembled buffered group message (${contents.length} chunks)`, { round });
-            this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+            this.handleIncomingMessage(participant, reassembled, round, totalAmount || undefined).catch((err) => {
                 log.error('Error handling buffered group message', { error: err instanceof Error ? err.message : String(err) });
             });
         }
@@ -415,7 +410,7 @@ export class AlgoChatBridge {
         this.responseFormatter.setPskManager(this.pskManager);
 
         this.pskManager.onMessage((msg) => {
-            this.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound).catch((err) => {
+            this.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound, msg.amount).catch((err) => {
                 log.error('Error handling PSK message', { error: err instanceof Error ? err.message : String(err) });
             });
         });
@@ -493,9 +488,9 @@ export class AlgoChatBridge {
         participant: string,
         content: string,
         confirmedRound: number,
-        fee?: number,
+        amount?: number,
     ): Promise<void> {
-        log.info(`Message from ${participant}`, { content: content.slice(0, 100), fee });
+        log.info(`Message from ${participant}`, { content: content.slice(0, 100), amount });
 
         // Safety guard: reject raw group chunks that weren't reassembled
         if (/^\[GRP:\d+\/\d+\]/.test(content)) {
@@ -532,66 +527,20 @@ export class AlgoChatBridge {
             }
         }
 
-        // Owner-only mode: only respond to wallets in ALGOCHAT_OWNER_ADDRESSES
-        if (!this.commandHandler.isOwner(participant)) {
+        const isOwner = this.commandHandler.isOwner(participant);
+
+        // Non-owners are blocked unless guest access is enabled in the future.
+        // For now, only owners can interact.
+        if (!isOwner) {
             log.info('Ignoring message from non-owner address', { address: participant.slice(0, 8) + '...' });
             return;
         }
 
         // Emit feed event only for external (non-agent) messages
-        this.responseFormatter.emitEvent(participant, content, 'inbound', fee);
+        this.responseFormatter.emitEvent(participant, content, 'inbound', amount);
 
-        // ── Credit system: detect payments and convert to credits ─────────
-        const MIN_TXFEE_MICRO = 1000;
-        if (fee && fee > MIN_TXFEE_MICRO) {
-            const paymentMicro = fee - MIN_TXFEE_MICRO;
-            if (paymentMicro > 0) {
-                const creditsAdded = purchaseCredits(this.db, participant, paymentMicro);
-                if (creditsAdded > 0) {
-                    const balance = getBalance(this.db, participant);
-                    log.info('Credits purchased from ALGO payment', {
-                        participant: participant.slice(0, 8) + '...',
-                        paymentMicro,
-                        creditsAdded,
-                        newBalance: balance.available,
-                    });
-                    if (paymentMicro >= 100_000) {
-                        this.responseFormatter.sendResponse(participant,
-                            `💰 +${creditsAdded} credits purchased! Balance: ${balance.available} credits`
-                        );
-                    }
-                }
-            }
-        }
-
-        // Grant first-time credits if this is a new wallet
-        const firstTimeCredits = maybeGrantFirstTimeCredits(this.db, participant);
-        if (firstTimeCredits > 0) {
-            const balance = getBalance(this.db, participant);
-            this.responseFormatter.sendResponse(participant,
-                `🎉 Welcome! You've received ${firstTimeCredits} free credits to get started.\n` +
-                `Balance: ${balance.available} credits\n` +
-                `Use /credits to check balance, send ALGO to buy more.`
-            );
-        }
-
-        // Check for commands first
+        // Check for commands first (owners always have access)
         if (this.commandHandler.handleCommand(participant, content)) return;
-
-        // ── Credit check: ensure participant has credits before proceeding ──
-        const creditCheck = canStartSession(this.db, participant);
-        if (!creditCheck.allowed) {
-            log.info('Insufficient credits, blocking message', {
-                participant: participant.slice(0, 8) + '...',
-                credits: creditCheck.credits,
-            });
-            this.responseFormatter.sendResponse(participant,
-                `⚠️ Insufficient credits (${creditCheck.credits} remaining).\n` +
-                `Send ALGO to purchase credits (1 ALGO = ${getCreditConfig(this.db).creditsPerAlgo} credits).\n` +
-                `Use /credits to check your balance.`
-            );
-            return;
-        }
 
         // Auto micro-fund agent wallet on localnet for incoming messages
         if (this.config.network === 'localnet' && this.agentWalletService) {

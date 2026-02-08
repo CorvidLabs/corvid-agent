@@ -13,6 +13,7 @@ export interface PSKMessage {
     sender: string;
     content: string;
     confirmedRound: number;
+    amount?: number;
 }
 
 export type PSKMessageCallback = (message: PSKMessage) => void;
@@ -43,7 +44,7 @@ interface IndexerTransaction {
     txType: string;
     note?: string;
     confirmedRound?: bigint;
-    paymentTransaction?: { receiver?: string };
+    paymentTransaction?: { receiver?: string; amount?: number | bigint };
 }
 
 interface IndexerSearchResponse {
@@ -279,10 +280,12 @@ export class PSKManager {
 
                     // Emit to callbacks
                     const round = Number(tx.confirmedRound ?? 0);
+                    const txAmount = tx.paymentTransaction?.amount != null ? Number(tx.paymentTransaction.amount) : undefined;
                     const msg: PSKMessage = {
                         sender: contactAddress,
                         content: decrypted.text,
                         confirmedRound: round,
+                        amount: txAmount,
                     };
 
                     for (const cb of this.callbacks) {
