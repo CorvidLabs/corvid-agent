@@ -166,6 +166,12 @@ export class SessionLifecycleManager {
 
         // Use a transaction for consistency
         const deleteTransaction = this.db.transaction(() => {
+            // Null out FK references from algochat_conversations
+            this.db.query(`
+                UPDATE algochat_conversations SET session_id = NULL
+                WHERE session_id IN (${placeholders})
+            `).run(...sessionIds);
+
             // Delete session messages
             this.db.query(`
                 DELETE FROM session_messages
@@ -238,6 +244,12 @@ export class SessionLifecycleManager {
                 const placeholders = sessionIds.map(() => '?').join(',');
 
                 const limitTransaction = this.db.transaction(() => {
+                    // Null out FK references from algochat_conversations
+                    this.db.query(`
+                        UPDATE algochat_conversations SET session_id = NULL
+                        WHERE session_id IN (${placeholders})
+                    `).run(...sessionIds);
+
                     // Delete session messages
                     this.db.query(`
                         DELETE FROM session_messages
@@ -325,6 +337,11 @@ export class SessionLifecycleManager {
     async cleanupSession(sessionId: string): Promise<boolean> {
         try {
             const cleanupTransaction = this.db.transaction(() => {
+                // Null out FK references from algochat_conversations
+                this.db.query(`
+                    UPDATE algochat_conversations SET session_id = NULL WHERE session_id = ?
+                `).run(sessionId);
+
                 // Delete session messages
                 const messagesResult = this.db.query(`
                     DELETE FROM session_messages WHERE session_id = ?
