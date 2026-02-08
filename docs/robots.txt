@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://corvidlabs.github.io/corvid-agent/sitemap.xml
