@@ -95,6 +95,13 @@ export class SubscriptionManager {
     }
 
     /**
+     * Check whether an on-chain subscription exists for a session.
+     */
+    hasChainSubscription(sessionId: string): boolean {
+        return this.chainSubscriptions.has(sessionId);
+    }
+
+    /**
      * Update the send function for a local session (e.g. on WS reconnect).
      */
     updateLocalSendFn(sessionId: string, sendFn: LocalChatSendFn): void {
@@ -142,6 +149,8 @@ export class SubscriptionManager {
         let lastAssistantText = '';
         let lastTurnResponse = '';
         let sent = false;
+        let timeoutExtensions = 0;
+        const MAX_TIMEOUT_EXTENSIONS = 3; // Up to 30 more minutes (3 x 10 min)
         const startedAt = Date.now();
 
         const sendOnce = () => {
@@ -171,7 +180,21 @@ export class SubscriptionManager {
 
         const resetTimer = () => {
             this.setSubscriptionTimer(sessionId, () => {
-                log.warn(`Subscription timeout for session ${sessionId}`);
+                // Check if the process is still running before giving up
+                if (this.processManager.isRunning(sessionId)) {
+                    timeoutExtensions++;
+                    if (timeoutExtensions < MAX_TIMEOUT_EXTENSIONS) {
+                        log.info(`Subscription timeout extended — session still running`, { sessionId, extension: timeoutExtensions });
+                        const msg = generateProgressSummary();
+                        this.responseFormatter.sendResponse(participant, `[Status] ${msg}`).catch(() => {});
+                        this.responseFormatter.emitEvent(participant, msg, 'status');
+                        resetTimer(); // Reset for another cycle
+                        return;
+                    }
+                    log.warn(`Subscription timeout — max extensions reached, sending partial response`, { sessionId });
+                } else {
+                    log.warn(`Subscription timeout — session no longer running`, { sessionId });
+                }
                 sendOnce();
             });
         };

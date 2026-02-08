@@ -519,7 +519,6 @@ export class ProcessManager {
 
         this.clearStableTimer(sessionId);
         this.clearSessionTimeout(sessionId);
-        this.eventBus.removeSessionSubscribers(sessionId);
         const now = Date.now();
         this.pausedSessions.set(sessionId, {
             pausedAt: now,
@@ -530,10 +529,13 @@ export class ProcessManager {
         updateSessionPid(this.db, sessionId, null);
         updateSessionStatus(this.db, sessionId, 'paused');
 
+        // Emit BEFORE removing subscribers so they receive the outage notification
         this.eventBus.emit(sessionId, {
             type: 'error',
             error: { message: `Session paused due to API outage — auto-resume in ${AUTO_RESUME_BASE_MS / 60_000}min`, type: 'api_outage' },
         } as ClaudeStreamEvent);
+
+        this.eventBus.removeSessionSubscribers(sessionId);
     }
 
     resumeSession(sessionId: string): boolean {
