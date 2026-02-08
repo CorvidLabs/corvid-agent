@@ -181,7 +181,8 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
             const generated = algochat.createRandomChatAccount();
             chatAccount = generated.account;
             log.info(`Generated new account`, { address: chatAccount.address });
-            log.info(`Mnemonic (save to persist): ${generated.mnemonic}`);
+            // SECURITY: Never log the mnemonic — it can be set via ALGOCHAT_MNEMONIC env var to persist across restarts
+            log.info('Generated new account — set ALGOCHAT_MNEMONIC env var to persist across restarts', { address: chatAccount.address });
 
             // Fund from LocalNet dispenser
             await fundFromLocalNetDispenser(algodClient, chatAccount.address);
