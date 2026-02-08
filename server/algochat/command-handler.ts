@@ -25,6 +25,7 @@ import {
 } from '../db/credits';
 import { listCouncils, createCouncil, getCouncilLaunch } from '../db/councils';
 import { launchCouncil, onCouncilStageChange } from '../routes/councils';
+import { COMMAND_DEFS, getCommandDef } from '../../shared/command-defs';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('CommandHandler');
@@ -103,40 +104,82 @@ export class CommandHandler {
     /**
      * Handle commands from AlgoChat messages.
      * Returns true if the message was handled as a command.
+     *
+     * @param participant - The sender's address (or 'local' for dashboard chat)
+     * @param content - The raw message content
+     * @param responseFn - Optional callback for routing responses (used by local chat).
+     *                     When provided, responses are sent via this function instead of on-chain.
      */
-    handleCommand(participant: string, content: string): boolean {
+    handleCommand(participant: string, content: string, responseFn?: (text: string) => void): boolean {
         const trimmed = content.trim();
         if (!trimmed.startsWith('/')) return false;
 
         const parts = trimmed.split(/\s+/);
         const command = parts[0].toLowerCase();
 
-        // Privileged commands require owner authorization
-        if (PRIVILEGED_COMMANDS.has(command) && !this.isOwner(participant)) {
+        // Helper: send response either via callback or on-chain
+        const respond = (text: string) => {
+            if (responseFn) {
+                responseFn(text);
+            } else {
+                this.responseFormatter.sendResponse(participant, text);
+            }
+        };
+
+        // Privileged commands require owner authorization (local chat is always authorized)
+        if (PRIVILEGED_COMMANDS.has(command) && !responseFn && !this.isOwner(participant)) {
             log.warn('Unauthorized command attempt', { participant: participant.slice(0, 8), command });
-            this.responseFormatter.sendResponse(participant, `Unauthorized: ${command} requires owner access`);
+            respond(`Unauthorized: ${command} requires owner access`);
             return true;
         }
 
         switch (command) {
+            case '/help': {
+                const target = parts[1]?.toLowerCase();
+                if (target) {
+                    const def = getCommandDef(target);
+                    if (def) {
+                        const lines = [
+                            `**${def.name}** — ${def.description}`,
+                            `Usage: \`${def.usage}\``,
+                            def.privileged ? '(Requires owner access)' : '',
+                            '',
+                            ...def.examples.map((e) => `  ${e}`),
+                        ].filter(Boolean);
+                        respond(lines.join('\n'));
+                    } else {
+                        respond(`Unknown command: ${target}. Type /help to see all commands.`);
+                    }
+                } else {
+                    const lines = ['**Available Commands:**', ''];
+                    for (const def of COMMAND_DEFS) {
+                        if (def.name === '/help') continue;
+                        lines.push(`  **${def.name}** — ${def.description}`);
+                    }
+                    lines.push('', 'Type `/help <command>` for detailed usage.');
+                    respond(lines.join('\n'));
+                }
+                return true;
+            }
+
             case '/status': {
                 const activeCount = this.processManager.getActiveSessionIds().length;
                 const conversations = listConversations(this.db);
-                this.responseFormatter.sendResponse(participant, `Active sessions: ${activeCount}, conversations: ${conversations.length}`);
+                respond(`Active sessions: ${activeCount}, conversations: ${conversations.length}`);
                 return true;
             }
 
             case '/stop': {
                 const sessionId = parts[1];
                 if (!sessionId) {
-                    this.responseFormatter.sendResponse(participant, 'Usage: /stop <session-id>');
+                    respond('Usage: /stop <session-id>');
                     return true;
                 }
                 if (this.processManager.isRunning(sessionId)) {
                     this.processManager.stopProcess(sessionId);
-                    this.responseFormatter.sendResponse(participant, `Stopped session ${sessionId}`);
+                    respond(`Stopped session ${sessionId}`);
                 } else {
-                    this.responseFormatter.sendResponse(participant, `Session ${sessionId} is not running`);
+                    respond(`Session ${sessionId} is not running`);
                 }
                 return true;
             }
@@ -146,7 +189,7 @@ export class CommandHandler {
                 if (!agentName) {
                     const agents = getAlgochatEnabledAgents(this.db);
                     const names = agents.map((a) => a.name).join(', ');
-                    this.responseFormatter.sendResponse(participant, `Available agents: ${names || 'none'}`);
+                    respond(`Available agents: ${names || 'none'}`);
                     return true;
                 }
                 // Route subsequent messages to the specified agent
@@ -154,9 +197,9 @@ export class CommandHandler {
                 const matched = agents.find((a) => a.name.toLowerCase() === agentName.toLowerCase());
                 if (matched) {
                     this.config.defaultAgentId = matched.id;
-                    this.responseFormatter.sendResponse(participant, `Routing to agent: ${matched.name}`);
+                    respond(`Routing to agent: ${matched.name}`);
                 } else {
-                    this.responseFormatter.sendResponse(participant, `Agent "${agentName}" not found`);
+                    respond(`Agent "${agentName}" not found`);
                 }
                 return true;
             }
@@ -164,10 +207,10 @@ export class CommandHandler {
             case '/queue': {
                 const queued = this.processManager.approvalManager.getQueuedRequests();
                 if (queued.length === 0) {
-                    this.responseFormatter.sendResponse(participant, 'No pending escalation requests');
+                    respond('No pending escalation requests');
                 } else {
                     const lines = queued.map((q) => `#${q.id}: [${q.toolName}] session=${q.sessionId.slice(0, 8)} (${q.createdAt})`);
-                    this.responseFormatter.sendResponse(participant, `Pending escalations:\n${lines.join('\n')}`);
+                    respond(`Pending escalations:\n${lines.join('\n')}`);
                 }
                 return true;
             }
@@ -175,11 +218,11 @@ export class CommandHandler {
             case '/approve': {
                 const queueId = parseInt(parts[1], 10);
                 if (isNaN(queueId)) {
-                    this.responseFormatter.sendResponse(participant, 'Usage: /approve <queue-id>');
+                    respond('Usage: /approve <queue-id>');
                     return true;
                 }
                 const resolved = this.processManager.approvalManager.resolveQueuedRequest(queueId, true);
-                this.responseFormatter.sendResponse(participant, resolved
+                respond(resolved
                     ? `Escalation #${queueId} approved`
                     : `Escalation #${queueId} not found or already resolved`);
                 return true;
@@ -188,11 +231,11 @@ export class CommandHandler {
             case '/deny': {
                 const queueId = parseInt(parts[1], 10);
                 if (isNaN(queueId)) {
-                    this.responseFormatter.sendResponse(participant, 'Usage: /deny <queue-id>');
+                    respond('Usage: /deny <queue-id>');
                     return true;
                 }
                 const resolved = this.processManager.approvalManager.resolveQueuedRequest(queueId, false);
-                this.responseFormatter.sendResponse(participant, resolved
+                respond(resolved
                     ? `Escalation #${queueId} denied`
                     : `Escalation #${queueId} not found or already resolved`);
                 return true;
@@ -201,16 +244,16 @@ export class CommandHandler {
             case '/mode': {
                 const newMode = parts[1]?.toLowerCase();
                 if (!newMode) {
-                    this.responseFormatter.sendResponse(participant, `Current mode: ${this.processManager.approvalManager.operationalMode}`);
+                    respond(`Current mode: ${this.processManager.approvalManager.operationalMode}`);
                     return true;
                 }
                 const validModes = ['normal', 'queued', 'paused'];
                 if (!validModes.includes(newMode)) {
-                    this.responseFormatter.sendResponse(participant, `Invalid mode. Use: ${validModes.join(', ')}`);
+                    respond(`Invalid mode. Use: ${validModes.join(', ')}`);
                     return true;
                 }
                 this.processManager.approvalManager.operationalMode = newMode as 'normal' | 'queued' | 'paused';
-                this.responseFormatter.sendResponse(participant, `Mode set to: ${newMode}`);
+                respond(`Mode set to: ${newMode}`);
                 return true;
             }
 
@@ -218,20 +261,20 @@ export class CommandHandler {
                 const balance = getBalance(this.db, participant);
                 const config = getCreditConfig(this.db);
                 const lines = [
-                    `💰 Credit Balance:`,
+                    `Credit Balance:`,
                     `  Available: ${balance.available} credits`,
                     `  Reserved: ${balance.reserved} credits`,
                     `  Total: ${balance.credits} credits`,
                     `  Purchased: ${balance.totalPurchased} | Used: ${balance.totalConsumed}`,
                     ``,
-                    `📊 Rates:`,
+                    `Rates:`,
                     `  1 ALGO = ${config.creditsPerAlgo} credits`,
                     `  1 turn = ${config.creditsPerTurn} credit(s)`,
                     `  1 agent message = ${config.creditsPerAgentMessage} credit(s)`,
                     ``,
                     `Send ALGO to this address to purchase credits.`,
                 ];
-                this.responseFormatter.sendResponse(participant, lines.join('\n'));
+                respond(lines.join('\n'));
                 return true;
             }
 
@@ -239,31 +282,31 @@ export class CommandHandler {
                 const limit = parseInt(parts[1], 10) || 10;
                 const transactions = getTransactionHistory(this.db, participant, Math.min(limit, 20));
                 if (transactions.length === 0) {
-                    this.responseFormatter.sendResponse(participant, 'No credit transactions yet.');
+                    respond('No credit transactions yet.');
                     return true;
                 }
                 const lines = transactions.map((t) =>
                     `${t.type === 'purchase' || t.type === 'grant' ? '+' : '-'}${t.amount} [${t.type}] → bal:${t.balanceAfter} (${t.createdAt})`
                 );
-                this.responseFormatter.sendResponse(participant, `📜 Recent Transactions:\n${lines.join('\n')}`);
+                respond(`Recent Transactions:\n${lines.join('\n')}`);
                 return true;
             }
 
             case '/work': {
                 const description = parts.slice(1).join(' ');
                 if (!description) {
-                    this.responseFormatter.sendResponse(participant, 'Usage: /work <task description>');
+                    respond('Usage: /work <task description>');
                     return true;
                 }
 
                 if (!this.workTaskService) {
-                    this.responseFormatter.sendResponse(participant, 'Work task service not available');
+                    respond('Work task service not available');
                     return true;
                 }
 
                 const agentId = this.context.findAgentForNewConversation();
                 if (!agentId) {
-                    this.responseFormatter.sendResponse(participant, 'No agent available for work tasks');
+                    respond('No agent available for work tasks');
                     return true;
                 }
 
@@ -273,24 +316,24 @@ export class CommandHandler {
                     source: 'algochat',
                     requesterInfo: { participant },
                 }).then((task) => {
-                    this.responseFormatter.sendResponse(participant, `Work task started: ${task.id}\nBranch: ${task.branchName ?? 'creating...'}\nStatus: ${task.status}`);
+                    respond(`Work task started: ${task.id}\nBranch: ${task.branchName ?? 'creating...'}\nStatus: ${task.status}`);
 
                     this.workTaskService?.onComplete(task.id, (completed) => {
                         if (completed.status === 'completed' && completed.prUrl) {
-                            this.responseFormatter.sendResponse(participant, `Work task completed!\nPR: ${completed.prUrl}`);
+                            respond(`Work task completed!\nPR: ${completed.prUrl}`);
                         } else {
-                            this.responseFormatter.sendResponse(participant, `Work task failed: ${completed.error ?? 'Unknown error'}`);
+                            respond(`Work task failed: ${completed.error ?? 'Unknown error'}`);
                         }
                     });
                 }).catch((err) => {
-                    this.responseFormatter.sendResponse(participant, `Work task error: ${err instanceof Error ? err.message : String(err)}`);
+                    respond(`Work task error: ${err instanceof Error ? err.message : String(err)}`);
                 });
                 return true;
             }
 
             case '/council': {
-                this.handleCouncilCommand(participant, parts).catch((err) => {
-                    this.responseFormatter.sendResponse(participant, `Council error: ${err instanceof Error ? err.message : String(err)}`);
+                this.handleCouncilCommand(participant, parts, respond).catch((err) => {
+                    respond(`Council error: ${err instanceof Error ? err.message : String(err)}`);
                 });
                 return true;
             }
@@ -303,14 +346,14 @@ export class CommandHandler {
                     sessionId = conversation?.sessionId ?? '';
                 }
                 if (!sessionId) {
-                    this.responseFormatter.sendResponse(participant, 'No active session found. Usage: /extend [minutes] [session-id]');
+                    respond('No active session found. Usage: /extend [minutes] [session-id]');
                     return true;
                 }
                 const extended = this.context.extendSession(sessionId, minutes);
                 if (extended) {
-                    this.responseFormatter.sendResponse(participant, `Extended session ${sessionId.slice(0, 8)}... by ${minutes} minutes`);
+                    respond(`Extended session ${sessionId.slice(0, 8)}... by ${minutes} minutes`);
                 } else {
-                    this.responseFormatter.sendResponse(participant, `Session ${sessionId.slice(0, 8)}... not found or not running`);
+                    respond(`Session ${sessionId.slice(0, 8)}... not found or not running`);
                 }
                 return true;
             }
@@ -328,10 +371,11 @@ export class CommandHandler {
      *   /council @Agent1 @Agent2 -- <prompt>         — auto-create council with specific agents
      *   /council MyCouncilName -- <prompt>            — use existing council by name
      */
-    private async handleCouncilCommand(participant: string, parts: string[]): Promise<void> {
+    private async handleCouncilCommand(participant: string, parts: string[], respond?: (text: string) => void): Promise<void> {
+        const send = respond ?? ((text: string) => this.responseFormatter.sendResponse(participant, text));
         const rest = parts.slice(1).join(' ').trim();
         if (!rest) {
-            this.responseFormatter.sendResponse(participant, 'Usage:\n  /council <prompt>\n  /council @Agent1 @Agent2 -- <prompt>\n  /council <CouncilName> -- <prompt>');
+            send('Usage:\n  /council <prompt>\n  /council @Agent1 @Agent2 -- <prompt>\n  /council <CouncilName> -- <prompt>');
             return;
         }
 
@@ -358,7 +402,7 @@ export class CommandHandler {
         }
 
         if (!prompt) {
-            this.responseFormatter.sendResponse(participant, 'Please provide a prompt for the council.');
+            send('Please provide a prompt for the council.');
             return;
         }
 
@@ -372,7 +416,7 @@ export class CommandHandler {
             const match = councils.find((c) => c.name.toLowerCase() === councilName!.toLowerCase());
             if (!match) {
                 const available = councils.map((c) => c.name).join(', ');
-                this.responseFormatter.sendResponse(participant, `Council "${councilName}" not found.\nAvailable: ${available || 'none'}`);
+                send(`Council "${councilName}" not found.\nAvailable: ${available || 'none'}`);
                 return;
             }
             councilId = match.id;
@@ -394,11 +438,11 @@ export class CommandHandler {
 
             if (notFound.length > 0) {
                 const available = allAgents.map((a) => a.name).join(', ');
-                this.responseFormatter.sendResponse(participant, `Agent(s) not found: ${notFound.join(', ')}\nAvailable: ${available || 'none'}`);
+                send(`Agent(s) not found: ${notFound.join(', ')}\nAvailable: ${available || 'none'}`);
                 return;
             }
             if (matched.length < 2) {
-                this.responseFormatter.sendResponse(participant, 'Council requires at least 2 agents. Mention multiple agents: /council @Agent1 @Agent2 -- <prompt>');
+                send('Council requires at least 2 agents. Mention multiple agents: /council @Agent1 @Agent2 -- <prompt>');
                 return;
             }
 
@@ -416,11 +460,11 @@ export class CommandHandler {
             // Auto-create council with all algochat-enabled agents
             const agents = getAlgochatEnabledAgents(this.db);
             if (agents.length === 0) {
-                this.responseFormatter.sendResponse(participant, 'No AlgoChat-enabled agents available for council.');
+                send('No AlgoChat-enabled agents available for council.');
                 return;
             }
             if (agents.length < 2) {
-                this.responseFormatter.sendResponse(participant, `Only 1 agent available (${agents[0].name}). Council requires at least 2 agents.\nEnable more agents for AlgoChat, or create a council in the dashboard.`);
+                send(`Only 1 agent available (${agents[0].name}). Council requires at least 2 agents.\nEnable more agents for AlgoChat, or create a council in the dashboard.`);
                 return;
             }
             const agentIds = agents.map((a) => a.id);
@@ -440,7 +484,7 @@ export class CommandHandler {
         const projectId = this.context.getDefaultProjectId();
 
         // Launch the council
-        this.responseFormatter.sendResponse(participant, `Launching council "${councilLabel}"...\nPrompt: ${prompt.slice(0, 200)}`);
+        send(`Launching council "${councilLabel}"...\nPrompt: ${prompt.slice(0, 200)}`);
 
         try {
             const result = launchCouncil(
@@ -452,9 +496,9 @@ export class CommandHandler {
                 this.agentMessengerRef,
             );
 
-            this.responseFormatter.sendResponse(participant, `Council launched! (${result.sessionIds.length} agents responding)\nLaunch ID: ${result.launchId.slice(0, 8)}...`);
+            send(`Council launched! (${result.sessionIds.length} agents responding)\nLaunch ID: ${result.launchId.slice(0, 8)}...`);
 
-            // Monitor stage changes and relay progress + final synthesis on-chain.
+            // Monitor stage changes and relay progress + final synthesis.
             // Safety timeout prevents the listener from leaking if the council
             // pipeline crashes before reaching the 'complete' stage.
             const COUNCIL_LISTENER_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes
@@ -473,11 +517,11 @@ export class CommandHandler {
                 if (launchId !== result.launchId) return;
 
                 if (stage === 'discussing') {
-                    this.responseFormatter.sendResponse(participant, `[Council] Agents are now discussing...`);
+                    send(`[Council] Agents are now discussing...`);
                 } else if (stage === 'reviewing') {
-                    this.responseFormatter.sendResponse(participant, `[Council] Peer review stage started.`);
+                    send(`[Council] Peer review stage started.`);
                 } else if (stage === 'synthesizing') {
-                    this.responseFormatter.sendResponse(participant, `[Council] Chairman is synthesizing final answer...`);
+                    send(`[Council] Chairman is synthesizing final answer...`);
                 } else if (stage === 'complete') {
                     cleanup();
                     // Fetch the synthesis and send it back
@@ -487,15 +531,15 @@ export class CommandHandler {
                         const synthesis = launch.synthesis.length > MAX_SYNTHESIS_LENGTH
                             ? launch.synthesis.slice(0, MAX_SYNTHESIS_LENGTH) + '\n\n[Truncated — view full synthesis on dashboard]'
                             : launch.synthesis;
-                        this.responseFormatter.sendResponse(participant, `[Council Complete]\n\n${synthesis}`);
+                        send(`[Council Complete]\n\n${synthesis}`);
                     } else {
-                        this.responseFormatter.sendResponse(participant, `[Council Complete] No synthesis produced.`);
+                        send(`[Council Complete] No synthesis produced.`);
                     }
                 }
             });
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            this.responseFormatter.sendResponse(participant, `Council launch failed: ${msg}`);
+            send(`Council launch failed: ${msg}`);
         }
     }
 }

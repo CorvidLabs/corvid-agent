@@ -11,6 +11,7 @@ import { TerminalChatComponent, type TerminalMessage, type ToolEvent } from '../
 import { ApiService } from '../../core/services/api.service';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
 import type { Agent } from '../../core/models/agent.model';
+import { COMMAND_DEFS, type CommandDef } from '../../../../../shared/command-defs';
 import { firstValueFrom } from 'rxjs';
 
 interface AgentSummary {
@@ -173,6 +174,8 @@ interface AgentSummary {
                             [thinking]="thinking()"
                             [toolEvents]="toolEvents()"
                             [inputDisabled]="!selectedAgentId()"
+                            [commandDefs]="commandDefs"
+                            [agentNames]="chatAgentNames()"
                             (messageSent)="onChatMessage($event)"
                             (rewardSent)="tipAgent()"
                         />
@@ -482,6 +485,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly chatSessionId = signal<string | null>(null);
     protected readonly selfTestRunning = signal(false);
     protected readonly agentSummaries = signal<AgentSummary[]>([]);
+    protected readonly commandDefs: CommandDef[] = COMMAND_DEFS;
+    protected readonly chatAgentNames = computed(() =>
+        this.agentService.agents().map((a) => a.name),
+    );
 
     private unsubscribeWs: (() => void) | null = null;
 
