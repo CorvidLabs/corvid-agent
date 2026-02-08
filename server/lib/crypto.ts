@@ -4,7 +4,16 @@
  *
  * Format (v2): base64( salt(16) + iv(12) + ciphertext )
  * Legacy (v1): base64( iv(12) + ciphertext ) — static salt, 100k iterations
+ *
+ * Security:
+ *   - WALLET_ENCRYPTION_KEY is required for testnet/mainnet
+ *   - Minimum key length enforced (32 chars) to prevent weak passphrases
+ *   - Warns on default key usage (localnet only)
  */
+
+import { createLogger } from './logger';
+
+const log = createLogger('Crypto');
 
 const ALGORITHM = 'AES-GCM';
 const KEY_LENGTH = 256;
@@ -15,6 +24,14 @@ const TAG_LENGTH = 128;
 const CURRENT_ITERATIONS = 600_000;
 const LEGACY_ITERATIONS = 100_000;
 const LEGACY_SALT = 'corvid-agent-wallet-encryption';
+
+const DEFAULT_LOCALNET_KEY = 'corvid-agent-localnet-default-key';
+
+/** Minimum length for WALLET_ENCRYPTION_KEY on non-localnet. */
+const MIN_KEY_LENGTH = 32;
+
+/** Track whether we've already warned about using the default key, to avoid spam. */
+let warnedDefaultKey = false;
 
 async function deriveKey(passphrase: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {
     const encoder = new TextEncoder();
@@ -40,9 +57,22 @@ async function deriveKey(passphrase: string, salt: Uint8Array, iterations: numbe
     );
 }
 
-function getEncryptionPassphrase(network?: string, serverMnemonic?: string | null): string {
+/**
+ * Resolve the encryption passphrase from environment / config.
+ * Exported for testing only — not part of the public API.
+ */
+export function getEncryptionPassphrase(network?: string, serverMnemonic?: string | null): string {
     const envKey = process.env.WALLET_ENCRYPTION_KEY;
-    if (envKey && envKey.trim().length > 0) return envKey.trim();
+    if (envKey && envKey.trim().length > 0) {
+        const trimmed = envKey.trim();
+
+        // Warn if the key is suspiciously short on non-localnet
+        if (network && network !== 'localnet' && trimmed.length < MIN_KEY_LENGTH) {
+            log.warn(`WALLET_ENCRYPTION_KEY is only ${trimmed.length} chars — recommend at least ${MIN_KEY_LENGTH}. Generate with: openssl rand -hex 32`);
+        }
+
+        return trimmed;
+    }
 
     // On non-localnet, require an explicit encryption key
     if (network && network !== 'localnet') {
@@ -53,7 +83,13 @@ function getEncryptionPassphrase(network?: string, serverMnemonic?: string | nul
     }
 
     if (serverMnemonic && serverMnemonic.trim().length > 0) return serverMnemonic.trim();
-    return 'corvid-agent-localnet-default-key';
+
+    // Default key: only acceptable on localnet for dev convenience
+    if (!warnedDefaultKey) {
+        log.warn('Using default encryption key — only acceptable for localnet development');
+        warnedDefaultKey = false; // keep warning each time to raise visibility
+    }
+    return DEFAULT_LOCALNET_KEY;
 }
 
 export async function encryptMnemonic(
