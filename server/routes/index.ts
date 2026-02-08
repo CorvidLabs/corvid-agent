@@ -18,6 +18,14 @@ import { searchAlgoChatMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import { checkHttpAuth, loadAuthConfig, type AuthConfig } from '../middleware/auth';
+
+// Load auth config once at module level
+let authConfig: AuthConfig | null = null;
+function getAuthConfig(): AuthConfig {
+    if (!authConfig) authConfig = loadAuthConfig();
+    return authConfig;
+}
 
 const log = createLogger('Router');
 
@@ -89,7 +97,11 @@ async function handleRoutes(
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
-        return handleBrowseDirs(req, url);
+        // Auth check — browse-dirs exposes the filesystem, so require authentication
+        const authDenied = checkHttpAuth(req, url, getAuthConfig());
+        if (authDenied) return authDenied;
+
+        return handleBrowseDirs(req, url, db);
     }
 
     const projectResponse = handleProjectRoutes(req, url, db);
