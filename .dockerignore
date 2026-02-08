@@ -52,4 +52,4 @@ AppState/
 run.sh
 playwright.config.js
 bunfig.toml
-tsconfig.json
+/tsconfig.json

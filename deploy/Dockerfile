@@ -1,16 +1,29 @@
-FROM oven/bun:1 AS base
+# ── Stage 1: Build Angular client ────────────────────────────────
+FROM oven/bun:1 AS client-build
+WORKDIR /app/client
+
+# Install client dependencies
+COPY client/package.json client/bun.lock* ./
+RUN bun install --frozen-lockfile
+
+# Copy client source & build
+COPY client/ .
+RUN bun run build
+
+# ── Stage 2: Production image ───────────────────────────────────
+FROM oven/bun:1 AS production
 WORKDIR /app
 
-# Install dependencies
+# Install server dependencies only
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile --production
 
-# Copy source
+# Copy server source
 COPY server/ server/
 COPY shared/ shared/
 
-# Copy pre-built client (if available)
-COPY client/dist/ client/dist/
+# Copy built client from stage 1
+COPY --from=client-build /app/client/dist/ client/dist/
 
 ENV PORT=3000
 # WARNING: 0.0.0.0 binds to all interfaces. In production, use a reverse
