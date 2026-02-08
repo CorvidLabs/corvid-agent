@@ -109,7 +109,17 @@ export class AlgoChatBridge {
         this.commandHandler = new CommandHandler(db, config, processManager, this.responseFormatter, {
             findAgentForNewConversation: () => this.discoveryService.findAgentForNewConversation(),
             getDefaultProjectId: () => this.discoveryService.getDefaultProjectId(),
+            extendSession: (sessionId: string, minutes: number): boolean => {
+                const extended = this.processManager.extendTimeout(sessionId, minutes * 60_000);
+                if (extended) {
+                    this.subscriptionManager.resetSubscriptionTimer(sessionId);
+                }
+                return extended;
+            },
         });
+
+        // Wire owner check into ProcessManager so credit deduction is skipped for owners
+        this.processManager.setOwnerCheck((address) => this.commandHandler.isOwner(address));
 
         this.setupMessageHandler();
         this.setupPSKManager();

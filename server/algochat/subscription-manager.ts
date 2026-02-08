@@ -78,6 +78,8 @@ export class SubscriptionManager {
     private localEventFns: Map<string, LocalChatEventFn> = new Map();
     /** Subscription timeout timers keyed by sessionId. */
     private subscriptionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+    /** Stored timeout callbacks keyed by sessionId (for external reset). */
+    private subscriptionTimeoutCallbacks: Map<string, () => void> = new Map();
 
     constructor(
         processManager: ProcessManager,
@@ -641,8 +643,24 @@ export class SubscriptionManager {
     setSubscriptionTimer(sessionId: string, onTimeout: () => void): void {
         // Clear any existing timer for this session
         this.clearSubscriptionTimer(sessionId);
+        // Store the callback so it can be re-used by resetSubscriptionTimer
+        this.subscriptionTimeoutCallbacks.set(sessionId, onTimeout);
         const timer = setTimeout(onTimeout, SUBSCRIPTION_TIMEOUT_MS);
         this.subscriptionTimers.set(sessionId, timer);
+    }
+
+    /**
+     * Reset the subscription timeout timer for an active chain subscription.
+     * No-op if no subscription exists for the session.
+     */
+    resetSubscriptionTimer(sessionId: string): void {
+        const callback = this.subscriptionTimeoutCallbacks.get(sessionId);
+        if (!callback) return;
+        // Clear just the timer, not the stored callback
+        const timer = this.subscriptionTimers.get(sessionId);
+        if (timer) clearTimeout(timer);
+        const newTimer = setTimeout(callback, SUBSCRIPTION_TIMEOUT_MS);
+        this.subscriptionTimers.set(sessionId, newTimer);
     }
 
     /**
@@ -654,6 +672,7 @@ export class SubscriptionManager {
             clearTimeout(timer);
             this.subscriptionTimers.delete(sessionId);
         }
+        this.subscriptionTimeoutCallbacks.delete(sessionId);
     }
 
     /**

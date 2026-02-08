@@ -80,6 +80,9 @@ export class ProcessManager {
     private orphanPruneTimer: ReturnType<typeof setInterval> | null = null;
     readonly approvalManager: ApprovalManager;
 
+    // Owner check — injected by AlgoChatBridge so credit deduction can be skipped for owners
+    private isOwnerAddress: ((address: string) => boolean) | null = null;
+
     // MCP services — set after AlgoChat init
     private mcpMessenger: AgentMessenger | null = null;
     private mcpDirectory: AgentDirectory | null = null;
@@ -95,6 +98,11 @@ export class ProcessManager {
         this.startTimeoutChecker();
         this.startAutoResumeChecker();
         this.startOrphanPruner();
+    }
+
+    /** Set the owner check function so credit deduction can be skipped for owners. */
+    setOwnerCheck(fn: (address: string) => boolean): void {
+        this.isOwnerAddress = fn;
     }
 
     /** Register MCP-related services so agent sessions get corvid_* tools. */
@@ -598,10 +606,12 @@ export class ProcessManager {
                 }
                 meta.lastKnownCostUsd = event.total_cost_usd;
 
-                // ── Credit system: deduct credits for AlgoChat sessions ──
+                // ── Credit system: deduct credits for AlgoChat sessions (skip for owners) ──
                 if (meta.source === 'algochat') {
                     const participantAddr = getParticipantForSession(this.db, sessionId);
-                    if (participantAddr) {
+                    if (participantAddr && this.isOwnerAddress?.(participantAddr)) {
+                        // Owners are exempt from credit deduction
+                    } else if (participantAddr) {
                         const result = deductTurnCredits(this.db, participantAddr, sessionId);
                         if (!result.success) {
                             log.warn(`Credits exhausted mid-session — pausing session ${sessionId}`, {
