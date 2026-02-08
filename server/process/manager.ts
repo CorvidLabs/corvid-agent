@@ -18,6 +18,12 @@ import { recordApiCost } from '../db/spending';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { SessionEventBus } from './event-bus';
+
+// Re-export EventCallback from interfaces for backward compatibility —
+// callers importing { EventCallback } from './manager' continue to work.
+export type { EventCallback } from './interfaces';
+import type { EventCallback } from './interfaces';
 
 const log = createLogger('ProcessManager');
 
@@ -36,8 +42,6 @@ const AUTO_RESUME_BASE_MS = 5 * 60 * 1000; // 5 minutes
 const AUTO_RESUME_MULTIPLIER = 3;
 const AUTO_RESUME_CAP_MS = 60 * 60 * 1000; // 1 hour max
 const AUTO_RESUME_MAX_ATTEMPTS = 10;
-
-export type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => void;
 
 // After this many user messages in a single process lifetime, kill and restart
 // through the capped resume path to keep context size manageable.
@@ -65,8 +69,7 @@ interface PausedSessionInfo {
 
 export class ProcessManager {
     private processes: Map<string, SdkProcess> = new Map();
-    private subscribers: Map<string, Set<EventCallback>> = new Map();
-    private globalSubscribers: Set<EventCallback> = new Set();
+    private readonly eventBus = new SessionEventBus();
     private sessionMeta: Map<string, SessionMeta> = new Map();
     private db: Database;
     private timeoutTimer: ReturnType<typeof setInterval> | null = null;
@@ -125,7 +128,7 @@ export class ProcessManager {
             network: this.mcpEncryptionConfig.network,
             workTaskService: this.mcpWorkTaskService ?? undefined,
             emitStatus: sessionId
-                ? (message: string) => this.emitEvent(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
+                ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
                 : undefined,
             extendTimeout: sessionId
                 ? (additionalMs: number) => this.extendTimeout(sessionId, additionalMs)
@@ -153,7 +156,7 @@ export class ProcessManager {
 
         const project = getProject(this.db, session.projectId);
         if (!project) {
-            this.emitEvent(session.id, {
+            this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Project ${session.projectId} not found`, type: 'not_found' },
             } as ClaudeStreamEvent);
@@ -199,7 +202,7 @@ export class ProcessManager {
             const message = err instanceof Error ? err.message : String(err);
             log.error(`Failed to start SDK process for session ${session.id}`, { error: message });
             updateSessionStatus(this.db, session.id, 'error');
-            this.emitEvent(session.id, {
+            this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Failed to start SDK process: ${message}`, type: 'spawn_error' },
             } as ClaudeStreamEvent);
@@ -229,14 +232,14 @@ export class ProcessManager {
 
         log.info(`Started process for session ${session.id}`, { pid: process.pid });
 
-        this.emitEvent(session.id, {
+        this.eventBus.emit(session.id, {
             type: 'session_started',
             session_id: session.id,
         } as ClaudeStreamEvent);
     }
 
     private handleApprovalRequest(sessionId: string, request: ApprovalRequestWire): void {
-        this.emitEvent(sessionId, {
+        this.eventBus.emit(sessionId, {
             type: 'approval_request',
             ...request,
         } as unknown as ClaudeStreamEvent);
@@ -305,7 +308,7 @@ export class ProcessManager {
             const message = err instanceof Error ? err.message : String(err);
             log.error(`Failed to resume SDK process for session ${session.id}`, { error: message });
             updateSessionStatus(this.db, session.id, 'error');
-            this.emitEvent(session.id, {
+            this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Failed to resume SDK process: ${message}`, type: 'spawn_error' },
             } as ClaudeStreamEvent);
@@ -378,7 +381,7 @@ export class ProcessManager {
             updateSessionStatus(this.db, sessionId, 'stopped');
 
             // Emit before cleanup so subscribers still receive the event
-            this.emitEvent(sessionId, {
+            this.eventBus.emit(sessionId, {
                 type: 'session_stopped',
                 session_id: sessionId,
             } as ClaudeStreamEvent);
@@ -397,7 +400,7 @@ export class ProcessManager {
     cleanupSessionState(sessionId: string): void {
         this.processes.delete(sessionId);
         this.sessionMeta.delete(sessionId);
-        this.subscribers.delete(sessionId);
+        this.eventBus.removeSessionSubscribers(sessionId);
         this.pausedSessions.delete(sessionId);
         this.clearStableTimer(sessionId);
         this.clearSessionTimeout(sessionId);
@@ -418,12 +421,12 @@ export class ProcessManager {
     } {
         return {
             processes: this.processes.size,
-            subscribers: this.subscribers.size,
+            subscribers: this.eventBus.getSubscriberCount(),
             sessionMeta: this.sessionMeta.size,
             pausedSessions: this.pausedSessions.size,
             sessionTimeouts: this.sessionTimeouts.size,
             stableTimers: this.stableTimers.size,
-            globalSubscribers: this.globalSubscribers.size,
+            globalSubscribers: this.eventBus.getGlobalSubscriberCount(),
         };
     }
 
@@ -451,30 +454,19 @@ export class ProcessManager {
     }
 
     subscribe(sessionId: string, callback: EventCallback): void {
-        let subs = this.subscribers.get(sessionId);
-        if (!subs) {
-            subs = new Set();
-            this.subscribers.set(sessionId, subs);
-        }
-        subs.add(callback);
+        this.eventBus.subscribe(sessionId, callback);
     }
 
     unsubscribe(sessionId: string, callback: EventCallback): void {
-        const subs = this.subscribers.get(sessionId);
-        if (subs) {
-            subs.delete(callback);
-            if (subs.size === 0) {
-                this.subscribers.delete(sessionId);
-            }
-        }
+        this.eventBus.unsubscribe(sessionId, callback);
     }
 
     subscribeAll(callback: EventCallback): void {
-        this.globalSubscribers.add(callback);
+        this.eventBus.subscribeAll(callback);
     }
 
     unsubscribeAll(callback: EventCallback): void {
-        this.globalSubscribers.delete(callback);
+        this.eventBus.unsubscribeAll(callback);
     }
 
     getActiveSessionIds(): string[] {
@@ -503,7 +495,7 @@ export class ProcessManager {
 
         // Final sweep: clear any remaining entries (e.g. subscribers for
         // sessions that were never started but had subscriptions registered)
-        this.subscribers.clear();
+        this.eventBus.clearAllSessionSubscribers();
         this.pausedSessions.clear();
         this.sessionMeta.clear();
         for (const timer of this.stableTimers.values()) {
@@ -527,7 +519,7 @@ export class ProcessManager {
 
         this.clearStableTimer(sessionId);
         this.clearSessionTimeout(sessionId);
-        this.subscribers.delete(sessionId);
+        this.eventBus.removeSessionSubscribers(sessionId);
         const now = Date.now();
         this.pausedSessions.set(sessionId, {
             pausedAt: now,
@@ -538,7 +530,7 @@ export class ProcessManager {
         updateSessionPid(this.db, sessionId, null);
         updateSessionStatus(this.db, sessionId, 'paused');
 
-        this.emitEvent(sessionId, {
+        this.eventBus.emit(sessionId, {
             type: 'error',
             error: { message: `Session paused due to API outage — auto-resume in ${AUTO_RESUME_BASE_MS / 60_000}min`, type: 'api_outage' },
         } as ClaudeStreamEvent);
@@ -613,7 +605,7 @@ export class ProcessManager {
                             log.warn(`Credits exhausted mid-session — pausing session ${sessionId}`, {
                                 participantAddr: participantAddr.slice(0, 8) + '...',
                             });
-                            this.emitEvent(sessionId, {
+                            this.eventBus.emit(sessionId, {
                                 type: 'error',
                                 error: {
                                     message: `Session paused: credits exhausted. Send ALGO to resume. Use /credits to check balance.`,
@@ -629,7 +621,7 @@ export class ProcessManager {
                                 remaining: result.creditsRemaining,
                                 threshold: config.lowCreditThreshold,
                             });
-                            this.emitEvent(sessionId, {
+                            this.eventBus.emit(sessionId, {
                                 type: 'system',
                                 message: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
                             } as unknown as ClaudeStreamEvent);
@@ -639,7 +631,7 @@ export class ProcessManager {
             }
         }
 
-        this.emitEvent(sessionId, event);
+        this.eventBus.emit(sessionId, event);
     }
 
     private handleExit(sessionId: string, code: number | null): void {
@@ -651,7 +643,7 @@ export class ProcessManager {
         updateSessionStatus(this.db, sessionId, status);
 
         // Emit before cleanup so subscribers still receive the exit event
-        this.emitEvent(sessionId, {
+        this.eventBus.emit(sessionId, {
             type: 'session_exited',
             session_id: sessionId,
             result: 'exited',
@@ -665,7 +657,7 @@ export class ProcessManager {
         if (code !== 0 && meta?.source === 'algochat') {
             // Clean everything except sessionMeta (attemptRestart needs it)
             this.processes.delete(sessionId);
-            this.subscribers.delete(sessionId);
+            this.eventBus.removeSessionSubscribers(sessionId);
             this.pausedSessions.delete(sessionId);
             this.clearStableTimer(sessionId);
             this.clearSessionTimeout(sessionId);
@@ -706,34 +698,6 @@ export class ProcessManager {
             log.info(`Auto-restarting session ${sessionId}`, { attempt: meta.restartCount });
             this.resumeProcess(session);
         }, backoffMs);
-    }
-
-    private emitEvent(sessionId: string, event: ClaudeStreamEvent): void {
-        const subs = this.subscribers.get(sessionId);
-        if (subs) {
-            for (const cb of subs) {
-                try {
-                    cb(sessionId, event);
-                } catch (err) {
-                    log.error('Subscriber callback threw', {
-                        sessionId,
-                        eventType: event.type,
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                }
-            }
-        }
-        for (const cb of this.globalSubscribers) {
-            try {
-                cb(sessionId, event);
-            } catch (err) {
-                log.error('Global subscriber callback threw', {
-                    sessionId,
-                    eventType: event.type,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
     }
 
     private startStableTimer(sessionId: string): void {
@@ -851,7 +815,7 @@ export class ProcessManager {
                     log.warn(`Giving up auto-resume for session ${sessionId} after ${info.resumeAttempts} attempts`);
                     this.pausedSessions.delete(sessionId);
                     updateSessionStatus(this.db, sessionId, 'error');
-                    this.emitEvent(sessionId, {
+                    this.eventBus.emit(sessionId, {
                         type: 'error',
                         error: { message: `Auto-resume abandoned after ${info.resumeAttempts} attempts`, type: 'auto_resume_exhausted' },
                     } as ClaudeStreamEvent);
@@ -915,17 +879,14 @@ export class ProcessManager {
             // Prune subscriber entries for sessions with no active process
             // and no paused entry (paused sessions may still receive events
             // when they resume).
-            for (const sessionId of this.subscribers.keys()) {
-                if (!this.processes.has(sessionId) && !this.pausedSessions.has(sessionId)) {
-                    this.subscribers.delete(sessionId);
-                    pruned++;
-                }
-            }
+            const isOrphan = (sessionId: string) =>
+                !this.processes.has(sessionId) && !this.pausedSessions.has(sessionId);
+            pruned += this.eventBus.pruneSubscribers(isOrphan);
 
             // Prune sessionMeta for sessions with no active process and not
             // scheduled for restart (restartCount handled by attemptRestart timeout).
             for (const sessionId of this.sessionMeta.keys()) {
-                if (!this.processes.has(sessionId) && !this.pausedSessions.has(sessionId)) {
+                if (isOrphan(sessionId)) {
                     this.sessionMeta.delete(sessionId);
                     pruned++;
                 }
@@ -933,7 +894,7 @@ export class ProcessManager {
 
             if (pruned > 0) {
                 log.info(`Orphan pruner cleaned ${pruned} stale entries`, {
-                    subscribers: this.subscribers.size,
+                    subscribers: this.eventBus.getSubscriberCount(),
                     sessionMeta: this.sessionMeta.size,
                     pausedSessions: this.pausedSessions.size,
                     processes: this.processes.size,
