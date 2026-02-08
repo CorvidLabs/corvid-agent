@@ -457,10 +457,13 @@ export class AlgoChatBridge {
             if (!conversation) return;
 
             if (event.type === 'session_exited') {
-                log.info(`AlgoChat session completed, notifying participant`, {
-                    sessionId,
-                    participant: conversation.participantAddr,
-                });
+                if (!this.subscriptionManager.hasChainSubscription(sessionId)) {
+                    this.responseFormatter.sendResponse(
+                        conversation.participantAddr,
+                        '[Session completed]'
+                    );
+                }
+                log.info(`AlgoChat session completed`, { sessionId, participant: conversation.participantAddr });
             }
 
             if (event.type === 'error' && event.error?.message) {
