@@ -346,12 +346,12 @@ export class AlgoChatBridge {
                 const contents = chunks.map((c) => c.content);
                 const reassembled = reassembleGroupMessage(contents);
                 if (reassembled) {
-                    const totalFee = chunks.reduce((sum, c) => {
-                        const f = (c as unknown as Record<string, unknown>).fee;
-                        return sum + (f != null ? Number(f) : 0);
+                    const totalAmount = chunks.reduce((sum, c) => {
+                        const a = (c as unknown as Record<string, unknown>).amount;
+                        return sum + (a != null ? Number(a) : 0);
                     }, 0);
                     log.info(`Reassembled group message (${chunks.length} chunks)`, { round });
-                    this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+                    this.handleIncomingMessage(participant, reassembled, round, totalAmount || undefined).catch((err) => {
                         log.error('Error handling group message', { error: err instanceof Error ? err.message : String(err) });
                     });
                 } else {
@@ -364,8 +364,8 @@ export class AlgoChatBridge {
 
             // Process regular messages
             for (const msg of regularMessages) {
-                const fee = (msg as unknown as Record<string, unknown>).fee;
-                this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), fee != null ? Number(fee) : undefined).catch((err) => {
+                const amount = (msg as unknown as Record<string, unknown>).amount;
+                this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), amount != null ? Number(amount) : undefined).catch((err) => {
                     log.error('Error handling message', { error: err instanceof Error ? err.message : String(err) });
                 });
             }
@@ -389,12 +389,12 @@ export class AlgoChatBridge {
 
         if (reassembled) {
             this.pendingGroupChunks.delete(key);
-            const totalFee = pending.chunks.reduce((sum: number, c) => {
-                const f = (c as unknown as Record<string, number | undefined>).fee;
-                return sum + (f != null ? Number(f) : 0);
+            const totalAmount = pending.chunks.reduce((sum: number, c) => {
+                const a = (c as unknown as Record<string, number | undefined>).amount;
+                return sum + (a != null ? Number(a) : 0);
             }, 0);
             log.info(`Reassembled buffered group message (${contents.length} chunks)`, { round });
-            this.handleIncomingMessage(participant, reassembled, round, totalFee || undefined).catch((err) => {
+            this.handleIncomingMessage(participant, reassembled, round, totalAmount || undefined).catch((err) => {
                 log.error('Error handling buffered group message', { error: err instanceof Error ? err.message : String(err) });
             });
         }
@@ -415,7 +415,7 @@ export class AlgoChatBridge {
         this.responseFormatter.setPskManager(this.pskManager);
 
         this.pskManager.onMessage((msg) => {
-            this.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound).catch((err) => {
+            this.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound, msg.amount).catch((err) => {
                 log.error('Error handling PSK message', { error: err instanceof Error ? err.message : String(err) });
             });
         });
@@ -493,9 +493,9 @@ export class AlgoChatBridge {
         participant: string,
         content: string,
         confirmedRound: number,
-        fee?: number,
+        amount?: number,
     ): Promise<void> {
-        log.info(`Message from ${participant}`, { content: content.slice(0, 100), fee });
+        log.info(`Message from ${participant}`, { content: content.slice(0, 100), amount });
 
         // Safety guard: reject raw group chunks that weren't reassembled
         if (/^\[GRP:\d+\/\d+\]/.test(content)) {
@@ -539,12 +539,15 @@ export class AlgoChatBridge {
         }
 
         // Emit feed event only for external (non-agent) messages
-        this.responseFormatter.emitEvent(participant, content, 'inbound', fee);
+        this.responseFormatter.emitEvent(participant, content, 'inbound', amount);
 
         // ── Credit system: detect payments and convert to credits ─────────
-        const MIN_TXFEE_MICRO = 1000;
-        if (fee && fee > MIN_TXFEE_MICRO) {
-            const paymentMicro = fee - MIN_TXFEE_MICRO;
+        // The `amount` field is the payment amount in microALGOs (separate from tx fee).
+        // The MINIMUM_PAYMENT for AlgoChat messages is 1000 microALGOs (0.001 ALGO),
+        // so anything above that is treated as a credit purchase.
+        const ALGOCHAT_MIN_PAYMENT_MICRO = 1000;
+        if (amount && amount > ALGOCHAT_MIN_PAYMENT_MICRO) {
+            const paymentMicro = amount - ALGOCHAT_MIN_PAYMENT_MICRO;
             if (paymentMicro > 0) {
                 const creditsAdded = purchaseCredits(this.db, participant, paymentMicro);
                 if (creditsAdded > 0) {
