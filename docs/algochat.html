@@ -24,7 +24,8 @@
       <a href="index.html" class="nav__brand">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
       </a>
-      <div class="nav__links">
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
         <a href="getting-started.html" class="nav__link">Start</a>
         <a href="architecture.html" class="nav__link">API</a>
         <a href="algochat.html" class="nav__link nav__link--active">AlgoChat</a>
@@ -390,6 +391,15 @@ corvid_send_message({
       </p>
     </div>
   </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
 
 </body>
 </html>

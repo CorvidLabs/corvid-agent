@@ -24,7 +24,8 @@
       <a href="index.html" class="nav__brand">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
       </a>
-      <div class="nav__links">
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
         <a href="getting-started.html" class="nav__link">Start</a>
         <a href="architecture.html" class="nav__link nav__link--active">API</a>
         <a href="algochat.html" class="nav__link">AlgoChat</a>
@@ -37,7 +38,7 @@
   <header class="page-hero">
     <div class="container">
       <h1 class="page-hero__title">API &amp; <span class="accent-magenta">Architecture</span></h1>
-      <p class="page-hero__tagline">REST endpoints, WebSocket protocol, and system design.</p>
+      <p class="page-hero__tagline">REST endpoints, WebSocket protocol, MCP tools, and system design.</p>
     </div>
     <div class="hero__scanline"></div>
   </header>
@@ -59,11 +60,11 @@
 <span class="t-comment">  │</span>  Port 4200  <span class="t-comment">│     │</span>  Port 3000  <span class="t-comment">│     │</span>  Subprocess <span class="t-comment">│</span>
 <span class="t-comment">  └─────────────┘     └──────┬───────┘     └──────────────┘</span>
 <span class="t-comment">                             │</span>
-<span class="t-comment">              ┌──────────────┼──────────────┐</span>
-<span class="t-comment">              ▼              ▼              ▼</span>
+<span class="t-comment">        ┌────────────────────┼────────────────────┐</span>
+<span class="t-comment">        ▼                    ▼                    ▼</span>
 <span class="t-comment">  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐</span>
 <span class="t-comment">  │</span> <span class="accent-cyan">SQLite DB</span>    <span class="t-comment">│  │</span> <span class="accent-magenta">MCP Server</span>   <span class="t-comment">│  │</span> <span class="accent-green">AlgoChat</span>     <span class="t-comment">│</span>
-<span class="t-comment">  │</span>  Persistence <span class="t-comment">│  │</span>  Tools       <span class="t-comment">│  │</span>  Algorand    <span class="t-comment">│</span>
+<span class="t-comment">  │</span>  Persistence <span class="t-comment">│  │</span>  9 Tools     <span class="t-comment">│  │</span>  (optional) <span class="t-comment">│</span>
 <span class="t-comment">  └──────────────┘  └──────────────┘  └──────────────┘</span>
 </code></pre>
       </div>
@@ -105,7 +106,7 @@
   <section class="section" id="rest-api">
     <div class="container">
       <h2 class="section__title">REST API</h2>
-      <p class="section__subtitle">All endpoints are prefixed with <code class="accent-cyan">/api</code>. Auth via <code>Authorization: Bearer &lt;API_KEY&gt;</code> when remote.</p>
+      <p class="section__subtitle">All endpoints prefixed with <code class="accent-cyan">/api</code>. Auth via <code>Authorization: Bearer &lt;API_KEY&gt;</code> when remote.</p>
 
       <!-- Agents -->
       <div class="api-group">
@@ -166,7 +167,7 @@
           <div class="api-row">
             <span class="api-method api-method--get">GET</span>
             <code class="api-path">/api/sessions</code>
-            <span class="api-desc">List sessions (filter by projectId)</span>
+            <span class="api-desc">List sessions (?projectId filter)</span>
           </div>
           <div class="api-row">
             <span class="api-method api-method--post">POST</span>
@@ -177,6 +178,16 @@
             <span class="api-method api-method--get">GET</span>
             <code class="api-path">/api/sessions/:id</code>
             <span class="api-desc">Get session details</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/sessions/:id</code>
+            <span class="api-desc">Update session</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/sessions/:id</code>
+            <span class="api-desc">Delete session</span>
           </div>
           <div class="api-row">
             <span class="api-method api-method--get">GET</span>
@@ -211,6 +222,11 @@
             <span class="api-desc">Create project</span>
           </div>
           <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/projects/:id</code>
+            <span class="api-desc">Get project</span>
+          </div>
+          <div class="api-row">
             <span class="api-method api-method--put">PUT</span>
             <code class="api-path">/api/projects/:id</code>
             <span class="api-desc">Update project</span>
@@ -238,21 +254,93 @@
             <span class="api-desc">Create council</span>
           </div>
           <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/councils/:id</code>
+            <span class="api-desc">Get council</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/councils/:id</code>
+            <span class="api-desc">Update council</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/councils/:id</code>
+            <span class="api-desc">Delete council</span>
+          </div>
+          <div class="api-row">
             <span class="api-method api-method--post">POST</span>
             <code class="api-path">/api/councils/:id/launch</code>
-            <span class="api-desc">Launch council deliberation</span>
+            <span class="api-desc">Launch deliberation</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/councils/:id/launches</code>
+            <span class="api-desc">List launches for council</span>
           </div>
         </div>
       </div>
 
-      <!-- Work Tasks & Health -->
+      <!-- Council Launches -->
       <div class="api-group">
-        <h3 class="api-group__title accent-magenta">Work Tasks &amp; Health</h3>
+        <h3 class="api-group__title accent-magenta">Council Launches</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches</code>
+            <span class="api-desc">List launches (?councilId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches/:id</code>
+            <span class="api-desc">Get launch details</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches/:id/logs</code>
+            <span class="api-desc">Get launch logs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches/:id/discussion-messages</code>
+            <span class="api-desc">Get discussion messages</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/abort</code>
+            <span class="api-desc">Abort launch</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/review</code>
+            <span class="api-desc">Start review stage</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/synthesize</code>
+            <span class="api-desc">Start synthesis stage</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/chat</code>
+            <span class="api-desc">Follow-up chat on completed council</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Work Tasks -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Work Tasks</h3>
         <div class="api-table">
           <div class="api-row">
             <span class="api-method api-method--get">GET</span>
             <code class="api-path">/api/work-tasks</code>
-            <span class="api-desc">List work tasks</span>
+            <span class="api-desc">List tasks (?agentId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/work-tasks</code>
+            <span class="api-desc">Create work task</span>
           </div>
           <div class="api-row">
             <span class="api-method api-method--get">GET</span>
@@ -260,14 +348,154 @@
             <span class="api-desc">Get task status</span>
           </div>
           <div class="api-row">
-            <span class="api-method api-method--delete">DEL</span>
-            <code class="api-path">/api/work-tasks/:id</code>
-            <span class="api-desc">Cancel task</span>
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/work-tasks/:id/cancel</code>
+            <span class="api-desc">Cancel running task</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Wallets -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Wallets</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/wallets/summary</code>
+            <span class="api-desc">External wallet summary (?search)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/wallets/:address/messages</code>
+            <span class="api-desc">Messages for wallet (?limit, ?offset)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Allowlist -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Allowlist</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/allowlist</code>
+            <span class="api-desc">List allowlisted addresses</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/allowlist</code>
+            <span class="api-desc">Add address to allowlist</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/allowlist/:address</code>
+            <span class="api-desc">Update allowlist entry</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/allowlist/:address</code>
+            <span class="api-desc">Remove from allowlist</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- System -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">System</h3>
+        <div class="api-table">
           <div class="api-row">
             <span class="api-method api-method--get">GET</span>
             <code class="api-path">/api/health</code>
             <span class="api-desc">Server health check</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/browse-dirs</code>
+            <span class="api-desc">Browse filesystem directories</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/operational-mode</code>
+            <span class="api-desc">Get operational mode</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/operational-mode</code>
+            <span class="api-desc">Set operational mode</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/escalation-queue</code>
+            <span class="api-desc">List pending approvals</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/escalation-queue/:id/resolve</code>
+            <span class="api-desc">Resolve escalation</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/feed/history</code>
+            <span class="api-desc">Activity feed history</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/backup</code>
+            <span class="api-desc">Create database backup</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/selftest/run</code>
+            <span class="api-desc">Run self-tests (unit/e2e/all)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AlgoChat -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">AlgoChat</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/algochat/status</code>
+            <span class="api-desc">Connection status</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/algochat/network</code>
+            <span class="api-desc">Switch network (testnet/mainnet)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/algochat/conversations</code>
+            <span class="api-desc">List conversations</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP API -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">MCP API</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp/send-message</code>
+            <span class="api-desc">Send message via MCP</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp/save-memory</code>
+            <span class="api-desc">Save memory via MCP</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp/recall-memory</code>
+            <span class="api-desc">Recall memory via MCP</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mcp/list-agents</code>
+            <span class="api-desc">List agents via MCP</span>
           </div>
         </div>
       </div>
@@ -286,6 +514,10 @@
           <div class="terminal terminal--compact">
             <pre class="terminal__body"><code><span class="t-comment">// Subscribe to session events</span>
 { "type": "<span class="accent-cyan">subscribe</span>",
+  "sessionId": "..." }
+
+<span class="t-comment">// Unsubscribe from session</span>
+{ "type": "<span class="accent-cyan">unsubscribe</span>",
   "sessionId": "..." }
 
 <span class="t-comment">// Send message to session</span>
@@ -307,7 +539,17 @@
 { "type": "<span class="accent-cyan">agent_invoke</span>",
   "fromAgentId": "...",
   "toAgentId": "...",
-  "content": "..." }</code></pre>
+  "content": "..." }
+
+<span class="t-comment">// Reward agent (ALGO)</span>
+{ "type": "<span class="accent-cyan">agent_reward</span>",
+  "agentId": "...",
+  "microAlgos": 1000000 }
+
+<span class="t-comment">// Create work task</span>
+{ "type": "<span class="accent-cyan">create_work_task</span>",
+  "agentId": "...",
+  "description": "..." }</code></pre>
           </div>
         </div>
 
@@ -334,9 +576,23 @@
   "request": { "id": "...",
     "toolName": "..." } }
 
-<span class="t-comment">// Work task updates</span>
-{ "type": "<span class="accent-magenta">work_task_update</span>",
-  "task": { ... } }</code></pre>
+<span class="t-comment">// Chat stream / tool / thinking</span>
+{ "type": "<span class="accent-magenta">chat_stream</span>",
+  "agentId": "...",
+  "chunk": "...", "done": false }
+{ "type": "<span class="accent-magenta">chat_tool_use</span>" }
+{ "type": "<span class="accent-magenta">chat_thinking</span>" }
+
+<span class="t-comment">// Work task &amp; council updates</span>
+{ "type": "<span class="accent-magenta">work_task_update</span>" }
+{ "type": "<span class="accent-magenta">council_stage_change</span>" }
+{ "type": "<span class="accent-magenta">council_log</span>" }
+{ "type": "<span class="accent-magenta">council_discussion_message</span>" }
+
+<span class="t-comment">// Balance &amp; errors</span>
+{ "type": "<span class="accent-magenta">agent_balance</span>" }
+{ "type": "<span class="accent-magenta">error</span>",
+  "message": "..." }</code></pre>
           </div>
         </div>
       </div>
@@ -347,7 +603,7 @@
   <section class="section" id="mcp-tools">
     <div class="container">
       <h2 class="section__title">MCP Tools</h2>
-      <p class="section__subtitle">Tools available to agents via the <a href="https://modelcontextprotocol.io" class="accent-green">Model Context Protocol</a>.</p>
+      <p class="section__subtitle">Tools available to agents via the <a href="https://modelcontextprotocol.io" class="accent-green">Model Context Protocol</a>. 7 default + 2 privileged.</p>
 
       <div class="grid grid--2">
         <div class="card card--cyan">
@@ -404,8 +660,12 @@
         </div>
 
         <div class="card card--outline">
-          <h3 class="card__title accent-magenta">Permission Model</h3>
-          <p>Web sessions access all tools. Remote sessions (AlgoChat/agent) are filtered by the agent&rsquo;s <code>mcpToolPermissions</code> column. Privileged tools like <code>grant_credits</code> require explicit grant.</p>
+          <h3 class="card__title accent-magenta">Privileged Tools</h3>
+          <p>Require explicit grant in <code>mcp_tool_permissions</code>:</p>
+          <div class="schema-list" style="margin-top: 8px;">
+            <div class="schema-item"><code>corvid_grant_credits</code> <span class="t-comment">&mdash; Grant free credits to a wallet (max 1M per call)</span></div>
+            <div class="schema-item"><code>corvid_credit_config</code> <span class="t-comment">&mdash; View or update credit system configuration</span></div>
+          </div>
         </div>
       </div>
     </div>
@@ -466,12 +726,17 @@
             <div class="schema-item"><code>agents</code> <span class="t-comment">&mdash; name, model, wallet</span></div>
             <div class="schema-item"><code>sessions</code> <span class="t-comment">&mdash; status, cost, source</span></div>
             <div class="schema-item"><code>session_messages</code> <span class="t-comment">&mdash; role, content</span></div>
+            <div class="schema-item"><code>daily_spending</code> <span class="t-comment">&mdash; date, total</span></div>
+            <div class="schema-item"><code>escalation_queue</code> <span class="t-comment">&mdash; pending approvals</span></div>
           </div>
         </div>
         <div class="card card--magenta">
           <h3 class="card__title">Messaging</h3>
           <div class="schema-list">
             <div class="schema-item"><code>algochat_conversations</code></div>
+            <div class="schema-item"><code>algochat_messages</code> <span class="t-comment">&mdash; content, txid</span></div>
+            <div class="schema-item"><code>algochat_psk_state_v2</code> <span class="t-comment">&mdash; PSK handshake</span></div>
+            <div class="schema-item"><code>algochat_allowlist</code> <span class="t-comment">&mdash; address, label</span></div>
             <div class="schema-item"><code>agent_messages</code> <span class="t-comment">&mdash; from, to, txid</span></div>
             <div class="schema-item"><code>agent_memories</code> <span class="t-comment">&mdash; encrypted</span></div>
           </div>
@@ -480,8 +745,13 @@
           <h3 class="card__title">Advanced</h3>
           <div class="schema-list">
             <div class="schema-item"><code>councils</code> <span class="t-comment">&mdash; members, rounds</span></div>
+            <div class="schema-item"><code>council_members</code></div>
             <div class="schema-item"><code>council_launches</code> <span class="t-comment">&mdash; stage</span></div>
-            <div class="schema-item"><code>credits</code> <span class="t-comment">&mdash; wallet, balance</span></div>
+            <div class="schema-item"><code>council_launch_logs</code></div>
+            <div class="schema-item"><code>council_discussion_messages</code></div>
+            <div class="schema-item"><code>credit_ledger</code> <span class="t-comment">&mdash; wallet, balance</span></div>
+            <div class="schema-item"><code>credit_transactions</code></div>
+            <div class="schema-item"><code>credit_config</code></div>
             <div class="schema-item"><code>work_tasks</code> <span class="t-comment">&mdash; status, branch</span></div>
           </div>
         </div>
@@ -527,6 +797,15 @@
       </p>
     </div>
   </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
 
 </body>
 </html>

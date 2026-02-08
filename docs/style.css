@@ -419,6 +419,29 @@ a {
   border: 1px solid rgba(0, 229, 255, 0.2);
 }
 
+/* ─── Hamburger Toggle ─── */
+.nav__toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1;
+  min-width: 36px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.nav__toggle:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
 /* ═══════════════════ PAGE HERO (sub-pages) ═══════════════════ */
 .page-hero {
   position: relative;
@@ -727,13 +750,69 @@ a {
 }
 
 /* ═══════════════════ RESPONSIVE ═══════════════════ */
+
+/* ─── Tablet (768px) ─── */
 @media (max-width: 768px) {
   :root {
-    --section-pad: 56px;
+    --section-pad: 48px;
   }
 
+  /* Nav: hamburger menu */
+  .nav__toggle {
+    display: flex;
+  }
+
+  .nav__links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: rgba(10, 10, 18, 0.97);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+  }
+
+  .nav__links--open {
+    display: flex;
+  }
+
+  .nav__link {
+    font-size: 10px;
+    padding: 12px 24px;
+    border-radius: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav__link:active {
+    background: var(--bg-hover);
+  }
+
+  .nav__link--active {
+    border: none;
+    border-left: 3px solid var(--cyan);
+  }
+
+  .nav__brand {
+    font-size: 12px;
+  }
+
+  .nav {
+    position: sticky;
+  }
+
+  .nav__inner {
+    position: relative;
+  }
+
+  /* Hero */
   .hero {
-    padding: 72px 20px 56px;
+    padding: 56px 20px 48px;
   }
 
   .hero__title {
@@ -742,9 +821,19 @@ a {
   }
 
   .hero__tagline {
-    font-size: 9px;
+    font-size: 10px;
   }
 
+  .page-hero {
+    padding: 56px 20px 40px;
+  }
+
+  .page-hero__title {
+    font-size: 24px;
+    letter-spacing: 2px;
+  }
+
+  /* Grids */
   .grid--2 {
     grid-template-columns: 1fr;
   }
@@ -757,19 +846,34 @@ a {
     grid-template-columns: repeat(3, 1fr);
   }
 
+  /* Sections */
   .section__title {
     font-size: 16px;
+    margin-bottom: 32px;
   }
 
+  .section__subtitle {
+    margin-bottom: 28px;
+  }
+
+  /* Cards — disable hover transform on touch */
+  .card:hover {
+    transform: none;
+  }
+
+  .card {
+    padding: 24px 20px;
+  }
+
+  /* Terminal */
   .terminal__body {
-    font-size: 8px;
-    padding: 14px;
+    font-size: 7px;
+    padding: 12px;
+    line-height: 2;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .page-hero__title {
-    font-size: 24px;
-  }
-
+  /* Steps */
   .step {
     flex-direction: column;
     gap: 12px;
@@ -777,65 +881,287 @@ a {
 
   .step__number {
     min-width: auto;
+    font-size: 16px;
   }
 
+  /* API rows — stacked layout */
   .api-row {
     flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .api-path {
+    flex-shrink: 1;
+    word-break: break-all;
+    font-size: 7px;
   }
 
   .api-desc {
     margin-left: 0;
     flex-basis: 100%;
+    padding-top: 4px;
+    font-size: 8px;
   }
 
+  .api-method {
+    font-size: 6px;
+    padding: 3px 6px;
+    min-width: 32px;
+  }
+
+  /* Config rows */
   .config-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+    padding: 10px 0;
   }
 
   .config-val {
     text-align: left;
   }
 
-  .nav__links {
+  .config-key {
+    word-break: break-all;
+  }
+
+  /* Buttons — bigger touch targets */
+  .btn {
+    padding: 12px 20px;
+    font-size: 9px;
+    min-height: 44px;
+  }
+
+  /* Footer */
+  .footer__links {
+    flex-direction: column;
+    align-items: center;
     gap: 12px;
   }
 
-  .nav__link {
-    font-size: 8px;
-    padding: 3px 6px;
+  .footer__links a {
+    padding: 6px 0;
+    font-size: 10px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
   }
 
-  .nav__brand {
-    font-size: 11px;
+  /* Callout */
+  .callout {
+    padding: 16px 18px;
+  }
+
+  .callout__title {
+    font-size: 10px;
+  }
+
+  /* Schema items — more readable on mobile */
+  .schema-item {
+    font-size: 8px;
+    padding: 8px 0;
+    line-height: 1.8;
+  }
+
+  .schema-item .t-comment {
+    display: block;
+    font-size: 7px;
+    margin-top: 2px;
   }
 }
 
+/* ─── Phone (480px) ─── */
 @media (max-width: 480px) {
+  :root {
+    --section-pad: 36px;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .hero {
+    padding: 48px 16px 40px;
+  }
+
   .hero__title {
     font-size: 22px;
+    letter-spacing: 1px;
+  }
+
+  .hero__tagline {
+    font-size: 9px;
+    margin-bottom: 24px;
+  }
+
+  .page-hero {
+    padding: 48px 16px 32px;
   }
 
   .page-hero__title {
-    font-size: 20px;
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+
+  .page-hero__tagline {
+    font-size: 9px;
   }
 
   .grid--6 {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .btn {
-    padding: 8px 16px;
+  .section__title {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  /* Terminal — even smaller for tiny screens */
+  .terminal__body {
+    font-size: 6px;
+    padding: 10px;
+    line-height: 1.8;
+  }
+
+  .terminal__bar {
+    padding: 8px 10px;
+  }
+
+  .terminal__label {
+    font-size: 7px;
+  }
+
+  /* API rows — fully stacked */
+  .api-row {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .api-method {
+    font-size: 7px;
+  }
+
+  .api-path {
+    font-size: 7px;
+    word-break: break-all;
+  }
+
+  .api-desc {
     font-size: 8px;
   }
 
-  .footer__links {
-    gap: 16px;
+  .api-group__title {
+    font-size: 11px;
   }
 
-  .nav__links {
-    gap: 8px;
+  /* Cards */
+  .card {
+    padding: 20px 16px;
+  }
+
+  .card__title {
+    font-size: 10px;
+  }
+
+  .card p {
+    font-size: 9px;
+  }
+
+  .card__icon {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  /* Chips */
+  .chip {
+    padding: 10px 6px;
+    font-size: 8px;
+  }
+
+  /* Steps */
+  .step {
+    margin-bottom: 28px;
+  }
+
+  .step__title {
+    font-size: 11px;
+  }
+
+  /* Buttons — full width on phone */
+  .hero__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn {
+    justify-content: center;
+    padding: 14px 20px;
+    font-size: 9px;
+  }
+
+  /* Footer */
+  .footer {
+    padding: 28px 0;
+  }
+
+  .footer__copy {
+    font-size: 7px;
+  }
+
+  /* Callout */
+  .callout {
+    padding: 14px 14px;
+  }
+
+  .callout__title {
+    font-size: 9px;
+  }
+
+  .callout p {
+    font-size: 8px;
+  }
+
+  /* Feature list — bigger text for readability */
+  .feature-item {
+    font-size: 9px;
+    padding: 8px 0;
+  }
+
+  /* Param chips */
+  .param {
+    font-size: 7px;
+    padding: 4px 8px;
+  }
+}
+
+/* ─── Very small phones (360px) ─── */
+@media (max-width: 360px) {
+  .hero__title {
+    font-size: 18px;
+  }
+
+  .page-hero__title {
+    font-size: 16px;
+  }
+
+  .section__title {
+    font-size: 12px;
+  }
+
+  .grid--6 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .terminal__body {
+    font-size: 5.5px;
+    padding: 8px;
+  }
+
+  .nav__brand {
+    font-size: 10px;
   }
 }
 
