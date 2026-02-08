@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { homedir, tmpdir, platform } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { resolve, sep } from 'node:path';
 import { handleBrowseDirs, getAllowedRoots, isPathAllowed } from '../routes/projects';
 
-const isWindows = platform() === 'win32';
 // Use os.tmpdir() for cross-platform temp directory (e.g. /tmp on Unix, C:\Users\...\Temp on Windows)
 const TEMP_DIR = resolve(tmpdir());
 
