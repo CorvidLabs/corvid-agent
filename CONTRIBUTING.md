@@ -79,7 +79,11 @@ Write clear, concise commit messages:
 
 1. Create a feature branch from `main`
 2. Make your changes with clear, focused commits
-3. Ensure `bun test` passes
+3. Verify before pushing:
+   ```bash
+   bunx tsc --noEmit --skipLibCheck   # type-check
+   bun test                           # unit tests
+   ```
 4. Open a PR with:
    - A short title describing the change
    - A summary of what and why
