@@ -5,11 +5,11 @@ AI agent orchestration platform with on-chain messaging via Algorand.
 ## Features
 
 - **Agent orchestration** -- spawn, manage, and monitor Claude-powered agents
-- **Council discussions** -- multi-agent deliberation with structured voting
-- **AlgoChat** -- on-chain messaging and group transactions via Algorand
+- **Council discussions** -- multi-agent deliberation with structured voting and follow-up chat
+- **AlgoChat** -- on-chain encrypted messaging via Algorand (PSK / X25519)
+- **Self-improvement** -- agents create work tasks, branch, validate, and open PRs autonomously
 - **Mobile chat client** -- responsive Angular UI with real-time WebSocket updates
 - **MCP tools** -- extensible tool system using the Model Context Protocol
-- **Work tasks** -- persistent task tracking with SQLite
 
 ## Tech Stack
 
@@ -62,11 +62,16 @@ e2e/             Playwright end-to-end tests
 | `ALGOCHAT_SYNC_INTERVAL` | Polling interval for on-chain messages (ms) | `30000` |
 | `ALGOCHAT_DEFAULT_AGENT_ID` | Default agent ID for AlgoChat | -- |
 | `ALGOCHAT_OWNER_ADDRESSES` | Comma-separated Algorand addresses authorized for admin commands | -- (open) |
+| `ALGOCHAT_PSK_URI` | Pre-shared key URI for encrypted AlgoChat channels | -- |
+| `AGENT_NETWORK` | Network for agent sub-wallets | `localnet` |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude agents | -- |
 | `PORT` | HTTP server port | `3000` |
 | `BIND_HOST` | Bind address (`127.0.0.1` for localhost, `0.0.0.0` for Docker/VM) | `127.0.0.1` |
 | `API_KEY` | Bearer token for HTTP/WS auth (required when `BIND_HOST` is non-localhost) | -- |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins | `*` |
+| `WALLET_ENCRYPTION_KEY` | AES-256 key for wallet encryption at rest | derived from mnemonic |
+| `LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
+| `GH_TOKEN` | GitHub token for work task PR creation | -- |
 
 Copy `.env.example` to `.env` and fill in your values. Bun loads `.env` automatically.
 
@@ -84,7 +89,8 @@ See the `deploy/` directory for production configurations:
 - `Dockerfile` + `docker-compose.yml` -- containerized deployment
 - `corvid-agent.service` -- systemd unit for Linux
 - `com.corvidlabs.corvid-agent.plist` -- macOS LaunchAgent
-- `daemon.sh` -- helper script
+- `daemon.sh` -- cross-platform daemon installer
+- `nginx/` + `caddy/` -- reverse proxy configs with TLS termination
 
 ## Contributing
 

@@ -35,7 +35,9 @@ CorvidAgent runs as a **local sandbox** — on your machine, in a VM, or on a pr
 
 - **Localhost mode** (default): `BIND_HOST=127.0.0.1` -- no API key required. Only local processes can reach the API.
 - **Network mode**: Set `API_KEY` in `.env`. All HTTP routes require `Authorization: Bearer <key>` and WebSocket upgrades require `?key=<key>` or a Bearer header. The server **refuses to start** if `BIND_HOST` is non-localhost and no `API_KEY` is set.
+- **WebSocket auth**: WebSocket upgrades require a valid API key (query param or Bearer header) before the connection is established. Unauthenticated upgrades are rejected with 401.
 - **CORS**: Configure `ALLOWED_ORIGINS` (comma-separated) to restrict browser access. Defaults to `*` on localhost.
+- **Directory browsing**: The `/api/browse-dirs` endpoint is sandboxed to the user's home directory, registered project working directories, and any paths in `ALLOWED_BROWSE_ROOTS`. Path traversal attempts are blocked.
 - **Health endpoint**: `/api/health` is always public for monitoring probes.
 - **Timing-safe comparison**: API key validation uses constant-time comparison to prevent timing attacks.
 - **Agent sessions**: Run locally with your own AI provider credentials.
@@ -48,7 +50,7 @@ The agent has real ALGO in its wallet. These safeguards prevent runaway spending
 |-----------|-------|---------|
 | Daily ALGO cap | `server/db/spending.ts` | 10 ALGO/day |
 | Per-message cost check | AlgoChat bridge | Checks before send |
-| Credit system | `server/db/credits.ts` | Tracks per-wallet usage |
+| Credit system | `server/db/credits.ts` | Guest-only; owners bypass credits |
 
 Configure via `DAILY_ALGO_LIMIT_MICRO` in `.env`.
 
