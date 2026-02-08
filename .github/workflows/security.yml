@@ -1,0 +1,31 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Secret Scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      # All actions pinned by SHA for supply-chain safety — Dependabot (P5) handles SHA bumps.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: 0
+
+      # Use gitleaks CLI directly (the gitleaks-action requires a paid license for org repos)
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION="8.24.0"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+
+      - name: Run gitleaks
+        run: gitleaks detect --source=. --config=.gitleaks.toml --verbose

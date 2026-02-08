@@ -1,0 +1,13 @@
+# Gitleaks configuration — P6 secret scanning
+# https://github.com/gitleaks/gitleaks
+
+title = "CorvidAgent gitleaks config"
+
+[allowlist]
+  description = "Known safe paths containing test fixtures and example configs"
+  paths = [
+    '''\.env\.example$''',
+    '''__tests__/.*\.test\.ts$''',
+    '''__tests__/setup\.ts$''',
+    '''patches/.*\.patch$''',
+  ]

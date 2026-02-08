@@ -35,8 +35,6 @@ coverage/
 # === CI/CD & deploy configs (not needed in image) ===
 .github/
 deploy/
-docker/
-docs/
 e2e/
 
 # === Documentation ===
@@ -52,7 +50,6 @@ AppState/
 
 # === Misc development files ===
 run.sh
-jest.config.js
 playwright.config.js
 bunfig.toml
 tsconfig.json

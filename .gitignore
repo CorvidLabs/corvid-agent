@@ -6,5 +6,3 @@ wallet-keystore.json
 .env
 dist/
 test-results/
-AppState/
-ecommerce-platform/

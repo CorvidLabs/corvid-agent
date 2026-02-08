@@ -1,0 +1,49 @@
+# Dependabot configuration — P5 security hardening
+# Keeps dependencies current and flags known vulnerabilities.
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # Server dependencies (root package.json)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    ignore:
+      # ts-algochat has a bun patchedDependencies entry — automated bumps
+      # will silently break the patch. Review these manually.
+      - dependency-name: "@corvidlabs/ts-algochat"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+    commit-message:
+      prefix: "deps"
+
+  # Client dependencies (Angular dashboard)
+  - package-ecosystem: "npm"
+    directory: "/client"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "deps(client)"
+
+  # GitHub Actions — pin actions by SHA, Dependabot bumps them safely
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
