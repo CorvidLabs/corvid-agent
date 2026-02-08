@@ -19,6 +19,7 @@ import { backupDatabase } from '../db/backup';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { checkHttpAuth, loadAuthConfig, type AuthConfig } from '../middleware/auth';
+import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
 
 // Load auth config once at module level
 let authConfig: AuthConfig | null = null;
@@ -26,6 +27,9 @@ function getAuthConfig(): AuthConfig {
     if (!authConfig) authConfig = loadAuthConfig();
     return authConfig;
 }
+
+// Load rate limiter once at module level
+const rateLimiter = new RateLimiter(loadRateLimitConfig());
 
 const log = createLogger('Router');
 
@@ -70,6 +74,13 @@ export async function handleRequest(
     // CORS preflight — allow everything (local sandbox)
     if (req.method === 'OPTIONS') {
         return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    // Rate limiting — check before auth or route dispatch
+    const rateLimited = checkRateLimit(req, url, rateLimiter);
+    if (rateLimited) {
+        addCors(rateLimited);
+        return rateLimited;
     }
 
     try {
