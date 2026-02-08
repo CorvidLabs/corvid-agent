@@ -34,13 +34,8 @@ import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
-import {
-    getBalance,
-    purchaseCredits,
-    maybeGrantFirstTimeCredits,
-    canStartSession,
-    getCreditConfig,
-} from '../db/credits';
+// Credit functions — will be used when guest access is enabled
+// import { getBalance, purchaseCredits, maybeGrantFirstTimeCredits, canStartSession, getCreditConfig } from '../db/credits';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
 
@@ -532,8 +527,11 @@ export class AlgoChatBridge {
             }
         }
 
-        // Owner-only mode: only respond to wallets in ALGOCHAT_OWNER_ADDRESSES
-        if (!this.commandHandler.isOwner(participant)) {
+        const isOwner = this.commandHandler.isOwner(participant);
+
+        // Non-owners are blocked unless guest access is enabled in the future.
+        // For now, only owners can interact.
+        if (!isOwner) {
             log.info('Ignoring message from non-owner address', { address: participant.slice(0, 8) + '...' });
             return;
         }
@@ -541,60 +539,8 @@ export class AlgoChatBridge {
         // Emit feed event only for external (non-agent) messages
         this.responseFormatter.emitEvent(participant, content, 'inbound', amount);
 
-        // ── Credit system: detect payments and convert to credits ─────────
-        // The `amount` field is the payment amount in microALGOs (separate from tx fee).
-        // The MINIMUM_PAYMENT for AlgoChat messages is 1000 microALGOs (0.001 ALGO),
-        // so anything above that is treated as a credit purchase.
-        const ALGOCHAT_MIN_PAYMENT_MICRO = 1000;
-        if (amount && amount > ALGOCHAT_MIN_PAYMENT_MICRO) {
-            const paymentMicro = amount - ALGOCHAT_MIN_PAYMENT_MICRO;
-            if (paymentMicro > 0) {
-                const creditsAdded = purchaseCredits(this.db, participant, paymentMicro);
-                if (creditsAdded > 0) {
-                    const balance = getBalance(this.db, participant);
-                    log.info('Credits purchased from ALGO payment', {
-                        participant: participant.slice(0, 8) + '...',
-                        paymentMicro,
-                        creditsAdded,
-                        newBalance: balance.available,
-                    });
-                    if (paymentMicro >= 100_000) {
-                        this.responseFormatter.sendResponse(participant,
-                            `💰 +${creditsAdded} credits purchased! Balance: ${balance.available} credits`
-                        );
-                    }
-                }
-            }
-        }
-
-        // Grant first-time credits if this is a new wallet
-        const firstTimeCredits = maybeGrantFirstTimeCredits(this.db, participant);
-        if (firstTimeCredits > 0) {
-            const balance = getBalance(this.db, participant);
-            this.responseFormatter.sendResponse(participant,
-                `🎉 Welcome! You've received ${firstTimeCredits} free credits to get started.\n` +
-                `Balance: ${balance.available} credits\n` +
-                `Use /credits to check balance, send ALGO to buy more.`
-            );
-        }
-
-        // Check for commands first
+        // Check for commands first (owners always have access)
         if (this.commandHandler.handleCommand(participant, content)) return;
-
-        // ── Credit check: ensure participant has credits before proceeding ──
-        const creditCheck = canStartSession(this.db, participant);
-        if (!creditCheck.allowed) {
-            log.info('Insufficient credits, blocking message', {
-                participant: participant.slice(0, 8) + '...',
-                credits: creditCheck.credits,
-            });
-            this.responseFormatter.sendResponse(participant,
-                `⚠️ Insufficient credits (${creditCheck.credits} remaining).\n` +
-                `Send ALGO to purchase credits (1 ALGO = ${getCreditConfig(this.db).creditsPerAlgo} credits).\n` +
-                `Use /credits to check your balance.`
-            );
-            return;
-        }
 
         // Auto micro-fund agent wallet on localnet for incoming messages
         if (this.config.network === 'localnet' && this.agentWalletService) {
