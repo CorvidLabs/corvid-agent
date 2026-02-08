@@ -102,4 +102,14 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/sessions/session-view.component').then((m) => m.SessionViewComponent),
     },
+    {
+        path: 'nft/review',
+        loadComponent: () =>
+            import('./features/nft/nft-initial-review.component').then((m) => m.NFTInitialReviewComponent),
+    },
+    {
+        path: 'nft/voting',
+        loadComponent: () =>
+            import('./features/nft/nft-swipe-voting.component').then((m) => m.NFTSwipeVotingComponent),
+    },
 ];

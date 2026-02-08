@@ -53,6 +53,14 @@ interface AgentSummary {
                     <h3 class="card__title">Running</h3>
                     <p class="card__count">{{ runningSessions().length }}</p>
                 </div>
+                <div class="card">
+                    <h3 class="card__title">NFT Review</h3>
+                    <a class="card__link" routerLink="/nft/review">Review proposals</a>
+                </div>
+                <div class="card">
+                    <h3 class="card__title">NFT Voting</h3>
+                    <a class="card__link" routerLink="/nft/voting">Vote on NFTs</a>
+                </div>
             </div>
 
             @if (agentSummaries().length > 0) {
