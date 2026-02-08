@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, unlinkSync, writeFileSync, chmodSync, statSync } from 'node:fs';
+import { existsSync, unlinkSync, writeFileSync, chmodSync, statSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+const IS_WINDOWS = process.platform === 'win32';
 
 // We test through the module functions. The module reads WALLET_KEYSTORE_PATH
 // from env at import time, so we set it before importing.
-const TEST_KEYSTORE_PATH = '/tmp/test-wallet-keystore-' + process.pid + '.json';
+// Use os.tmpdir() for cross-platform temp directory support.
+const TEST_DIR = mkdtempSync(join(tmpdir(), 'corvid-keystore-test-'));
+const TEST_KEYSTORE_PATH = join(TEST_DIR, 'test-wallet-keystore.json');
 const TEST_TMP_PATH = TEST_KEYSTORE_PATH + '.tmp';
 
 // Override the keystore path for testing
@@ -69,7 +75,8 @@ describe('wallet-keystore', () => {
         expect(getKeystoreEntry('agent-1')).not.toBeNull();
     });
 
-    it('creates file with 0o600 permissions', () => {
+    // POSIX file permission tests — skip on Windows where chmod is a no-op
+    it.skipIf(IS_WINDOWS)('creates file with 0o600 permissions', () => {
         saveKeystoreEntry('agent-1', 'ADDR123', 'encrypted');
 
         expect(existsSync(TEST_KEYSTORE_PATH)).toBe(true);
@@ -78,7 +85,7 @@ describe('wallet-keystore', () => {
         expect(mode).toBe(0o600);
     });
 
-    it('auto-fixes overly permissive file permissions on read', () => {
+    it.skipIf(IS_WINDOWS)('auto-fixes overly permissive file permissions on read', () => {
         // Write a valid keystore file with wide-open permissions
         writeFileSync(TEST_KEYSTORE_PATH, JSON.stringify({
             'agent-1': { address: 'ADDR123', encryptedMnemonic: 'encrypted' },
@@ -97,16 +104,14 @@ describe('wallet-keystore', () => {
     });
 
     it('rejects invalid JSON gracefully', () => {
-        writeFileSync(TEST_KEYSTORE_PATH, 'not valid json', 'utf-8');
-        chmodSync(TEST_KEYSTORE_PATH, 0o600);
+        writeFileSync(TEST_KEYSTORE_PATH, 'not valid json', { encoding: 'utf-8', mode: 0o600 });
 
         const data = readKeystore();
         expect(data).toEqual({});
     });
 
     it('rejects array-shaped JSON gracefully', () => {
-        writeFileSync(TEST_KEYSTORE_PATH, '[]', 'utf-8');
-        chmodSync(TEST_KEYSTORE_PATH, 0o600);
+        writeFileSync(TEST_KEYSTORE_PATH, '[]', { encoding: 'utf-8', mode: 0o600 });
 
         const data = readKeystore();
         expect(data).toEqual({});
@@ -119,8 +124,7 @@ describe('wallet-keystore', () => {
             'bad-no-mnemonic': { address: 'ADDR' },
             'bad-number': 42,
             'bad-null': null,
-        }), 'utf-8');
-        chmodSync(TEST_KEYSTORE_PATH, 0o600);
+        }), { encoding: 'utf-8', mode: 0o600 });
 
         const data = readKeystore();
         expect(Object.keys(data)).toEqual(['valid']);

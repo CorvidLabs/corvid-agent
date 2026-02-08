@@ -22,6 +22,9 @@ export const KEYSTORE_PATH = process.env.WALLET_KEYSTORE_PATH ?? './wallet-keyst
 /** Required file mode: owner read/write only (0o600). */
 const REQUIRED_MODE = 0o600;
 
+/** Windows doesn't support POSIX file permissions (chmod is a no-op). */
+const IS_WINDOWS = process.platform === 'win32';
+
 export interface KeystoreEntry {
     address: string;
     encryptedMnemonic: string;
@@ -33,8 +36,14 @@ export type KeystoreData = Record<string, KeystoreEntry>;
  * Check that keystore file permissions are not too permissive.
  * Returns true if the file is safe to read, false if permissions are wrong.
  * If the file doesn't exist, returns true (no data to leak).
+ *
+ * On Windows, POSIX file permissions are not supported (chmod is a no-op
+ * and stat.mode returns meaningless values), so we skip permission checks
+ * entirely. Windows uses ACLs for file security instead.
  */
 function verifyFilePermissions(): boolean {
+    if (IS_WINDOWS) return true;
+
     try {
         const fs = require('node:fs') as typeof import('node:fs');
         const stat = fs.statSync(KEYSTORE_PATH);
@@ -110,14 +119,18 @@ function writeKeystore(data: KeystoreData): void {
         const content = JSON.stringify(data, null, 2);
 
         // Write to temp file with restrictive permissions from the start
+        // (mode option is ignored on Windows, but harmless to pass)
         fs.writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: REQUIRED_MODE });
 
         // Atomic rename
         fs.renameSync(tmpPath, KEYSTORE_PATH);
 
         // Ensure final file has correct permissions (rename preserves source perms,
-        // but belt-and-suspenders for cross-platform safety)
-        fs.chmodSync(KEYSTORE_PATH, REQUIRED_MODE);
+        // but belt-and-suspenders for cross-platform safety).
+        // Skip on Windows where chmod is a no-op.
+        if (!IS_WINDOWS) {
+            fs.chmodSync(KEYSTORE_PATH, REQUIRED_MODE);
+        }
     } catch (err) {
         log.error('Failed to write wallet keystore', {
             path: KEYSTORE_PATH,
