@@ -1,0 +1,38 @@
+# CorvidAgent reverse proxy — Caddy
+#
+# Caddy automatically provisions and renews TLS certificates via Let's Encrypt.
+# Replace "yourdomain.com" with your actual domain.
+#
+# Usage:
+#   1. Install Caddy: https://caddyserver.com/docs/install
+#   2. Copy this file to /etc/caddy/Caddyfile (or use `caddy run --config Caddyfile`)
+#   3. Ensure DNS A/AAAA records point to your server
+#   4. Set BIND_HOST=127.0.0.1 in your .env or docker-compose override
+#   5. Start Caddy: `sudo systemctl start caddy`
+
+yourdomain.com {
+    reverse_proxy localhost:3000
+
+    # WebSocket support (automatic in Caddy, but explicit for clarity)
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket localhost:3000
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # Request logging
+    log {
+        output file /var/log/caddy/corvid-agent.log {
+            roll_size 50MiB
+            roll_keep 3
+        }
+    }
+}
