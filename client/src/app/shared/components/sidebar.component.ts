@@ -88,6 +88,22 @@ import { filter, Subscription } from 'rxjs';
                         Sessions
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/nft/review"
+                        routerLinkActive="sidebar__link--active">
+                        NFT Review
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/nft/voting"
+                        routerLinkActive="sidebar__link--active">
+                        NFT Voting
+                    </a>
+                </li>
             </ul>
         </nav>
     `,
