@@ -227,6 +227,11 @@ export class AlgoChatBridge {
      * Routes through the same agent→session→process flow, but sends the
      * response back via the provided callback instead of on-chain.
      */
+    /** Expose the command handler for direct access (e.g., from WS handler). */
+    getCommandHandler(): CommandHandler {
+        return this.commandHandler;
+    }
+
     async handleLocalMessage(
         agentId: string,
         content: string,
@@ -239,6 +244,19 @@ export class AlgoChatBridge {
         if (!agent) {
             log.error(`Agent ${agentId} not found`);
             return;
+        }
+
+        // Route slash commands through CommandHandler before creating sessions.
+        // The response callback sends command output directly to the WS client.
+        if (content.trim().startsWith('/')) {
+            const handled = this.commandHandler.handleCommand('local', content, (text) => {
+                sendFn('local', text, 'outbound');
+                eventFn?.({ type: 'message', content: text, direction: 'outbound' });
+            });
+            if (handled) {
+                log.debug('Local message handled as command', { content: content.slice(0, 50) });
+                return;
+            }
         }
 
         log.debug(`Agent found: ${agent.name}, echoing inbound message`);
