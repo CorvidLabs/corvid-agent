@@ -676,14 +676,19 @@ export class SubscriptionManager {
     }
 
     /**
-     * Clean up all subscription timers and chain subscriptions.
-     * Called during bridge shutdown.
+     * Clean up all subscriptions, timers, and callbacks.
+     * Called during bridge shutdown. Clears every internal Map/Set to prevent
+     * orphaned callbacks from accumulating across bridge restarts.
      */
     cleanup(): void {
         for (const timer of this.subscriptionTimers.values()) {
             clearTimeout(timer);
         }
         this.subscriptionTimers.clear();
+        this.subscriptionTimeoutCallbacks.clear();
         this.chainSubscriptions.clear();
+        this.localSubscriptions.clear();
+        this.localSendFns.clear();
+        this.localEventFns.clear();
     }
 }
