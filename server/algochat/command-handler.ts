@@ -324,24 +324,35 @@ export class CommandHandler {
      * Handle the `/council` command from AlgoChat.
      *
      * Usage:
-     *   /council <prompt>                       — auto-create council with all enabled agents
-     *   /council MyCouncilName -- <prompt>      — use existing council by name
+     *   /council <prompt>                            — auto-create council with all enabled agents
+     *   /council @Agent1 @Agent2 -- <prompt>         — auto-create council with specific agents
+     *   /council MyCouncilName -- <prompt>            — use existing council by name
      */
     private async handleCouncilCommand(participant: string, parts: string[]): Promise<void> {
         const rest = parts.slice(1).join(' ').trim();
         if (!rest) {
-            this.responseFormatter.sendResponse(participant, 'Usage:\n  /council <prompt>\n  /council <CouncilName> -- <prompt>');
+            this.responseFormatter.sendResponse(participant, 'Usage:\n  /council <prompt>\n  /council @Agent1 @Agent2 -- <prompt>\n  /council <CouncilName> -- <prompt>');
             return;
         }
 
-        // Parse: "/council CouncilName -- prompt" or "/council prompt"
+        // Parse: "/council @A @B -- prompt" or "/council CouncilName -- prompt" or "/council prompt"
         const doubleDashIdx = rest.indexOf('--');
         let councilName: string | null = null;
+        let agentMentions: string[] | null = null;
         let prompt: string;
 
         if (doubleDashIdx >= 0) {
-            councilName = rest.slice(0, doubleDashIdx).trim();
+            const beforeDash = rest.slice(0, doubleDashIdx).trim();
             prompt = rest.slice(doubleDashIdx + 2).trim();
+
+            if (beforeDash.includes('@')) {
+                // Agent selection mode: extract @mentions
+                const mentions = beforeDash.match(/@([^@]+)/g);
+                agentMentions = mentions ? mentions.map((m) => m.slice(1).trim()).filter(Boolean) : [];
+            } else if (beforeDash) {
+                // Existing council name mode
+                councilName = beforeDash;
+            }
         } else {
             prompt = rest;
         }
@@ -366,11 +377,50 @@ export class CommandHandler {
             }
             councilId = match.id;
             councilLabel = match.name;
+        } else if (agentMentions && agentMentions.length > 0) {
+            // Auto-create council with specific mentioned agents
+            const allAgents = getAlgochatEnabledAgents(this.db);
+            const matched: typeof allAgents = [];
+            const notFound: string[] = [];
+
+            for (const name of agentMentions) {
+                const agent = allAgents.find((a) => a.name.toLowerCase() === name.toLowerCase());
+                if (agent) {
+                    matched.push(agent);
+                } else {
+                    notFound.push(name);
+                }
+            }
+
+            if (notFound.length > 0) {
+                const available = allAgents.map((a) => a.name).join(', ');
+                this.responseFormatter.sendResponse(participant, `Agent(s) not found: ${notFound.join(', ')}\nAvailable: ${available || 'none'}`);
+                return;
+            }
+            if (matched.length < 2) {
+                this.responseFormatter.sendResponse(participant, 'Council requires at least 2 agents. Mention multiple agents: /council @Agent1 @Agent2 -- <prompt>');
+                return;
+            }
+
+            const agentIds = matched.map((a) => a.id);
+            const council = createCouncil(this.db, {
+                name: `AlgoChat Council ${new Date().toISOString().slice(0, 16)}`,
+                description: `Auto-created with agents: ${matched.map((a) => a.name).join(', ')}`,
+                agentIds,
+                chairmanAgentId: agentIds[0],
+                discussionRounds: 2,
+            });
+            councilId = council.id;
+            councilLabel = council.name;
         } else {
             // Auto-create council with all algochat-enabled agents
             const agents = getAlgochatEnabledAgents(this.db);
             if (agents.length === 0) {
                 this.responseFormatter.sendResponse(participant, 'No AlgoChat-enabled agents available for council.');
+                return;
+            }
+            if (agents.length < 2) {
+                this.responseFormatter.sendResponse(participant, `Only 1 agent available (${agents[0].name}). Council requires at least 2 agents.\nEnable more agents for AlgoChat, or create a council in the dashboard.`);
                 return;
             }
             const agentIds = agents.map((a) => a.id);
