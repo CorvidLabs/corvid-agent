@@ -240,6 +240,7 @@ a {
 .grid {
   display: grid;
   gap: 20px;
+  align-items: stretch;
 }
 
 .grid--3 {
@@ -257,6 +258,8 @@ a {
   border-radius: 6px;
   padding: 28px 24px;
   transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .card:hover {
@@ -503,6 +506,7 @@ a {
   font-family: 'Dogica Pixel', monospace;
   letter-spacing: 0.5px;
   flex-shrink: 0;
+  word-break: break-all;
 }
 
 .config-val {
@@ -526,7 +530,7 @@ a {
   text-align: center;
   font-size: 9px;
   color: var(--text-secondary);
-  margin-top: -32px;
+  margin-top: -16px;
   margin-bottom: 40px;
   line-height: 2;
 }
@@ -625,6 +629,12 @@ a {
   background: transparent;
   color: var(--text-tertiary);
   border-color: var(--border);
+}
+
+/* ─── Terminals inside steps/cards fill parent ─── */
+.step__content .terminal,
+.card .terminal {
+  max-width: none;
 }
 
 /* ═══════════════════ COMPACT TERMINAL ═══════════════════ */
@@ -774,7 +784,7 @@ a {
   }
 
   .api-desc {
-    margin-left: 52px;
+    margin-left: 0;
     flex-basis: 100%;
   }
 
@@ -827,6 +837,36 @@ a {
   .nav__links {
     gap: 8px;
   }
+}
+
+/* ═══════════════════ CALLOUT BOX ═══════════════════ */
+.callout {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin-bottom: 32px;
+  line-height: 2;
+}
+
+.callout--cyan {
+  border-left: 3px solid var(--cyan);
+}
+
+.callout--green {
+  border-left: 3px solid var(--green);
+}
+
+.callout__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.callout p {
+  font-size: 9px;
+  color: var(--text-secondary);
 }
 
 /* ─── Subtle animation ─── */
