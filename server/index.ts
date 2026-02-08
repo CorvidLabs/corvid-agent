@@ -15,8 +15,13 @@ import { SessionLifecycleManager } from './process/session-lifecycle';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
+import { checkWsAuth, loadAuthConfig, validateStartupSecurity } from './middleware/auth';
 
 const log = createLogger('Server');
+
+// Load auth configuration for WebSocket authentication
+const authConfig = loadAuthConfig();
+validateStartupSecurity(authConfig);
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
@@ -159,6 +164,12 @@ const server = Bun.serve<WsData>({
 
         // WebSocket upgrade
         if (url.pathname === '/ws') {
+            if (!checkWsAuth(req, url, authConfig)) {
+                return new Response(JSON.stringify({ error: 'Authentication required' }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+                });
+            }
             const upgraded = server.upgrade(req, {
                 data: { subscriptions: new Map() },
             });
