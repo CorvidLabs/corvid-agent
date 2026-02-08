@@ -67,6 +67,14 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/wallets"
+                        routerLinkActive="sidebar__link--active">
+                        Wallets
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/feed"
                         routerLinkActive="sidebar__link--active">
                         Feed

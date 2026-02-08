@@ -42,8 +42,23 @@
     <div class="hero__scanline"></div>
   </header>
 
+  <!-- ═══════════════════ OPTIONAL CALLOUT ═══════════════════ -->
+  <section class="section" id="optional">
+    <div class="container">
+      <div class="callout callout--cyan">
+        <h3 class="callout__title accent-cyan">AlgoChat is Optional</h3>
+        <p>CorvidAgent works fully without AlgoChat. Without an <code class="accent-cyan">ALGOCHAT_MNEMONIC</code>, the on-chain bridge stays disabled. All features &mdash; sessions, councils, work tasks, the web UI &mdash; work via HTTP/WebSocket + SQLite. AlgoChat adds on-chain identity, encrypted remote messaging, and wallet-based authentication.</p>
+      </div>
+
+      <div class="callout callout--green">
+        <h3 class="callout__title accent-green">Localnet: Zero-Cost Development</h3>
+        <p>Agents default to <code class="accent-green">AGENT_NETWORK=localnet</code>. Localnet auto-generates test wallets and funds them with 10 ALGO &mdash; zero real crypto needed. Test the full AlgoChat flow (PSK encryption, slash commands, agent-to-agent messaging) without spending a single ALGO. The server and agents can even run on different networks (e.g., mainnet for the server, localnet for agents).</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══════════════════ WHAT IS ALGOCHAT ═══════════════════ -->
-  <section class="section" id="what">
+  <section class="section section--alt" id="what">
     <div class="container">
       <h2 class="section__title">What is AlgoChat?</h2>
       <div class="grid grid--3">
@@ -67,7 +82,7 @@
   </section>
 
   <!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
-  <section class="section section--alt" id="how">
+  <section class="section" id="how">
     <div class="container">
       <h2 class="section__title">How It Works</h2>
 
@@ -116,7 +131,7 @@
   </section>
 
   <!-- ═══════════════════ ARCHITECTURE ═══════════════════ -->
-  <section class="section" id="components">
+  <section class="section section--alt" id="components">
     <div class="container">
       <h2 class="section__title">Components</h2>
       <div class="terminal">
@@ -142,7 +157,7 @@
   </section>
 
   <!-- ═══════════════════ PSK ENCRYPTION ═══════════════════ -->
-  <section class="section section--alt" id="encryption">
+  <section class="section" id="encryption">
     <div class="container">
       <h2 class="section__title">PSK Encryption</h2>
 
@@ -183,7 +198,7 @@ algochat-psk://v1?addr=<span class="accent-magenta">ALGO_ADDR</span>&amp;psk=<sp
   </section>
 
   <!-- ═══════════════════ SLASH COMMANDS ═══════════════════ -->
-  <section class="section" id="commands">
+  <section class="section section--alt" id="commands">
     <div class="container">
       <h2 class="section__title">Slash Commands</h2>
       <p class="section__subtitle">Send these commands via AlgoChat to control your agent remotely. Requires <code class="accent-magenta">ALGOCHAT_OWNER_ADDRESSES</code> authorization.</p>
@@ -245,7 +260,7 @@ algochat-psk://v1?addr=<span class="accent-magenta">ALGO_ADDR</span>&amp;psk=<sp
   </section>
 
   <!-- ═══════════════════ AGENT MESSAGING ═══════════════════ -->
-  <section class="section section--alt" id="agent-messaging">
+  <section class="section" id="agent-messaging">
     <div class="container">
       <h2 class="section__title">Agent-to-Agent Messaging</h2>
 
@@ -290,13 +305,13 @@ corvid_send_message({
   </section>
 
   <!-- ═══════════════════ CONFIGURATION ═══════════════════ -->
-  <section class="section" id="config">
+  <section class="section section--alt" id="config">
     <div class="container">
       <h2 class="section__title">Configuration</h2>
 
       <div class="grid grid--2">
         <div class="card card--green">
-          <h3 class="card__title">Required for AlgoChat</h3>
+          <h3 class="card__title">Required <span style="font-size: 7px; opacity: 0.7;">(only if using AlgoChat)</span></h3>
           <div class="config-table">
             <div class="config-row">
               <span class="config-key accent-green">ALGOCHAT_MNEMONIC</span>
@@ -338,7 +353,7 @@ corvid_send_message({
   </section>
 
   <!-- ═══════════════════ NEXT ═══════════════════ -->
-  <section class="section section--alt" id="next">
+  <section class="section" id="next">
     <div class="container">
       <h2 class="section__title">Related Docs</h2>
       <div class="grid grid--3">

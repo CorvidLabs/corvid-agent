@@ -14,7 +14,7 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { WorkTaskService } from '../work/service';
 import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
-import { searchAlgoChatMessages } from '../db/algochat-messages';
+import { searchAlgoChatMessages, getWalletSummaries, getWalletMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
@@ -233,6 +233,23 @@ async function handleRoutes(
             return json({ error: 'Self-test service not available' }, 503);
         }
         return handleSelfTestRun(req, selfTestService);
+    }
+
+    // Wallet viewer — summary of all external wallets
+    if (url.pathname === '/api/wallets/summary' && req.method === 'GET') {
+        const search = url.searchParams.get('search') ?? undefined;
+        const wallets = getWalletSummaries(db, { search });
+        return json({ wallets });
+    }
+
+    // Wallet viewer — messages for a specific wallet
+    const walletMsgMatch = url.pathname.match(/^\/api\/wallets\/([^/]+)\/messages$/);
+    if (walletMsgMatch && req.method === 'GET') {
+        const address = decodeURIComponent(walletMsgMatch[1]);
+        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const offset = Number(url.searchParams.get('offset') ?? '0');
+        const result = getWalletMessages(db, address, limit, offset);
+        return json(result);
     }
 
     return null;

@@ -78,6 +78,11 @@ export const routes: Routes = [
             import('./features/allowlist/allowlist.component').then((m) => m.AllowlistComponent),
     },
     {
+        path: 'wallets',
+        loadComponent: () =>
+            import('./features/wallets/wallet-viewer.component').then((m) => m.WalletViewerComponent),
+    },
+    {
         path: 'feed',
         loadComponent: () =>
             import('./features/feed/live-feed.component').then((m) => m.LiveFeedComponent),
