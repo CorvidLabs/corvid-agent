@@ -15,6 +15,7 @@ import type { WorkTaskService } from '../work/service';
 import type { ResponseFormatter } from './response-formatter';
 import {
     listConversations,
+    getConversationByParticipant,
 } from '../db/sessions';
 import { getAlgochatEnabledAgents } from '../db/agents';
 import {
@@ -29,7 +30,7 @@ import { createLogger } from '../lib/logger';
 const log = createLogger('CommandHandler');
 
 /** Commands that require owner authorization. */
-const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent', '/council']);
+const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent', '/council', '/extend']);
 
 /**
  * Context required by the CommandHandler for resolving agents and projects.
@@ -40,6 +41,8 @@ export interface CommandHandlerContext {
     findAgentForNewConversation(): string | null;
     /** Get or create the default project ID. */
     getDefaultProjectId(): string;
+    /** Extend a running session's timeout. Returns true if the session was found and extended. */
+    extendSession(sessionId: string, minutes: number): boolean;
 }
 
 /**
@@ -289,6 +292,26 @@ export class CommandHandler {
                 this.handleCouncilCommand(participant, parts).catch((err) => {
                     this.responseFormatter.sendResponse(participant, `Council error: ${err instanceof Error ? err.message : String(err)}`);
                 });
+                return true;
+            }
+
+            case '/extend': {
+                const minutes = Math.max(1, Math.min(120, parseInt(parts[1], 10) || 30));
+                let sessionId = parts[2];
+                if (!sessionId) {
+                    const conversation = getConversationByParticipant(this.db, participant);
+                    sessionId = conversation?.sessionId ?? '';
+                }
+                if (!sessionId) {
+                    this.responseFormatter.sendResponse(participant, 'No active session found. Usage: /extend [minutes] [session-id]');
+                    return true;
+                }
+                const extended = this.context.extendSession(sessionId, minutes);
+                if (extended) {
+                    this.responseFormatter.sendResponse(participant, `Extended session ${sessionId.slice(0, 8)}... by ${minutes} minutes`);
+                } else {
+                    this.responseFormatter.sendResponse(participant, `Session ${sessionId.slice(0, 8)}... not found or not running`);
+                }
                 return true;
             }
 
