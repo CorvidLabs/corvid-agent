@@ -230,7 +230,7 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .invoke-select:focus, .invoke-textarea:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
-        .invoke-textarea { resize: vertical; min-height: 60px; }
+        .invoke-textarea { resize: vertical; min-height: 5em; line-height: 1.5; }
         .btn--primary {
             padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
             cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);

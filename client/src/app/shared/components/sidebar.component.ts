@@ -91,6 +91,41 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/work-tasks"
+                        routerLinkActive="sidebar__link--active">
+                        Work Tasks
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/analytics"
+                        routerLinkActive="sidebar__link--active">
+                        Analytics
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/logs"
+                        routerLinkActive="sidebar__link--active">
+                        Logs
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/settings"
+                        routerLinkActive="sidebar__link--active">
+                        Settings
+                    </a>
+                </li>
+
+                <li class="sidebar__divider" aria-hidden="true"></li>
+
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/nft/review"
                         routerLinkActive="sidebar__link--active">
                         NFT Review
@@ -146,6 +181,12 @@ import { filter, Subscription } from 'rxjs';
             background: var(--bg-raised);
             border-left: 3px solid var(--accent-cyan);
             text-shadow: 0 0 8px rgba(0, 229, 255, 0.3);
+        }
+        .sidebar__divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.5rem 1.5rem;
+            list-style: none;
         }
 
         /* ── Mobile (<768px): slide-out overlay ── */

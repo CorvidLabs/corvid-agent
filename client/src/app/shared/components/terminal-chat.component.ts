@@ -117,6 +117,12 @@ interface AutocompleteItem {
         </div>
     `,
     styles: `
+        :host {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
         .terminal {
             display: flex;
             flex-direction: column;
@@ -127,7 +133,8 @@ interface AutocompleteItem {
             font-size: 0.8rem;
             line-height: 1.6;
             overflow: hidden;
-            height: 100%;
+            flex: 1;
+            min-height: 0;
         }
         .terminal__output {
             flex: 1;
