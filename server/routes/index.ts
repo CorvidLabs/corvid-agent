@@ -9,7 +9,9 @@ import { handleAllowlistRoutes } from './allowlist';
 import { handleAnalyticsRoutes } from './analytics';
 import { handleSystemLogRoutes } from './system-logs';
 import { handleSettingsRoutes } from './settings';
+import { handleScheduleRoutes } from './schedules';
 import type { ProcessManager } from '../process/manager';
+import type { SchedulerService } from '../scheduler/service';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
@@ -71,6 +73,7 @@ export async function handleRequest(
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
     networkSwitchFn?: NetworkSwitchFn | null,
+    schedulerService?: SchedulerService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
 
@@ -87,7 +90,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn);
+        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService);
         if (response) addCors(response);
         return response;
     } catch (err) {
@@ -108,6 +111,7 @@ async function handleRoutes(
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
     networkSwitchFn?: NetworkSwitchFn | null,
+    schedulerService?: SchedulerService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -146,6 +150,10 @@ async function handleRoutes(
         const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService);
         if (workTaskResponse) return workTaskResponse;
     }
+
+    // Schedule routes (scheduler CRUD + health + global pause)
+    const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService);
+    if (scheduleResponse) return scheduleResponse;
 
     // MCP API routes (used by stdio server subprocess)
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService
