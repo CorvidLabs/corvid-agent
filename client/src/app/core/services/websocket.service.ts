@@ -113,6 +113,10 @@ export class WebSocketService {
         this.send({ type: 'create_work_task', agentId, description, ...(projectId ? { projectId } : {}) });
     }
 
+    /** No-op — ollama topic is auto-subscribed on connect. */
+    subscribeOllama(): void {}
+    unsubscribeOllama(): void {}
+
     onMessage(handler: MessageHandler): () => void {
         this.handlers.add(handler);
         return () => this.handlers.delete(handler);

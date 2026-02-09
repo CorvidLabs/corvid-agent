@@ -48,6 +48,11 @@ export const routes: Routes = [
             import('./features/agents/agent-form.component').then((m) => m.AgentFormComponent),
     },
     {
+        path: 'models',
+        loadComponent: () =>
+            import('./features/models/models.component').then((m) => m.ModelsComponent),
+    },
+    {
         path: 'councils',
         loadComponent: () =>
             import('./features/councils/council-list.component').then((m) => m.CouncilListComponent),

@@ -246,6 +246,16 @@ export const SwitchNetworkSchema = z.object({
     network: z.enum(['testnet', 'mainnet'], { message: 'network must be testnet or mainnet' }),
 });
 
+// ─── Ollama ──────────────────────────────────────────────────────────────────
+
+export const OllamaPullModelSchema = z.object({
+    model: z.string().min(1, 'model name is required'),
+});
+
+export const OllamaDeleteModelSchema = z.object({
+    model: z.string().min(1, 'model name is required'),
+});
+
 // ─── Schedules ───────────────────────────────────────────────────────────────
 
 const ScheduleActionSchema = z.object({
