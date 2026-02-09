@@ -239,6 +239,34 @@ async function handleRoutes(
         return json(listConversations(db));
     }
 
+    // PSK exchange URI for mobile client connections
+    if (url.pathname === '/api/algochat/psk-exchange' && req.method === 'GET') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        try {
+            const result = algochatBridge.getPSKExchangeURI();
+            return json(result);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return json({ error: message }, 500);
+        }
+    }
+
+    // Generate new PSK for mobile client connections
+    if (url.pathname === '/api/algochat/psk-exchange' && req.method === 'POST') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        try {
+            const result = algochatBridge.generatePSKExchangeURI();
+            return json(result);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return json({ error: message }, 500);
+        }
+    }
+
     // Database backup
     if (url.pathname === '/api/backup' && req.method === 'POST') {
         try {
