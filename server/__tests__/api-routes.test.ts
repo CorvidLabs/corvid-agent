@@ -51,6 +51,7 @@ beforeAll(() => {
             system_prompt TEXT DEFAULT '',
             append_prompt TEXT DEFAULT '',
             model TEXT DEFAULT '',
+            provider TEXT DEFAULT '',
             allowed_tools TEXT DEFAULT '',
             disallowed_tools TEXT DEFAULT '',
             permission_mode TEXT DEFAULT 'default',

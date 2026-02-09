@@ -16,6 +16,7 @@ export interface Agent {
     systemPrompt: string;
     appendPrompt: string;
     model: string;
+    provider?: string;
     allowedTools: string;
     disallowedTools: string;
     permissionMode: 'default' | 'plan' | 'auto-edit' | 'full-auto';
@@ -104,6 +105,7 @@ export interface CreateAgentInput {
     systemPrompt?: string;
     appendPrompt?: string;
     model?: string;
+    provider?: string;
     allowedTools?: string;
     disallowedTools?: string;
     permissionMode?: Agent['permissionMode'];
@@ -147,6 +149,8 @@ export interface AgentMessage {
     responseTxid: string | null;
     sessionId: string | null;
     threadId: string | null;
+    provider?: string;
+    model?: string;
     createdAt: string;
     completedAt: string | null;
 }
@@ -303,84 +307,107 @@ export interface CreateWorkTaskInput {
     requesterInfo?: Record<string, unknown>;
 }
 
-// MARK: - Schedules
+// MARK: - Agent Schedules (Automation)
 
-export type ActionType =
-    | 'star_repos'
-    | 'fork_repos'
+export type ScheduleStatus = 'active' | 'paused' | 'completed' | 'failed';
+
+export type ScheduleActionType =
+    | 'star_repo'
+    | 'fork_repo'
     | 'review_prs'
-    | 'work_on_repo'
-    | 'suggest_improvements'
-    | 'council_review'
+    | 'work_task'
+    | 'council_launch'
+    | 'send_message'
+    | 'github_suggest'
     | 'custom';
 
-export type ScheduleStatus = 'active' | 'paused' | 'error';
-export type ScheduleSource = 'owner' | 'agent';
+export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
 
-export interface ScheduleWire {
+export interface ScheduleAction {
+    type: ScheduleActionType;
+    /** Target repos (for star/fork/review/suggest) */
+    repos?: string[];
+    /** PR description or work task description */
+    description?: string;
+    /** Project ID for work tasks / council launches */
+    projectId?: string;
+    /** Council ID for council launches */
+    councilId?: string;
+    /** Target agent for send_message */
+    toAgentId?: string;
+    /** Message content for send_message */
+    message?: string;
+    /** Max PRs to review per execution (for review_prs) */
+    maxPrs?: number;
+    /** Whether to auto-create PRs from suggestions (for github_suggest) */
+    autoCreatePr?: boolean;
+    /** Arbitrary prompt for custom action type */
+    prompt?: string;
+}
+
+export interface AgentSchedule {
     id: string;
+    agentId: string;
     name: string;
-    actionType: ActionType;
+    description: string;
+    /** Cron expression (e.g. "0 9 * * 1-5" = weekdays at 9am) */
     cronExpression: string;
-    agentId: string | null;
-    councilId: string | null;
-    actionConfig: Record<string, unknown>;
-    source: ScheduleSource;
-    requiresApproval: boolean;
-    maxBudgetUsd: number;
-    dailyBudgetUsd: number;
-    approvalTimeoutH: number;
-    dailyRuns: number;
-    dailyCostUsd: number;
-    dailyResetDate: string;
+    /** Fixed interval in ms (alternative to cron) */
+    intervalMs: number | null;
+    /** Actions to perform on each execution */
+    actions: ScheduleAction[];
+    /** What approval is needed before executing PRs / destructive actions */
+    approvalPolicy: ScheduleApprovalPolicy;
     status: ScheduleStatus;
-    consecutiveFailures: number;
+    /** Max total executions (null = unlimited) */
+    maxExecutions: number | null;
+    executionCount: number;
+    /** Max USD budget per execution */
+    maxBudgetPerRun: number | null;
+    lastRunAt: string | null;
     nextRunAt: string | null;
-    totalRuns: number;
     createdAt: string;
     updatedAt: string;
 }
 
-export type ScheduleRunStatus =
-    | 'pending'
-    | 'running'
-    | 'awaiting_approval'
-    | 'completed'
-    | 'failed'
-    | 'interrupted'
-    | 'skipped'
-    | 'denied';
+export type ScheduleExecutionStatus = 'running' | 'completed' | 'failed' | 'awaiting_approval' | 'approved' | 'denied';
 
-export interface ScheduleRunWire {
+export interface ScheduleExecution {
     id: string;
     scheduleId: string;
-    configSnapshot: Record<string, unknown>;
-    status: ScheduleRunStatus;
+    agentId: string;
+    status: ScheduleExecutionStatus;
+    actionType: ScheduleActionType;
+    actionInput: Record<string, unknown>;
+    result: string | null;
     sessionId: string | null;
     workTaskId: string | null;
     costUsd: number;
-    output: Record<string, unknown> | null;
-    error: string | null;
-    pendingApprovals: Record<string, unknown> | null;
-    approvalDecidedBy: string | null;
-    approvalDecidedAt: string | null;
-    startedAt: string | null;
+    configSnapshot?: Record<string, unknown>;
+    startedAt: string;
     completedAt: string | null;
-    createdAt: string;
 }
 
-export interface ScheduleEventWire {
-    type: 'schedule_event';
-    event:
-        | 'run_started'
-        | 'run_completed'
-        | 'run_failed'
-        | 'run_interrupted'
-        | 'approval_requested'
-        | 'approval_resolved'
-        | 'schedule_paused'
-        | 'schedule_error';
-    scheduleId: string;
-    runId?: string;
-    patch: Partial<ScheduleWire>;
+export interface CreateScheduleInput {
+    agentId: string;
+    name: string;
+    description?: string;
+    cronExpression?: string;
+    intervalMs?: number;
+    actions: ScheduleAction[];
+    approvalPolicy?: ScheduleApprovalPolicy;
+    maxExecutions?: number;
+    maxBudgetPerRun?: number;
+}
+
+export interface UpdateScheduleInput {
+    name?: string;
+    description?: string;
+    cronExpression?: string;
+    intervalMs?: number;
+    actions?: ScheduleAction[];
+    approvalPolicy?: ScheduleApprovalPolicy;
+    status?: ScheduleStatus;
+    maxExecutions?: number;
+    maxBudgetPerRun?: number;
 }

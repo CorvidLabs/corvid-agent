@@ -13,6 +13,8 @@ interface AgentMessageRow {
     response_txid: string | null;
     session_id: string | null;
     thread_id: string | null;
+    provider: string;
+    model: string;
     created_at: string;
     completed_at: string | null;
 }
@@ -30,6 +32,8 @@ function rowToAgentMessage(row: AgentMessageRow): AgentMessage {
         responseTxid: row.response_txid,
         sessionId: row.session_id,
         threadId: row.thread_id,
+        provider: row.provider || undefined,
+        model: row.model || undefined,
         createdAt: row.created_at,
         completedAt: row.completed_at,
     };
@@ -43,13 +47,15 @@ export function createAgentMessage(
         content: string;
         paymentMicro?: number;
         threadId?: string;
+        provider?: string;
+        model?: string;
     },
 ): AgentMessage {
     const id = crypto.randomUUID();
     db.query(
-        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id)
-         VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(id, params.fromAgentId, params.toAgentId, params.content, params.paymentMicro ?? 0, params.threadId ?? null);
+        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id, provider, model)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, params.fromAgentId, params.toAgentId, params.content, params.paymentMicro ?? 0, params.threadId ?? null, params.provider ?? '', params.model ?? '');
 
     return getAgentMessage(db, id) as AgentMessage;
 }

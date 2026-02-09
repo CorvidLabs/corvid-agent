@@ -100,6 +100,7 @@ export const CreateAgentSchema = z.object({
     name: z.string().min(1, 'name is required'),
     description: z.string().optional(),
     model: z.string().optional(),
+    provider: z.string().optional(),
     systemPrompt: z.string().optional(),
     appendPrompt: z.string().optional(),
     allowedTools: z.string().optional(),        // Comma-separated string, not array
@@ -117,6 +118,7 @@ export const UpdateAgentSchema = z.object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
     model: z.string().optional(),
+    provider: z.string().optional(),
     systemPrompt: z.string().optional(),
     appendPrompt: z.string().optional(),
     allowedTools: z.string().optional(),
@@ -242,4 +244,50 @@ export const SelfTestSchema = z.object({
 
 export const SwitchNetworkSchema = z.object({
     network: z.enum(['testnet', 'mainnet'], { message: 'network must be testnet or mainnet' }),
+});
+
+// ─── Schedules ───────────────────────────────────────────────────────────────
+
+const ScheduleActionSchema = z.object({
+    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'custom']),
+    repos: z.array(z.string()).optional(),
+    description: z.string().optional(),
+    projectId: z.string().optional(),
+    councilId: z.string().optional(),
+    toAgentId: z.string().optional(),
+    message: z.string().optional(),
+    maxPrs: z.number().int().min(1).max(50).optional(),
+    autoCreatePr: z.boolean().optional(),
+    prompt: z.string().optional(),
+});
+
+export const CreateScheduleSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    name: z.string().min(1, 'name is required'),
+    description: z.string().optional(),
+    cronExpression: z.string().optional(),
+    intervalMs: z.number().int().min(60000).optional(), // Minimum 1 minute
+    actions: z.array(ScheduleActionSchema).min(1, 'At least one action is required'),
+    approvalPolicy: z.enum(['auto', 'owner_approve', 'council_approve']).optional(),
+    maxExecutions: z.number().int().min(1).optional(),
+    maxBudgetPerRun: z.number().min(0).optional(),
+}).refine(
+    (d) => d.cronExpression || d.intervalMs,
+    { message: 'Either cronExpression or intervalMs must be provided' },
+);
+
+export const UpdateScheduleSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    cronExpression: z.string().optional(),
+    intervalMs: z.number().int().min(60000).optional(),
+    actions: z.array(ScheduleActionSchema).min(1).optional(),
+    approvalPolicy: z.enum(['auto', 'owner_approve', 'council_approve']).optional(),
+    status: z.enum(['active', 'paused', 'completed', 'failed']).optional(),
+    maxExecutions: z.number().int().min(1).optional(),
+    maxBudgetPerRun: z.number().min(0).optional(),
+});
+
+export const ScheduleApprovalSchema = z.object({
+    approved: z.boolean({ message: 'approved (boolean) is required' }),
 });

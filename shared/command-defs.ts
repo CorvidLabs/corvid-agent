@@ -148,6 +148,17 @@ export const COMMAND_DEFS: CommandDef[] = [
         examples: ['/extend', '/extend 60'],
     },
     {
+        name: '/schedule',
+        description: 'Manage automated schedules',
+        usage: '/schedule [list|pause|resume|history|run] [schedule-id]',
+        params: [
+            { name: 'subcommand', description: 'list, pause, resume, history, or run', required: false },
+            { name: 'schedule-id', description: 'Schedule ID (for pause/resume/history/run)', required: false },
+        ],
+        privileged: true,
+        examples: ['/schedule', '/schedule pause abc123', '/schedule history abc123', '/schedule run abc123'],
+    },
+    {
         name: '/help',
         description: 'Show available commands and usage',
         usage: '/help [command]',

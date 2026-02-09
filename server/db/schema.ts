@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 24;
+const SCHEMA_VERSION = 26;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -332,53 +332,58 @@ const MIGRATIONS: Record<number, string[]> = {
         `ALTER TABLE algochat_psk_state_v2 RENAME TO algochat_psk_state`,
     ],
     24: [
-        // Autonomous agent scheduler — schedules and schedule_runs
-        `CREATE TABLE IF NOT EXISTS schedules (
-            id                    TEXT PRIMARY KEY,
-            name                  TEXT NOT NULL,
-            action_type           TEXT NOT NULL,
-            cron_expression       TEXT NOT NULL,
-            agent_id              TEXT DEFAULT NULL REFERENCES agents(id),
-            council_id            TEXT DEFAULT NULL REFERENCES councils(id),
-            action_config         TEXT NOT NULL DEFAULT '{}',
-            source                TEXT NOT NULL DEFAULT 'owner',
-            requires_approval     INTEGER NOT NULL DEFAULT 0,
-            max_budget_usd        REAL NOT NULL DEFAULT 1.0,
-            daily_budget_usd      REAL NOT NULL DEFAULT 5.0,
-            approval_timeout_h    INTEGER NOT NULL DEFAULT 8,
-            daily_runs            INTEGER NOT NULL DEFAULT 0,
-            daily_cost_usd        REAL NOT NULL DEFAULT 0.0,
-            daily_reset_date      TEXT NOT NULL DEFAULT (date('now')),
-            status                TEXT NOT NULL DEFAULT 'active',
-            consecutive_failures  INTEGER NOT NULL DEFAULT 0,
-            next_run_at           TEXT DEFAULT NULL,
-            total_runs            INTEGER NOT NULL DEFAULT 0,
-            created_at            TEXT DEFAULT (datetime('now')),
-            updated_at            TEXT DEFAULT (datetime('now'))
+        // Agent schedules — cron/interval-based automation for agents and councils
+        `CREATE TABLE IF NOT EXISTS agent_schedules (
+            id                  TEXT PRIMARY KEY,
+            agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            name                TEXT NOT NULL,
+            description         TEXT DEFAULT '',
+            cron_expression     TEXT DEFAULT NULL,
+            interval_ms         INTEGER DEFAULT NULL,
+            actions             TEXT NOT NULL DEFAULT '[]',
+            approval_policy     TEXT DEFAULT 'owner_approve',
+            status              TEXT DEFAULT 'active',
+            max_executions      INTEGER DEFAULT NULL,
+            execution_count     INTEGER DEFAULT 0,
+            max_budget_per_run  REAL DEFAULT NULL,
+            last_run_at         TEXT DEFAULT NULL,
+            next_run_at         TEXT DEFAULT NULL,
+            created_at          TEXT DEFAULT (datetime('now')),
+            updated_at          TEXT DEFAULT (datetime('now'))
         )`,
-        `CREATE TABLE IF NOT EXISTS schedule_runs (
-            id                    TEXT PRIMARY KEY,
-            schedule_id           TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-            config_snapshot       TEXT NOT NULL,
-            status                TEXT NOT NULL DEFAULT 'pending',
-            session_id            TEXT DEFAULT NULL,
-            work_task_id          TEXT DEFAULT NULL,
-            cost_usd              REAL NOT NULL DEFAULT 0.0,
-            output                TEXT DEFAULT NULL,
-            error                 TEXT DEFAULT NULL,
-            pending_approvals     TEXT DEFAULT NULL,
-            approval_decided_by   TEXT DEFAULT NULL,
-            approval_decided_at   TEXT DEFAULT NULL,
-            started_at            TEXT DEFAULT NULL,
-            completed_at          TEXT DEFAULT NULL,
-            created_at            TEXT DEFAULT (datetime('now'))
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_agent ON agent_schedules(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_status ON agent_schedules(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_next_run ON agent_schedules(next_run_at)`,
+
+        // Schedule execution log — one row per action execution
+        `CREATE TABLE IF NOT EXISTS schedule_executions (
+            id              TEXT PRIMARY KEY,
+            schedule_id     TEXT NOT NULL REFERENCES agent_schedules(id) ON DELETE CASCADE,
+            agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            status          TEXT DEFAULT 'running',
+            action_type     TEXT NOT NULL,
+            action_input    TEXT DEFAULT '{}',
+            result          TEXT DEFAULT NULL,
+            session_id      TEXT DEFAULT NULL,
+            work_task_id    TEXT DEFAULT NULL,
+            cost_usd        REAL DEFAULT 0,
+            started_at      TEXT DEFAULT (datetime('now')),
+            completed_at    TEXT DEFAULT NULL
         )`,
-        // Partial index for efficient "due schedules" query
-        `CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run_at) WHERE status = 'active'`,
-        `CREATE INDEX IF NOT EXISTS idx_schedules_agent ON schedules(agent_id)`,
-        `CREATE INDEX IF NOT EXISTS idx_schedules_council ON schedules(council_id)`,
-        `CREATE INDEX IF NOT EXISTS idx_schedule_runs_schedule ON schedule_runs(schedule_id)`,
-        `CREATE INDEX IF NOT EXISTS idx_schedule_runs_status ON schedule_runs(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule ON schedule_executions(schedule_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_executions_status ON schedule_executions(status)`,
+    ],
+    25: [
+        // Add config snapshot to execution records for audit/debugging
+        `ALTER TABLE schedule_executions ADD COLUMN config_snapshot TEXT DEFAULT NULL`,
+    ],
+    26: [
+        // LLM provider metadata columns
+        `ALTER TABLE agents ADD COLUMN provider TEXT DEFAULT ''`,
+        `ALTER TABLE agent_messages ADD COLUMN provider TEXT DEFAULT ''`,
+        `ALTER TABLE agent_messages ADD COLUMN model TEXT DEFAULT ''`,
+        `ALTER TABLE algochat_messages ADD COLUMN provider TEXT DEFAULT ''`,
+        `ALTER TABLE algochat_messages ADD COLUMN model TEXT DEFAULT ''`,
     ],
 };
 
