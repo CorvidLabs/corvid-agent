@@ -61,6 +61,8 @@ export interface McpToolContext {
     workTaskService?: WorkTaskService;
     /** Extend the current session's timeout by the given ms. */
     extendTimeout?: (additionalMs: number) => boolean;
+    /** When true, this session was spawned by the scheduler — certain tools are blocked. */
+    schedulerMode?: boolean;
 }
 
 function textResult(text: string): CallToolResult {
