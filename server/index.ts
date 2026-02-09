@@ -17,6 +17,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity } from './middleware/auth';
+import { LlmProviderRegistry } from './providers/registry';
+import { AnthropicProvider } from './providers/anthropic/provider';
 
 const log = createLogger('Server');
 
@@ -31,6 +33,10 @@ const startTime = Date.now();
 
 // Initialize database
 const db = getDb();
+
+// Initialize LLM provider registry
+const providerRegistry = LlmProviderRegistry.getInstance();
+providerRegistry.register(new AnthropicProvider());
 
 // Ensure a project exists for the server's own codebase
 {
@@ -220,6 +226,14 @@ const server = Bun.serve<WsData>({
                 health.scheduler = schedulerService.getHealth();
             }
             return new Response(JSON.stringify(health), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // LLM providers endpoint
+        if (url.pathname === '/api/providers' && req.method === 'GET') {
+            const providers = providerRegistry.getAll().map((p) => p.getInfo());
+            return new Response(JSON.stringify(providers), {
                 headers: { 'Content-Type': 'application/json' },
             });
         }

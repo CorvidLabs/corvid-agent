@@ -1,525 +1,670 @@
 /**
- * SchedulerService — core engine for autonomous scheduled agent runs.
+ * SchedulerService — cron/interval-based automation engine for agent schedules.
  *
- * Implements a 60-second tick loop that:
- *   1. Resets daily counters if the date has changed.
- *   2. Queries due schedules (active + next_run_at <= now).
- *   3. Skips schedules with an existing pending/running/awaiting_approval run.
- *   4. Dispatches runs up to the concurrency limit.
- *   5. Detects stale runs (running > 30 min with no live session).
- *
- * On startup, performs recovery: marks 'running' runs as 'interrupted' and
- * recomputes all next_run_at values from now.
- *
- * Supports graceful shutdown with a configurable drain timeout.
+ * Polls for due schedules every 30 seconds, executes their actions,
+ * and manages approval workflows for PR submissions.
  */
 
 import type { Database } from 'bun:sqlite';
-import { Cron } from 'croner';
-import { createLogger } from '../lib/logger';
-import type { Schedule, ScheduleRun, SchedulerHealth, ScheduleEvent } from './types';
-import { buildPrompt } from './prompts';
+import type { ProcessManager } from '../process/manager';
+import type { WorkTaskService } from '../work/service';
+import type { AgentMessenger } from '../algochat/agent-messenger';
+import type {
+    AgentSchedule,
+    ScheduleAction,
+    ScheduleExecution,
+    ScheduleActionType,
+} from '../../shared/types';
 import {
-    getDueSchedules,
-    getActiveRunCount,
-    getRunningRunCount,
-    getRunningRuns,
-    getActiveSchedules,
-    getActiveScheduleCount,
-    getNextGlobalRunAt,
-    getTodayStats,
-    getPendingApprovalRuns,
-    createScheduleRun,
-    updateScheduleRun,
+    listDueSchedules,
+    updateScheduleLastRun,
+    updateScheduleNextRun,
     updateSchedule,
     getSchedule,
+    createExecution,
+    updateExecutionStatus,
+    getExecution,
+    resolveScheduleApproval,
 } from '../db/schedules';
+import { getAgent } from '../db/agents';
+import { createSession } from '../db/sessions';
+import * as github from '../github/operations';
+import { getNextCronDate } from './cron-parser';
+import { createLogger } from '../lib/logger';
 
 const log = createLogger('Scheduler');
 
-// ─── Environment config ──────────────────────────────────────────────────────
+const POLL_INTERVAL_MS = 30_000; // Check for due schedules every 30s
+const MAX_CONCURRENT_EXECUTIONS = 2;
+const MAX_CONSECUTIVE_FAILURES = 5;
+const MIN_SCHEDULE_INTERVAL_MS = 300_000; // 5 minutes
 
-function envInt(key: string, fallback: number): number {
-    const v = process.env[key];
-    return v ? parseInt(v, 10) : fallback;
-}
+type ScheduleEventCallback = (event: {
+    type: 'schedule_update' | 'schedule_execution_update' | 'schedule_approval_request';
+    data: unknown;
+}) => void;
 
-const POLL_INTERVAL_MS = envInt('SCHEDULER_POLL_INTERVAL_MS', 60_000);
-const MAX_CONCURRENT = envInt('SCHEDULER_MAX_CONCURRENT', 2);
-const FAILURE_THRESHOLD = envInt('SCHEDULER_FAILURE_THRESHOLD', 5);
-const DRAIN_TIMEOUT_MS = envInt('SCHEDULER_DRAIN_TIMEOUT_MS', 30_000);
-const MAX_SESSION_TIMEOUT_MS = envInt('SCHEDULER_MAX_SESSION_TIMEOUT_MS', 3_600_000);
-const STALE_RUN_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+/**
+ * Validate that a schedule doesn't fire more often than every 5 minutes.
+ * Throws an Error if the schedule is too frequent.
+ */
+export function validateScheduleFrequency(cronExpression?: string | null, intervalMs?: number | null): void {
+    if (intervalMs !== undefined && intervalMs !== null) {
+        if (intervalMs < MIN_SCHEDULE_INTERVAL_MS) {
+            throw new Error(`Schedule interval too short: ${intervalMs}ms. Minimum is ${MIN_SCHEDULE_INTERVAL_MS}ms (5 minutes).`);
+        }
+    }
 
-// ─── Service ─────────────────────────────────────────────────────────────────
-
-export interface SchedulerServiceDeps {
-    db: Database;
-    /** Callback to start an agent session for a scheduled run. Returns sessionId. */
-    startSession: (schedule: Schedule, run: ScheduleRun, prompt: string, timeoutMs: number) => Promise<string | null>;
-    /** Check if a session is still alive. */
-    isSessionAlive: (sessionId: string) => boolean;
-    /** Emit a WebSocket event for subscribers. */
-    emitEvent: (event: ScheduleEvent) => void;
-    /** Injectable clock — defaults to real time, override in tests. */
-    clock?: () => Date;
+    if (cronExpression) {
+        const now = new Date();
+        try {
+            const first = getNextCronDate(cronExpression, now);
+            const second = getNextCronDate(cronExpression, first);
+            const gapMs = second.getTime() - first.getTime();
+            if (gapMs < MIN_SCHEDULE_INTERVAL_MS) {
+                throw new Error(
+                    `Cron expression "${cronExpression}" fires every ${Math.round(gapMs / 1000)}s. ` +
+                    `Minimum interval is 5 minutes.`
+                );
+            }
+        } catch (err) {
+            if (err instanceof Error && err.message.includes('Minimum interval')) throw err;
+            if (err instanceof Error && err.message.includes('fires every')) throw err;
+            throw new Error(`Invalid cron expression: ${cronExpression}`);
+        }
+    }
 }
 
 export class SchedulerService {
     private db: Database;
-    private startSession: SchedulerServiceDeps['startSession'];
-    private isSessionAlive: SchedulerServiceDeps['isSessionAlive'];
-    private emitEvent: SchedulerServiceDeps['emitEvent'];
-    private clock: () => Date;
+    private processManager: ProcessManager;
+    private workTaskService: WorkTaskService | null;
+    private agentMessenger: AgentMessenger | null;
+    private pollTimer: ReturnType<typeof setInterval> | null = null;
+    private runningExecutions = new Set<string>();
+    private eventCallbacks = new Set<ScheduleEventCallback>();
+    private consecutiveFailures = new Map<string, number>();
 
-    private tickTimer: ReturnType<typeof setInterval> | null = null;
-    private paused = false;
-    private lastTickAt: Date | null = null;
-    private shuttingDown = false;
-
-    constructor(deps: SchedulerServiceDeps) {
-        this.db = deps.db;
-        this.startSession = deps.startSession;
-        this.isSessionAlive = deps.isSessionAlive;
-        this.emitEvent = deps.emitEvent;
-        this.clock = deps.clock ?? (() => new Date());
+    constructor(
+        db: Database,
+        processManager: ProcessManager,
+        workTaskService?: WorkTaskService | null,
+        agentMessenger?: AgentMessenger | null,
+    ) {
+        this.db = db;
+        this.processManager = processManager;
+        this.workTaskService = workTaskService ?? null;
+        this.agentMessenger = agentMessenger ?? null;
     }
 
-    // ─── Lifecycle ───────────────────────────────────────────────────────────
+    /** Update the agent messenger (set after async AlgoChat init). */
+    setAgentMessenger(messenger: AgentMessenger): void {
+        this.agentMessenger = messenger;
+    }
 
-    /** Perform startup recovery, then begin the tick loop. */
+    /** Start the scheduler polling loop. */
     start(): void {
-        log.info('Scheduler starting', { pollIntervalMs: POLL_INTERVAL_MS, maxConcurrent: MAX_CONCURRENT });
-        this.recoverOnStartup();
-        this.tickTimer = setInterval(() => this.tick(), POLL_INTERVAL_MS);
-        // Run first tick immediately
+        if (this.pollTimer) return;
+        log.info('Scheduler started', { pollIntervalMs: POLL_INTERVAL_MS });
+
+        // Initialize next_run_at for schedules that don't have one yet
+        this.initializeNextRuns();
+
+        this.pollTimer = setInterval(() => this.tick(), POLL_INTERVAL_MS);
+        // Run once immediately
         this.tick();
     }
 
-    /** Gracefully stop: pause, wait for running runs to drain, then force-interrupt. */
-    async stop(): Promise<void> {
-        if (this.shuttingDown) return;
-        this.shuttingDown = true;
-        this.paused = true;
-
-        if (this.tickTimer) {
-            clearInterval(this.tickTimer);
-            this.tickTimer = null;
+    /** Stop the scheduler. */
+    stop(): void {
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
         }
-
-        log.info('Scheduler shutting down, waiting for running runs to drain', { drainTimeoutMs: DRAIN_TIMEOUT_MS });
-
-        const deadline = Date.now() + DRAIN_TIMEOUT_MS;
-        while (Date.now() < deadline) {
-            const runningCount = getRunningRunCount(this.db);
-            if (runningCount === 0) {
-                log.info('All runs drained');
-                break;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-
-        // Force-mark any survivors as interrupted
-        const survivors = getRunningRuns(this.db);
-        for (const run of survivors) {
-            this.interruptRun(run, 'Server shutdown');
-        }
-
         log.info('Scheduler stopped');
     }
 
-    /** Emergency pause/resume — stops dispatching but keeps tick alive for stale detection. */
-    setPaused(paused: boolean): void {
-        this.paused = paused;
-        log.info(`Scheduler ${paused ? 'paused' : 'resumed'}`);
-    }
-
-    isPaused(): boolean {
-        return this.paused;
-    }
-
-    // ─── Startup Recovery ────────────────────────────────────────────────────
-
-    private recoverOnStartup(): void {
-        const now = this.clock();
-
-        // Mark all 'running' runs as 'interrupted' (NOT failed — doesn't increment failures)
-        const runningRuns = getRunningRuns(this.db);
-        for (const run of runningRuns) {
-            this.interruptRun(run, 'Server restart recovery');
-        }
-        if (runningRuns.length > 0) {
-            log.info(`Recovered ${runningRuns.length} stale run(s) from previous instance`);
-        }
-
-        // Recompute daily counters for all active schedules
-        const activeSchedules = getActiveSchedules(this.db);
-        for (const schedule of activeSchedules) {
-            this.resetDailyCountersIfNeeded(schedule);
-            this.recomputeNextRunAt(schedule, now);
-        }
-
-        log.info(`Startup recovery complete`, { activeSchedules: activeSchedules.length });
-    }
-
-    // ─── Tick ────────────────────────────────────────────────────────────────
-
-    private tick(): void {
-        try {
-            this.tickInner();
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error('Tick failed', { error: message });
-        }
-    }
-
-    private tickInner(): void {
-        const now = this.clock();
-        this.lastTickAt = now;
-
-        // Detect stale runs first (always, even when paused)
-        this.detectStaleRuns(now);
-
-        if (this.paused || this.shuttingDown) return;
-
-        // Query due schedules
-        const dueSchedules = getDueSchedules(this.db, now);
-        if (dueSchedules.length === 0) return;
-
-        const currentRunning = getRunningRunCount(this.db);
-        let slotsAvailable = MAX_CONCURRENT - currentRunning;
-
-        for (const schedule of dueSchedules) {
-            if (slotsAvailable <= 0) break;
-
-            // Reset daily counters if date changed
-            const freshSchedule = this.resetDailyCountersIfNeeded(schedule);
-
-            // Skip if there's already an active run for this schedule
-            const activeRuns = getActiveRunCount(this.db, freshSchedule.id);
-            if (activeRuns > 0) {
-                log.debug('Skipping schedule — active run exists', { scheduleId: freshSchedule.id });
-                // Advance next_run_at so we don't re-check every tick
-                this.recomputeNextRunAt(freshSchedule, now);
-                continue;
-            }
-
-            // Budget check: daily budget
-            if (freshSchedule.dailyCostUsd >= freshSchedule.dailyBudgetUsd) {
-                log.info('Skipping schedule — daily budget exhausted', {
-                    scheduleId: freshSchedule.id,
-                    dailyCost: freshSchedule.dailyCostUsd,
-                    dailyBudget: freshSchedule.dailyBudgetUsd,
-                });
-                this.recomputeNextRunAt(freshSchedule, now);
-                continue;
-            }
-
-            // Dispatch the run
-            this.dispatchRun(freshSchedule, now);
-            slotsAvailable--;
-        }
-    }
-
-    // ─── Dispatch ────────────────────────────────────────────────────────────
-
-    private dispatchRun(schedule: Schedule, now: Date): void {
-        const runId = crypto.randomUUID();
-
-        // Create the run with a config snapshot
-        const run = createScheduleRun(this.db, {
-            id: runId,
-            scheduleId: schedule.id,
-            configSnapshot: schedule.actionConfig as unknown as Record<string, unknown>,
-        });
-
-        log.info('Dispatching scheduled run', {
-            scheduleId: schedule.id,
-            runId: run.id,
-            actionType: schedule.actionType,
-        });
-
-        // Build prompt
-        let prompt: string;
-        let sessionTimeout: number;
-        try {
-            const result = buildPrompt(schedule.actionConfig);
-            prompt = result.prompt;
-            sessionTimeout = Math.min(result.sessionTimeout, MAX_SESSION_TIMEOUT_MS);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            this.failRun(run, schedule, `Prompt build failed: ${message}`);
-            this.recomputeNextRunAt(schedule, now);
-            return;
-        }
-
-        // Mark as running
-        updateScheduleRun(this.db, run.id, {
-            status: 'running',
-            startedAt: now.toISOString(),
-        });
-
-        // Advance next_run_at and increment counters
-        updateSchedule(this.db, schedule.id, {
-            dailyRuns: schedule.dailyRuns + 1,
-            totalRuns: schedule.totalRuns + 1,
-        });
-        this.recomputeNextRunAt(schedule, now);
-
-        this.emitEvent({
-            type: 'schedule_event',
-            event: 'run_started',
-            scheduleId: schedule.id,
-            runId: run.id,
-            patch: { dailyRuns: schedule.dailyRuns + 1, totalRuns: schedule.totalRuns + 1 },
-        });
-
-        // Start the session (async — fire and handle result)
-        this.startSession(schedule, run, prompt, sessionTimeout).then((sessionId) => {
-            if (!sessionId) {
-                this.failRun(run, schedule, 'Failed to start agent session');
-                return;
-            }
-            updateScheduleRun(this.db, run.id, { sessionId });
-            log.info('Session started for scheduled run', {
-                scheduleId: schedule.id,
-                runId: run.id,
-                sessionId,
-            });
-        }).catch((err) => {
-            const message = err instanceof Error ? err.message : String(err);
-            this.failRun(run, schedule, `Session start error: ${message}`);
-        });
-    }
-
-    // ─── Run Completion ──────────────────────────────────────────────────────
-
-    /** Called by the session lifecycle when a scheduled run's session completes. */
-    onRunCompleted(runId: string, costUsd: number, output?: Record<string, unknown>): void {
-        const run = updateScheduleRun(this.db, runId, {
-            status: 'completed',
-            costUsd,
-            output: output ?? null,
-            completedAt: this.clock().toISOString(),
-        });
-        if (!run) return;
-
-        const schedule = getSchedule(this.db, run.scheduleId);
-        if (!schedule) return;
-
-        // Reset consecutive failures on success
-        const updatedSchedule = updateSchedule(this.db, schedule.id, {
-            consecutiveFailures: 0,
-            dailyCostUsd: schedule.dailyCostUsd + costUsd,
-        });
-
-        // Post-run: check if max_budget_usd exceeded — auto-pause
-        if (costUsd > schedule.maxBudgetUsd) {
-            log.warn('Run exceeded max budget, pausing schedule', {
-                scheduleId: schedule.id,
-                runCost: costUsd,
-                maxBudget: schedule.maxBudgetUsd,
-            });
-            updateSchedule(this.db, schedule.id, { status: 'paused' });
-            this.emitEvent({
-                type: 'schedule_event',
-                event: 'schedule_paused',
-                scheduleId: schedule.id,
-                runId: run.id,
-                patch: { status: 'paused' },
-            });
-            return;
-        }
-
-        this.emitEvent({
-            type: 'schedule_event',
-            event: 'run_completed',
-            scheduleId: schedule.id,
-            runId: run.id,
-            patch: {
-                consecutiveFailures: 0,
-                dailyCostUsd: (updatedSchedule?.dailyCostUsd ?? schedule.dailyCostUsd + costUsd),
-            },
-        });
-
-        log.info('Scheduled run completed', {
-            scheduleId: schedule.id,
-            runId: run.id,
-            costUsd,
-        });
-    }
-
-    /** Called when a run fails externally. */
-    onRunFailed(runId: string, error: string): void {
-        const run = updateScheduleRun(this.db, runId, {
-            status: 'failed',
-            error,
-            completedAt: this.clock().toISOString(),
-        });
-        if (!run) return;
-
-        const schedule = getSchedule(this.db, run.scheduleId);
-        if (schedule) {
-            this.incrementFailures(schedule);
-        }
-
-        this.emitEvent({
-            type: 'schedule_event',
-            event: 'run_failed',
-            scheduleId: run.scheduleId,
-            runId: run.id,
-            patch: {},
-        });
-    }
-
-    // ─── Stale Run Detection ─────────────────────────────────────────────────
-
-    private detectStaleRuns(now: Date): void {
-        const runningRuns = getRunningRuns(this.db);
-        for (const run of runningRuns) {
-            if (!run.startedAt) continue;
-
-            const startedAt = new Date(run.startedAt).getTime();
-            const elapsed = now.getTime() - startedAt;
-
-            if (elapsed > STALE_RUN_THRESHOLD_MS) {
-                // Check if session is still alive
-                if (run.sessionId && this.isSessionAlive(run.sessionId)) {
-                    continue; // Still alive, not stale
-                }
-
-                log.warn('Detected stale run, marking as failed', {
-                    runId: run.id,
-                    scheduleId: run.scheduleId,
-                    elapsedMs: elapsed,
-                });
-
-                this.failRun(run, null, 'Stale run detected — session no longer alive');
-            }
-        }
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
-    private failRun(run: ScheduleRun, schedule: Schedule | null, error: string): void {
-        updateScheduleRun(this.db, run.id, {
-            status: 'failed',
-            error,
-            completedAt: this.clock().toISOString(),
-        });
-
-        const sched = schedule ?? getSchedule(this.db, run.scheduleId);
-        if (sched) {
-            this.incrementFailures(sched);
-        }
-
-        this.emitEvent({
-            type: 'schedule_event',
-            event: 'run_failed',
-            scheduleId: run.scheduleId,
-            runId: run.id,
-            patch: {},
-        });
-
-        log.error('Scheduled run failed', {
-            scheduleId: run.scheduleId,
-            runId: run.id,
-            error,
-        });
-    }
-
-    private interruptRun(run: ScheduleRun, reason: string): void {
-        updateScheduleRun(this.db, run.id, {
-            status: 'interrupted',
-            error: reason,
-            completedAt: this.clock().toISOString(),
-        });
-
-        this.emitEvent({
-            type: 'schedule_event',
-            event: 'run_interrupted',
-            scheduleId: run.scheduleId,
-            runId: run.id,
-            patch: {},
-        });
-
-        log.info('Run interrupted', { runId: run.id, reason });
-    }
-
-    private incrementFailures(schedule: Schedule): void {
-        const newCount = schedule.consecutiveFailures + 1;
-
-        if (newCount >= FAILURE_THRESHOLD) {
-            log.warn('Auto-pausing schedule after consecutive failures', {
-                scheduleId: schedule.id,
-                failures: newCount,
-                threshold: FAILURE_THRESHOLD,
-            });
-            updateSchedule(this.db, schedule.id, {
-                consecutiveFailures: newCount,
-                status: 'error',
-            });
-            this.emitEvent({
-                type: 'schedule_event',
-                event: 'schedule_error',
-                scheduleId: schedule.id,
-                patch: { status: 'error', consecutiveFailures: newCount },
-            });
-        } else {
-            updateSchedule(this.db, schedule.id, {
-                consecutiveFailures: newCount,
-            });
-        }
-    }
-
-    private resetDailyCountersIfNeeded(schedule: Schedule): Schedule {
-        const today = this.clock().toISOString().slice(0, 10);
-        if (schedule.dailyResetDate === today) return schedule;
-
-        const updated = updateSchedule(this.db, schedule.id, {
-            dailyRuns: 0,
-            dailyCostUsd: 0,
-            dailyResetDate: today,
-        });
-
-        log.debug('Reset daily counters', { scheduleId: schedule.id, date: today });
-        return updated ?? schedule;
-    }
-
-    private recomputeNextRunAt(schedule: Schedule, after: Date): void {
-        try {
-            const cron = new Cron(schedule.cronExpression);
-            const next = cron.nextRun(after);
-            const nextStr = next ? next.toISOString() : null;
-            updateSchedule(this.db, schedule.id, { nextRunAt: nextStr });
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error('Failed to compute next_run_at', {
-                scheduleId: schedule.id,
-                cronExpression: schedule.cronExpression,
-                error: message,
-            });
-        }
-    }
-
-    // ─── Health ──────────────────────────────────────────────────────────────
-
-    getHealth(): SchedulerHealth {
-        const now = this.clock();
-        const today = now.toISOString().slice(0, 10);
-        const stats = getTodayStats(this.db, today);
-        const pendingApprovals = getPendingApprovalRuns(this.db);
+    /** Get scheduler stats for the health endpoint. */
+    getStats(): {
+        running: boolean;
+        activeSchedules: number;
+        pausedSchedules: number;
+        runningExecutions: number;
+        maxConcurrent: number;
+        recentFailures: number;
+    } {
+        const activeRow = this.db.query(
+            `SELECT COUNT(*) as count FROM agent_schedules WHERE status = 'active'`
+        ).get() as { count: number };
+        const pausedRow = this.db.query(
+            `SELECT COUNT(*) as count FROM agent_schedules WHERE status = 'paused'`
+        ).get() as { count: number };
+        const failureRow = this.db.query(
+            `SELECT COUNT(*) as count FROM schedule_executions WHERE status = 'failed' AND started_at >= datetime('now', '-24 hours')`
+        ).get() as { count: number };
 
         return {
-            running: this.tickTimer !== null && !this.shuttingDown,
-            paused: this.paused,
-            lastTickAt: this.lastTickAt?.toISOString() ?? null,
-            activeSchedules: getActiveScheduleCount(this.db),
-            runningNow: getRunningRunCount(this.db),
-            pendingApprovals: pendingApprovals.length,
-            todayRuns: stats.runs,
-            todayCostUsd: stats.costUsd,
-            nextRunAt: getNextGlobalRunAt(this.db),
+            running: this.pollTimer !== null,
+            activeSchedules: activeRow.count,
+            pausedSchedules: pausedRow.count,
+            runningExecutions: this.runningExecutions.size,
+            maxConcurrent: MAX_CONCURRENT_EXECUTIONS,
+            recentFailures: failureRow.count,
         };
+    }
+
+    /** Subscribe to schedule events (for WebSocket broadcast). */
+    onEvent(callback: ScheduleEventCallback): () => void {
+        this.eventCallbacks.add(callback);
+        return () => this.eventCallbacks.delete(callback);
+    }
+
+    /** Resolve an approval request for a schedule execution. */
+    resolveApproval(executionId: string, approved: boolean): ScheduleExecution | null {
+        const execution = resolveScheduleApproval(this.db, executionId, approved);
+        if (!execution) return null;
+
+        this.emit({
+            type: 'schedule_execution_update',
+            data: execution,
+        });
+
+        // If approved, actually execute the action
+        if (approved) {
+            const schedule = getSchedule(this.db, execution.scheduleId);
+            if (schedule) {
+                this.executeApprovedAction(execution, schedule);
+            }
+        }
+
+        return execution;
+    }
+
+    // ─── Internal ────────────────────────────────────────────────────────────
+
+    private initializeNextRuns(): void {
+        const schedules = this.db.query(
+            `SELECT * FROM agent_schedules WHERE status = 'active' AND next_run_at IS NULL`
+        ).all() as Record<string, unknown>[];
+
+        for (const row of schedules) {
+            const id = row.id as string;
+            const cronExpr = row.cron_expression as string | null;
+            const intervalMs = row.interval_ms as number | null;
+
+            const nextRun = this.calculateNextRun(cronExpr, intervalMs);
+            if (nextRun) {
+                updateScheduleNextRun(this.db, id, nextRun);
+            }
+        }
+    }
+
+    private async tick(): Promise<void> {
+        if (this.runningExecutions.size >= MAX_CONCURRENT_EXECUTIONS) {
+            log.debug('Max concurrent executions reached, skipping tick');
+            return;
+        }
+
+        const dueSchedules = listDueSchedules(this.db);
+        if (dueSchedules.length === 0) return;
+
+        log.info(`Processing ${dueSchedules.length} due schedule(s)`);
+
+        for (const schedule of dueSchedules) {
+            if (this.runningExecutions.size >= MAX_CONCURRENT_EXECUTIONS) break;
+
+            // Check if max executions reached
+            if (schedule.maxExecutions !== null && schedule.executionCount >= schedule.maxExecutions) {
+                updateSchedule(this.db, schedule.id, { status: 'completed' });
+                const updated = getSchedule(this.db, schedule.id);
+                if (updated) this.emit({ type: 'schedule_update', data: updated });
+                continue;
+            }
+
+            await this.executeSchedule(schedule);
+        }
+    }
+
+    private async executeSchedule(schedule: AgentSchedule): Promise<void> {
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            log.warn('Schedule agent not found', { scheduleId: schedule.id, agentId: schedule.agentId });
+            return;
+        }
+
+        // Update last run and calculate next run
+        updateScheduleLastRun(this.db, schedule.id);
+        const nextRun = this.calculateNextRun(schedule.cronExpression, schedule.intervalMs);
+        updateScheduleNextRun(this.db, schedule.id, nextRun);
+
+        // Emit schedule update
+        const updatedSchedule = getSchedule(this.db, schedule.id);
+        if (updatedSchedule) this.emit({ type: 'schedule_update', data: updatedSchedule });
+
+        // Execute each action in the schedule
+        for (const action of schedule.actions) {
+            if (this.runningExecutions.size >= MAX_CONCURRENT_EXECUTIONS) break;
+
+            const configSnapshot = {
+                actions: schedule.actions,
+                approvalPolicy: schedule.approvalPolicy,
+                cronExpression: schedule.cronExpression,
+                intervalMs: schedule.intervalMs,
+            };
+
+            const execution = createExecution(
+                this.db,
+                schedule.id,
+                schedule.agentId,
+                action.type,
+                action as unknown as Record<string, unknown>,
+                configSnapshot,
+            );
+
+            this.emit({ type: 'schedule_execution_update', data: execution });
+
+            // Check if this action needs approval
+            if (this.needsApproval(schedule, action)) {
+                updateExecutionStatus(this.db, execution.id, 'awaiting_approval');
+                const updated = getExecution(this.db, execution.id);
+                this.emit({
+                    type: 'schedule_approval_request',
+                    data: {
+                        executionId: execution.id,
+                        scheduleId: schedule.id,
+                        agentId: schedule.agentId,
+                        actionType: action.type,
+                        description: action.description ?? `${action.type} on ${action.repos?.join(', ') ?? 'N/A'}`,
+                    },
+                });
+                if (updated) this.emit({ type: 'schedule_execution_update', data: updated });
+                continue;
+            }
+
+            // Execute immediately
+            this.runAction(execution.id, schedule, action);
+        }
+    }
+
+    private needsApproval(schedule: AgentSchedule, action: ScheduleAction): boolean {
+        if (schedule.approvalPolicy === 'auto') return false;
+
+        // Actions that modify external repos always need approval unless auto
+        const destructiveActions: ScheduleActionType[] = [
+            'work_task',
+            'github_suggest',
+            'fork_repo',
+        ];
+
+        if (schedule.approvalPolicy === 'owner_approve') {
+            return destructiveActions.includes(action.type);
+        }
+
+        // council_approve: all actions need approval
+        return true;
+    }
+
+    private async runAction(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        this.runningExecutions.add(executionId);
+
+        try {
+            switch (action.type) {
+                case 'star_repo':
+                    await this.execStarRepos(executionId, action);
+                    break;
+                case 'fork_repo':
+                    await this.execForkRepos(executionId, action);
+                    break;
+                case 'review_prs':
+                    await this.execReviewPrs(executionId, schedule, action);
+                    break;
+                case 'work_task':
+                    await this.execWorkTask(executionId, schedule, action);
+                    break;
+                case 'council_launch':
+                    await this.execCouncilLaunch(executionId, schedule, action);
+                    break;
+                case 'send_message':
+                    await this.execSendMessage(executionId, schedule, action);
+                    break;
+                case 'github_suggest':
+                    await this.execGithubSuggest(executionId, schedule, action);
+                    break;
+                case 'custom':
+                    await this.execCustom(executionId, schedule, action);
+                    break;
+                default:
+                    updateExecutionStatus(this.db, executionId, 'failed', {
+                        result: `Unknown action type: ${action.type}`,
+                    });
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error('Schedule action failed', { executionId, actionType: action.type, error: message });
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        } finally {
+            this.runningExecutions.delete(executionId);
+            const updated = getExecution(this.db, executionId);
+            if (updated) {
+                this.emit({ type: 'schedule_execution_update', data: updated });
+
+                // Track consecutive failures for auto-pause
+                if (updated.status === 'failed') {
+                    const count = (this.consecutiveFailures.get(schedule.id) ?? 0) + 1;
+                    this.consecutiveFailures.set(schedule.id, count);
+
+                    if (count >= MAX_CONSECUTIVE_FAILURES) {
+                        log.warn('Auto-pausing schedule after consecutive failures', {
+                            scheduleId: schedule.id,
+                            failures: count,
+                        });
+                        updateSchedule(this.db, schedule.id, { status: 'paused' });
+                        this.consecutiveFailures.delete(schedule.id);
+                        const pausedSchedule = getSchedule(this.db, schedule.id);
+                        if (pausedSchedule) this.emit({ type: 'schedule_update', data: pausedSchedule });
+                    }
+                } else if (updated.status === 'completed') {
+                    this.consecutiveFailures.delete(schedule.id);
+                }
+            }
+        }
+    }
+
+    private async executeApprovedAction(execution: ScheduleExecution, schedule: AgentSchedule): Promise<void> {
+        const action = execution.actionInput as unknown as ScheduleAction;
+        // Re-set status to running
+        updateExecutionStatus(this.db, execution.id, 'running');
+        const updated = getExecution(this.db, execution.id);
+        if (updated) this.emit({ type: 'schedule_execution_update', data: updated });
+
+        await this.runAction(execution.id, schedule, action);
+    }
+
+    // ─── Action Executors ────────────────────────────────────────────────────
+
+    private async execStarRepos(executionId: string, action: ScheduleAction): Promise<void> {
+        if (!action.repos?.length) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No repos specified' });
+            return;
+        }
+
+        const results: string[] = [];
+        for (const repo of action.repos) {
+            const r = await github.starRepo(repo);
+            results.push(r.message);
+        }
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: results.join('\n'),
+        });
+    }
+
+    private async execForkRepos(executionId: string, action: ScheduleAction): Promise<void> {
+        if (!action.repos?.length) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No repos specified' });
+            return;
+        }
+
+        const results: string[] = [];
+        for (const repo of action.repos) {
+            const r = await github.forkRepo(repo);
+            results.push(r.message);
+        }
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: results.join('\n'),
+        });
+    }
+
+    private async execReviewPrs(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!action.repos?.length) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No repos specified' });
+            return;
+        }
+
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
+            return;
+        }
+
+        const maxPrs = action.maxPrs ?? 5;
+        const results: string[] = [];
+
+        for (const repo of action.repos) {
+            const prList = await github.listOpenPrs(repo, maxPrs);
+            if (!prList.ok) {
+                results.push(`${repo}: Failed to list PRs — ${prList.error}`);
+                continue;
+            }
+
+            if (prList.prs.length === 0) {
+                results.push(`${repo}: No open PRs`);
+                continue;
+            }
+
+            // Create a session for the agent to review the PRs
+            const prSummary = prList.prs.map((pr) =>
+                `- #${pr.number}: "${pr.title}" by ${pr.author} (+${pr.additions}/-${pr.deletions}, ${pr.changedFiles} files)`
+            ).join('\n');
+
+            const prompt = `You are reviewing open pull requests for ${repo}.\n\n` +
+                `## Open PRs\n${prSummary}\n\n` +
+                `## Instructions\n` +
+                `1. For each PR, use \`gh pr diff <number> --repo ${repo}\` to review the changes.\n` +
+                `2. Analyze code quality, potential issues, and improvements.\n` +
+                `3. Leave a helpful review comment using \`gh pr comment <number> --repo ${repo} --body "..."\`\n` +
+                `4. Summarize your review findings at the end.`;
+
+            const projectId = action.projectId ?? agent.defaultProjectId;
+            if (!projectId) {
+                results.push(`${repo}: No project configured for agent`);
+                continue;
+            }
+
+            const session = createSession(this.db, {
+                projectId,
+                agentId: schedule.agentId,
+                name: `Scheduled PR Review: ${repo}`,
+                initialPrompt: prompt,
+                source: 'agent',
+            });
+
+            updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
+            this.processManager.startProcess(session, prompt, { schedulerMode: true });
+            results.push(`${repo}: Reviewing ${prList.prs.length} PR(s) in session ${session.id}`);
+        }
+
+        // Mark completed (the session may still be running)
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: results.join('\n'),
+        });
+    }
+
+    private async execWorkTask(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!this.workTaskService) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Work task service not available' });
+            return;
+        }
+
+        if (!action.description) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No description provided' });
+            return;
+        }
+
+        try {
+            const task = await this.workTaskService.create({
+                agentId: schedule.agentId,
+                description: action.description,
+                projectId: action.projectId,
+                source: 'agent',
+            });
+
+            updateExecutionStatus(this.db, executionId, 'completed', {
+                result: `Work task created: ${task.id} (branch: ${task.branchName ?? 'pending'})`,
+                workTaskId: task.id,
+                sessionId: task.sessionId ?? undefined,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
+    }
+
+    private async execCouncilLaunch(executionId: string, _schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!action.councilId || !action.projectId || !action.description) {
+            updateExecutionStatus(this.db, executionId, 'failed', {
+                result: 'councilId, projectId, and description are required for council_launch',
+            });
+            return;
+        }
+
+        // Council launches are handled via HTTP API — we'll create the execution record
+        // and let the caller handle the actual launch
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: `Council launch queued for council ${action.councilId}`,
+        });
+    }
+
+    private async execSendMessage(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!action.toAgentId || !action.message) {
+            updateExecutionStatus(this.db, executionId, 'failed', {
+                result: 'toAgentId and message are required for send_message',
+            });
+            return;
+        }
+
+        if (!this.agentMessenger) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent messenger not available' });
+            return;
+        }
+
+        try {
+            const { response, threadId } = await this.agentMessenger.invokeAndWait({
+                fromAgentId: schedule.agentId,
+                toAgentId: action.toAgentId,
+                content: action.message,
+            });
+
+            updateExecutionStatus(this.db, executionId, 'completed', {
+                result: `Message sent. Response: ${response.slice(0, 500)}... [thread: ${threadId}]`,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
+    }
+
+    private async execGithubSuggest(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!action.repos?.length) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No repos specified' });
+            return;
+        }
+
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
+            return;
+        }
+
+        const projectId = action.projectId ?? agent.defaultProjectId;
+        if (!projectId) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No project configured for agent' });
+            return;
+        }
+
+        // Create a session for the agent to analyze repos and suggest improvements
+        const repoList = action.repos.join(', ');
+        const prompt = `You are analyzing the following repositories for potential improvements: ${repoList}\n\n` +
+            `## Instructions\n` +
+            `1. For each repo, examine the codebase structure, README, issues, and recent PRs.\n` +
+            `2. Identify potential improvements: documentation, code quality, performance, testing, CI/CD.\n` +
+            `3. Prioritize suggestions by impact and feasibility.\n` +
+            `4. For each suggestion, provide a clear description of the change.\n` +
+            (action.autoCreatePr
+                ? `5. If you have high-confidence suggestions, create work tasks using corvid_create_work_task.\n`
+                : `5. Summarize your findings — do NOT create PRs automatically.\n`) +
+            `\nBe thorough but focused. Quality over quantity.`;
+
+        const session = createSession(this.db, {
+            projectId,
+            agentId: schedule.agentId,
+            name: `Scheduled Suggestions: ${repoList.slice(0, 50)}`,
+            initialPrompt: prompt,
+            source: 'agent',
+        });
+
+        updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
+        this.processManager.startProcess(session, prompt, { schedulerMode: true });
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: `Analysis session started: ${session.id}`,
+            sessionId: session.id,
+        });
+    }
+
+    private async execCustom(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!action.prompt) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No prompt provided for custom action' });
+            return;
+        }
+
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
+            return;
+        }
+
+        const projectId = action.projectId ?? agent.defaultProjectId;
+        if (!projectId) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No project configured for agent' });
+            return;
+        }
+
+        const session = createSession(this.db, {
+            projectId,
+            agentId: schedule.agentId,
+            name: `Scheduled Custom: ${action.prompt.slice(0, 50)}`,
+            initialPrompt: action.prompt,
+            source: 'agent',
+        });
+
+        updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
+        this.processManager.startProcess(session, action.prompt, { schedulerMode: true });
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: `Custom action session started: ${session.id}`,
+            sessionId: session.id,
+        });
+    }
+
+    // ─── Cron helpers ────────────────────────────────────────────────────────
+
+    private calculateNextRun(cronExpression: string | null, intervalMs: number | null): string | null {
+        if (cronExpression) {
+            try {
+                const next = getNextCronDate(cronExpression);
+                return next.toISOString();
+            } catch (err) {
+                log.warn('Invalid cron expression', { cronExpression, error: String(err) });
+                return null;
+            }
+        }
+
+        if (intervalMs && intervalMs > 0) {
+            return new Date(Date.now() + intervalMs).toISOString();
+        }
+
+        return null;
+    }
+
+    private emit(event: { type: string; data: unknown }): void {
+        for (const cb of this.eventCallbacks) {
+            try {
+                cb(event as Parameters<ScheduleEventCallback>[0]);
+            } catch (err) {
+                log.error('Schedule event callback error', { error: err instanceof Error ? err.message : String(err) });
+            }
+        }
     }
 }

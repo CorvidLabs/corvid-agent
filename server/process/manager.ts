@@ -12,6 +12,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
+import type { SchedulerService } from '../scheduler/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -89,6 +90,7 @@ export class ProcessManager {
     private mcpWalletService: AgentWalletService | null = null;
     private mcpEncryptionConfig: { serverMnemonic?: string | null; network?: string } = {};
     private mcpWorkTaskService: WorkTaskService | null = null;
+    private mcpSchedulerService: SchedulerService | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -112,17 +114,19 @@ export class ProcessManager {
         walletService: AgentWalletService,
         encryptionConfig?: { serverMnemonic?: string | null; network?: string },
         workTaskService?: WorkTaskService,
+        schedulerService?: SchedulerService,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
         this.mcpWalletService = walletService;
         this.mcpEncryptionConfig = encryptionConfig ?? {};
         this.mcpWorkTaskService = workTaskService ?? null;
+        this.mcpSchedulerService = schedulerService ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
-    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number): McpToolContext | null {
+    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number, schedulerMode?: boolean): McpToolContext | null {
         if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
         return {
             agentId,
@@ -135,6 +139,8 @@ export class ProcessManager {
             serverMnemonic: this.mcpEncryptionConfig.serverMnemonic,
             network: this.mcpEncryptionConfig.network,
             workTaskService: this.mcpWorkTaskService ?? undefined,
+            schedulerService: this.mcpSchedulerService ?? undefined,
+            schedulerMode,
             emitStatus: sessionId
                 ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
                 : undefined,
@@ -157,7 +163,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -175,10 +181,10 @@ export class ProcessManager {
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
         // All agents route through SDK path so they receive MCP tools (corvid_*)
-        this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth);
+        this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth, options?.schedulerMode);
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean): void {
         // Use session-level workDir override (e.g. git worktree for work tasks)
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -187,7 +193,7 @@ export class ProcessManager {
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;

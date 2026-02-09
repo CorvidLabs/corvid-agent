@@ -27,6 +27,14 @@ import type { Project } from '../../core/models/project.model';
                 </div>
 
                 <div class="form__field">
+                    <label for="provider" class="form__label">Provider</label>
+                    <select id="provider" formControlName="provider" class="form__input">
+                        <option value="">Default (Anthropic)</option>
+                        <option value="anthropic">Anthropic</option>
+                    </select>
+                </div>
+
+                <div class="form__field">
                     <label for="model" class="form__label">Model</label>
                     <select id="model" formControlName="model" class="form__input">
                         <option value="">Default</option>
@@ -148,6 +156,7 @@ export class AgentFormComponent implements OnInit {
     protected readonly form = this.fb.nonNullable.group({
         name: ['', Validators.required],
         description: [''],
+        provider: [''],
         model: [''],
         permissionMode: ['default'],
         systemPrompt: [''],
@@ -170,6 +179,7 @@ export class AgentFormComponent implements OnInit {
             this.form.patchValue({
                 name: agent.name,
                 description: agent.description,
+                provider: agent.provider ?? '',
                 model: agent.model,
                 permissionMode: agent.permissionMode,
                 systemPrompt: agent.systemPrompt,
