@@ -152,6 +152,7 @@ const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, (
 
 interface WsData {
     subscriptions: Map<string, unknown>;
+    walletAddress?: string;
 }
 
 // Start server
@@ -170,8 +171,14 @@ const server = Bun.serve<WsData>({
                     headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
                 });
             }
+            // Extract wallet address if provided (from chat client)
+            const walletAddress = url.searchParams.get('wallet') || undefined;
+            if (walletAddress) {
+                log.info('WebSocket connection with wallet identity', { wallet: walletAddress.slice(0, 8) + '...' });
+            }
+
             const upgraded = server.upgrade(req, {
-                data: { subscriptions: new Map() },
+                data: { subscriptions: new Map(), walletAddress },
             });
             if (upgraded) return undefined as unknown as Response;
             return new Response('WebSocket upgrade failed', { status: 400 });

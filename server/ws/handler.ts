@@ -11,6 +11,7 @@ const log = createLogger('WebSocket');
 
 interface WsData {
     subscriptions: Map<string, EventCallback>;
+    walletAddress?: string;
 }
 
 export function createWebSocketHandler(
@@ -127,7 +128,8 @@ function handleClientMessage(
         }
 
         case 'chat_send': {
-            log.debug(`chat_send received`, { agentId: msg.agentId, content: msg.content.slice(0, 50) });
+            const walletCtx = ws.data?.walletAddress;
+            log.debug(`chat_send received`, { agentId: msg.agentId, content: msg.content.slice(0, 50), wallet: walletCtx?.slice(0, 8) });
             const bridge = getBridge();
             if (!bridge) {
                 log.debug('chat_send: bridge is null, AlgoChat not available');
