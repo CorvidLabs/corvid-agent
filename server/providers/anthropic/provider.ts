@@ -32,7 +32,9 @@ export class AnthropicProvider extends BaseLlmProvider {
             model: params.model,
             max_tokens: params.maxTokens ?? 1024,
             system: params.systemPrompt,
-            messages: params.messages.map((m) => ({ role: m.role, content: m.content })),
+            messages: params.messages
+                .filter((m) => m.role === 'user' || m.role === 'assistant')
+                .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         });
 
         const content = response.content

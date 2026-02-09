@@ -19,6 +19,7 @@ import { createLogger } from './lib/logger';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity } from './middleware/auth';
 import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
+import { OllamaProvider } from './providers/ollama/provider';
 
 const log = createLogger('Server');
 
@@ -37,6 +38,13 @@ const db = getDb();
 // Initialize LLM provider registry
 const providerRegistry = LlmProviderRegistry.getInstance();
 providerRegistry.register(new AnthropicProvider());
+const ollamaProvider = new OllamaProvider();
+providerRegistry.register(ollamaProvider);
+
+// Fire-and-forget: refresh Ollama models on startup (warn if not running)
+ollamaProvider.refreshModels().catch((err) => {
+    log.warn('Ollama not available on startup', { error: err instanceof Error ? err.message : String(err) });
+});
 
 // Ensure a project exists for the server's own codebase
 {
@@ -213,6 +221,27 @@ const server = Bun.serve<WsData>({
         if (url.pathname === '/api/providers' && req.method === 'GET') {
             const providers = providerRegistry.getAll().map((p) => p.getInfo());
             return new Response(JSON.stringify(providers), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Provider models endpoint — dynamic model listing (e.g. Ollama local models)
+        const modelsMatch = url.pathname.match(/^\/api\/providers\/([^/]+)\/models$/);
+        if (modelsMatch && req.method === 'GET') {
+            const providerType = modelsMatch[1];
+            const provider = providerRegistry.get(providerType as import('./providers/types').LlmProviderType);
+            if (!provider) {
+                return new Response(JSON.stringify({ error: `Unknown provider: ${providerType}` }), {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
+            // Refresh models if provider supports it (e.g. Ollama)
+            if ('refreshModels' in provider && typeof (provider as { refreshModels: () => Promise<string[]> }).refreshModels === 'function') {
+                await (provider as { refreshModels: () => Promise<string[]> }).refreshModels();
+            }
+            const info = provider.getInfo();
+            return new Response(JSON.stringify({ models: info.models, defaultModel: info.defaultModel }), {
                 headers: { 'Content-Type': 'application/json' },
             });
         }
