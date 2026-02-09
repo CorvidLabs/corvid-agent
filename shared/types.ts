@@ -302,3 +302,85 @@ export interface CreateWorkTaskInput {
     sourceId?: string;
     requesterInfo?: Record<string, unknown>;
 }
+
+// MARK: - Schedules
+
+export type ActionType =
+    | 'star_repos'
+    | 'fork_repos'
+    | 'review_prs'
+    | 'work_on_repo'
+    | 'suggest_improvements'
+    | 'council_review'
+    | 'custom';
+
+export type ScheduleStatus = 'active' | 'paused' | 'error';
+export type ScheduleSource = 'owner' | 'agent';
+
+export interface ScheduleWire {
+    id: string;
+    name: string;
+    actionType: ActionType;
+    cronExpression: string;
+    agentId: string | null;
+    councilId: string | null;
+    actionConfig: Record<string, unknown>;
+    source: ScheduleSource;
+    requiresApproval: boolean;
+    maxBudgetUsd: number;
+    dailyBudgetUsd: number;
+    approvalTimeoutH: number;
+    dailyRuns: number;
+    dailyCostUsd: number;
+    dailyResetDate: string;
+    status: ScheduleStatus;
+    consecutiveFailures: number;
+    nextRunAt: string | null;
+    totalRuns: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type ScheduleRunStatus =
+    | 'pending'
+    | 'running'
+    | 'awaiting_approval'
+    | 'completed'
+    | 'failed'
+    | 'interrupted'
+    | 'skipped'
+    | 'denied';
+
+export interface ScheduleRunWire {
+    id: string;
+    scheduleId: string;
+    configSnapshot: Record<string, unknown>;
+    status: ScheduleRunStatus;
+    sessionId: string | null;
+    workTaskId: string | null;
+    costUsd: number;
+    output: Record<string, unknown> | null;
+    error: string | null;
+    pendingApprovals: Record<string, unknown> | null;
+    approvalDecidedBy: string | null;
+    approvalDecidedAt: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    createdAt: string;
+}
+
+export interface ScheduleEventWire {
+    type: 'schedule_event';
+    event:
+        | 'run_started'
+        | 'run_completed'
+        | 'run_failed'
+        | 'run_interrupted'
+        | 'approval_requested'
+        | 'approval_resolved'
+        | 'schedule_paused'
+        | 'schedule_error';
+    scheduleId: string;
+    runId?: string;
+    patch: Partial<ScheduleWire>;
+}
