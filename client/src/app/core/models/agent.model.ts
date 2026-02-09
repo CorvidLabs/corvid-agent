@@ -40,3 +40,13 @@ export interface CreateAgentInput {
 }
 
 export type UpdateAgentInput = Partial<CreateAgentInput>;
+
+export interface ProviderInfo {
+    type: string;
+    name: string;
+    executionMode: string;
+    models: string[];
+    defaultModel: string;
+    supportsTools: boolean;
+    supportsStreaming: boolean;
+}

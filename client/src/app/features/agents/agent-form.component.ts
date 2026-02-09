@@ -3,8 +3,10 @@ import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
-import type { CreateAgentInput } from '../../core/models/agent.model';
+import { ApiService } from '../../core/services/api.service';
+import type { CreateAgentInput, ProviderInfo } from '../../core/models/agent.model';
 import type { Project } from '../../core/models/project.model';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
     selector: 'app-agent-form',
@@ -28,9 +30,11 @@ import type { Project } from '../../core/models/project.model';
 
                 <div class="form__field">
                     <label for="provider" class="form__label">Provider</label>
-                    <select id="provider" formControlName="provider" class="form__input">
+                    <select id="provider" formControlName="provider" class="form__input" (change)="onProviderChange()">
                         <option value="">Default (Anthropic)</option>
-                        <option value="anthropic">Anthropic</option>
+                        @for (p of providers(); track p.type) {
+                            <option [value]="p.type">{{ p.name }}</option>
+                        }
                     </select>
                 </div>
 
@@ -38,10 +42,13 @@ import type { Project } from '../../core/models/project.model';
                     <label for="model" class="form__label">Model</label>
                     <select id="model" formControlName="model" class="form__input">
                         <option value="">Default</option>
-                        <option value="claude-sonnet-4-20250514">Sonnet 4</option>
-                        <option value="claude-opus-4-20250514">Opus 4</option>
-                        <option value="claude-haiku-3-5-20241022">Haiku 3.5</option>
+                        @for (m of models(); track m) {
+                            <option [value]="m">{{ m }}</option>
+                        }
                     </select>
+                    @if (loadingModels()) {
+                        <span class="form__hint">Loading models...</span>
+                    }
                 </div>
 
                 <div class="form__field">
@@ -126,6 +133,7 @@ import type { Project } from '../../core/models/project.model';
         }
         .form__input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
         .form__textarea { resize: vertical; min-height: 5em; line-height: 1.5; }
+        .form__hint { font-size: 0.75rem; color: var(--text-secondary); font-style: italic; }
         .form__fieldset { border: 1px solid var(--border-bright); border-radius: var(--radius); padding: 1rem; margin: 0; background: var(--bg-surface); }
         .form__legend { font-weight: 600; font-size: 0.8rem; color: var(--accent-magenta); padding: 0 0.25rem; letter-spacing: 0.05em; }
         .form__checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-top: 0.5rem; cursor: pointer; color: var(--text-primary); }
@@ -147,11 +155,15 @@ export class AgentFormComponent implements OnInit {
     private readonly fb = inject(FormBuilder);
     private readonly agentService = inject(AgentService);
     private readonly projectService = inject(ProjectService);
+    private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
 
     readonly id = input<string | undefined>(undefined);
     protected readonly saving = signal(false);
     protected readonly projects = signal<Project[]>([]);
+    protected readonly providers = signal<ProviderInfo[]>([]);
+    protected readonly models = signal<string[]>([]);
+    protected readonly loadingModels = signal(false);
 
     protected readonly form = this.fb.nonNullable.group({
         name: ['', Validators.required],
@@ -173,6 +185,14 @@ export class AgentFormComponent implements OnInit {
         await this.projectService.loadProjects();
         this.projects.set(this.projectService.projects());
 
+        // Fetch available providers
+        try {
+            const providerList = await firstValueFrom(this.apiService.get<ProviderInfo[]>('/providers'));
+            this.providers.set(providerList);
+        } catch {
+            // Fallback — providers endpoint may not be available
+        }
+
         const id = this.id();
         if (id) {
             const agent = await this.agentService.getAgent(id);
@@ -191,6 +211,41 @@ export class AgentFormComponent implements OnInit {
                 algochatAuto: agent.algochatAuto,
                 defaultProjectId: agent.defaultProjectId,
             });
+            // Load models for the agent's current provider
+            await this.loadModelsForProvider(agent.provider ?? '');
+        } else {
+            // Load models for default provider
+            await this.loadModelsForProvider('');
+        }
+    }
+
+    async onProviderChange(): Promise<void> {
+        const provider = this.form.get('provider')?.value ?? '';
+        this.form.get('model')?.setValue('');
+        await this.loadModelsForProvider(provider);
+    }
+
+    private async loadModelsForProvider(providerType: string): Promise<void> {
+        if (!providerType) {
+            // Default provider — use the first provider's models (Anthropic)
+            const allProviders = this.providers();
+            const defaultProvider = allProviders.find((p) => p.type === 'anthropic') ?? allProviders[0];
+            this.models.set(defaultProvider?.models ?? []);
+            return;
+        }
+
+        this.loadingModels.set(true);
+        try {
+            const result = await firstValueFrom(
+                this.apiService.get<{ models: string[]; defaultModel: string }>(`/providers/${providerType}/models`),
+            );
+            this.models.set(result.models);
+        } catch {
+            // Fallback to static list from provider info
+            const provider = this.providers().find((p) => p.type === providerType);
+            this.models.set(provider?.models ?? []);
+        } finally {
+            this.loadingModels.set(false);
         }
     }
 
