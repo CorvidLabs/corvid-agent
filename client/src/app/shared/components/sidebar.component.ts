@@ -121,24 +121,6 @@ import { filter, Subscription } from 'rxjs';
                     </a>
                 </li>
 
-                <li class="sidebar__divider" aria-hidden="true"></li>
-
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/nft/review"
-                        routerLinkActive="sidebar__link--active">
-                        NFT Review
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/nft/voting"
-                        routerLinkActive="sidebar__link--active">
-                        NFT Voting
-                    </a>
-                </li>
             </ul>
         </nav>
     `,
