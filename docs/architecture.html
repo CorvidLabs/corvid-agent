@@ -54,19 +54,57 @@
           <span class="terminal__dot terminal__dot--green"></span>
           <span class="terminal__label">architecture</span>
         </div>
-        <pre class="terminal__body"><code>
-<span class="t-comment">  ┌─────────────┐     ┌──────────────┐     ┌──────────────┐</span>
-<span class="t-comment">  │</span> <span class="accent-cyan">Angular UI</span>  <span class="t-comment">│────▶│</span> <span class="accent-magenta">Bun Server</span>   <span class="t-comment">│────▶│</span> <span class="accent-green">Claude SDK</span>   <span class="t-comment">│</span>
-<span class="t-comment">  │</span>  Port 4200  <span class="t-comment">│     │</span>  Port 3000  <span class="t-comment">│     │</span>  Subprocess <span class="t-comment">│</span>
-<span class="t-comment">  └─────────────┘     └──────┬───────┘     └──────────────┘</span>
-<span class="t-comment">                             │</span>
-<span class="t-comment">        ┌────────────────────┼────────────────────┐</span>
-<span class="t-comment">        ▼                    ▼                    ▼</span>
-<span class="t-comment">  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐</span>
-<span class="t-comment">  │</span> <span class="accent-cyan">SQLite DB</span>    <span class="t-comment">│  │</span> <span class="accent-magenta">MCP Server</span>   <span class="t-comment">│  │</span> <span class="accent-green">AlgoChat</span>     <span class="t-comment">│</span>
-<span class="t-comment">  │</span>  Persistence <span class="t-comment">│  │</span>  9 Tools     <span class="t-comment">│  │</span>  (optional) <span class="t-comment">│</span>
-<span class="t-comment">  └──────────────┘  └──────────────┘  └──────────────┘</span>
-</code></pre>
+        <div class="arch-diagram">
+          <!-- Top row: Angular UI → Bun Server → Claude SDK -->
+          <div class="arch-row">
+            <div class="arch-box arch-box--cyan">
+              <div class="arch-box__label accent-cyan">Angular UI</div>
+              <div class="arch-box__sub">Port 4200</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--magenta">
+              <div class="arch-box__label accent-magenta">Bun Server</div>
+              <div class="arch-box__sub">Port 3000</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Claude SDK</div>
+              <div class="arch-box__sub">Subprocess</div>
+            </div>
+          </div>
+
+          <!-- Connector: vertical line from Bun Server down -->
+          <div class="arch-arrow--down"></div>
+
+          <!-- Branching connectors -->
+          <div class="arch-connector">
+            <div class="arch-connector__line"></div>
+            <div class="arch-connector__junction">
+              <div class="arch-connector__vert"></div>
+            </div>
+            <div class="arch-connector__line"></div>
+            <div class="arch-connector__junction">
+              <div class="arch-connector__vert"></div>
+            </div>
+            <div class="arch-connector__line"></div>
+          </div>
+
+          <!-- Bottom row: SQLite, MCP Server, AlgoChat -->
+          <div class="arch-row">
+            <div class="arch-box arch-box--cyan">
+              <div class="arch-box__label accent-cyan">SQLite DB</div>
+              <div class="arch-box__sub">Persistence</div>
+            </div>
+            <div class="arch-box arch-box--magenta">
+              <div class="arch-box__label accent-magenta">MCP Server</div>
+              <div class="arch-box__sub">9 Tools</div>
+            </div>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">AlgoChat</div>
+              <div class="arch-box__sub">(optional)</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -682,17 +720,62 @@
           <span class="terminal__dot terminal__dot--green"></span>
           <span class="terminal__label">lifecycle</span>
         </div>
-        <pre class="terminal__body"><code>
-<span class="accent-cyan">  Created</span> ──▶ <span class="accent-green">Running</span> ──▶ <span class="accent-magenta">Paused</span> ──▶ <span class="accent-green">Resumed</span>
-                 │                          │
-                 │    <span class="t-comment">context reset</span>          │
-                 │    <span class="t-comment">(every 8 turns)</span>        │
-                 ▼                          ▼
-              <span class="accent-cyan">Timeout</span> ──▶ <span class="accent-magenta">Stopped</span>     <span class="accent-green">Running</span>
+        <div class="arch-diagram" style="padding: 20px 12px;">
+          <!-- Main flow: Created → Running → Paused → Resumed -->
+          <div class="arch-row">
+            <div class="arch-box arch-box--cyan">
+              <div class="arch-box__label accent-cyan">Created</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Running</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--magenta">
+              <div class="arch-box__label accent-magenta">Paused</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Resumed</div>
+            </div>
+          </div>
 
-  <span class="t-comment">Auto-resume backoff: 5m → 15m → 45m → 60m cap</span>
-  <span class="t-comment">Default timeout: 30 minutes (configurable)</span>
-</code></pre>
+          <!-- Branches down -->
+          <div style="display: flex; justify-content: space-around; width: 100%; padding: 0 40px;">
+            <div style="text-align: center; flex: 1;">
+              <div class="arch-arrow--down"></div>
+              <div style="font-size: 7px; color: var(--text-tertiary); padding: 2px 0;">context reset</div>
+              <div style="font-size: 7px; color: var(--text-tertiary); padding: 0 0 4px;">(every 8 turns)</div>
+              <div class="arch-arrow--down arch-arrow--down-tip"></div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div class="arch-arrow--down"></div>
+              <div style="padding: 16px 0 4px;"></div>
+              <div class="arch-arrow--down arch-arrow--down-tip"></div>
+            </div>
+          </div>
+
+          <div class="arch-row" style="gap: 40px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="arch-box arch-box--cyan">
+                <div class="arch-box__label accent-cyan">Timeout</div>
+              </div>
+              <span class="arch-arrow"></span>
+              <div class="arch-box arch-box--magenta">
+                <div class="arch-box__label accent-magenta">Stopped</div>
+              </div>
+            </div>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Running</div>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div style="margin-top: 20px; text-align: center;">
+            <div style="font-size: 8px; color: var(--text-tertiary); line-height: 2.2;">Auto-resume backoff: 5m &rarr; 15m &rarr; 45m &rarr; 60m cap</div>
+            <div style="font-size: 8px; color: var(--text-tertiary); line-height: 2.2;">Default timeout: 30 minutes (configurable)</div>
+          </div>
+        </div>
       </div>
 
       <div class="grid grid--3" style="margin-top: 40px;">
