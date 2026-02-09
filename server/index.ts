@@ -11,8 +11,8 @@ import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
-import { SessionLifecycleManager } from './process/session-lifecycle';
 import { SchedulerService } from './scheduler/service';
+import { SessionLifecycleManager } from './process/session-lifecycle';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
@@ -69,27 +69,8 @@ workTaskService.recoverStaleTasks().catch((err) =>
     log.error('Failed to recover stale work tasks', { error: err instanceof Error ? err.message : String(err) }),
 );
 
-// Initialize scheduler (if enabled)
-const SCHEDULER_ENABLED = process.env.SCHEDULER_ENABLED === 'true';
-let schedulerService: SchedulerService | null = null;
-if (SCHEDULER_ENABLED) {
-    schedulerService = new SchedulerService({
-        db,
-        startSession: async (_schedule, _run, _prompt, _timeoutMs) => {
-            // Session spawning will be wired in when full session integration is implemented.
-            // For now, return null to indicate the session was not started.
-            log.warn('Scheduler session spawning not yet wired — run will fail');
-            return null;
-        },
-        isSessionAlive: (sessionId) => {
-            return processManager.getActiveSessionIds().includes(sessionId);
-        },
-        emitEvent: (event) => {
-            const msg = JSON.stringify(event);
-            server.publish('scheduler', msg);
-        },
-    });
-}
+// Initialize scheduler (cron/interval automation for agents)
+const schedulerService = new SchedulerService(db, processManager, workTaskService);
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -163,7 +144,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService);
+    }, workTaskService, schedulerService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -177,7 +158,7 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -222,9 +203,7 @@ const server = Bun.serve<WsData>({
                 algochat: algochatBridge !== null,
                 timestamp: new Date().toISOString(),
             };
-            if (schedulerService) {
-                health.scheduler = schedulerService.getHealth();
-            }
+            health.scheduler = schedulerService.getStats();
             return new Response(JSON.stringify(health), {
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -292,6 +271,25 @@ onCouncilDiscussionMessage((message) => {
     server.publish('council', msg);
 });
 
+// Broadcast schedule events to all WebSocket clients
+schedulerService.onEvent((event) => {
+    const msg = JSON.stringify({ type: event.type, ...spreadScheduleEvent(event) });
+    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+});
+
+function spreadScheduleEvent(event: { type: string; data: unknown }): Record<string, unknown> {
+    switch (event.type) {
+        case 'schedule_update':
+            return { schedule: event.data };
+        case 'schedule_execution_update':
+            return { execution: event.data };
+        case 'schedule_approval_request':
+            return event.data as Record<string, unknown>;
+        default:
+            return {};
+    }
+}
+
 // Initialize AlgoChat after server starts
 initAlgoChat().then(() => {
     // Wire agent message broadcasts once messenger is available
@@ -301,18 +299,21 @@ initAlgoChat().then(() => {
             server.publish('algochat', msg);
         });
     }
+
+    // Start the scheduler now that all services are available
+    // Give it the agentMessenger if AlgoChat is initialized
+    if (agentMessenger) {
+        schedulerService.setAgentMessenger(agentMessenger);
+    }
+    schedulerService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
+    // Start scheduler even if AlgoChat fails — it can still do GitHub ops and work tasks
+    schedulerService.start();
 });
 
 // Start session lifecycle cleanup after server is running
 sessionLifecycle.start();
-
-// Start scheduler if enabled
-if (schedulerService) {
-    schedulerService.start();
-    log.info('Scheduler started');
-}
 
 log.info(`Server running at http://${BIND_HOST}:${PORT}`);
 
@@ -329,7 +330,7 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (err) => {
     log.error('Uncaught exception, shutting down', { error: err.message, stack: err.stack });
-    schedulerService?.stop().catch(() => {});
+    schedulerService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
@@ -340,7 +341,7 @@ process.on('uncaughtException', (err) => {
 // Graceful shutdown
 process.on('SIGINT', () => {
     log.info('Shutting down (SIGINT)');
-    schedulerService?.stop().catch(() => {});
+    schedulerService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
@@ -350,17 +351,10 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
     log.info('Shutting down (SIGTERM)');
-    schedulerService?.stop().then(() => {
-        sessionLifecycle.stop();
-        processManager.shutdown();
-        algochatBridge?.stop();
-        closeDb();
-        process.exit(0);
-    }).catch(() => {
-        sessionLifecycle.stop();
-        processManager.shutdown();
-        algochatBridge?.stop();
-        closeDb();
-        process.exit(0);
-    });
+    schedulerService.stop();
+    sessionLifecycle.stop();
+    processManager.shutdown();
+    algochatBridge?.stop();
+    closeDb();
+    process.exit(0);
 });

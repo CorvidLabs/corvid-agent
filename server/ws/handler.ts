@@ -5,6 +5,7 @@ import { isClientMessage } from '../../shared/ws-protocol';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { WorkTaskService } from '../work/service';
+import type { SchedulerService } from '../scheduler/service';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
@@ -19,6 +20,7 @@ export function createWebSocketHandler(
     getBridge: () => AlgoChatBridge | null,
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
+    getSchedulerService?: () => SchedulerService | null,
 ) {
     return {
         open(ws: ServerWebSocket<WsData>) {
@@ -46,7 +48,7 @@ export function createWebSocketHandler(
                 return;
             }
 
-            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService);
+            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService);
         },
 
         close(ws: ServerWebSocket<WsData>) {
@@ -68,6 +70,7 @@ function handleClientMessage(
     getBridge: () => AlgoChatBridge | null,
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
+    getSchedulerService?: () => SchedulerService | null,
 ): void {
     switch (msg.type) {
         case 'subscribe': {
@@ -288,6 +291,23 @@ function handleClientMessage(
             }).catch((err) => {
                 sendError(ws, `Reward error: ${err instanceof Error ? err.message : String(err)}`);
             });
+            break;
+        }
+
+        case 'schedule_approval': {
+            const scheduler = getSchedulerService?.();
+            if (!scheduler) {
+                sendError(ws, 'Scheduler service not available');
+                break;
+            }
+
+            const execution = scheduler.resolveApproval(msg.executionId, msg.approved);
+            if (!execution) {
+                sendError(ws, 'Execution not found or not awaiting approval');
+            } else {
+                const serverMsg: ServerMessage = { type: 'schedule_execution_update', execution };
+                ws.send(JSON.stringify(serverMsg));
+            }
             break;
         }
     }
