@@ -6,7 +6,8 @@ export type ClientMessage =
     | { type: 'agent_reward'; agentId: string; microAlgos: number }
     | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
     | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
-    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string };
+    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string }
+    | { type: 'schedule_approval'; executionId: string; approved: boolean };
 
 export type ServerMessage =
     | { type: 'session_event'; sessionId: string; event: StreamEvent }
@@ -23,6 +24,9 @@ export type ServerMessage =
     | { type: 'council_log'; log: import('./types').CouncilLaunchLog }
     | { type: 'council_discussion_message'; message: import('./types').CouncilDiscussionMessage }
     | { type: 'work_task_update'; task: import('./types').WorkTask }
+    | { type: 'schedule_update'; schedule: import('./types').AgentSchedule }
+    | { type: 'schedule_execution_update'; execution: import('./types').ScheduleExecution }
+    | { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
     | { type: 'error'; message: string };
 
 export interface StreamEvent {
@@ -56,6 +60,8 @@ export function isClientMessage(data: unknown): data is ClientMessage {
         case 'create_work_task':
             return typeof msg.agentId === 'string' && typeof msg.description === 'string'
                 && (msg.projectId === undefined || typeof msg.projectId === 'string');
+        case 'schedule_approval':
+            return typeof msg.executionId === 'string' && typeof msg.approved === 'boolean';
         default:
             return false;
     }

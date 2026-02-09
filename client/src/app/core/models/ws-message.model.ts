@@ -29,6 +29,9 @@ export type ServerWsMessage =
     | { type: 'council_log'; log: import('./council.model').CouncilLaunchLog }
     | { type: 'council_discussion_message'; message: import('./council.model').CouncilDiscussionMessage }
     | { type: 'work_task_update'; task: import('./work-task.model').WorkTask }
+    | { type: 'schedule_update'; schedule: import('./schedule.model').AgentSchedule }
+    | { type: 'schedule_execution_update'; execution: import('./schedule.model').ScheduleExecution }
+    | { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {
