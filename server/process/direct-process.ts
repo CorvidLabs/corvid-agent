@@ -11,7 +11,7 @@ import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
 import type { SdkProcess } from './sdk-process';
-import type { LlmProvider, LlmToolCall } from '../providers/types';
+import type { LlmProvider, LlmToolCall, LlmCompletionResult } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { createLogger } from '../lib/logger';
@@ -95,14 +95,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 ? toProviderTools(directTools)
                 : undefined;
 
-            let result;
+            let result: LlmCompletionResult;
             try {
-                result = await provider.complete({
-                    model,
-                    systemPrompt,
-                    messages,
-                    tools: providerTools,
-                });
+                result = await completeWithStreaming(
+                    provider, model, systemPrompt, messages, providerTools,
+                    onEvent, () => aborted,
+                );
             } catch (err) {
                 // Tool fallback: if the model doesn't support tools, retry without them
                 const errorMsg = err instanceof Error ? err.message : String(err);
@@ -110,28 +108,16 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     log.warn(`Model ${model} does not support tools — disabling for this session`);
                     toolsDisabled = true;
                     // Retry without tools
-                    result = await provider.complete({
-                        model,
-                        systemPrompt,
-                        messages,
-                    });
+                    result = await completeWithStreaming(
+                        provider, model, systemPrompt, messages, undefined,
+                        onEvent, () => aborted,
+                    );
                 } else {
                     throw err;
                 }
             }
 
             if (aborted) return;
-
-            // Emit assistant response
-            if (result.content) {
-                onEvent({
-                    type: 'assistant',
-                    message: {
-                        role: 'assistant',
-                        content: [{ type: 'text', text: result.content }],
-                    },
-                } as ClaudeStreamEvent);
-            }
 
             // Handle tool calls
             if (result.toolCalls && result.toolCalls.length > 0) {
@@ -314,6 +300,96 @@ async function checkToolPermission(
 
     const response = await approvalManager.createRequest(request);
     return response.behavior === 'allow';
+}
+
+/**
+ * Complete a request using streaming when available, falling back to non-streaming.
+ * Emits content_block_start / content_block_delta / assistant events through the event bus.
+ */
+async function completeWithStreaming(
+    provider: LlmProvider,
+    model: string,
+    systemPrompt: string,
+    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
+    tools: import('../providers/types').LlmToolDefinition[] | undefined,
+    onEvent: (event: ClaudeStreamEvent) => void,
+    isAborted: () => boolean,
+): Promise<LlmCompletionResult> {
+    const params = { model, systemPrompt, messages, tools };
+
+    // Use streaming path when provider supports it
+    if (provider.streamComplete) {
+        let fullContent = '';
+        let finalModel = model;
+        let finalUsage: { inputTokens: number; outputTokens: number } | undefined;
+        let finalToolCalls: LlmToolCall[] | undefined;
+        let started = false;
+
+        const stream = provider.streamComplete(params);
+
+        for await (const chunk of stream) {
+            if (isAborted()) break;
+
+            // Emit content_block_start on first chunk
+            if (!started && chunk.text) {
+                started = true;
+                onEvent({
+                    type: 'content_block_start',
+                    content_block: { type: 'text' },
+                } as ClaudeStreamEvent);
+            }
+
+            // Emit incremental text via content_block_delta
+            if (chunk.text) {
+                fullContent += chunk.text;
+                onEvent({
+                    type: 'content_block_delta',
+                    delta: { type: 'text_delta', text: chunk.text },
+                } as ClaudeStreamEvent);
+            }
+
+            // Capture final metadata
+            if (chunk.done) {
+                finalModel = chunk.model ?? model;
+                finalUsage = chunk.usage;
+                finalToolCalls = chunk.toolCalls;
+            }
+        }
+
+        // Emit the full assistant message (for persistence and tool loop)
+        if (fullContent) {
+            onEvent({
+                type: 'assistant',
+                message: {
+                    role: 'assistant',
+                    content: [{ type: 'text', text: fullContent }],
+                },
+            } as ClaudeStreamEvent);
+        }
+
+        return {
+            content: fullContent,
+            model: finalModel,
+            usage: finalUsage,
+            toolCalls: finalToolCalls,
+        };
+    }
+
+    // Non-streaming fallback
+    const result = await provider.complete(params);
+
+    // Emit assistant response
+    if (result.content) {
+        onEvent({
+            type: 'assistant',
+            message: {
+                role: 'assistant',
+                content: [{ type: 'text', text: result.content }],
+            },
+        } as ClaudeStreamEvent);
+    }
+
+    return result;
 }
 
 function isToolUnsupportedError(errorMsg: string): boolean {

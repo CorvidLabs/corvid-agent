@@ -463,6 +463,11 @@ export class SessionOutputComponent implements AfterViewChecked {
                     break;
                 }
 
+                case 'content_block_start':
+                case 'content_block_delta':
+                    // Skip — streaming deltas are already folded into the final 'assistant' event
+                    break;
+
                 case 'session_started':
                 case 'session_stopped':
                 case 'session_exited':

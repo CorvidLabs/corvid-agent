@@ -7,6 +7,7 @@ import type {
     LlmProviderInfo,
     LlmToolDefinition,
     LlmToolCall,
+    LlmStreamChunk,
 } from '../types';
 import { getModelCapabilityDetector } from './model-capabilities';
 import { createLogger } from '../../lib/logger';
@@ -104,7 +105,7 @@ export class OllamaProvider extends BaseLlmProvider {
             models: this.cachedModels,
             defaultModel: this.cachedModels[0] ?? 'llama3.1',
             supportsTools: true,
-            supportsStreaming: false,
+            supportsStreaming: true,
         };
     }
 
@@ -200,6 +201,142 @@ export class OllamaProvider extends BaseLlmProvider {
             },
             toolCalls,
         };
+    }
+
+    /**
+     * Streaming completion — yields incremental text chunks as they arrive.
+     * Ollama's /api/chat with `stream: true` returns newline-delimited JSON objects.
+     */
+    async *streamComplete(params: LlmCompletionParams): AsyncGenerator<LlmStreamChunk> {
+        const messages: OllamaChatMessage[] = [];
+
+        if (params.systemPrompt) {
+            messages.push({ role: 'system', content: params.systemPrompt });
+        }
+        for (const m of params.messages) {
+            messages.push({ role: m.role, content: m.content });
+        }
+
+        const body: Record<string, unknown> = {
+            model: params.model,
+            messages,
+            stream: true,
+        };
+
+        if (params.temperature !== undefined) {
+            body.options = { temperature: params.temperature };
+        }
+
+        if (params.tools && params.tools.length > 0) {
+            body.tools = params.tools.map((t) => this.toOllamaTool(t));
+        }
+
+        const response = await fetch(`${this.host}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Ollama API error (${response.status}): ${text}`);
+        }
+
+        if (!response.body) {
+            throw new Error('Ollama streaming response has no body');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedToolCalls: LlmToolCall[] = [];
+
+        try {
+            while (true) {
+                const { done: readerDone, value } = await reader.read();
+                if (readerDone) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // Process complete lines (newline-delimited JSON)
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+
+                    let chunk: OllamaChatResponse;
+                    try {
+                        chunk = JSON.parse(trimmed) as OllamaChatResponse;
+                    } catch {
+                        log.warn('Failed to parse Ollama stream chunk', { line: trimmed });
+                        continue;
+                    }
+
+                    // Accumulate tool calls from streaming chunks
+                    if (chunk.message?.tool_calls && chunk.message.tool_calls.length > 0) {
+                        for (const tc of chunk.message.tool_calls) {
+                            accumulatedToolCalls.push({
+                                id: tc.id || crypto.randomUUID().slice(0, 8),
+                                name: tc.function.name,
+                                arguments: tc.function.arguments,
+                            });
+                        }
+                    }
+
+                    if (chunk.done) {
+                        // Final chunk — include metadata
+                        yield {
+                            text: chunk.message?.content ?? '',
+                            done: true,
+                            model: chunk.model,
+                            usage: {
+                                inputTokens: chunk.prompt_eval_count ?? 0,
+                                outputTokens: chunk.eval_count ?? 0,
+                            },
+                            toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+                        };
+                    } else {
+                        // Intermediate chunk — yield text delta
+                        const text = chunk.message?.content ?? '';
+                        if (text) {
+                            yield { text, done: false };
+                        }
+                    }
+                }
+            }
+
+            // Process any remaining buffer
+            if (buffer.trim()) {
+                try {
+                    const chunk = JSON.parse(buffer.trim()) as OllamaChatResponse;
+                    if (chunk.message?.tool_calls && chunk.message.tool_calls.length > 0) {
+                        for (const tc of chunk.message.tool_calls) {
+                            accumulatedToolCalls.push({
+                                id: tc.id || crypto.randomUUID().slice(0, 8),
+                                name: tc.function.name,
+                                arguments: tc.function.arguments,
+                            });
+                        }
+                    }
+                    yield {
+                        text: chunk.message?.content ?? '',
+                        done: true,
+                        model: chunk.model,
+                        usage: {
+                            inputTokens: chunk.prompt_eval_count ?? 0,
+                            outputTokens: chunk.eval_count ?? 0,
+                        },
+                        toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+                    };
+                } catch {
+                    log.warn('Failed to parse final Ollama stream buffer', { buffer });
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
     }
 
     async isAvailable(): Promise<boolean> {

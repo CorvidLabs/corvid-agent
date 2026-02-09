@@ -29,6 +29,20 @@ export interface LlmCompletionResult {
     toolCalls?: LlmToolCall[];
 }
 
+/** A single chunk yielded during streaming completion */
+export interface LlmStreamChunk {
+    /** Incremental text content */
+    text: string;
+    /** True when this is the final chunk (includes aggregated metadata) */
+    done: boolean;
+    /** Only present on the final chunk */
+    model?: string;
+    /** Only present on the final chunk */
+    usage?: { inputTokens: number; outputTokens: number };
+    /** Only present on the final chunk if the model made tool calls */
+    toolCalls?: LlmToolCall[];
+}
+
 export interface LlmProviderInfo {
     type: LlmProviderType;
     name: string;
@@ -44,5 +58,7 @@ export interface LlmProvider {
     readonly executionMode: ExecutionMode;
     getInfo(): LlmProviderInfo;
     complete(params: LlmCompletionParams): Promise<LlmCompletionResult>;
+    /** Stream completion yielding incremental text chunks. Optional — only available when supportsStreaming is true. */
+    streamComplete?(params: LlmCompletionParams): AsyncGenerator<LlmStreamChunk>;
     isAvailable(): Promise<boolean>;
 }
