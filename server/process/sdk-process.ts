@@ -199,6 +199,8 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         }
 
         // Auto-approve tool use for bypass permission modes (full-auto, bypassPermissions, etc.)
+        // NOTE: Plan mode tools (EnterPlanMode, ExitPlanMode) are handled at the SDK
+        // disallowedTools level for bypass modes — see below where sdkOptions is built.
         const BYPASS_MODES = new Set(['bypassPermissions', 'dontAsk', 'acceptEdits', 'full-auto']);
         if (BYPASS_MODES.has(permissionMode)) {
             return { behavior: 'allow' as const };
@@ -250,8 +252,10 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
 
     // Map our permission modes to SDK-compatible values.
     // The SDK doesn't have 'full-auto' — map it to 'bypassPermissions'.
+    // The SDK uses 'acceptEdits' not 'auto-edit'.
     const SDK_MODE_MAP: Record<string, import('@anthropic-ai/claude-agent-sdk').PermissionMode> = {
         'full-auto': 'bypassPermissions',
+        'auto-edit': 'acceptEdits',
     };
     const sdkPermissionMode = SDK_MODE_MAP[permissionMode] ?? permissionMode as import('@anthropic-ai/claude-agent-sdk').PermissionMode;
     const needsBypass = sdkPermissionMode === 'bypassPermissions';
@@ -296,8 +300,19 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         sdkOptions.tools = agent.allowedTools.split(',').map((t) => t.trim());
     }
 
-    if (agent?.disallowedTools) {
-        sdkOptions.disallowedTools = agent.disallowedTools.split(',').map((t) => t.trim());
+    // Plan mode tools (EnterPlanMode, ExitPlanMode) require an interactive user
+    // to approve plans. They're incompatible with bypassPermissions mode and will
+    // error at the SDK level. Disallow them to prevent confusing errors. (#71)
+    const systemDisallowed: string[] = [];
+    if (needsBypass) {
+        systemDisallowed.push('EnterPlanMode', 'ExitPlanMode');
+    }
+    const agentDisallowed = agent?.disallowedTools
+        ? agent.disallowedTools.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
+    const allDisallowed = [...new Set([...systemDisallowed, ...agentDisallowed])];
+    if (allDisallowed.length > 0) {
+        sdkOptions.disallowedTools = allDisallowed;
     }
 
     if (agent?.maxBudgetUsd !== null && agent?.maxBudgetUsd !== undefined) {
