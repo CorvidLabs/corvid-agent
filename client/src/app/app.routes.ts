@@ -122,14 +122,4 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/settings/settings.component').then((m) => m.SettingsComponent),
     },
-    {
-        path: 'nft/review',
-        loadComponent: () =>
-            import('./features/nft/nft-initial-review.component').then((m) => m.NFTInitialReviewComponent),
-    },
-    {
-        path: 'nft/voting',
-        loadComponent: () =>
-            import('./features/nft/nft-swipe-voting.component').then((m) => m.NFTSwipeVotingComponent),
-    },
 ];
