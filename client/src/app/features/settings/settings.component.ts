@@ -1,9 +1,10 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { SessionService } from '../../core/services/session.service';
 import { firstValueFrom } from 'rxjs';
+import QRCode from 'qrcode';
 
 interface SettingsData {
     creditConfig: Record<string, string>;
@@ -17,6 +18,13 @@ interface SettingsData {
 
 interface OperationalMode {
     mode: string;
+}
+
+interface PSKExchange {
+    uri: string;
+    address: string;
+    network: string;
+    label: string;
 }
 
 @Component({
@@ -81,6 +89,39 @@ interface OperationalMode {
                         </div>
                     } @else {
                         <p class="muted">AlgoChat not configured</p>
+                    }
+                </div>
+
+                <!-- Connect Mobile -->
+                <div class="settings__section">
+                    <h3>Connect Mobile</h3>
+                    <p class="connect-desc">
+                        Scan this QR code with the CorvidChat app to connect your phone to this agent via AlgoChat.
+                    </p>
+                    @if (pskExchange()) {
+                        <div class="qr-container">
+                            <canvas #qrCanvas class="qr-canvas"></canvas>
+                        </div>
+                        <div class="connect-info">
+                            <div class="info-item">
+                                <span class="info-label">Network</span>
+                                <span class="info-value network-badge" [attr.data-network]="pskExchange()?.network">
+                                    {{ pskExchange()?.network }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="connect-actions">
+                            <button class="save-btn" (click)="copyPSKUri()">Copy URI</button>
+                            <button class="backup-btn" (click)="regeneratePSK()">
+                                {{ generatingPSK() ? 'Generating...' : 'Regenerate' }}
+                            </button>
+                        </div>
+                    } @else {
+                        <button
+                            class="save-btn"
+                            [disabled]="generatingPSK()"
+                            (click)="generatePSK()"
+                        >{{ generatingPSK() ? 'Generating...' : 'Generate QR Code' }}</button>
                     }
                 </div>
 
@@ -199,6 +240,30 @@ interface OperationalMode {
         .network-badge[data-network="mainnet"] { color: #50e3c2; }
         .network-badge[data-network="localnet"] { color: #f5a623; }
 
+        /* Connect Mobile */
+        .connect-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .qr-canvas {
+            border-radius: var(--radius);
+            border: 2px solid var(--accent-cyan);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+        }
+        .connect-info {
+            margin-bottom: 0.75rem;
+        }
+        .connect-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
         /* Operational mode */
         .mode-selector {
             display: flex;
@@ -301,13 +366,17 @@ export class SettingsComponent implements OnInit {
     private readonly notifications = inject(NotificationService);
     private readonly sessionService = inject(SessionService);
 
+    @ViewChild('qrCanvas') qrCanvas!: ElementRef<HTMLCanvasElement>;
+
     readonly loading = signal(true);
     readonly saving = signal(false);
     readonly backingUp = signal(false);
+    readonly generatingPSK = signal(false);
     readonly settings = signal<SettingsData | null>(null);
     readonly operationalMode = signal('normal');
     readonly backupResult = signal<string | null>(null);
     readonly algochatStatus = this.sessionService.algochatStatus;
+    readonly pskExchange = signal<PSKExchange | null>(null);
 
     // Mutable copy for credit config editing
     private creditValues: Record<string, string> = {};
@@ -376,6 +445,49 @@ export class SettingsComponent implements OnInit {
         }
     }
 
+    async generatePSK(): Promise<void> {
+        this.generatingPSK.set(true);
+        try {
+            const result = await firstValueFrom(this.api.post<PSKExchange>('/algochat/psk-exchange'));
+            this.pskExchange.set(result);
+            this.notifications.success('PSK QR code generated');
+            // Wait for DOM update, then render QR
+            setTimeout(() => this.renderQRCode(result.uri), 50);
+        } catch {
+            this.notifications.error('Failed to generate PSK');
+        } finally {
+            this.generatingPSK.set(false);
+        }
+    }
+
+    async regeneratePSK(): Promise<void> {
+        if (!confirm('Regenerating the PSK will disconnect any mobile clients currently connected. Continue?')) {
+            return;
+        }
+        await this.generatePSK();
+    }
+
+    copyPSKUri(): void {
+        const uri = this.pskExchange()?.uri;
+        if (uri) {
+            navigator.clipboard.writeText(uri).then(() => {
+                this.notifications.success('PSK URI copied to clipboard');
+            });
+        }
+    }
+
+    private renderQRCode(uri: string): void {
+        if (!this.qrCanvas?.nativeElement) return;
+        QRCode.toCanvas(this.qrCanvas.nativeElement, uri, {
+            width: 280,
+            margin: 2,
+            color: {
+                dark: '#00e5ff',
+                light: '#0a0a12',
+            },
+        });
+    }
+
     private async loadAll(): Promise<void> {
         this.loading.set(true);
         try {
@@ -386,6 +498,17 @@ export class SettingsComponent implements OnInit {
             this.settings.set(settings);
             this.operationalMode.set(mode.mode);
             this.sessionService.loadAlgoChatStatus();
+
+            // Load existing PSK exchange URI
+            try {
+                const psk = await firstValueFrom(this.api.get<PSKExchange | null>('/algochat/psk-exchange'));
+                if (psk?.uri) {
+                    this.pskExchange.set(psk);
+                    setTimeout(() => this.renderQRCode(psk.uri), 50);
+                }
+            } catch {
+                // PSK not configured yet, that's fine
+            }
         } catch {
             // Non-critical
         } finally {

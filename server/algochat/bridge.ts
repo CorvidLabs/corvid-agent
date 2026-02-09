@@ -222,6 +222,72 @@ export class AlgoChatBridge {
         };
     }
 
+    /** Get or generate a PSK exchange URI for mobile client connections. */
+    getPSKExchangeURI(): { uri: string; address: string; network: string; label: string } | null {
+        const stored = this.loadMobilePSK();
+        if (!stored) return null;
+        return {
+            uri: stored,
+            address: this.service.chatAccount.address,
+            network: this.config.network,
+            label: 'CorvidAgent',
+        };
+    }
+
+    /** Generate a new PSK exchange URI and store it. */
+    generatePSKExchangeURI(): { uri: string; address: string; network: string; label: string } {
+        const psk = crypto.getRandomValues(new Uint8Array(32));
+        const address = this.service.chatAccount.address;
+        const label = 'CorvidAgent';
+        const network = this.config.network;
+
+        // Encode PSK as base64url
+        const pskBase64 = btoa(String.fromCharCode(...psk))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        const uri = `algochat-psk://v1?addr=${address}&psk=${pskBase64}&label=${encodeURIComponent(label)}&network=${network}`;
+
+        // Store in database for persistence
+        this.saveMobilePSK(uri, psk, label);
+
+        // Initialize PSK manager for this mobile contact
+        // The PSK manager will handle message encryption/decryption
+        log.info('Generated new PSK exchange URI for mobile client', { address: address.slice(0, 8) });
+
+        return { uri, address, network, label };
+    }
+
+    private loadMobilePSK(): string | null {
+        try {
+            const row = this.db.prepare(
+                'SELECT initial_psk, label FROM algochat_psk_state WHERE address = ? AND network = ?'
+            ).get('mobile-client', this.config.network) as { initial_psk: Uint8Array; label: string } | null;
+
+            if (!row) return null;
+
+            const address = this.service.chatAccount.address;
+            const pskBase64 = btoa(String.fromCharCode(...new Uint8Array(row.initial_psk)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+            const label = row.label || 'CorvidAgent';
+
+            return `algochat-psk://v1?addr=${address}&psk=${pskBase64}&label=${encodeURIComponent(label)}&network=${this.config.network}`;
+        } catch {
+            return null;
+        }
+    }
+
+    private saveMobilePSK(_uri: string, psk: Uint8Array, label: string): void {
+        this.db.prepare(`
+            INSERT OR REPLACE INTO algochat_psk_state
+                (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
+            VALUES (?, ?, ?, ?, 0, 0, '[]', 0, datetime('now'))
+        `).run('mobile-client', this.config.network, psk, label);
+    }
+
     /**
      * Handle a message from the browser dashboard chat UI.
      * Routes through the same agent→session→process flow, but sends the
