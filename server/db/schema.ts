@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 23;
+const SCHEMA_VERSION = 24;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -330,6 +330,55 @@ const MIGRATIONS: Record<number, string[]> = {
          FROM algochat_psk_state`,
         `DROP TABLE IF EXISTS algochat_psk_state`,
         `ALTER TABLE algochat_psk_state_v2 RENAME TO algochat_psk_state`,
+    ],
+    24: [
+        // Autonomous agent scheduler — schedules and schedule_runs
+        `CREATE TABLE IF NOT EXISTS schedules (
+            id                    TEXT PRIMARY KEY,
+            name                  TEXT NOT NULL,
+            action_type           TEXT NOT NULL,
+            cron_expression       TEXT NOT NULL,
+            agent_id              TEXT DEFAULT NULL REFERENCES agents(id),
+            council_id            TEXT DEFAULT NULL REFERENCES councils(id),
+            action_config         TEXT NOT NULL DEFAULT '{}',
+            source                TEXT NOT NULL DEFAULT 'owner',
+            requires_approval     INTEGER NOT NULL DEFAULT 0,
+            max_budget_usd        REAL NOT NULL DEFAULT 1.0,
+            daily_budget_usd      REAL NOT NULL DEFAULT 5.0,
+            approval_timeout_h    INTEGER NOT NULL DEFAULT 8,
+            daily_runs            INTEGER NOT NULL DEFAULT 0,
+            daily_cost_usd        REAL NOT NULL DEFAULT 0.0,
+            daily_reset_date      TEXT NOT NULL DEFAULT (date('now')),
+            status                TEXT NOT NULL DEFAULT 'active',
+            consecutive_failures  INTEGER NOT NULL DEFAULT 0,
+            next_run_at           TEXT DEFAULT NULL,
+            total_runs            INTEGER NOT NULL DEFAULT 0,
+            created_at            TEXT DEFAULT (datetime('now')),
+            updated_at            TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE TABLE IF NOT EXISTS schedule_runs (
+            id                    TEXT PRIMARY KEY,
+            schedule_id           TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+            config_snapshot       TEXT NOT NULL,
+            status                TEXT NOT NULL DEFAULT 'pending',
+            session_id            TEXT DEFAULT NULL,
+            work_task_id          TEXT DEFAULT NULL,
+            cost_usd              REAL NOT NULL DEFAULT 0.0,
+            output                TEXT DEFAULT NULL,
+            error                 TEXT DEFAULT NULL,
+            pending_approvals     TEXT DEFAULT NULL,
+            approval_decided_by   TEXT DEFAULT NULL,
+            approval_decided_at   TEXT DEFAULT NULL,
+            started_at            TEXT DEFAULT NULL,
+            completed_at          TEXT DEFAULT NULL,
+            created_at            TEXT DEFAULT (datetime('now'))
+        )`,
+        // Partial index for efficient "due schedules" query
+        `CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run_at) WHERE status = 'active'`,
+        `CREATE INDEX IF NOT EXISTS idx_schedules_agent ON schedules(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedules_council ON schedules(council_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_runs_schedule ON schedule_runs(schedule_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_runs_status ON schedule_runs(status)`,
     ],
 };
 
