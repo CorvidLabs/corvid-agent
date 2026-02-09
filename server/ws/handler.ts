@@ -25,6 +25,7 @@ export function createWebSocketHandler(
             ws.data = { subscriptions: new Map() };
             ws.subscribe('council');
             ws.subscribe('algochat');
+            ws.subscribe('scheduler');
             log.info('WebSocket connection opened');
         },
 
