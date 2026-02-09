@@ -82,16 +82,15 @@ function handleClientMessage(
             const callback: EventCallback = (sessionId, event) => {
                 // Forward approval requests as dedicated messages
                 if (event.type === 'approval_request') {
-                    const approvalEvent = event as unknown as { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number };
                     const approvalMsg: ServerMessage = {
                         type: 'approval_request',
                         request: {
-                            id: approvalEvent.id,
-                            sessionId: approvalEvent.sessionId,
-                            toolName: approvalEvent.toolName,
-                            description: approvalEvent.description,
-                            createdAt: approvalEvent.createdAt,
-                            timeoutMs: approvalEvent.timeoutMs,
+                            id: event.id as string,
+                            sessionId: event.sessionId as string,
+                            toolName: event.toolName as string,
+                            description: event.description as string,
+                            createdAt: event.createdAt as number,
+                            timeoutMs: event.timeoutMs as number,
                         },
                     };
                     ws.send(JSON.stringify(approvalMsg));
@@ -208,7 +207,7 @@ function handleClientMessage(
                             // Re-fetch the message to get the final state
                             import('../db/agent-messages').then(({ getAgentMessage }) => {
                                 const updated = getAgentMessage(
-                                    (messenger as unknown as { db: import('bun:sqlite').Database }).db,
+                                    messenger.db,
                                     result.message.id,
                                 );
                                 if (updated) {
@@ -280,7 +279,7 @@ function handleClientMessage(
 
             walletService.fundAgent(agentId, microAlgos).then(async () => {
                 const { getAgent } = await import('../db/agents');
-                const agent = getAgent((bridge as unknown as { db: import('bun:sqlite').Database }).db, agentId);
+                const agent = getAgent(bridge!.db, agentId);
                 if (!agent?.walletAddress) return;
 
                 const balance = await walletService.getBalance(agent.walletAddress);

@@ -61,7 +61,7 @@ const log = createLogger('AlgoChatBridge');
  * (server/index.ts, ws/handler.ts, routes/index.ts) require no changes.
  */
 export class AlgoChatBridge {
-    private db: Database;
+    readonly db: Database;
     private processManager: ProcessManager;
     private config: AlgoChatConfig;
     private service: AlgoChatService;
@@ -523,17 +523,16 @@ export class AlgoChatBridge {
                 const conversations = listConversations(this.db);
                 const conversation = conversations.find((c) => c.sessionId === sessionId);
                 if (conversation) {
-                    const approvalEvent = event as unknown as { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number };
                     // Register the expected responder so resolveByShortId can verify sender
-                    this.approvalManager?.setSenderAddress(approvalEvent.id, conversation.participantAddr);
+                    this.approvalManager?.setSenderAddress(event.id!, conversation.participantAddr);
 
                     this.sendApprovalRequest(conversation.participantAddr, {
-                        id: approvalEvent.id,
-                        sessionId: approvalEvent.sessionId,
-                        toolName: approvalEvent.toolName,
-                        description: approvalEvent.description,
-                        createdAt: approvalEvent.createdAt,
-                        timeoutMs: approvalEvent.timeoutMs,
+                        id: event.id!,
+                        sessionId: event.sessionId!,
+                        toolName: event.toolName!,
+                        description: event.description!,
+                        createdAt: event.createdAt!,
+                        timeoutMs: event.timeoutMs!,
                     }).catch((err) => {
                         log.error('Failed to send approval request on-chain', {
                             error: err instanceof Error ? err.message : String(err),

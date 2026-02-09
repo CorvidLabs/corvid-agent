@@ -10,15 +10,9 @@ import type { ModelPullStatus } from '../providers/ollama/provider';
 import { LlmProviderRegistry } from '../providers/registry';
 import { parseBodyOrThrow, ValidationError, OllamaPullModelSchema, OllamaDeleteModelSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import { json } from '../lib/response';
 
 const log = createLogger('OllamaRoutes');
-
-function json(data: unknown, status = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
 
 /** Get the OllamaProvider instance from the registry, or null. */
 function getOllamaProvider(): OllamaProvider | null {

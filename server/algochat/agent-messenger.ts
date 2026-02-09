@@ -42,7 +42,7 @@ export interface AgentInvokeResult {
 
 type MessageUpdateCallback = (message: AgentMessage) => void;
 export class AgentMessenger {
-    private db: Database;
+    readonly db: Database;
     private service: AlgoChatService | null;
     private agentWalletService: AgentWalletService;
     private agentDirectory: AgentDirectory;

@@ -6,13 +6,7 @@ import {
     removeFromAllowlist,
 } from '../db/allowlist';
 import { parseBodyOrThrow, ValidationError, AddAllowlistSchema, UpdateAllowlistSchema } from '../lib/validation';
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
+import { json } from '../lib/response';
 
 let _algosdk: typeof import('algosdk').default | null = null;
 async function getAlgosdk() {

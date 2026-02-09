@@ -1,12 +1,6 @@
 import type { WorkTaskService } from '../work/service';
 import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
+import { json } from '../lib/response';
 
 export function handleWorkTaskRoutes(
     req: Request,
