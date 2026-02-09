@@ -2,6 +2,8 @@ import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig } from './tool-handlers';
+import { handleManageSchedule } from './schedule-handler';
+import { SCHEDULER_BLOCKED_TOOLS } from '../scheduler/types';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -13,6 +15,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_extend_timeout',
     'corvid_check_credits',
     'corvid_create_work_task',
+    'corvid_manage_schedule',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -114,6 +117,28 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 async (args) => handleCreateWorkTask(ctx, args),
             ),
         ] : []),
+        tool(
+            'corvid_manage_schedule',
+            'Manage autonomous scheduled tasks. Create, list, pause, resume schedules or view run history. ' +
+            'Schedules run actions on a cron schedule (e.g. star repos, review PRs). ' +
+            'Write actions (work_on_repo, suggest_improvements, fork_repos) always require approval.',
+            {
+                action: z.enum(['create', 'list', 'pause', 'resume', 'history']).describe(
+                    'The action to perform: create a schedule, list your schedules, pause/resume a schedule, or view run history.',
+                ),
+                name: z.string().optional().describe('Schedule name (required for create)'),
+                action_type: z.string().optional().describe(
+                    'Action type (required for create): star_repos, fork_repos, review_prs, work_on_repo, suggest_improvements, council_review',
+                ),
+                cron_expression: z.string().optional().describe('Cron expression (required for create), e.g. "0 */6 * * *" for every 6 hours'),
+                action_config: z.record(z.string(), z.unknown()).optional().describe('Action configuration (e.g. { "topics": ["ai"], "language": "python" } for star_repos)'),
+                schedule_id: z.string().optional().describe('Schedule ID (required for pause, resume, history)'),
+                requires_approval: z.boolean().optional().describe('Whether runs need owner approval before execution'),
+                max_budget_usd: z.number().optional().describe('Max USD budget per run (default 1.0)'),
+                daily_budget_usd: z.number().optional().describe('Max USD budget per day (default 5.0)'),
+            },
+            async (args) => handleManageSchedule({ agentId: ctx.agentId, db: ctx.db }, args),
+        ),
     ];
 
     // Local (web) sessions get all tools — permission scoping only applies to
@@ -124,6 +149,12 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         const permissions = agent?.mcpToolPermissions;
         const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
         filteredTools = tools.filter((t) => allowedSet.has(t.name));
+    }
+
+    // Scheduler mode: block specific tools to prevent scheduled runs from
+    // messaging other agents or modifying credit config.
+    if (ctx.schedulerMode) {
+        filteredTools = filteredTools.filter((t) => !SCHEDULER_BLOCKED_TOOLS.has(t.name));
     }
 
     return createSdkMcpServer({
