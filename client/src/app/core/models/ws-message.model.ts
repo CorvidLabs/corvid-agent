@@ -32,6 +32,7 @@ export type ServerWsMessage =
     | { type: 'schedule_update'; schedule: import('./schedule.model').AgentSchedule }
     | { type: 'schedule_execution_update'; execution: import('./schedule.model').ScheduleExecution }
     | { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
+    | { type: 'ollama_pull_progress'; model: string; status: string; progress: number; downloadedBytes: number; totalBytes: number; currentLayer: string; error?: string }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {

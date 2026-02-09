@@ -20,6 +20,7 @@ import { checkWsAuth, loadAuthConfig, validateStartupSecurity } from './middlewa
 import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
+import { handleOllamaRoutes } from './routes/ollama';
 
 const log = createLogger('Server');
 
@@ -245,6 +246,13 @@ const server = Bun.serve<WsData>({
                 headers: { 'Content-Type': 'application/json' },
             });
         }
+
+        // Ollama model management routes
+        const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
+            const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
+            server.publish('ollama', msg);
+        });
+        if (ollamaResponse) return ollamaResponse;
 
         // API routes
         const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService);

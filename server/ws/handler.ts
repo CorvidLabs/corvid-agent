@@ -28,6 +28,7 @@ export function createWebSocketHandler(
             ws.subscribe('council');
             ws.subscribe('algochat');
             ws.subscribe('scheduler');
+            ws.subscribe('ollama');
             log.info('WebSocket connection opened');
         },
 
@@ -44,6 +45,8 @@ export function createWebSocketHandler(
             }
 
             if (!isClientMessage(parsed)) {
+                const preview = raw.slice(0, 200);
+                log.warn('Invalid WS message format', { raw: preview });
                 sendError(ws, 'Invalid message format');
                 return;
             }
