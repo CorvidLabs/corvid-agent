@@ -24,6 +24,8 @@ import {
     getTransactionHistory,
 } from '../db/credits';
 import { listCouncils, createCouncil, getCouncilLaunch } from '../db/councils';
+import { listSchedules, getSchedule, updateSchedule, updateScheduleNextRun, listExecutions } from '../db/schedules';
+import type { SchedulerService } from '../scheduler/service';
 import { launchCouncil, onCouncilStageChange } from '../routes/councils';
 import { COMMAND_DEFS, getCommandDef } from '../../shared/command-defs';
 import { createLogger } from '../lib/logger';
@@ -31,7 +33,7 @@ import { createLogger } from '../lib/logger';
 const log = createLogger('CommandHandler');
 
 /** Commands that require owner authorization. */
-const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent', '/council', '/extend']);
+const PRIVILEGED_COMMANDS = new Set(['/stop', '/approve', '/deny', '/mode', '/work', '/agent', '/council', '/extend', '/schedule']);
 
 /**
  * Context required by the CommandHandler for resolving agents and projects.
@@ -60,6 +62,7 @@ export class CommandHandler {
     private context: CommandHandlerContext;
     private workTaskService: WorkTaskService | null = null;
     private agentMessengerRef: AgentMessenger | null = null;
+    private schedulerServiceRef: SchedulerService | null = null;
 
     constructor(
         db: Database,
@@ -83,6 +86,11 @@ export class CommandHandler {
     /** Inject the optional agent messenger reference (for councils). */
     setAgentMessenger(messenger: AgentMessenger): void {
         this.agentMessengerRef = messenger;
+    }
+
+    /** Inject the optional scheduler service reference. */
+    setSchedulerService(service: SchedulerService): void {
+        this.schedulerServiceRef = service;
     }
 
     /**
@@ -358,8 +366,80 @@ export class CommandHandler {
                 return true;
             }
 
+            case '/schedule': {
+                this.handleScheduleCommand(parts, respond);
+                return true;
+            }
+
             default:
                 return false;
+        }
+    }
+
+    /**
+     * Handle the `/schedule` command from AlgoChat.
+     */
+    private handleScheduleCommand(parts: string[], respond: (text: string) => void): void {
+        const sub = parts[1]?.toLowerCase() ?? 'list';
+        const scheduleId = parts[2];
+
+        switch (sub) {
+            case 'list': {
+                const schedules = listSchedules(this.db);
+                if (schedules.length === 0) {
+                    respond('No schedules found.');
+                    return;
+                }
+                const lines = schedules.map((s) =>
+                    `- **${s.name}** [${s.id.slice(0, 8)}] status=${s.status} runs=${s.executionCount}${s.nextRunAt ? ` next=${s.nextRunAt}` : ''}`
+                );
+                respond(`**Schedules:**\n${lines.join('\n')}`);
+                return;
+            }
+
+            case 'pause': {
+                if (!scheduleId) { respond('Usage: /schedule pause <schedule-id>'); return; }
+                const updated = updateSchedule(this.db, scheduleId, { status: 'paused' });
+                if (!updated) { respond(`Schedule ${scheduleId} not found`); return; }
+                respond(`Schedule "${updated.name}" paused.`);
+                return;
+            }
+
+            case 'resume': {
+                if (!scheduleId) { respond('Usage: /schedule resume <schedule-id>'); return; }
+                const updated = updateSchedule(this.db, scheduleId, { status: 'active' });
+                if (!updated) { respond(`Schedule ${scheduleId} not found`); return; }
+                respond(`Schedule "${updated.name}" resumed.`);
+                return;
+            }
+
+            case 'history': {
+                if (!scheduleId) { respond('Usage: /schedule history <schedule-id>'); return; }
+                const executions = listExecutions(this.db, scheduleId, 10);
+                if (executions.length === 0) {
+                    respond('No executions found for this schedule.');
+                    return;
+                }
+                const lines = executions.map((e) =>
+                    `- [${e.id.slice(0, 8)}] ${e.actionType} status=${e.status} ${e.startedAt}${e.result ? ` — ${e.result.slice(0, 80)}` : ''}`
+                );
+                respond(`**Recent Executions:**\n${lines.join('\n')}`);
+                return;
+            }
+
+            case 'run': {
+                if (!scheduleId) { respond('Usage: /schedule run <schedule-id>'); return; }
+                const schedule = getSchedule(this.db, scheduleId);
+                if (!schedule) { respond(`Schedule ${scheduleId} not found`); return; }
+                if (!this.schedulerServiceRef) { respond('Scheduler service not available'); return; }
+                // Trigger immediate execution by setting next_run_at to now
+                updateScheduleNextRun(this.db, scheduleId, new Date().toISOString());
+                respond(`Schedule "${schedule.name}" queued for immediate execution.`);
+                return;
+            }
+
+            default:
+                respond('Usage: /schedule [list|pause|resume|history|run] [schedule-id]');
         }
     }
 

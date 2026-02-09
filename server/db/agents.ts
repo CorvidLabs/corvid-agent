@@ -8,6 +8,7 @@ interface AgentRow {
     system_prompt: string;
     append_prompt: string;
     model: string;
+    provider: string;
     allowed_tools: string;
     disallowed_tools: string;
     permission_mode: string;
@@ -32,6 +33,7 @@ function rowToAgent(row: AgentRow): Agent {
         systemPrompt: row.system_prompt,
         appendPrompt: row.append_prompt,
         model: row.model,
+        provider: row.provider || undefined,
         allowedTools: row.allowed_tools,
         disallowedTools: row.disallowed_tools,
         permissionMode: row.permission_mode as Agent['permissionMode'],
@@ -65,10 +67,10 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
     const mcpToolPermissions = input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null;
 
     db.query(
-        `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model,
+        `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
          algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -76,6 +78,7 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         input.systemPrompt ?? '',
         input.appendPrompt ?? '',
         input.model ?? '',
+        input.provider ?? '',
         input.allowedTools ?? '',
         input.disallowedTools ?? '',
         input.permissionMode ?? 'default',
@@ -103,6 +106,7 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
         ['systemPrompt', 'system_prompt'],
         ['appendPrompt', 'append_prompt'],
         ['model', 'model'],
+        ['provider', 'provider'],
         ['allowedTools', 'allowed_tools'],
         ['disallowedTools', 'disallowed_tools'],
         ['permissionMode', 'permission_mode'],

@@ -7,6 +7,7 @@ export interface Agent {
     systemPrompt: string;
     appendPrompt: string;
     model: string;
+    provider?: string;
     allowedTools: string;
     disallowedTools: string;
     permissionMode: PermissionMode;
@@ -27,6 +28,7 @@ export interface CreateAgentInput {
     systemPrompt?: string;
     appendPrompt?: string;
     model?: string;
+    provider?: string;
     allowedTools?: string;
     disallowedTools?: string;
     permissionMode?: PermissionMode;
