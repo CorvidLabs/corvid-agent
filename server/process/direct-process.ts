@@ -14,6 +14,7 @@ import type { SdkProcess } from './sdk-process';
 import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
+import { getToolInstructionPrompt, getResponseRoutingPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DirectProcess');
@@ -64,15 +65,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         toolMap.set(t.name, t);
     }
 
-    // Build system prompt
-    const systemPrompt = buildSystemPrompt(agent, project);
     const model = agent?.model || provider.getInfo().defaultModel;
+
+    // Build system prompt (with tool instructions if tools are available)
+    const toolNames = directTools.map((t) => t.name);
+    const systemPrompt = buildSystemPrompt(agent, project, model, toolNames, !toolsDisabled && directTools.length > 0);
 
     // Conversation history for the current session
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
 
+    // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
+    const effectivePrompt = prependRoutingContext(prompt, session.source);
+
     // Start the main loop
-    runLoop(prompt).catch((err) => {
+    runLoop(effectivePrompt).catch((err) => {
         if (aborted) return;
         const errorMsg = err instanceof Error ? err.message : String(err);
         log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
@@ -254,7 +260,25 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     return { pid: pseudoPid, sendMessage, kill };
 }
 
-function buildSystemPrompt(agent: Agent | null, project: Project): string {
+/**
+ * For AlgoChat/agent-sourced messages, prepend a routing hint so the model
+ * knows to reply with text directly rather than wrapping responses in
+ * corvid_send_message tool calls.
+ */
+function prependRoutingContext(message: string, source: string): string {
+    if (source === 'algochat' || source === 'agent') {
+        return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${message}`;
+    }
+    return message;
+}
+
+function buildSystemPrompt(
+    agent: Agent | null,
+    project: Project,
+    model: string,
+    toolNames: string[],
+    hasTools: boolean,
+): string {
     const parts: string[] = [];
 
     if (agent?.systemPrompt) {
@@ -268,6 +292,17 @@ function buildSystemPrompt(agent: Agent | null, project: Project): string {
 
     if (agent?.appendPrompt) {
         parts.push('', agent.appendPrompt);
+    }
+
+    // Append tool-specific instructions when tools are available
+    if (hasTools && toolNames.length > 0) {
+        const family = detectModelFamily(model);
+        parts.push('', getToolInstructionPrompt(family, toolNames));
+
+        // Add response routing instructions if messaging tools are present
+        if (toolNames.includes('corvid_send_message')) {
+            parts.push('', getResponseRoutingPrompt());
+        }
     }
 
     return parts.join('\n');
