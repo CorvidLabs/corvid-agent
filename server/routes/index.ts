@@ -6,6 +6,9 @@ import { handleCouncilRoutes } from './councils';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleMcpApiRoutes } from './mcp-api';
 import { handleAllowlistRoutes } from './allowlist';
+import { handleAnalyticsRoutes } from './analytics';
+import { handleSystemLogRoutes } from './system-logs';
+import { handleSettingsRoutes } from './settings';
 import type { ProcessManager } from '../process/manager';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
@@ -123,6 +126,15 @@ async function handleRoutes(
 
     const allowlistResponse = handleAllowlistRoutes(req, url, db);
     if (allowlistResponse) return allowlistResponse;
+
+    const analyticsResponse = handleAnalyticsRoutes(req, url, db);
+    if (analyticsResponse) return analyticsResponse;
+
+    const systemLogResponse = handleSystemLogRoutes(req, url, db);
+    if (systemLogResponse) return systemLogResponse;
+
+    const settingsResponse = await handleSettingsRoutes(req, url, db);
+    if (settingsResponse) return settingsResponse;
 
     const sessionResponse = await handleSessionRoutes(req, url, db, processManager);
     if (sessionResponse) return sessionResponse;

@@ -288,8 +288,22 @@ interface AgentSummary {
             background: rgba(80, 227, 194, 0.1);
             border-color: rgba(80, 227, 194, 0.4);
         }
-        .dashboard__local-chat { margin-top: 1.5rem; }
-        .dashboard__local-chat h3 { margin: 0 0 0.75rem; }
+        .dashboard__local-chat {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 500px;
+            height: calc(100vh - 200px);
+            max-height: 800px;
+        }
+        .dashboard__local-chat h3 { margin: 0 0 0.75rem; flex-shrink: 0; }
+        .dashboard__local-chat .chat-controls { flex-shrink: 0; }
+        .dashboard__local-chat app-terminal-chat {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
         .chat-controls {
             margin-bottom: 0.75rem;
             display: flex;

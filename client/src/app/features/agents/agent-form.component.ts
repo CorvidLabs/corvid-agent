@@ -23,7 +23,7 @@ import type { Project } from '../../core/models/project.model';
                 <div class="form__field">
                     <label for="description" class="form__label">Description</label>
                     <textarea id="description" formControlName="description" class="form__input form__textarea"
-                              rows="2"></textarea>
+                              rows="3"></textarea>
                 </div>
 
                 <div class="form__field">
@@ -49,13 +49,13 @@ import type { Project } from '../../core/models/project.model';
                 <div class="form__field">
                     <label for="systemPrompt" class="form__label">System Prompt</label>
                     <textarea id="systemPrompt" formControlName="systemPrompt" class="form__input form__textarea"
-                              rows="4" placeholder="Custom system instructions..."></textarea>
+                              rows="8" placeholder="Custom system instructions..."></textarea>
                 </div>
 
                 <div class="form__field">
                     <label for="appendPrompt" class="form__label">Append Prompt</label>
                     <textarea id="appendPrompt" formControlName="appendPrompt" class="form__input form__textarea"
-                              rows="3" placeholder="Appended to the system prompt..."></textarea>
+                              rows="6" placeholder="Appended to the system prompt..."></textarea>
                 </div>
 
                 <div class="form__field">
@@ -117,7 +117,7 @@ import type { Project } from '../../core/models/project.model';
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .form__input:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-        .form__textarea { resize: vertical; }
+        .form__textarea { resize: vertical; min-height: 5em; line-height: 1.5; }
         .form__fieldset { border: 1px solid var(--border-bright); border-radius: var(--radius); padding: 1rem; margin: 0; background: var(--bg-surface); }
         .form__legend { font-weight: 600; font-size: 0.8rem; color: var(--accent-magenta); padding: 0 0.25rem; letter-spacing: 0.05em; }
         .form__checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-top: 0.5rem; cursor: pointer; color: var(--text-primary); }

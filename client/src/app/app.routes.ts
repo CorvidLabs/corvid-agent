@@ -103,6 +103,26 @@ export const routes: Routes = [
             import('./features/sessions/session-view.component').then((m) => m.SessionViewComponent),
     },
     {
+        path: 'work-tasks',
+        loadComponent: () =>
+            import('./features/work-tasks/work-task-list.component').then((m) => m.WorkTaskListComponent),
+    },
+    {
+        path: 'analytics',
+        loadComponent: () =>
+            import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent),
+    },
+    {
+        path: 'logs',
+        loadComponent: () =>
+            import('./features/logs/system-logs.component').then((m) => m.SystemLogsComponent),
+    },
+    {
+        path: 'settings',
+        loadComponent: () =>
+            import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+    },
+    {
         path: 'nft/review',
         loadComponent: () =>
             import('./features/nft/nft-initial-review.component').then((m) => m.NFTInitialReviewComponent),
