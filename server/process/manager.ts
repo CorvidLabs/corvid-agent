@@ -145,7 +145,7 @@ export class ProcessManager {
             schedulerService: this.mcpSchedulerService ?? undefined,
             schedulerMode,
             emitStatus: sessionId
-                ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
+                ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', statusMessage: message })
                 : undefined,
             extendTimeout: sessionId
                 ? (additionalMs: number) => this.extendTimeout(sessionId, additionalMs)
@@ -311,7 +311,7 @@ export class ProcessManager {
         this.eventBus.emit(sessionId, {
             type: 'approval_request',
             ...request,
-        } as unknown as ClaudeStreamEvent);
+        });
     }
 
     resumeProcess(session: Session, prompt?: string): void {
@@ -717,8 +717,8 @@ export class ProcessManager {
                             });
                             this.eventBus.emit(sessionId, {
                                 type: 'system',
-                                message: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
-                            } as unknown as ClaudeStreamEvent);
+                                statusMessage: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
+                            });
                         }
                     }
                 }

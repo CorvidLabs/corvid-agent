@@ -4,13 +4,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
+import { json } from '../lib/response';
 
 interface DailySpendingRow {
     date: string;

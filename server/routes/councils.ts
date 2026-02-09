@@ -25,6 +25,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
+import { json } from '../lib/response';
 
 const log = createLogger('CouncilRoutes');
 
@@ -80,15 +81,6 @@ function emitLog(db: Database, launchId: string, level: CouncilLogLevel, message
     if (level === 'error') log.error(message, detail ? { detail } : undefined);
     else if (level === 'warn') log.warn(message, detail ? { detail } : undefined);
     else log.info(message, detail ? { detail } : undefined);
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────

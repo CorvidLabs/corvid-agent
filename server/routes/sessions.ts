@@ -10,15 +10,9 @@ import {
 import type { ProcessManager } from '../process/manager';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema } from '../lib/validation';
+import { json } from '../lib/response';
 
 const log = createLogger('SessionRoutes');
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
 
 export async function handleSessionRoutes(
     req: Request,

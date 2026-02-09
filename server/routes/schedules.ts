@@ -12,13 +12,7 @@ import {
 } from '../db/schedules';
 import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
+import { json, handleRouteError, errorMessage, badRequest } from '../lib/response';
 
 export function handleScheduleRoutes(
     req: Request,
@@ -110,12 +104,12 @@ async function handleCreateSchedule(req: Request, db: Database): Promise<Respons
         const schedule = createSchedule(db, data);
         return json(schedule, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('Minimum interval') || message.includes('fires every') || message.includes('too short')) {
-            return json({ error: message }, 400);
+        if (err instanceof ValidationError) return badRequest(err.message);
+        const msg = errorMessage(err);
+        if (msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short')) {
+            return badRequest(msg);
         }
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
@@ -126,9 +120,7 @@ async function handleUpdateSchedule(req: Request, db: Database, id: string): Pro
         if (!schedule) return json({ error: 'Schedule not found' }, 404);
         return json(schedule);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
@@ -153,8 +145,6 @@ async function handleResolveApproval(
         if (!execution) return json({ error: 'Execution not found or not awaiting approval' }, 404);
         return json(execution);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }

@@ -223,8 +223,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     function emitToolStatus(toolName: string, message: string, _isError: boolean): void {
         onEvent({
             type: 'tool_status',
-            message: `[${toolName}] ${message}`,
-        } as unknown as ClaudeStreamEvent);
+            statusMessage: `[${toolName}] ${message}`,
+        });
     }
 
     function sendMessage(content: string): boolean {

@@ -21,6 +21,7 @@ import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { handleOllamaRoutes } from './routes/ollama';
+import { listProjects, createProject } from './db/projects';
 
 const log = createLogger('Server');
 
@@ -49,9 +50,8 @@ ollamaProvider.refreshModels().catch((err) => {
 
 // Ensure a project exists for the server's own codebase
 {
-    const { listProjects, createProject } = require('./db/projects');
     const projects = listProjects(db);
-    const selfProject = projects.find((p: { workingDir: string }) => p.workingDir === process.cwd());
+    const selfProject = projects.find((p) => p.workingDir === process.cwd());
     if (!selfProject) {
         createProject(db, {
             name: 'corvid-agent',

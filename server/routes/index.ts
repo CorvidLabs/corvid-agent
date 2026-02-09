@@ -23,6 +23,7 @@ import { searchAlgoChatMessages, getWalletSummaries, getWalletMessages } from '.
 import { backupDatabase } from '../db/backup';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import { json, serverError, handleRouteError, errorMessage } from '../lib/response';
 import { checkHttpAuth, loadAuthConfig, type AuthConfig } from '../middleware/auth';
 import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
 
@@ -38,13 +39,6 @@ const rateLimiter = new RateLimiter(loadRateLimitConfig());
 
 const log = createLogger('Router');
 
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
-
 /**
  * Global error handler — catches any unhandled error from route handlers
  * and returns a proper JSON 500 response instead of crashing the server.
@@ -55,7 +49,7 @@ function errorResponse(err: unknown): Response {
 
     log.error('Unhandled route error', { error: message, stack });
 
-    const response = json({ error: message, timestamp: new Date().toISOString() }, 500);
+    const response = serverError(err);
     addCors(response);
     return response;
 }
@@ -237,9 +231,7 @@ async function handleRoutes(
             await networkSwitchFn(data.network);
             return json({ ok: true, network: data.network });
         } catch (err) {
-            if (err instanceof ValidationError) return json({ error: err.message }, 400);
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: message }, 500);
+            return handleRouteError(err);
         }
     }
 
@@ -256,8 +248,7 @@ async function handleRoutes(
             const result = algochatBridge.getPSKExchangeURI();
             return json(result);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: message }, 500);
+            return handleRouteError(err);
         }
     }
 
@@ -270,8 +261,7 @@ async function handleRoutes(
             const result = algochatBridge.generatePSKExchangeURI();
             return json(result);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: message }, 500);
+            return handleRouteError(err);
         }
     }
 
@@ -281,8 +271,7 @@ async function handleRoutes(
             const result = backupDatabase(db);
             return json(result);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: `Backup failed: ${message}` }, 500);
+            return json({ error: `Backup failed: ${errorMessage(err)}` }, 500);
         }
     }
 
@@ -325,9 +314,7 @@ async function handleSelfTestRun(
         const result = selfTestService.run(testType);
         return json({ sessionId: result.sessionId });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
