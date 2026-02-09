@@ -99,6 +99,14 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/schedules"
+                        routerLinkActive="sidebar__link--active">
+                        Schedules
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/analytics"
                         routerLinkActive="sidebar__link--active">
                         Analytics

@@ -151,8 +151,8 @@ async function handleRoutes(
         if (workTaskResponse) return workTaskResponse;
     }
 
-    // Schedule routes (scheduler CRUD + health + global pause)
-    const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService);
+    // Schedule routes (automation)
+    const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService ?? null);
     if (scheduleResponse) return scheduleResponse;
 
     // MCP API routes (used by stdio server subprocess)
