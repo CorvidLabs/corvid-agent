@@ -280,7 +280,7 @@ export class AlgoChatBridge {
         }
     }
 
-    private saveMobilePSK(uri: string, psk: Uint8Array, label: string): void {
+    private saveMobilePSK(_uri: string, psk: Uint8Array, label: string): void {
         this.db.prepare(`
             INSERT OR REPLACE INTO algochat_psk_state
                 (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
