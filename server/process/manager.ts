@@ -11,6 +11,7 @@ import { getAgent } from '../db/agents';
 import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
+import { getAgentMessageBySessionId } from '../db/agent-messages';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
@@ -253,6 +254,19 @@ export class ProcessManager {
             ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode)
             : null;
 
+        // Look up the original sender for agent-to-agent sessions so the
+        // DirectProcess can intercept self-reply corvid_send_message calls.
+        let senderAgentId: string | undefined;
+        let senderAgentName: string | undefined;
+        if (session.source === 'agent' || session.source === 'algochat') {
+            const agentMsg = getAgentMessageBySessionId(this.db, session.id);
+            if (agentMsg) {
+                senderAgentId = agentMsg.fromAgentId;
+                const senderAgent = getAgent(this.db, agentMsg.fromAgentId);
+                senderAgentName = senderAgent?.name;
+            }
+        }
+
         let sp: SdkProcess;
         try {
             sp = startDirectProcess({
@@ -266,6 +280,8 @@ export class ProcessManager {
                 onExit: (code) => this.handleExit(session.id, code),
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 mcpToolContext,
+                senderAgentId,
+                senderAgentName,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -362,6 +378,19 @@ export class ProcessManager {
                 const mcpToolContext = session.agentId
                     ? this.buildMcpContext(session.agentId, session.source, session.id)
                     : null;
+
+                // Look up sender for agent-sourced sessions (same as startDirectProcessWrapped)
+                let senderIdResume: string | undefined;
+                let senderNameResume: string | undefined;
+                if (session.source === 'agent' || session.source === 'algochat') {
+                    const agentMsg = getAgentMessageBySessionId(this.db, session.id);
+                    if (agentMsg) {
+                        senderIdResume = agentMsg.fromAgentId;
+                        const senderAgent = getAgent(this.db, agentMsg.fromAgentId);
+                        senderNameResume = senderAgent?.name;
+                    }
+                }
+
                 sp = startDirectProcess({
                     session,
                     project,
@@ -373,6 +402,8 @@ export class ProcessManager {
                     onExit: (code) => this.handleExit(session.id, code),
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     mcpToolContext,
+                    senderAgentId: senderIdResume,
+                    senderAgentName: senderNameResume,
                 });
             } else {
                 const mcpServers = session.agentId

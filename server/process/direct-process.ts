@@ -32,6 +32,10 @@ export interface DirectProcessOptions {
     onExit: (code: number | null) => void;
     onApprovalRequest: (request: ApprovalRequestWire) => void;
     mcpToolContext: McpToolContext | null;
+    /** The agent ID that sent the message triggering this session (for intercept logic). */
+    senderAgentId?: string;
+    /** The agent name that sent the message triggering this session (for intercept logic). */
+    senderAgentName?: string;
 }
 
 let nextPseudoPid = 800_000;
@@ -48,6 +52,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         onExit,
         onApprovalRequest,
         mcpToolContext,
+        senderAgentId,
+        senderAgentName,
     } = options;
 
     const pseudoPid = nextPseudoPid++;
@@ -144,6 +150,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 // Add assistant message with tool call indication
                 messages.push({ role: 'assistant', content: result.content || '' });
 
+                let intercepted = false;
                 for (const toolCall of result.toolCalls) {
                     if (aborted) return;
 
@@ -168,6 +175,43 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         continue;
                     }
 
+                    // Intercept corvid_send_message when the model tries to reply
+                    // to the original sender instead of responding with plain text.
+                    // This is common with smaller models (e.g. Qwen/Llama via Ollama)
+                    // that ignore system prompt instructions about not using tools to reply.
+                    if (toolCall.name === 'corvid_send_message' && senderAgentId) {
+                        const toAgent = (toolCall.arguments as { to_agent?: string }).to_agent ?? '';
+                        const isSelfReply =
+                            toAgent === senderAgentId ||
+                            (senderAgentName != null && toAgent.toLowerCase() === senderAgentName.toLowerCase());
+
+                        if (isSelfReply) {
+                            const interceptedMessage = (toolCall.arguments as { message?: string }).message ?? '';
+                            log.info('Intercepted corvid_send_message self-reply', {
+                                sessionId: session.id,
+                                senderAgentId,
+                                toAgent,
+                                messagePreview: interceptedMessage.slice(0, 100),
+                            });
+
+                            // Treat the intercepted message as the model's plain text response
+                            if (interceptedMessage) {
+                                onEvent({
+                                    type: 'assistant',
+                                    message: {
+                                        role: 'assistant',
+                                        content: [{ type: 'text', text: interceptedMessage }],
+                                    },
+                                } as ClaudeStreamEvent);
+                                messages.push({ role: 'assistant', content: interceptedMessage });
+                            }
+
+                            // Signal to break out of both loops — this is the final response
+                            intercepted = true;
+                            break;
+                        }
+                    }
+
                     // Execute tool
                     emitToolStatus(toolCall.name, `Running ${toolCall.name}...`, false);
                     try {
@@ -184,6 +228,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         emitToolStatus(toolCall.name, errorText, true);
                     }
                 }
+
+                // If a self-reply was intercepted, we're done — break out of the outer loop
+                if (intercepted) break;
 
                 // Continue loop to let the model process tool results
                 continue;
