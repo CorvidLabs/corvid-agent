@@ -52,6 +52,9 @@ export function buildSafeEnvForCoding(): Record<string, string> {
         'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL',
         'GH_TOKEN', 'GITHUB_TOKEN',
         'NODE_PATH', 'BUN_INSTALL',
+        // Windows equivalents
+        'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
+        'SystemRoot', 'COMSPEC', 'PATHEXT',
     ];
 
     const safe: Record<string, string> = {};

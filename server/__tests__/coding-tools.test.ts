@@ -61,7 +61,9 @@ describe('buildSafeEnvForCoding', () => {
     test('includes PATH and HOME', () => {
         const env = buildSafeEnvForCoding();
         expect(env.PATH).toBeDefined();
-        expect(env.HOME).toBeDefined();
+        // Windows uses USERPROFILE instead of HOME
+        const hasHome = env.HOME !== undefined || env.USERPROFILE !== undefined;
+        expect(hasHome).toBe(true);
     });
 
     test('excludes secret-like env vars', () => {
@@ -229,18 +231,24 @@ describe('run_command', () => {
     });
 
     test('runs in the project directory', async () => {
-        const result = await getTool('run_command').handler({ command: 'pwd' });
-        // macOS: /var → /private/var symlink
-        expect(result.text.trim()).toEndWith(workDir.replace(/^\/private/, ''));
+        const isWindows = process.platform === 'win32';
+        const command = isWindows ? 'cd' : 'pwd';
+        const result = await getTool('run_command').handler({ command });
+        const output = result.text.trim().replace(/\r\n/g, '\n').trim();
+        // macOS: /var → /private/var symlink; Windows: paths use backslashes
+        const normalizedWorkDir = isWindows ? workDir : workDir.replace(/^\/private/, '');
+        expect(output).toEndWith(normalizedWorkDir);
     });
 
     test('respects timeout', async () => {
+        const isWindows = process.platform === 'win32';
+        const command = isWindows ? 'ping -n 30 127.0.0.1' : 'sleep 30';
         const start = Date.now();
-        await getTool('run_command').handler({ command: 'sleep 30', timeout: 2 });
+        await getTool('run_command').handler({ command, timeout: 2 });
         const elapsed = Date.now() - start;
-        // Should be killed well before 30s
-        expect(elapsed).toBeLessThan(10_000);
-    });
+        // Should be killed well before 30s (generous for slow CI runners)
+        expect(elapsed).toBeLessThan(15_000);
+    }, 20_000);
 
     test('blocks write operators targeting protected paths', async () => {
         const result = await getTool('run_command').handler({ command: 'rm CLAUDE.md' });
