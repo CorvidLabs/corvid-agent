@@ -174,6 +174,21 @@ export class OllamaProvider extends BaseLlmProvider {
      */
     private static readonly TEXT_BASED_TOOL_FAMILIES = new Set(['qwen3']);
 
+    /**
+     * Detect if running inside a macOS VM. Virtual GPU (Metal) is orders of
+     * magnitude slower than CPU for LLM inference, so we default to num_gpu=0.
+     */
+    private static readonly isVirtualMac: boolean = (() => {
+        try {
+            const model = new TextDecoder().decode(
+                Bun.spawnSync({ cmd: ['sysctl', '-n', 'hw.model'] }).stdout,
+            ).trim();
+            return model.startsWith('VirtualMac');
+        } catch {
+            return false;
+        }
+    })();
+
     protected async doComplete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
         // Wait for a concurrency slot
         if (this.activeRequests >= OllamaProvider.MAX_CONCURRENT) {
@@ -229,6 +244,16 @@ export class OllamaProvider extends BaseLlmProvider {
         const options: Record<string, unknown> = {
             num_ctx: defaultCtx,
         };
+
+        // Virtual macOS GPU is slower than CPU — force CPU mode in VMs.
+        // Override with OLLAMA_NUM_GPU env var (set to -1 for auto, 0 for CPU-only).
+        const numGpu = process.env.OLLAMA_NUM_GPU;
+        if (numGpu !== undefined) {
+            options.num_gpu = parseInt(numGpu, 10);
+        } else if (OllamaProvider.isVirtualMac) {
+            options.num_gpu = 0;
+            log.info('Virtual macOS detected — using CPU-only mode (set OLLAMA_NUM_GPU to override)');
+        }
         if (params.temperature !== undefined) {
             options.temperature = params.temperature;
         }
