@@ -60,6 +60,8 @@ export interface DirectProcessOptions {
     onExit: (code: number | null) => void;
     onApprovalRequest: (request: ApprovalRequestWire) => void;
     mcpToolContext: McpToolContext | null;
+    /** Called to reset the session timeout when the agent is still active. */
+    extendTimeout?: (additionalMs: number) => void;
 }
 
 let nextPseudoPid = 800_000;
@@ -76,6 +78,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         onExit,
         onApprovalRequest,
         mcpToolContext,
+        extendTimeout,
     } = options;
 
     const pseudoPid = nextPseudoPid++;
@@ -143,8 +146,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 ? toProviderTools(directTools)
                 : undefined;
 
+            // Extend session timeout on activity (debounced to once per minute)
+            let lastExtend = 0;
+            const EXTEND_DEBOUNCE_MS = 60_000;
+            const TIMEOUT_EXTENSION_MS = 30 * 60 * 1000; // 30 minutes
+
             const activityCallback = () => {
                 onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+                if (extendTimeout) {
+                    const now = Date.now();
+                    if (now - lastExtend > EXTEND_DEBOUNCE_MS) {
+                        extendTimeout(TIMEOUT_EXTENSION_MS);
+                        lastExtend = now;
+                    }
+                }
             };
 
             // Heartbeat while waiting for provider (covers Ollama queue wait + prompt eval)

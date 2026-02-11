@@ -266,6 +266,7 @@ export class ProcessManager {
                 onExit: (code) => this.handleExit(session.id, code),
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 mcpToolContext,
+                extendTimeout: (ms) => this.extendTimeout(session.id, ms),
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -373,6 +374,7 @@ export class ProcessManager {
                     onExit: (code) => this.handleExit(session.id, code),
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     mcpToolContext,
+                    extendTimeout: (ms) => this.extendTimeout(session.id, ms),
                 });
             } else {
                 const mcpServers = session.agentId
