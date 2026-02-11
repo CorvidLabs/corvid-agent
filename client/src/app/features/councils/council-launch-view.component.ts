@@ -126,6 +126,9 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                 }
                                 <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                 <app-status-badge [status]="session.status" />
+                                @if (session.status === 'running' && getActivity(session.agentId)) {
+                                    <span class="feed-activity">{{ getActivity(session.agentId) }}</span>
+                                }
                                 @if (!expandedSessions().has(session.id)) {
                                     <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
                                 }
@@ -212,6 +215,9 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                     }
                                     <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                     <app-status-badge [status]="session.status" />
+                                    @if (session.status === 'running' && getActivity(session.agentId)) {
+                                        <span class="feed-activity">{{ getActivity(session.agentId) }}</span>
+                                    }
                                     @if (!expandedSessions().has(session.id)) {
                                         <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
                                     }
@@ -377,6 +383,10 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .feed-preview {
             flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
+        }
+        .feed-activity {
+            flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: var(--accent); font-size: 0.7rem; font-style: italic; opacity: 0.85;
         }
         .feed-toggle {
             flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
@@ -566,6 +576,19 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
                 const existing = events.get(msg.sessionId) ?? [];
                 events.set(msg.sessionId, [...existing, msg.event]);
                 this.sessionEvents.set(events);
+
+                // Surface thinking/tool activity for Ollama (direct-process) sessions
+                const agentId = this.agentIdBySession[msg.sessionId];
+                if (agentId && msg.event?.eventType === 'thinking') {
+                    const active = !!(msg.event.data as Record<string, unknown>)?.thinking;
+                    this.setActivity(agentId, active ? 'Thinking...' : '');
+                }
+                if (agentId && msg.event?.eventType === 'tool_status') {
+                    const statusMsg = (msg.event.data as Record<string, unknown>)?.statusMessage as string;
+                    if (statusMsg) {
+                        this.setActivity(agentId, statusMsg, 5000);
+                    }
+                }
             }
             if (msg.type === 'session_status') {
                 this.refreshSessions();
