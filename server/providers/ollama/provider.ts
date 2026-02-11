@@ -94,12 +94,12 @@ export class OllamaProvider extends BaseLlmProvider {
 
     /**
      * Concurrency limiter — allows up to MAX_CONCURRENT Ollama requests at once.
-     * Default 1 because Ollama returns 500s on concurrent tool-call requests
-     * (even with OLLAMA_NUM_PARALLEL > 1). Serial processing is slower but
-     * reliable, and avoids VRAM swap overhead entirely.
+     * Text-based tool calling avoids the 500s that Ollama's native tools API
+     * produces under concurrency. Default 3 for reasonable throughput in councils.
+     * Override with OLLAMA_MAX_PARALLEL env var.
      */
     private static readonly MAX_CONCURRENT = parseInt(
-        process.env.OLLAMA_MAX_PARALLEL ?? '1', 10,
+        process.env.OLLAMA_MAX_PARALLEL ?? '3', 10,
     );
     private activeRequests = 0;
     private waitQueue: Array<() => void> = [];
@@ -174,20 +174,8 @@ export class OllamaProvider extends BaseLlmProvider {
      */
     private static readonly TEXT_BASED_TOOL_FAMILIES = new Set(['qwen3']);
 
-    /**
-     * Detect if running inside a macOS VM. Virtual GPU (Metal) is orders of
-     * magnitude slower than CPU for LLM inference, so we default to num_gpu=0.
-     */
-    private static readonly isVirtualMac: boolean = (() => {
-        try {
-            const model = new TextDecoder().decode(
-                Bun.spawnSync({ cmd: ['sysctl', '-n', 'hw.model'] }).stdout,
-            ).trim();
-            return model.startsWith('VirtualMac');
-        } catch {
-            return false;
-        }
-    })();
+    // GPU mode is controlled via OLLAMA_NUM_GPU env var (e.g. 0 for CPU-only, -1 for auto).
+    // By default, Ollama auto-selects GPU layers. UTM VMs on Apple Silicon support GPU passthrough.
 
     protected async doComplete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
         // Wait for a concurrency slot
@@ -245,14 +233,12 @@ export class OllamaProvider extends BaseLlmProvider {
             num_ctx: defaultCtx,
         };
 
-        // Virtual macOS GPU is slower than CPU — force CPU mode in VMs.
-        // Override with OLLAMA_NUM_GPU env var (set to -1 for auto, 0 for CPU-only).
+        // Control GPU layers via OLLAMA_NUM_GPU env var (0=CPU-only, -1=auto).
+        // Omitted by default — Ollama auto-selects GPU layers.
         const numGpu = process.env.OLLAMA_NUM_GPU;
         if (numGpu !== undefined) {
             options.num_gpu = parseInt(numGpu, 10);
-        } else if (OllamaProvider.isVirtualMac) {
-            options.num_gpu = 0;
-            log.info('Virtual macOS detected — using CPU-only mode (set OLLAMA_NUM_GPU to override)');
+            log.info(`Using num_gpu=${options.num_gpu} from OLLAMA_NUM_GPU env var`);
         }
         if (params.temperature !== undefined) {
             options.temperature = params.temperature;

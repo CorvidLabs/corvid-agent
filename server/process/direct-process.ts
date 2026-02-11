@@ -132,6 +132,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
 
         let iteration = 0;
+        let lastToolCallKey = '';
+        let repeatCount = 0;
+        const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
+
         while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
             iteration++;
 
@@ -189,6 +193,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
             // Handle tool calls
             if (result.toolCalls && result.toolCalls.length > 0) {
+                // Detect repeated identical tool calls (small models get stuck in loops)
+                const callKey = result.toolCalls.map(tc => `${tc.name}:${JSON.stringify(tc.arguments)}`).join('|');
+                if (callKey === lastToolCallKey) {
+                    repeatCount++;
+                    if (repeatCount >= MAX_REPEATS) {
+                        log.warn(`Breaking tool loop: same call repeated ${repeatCount + 1} times`, { calls: callKey.slice(0, 200) });
+                        messages.push({ role: 'assistant', content: result.content || '' });
+                        break;
+                    }
+                } else {
+                    lastToolCallKey = callKey;
+                    repeatCount = 0;
+                }
+
                 // Add assistant message with tool call indication
                 messages.push({ role: 'assistant', content: result.content || '' });
 
