@@ -330,15 +330,15 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .stage-connector { flex: 1; height: 2px; background: var(--border); margin: 0 0.5rem; min-width: 20px; }
         .stage-connector--done { background: var(--accent-green); }
 
-        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; box-shadow: 0 0 8px #00e5ff66; }
+        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; }
         .stage-step--active[data-stage="responding"] .stage-label { color: #00e5ff; }
-        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; box-shadow: 0 0 8px #fbbf2466; }
+        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; }
         .stage-step--active[data-stage="discussing"] .stage-label { color: #fbbf24; }
-        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; box-shadow: 0 0 8px #a78bfa66; }
+        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; }
         .stage-step--active[data-stage="reviewing"] .stage-label { color: #a78bfa; }
-        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; box-shadow: 0 0 8px #f472b666; }
+        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; }
         .stage-step--active[data-stage="synthesizing"] .stage-label { color: #f472b6; }
-        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); box-shadow: 0 0 8px #00ff8866; }
+        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); }
         .stage-step--active[data-stage="complete"] .stage-label { color: var(--accent-green); }
 
         .actions { margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
@@ -385,8 +385,8 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
         }
         .feed-activity {
-            flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-            color: var(--accent); font-size: 0.7rem; font-style: italic; opacity: 0.85;
+            color: var(--accent); font-size: 0.7rem; font-style: italic;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .feed-toggle {
             flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
@@ -579,12 +579,13 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
 
                 // Surface thinking/tool activity for Ollama (direct-process) sessions
                 const agentId = this.agentIdBySession[msg.sessionId];
+                const eventData = msg.event?.data as Record<string, unknown> | undefined;
                 if (agentId && msg.event?.eventType === 'thinking') {
-                    const active = !!(msg.event.data as Record<string, unknown>)?.thinking;
+                    const active = !!(eventData?.['thinking']);
                     this.setActivity(agentId, active ? 'Thinking...' : '');
                 }
                 if (agentId && msg.event?.eventType === 'tool_status') {
-                    const statusMsg = (msg.event.data as Record<string, unknown>)?.statusMessage as string;
+                    const statusMsg = eventData?.['statusMessage'] as string | undefined;
                     if (statusMsg) {
                         this.setActivity(agentId, statusMsg, 5000);
                     }
