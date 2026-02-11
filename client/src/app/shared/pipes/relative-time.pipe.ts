@@ -5,7 +5,9 @@ export class RelativeTimePipe implements PipeTransform {
     transform(value: string | null | undefined): string {
         if (!value) return '';
 
-        const date = new Date(value);
+        // SQLite timestamps are UTC but lack a timezone suffix — normalize
+        const normalized = value.includes('T') || value.endsWith('Z') ? value : value.replace(' ', 'T') + 'Z';
+        const date = new Date(normalized);
         const now = new Date();
         const diffMs = now.getTime() - date.getTime();
         const diffSec = Math.floor(diffMs / 1000);

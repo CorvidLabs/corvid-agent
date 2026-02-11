@@ -20,6 +20,10 @@ export interface LlmCompletionParams {
     maxTokens?: number;
     temperature?: number;
     tools?: LlmToolDefinition[];
+    /** External abort signal — allows callers to cancel in-flight requests. */
+    signal?: AbortSignal;
+    /** Called periodically during streaming to signal the model is generating. */
+    onActivity?: () => void;
 }
 
 export interface LlmCompletionResult {

@@ -527,6 +527,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
             if (msg.type === 'algochat_message') {
+                // Skip inbound messages — already added optimistically in onChatMessage()
+                if (msg.direction === 'inbound') return;
                 this.chatMessages.update((msgs) => [
                     ...msgs,
                     {

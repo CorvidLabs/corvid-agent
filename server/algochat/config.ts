@@ -24,7 +24,7 @@ export interface AlgoChatConfig {
 
 export function loadAlgoChatConfig(): AlgoChatConfig {
     const mnemonic = process.env.ALGOCHAT_MNEMONIC ?? null;
-    const rawNetwork = (process.env.ALGORAND_NETWORK ?? 'testnet') as AlgoChatNetwork;
+    const rawNetwork = (process.env.ALGORAND_NETWORK ?? 'localnet') as AlgoChatNetwork;
     const rawAgentNetwork = (process.env.AGENT_NETWORK ?? 'localnet') as AlgoChatNetwork;
     const syncInterval = parseInt(process.env.ALGOCHAT_SYNC_INTERVAL ?? '30000', 10);
     const defaultAgentId = process.env.ALGOCHAT_DEFAULT_AGENT_ID ?? null;

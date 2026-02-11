@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, OnInit, effect } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { CouncilService } from '../../core/services/council.service';
@@ -59,10 +59,10 @@ import type { Agent } from '../../core/models/agent.model';
 
                 <div class="form__field">
                     <label for="chairman" class="form__label">Chairman (optional)</label>
-                    <select id="chairman" class="form__input" [value]="chairmanId()" (change)="onChairmanChange($event)">
+                    <select #chairmanSelect id="chairman" class="form__input" (change)="onChairmanChange($event)">
                         <option value="">None</option>
                         @for (agent of selectedAgentsList(); track agent.id) {
-                            <option [value]="agent.id">{{ agent.name }}</option>
+                            <option [value]="agent.id" [selected]="agent.id === chairmanId()">{{ agent.name }}</option>
                         }
                     </select>
                     <p class="form__hint">The chairman produces the final synthesized answer.</p>

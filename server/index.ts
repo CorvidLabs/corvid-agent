@@ -367,31 +367,51 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (err) => {
     log.error('Uncaught exception, shutting down', { error: err.message, stack: err.stack });
-    schedulerService.stop();
-    sessionLifecycle.stop();
-    processManager.shutdown();
-    algochatBridge?.stop();
-    closeDb();
+    logShutdownDiagnostics('uncaughtException');
+    gracefulShutdown();
     process.exit(1);
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-    log.info('Shutting down (SIGINT)');
+// Shutdown diagnostics — log enough context to diagnose unexpected kills
+function logShutdownDiagnostics(signal: string): void {
+    const uptimeSeconds = Math.round((Date.now() - startTime) / 1000);
+    const mem = process.memoryUsage();
+    let parentInfo = `ppid=${process.ppid}`;
+    try {
+        // Try to identify the parent process that may have sent the signal
+        const result = Bun.spawnSync(['ps', '-p', String(process.ppid), '-o', 'comm=']);
+        const parentName = result.stdout.toString().trim();
+        if (parentName) parentInfo += ` (${parentName})`;
+    } catch { /* ignore */ }
+
+    log.info(`Shutting down (${signal})`, {
+        uptime: `${uptimeSeconds}s`,
+        parent: parentInfo,
+        activeSessions: processManager.getActiveSessionIds().length,
+        rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
+    });
+}
+
+function gracefulShutdown(): void {
     schedulerService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();
+}
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    logShutdownDiagnostics('SIGINT');
+    gracefulShutdown();
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    log.info('Shutting down (SIGTERM)');
-    schedulerService.stop();
-    sessionLifecycle.stop();
-    processManager.shutdown();
-    algochatBridge?.stop();
-    closeDb();
-    process.exit(0);
+    logShutdownDiagnostics('SIGTERM');
+    gracefulShutdown();
+    // Exit non-zero so launchd/run.sh know this was NOT an intentional stop.
+    // Only SIGINT (ctrl-C / manual stop) exits 0.
+    process.exit(1);
 });

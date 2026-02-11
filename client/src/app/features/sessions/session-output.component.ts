@@ -20,7 +20,7 @@ interface ParsedEvent {
             @for (msg of messages(); track msg.id) {
                 <div class="line" [class]="'line--' + msg.role">
                     <span class="prompt">{{ msg.role === 'user' ? '>' : msg.role === 'assistant' ? '<' : '#' }}</span>
-                    <span class="label">{{ msg.role }}</span>
+                    <span class="label">{{ msg.role === 'assistant' ? agentName() : msg.role }}</span>
                     <span class="time">{{ msg.timestamp | date:'HH:mm:ss' }}</span>
                     <pre class="text">{{ msg.content }}</pre>
                 </div>
@@ -71,7 +71,7 @@ interface ParsedEvent {
                         @switch (evt.kind) {
                             @case ('assistant') {
                                 <span class="prompt">&lt;</span>
-                                <span class="label">claude</span>
+                                <span class="label">{{ agentName() }}</span>
                                 <pre class="text">{{ evt.content }}</pre>
                             }
                             @case ('user') {
@@ -322,6 +322,7 @@ export class SessionOutputComponent implements AfterViewChecked {
     readonly messages = input<SessionMessage[]>([]);
     readonly events = input<StreamEvent[]>([]);
     readonly isRunning = input(false, { transform: booleanAttribute });
+    readonly agentName = input('assistant');
 
     private readonly outputContainer = viewChild<ElementRef<HTMLDivElement>>('outputContainer');
 
@@ -436,7 +437,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                     const parts: string[] = [];
                     if (turns !== undefined) parts.push(`${turns} turn${turns !== 1 ? 's' : ''}`);
                     if (duration !== undefined) parts.push(`${(duration / 1000).toFixed(1)}s`);
-                    if (cost !== undefined) parts.push(`$${cost.toFixed(4)}`);
+                    if (cost) parts.push(`$${cost.toFixed(4)}`);
                     parsed.push({
                         kind: subtype === 'error_during_execution' ? 'error' : 'result',
                         content: parts.join(' · ') || (subtype ?? 'done'),
@@ -466,7 +467,9 @@ export class SessionOutputComponent implements AfterViewChecked {
                 case 'session_started':
                 case 'session_stopped':
                 case 'session_exited':
-                    // Skip — already reflected in session status badge
+                case 'thinking':
+                case 'tool_status':
+                    // Skip — UI state events, not content
                     break;
 
                 default: {

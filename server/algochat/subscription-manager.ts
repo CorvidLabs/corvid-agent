@@ -573,11 +573,24 @@ export class SubscriptionManager {
                 currentEventFn?.({ type: 'stream', chunk: event.delta.text, done: false });
             }
 
-            // Emit tool_use events
+            // Emit tool_use events (SDK mode)
             if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
                 const toolName = event.content_block.name ?? 'unknown';
                 const input = JSON.stringify(event.content_block.input ?? {});
                 currentEventFn?.({ type: 'tool_use', toolName, input });
+            }
+
+            // Direct-mode: tool_status events
+            if (event.type === 'tool_status' && (event as any).statusMessage) {
+                const match = (event as any).statusMessage.match(/^\[(\w+)\]\s(.*)$/);
+                if (match) {
+                    currentEventFn?.({ type: 'tool_use', toolName: match[1], input: match[2] });
+                }
+            }
+
+            // Direct-mode: thinking signal
+            if (event.type === 'thinking') {
+                currentEventFn?.({ type: 'thinking', active: !!(event as any).thinking });
             }
 
             if (event.type === 'assistant' && event.message?.content) {

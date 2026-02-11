@@ -14,11 +14,40 @@ import type { SdkProcess } from './sdk-process';
 import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
+import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
+import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DirectProcess');
 
 const MAX_TOOL_ITERATIONS = 25;
+const MAX_MESSAGES = 40;
+const KEEP_RECENT = 30;
+
+/**
+ * Trim conversation history to bound memory usage.
+ * Keeps the first user message (original prompt context) and the most recent
+ * KEEP_RECENT messages so the model retains enough context to continue.
+ */
+function trimMessages(
+    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
+): void {
+    if (messages.length <= MAX_MESSAGES) return;
+
+    const first = messages[0];
+    const recent = messages.slice(-KEEP_RECENT);
+
+    // Avoid duplicating the first message if it's already in the recent window
+    if (recent[0] === first) {
+        messages.length = 0;
+        messages.push(...recent);
+    } else {
+        messages.length = 0;
+        messages.push(first, ...recent);
+    }
+
+    log.info(`Trimmed conversation history to ${messages.length} messages`);
+}
 
 export interface DirectProcessOptions {
     session: Session;
@@ -52,27 +81,39 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     const pseudoPid = nextPseudoPid++;
     let aborted = false;
     let toolsDisabled = false;
+    const abortController = new AbortController();
 
     // Message queue for follow-up user messages
     const pendingMessages: string[] = [];
     let processing = false;
 
-    // Build tools
-    const directTools = mcpToolContext ? buildDirectTools(mcpToolContext) : [];
+    // Build coding context (always available — file/command tools don't need MCP)
+    const codingCtx: CodingToolContext = {
+        workingDir: project.workingDir,
+        env: buildSafeEnvForCoding(),
+    };
+
+    // Build tools — coding tools are available even without mcpToolContext
+    const directTools = buildDirectTools(mcpToolContext, codingCtx);
     const toolMap = new Map<string, DirectToolDefinition>();
     for (const t of directTools) {
         toolMap.set(t.name, t);
     }
 
-    // Build system prompt
-    const systemPrompt = buildSystemPrompt(agent, project);
     const model = agent?.model || provider.getInfo().defaultModel;
+
+    // Build system prompt (with tool instructions if tools are available)
+    const toolNames = directTools.map((t) => t.name);
+    const systemPrompt = buildSystemPrompt(agent, project, model, toolNames, !toolsDisabled && directTools.length > 0);
 
     // Conversation history for the current session
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
 
+    // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
+    const effectivePrompt = prependRoutingContext(prompt, session.source);
+
     // Start the main loop
-    runLoop(prompt).catch((err) => {
+    runLoop(effectivePrompt).catch((err) => {
         if (aborted) return;
         const errorMsg = err instanceof Error ? err.message : String(err);
         log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
@@ -87,6 +128,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         processing = true;
         messages.push({ role: 'user', content: userMessage });
 
+        // Signal that the agent is working
+        onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+
         let iteration = 0;
         while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
             iteration++;
@@ -95,13 +139,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 ? toProviderTools(directTools)
                 : undefined;
 
+            const activityCallback = () => {
+                onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+            };
+
             let result;
             try {
+                trimMessages(messages);
                 result = await provider.complete({
                     model,
                     systemPrompt,
                     messages,
                     tools: providerTools,
+                    signal: abortController.signal,
+                    onActivity: activityCallback,
                 });
             } catch (err) {
                 // Tool fallback: if the model doesn't support tools, retry without them
@@ -110,10 +161,13 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     log.warn(`Model ${model} does not support tools — disabling for this session`);
                     toolsDisabled = true;
                     // Retry without tools
+                    trimMessages(messages);
                     result = await provider.complete({
                         model,
                         systemPrompt,
                         messages,
+                        signal: abortController.signal,
+                        onActivity: activityCallback,
                     });
                 } else {
                     throw err;
@@ -190,6 +244,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
         if (aborted) return;
 
+        // Signal that the agent is done thinking
+        onEvent({ type: 'thinking', thinking: false } as ClaudeStreamEvent);
+
         // Emit result event
         onEvent({
             type: 'result',
@@ -248,13 +305,32 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     function kill(): void {
         aborted = true;
+        abortController.abort();
         approvalManager.cancelSession(session.id);
     }
 
     return { pid: pseudoPid, sendMessage, kill };
 }
 
-function buildSystemPrompt(agent: Agent | null, project: Project): string {
+/**
+ * For AlgoChat/agent-sourced messages, prepend a routing hint so the model
+ * knows to reply with text directly rather than wrapping responses in
+ * corvid_send_message tool calls.
+ */
+function prependRoutingContext(message: string, source: string): string {
+    if (source === 'algochat' || source === 'agent') {
+        return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${message}`;
+    }
+    return message;
+}
+
+function buildSystemPrompt(
+    agent: Agent | null,
+    project: Project,
+    model: string,
+    toolNames: string[],
+    hasTools: boolean,
+): string {
     const parts: string[] = [];
 
     if (agent?.systemPrompt) {
@@ -268,6 +344,22 @@ function buildSystemPrompt(agent: Agent | null, project: Project): string {
 
     if (agent?.appendPrompt) {
         parts.push('', agent.appendPrompt);
+    }
+
+    // Append tool-specific instructions when tools are available
+    if (hasTools && toolNames.length > 0) {
+        const family = detectModelFamily(model);
+        parts.push('', getToolInstructionPrompt(family, toolNames));
+
+        // Add response routing instructions if messaging tools are present
+        if (toolNames.includes('corvid_send_message')) {
+            parts.push('', getResponseRoutingPrompt());
+        }
+
+        // Add coding tool guidelines if coding tools are present
+        if (toolNames.includes('read_file')) {
+            parts.push('', getCodingToolPrompt());
+        }
     }
 
     return parts.join('\n');

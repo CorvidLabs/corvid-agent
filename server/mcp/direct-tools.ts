@@ -19,6 +19,7 @@ import {
     handleCreateWorkTask,
     handleManageSchedule,
 } from './tool-handlers';
+import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
 import type { LlmToolDefinition } from '../providers/types';
 
@@ -39,6 +40,12 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_check_credits',
     'corvid_create_work_task',
     'corvid_manage_schedule',
+    'read_file',
+    'write_file',
+    'edit_file',
+    'run_command',
+    'list_files',
+    'search_files',
 ]);
 
 /** Tools blocked during scheduler-initiated sessions. */
@@ -47,6 +54,28 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_grant_credits',
     'corvid_credit_config',
 ]);
+
+/** Validate that required fields exist and are non-empty strings/numbers in the args object. */
+function validateRequired(
+    toolName: string,
+    args: Record<string, unknown>,
+    fields: string[],
+): { text: string; isError: true } | null {
+    const missing: string[] = [];
+    for (const field of fields) {
+        const val = args[field];
+        if (val === undefined || val === null || val === '') {
+            missing.push(field);
+        }
+    }
+    if (missing.length > 0) {
+        return {
+            text: `Missing required argument(s) for ${toolName}: ${missing.join(', ')}`,
+            isError: true,
+        };
+    }
+    return null;
+}
 
 /** Convert a CallToolResult to our simple { text, isError } format. */
 function unwrapResult(result: { content: Array<{ type: string; text?: string }>; isError?: boolean }): { text: string; isError?: boolean } {
@@ -57,8 +86,12 @@ function unwrapResult(result: { content: Array<{ type: string; text?: string }>;
     return { text, isError: result.isError };
 }
 
-export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
-    const tools: DirectToolDefinition[] = [
+export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingToolContext): DirectToolDefinition[] {
+    const tools: DirectToolDefinition[] = [];
+
+    // MCP-based tools require a valid McpToolContext
+    if (ctx) {
+    tools.push(
         {
             name: 'corvid_send_message',
             description: 'Send a message to another agent and wait for their response. Use corvid_list_agents first to discover available agents.',
@@ -71,7 +104,11 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
                 },
                 required: ['to_agent', 'message'],
             },
-            handler: async (args) => unwrapResult(await handleSendMessage(ctx, args as { to_agent: string; message: string; thread?: string })),
+            handler: async (args) => {
+                const err = validateRequired('corvid_send_message', args, ['to_agent', 'message']);
+                if (err) return err;
+                return unwrapResult(await handleSendMessage(ctx, args as { to_agent: string; message: string; thread?: string }));
+            },
         },
         {
             name: 'corvid_save_memory',
@@ -84,7 +121,11 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
                 },
                 required: ['key', 'content'],
             },
-            handler: async (args) => unwrapResult(await handleSaveMemory(ctx, args as { key: string; content: string })),
+            handler: async (args) => {
+                const err = validateRequired('corvid_save_memory', args, ['key', 'content']);
+                if (err) return err;
+                return unwrapResult(await handleSaveMemory(ctx, args as { key: string; content: string }));
+            },
         },
         {
             name: 'corvid_recall_memory',
@@ -114,7 +155,11 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
                 },
                 required: ['minutes'],
             },
-            handler: async (args) => unwrapResult(await handleExtendTimeout(ctx, args as { minutes: number })),
+            handler: async (args) => {
+                const err = validateRequired('corvid_extend_timeout', args, ['minutes']);
+                if (err) return err;
+                return unwrapResult(await handleExtendTimeout(ctx, args as { minutes: number }));
+            },
         },
         {
             name: 'corvid_check_credits',
@@ -139,7 +184,11 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
                 },
                 required: ['wallet_address', 'amount'],
             },
-            handler: async (args) => unwrapResult(await handleGrantCredits(ctx, args as { wallet_address: string; amount: number; reason?: string })),
+            handler: async (args) => {
+                const err = validateRequired('corvid_grant_credits', args, ['wallet_address', 'amount']);
+                if (err) return err;
+                return unwrapResult(await handleGrantCredits(ctx, args as { wallet_address: string; amount: number; reason?: string }));
+            },
         },
         {
             name: 'corvid_credit_config',
@@ -153,7 +202,7 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
             },
             handler: async (args) => unwrapResult(await handleCreditConfig(ctx, args as { key?: string; value?: string })),
         },
-    ];
+    );
 
     // Conditionally add work task tool
     if (ctx.workTaskService) {
@@ -168,7 +217,11 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
                 },
                 required: ['description'],
             },
-            handler: async (args) => unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string })),
+            handler: async (args) => {
+                const err = validateRequired('corvid_create_work_task', args, ['description']);
+                if (err) return err;
+                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string }));
+            },
         });
     }
 
@@ -205,20 +258,41 @@ export function buildDirectTools(ctx: McpToolContext): DirectToolDefinition[] {
             },
             required: ['action'],
         },
-        handler: async (args) => unwrapResult(await handleManageSchedule(ctx, args as Parameters<typeof handleManageSchedule>[1])),
+        handler: async (args) => {
+            const err = validateRequired('corvid_manage_schedule', args, ['action']);
+            if (err) return err;
+            return unwrapResult(await handleManageSchedule(ctx, args as Parameters<typeof handleManageSchedule>[1]));
+        },
     });
+    } // end if (ctx)
 
-    // Permission filtering — same logic as sdk-tools.ts
-    let filtered = tools;
-    if (ctx.sessionSource !== 'web') {
-        const agent = getAgent(ctx.db, ctx.agentId);
-        const permissions = agent?.mcpToolPermissions;
-        const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
-        filtered = filtered.filter((t) => allowedSet.has(t.name));
+    // Merge coding tools when a coding context is provided
+    if (codingCtx) {
+        tools.push(...buildCodingTools(codingCtx));
     }
 
-    if (ctx.schedulerMode) {
-        filtered = filtered.filter((t) => !SCHEDULER_BLOCKED_TOOLS.has(t.name));
+    // Permission filtering — apply agent's explicit mcp_tool_permissions regardless
+    // of session source. For non-web sessions without explicit permissions, fall back
+    // to DEFAULT_ALLOWED_TOOLS. This is critical for small Ollama models that cannot
+    // handle 10+ tool definitions efficiently.
+    let filtered = tools;
+
+    if (ctx) {
+        const agent = getAgent(ctx.db, ctx.agentId);
+        const permissions = agent?.mcpToolPermissions;
+        if (permissions) {
+            // Agent has explicit tool permissions — always apply
+            const allowedSet = new Set(permissions);
+            filtered = filtered.filter((t) => allowedSet.has(t.name));
+        } else if (ctx.sessionSource !== 'web') {
+            // Non-web sessions without explicit permissions get the default set
+            const allowedSet = DEFAULT_ALLOWED_TOOLS;
+            filtered = filtered.filter((t) => allowedSet.has(t.name));
+        }
+
+        if (ctx.schedulerMode) {
+            filtered = filtered.filter((t) => !SCHEDULER_BLOCKED_TOOLS.has(t.name));
+        }
     }
 
     return filtered;
