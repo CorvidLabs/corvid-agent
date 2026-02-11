@@ -727,9 +727,15 @@ async function runDiscussionRounds(
 ): Promise<void> {
     const discussionStartTime = Date.now();
 
+    // Scale timeouts based on agent count — serialized Ollama agents queue behind each other
+    const agentCount = council.agentIds.length;
+    const perRoundTimeout = Math.max(MIN_ROUND_TIMEOUT_MS, agentCount * PER_AGENT_ROUND_BUDGET_MS);
+    const totalTimeout = Math.min(totalRounds * perRoundTimeout, MAX_DISCUSSION_TOTAL_MS);
+    log.info(`Discussion timeouts: ${Math.round(perRoundTimeout / 60000)}m/round, ${Math.round(totalTimeout / 60000)}m total (${agentCount} agents, ${totalRounds} rounds)`);
+
     for (let round = 1; round <= totalRounds; round++) {
         // Check overall discussion timeout
-        if (Date.now() - discussionStartTime > DISCUSSION_TOTAL_TIMEOUT_MS) {
+        if (Date.now() - discussionStartTime > totalTimeout) {
             emitLog(db, launchId, 'warn', `Discussion timed out after ${Math.round((Date.now() - discussionStartTime) / 60000)} minutes, skipping remaining rounds`);
             break;
         }
@@ -782,7 +788,7 @@ async function runDiscussionRounds(
         if (discusserSessionIds.length === 0) {
             emitLog(db, launchId, 'warn', `No discusser sessions started for round ${round}/${totalRounds}`);
         } else {
-            await waitForSessions(processManager, discusserSessionIds);
+            await waitForSessions(processManager, discusserSessionIds, perRoundTimeout);
         }
 
         // Extract responses and store as discussion messages
@@ -891,10 +897,12 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
     return parts.join('\n\n---\n\n');
 }
 
-const DISCUSSION_SESSION_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes per round (accounts for serial Ollama queue)
-const DISCUSSION_TOTAL_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes max for all rounds combined
+// Per-agent budget per round — accounts for serialized Ollama queue (one-at-a-time inference)
+const PER_AGENT_ROUND_BUDGET_MS = 10 * 60 * 1000; // 10 minutes per agent per round
+const MIN_ROUND_TIMEOUT_MS = 20 * 60 * 1000; // minimum 20 minutes per round
+const MAX_DISCUSSION_TOTAL_MS = 3 * 60 * 60 * 1000; // hard cap at 3 hours
 
-function waitForSessions(processManager: ProcessManager, sessionIds: string[]): Promise<void> {
+function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number): Promise<void> {
     return new Promise<void>((resolve) => {
         let settled = false;
         const pending = new Set(sessionIds);
@@ -916,13 +924,14 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[]): 
         };
 
         // Timeout: resolve even if some sessions are stuck
+        const effectiveTimeout = timeoutMs ?? MIN_ROUND_TIMEOUT_MS;
         const timer = setTimeout(() => {
             if (!settled) {
                 const timedOut = Array.from(pending);
-                log.warn(`waitForSessions timed out with ${timedOut.length} sessions still pending: ${timedOut.join(', ')}`);
+                log.warn(`waitForSessions timed out (${Math.round(effectiveTimeout / 60000)}m) with ${timedOut.length} sessions still pending: ${timedOut.join(', ')}`);
                 finish();
             }
-        }, DISCUSSION_SESSION_TIMEOUT_MS);
+        }, effectiveTimeout);
 
         // Subscribe FIRST, then check isRunning — this closes the race window
         // where a process exits between the isRunning check and subscribe call.
@@ -989,8 +998,8 @@ function watchSessionsForAutoAdvance(
     const callbacks = new Map<string, EventCallback>();
     let settled = false;
 
-    // Safety timeout: force-advance if sessions are stuck (e.g., Ollama queue backlog)
-    const WATCHER_TIMEOUT_MS = 30 * 60 * 1000;
+    // Safety timeout: scale with session count (serialized Ollama agents need ~10 min each)
+    const WATCHER_TIMEOUT_MS = Math.max(30 * 60 * 1000, sessionIds.length * PER_AGENT_ROUND_BUDGET_MS);
     const watcherTimer = setTimeout(() => {
         if (settled || pending.size === 0) return;
         const stuck = Array.from(pending);
