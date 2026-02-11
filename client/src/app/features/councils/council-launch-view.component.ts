@@ -137,9 +137,18 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             @if (expandedSessions().has(session.id)) {
                                 <div class="feed-content" (click)="$event.stopPropagation()">
                                     @if (session.status === 'running') {
-                                        <div class="feed-status-bar">
-                                            <span class="processing-dot"></span>
-                                            <span>{{ getActivity(session.agentId) || 'Queued — waiting for model...' }}</span>
+                                        <div class="feed-event-log">
+                                            @for (entry of getEventLog(session.id); track entry.ts) {
+                                                <div class="feed-event-entry">
+                                                    <span class="log-ts">{{ entry.time }}</span>
+                                                    <span>{{ entry.text }}</span>
+                                                </div>
+                                            } @empty {
+                                                <div class="feed-event-entry">
+                                                    <span class="processing-dot"></span>
+                                                    <span>Queued — waiting for model...</span>
+                                                </div>
+                                            }
                                         </div>
                                     }
                                     <app-session-output
@@ -232,9 +241,18 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                 @if (expandedSessions().has(session.id)) {
                                     <div class="feed-content" (click)="$event.stopPropagation()">
                                         @if (session.status === 'running') {
-                                            <div class="feed-status-bar">
-                                                <span class="processing-dot"></span>
-                                                <span>{{ getActivity(session.agentId) || 'Queued — waiting for model...' }}</span>
+                                            <div class="feed-event-log">
+                                                @for (entry of getEventLog(session.id); track entry.ts) {
+                                                    <div class="feed-event-entry">
+                                                        <span class="log-ts">{{ entry.time }}</span>
+                                                        <span>{{ entry.text }}</span>
+                                                    </div>
+                                                } @empty {
+                                                    <div class="feed-event-entry">
+                                                        <span class="processing-dot"></span>
+                                                        <span>Queued — waiting for model...</span>
+                                                    </div>
+                                                }
                                             </div>
                                         }
                                         <app-session-output
@@ -360,7 +378,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             padding: 0.5rem; margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto;
             font-family: 'Dogica Pixel', 'Dogica', monospace; font-size: 0.75rem; line-height: 1.6;
         }
-        .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 2px; }
+        .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem 0.5rem; }
         .log-entry:hover { background: var(--bg-hover); }
         .log-ts { color: var(--text-tertiary); flex-shrink: 0; }
         .log-level {
@@ -385,8 +403,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             cursor: pointer; transition: background 0.1s;
         }
         .feed-entry:hover { background: var(--bg-hover); }
-        .feed-entry--expanded { background: var(--bg-raised); }
-        .feed-entry--expanded:hover { background: var(--bg-raised); }
+        .feed-entry--expanded, .feed-entry--expanded:hover { background: var(--bg-raised); }
         .feed-meta {
             display: flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap; overflow: hidden;
         }
@@ -399,12 +416,12 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             color: var(--accent); font-size: 0.7rem; font-style: italic;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .feed-status-bar {
-            display: flex; align-items: center; gap: 0.4rem;
-            padding: 0.4rem 0.5rem; margin-bottom: 0.4rem;
+        .feed-event-log {
             background: var(--bg-deep); border-radius: var(--radius-sm);
-            color: var(--accent); font-size: 0.75rem;
+            padding: 0.3rem; margin-bottom: 0.3rem; max-height: 120px;
+            overflow-y: auto; font-size: 0.7rem;
         }
+        .feed-event-entry { display: flex; gap: 0.3rem; padding: 1px 0.3rem; color: var(--accent); }
         .feed-toggle {
             flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
             user-select: none;
@@ -721,6 +738,29 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected getActivity(agentId: string | null): string {
         if (!agentId) return '';
         return this.agentActivity().get(agentId) ?? '';
+    }
+
+    protected getEventLog(sessionId: string): { ts: number; time: string; text: string }[] {
+        const events = this.sessionEvents().get(sessionId) ?? [];
+        const log: { ts: number; time: string; text: string }[] = [];
+        let lastText = '';
+        for (const evt of events) {
+            const data = evt.data as Record<string, unknown> | undefined;
+            let text = '';
+            if (evt.eventType === 'tool_status' && data?.['statusMessage']) {
+                text = data['statusMessage'] as string;
+            } else if (evt.eventType === 'thinking' && data?.['thinking']) {
+                text = 'Thinking...';
+            } else if (evt.eventType === 'assistant') {
+                text = 'Generating response...';
+            }
+            if (text && text !== lastText) {
+                const d = new Date(evt.timestamp);
+                log.push({ ts: d.getTime(), time: d.toLocaleTimeString(), text });
+                lastText = text;
+            }
+        }
+        return log;
     }
 
     private setActivity(agentId: string, text: string, autoClearMs?: number): void {

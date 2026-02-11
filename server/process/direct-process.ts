@@ -147,6 +147,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
             };
 
+            // Heartbeat while waiting for provider (covers Ollama queue wait + prompt eval)
+            const heartbeat = setInterval(activityCallback, 10_000);
+
             let result;
             try {
                 trimMessages(messages);
@@ -159,6 +162,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     onActivity: activityCallback,
                 });
             } catch (err) {
+                clearInterval(heartbeat);
                 // Tool fallback: if the model doesn't support tools, retry without them
                 const errorMsg = err instanceof Error ? err.message : String(err);
                 if (!toolsDisabled && providerTools && isToolUnsupportedError(errorMsg)) {
@@ -176,6 +180,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 } else {
                     throw err;
                 }
+            } finally {
+                clearInterval(heartbeat);
             }
 
             if (aborted) return;
