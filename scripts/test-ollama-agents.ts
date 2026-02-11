@@ -15,7 +15,9 @@
 
 const API = 'http://localhost:3000';
 const WS_URL = 'ws://localhost:3000/ws';
-const AGENT_ID = 'e2cb4dfb-40c5-4a85-9c7d-afeb260f9c0a'; // Qwen Coder
+// CLI: bun test-ollama-agents.ts [--agent <id>] [T2.3 T3.1 ...]
+const agentArgIdx = Bun.argv.indexOf('--agent');
+const AGENT_ID = agentArgIdx >= 0 ? Bun.argv[agentArgIdx + 1] : 'e2cb4dfb-40c5-4a85-9c7d-afeb260f9c0a';
 const PROJECT_ID = '00028c43-3bc0-4c94-92f7-d5e88065e886'; // corvid-agent
 const MAX_WAIT = 600_000; // 10 minutes absolute max per test
 const INITIAL_TIMEOUT = 300_000; // 5 minutes for the first event (Ollama inference is slow)
@@ -148,8 +150,8 @@ const ALL_TESTS: TestCase[] = [
 ];
 
 // Filter: run specific tests via CLI arg, or all tests if none specified
-// Usage: bun scripts/test-ollama-agents.ts T2.3 T3.1
-const filterIds = process.argv.slice(2);
+// Usage: bun scripts/test-ollama-agents.ts [--agent <id>] [T2.3 T3.1]
+const filterIds = process.argv.slice(2).filter(a => a !== '--agent' && (agentArgIdx < 0 || a !== process.argv[agentArgIdx + 1]));
 const tests = filterIds.length > 0
     ? ALL_TESTS.filter(t => filterIds.includes(t.id))
     : ALL_TESTS;
@@ -346,18 +348,23 @@ function watchSession(sessionId: string): Promise<CollectedResult> {
 async function main() {
     console.log('Ollama Agent Test Suite');
     console.log('======================\n');
-    console.log(`Agent: Qwen Coder (${AGENT_ID.slice(0, 8)})`);
-    console.log(`Model: qwen3:8b`);
-    console.log(`Output: ${OUTPUT_FILE}\n`);
 
-    // Verify server is reachable
+    // Fetch agent info
+    let agentName = 'Unknown';
+    let agentModel = 'unknown';
     try {
-        await api<unknown>('GET', '/api/agents');
+        const agentData = await api<{ name: string; model: string }>('GET', `/api/agents/${AGENT_ID}`);
+        agentName = agentData.name;
+        agentModel = agentData.model;
     } catch {
-        console.error('ERROR: Cannot reach server at ' + API);
+        console.error('ERROR: Cannot reach server at ' + API + ' or agent not found: ' + AGENT_ID);
         console.error('Make sure the server is running.');
         process.exit(1);
     }
+
+    console.log(`Agent: ${agentName} (${AGENT_ID.slice(0, 8)})`);
+    console.log(`Model: ${agentModel}`);
+    console.log(`Output: ${OUTPUT_FILE}\n`);
 
     // Establish persistent WebSocket connection
     console.log('Connecting WebSocket...');

@@ -471,25 +471,43 @@ export class OllamaProvider extends BaseLlmProvider {
             }
         }
 
-        // Pattern 3: JSON array of tool calls in content (Mistral format)
+        // Pattern 3: JSON array of tool calls in content
         // e.g., ```\n[{"name":"tool","arguments":{...}}]\n``` or just [{"name":"tool",...}]
+        // Also handles JSON embedded within surrounding text (model may add preamble text)
         if (calls.length === 0) {
             // Strip markdown code fences if present
             const stripped = content.replace(/```(?:json)?\s*/g, '').replace(/```/g, '').trim();
-            try {
-                const parsed = JSON.parse(stripped);
-                const arr = Array.isArray(parsed) ? parsed : [parsed];
-                for (const item of arr) {
-                    if (item && typeof item === 'object' && typeof item.name === 'string' && toolNames.has(item.name)) {
-                        calls.push({
-                            id: crypto.randomUUID().slice(0, 8),
-                            name: item.name,
-                            arguments: item.arguments ?? item.parameters ?? {},
-                        });
+
+            // Try whole content first, then extract embedded JSON arrays
+            const candidates: string[] = [stripped];
+            // Extract JSON arrays embedded in text: find [ ... ] containing "name"
+            const arrayMatch = stripped.match(/\[\s*\{[\s\S]*?"name"\s*:[\s\S]*?\}\s*\]/g);
+            if (arrayMatch) {
+                candidates.push(...arrayMatch);
+            }
+            // Also try single objects: {"name": "tool", "arguments": {...}}
+            const objMatch = stripped.match(/\{\s*"name"\s*:\s*"[\w]+"\s*,\s*"arguments"\s*:\s*\{[\s\S]*?\}\s*\}/g);
+            if (objMatch) {
+                candidates.push(...objMatch);
+            }
+
+            for (const candidate of candidates) {
+                try {
+                    const parsed = JSON.parse(candidate);
+                    const arr = Array.isArray(parsed) ? parsed : [parsed];
+                    for (const item of arr) {
+                        if (item && typeof item === 'object' && typeof item.name === 'string' && toolNames.has(item.name)) {
+                            calls.push({
+                                id: crypto.randomUUID().slice(0, 8),
+                                name: item.name,
+                                arguments: item.arguments ?? item.parameters ?? {},
+                            });
+                        }
                     }
+                    if (calls.length > 0) break; // Found valid tool calls
+                } catch {
+                    // Not valid JSON, try next candidate
                 }
-            } catch {
-                // Not valid JSON array, continue to next pattern
             }
         }
 
