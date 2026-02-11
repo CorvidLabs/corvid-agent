@@ -103,8 +103,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     const model = agent?.model || provider.getInfo().defaultModel;
 
     // Build system prompt (with tool instructions if tools are available)
-    const toolNames = directTools.map((t) => t.name);
-    const systemPrompt = buildSystemPrompt(agent, project, model, toolNames, !toolsDisabled && directTools.length > 0);
+    const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
+    const systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0);
 
     // Conversation history for the current session
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
@@ -324,11 +324,17 @@ function prependRoutingContext(message: string, source: string): string {
     return message;
 }
 
+interface ToolDef {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+}
+
 function buildSystemPrompt(
     agent: Agent | null,
     project: Project,
     model: string,
-    toolNames: string[],
+    toolDefs: ToolDef[],
     hasTools: boolean,
 ): string {
     const parts: string[] = [];
@@ -347,9 +353,10 @@ function buildSystemPrompt(
     }
 
     // Append tool-specific instructions when tools are available
-    if (hasTools && toolNames.length > 0) {
+    const toolNames = toolDefs.map((t) => t.name);
+    if (hasTools && toolDefs.length > 0) {
         const family = detectModelFamily(model);
-        parts.push('', getToolInstructionPrompt(family, toolNames));
+        parts.push('', getToolInstructionPrompt(family, toolNames, toolDefs));
 
         // Add response routing instructions if messaging tools are present
         if (toolNames.includes('corvid_send_message')) {

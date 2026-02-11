@@ -34,15 +34,34 @@ export function detectModelFamily(modelName: string): ModelFamily {
     return 'unknown';
 }
 
+interface ToolSchema {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+}
+
 /**
  * Get the complete tool instruction prompt for a given model family.
  * This should be appended to the system prompt when tools are available.
+ *
+ * For text-based tool families (e.g., qwen3), includes full parameter schemas
+ * so the model outputs correct argument names.
  */
-export function getToolInstructionPrompt(family: ModelFamily, toolNames: string[]): string {
+export function getToolInstructionPrompt(
+    family: ModelFamily,
+    toolNames: string[],
+    toolDefs?: ToolSchema[],
+): string {
     const parts: string[] = [];
 
     // Common instructions for all model families
     parts.push(getCommonToolInstructions(toolNames));
+
+    // For text-based tool families, include full tool schemas
+    // so the model knows exact parameter names
+    if (TEXT_BASED_FAMILIES.has(family) && toolDefs && toolDefs.length > 0) {
+        parts.push(formatToolSchemas(toolDefs));
+    }
 
     // Family-specific guidance
     const familyPrompt = getFamilySpecificPrompt(family);
@@ -51,6 +70,27 @@ export function getToolInstructionPrompt(family: ModelFamily, toolNames: string[
     }
 
     return parts.join('\n\n');
+}
+
+/** Families that use text-based tool calling and need full schemas in prompt. */
+const TEXT_BASED_FAMILIES = new Set<ModelFamily>(['qwen3']);
+
+/** Format tool definitions as a compact reference for the system prompt. */
+function formatToolSchemas(toolDefs: ToolSchema[]): string {
+    const lines = ['### Tool Schemas', 'Use EXACTLY these parameter names when calling tools:'];
+    for (const tool of toolDefs) {
+        const props = (tool.parameters as any)?.properties ?? {};
+        const required = (tool.parameters as any)?.required ?? [];
+        const params = Object.entries(props).map(([name, schema]: [string, any]) => {
+            const req = required.includes(name) ? ' (required)' : '';
+            return `  - ${name}: ${schema.type ?? 'string'}${req} — ${schema.description ?? ''}`;
+        });
+        lines.push(`\n**${tool.name}**: ${tool.description}`);
+        if (params.length > 0) {
+            lines.push(params.join('\n'));
+        }
+    }
+    return lines.join('\n');
 }
 
 /**

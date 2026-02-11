@@ -383,6 +383,17 @@ export class OllamaProvider extends BaseLlmProvider {
             }
         }
 
+        // Normalize tool call arguments: map common aliases to expected parameter names.
+        // Text-based tool calling models often guess wrong names (e.g., "file_path" instead of "path").
+        if (toolCalls && params.tools) {
+            for (const tc of toolCalls) {
+                const toolDef = params.tools.find((t) => t.name === tc.name);
+                if (toolDef) {
+                    tc.arguments = this.normalizeToolArgs(tc.arguments, toolDef);
+                }
+            }
+        }
+
         return {
             content,
             model: finalData?.model ?? params.model,
@@ -550,6 +561,60 @@ export class OllamaProvider extends BaseLlmProvider {
             }
         }
         return result;
+    }
+
+    /**
+     * Normalize tool call arguments to match the expected parameter schema.
+     * Text-based tool calling models often guess parameter names (e.g., "file_path"
+     * instead of "path"). This maps unrecognized argument keys to the closest
+     * matching schema parameter using substring matching.
+     */
+    private normalizeToolArgs(
+        args: Record<string, unknown>,
+        toolDef: LlmToolDefinition,
+    ): Record<string, unknown> {
+        const schemaProps = (toolDef.parameters as any)?.properties;
+        if (!schemaProps) return args;
+
+        const schemaKeys = new Set(Object.keys(schemaProps));
+        const normalized: Record<string, unknown> = {};
+        let didNormalize = false;
+
+        for (const [key, value] of Object.entries(args)) {
+            if (schemaKeys.has(key)) {
+                // Key matches schema exactly
+                normalized[key] = value;
+            } else {
+                // Try to find a matching schema key by substring match
+                const lowerKey = key.toLowerCase().replace(/[_-]/g, '');
+                let matched = false;
+                for (const schemaKey of schemaKeys) {
+                    const lowerSchema = schemaKey.toLowerCase().replace(/[_-]/g, '');
+                    if (lowerKey.includes(lowerSchema) || lowerSchema.includes(lowerKey)) {
+                        // Don't overwrite if we already have a value for this schema key
+                        if (!(schemaKey in normalized)) {
+                            normalized[schemaKey] = value;
+                            didNormalize = true;
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+                if (!matched) {
+                    // Keep the original key as fallback
+                    normalized[key] = value;
+                }
+            }
+        }
+
+        if (didNormalize) {
+            log.info(`Normalized tool args for ${toolDef.name}`, {
+                original: args,
+                normalized,
+            });
+        }
+
+        return normalized;
     }
 
     /** Extract the model family from a model name (e.g., "qwen3:8b" → "qwen3"). */

@@ -236,7 +236,7 @@ describe('run_command', () => {
 
     test('respects timeout', async () => {
         const start = Date.now();
-        const result = await getTool('run_command').handler({ command: 'sleep 30', timeout: 2 });
+        await getTool('run_command').handler({ command: 'sleep 30', timeout: 2 });
         const elapsed = Date.now() - start;
         // Should be killed well before 30s
         expect(elapsed).toBeLessThan(10_000);

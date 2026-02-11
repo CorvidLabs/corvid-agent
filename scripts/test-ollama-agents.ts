@@ -116,6 +116,35 @@ const ALL_TESTS: TestCase[] = [
         prompt: 'You are in a council discussion about improving error handling. The previous speaker said: "We should wrap every function in try-catch and log the error." What\'s your response? Be direct.',
         passCriteria: 'Pushes back constructively — blanket try-catch hides bugs, advocates for targeted error boundaries',
     },
+    // ── Tier 4: Tool Argument Accuracy ───────────────────────
+    {
+        id: 'T4.1',
+        tier: 4,
+        name: 'read_file with correct path arg',
+        prompt: 'Read the file shared/types.ts and tell me the first interface name defined in it.',
+        passCriteria: 'Calls read_file with path="shared/types.ts" (not file_path), returns a real interface name',
+    },
+    {
+        id: 'T4.2',
+        tier: 4,
+        name: 'list_files then read_file chain',
+        prompt: 'List the files in server/lib/ and then read the file called logger.ts from that directory. What does createLogger return?',
+        passCriteria: 'Calls list_files(directory="server/lib/"), then read_file(path="server/lib/logger.ts"), describes Logger',
+    },
+    {
+        id: 'T4.3',
+        tier: 4,
+        name: 'search_files tool usage',
+        prompt: 'Search for the string "MAX_CONCURRENT" in the server/ directory. What file is it in and what is the value?',
+        passCriteria: 'Calls search_files with query="MAX_CONCURRENT" and directory="server/", finds provider.ts, reports the value',
+    },
+    {
+        id: 'T4.4',
+        tier: 4,
+        name: 'corvid_save_memory tool',
+        prompt: 'Save a memory with key "test-run" and content "Ollama test suite ran successfully". Then recall it to confirm it was saved.',
+        passCriteria: 'Calls corvid_save_memory with correct key/content args, then corvid_recall_memory to verify',
+    },
 ];
 
 // Filter: run specific tests via CLI arg, or all tests if none specified
