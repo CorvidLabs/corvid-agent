@@ -891,8 +891,8 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
     return parts.join('\n\n---\n\n');
 }
 
-const DISCUSSION_SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per round
-const DISCUSSION_TOTAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max for all rounds combined
+const DISCUSSION_SESSION_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes per round (accounts for serial Ollama queue)
+const DISCUSSION_TOTAL_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes max for all rounds combined
 
 function waitForSessions(processManager: ProcessManager, sessionIds: string[]): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -987,15 +987,33 @@ function watchSessionsForAutoAdvance(
 ): void {
     const pending = new Set(sessionIds);
     const callbacks = new Map<string, EventCallback>();
+    let settled = false;
 
-    const checkAllDone = (): void => {
-        if (pending.size > 0) return;
+    // Safety timeout: force-advance if sessions are stuck (e.g., Ollama queue backlog)
+    const WATCHER_TIMEOUT_MS = 30 * 60 * 1000;
+    const watcherTimer = setTimeout(() => {
+        if (settled || pending.size === 0) return;
+        const stuck = Array.from(pending);
+        emitLog(db, launchId, 'warn', `${role} watcher timed out with ${stuck.length} sessions still pending — force-advancing`);
+        for (const sid of stuck) {
+            try { processManager.stopProcess(sid); } catch { /* already stopped */ }
+        }
+        pending.clear();
+        advance();
+    }, WATCHER_TIMEOUT_MS);
 
-        // Clean up all subscriptions
+    const cleanup = (): void => {
+        settled = true;
+        clearTimeout(watcherTimer);
         for (const [sid, cb] of callbacks) {
             processManager.unsubscribe(sid, cb);
         }
         callbacks.clear();
+    };
+
+    const advance = (): void => {
+        if (settled) return;
+        cleanup();
 
         // Verify launch is still in the expected stage before advancing
         const launch = getCouncilLaunch(db, launchId);
@@ -1027,6 +1045,10 @@ function watchSessionsForAutoAdvance(
                 }
             }
         }
+    };
+
+    const checkAllDone = (): void => {
+        if (pending.size === 0) advance();
     };
 
     // Subscribe FIRST, then check isRunning — closes the race window where
