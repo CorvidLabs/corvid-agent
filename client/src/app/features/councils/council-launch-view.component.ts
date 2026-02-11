@@ -126,16 +126,22 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                 }
                                 <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                 <app-status-badge [status]="session.status" />
-                                @if (session.status === 'running' && getActivity(session.agentId)) {
-                                    <span class="feed-activity">{{ getActivity(session.agentId) }}</span>
+                                @if (session.status === 'running') {
+                                    <span class="feed-activity">{{ getActivity(session.agentId) || 'Queued...' }}</span>
                                 }
-                                @if (!expandedSessions().has(session.id)) {
+                                @if (!expandedSessions().has(session.id) && session.status !== 'running') {
                                     <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
                                 }
                                 <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                             </div>
                             @if (expandedSessions().has(session.id)) {
                                 <div class="feed-content" (click)="$event.stopPropagation()">
+                                    @if (session.status === 'running') {
+                                        <div class="feed-status-bar">
+                                            <span class="processing-dot"></span>
+                                            <span>{{ getActivity(session.agentId) || 'Queued — waiting for model...' }}</span>
+                                        </div>
+                                    }
                                     <app-session-output
                                         [messages]="getMessages(session.id)"
                                         [events]="getEvents(session.id)"
@@ -215,16 +221,22 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                     }
                                     <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                     <app-status-badge [status]="session.status" />
-                                    @if (session.status === 'running' && getActivity(session.agentId)) {
-                                        <span class="feed-activity">{{ getActivity(session.agentId) }}</span>
+                                    @if (session.status === 'running') {
+                                        <span class="feed-activity">{{ getActivity(session.agentId) || 'Queued...' }}</span>
                                     }
-                                    @if (!expandedSessions().has(session.id)) {
+                                    @if (!expandedSessions().has(session.id) && session.status !== 'running') {
                                         <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
                                     }
                                     <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                                 </div>
                                 @if (expandedSessions().has(session.id)) {
                                     <div class="feed-content" (click)="$event.stopPropagation()">
+                                        @if (session.status === 'running') {
+                                            <div class="feed-status-bar">
+                                                <span class="processing-dot"></span>
+                                                <span>{{ getActivity(session.agentId) || 'Queued — waiting for model...' }}</span>
+                                            </div>
+                                        }
                                         <app-session-output
                                             [messages]="getMessages(session.id)"
                                             [events]="getEvents(session.id)"
@@ -293,15 +305,14 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .page__prompt { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.9rem; max-width: 600px; }
         .btn {
             padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
+            cursor: pointer; border: 1px solid; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+        .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); }
         .btn--danger { background: transparent; color: var(--accent-red, #f87171); border-color: var(--accent-red, #f87171); }
-        .btn--danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.1); }
         .btn:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
 
@@ -387,6 +398,12 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .feed-activity {
             color: var(--accent); font-size: 0.7rem; font-style: italic;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .feed-status-bar {
+            display: flex; align-items: center; gap: 0.4rem;
+            padding: 0.4rem 0.5rem; margin-bottom: 0.4rem;
+            background: var(--bg-deep); border-radius: var(--radius-sm);
+            color: var(--accent); font-size: 0.75rem;
         }
         .feed-toggle {
             flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
