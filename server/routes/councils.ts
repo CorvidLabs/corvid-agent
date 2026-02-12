@@ -873,13 +873,17 @@ ${originalPrompt}
 ${responsesText}${priorText}
 
 ## Your Task
-React to the other members' responses. You may:
-- Ask clarifying questions
-- Challenge points you disagree with
-- Build on ideas you find promising
-- Propose alternatives
+React to the other members' responses and advance the discussion. You MUST:
+- Take a clear position — agree or disagree with specific points
+- Add NEW information, analysis, or trade-offs not yet raised
+- If you disagree with someone, explain WHY with a concrete argument
 
-Keep your response focused and concise.`;
+Do NOT:
+- Repeat points already made by yourself or others
+- Ask questions that were already asked in prior rounds
+- Summarize what others said — they can read their own responses
+
+Keep your response focused, concise, and original.`;
 }
 
 function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string {

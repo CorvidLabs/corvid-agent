@@ -24,6 +24,8 @@ export interface LlmCompletionParams {
     signal?: AbortSignal;
     /** Called periodically during streaming to signal the model is generating. */
     onActivity?: () => void;
+    /** Called when the provider's queue status changes (e.g. "Queued...", or "" when cleared). */
+    onStatus?: (message: string) => void;
 }
 
 export interface LlmCompletionResult {
@@ -31,6 +33,11 @@ export interface LlmCompletionResult {
     model: string;
     usage?: { inputTokens: number; outputTokens: number };
     toolCalls?: LlmToolCall[];
+    performance?: {
+        evalDurationMs: number;       // time spent generating output tokens
+        promptEvalDurationMs: number; // time spent processing prompt
+        tokensPerSecond: number;      // eval_count / (eval_duration in seconds)
+    };
 }
 
 export interface LlmProviderInfo {
@@ -49,4 +56,15 @@ export interface LlmProvider {
     getInfo(): LlmProviderInfo;
     complete(params: LlmCompletionParams): Promise<LlmCompletionResult>;
     isAvailable(): Promise<boolean>;
+
+    /**
+     * Acquire an inference slot for the given model. Blocks until a slot is
+     * available. Call releaseSlot() when done with the entire agentic loop
+     * so the model stays loaded in memory (avoids KV cache eviction between
+     * turns). No-op for providers without concurrency limits.
+     */
+    acquireSlot?(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<void>;
+
+    /** Release a previously acquired slot. */
+    releaseSlot?(model: string): void;
 }

@@ -517,13 +517,9 @@ export class AgentMessenger {
             return null;
         }
 
-        let pubKey: Uint8Array;
-        try {
-            pubKey = await this.service.algorandService.discoverPublicKey(account.address);
-        } catch {
-            log.debug(`Could not discover public key for self-send: ${account.address}`);
-            return null;
-        }
+        // For self-sends we already have the encryption keys — no need to discover
+        // via the indexer (which may lag behind or be unavailable).
+        const pubKey = account.account.encryptionKeys.publicKey;
 
         // Use group transactions for large messages; fall back to condense
         try {

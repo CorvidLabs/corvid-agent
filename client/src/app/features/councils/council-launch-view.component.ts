@@ -121,11 +121,14 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                              (keydown.enter)="toggleSession(session.id)"
                              (keydown.space)="$event.preventDefault(); toggleSession(session.id)">
                             <div class="feed-meta">
-                                @if (session.status === 'running') {
+                                @if (session.status === 'running' && getDisplayStatus(session) !== 'queued') {
                                     <span class="processing-dot"></span>
                                 }
+                                @if (getDisplayStatus(session) === 'queued') {
+                                    <span class="queued-dot"></span>
+                                }
                                 <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
-                                <app-status-badge [status]="session.status" />
+                                <app-status-badge [status]="getDisplayStatus(session)" />
                                 @if (!expandedSessions().has(session.id)) {
                                     <span class="feed-preview">{{ session.status === 'running' ? (getActivity(session.agentId) || 'Waiting...') : getPreviewText(session.id) }}</span>
                                 }
@@ -142,8 +145,13 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                                 </div>
                                             } @empty {
                                                 <div class="feed-event-entry">
-                                                    <span class="processing-dot"></span>
-                                                    <span>Waiting for model...</span>
+                                                    @if (getDisplayStatus(session) === 'queued') {
+                                                        <span class="queued-dot"></span>
+                                                        <span>{{ getActivity(session.agentId) || 'Queued — waiting for model slot...' }}</span>
+                                                    } @else {
+                                                        <span class="processing-dot"></span>
+                                                        <span>{{ getActivity(session.agentId) || 'Waiting for model...' }}</span>
+                                                    }
                                                 </div>
                                             }
                                         </div>
@@ -223,11 +231,14 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                  (keydown.enter)="toggleSession(session.id)"
                                  (keydown.space)="$event.preventDefault(); toggleSession(session.id)">
                                 <div class="feed-meta">
-                                    @if (session.status === 'running') {
+                                    @if (session.status === 'running' && getDisplayStatus(session) !== 'queued') {
                                         <span class="processing-dot"></span>
                                     }
+                                    @if (getDisplayStatus(session) === 'queued') {
+                                        <span class="queued-dot"></span>
+                                    }
                                     <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
-                                    <app-status-badge [status]="session.status" />
+                                    <app-status-badge [status]="getDisplayStatus(session)" />
                                     @if (!expandedSessions().has(session.id)) {
                                         <span class="feed-preview">{{ session.status === 'running' ? (getActivity(session.agentId) || 'Waiting...') : getPreviewText(session.id) }}</span>
                                     }
@@ -244,8 +255,13 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                                     </div>
                                                 } @empty {
                                                     <div class="feed-event-entry">
-                                                        <span class="processing-dot"></span>
-                                                        <span>Waiting for model...</span>
+                                                        @if (getDisplayStatus(session) === 'queued') {
+                                                            <span class="queued-dot"></span>
+                                                            <span>{{ getActivity(session.agentId) || 'Queued — waiting for model slot...' }}</span>
+                                                        } @else {
+                                                            <span class="processing-dot"></span>
+                                                            <span>{{ getActivity(session.agentId) || 'Waiting for model...' }}</span>
+                                                        }
                                                     </div>
                                                 }
                                             </div>
@@ -451,6 +467,11 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             50% { opacity: 1; transform: scale(1.2); }
         }
 
+        .queued-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent-yellow, #fbbf24); flex-shrink: 0;
+            opacity: 0.6;
+        }
+
         .discussion-loading {
             display: flex; align-items: center; gap: 0.5rem;
             padding: 0.75rem; font-size: 0.8rem; color: var(--accent-cyan);
@@ -528,6 +549,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     private sessionMessages = signal<Map<string, import('../../core/models/session.model').SessionMessage[]>>(new Map());
     private sessionEvents = signal<Map<string, StreamEvent[]>>(new Map());
     protected readonly agentActivity = signal<Map<string, string>>(new Map());
+    protected readonly queuedAgents = signal<Set<string>>(new Set());
     private unsubscribeWs: (() => void) | null = null;
     private refreshInterval: ReturnType<typeof setInterval> | null = null;
     private activityTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -609,6 +631,18 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
                 if (agentId && msg.event?.eventType === 'thinking') {
                     const active = !!(eventData?.['thinking']);
                     this.setActivity(agentId, active ? 'Thinking...' : '');
+                    if (active) {
+                        this.queuedAgents.update((s) => { const n = new Set(s); n.delete(agentId); return n; });
+                    }
+                }
+                if (agentId && msg.event?.eventType === 'queue_status') {
+                    const statusMsg = eventData?.['statusMessage'] as string | undefined;
+                    if (statusMsg) {
+                        this.setActivity(agentId, statusMsg); // No auto-clear — persists until dequeued
+                        this.queuedAgents.update((s) => { const n = new Set(s); n.add(agentId); return n; });
+                    } else {
+                        this.queuedAgents.update((s) => { const n = new Set(s); n.delete(agentId); return n; });
+                    }
                 }
                 if (agentId && msg.event?.eventType === 'tool_status') {
                     const statusMsg = eventData?.['statusMessage'] as string | undefined;
@@ -680,6 +714,14 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         return this.agentNameMap[agentId] ?? agentId.slice(0, 8);
     }
 
+    /** Override session status to show "queued" when the model is waiting for a slot. */
+    protected getDisplayStatus(session: Session): string {
+        if (session.status === 'running' && session.agentId && this.queuedAgents().has(session.agentId)) {
+            return 'queued';
+        }
+        return session.status;
+    }
+
     protected agentColor(agentKey: string | null): string {
         if (!agentKey) return '#666';
         const name = this.agentNameMap[agentKey] ?? agentKey;
@@ -741,10 +783,19 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
             let text = '';
             if (evt.eventType === 'tool_status' && data?.['statusMessage']) {
                 text = data['statusMessage'] as string;
+            } else if (evt.eventType === 'queue_status' && data?.['statusMessage']) {
+                text = data['statusMessage'] as string;
             } else if (evt.eventType === 'thinking' && data?.['thinking']) {
                 text = 'Thinking...';
             } else if (evt.eventType === 'assistant') {
                 text = 'Generating response...';
+            } else if (evt.eventType === 'performance') {
+                const tps = data?.['tokensPerSecond'] as number | undefined;
+                const tokens = data?.['outputTokens'] as number | undefined;
+                const model = data?.['model'] as string | undefined;
+                if (tps) {
+                    text = `${model ?? 'Model'}: ${tokens ?? '?'} tokens @ ${tps} tok/s`;
+                }
             }
             if (text && text !== lastText) {
                 const d = new Date(evt.timestamp);

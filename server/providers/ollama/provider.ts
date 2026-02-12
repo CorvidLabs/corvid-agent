@@ -56,6 +56,8 @@ interface OllamaChatResponse {
     done: boolean;
     eval_count?: number;
     prompt_eval_count?: number;
+    eval_duration?: number;          // nanoseconds
+    prompt_eval_duration?: number;   // nanoseconds
 }
 
 interface OllamaTagsResponse {
@@ -79,6 +81,7 @@ interface OllamaPsResponse {
         size: number;
         digest: string;
         expires_at: string;
+        size_vram?: number;  // bytes loaded into GPU VRAM (0 = CPU-only)
     }>;
 }
 
@@ -93,16 +96,24 @@ export class OllamaProvider extends BaseLlmProvider {
     private readonly capabilityDetector = getModelCapabilityDetector();
 
     /**
-     * Concurrency limiter — allows up to MAX_CONCURRENT Ollama requests at once.
-     * Text-based tool calling avoids the 500s that Ollama's native tools API
-     * produces under concurrency. Default 3 for reasonable throughput in councils.
-     * Override with OLLAMA_MAX_PARALLEL env var.
+     * Weight-based concurrency limiter for model-size-aware scheduling.
+     * Small models (<=7B) cost 1 slot, medium (8-13B) cost 2, large (>=14B) cost 3.
+     *
+     * GPU-aware defaults:
+     * - CPU mode (no GPU / OLLAMA_NUM_GPU=0): maxWeight=1 (serial, one model at a time)
+     * - GPU mode (auto-detected via /api/ps size_vram): maxWeight=3 (concurrent)
+     * - Override: set OLLAMA_MAX_PARALLEL env var to skip auto-detection
+     *
+     * Auto-detection: after the first completion, probes /api/ps to check if
+     * the model was loaded into GPU VRAM. If so, upgrades from serial to concurrent.
      */
-    private static readonly MAX_CONCURRENT = parseInt(
-        process.env.OLLAMA_MAX_PARALLEL ?? '3', 10,
-    );
-    private activeRequests = 0;
-    private waitQueue: Array<() => void> = [];
+    private maxWeight = process.env.OLLAMA_MAX_PARALLEL
+        ? parseInt(process.env.OLLAMA_MAX_PARALLEL, 10)
+        : 1; // Serial until GPU auto-detected
+    private activeWeight = 0;
+    private waitQueue: Array<{ weight: number; resolve: () => void }> = [];
+    /** null = not yet probed, true/false = detected */
+    private gpuDetected: boolean | null = process.env.OLLAMA_MAX_PARALLEL ? true : null;
 
     private get host(): string {
         return process.env.OLLAMA_HOST || 'http://localhost:11434';
@@ -152,7 +163,9 @@ export class OllamaProvider extends BaseLlmProvider {
     }
 
     /** Max time (ms) to wait for a single Ollama chat completion. */
-    private static readonly REQUEST_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+    private static readonly REQUEST_TIMEOUT_MS = parseInt(
+        process.env.OLLAMA_REQUEST_TIMEOUT ?? String(30 * 60 * 1000), 10,
+    ); // 30 minutes default (CPU inference with large context can be slow)
 
     /**
      * Model families that use a "thinking" mode by default (extended CoT).
@@ -174,23 +187,143 @@ export class OllamaProvider extends BaseLlmProvider {
      */
     private static readonly TEXT_BASED_TOOL_FAMILIES = new Set(['qwen3']);
 
-    // GPU mode is controlled via OLLAMA_NUM_GPU env var (e.g. 0 for CPU-only, -1 for auto).
-    // By default, Ollama auto-selects GPU layers. UTM VMs on Apple Silicon support GPU passthrough.
+    /**
+     * Acquire an inference slot for the given model. Blocks until enough
+     * weight budget is available. Called once before an agent's agentic loop
+     * so the model stays loaded (preserves KV cache across turns).
+     */
+    async acquireSlot(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<void> {
+        const weight = this.getModelWeight(model);
+        if (this.activeWeight > 0 && this.activeWeight + weight > this.maxWeight) {
+            const mode = this.gpuDetected === null ? 'detecting' : (this.gpuDetected ? 'GPU' : 'CPU');
+            onStatus?.(`Queued — waiting for model slot (need ${weight}, ${this.activeWeight}/${this.maxWeight} in use, ${mode})`);
+            await new Promise<void>((resolve) => {
+                this.waitQueue.push({ weight, resolve });
+                // If caller aborts while queued, remove from wait queue
+                signal?.addEventListener('abort', () => {
+                    const idx = this.waitQueue.findIndex(w => w.resolve === resolve);
+                    if (idx >= 0) {
+                        this.waitQueue.splice(idx, 1);
+                        resolve(); // unblock the await
+                    }
+                }, { once: true });
+            });
+            if (signal?.aborted) return; // Aborted while queued
+        } else {
+            this.activeWeight += weight;
+        }
+        onStatus?.(''); // Clear queued status
+        log.info(`Slot acquired for ${model} (weight=${weight}, active=${this.activeWeight}/${this.maxWeight})`);
+    }
+
+    /** Release a previously acquired slot and unblock queued waiters. */
+    releaseSlot(model: string): void {
+        const weight = this.getModelWeight(model);
+        this.activeWeight -= weight;
+        log.info(`Slot released for ${model} (weight=${weight}, active=${this.activeWeight}/${this.maxWeight})`);
+        // Probe GPU after first release to potentially upgrade concurrency
+        if (this.gpuDetected === null) {
+            this.probeGpuMode().catch(() => {});
+        }
+        this.releaseWaiters();
+    }
 
     protected async doComplete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
-        // Wait for a concurrency slot
-        if (this.activeRequests >= OllamaProvider.MAX_CONCURRENT) {
-            await new Promise<void>((resolve) => this.waitQueue.push(resolve));
+        return this.doCompleteInner(params);
+    }
+
+    /** Release queued waiters that fit within the remaining weight budget. */
+    private releaseWaiters(): void {
+        let i = 0;
+        while (i < this.waitQueue.length) {
+            // Always allow at least one model through when nothing is running
+            const canFit = this.activeWeight === 0
+                || this.activeWeight + this.waitQueue[i].weight <= this.maxWeight;
+            if (canFit) {
+                const waiter = this.waitQueue.splice(i, 1)[0];
+                this.activeWeight += waiter.weight;
+                waiter.resolve();
+            } else {
+                i++;
+            }
         }
-        this.activeRequests++;
+    }
+
+    /**
+     * Probe Ollama to detect GPU inference by checking if any running model
+     * has VRAM allocated. If GPU is detected, upgrade from serial to concurrent.
+     * Sets maxWeight based on available VRAM:
+     *   - <10GB VRAM: maxWeight=3  (fit 1 large or 3 small)
+     *   - 10-40GB:    maxWeight=5  (mid-range GPU)
+     *   - >40GB:      maxWeight=8  (M1 Ultra 64GB / high-end)
+     */
+    private async probeGpuMode(): Promise<void> {
+        if (this.gpuDetected !== null) return;
+
+        // If OLLAMA_NUM_GPU=0 is explicitly set, force CPU mode
+        if (process.env.OLLAMA_NUM_GPU === '0') {
+            this.gpuDetected = false;
+            log.info('OLLAMA_NUM_GPU=0 — forcing serial scheduling (CPU mode)');
+            return;
+        }
+
         try {
-            return await this.doCompleteInner(params);
-        } finally {
-            this.activeRequests--;
-            // Release next waiter
-            const next = this.waitQueue.shift();
-            if (next) next();
+            const response = await fetch(`${this.host}/api/ps`, {
+                signal: AbortSignal.timeout(3_000),
+            });
+            if (!response.ok) return;
+            const data = (await response.json()) as OllamaPsResponse;
+
+            // Log detailed GPU info for debugging
+            for (const m of data.models) {
+                const sizeGB = (m.size / (1024 ** 3)).toFixed(1);
+                const vramGB = ((m.size_vram ?? 0) / (1024 ** 3)).toFixed(1);
+                const gpuPct = m.size > 0 ? Math.round(((m.size_vram ?? 0) / m.size) * 100) : 0;
+                log.info(`Ollama model "${m.name}": size=${sizeGB}GB, vram=${vramGB}GB (${gpuPct}% GPU)`);
+            }
+
+            const totalVram = data.models.reduce((sum, m) => sum + (m.size_vram ?? 0), 0);
+            const hasGpu = totalVram > 0;
+            this.gpuDetected = hasGpu;
+
+            if (hasGpu) {
+                // Check GPU offload ratio — warn if model is mostly on CPU
+                for (const m of data.models) {
+                    const ratio = m.size > 0 ? (m.size_vram ?? 0) / m.size : 0;
+                    if (ratio > 0 && ratio < 0.5) {
+                        log.warn(`Model "${m.name}" is only ${Math.round(ratio * 100)}% on GPU — expect slow inference. Check OLLAMA_NUM_GPU or available VRAM.`);
+                    }
+                }
+
+                // Scale maxWeight based on VRAM capacity
+                const totalVramGB = totalVram / (1024 ** 3);
+                if (totalVramGB > 40) {
+                    this.maxWeight = 8; // M1 Ultra 64GB / high-end
+                } else if (totalVramGB > 10) {
+                    this.maxWeight = 5; // Mid-range
+                } else {
+                    this.maxWeight = 3; // Entry-level GPU
+                }
+                log.info(`GPU detected — concurrent scheduling enabled (maxWeight=${this.maxWeight}, vram=${totalVramGB.toFixed(1)}GB)`);
+                this.releaseWaiters();
+            } else {
+                log.info('No GPU detected (size_vram=0) — keeping serial scheduling (maxWeight=1)');
+            }
+        } catch {
+            log.warn('Failed to probe GPU mode via /api/ps — keeping serial scheduling');
         }
+    }
+
+    /** Resolve the concurrency weight for a model based on its parameter size. */
+    private getModelWeight(modelName: string): number {
+        const tag = this.cachedTags.find(t => t.name === modelName);
+        const paramSize = tag?.details?.parameter_size; // e.g. "14B", "3.4B", "8B"
+        if (!paramSize) return 1; // unknown → assume small
+        const billions = parseFloat(paramSize); // "14B" → 14, "3.4B" → 3.4
+        if (isNaN(billions)) return 1;
+        if (billions >= 14) return 3;
+        if (billions >= 8) return 2;
+        return 1;
     }
 
     private async doCompleteInner(params: LlmCompletionParams): Promise<LlmCompletionResult> {
@@ -224,22 +357,19 @@ export class OllamaProvider extends BaseLlmProvider {
             stream: true,
         };
 
-        // Build options — set num_ctx to a reasonable context window.
-        // Ollama defaults to 2048-4096 which is too small for agent workflows.
-        // 16384 gives enough room for council review prompts that aggregate
-        // multiple member responses and discussion rounds.
-        const defaultCtx = parseInt(process.env.OLLAMA_NUM_CTX ?? '16384', 10);
+        // Build Ollama options for optimal performance.
+        const defaultCtx = parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10);
+        const maxOutput = parseInt(process.env.OLLAMA_NUM_PREDICT ?? '2048', 10);
         const options: Record<string, unknown> = {
             num_ctx: defaultCtx,
+            // Cap output tokens to prevent runaway generation (14B models can get stuck)
+            num_predict: maxOutput,
+            // Force all layers to GPU — critical for Apple Silicon performance.
+            // Without this, Ollama may partially offload to CPU, causing 50x slowdown.
+            num_gpu: parseInt(process.env.OLLAMA_NUM_GPU ?? '-1', 10),
+            // Larger batch size speeds up prompt evaluation significantly.
+            num_batch: parseInt(process.env.OLLAMA_NUM_BATCH ?? '512', 10),
         };
-
-        // Control GPU layers via OLLAMA_NUM_GPU env var (0=CPU-only, -1=auto).
-        // Omitted by default — Ollama auto-selects GPU layers.
-        const numGpu = process.env.OLLAMA_NUM_GPU;
-        if (numGpu !== undefined) {
-            options.num_gpu = parseInt(numGpu, 10);
-            log.info(`Using num_gpu=${options.num_gpu} from OLLAMA_NUM_GPU env var`);
-        }
         if (params.temperature !== undefined) {
             options.temperature = params.temperature;
         }
@@ -293,10 +423,23 @@ export class OllamaProvider extends BaseLlmProvider {
         let finalData: OllamaChatResponse | null = null;
         let lastActivitySignal = 0;
         const ACTIVITY_INTERVAL = 10_000; // Signal activity every 10s
+        const STREAM_IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 min — abort if no data arrives
 
         try {
             while (true) {
-                const { done, value } = await reader.read();
+                // Race read against idle timeout to detect hung streams
+                const readPromise = reader.read();
+                const timeoutPromise = new Promise<{ done: true; value: undefined }>((_, reject) =>
+                    setTimeout(() => reject(new Error(`Ollama stream idle for ${STREAM_IDLE_TIMEOUT_MS / 1000}s — aborting (model may be stuck)`)), STREAM_IDLE_TIMEOUT_MS),
+                );
+                let readResult: ReadableStreamReadResult<Uint8Array>;
+                try {
+                    readResult = await Promise.race([readPromise, timeoutPromise]) as ReadableStreamReadResult<Uint8Array>;
+                } catch (idleErr) {
+                    log.warn(`Stream idle timeout for ${params.model} after generating ${content.length} chars`);
+                    throw idleErr;
+                }
+                const { done, value } = readResult;
                 if (done) break;
 
                 streamBuffer += decoder.decode(value, { stream: true });
@@ -405,14 +548,32 @@ export class OllamaProvider extends BaseLlmProvider {
             }
         }
 
+        const evalDurationMs = (finalData?.eval_duration ?? 0) / 1_000_000;
+        const promptEvalDurationMs = (finalData?.prompt_eval_duration ?? 0) / 1_000_000;
+        const outputTokens = finalData?.eval_count ?? 0;
+        const inputTokens = finalData?.prompt_eval_count ?? 0;
+        const tokensPerSecond = evalDurationMs > 0 ? (outputTokens / (evalDurationMs / 1000)) : 0;
+        const promptTps = promptEvalDurationMs > 0 ? (inputTokens / (promptEvalDurationMs / 1000)) : 0;
+
+        log.info(`Ollama completed: model=${params.model} in=${inputTokens}tok (${Math.round(promptTps)} tok/s, ${Math.round(promptEvalDurationMs)}ms) out=${outputTokens}tok (${Math.round(tokensPerSecond * 10) / 10} tok/s, ${Math.round(evalDurationMs)}ms)`);
+
+        if (tokensPerSecond > 0 && tokensPerSecond < 5) {
+            log.warn(`Very slow inference: ${tokensPerSecond.toFixed(1)} tok/s. On Apple Silicon this should be 30-60 tok/s. Check: (1) Ollama running natively (not in Docker), (2) num_gpu=-1, (3) sufficient memory for model + KV cache.`);
+        }
+
         return {
             content,
             model: finalData?.model ?? params.model,
             usage: {
                 inputTokens: finalData?.prompt_eval_count ?? 0,
-                outputTokens: finalData?.eval_count ?? 0,
+                outputTokens,
             },
             toolCalls,
+            performance: {
+                evalDurationMs,
+                promptEvalDurationMs,
+                tokensPerSecond: Math.round(tokensPerSecond * 10) / 10,
+            },
         };
     }
 

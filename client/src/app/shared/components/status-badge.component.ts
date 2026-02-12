@@ -27,6 +27,7 @@ import { Component, ChangeDetectionStrategy, input, computed } from '@angular/co
         .status-badge--paused { background: var(--accent-amber-dim); color: var(--accent-amber); border-color: rgba(255, 170, 0, 0.3); }
         .status-badge--stopped { background: var(--bg-raised); color: var(--text-tertiary); border-color: var(--border); }
         .status-badge--error { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
+        .status-badge--queued { background: rgba(251, 191, 36, 0.1); color: var(--accent-yellow, #fbbf24); border-color: rgba(251, 191, 36, 0.3); }
         .status-badge--connected { background: var(--accent-green-dim); color: var(--accent-green); border-color: rgba(0, 255, 136, 0.3); }
         .status-badge--disconnected { background: var(--accent-red-dim); color: var(--accent-red); border-color: rgba(255, 51, 85, 0.3); }
     `,

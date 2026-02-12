@@ -90,14 +90,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     const pendingMessages: string[] = [];
     let processing = false;
 
+    // Council deliberation sessions (member, discusser, reviewer) should reason,
+    // not call tools. Only chairman/chat sessions get tools.
+    const isDeliberationSession = session.councilRole === 'member'
+        || session.councilRole === 'discusser'
+        || session.councilRole === 'reviewer';
+
     // Build coding context (always available — file/command tools don't need MCP)
     const codingCtx: CodingToolContext = {
         workingDir: project.workingDir,
         env: buildSafeEnvForCoding(),
     };
 
-    // Build tools — coding tools are available even without mcpToolContext
-    const directTools = buildDirectTools(mcpToolContext, codingCtx);
+    // Build tools — skip for council deliberation sessions
+    const directTools = isDeliberationSession ? [] : buildDirectTools(mcpToolContext, codingCtx);
     const toolMap = new Map<string, DirectToolDefinition>();
     for (const t of directTools) {
         toolMap.set(t.name, t);
@@ -107,7 +113,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     // Build system prompt (with tool instructions if tools are available)
     const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-    const systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0);
+    const systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession);
 
     // Conversation history for the current session
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
@@ -134,10 +140,57 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         // Signal that the agent is working
         onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
 
+        // Extend session timeout on activity (debounced to once per minute)
+        let lastExtend = 0;
+        const EXTEND_DEBOUNCE_MS = 60_000;
+        const TIMEOUT_EXTENSION_MS = 30 * 60 * 1000; // 30 minutes
+
+        const extendTimeoutIfNeeded = () => {
+            if (extendTimeout) {
+                const now = Date.now();
+                if (now - lastExtend > EXTEND_DEBOUNCE_MS) {
+                    extendTimeout(TIMEOUT_EXTENSION_MS);
+                    lastExtend = now;
+                }
+            }
+        };
+
+        // Acquire inference slot BEFORE the agentic loop so this agent runs all
+        // its turns to completion without yielding. This keeps the model loaded
+        // in Ollama's memory (preserves KV cache) and avoids context-switching.
+        const onSlotStatus = (status: string) => {
+            if (status) {
+                onEvent({
+                    type: 'queue_status',
+                    statusMessage: status,
+                } as ClaudeStreamEvent);
+            } else {
+                onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+            }
+        };
+
+        // Heartbeat while waiting for slot (so UI doesn't look frozen)
+        const slotHeartbeat = setInterval(() => {
+            extendTimeoutIfNeeded();
+            onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
+        }, 10_000);
+
+        if (provider.acquireSlot) {
+            await provider.acquireSlot(model, abortController.signal, onSlotStatus);
+        }
+        clearInterval(slotHeartbeat);
+
+        if (aborted) {
+            provider.releaseSlot?.(model);
+            return;
+        }
+
         let iteration = 0;
         let lastToolCallKey = '';
         let repeatCount = 0;
         const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
+
+        try {
 
         while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
             iteration++;
@@ -146,23 +199,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 ? toProviderTools(directTools)
                 : undefined;
 
-            // Extend session timeout on activity (debounced to once per minute)
-            let lastExtend = 0;
-            const EXTEND_DEBOUNCE_MS = 60_000;
-            const TIMEOUT_EXTENSION_MS = 30 * 60 * 1000; // 30 minutes
-
             const activityCallback = () => {
                 onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
-                if (extendTimeout) {
-                    const now = Date.now();
-                    if (now - lastExtend > EXTEND_DEBOUNCE_MS) {
-                        extendTimeout(TIMEOUT_EXTENSION_MS);
-                        lastExtend = now;
-                    }
-                }
+                extendTimeoutIfNeeded();
             };
 
-            // Heartbeat while waiting for provider (covers Ollama queue wait + prompt eval)
+            // Heartbeat while waiting for inference
             const heartbeat = setInterval(activityCallback, 10_000);
 
             let result;
@@ -209,6 +251,17 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         role: 'assistant',
                         content: [{ type: 'text', text: result.content }],
                     },
+                } as ClaudeStreamEvent);
+            }
+
+            // Emit performance metrics (tok/s) if available
+            if (result.performance && result.performance.tokensPerSecond > 0) {
+                onEvent({
+                    type: 'performance',
+                    model: result.model,
+                    tokensPerSecond: result.performance.tokensPerSecond,
+                    outputTokens: result.usage?.outputTokens ?? 0,
+                    evalDurationMs: result.performance.evalDurationMs,
                 } as ClaudeStreamEvent);
             }
 
@@ -279,6 +332,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             // No tool calls — model is done
             messages.push({ role: 'assistant', content: result.content || '' });
             break;
+        }
+
+        } finally {
+            // Release the slot so the next agent can run
+            provider.releaseSlot?.(model);
         }
 
         if (aborted) return;
@@ -375,8 +433,27 @@ function buildSystemPrompt(
     model: string,
     toolDefs: ToolDef[],
     hasTools: boolean,
+    isDeliberation = false,
 ): string {
     const parts: string[] = [];
+
+    // Council deliberation sessions: override with reasoning-only instructions
+    if (isDeliberation) {
+        parts.push(
+            'You are a council member participating in a structured deliberation.',
+            'Answer the question directly using your expertise and reasoning.',
+            'Do NOT attempt to call tools, read files, or review code — you have no tools available.',
+            'Provide your analysis, recommendations, and trade-offs based on your knowledge.',
+            'Be specific and opinionated. Take a clear position rather than listing generic pros and cons.',
+        );
+        if (agent?.systemPrompt) {
+            parts.push('', `Your role: ${agent.systemPrompt}`);
+        }
+        if (agent?.appendPrompt) {
+            parts.push('', agent.appendPrompt);
+        }
+        return parts.join('\n');
+    }
 
     if (agent?.systemPrompt) {
         parts.push(agent.systemPrompt);

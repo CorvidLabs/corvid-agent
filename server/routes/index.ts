@@ -21,6 +21,9 @@ import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
 import { searchAlgoChatMessages, getWalletSummaries, getWalletMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
+import { updateMemoryTxid } from '../db/agent-memories';
+import { encryptMemoryContent } from '../lib/crypto';
+import { loadAlgoChatConfig } from '../algochat/config';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json, serverError, handleRouteError, errorMessage } from '../lib/response';
@@ -275,6 +278,11 @@ async function handleRoutes(
         }
     }
 
+    // Memory backfill — re-send memories with NULL txids on-chain
+    if (url.pathname === '/api/memories/backfill' && req.method === 'POST') {
+        return handleMemoryBackfill(db, agentMessenger ?? null);
+    }
+
     // Self-test route
     if (url.pathname === '/api/selftest/run' && req.method === 'POST') {
         if (!selfTestService) {
@@ -365,4 +373,58 @@ async function handleSetOperationalMode(
         if (err instanceof ValidationError) return json({ error: err.message }, 400);
         throw err;
     }
+}
+
+interface NullTxidRow {
+    id: string;
+    agent_id: string;
+    key: string;
+    content: string;
+}
+
+async function handleMemoryBackfill(
+    db: Database,
+    agentMessenger: AgentMessenger | null,
+): Promise<Response> {
+    if (!agentMessenger) {
+        return json({ error: 'Agent messenger not available' }, 503);
+    }
+
+    const rows = db.query(
+        'SELECT id, agent_id, key, content FROM agent_memories WHERE txid IS NULL ORDER BY created_at ASC',
+    ).all() as NullTxidRow[];
+
+    if (rows.length === 0) {
+        return json({ ok: true, backfilled: 0, message: 'No memories with NULL txids' });
+    }
+
+    const config = loadAlgoChatConfig();
+    const results: Array<{ id: string; key: string; agentId: string; txid: string | null; error?: string }> = [];
+
+    for (const row of rows) {
+        try {
+            const encrypted = await encryptMemoryContent(row.content, config.mnemonic, config.network);
+            const txid = await agentMessenger.sendOnChainToSelf(
+                row.agent_id,
+                `[MEMORY:${row.key}] ${encrypted}`,
+            );
+            if (txid) {
+                updateMemoryTxid(db, row.id, txid);
+            }
+            results.push({ id: row.id, key: row.key, agentId: row.agent_id, txid });
+        } catch (err) {
+            results.push({
+                id: row.id,
+                key: row.key,
+                agentId: row.agent_id,
+                txid: null,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    const succeeded = results.filter(r => r.txid !== null).length;
+    log.info('Memory backfill complete', { total: rows.length, succeeded });
+
+    return json({ ok: true, backfilled: succeeded, total: rows.length, results });
 }

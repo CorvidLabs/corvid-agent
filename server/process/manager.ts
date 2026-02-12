@@ -547,6 +547,11 @@ export class ProcessManager {
 
     subscribe(sessionId: string, callback: EventCallback): void {
         this.eventBus.subscribe(sessionId, callback);
+        // Immediately replay current state so clients that subscribe late
+        // don't see an empty event log for running sessions.
+        if (this.processes.has(sessionId)) {
+            callback(sessionId, { type: 'thinking', thinking: true } as ClaudeStreamEvent);
+        }
     }
 
     unsubscribe(sessionId: string, callback: EventCallback): void {
