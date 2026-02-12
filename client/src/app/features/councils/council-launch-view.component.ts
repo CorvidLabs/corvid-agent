@@ -133,24 +133,27 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             </div>
                             @if (expandedSessions().has(session.id)) {
                                 <div class="feed-content" (click)="$event.stopPropagation()">
-                                    <div class="feed-event-log">
-                                        @for (entry of getEventLog(session.id); track entry.ts) {
-                                            <div class="feed-event-entry">
-                                                <span class="log-ts">{{ entry.time }}</span>
-                                                <span>{{ entry.text }}</span>
-                                            </div>
-                                        } @empty {
-                                            <div class="feed-event-entry">
-                                                <span class="processing-dot"></span>
-                                                <span>Waiting for model...</span>
-                                            </div>
-                                        }
-                                    </div>
-                                    <app-session-output
-                                        [messages]="getMessages(session.id)"
-                                        [events]="getEvents(session.id)"
-                                        [isRunning]="session.status === 'running'"
-                                    />
+                                    @if (session.status === 'running') {
+                                        <div class="feed-event-log">
+                                            @for (entry of getEventLog(session.id); track entry.ts) {
+                                                <div class="feed-event-entry">
+                                                    <span class="log-ts">{{ entry.time }}</span>
+                                                    <span>{{ entry.text }}</span>
+                                                </div>
+                                            } @empty {
+                                                <div class="feed-event-entry">
+                                                    <span class="processing-dot"></span>
+                                                    <span>Waiting for model...</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <app-session-output
+                                            [messages]="getMessages(session.id)"
+                                            [events]="getEvents(session.id)"
+                                            [isRunning]="false"
+                                        />
+                                    }
                                 </div>
                             }
                         </div>
@@ -232,24 +235,27 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                 </div>
                                 @if (expandedSessions().has(session.id)) {
                                     <div class="feed-content" (click)="$event.stopPropagation()">
-                                        <div class="feed-event-log">
-                                            @for (entry of getEventLog(session.id); track entry.ts) {
-                                                <div class="feed-event-entry">
-                                                    <span class="log-ts">{{ entry.time }}</span>
-                                                    <span>{{ entry.text }}</span>
-                                                </div>
-                                            } @empty {
-                                                <div class="feed-event-entry">
-                                                    <span class="processing-dot"></span>
-                                                    <span>Waiting for model...</span>
-                                                </div>
-                                            }
-                                        </div>
-                                        <app-session-output
-                                            [messages]="getMessages(session.id)"
-                                            [events]="getEvents(session.id)"
-                                            [isRunning]="session.status === 'running'"
-                                        />
+                                        @if (session.status === 'running') {
+                                            <div class="feed-event-log">
+                                                @for (entry of getEventLog(session.id); track entry.ts) {
+                                                    <div class="feed-event-entry">
+                                                        <span class="log-ts">{{ entry.time }}</span>
+                                                        <span>{{ entry.text }}</span>
+                                                    </div>
+                                                } @empty {
+                                                    <div class="feed-event-entry">
+                                                        <span class="processing-dot"></span>
+                                                        <span>Waiting for model...</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        } @else {
+                                            <app-session-output
+                                                [messages]="getMessages(session.id)"
+                                                [events]="getEvents(session.id)"
+                                                [isRunning]="false"
+                                            />
+                                        }
                                     </div>
                                 }
                             </div>
