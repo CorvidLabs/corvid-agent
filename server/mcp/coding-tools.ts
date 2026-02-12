@@ -5,7 +5,8 @@
  * so Ollama agents can do real coding work without Claude SDK.
  */
 
-import { resolve, relative } from 'path';
+import { resolve, relative, dirname } from 'path';
+import { mkdir } from 'fs/promises';
 import { isProtectedPath, BASH_WRITE_OPERATORS } from '../process/protected-paths';
 import type { DirectToolDefinition } from './direct-tools';
 
@@ -23,11 +24,12 @@ export interface CodingToolContext {
 function resolveSafePath(workingDir: string, filePath: string): string {
     const abs = resolve(workingDir, filePath);
     const rel = relative(workingDir, abs);
-    if (rel.startsWith('..') || resolve(abs) !== abs && rel.startsWith('..')) {
+    // relative() returns a path starting with '..' if abs escapes workingDir
+    if (rel.startsWith('..') || rel.startsWith(process.platform === 'win32' ? '..\\' : '../')) {
         throw new Error(`Path traversal denied: "${filePath}" resolves outside the project directory`);
     }
-    // Double-check: the resolved path must start with workingDir
-    if (!abs.startsWith(workingDir)) {
+    // On Windows, an absolute path on a different drive will produce an absolute relative path
+    if (resolve(rel) === rel) {
         throw new Error(`Path traversal denied: "${filePath}" resolves outside the project directory`);
     }
     return abs;
@@ -142,9 +144,8 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                         return { text: `Protected file — cannot write: ${filePath}`, isError: true };
                     }
 
-                    // Ensure parent directory exists
-                    const dir = absPath.substring(0, absPath.lastIndexOf('/'));
-                    await Bun.spawn(['mkdir', '-p', dir], { cwd: ctx.workingDir }).exited;
+                    // Ensure parent directory exists (cross-platform)
+                    await mkdir(dirname(absPath), { recursive: true });
 
                     await Bun.write(absPath, String(args.content));
                     return { text: `File written: ${filePath}` };

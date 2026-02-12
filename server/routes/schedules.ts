@@ -116,10 +116,25 @@ async function handleCreateSchedule(req: Request, db: Database): Promise<Respons
 async function handleUpdateSchedule(req: Request, db: Database, id: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateScheduleSchema);
+
+        // Validate frequency constraints if cron/interval is being updated
+        if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
+            const existing = getSchedule(db, id);
+            if (!existing) return json({ error: 'Schedule not found' }, 404);
+            const effectiveCron = data.cronExpression ?? existing.cronExpression;
+            const effectiveInterval = data.intervalMs ?? existing.intervalMs;
+            validateScheduleFrequency(effectiveCron, effectiveInterval ?? undefined);
+        }
+
         const schedule = updateSchedule(db, id, data);
         if (!schedule) return json({ error: 'Schedule not found' }, 404);
         return json(schedule);
     } catch (err) {
+        if (err instanceof ValidationError) return badRequest(err.message);
+        const msg = errorMessage(err);
+        if (msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short')) {
+            return badRequest(msg);
+        }
         return handleRouteError(err);
     }
 }

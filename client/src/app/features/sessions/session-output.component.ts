@@ -437,7 +437,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                     const parts: string[] = [];
                     if (turns !== undefined) parts.push(`${turns} turn${turns !== 1 ? 's' : ''}`);
                     if (duration !== undefined) parts.push(`${(duration / 1000).toFixed(1)}s`);
-                    if (cost) parts.push(`$${cost.toFixed(4)}`);
+                    if (cost !== undefined) parts.push(`$${cost.toFixed(4)}`);
                     parsed.push({
                         kind: subtype === 'error_during_execution' ? 'error' : 'result',
                         content: parts.join(' · ') || (subtype ?? 'done'),

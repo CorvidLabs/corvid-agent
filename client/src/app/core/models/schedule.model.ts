@@ -7,7 +7,8 @@ export type ScheduleActionType =
     | 'work_task'
     | 'council_launch'
     | 'send_message'
-    | 'github_suggest';
+    | 'github_suggest'
+    | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
 
@@ -21,6 +22,7 @@ export interface ScheduleAction {
     message?: string;
     maxPrs?: number;
     autoCreatePr?: boolean;
+    prompt?: string;
 }
 
 export interface AgentSchedule {

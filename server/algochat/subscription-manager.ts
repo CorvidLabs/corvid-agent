@@ -564,8 +564,6 @@ export class SubscriptionManager {
 
             // Emit thinking events
             if (event.type === 'assistant' && !isThinking) {
-                // Ensure isThinking is updated before emitting events
-                isThinking = true;
                 isThinking = true;
                 currentEventFn?.({ type: 'thinking', active: true });
             }

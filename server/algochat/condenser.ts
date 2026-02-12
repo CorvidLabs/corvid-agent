@@ -43,7 +43,7 @@ export async function condenseMessage(
         if (!provider) throw new Error('No LLM provider available');
 
         const result = await provider.complete({
-            model: 'claude-sonnet-4-20250514',
+            model: provider.getInfo().defaultModel,
             systemPrompt: `You are a message condenser. Your job is to condense the user's message to fit within ${condenseTarget} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
             messages: [{ role: 'user', content }],
             maxTokens: 1024,
