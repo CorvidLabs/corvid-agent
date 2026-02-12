@@ -28,7 +28,20 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-    await rm(workDir, { recursive: true, force: true });
+    // On Windows, killed child processes may still hold locks on the temp dir.
+    // Retry cleanup a few times before giving up (EBUSY).
+    for (let i = 0; i < 3; i++) {
+        try {
+            await rm(workDir, { recursive: true, force: true });
+            return;
+        } catch (err: unknown) {
+            if ((err as NodeJS.ErrnoException).code === 'EBUSY' && i < 2) {
+                await new Promise((r) => setTimeout(r, 500));
+                continue;
+            }
+            // Last attempt or non-EBUSY: swallow to avoid crashing test runner
+        }
+    }
 });
 
 // ── Tool registration ───────────────────────────────────────────────────
