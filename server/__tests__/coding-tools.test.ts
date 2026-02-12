@@ -231,13 +231,12 @@ describe('run_command', () => {
     });
 
     test('runs in the project directory', async () => {
-        const isWindows = process.platform === 'win32';
-        const command = isWindows ? 'cd' : 'pwd';
-        const result = await getTool('run_command').handler({ command });
+        // Always use `pwd` since run_command uses `sh -c` on all platforms
+        const result = await getTool('run_command').handler({ command: 'pwd' });
         const output = result.text.trim().replace(/\r\n/g, '\n').trim();
-        // macOS: /var → /private/var symlink; Windows: paths use backslashes
-        const normalizedWorkDir = isWindows ? workDir : workDir.replace(/^\/private/, '');
-        expect(output).toEndWith(normalizedWorkDir);
+        // macOS: /var → /private/var symlink; normalize both sides
+        const normalizePrivate = (p: string) => p.replace(/^\/private/, '');
+        expect(normalizePrivate(output)).toEndWith(normalizePrivate(workDir));
     });
 
     test('respects timeout', async () => {

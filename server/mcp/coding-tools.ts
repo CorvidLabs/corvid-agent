@@ -258,13 +258,22 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                         stderr: 'pipe',
                     });
 
+                    // Read stdout/stderr concurrently (don't await after exited —
+                    // child processes may hold pipes open after the shell is killed).
+                    const stdoutP = new Response(proc.stdout).text();
+                    const stderrP = new Response(proc.stderr).text();
+
                     // Race between process completion and timeout
-                    const timer = setTimeout(() => proc.kill(), timeoutMs);
+                    let timedOut = false;
+                    const timer = setTimeout(() => { timedOut = true; proc.kill(); }, timeoutMs);
                     const exitCode = await proc.exited;
                     clearTimeout(timer);
 
-                    const stdout = await new Response(proc.stdout).text();
-                    const stderr = await new Response(proc.stderr).text();
+                    // On timeout the child may still hold pipes open — race with a deadline
+                    const pipeDeadline = timedOut ? 2_000 : 30_000;
+                    const deadline = new Promise<string>((r) => setTimeout(() => r(''), pipeDeadline));
+                    const stdout = await Promise.race([stdoutP, deadline]);
+                    const stderr = await Promise.race([stderrP, deadline]);
 
                     let output = '';
                     if (stdout) output += stdout;
