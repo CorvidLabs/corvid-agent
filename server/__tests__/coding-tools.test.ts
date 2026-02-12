@@ -234,9 +234,17 @@ describe('run_command', () => {
         // Always use `pwd` since run_command uses `sh -c` on all platforms
         const result = await getTool('run_command').handler({ command: 'pwd' });
         const output = result.text.trim().replace(/\r\n/g, '\n').trim();
-        // macOS: /var → /private/var symlink; normalize both sides
-        const normalizePrivate = (p: string) => p.replace(/^\/private/, '');
-        expect(normalizePrivate(output)).toEndWith(normalizePrivate(workDir));
+        // macOS: /var → /private/var symlink; normalize both sides.
+        // Windows: MSYS2 translates C:\Users\...\Temp → /tmp so compare
+        // just the directory basename to handle path remapping.
+        const isWindows = process.platform === 'win32';
+        if (isWindows) {
+            const basename = workDir.split(/[/\\]/).pop()!;
+            expect(output).toEndWith(basename);
+        } else {
+            const normalizePrivate = (p: string) => p.replace(/^\/private/, '');
+            expect(normalizePrivate(output)).toEndWith(normalizePrivate(workDir));
+        }
     });
 
     test('respects timeout', async () => {
