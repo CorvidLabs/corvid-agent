@@ -4,11 +4,14 @@ AI agent orchestration platform with on-chain messaging via Algorand.
 
 ## Features
 
-- **Agent orchestration** -- spawn, manage, and monitor Claude-powered agents
-- **Council discussions** -- multi-agent deliberation with structured voting and follow-up chat
+- **Agent orchestration** -- spawn, manage, and monitor AI agents (Claude + Ollama)
+- **Council discussions** -- multi-agent deliberation with structured voting, discussion rounds, and follow-up chat
+- **Scheduler** -- cron/interval-based autonomous agent tasks with approval policies
+- **Ollama support** -- run local models (Qwen, LLama, etc.) with weight-based concurrency and tok/s metrics
 - **AlgoChat** -- on-chain encrypted messaging via Algorand (PSK / X25519)
 - **Self-improvement** -- agents create work tasks, branch, validate, and open PRs autonomously
-- **Mobile chat client** -- responsive Angular UI with real-time WebSocket updates
+- **Mobile connect** -- QR code PSK exchange for mobile wallet pairing
+- **Dashboard** -- Angular UI with analytics, settings, work tasks, system logs, and real-time streaming
 - **MCP tools** -- extensible tool system using the Model Context Protocol
 
 ## Tech Stack
@@ -18,6 +21,7 @@ AI agent orchestration platform with on-chain messaging via Algorand.
 - [SQLite](https://bun.sh/docs/api/sqlite) -- persistence via `bun:sqlite`
 - [Algorand](https://algorand.co) (`algosdk`) -- on-chain messaging
 - [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) -- agent orchestration
+- [Ollama](https://ollama.com) -- local model inference (optional)
 - [MCP SDK](https://github.com/modelcontextprotocol/sdk) -- tool protocol
 
 ## Quick Start
@@ -40,10 +44,12 @@ server/          Bun HTTP + WebSocket server, agent process management
   algochat/      AlgoChat on-chain messaging layer
   db/            SQLite schema and queries
   lib/           Shared utilities (logger, crypto, validation)
-  mcp/           MCP tool server
+  mcp/           MCP tool server and coding tools for Ollama agents
   middleware/    HTTP/WS auth, CORS, startup security checks
-  process/       Agent lifecycle management
-  routes/        REST API routes
+  process/       Agent lifecycle (SDK + direct Ollama execution)
+  providers/     LLM provider registry (Anthropic, Ollama)
+  routes/        REST API routes (agents, sessions, schedules, councils)
+  scheduler/     Cron/interval schedule execution engine
   selftest/      Self-test service
   work/          Task/work item management
   ws/            WebSocket handlers
@@ -72,6 +78,10 @@ e2e/             Playwright end-to-end tests
 | `WALLET_ENCRYPTION_KEY` | AES-256 key for wallet encryption at rest | derived from mnemonic |
 | `LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
 | `GH_TOKEN` | GitHub token for work task PR creation | -- |
+| `OLLAMA_URL` | Ollama API base URL | `http://localhost:11434` |
+| `OLLAMA_MAX_PARALLEL` | Max concurrency weight budget for Ollama | `3` |
+| `SCHEDULER_ENABLED` | Enable the autonomous scheduler | `true` |
+| `SCHEDULER_MAX_CONCURRENT` | Max concurrent schedule executions | `2` |
 
 Copy `.env.example` to `.env` and fill in your values. Bun loads `.env` automatically.
 
