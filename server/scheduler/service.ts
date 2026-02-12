@@ -29,6 +29,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import * as github from '../github/operations';
+import { launchCouncil } from '../routes/councils';
 import { getNextCronDate } from './cron-parser';
 import { createLogger } from '../lib/logger';
 
@@ -519,11 +520,22 @@ export class SchedulerService {
             return;
         }
 
-        // Council launches are handled via HTTP API — we'll create the execution record
-        // and let the caller handle the actual launch
-        updateExecutionStatus(this.db, executionId, 'completed', {
-            result: `Council launch queued for council ${action.councilId}`,
-        });
+        try {
+            const result = launchCouncil(
+                this.db,
+                this.processManager,
+                action.councilId,
+                action.projectId,
+                action.description,
+                this.agentMessenger,
+            );
+            updateExecutionStatus(this.db, executionId, 'completed', {
+                result: `Council launched: ${result.launchId} (${result.sessionIds.length} agents)`,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
     }
 
     private async execSendMessage(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
