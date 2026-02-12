@@ -39,7 +39,7 @@
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="hero">
     <div class="container">
-      <div class="hero__badge">v0.3.0</div>
+      <div class="hero__badge">v0.4.0</div>
       <h1 class="hero__title">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
       </h1>
@@ -70,7 +70,7 @@
         <div class="card card--cyan">
           <div class="card__icon">&#x1F9E0;</div>
           <h3 class="card__title">Agent Orchestration</h3>
-          <p>Multi-agent council system with configurable personas. Agents deliberate, vote, and reach consensus on complex decisions.</p>
+          <p>Multi-agent council system with configurable personas. Agents deliberate, vote, and reach consensus. Supports both Claude and local Ollama models.</p>
         </div>
 
         <div class="card card--magenta">
@@ -80,15 +80,15 @@
         </div>
 
         <div class="card card--green">
-          <div class="card__icon">&#x1F4F1;</div>
-          <h3 class="card__title">Cyberpunk UI</h3>
-          <p>Angular client with pixel-art aesthetic, real-time streaming, and mobile-responsive design. Dark mode by default.</p>
+          <div class="card__icon">&#x23F0;</div>
+          <h3 class="card__title">Scheduler</h3>
+          <p>Cron and interval-based autonomous task execution. Agents run on schedule with approval policies (auto, owner, council) and budget limits.</p>
         </div>
 
         <div class="card card--cyan">
-          <div class="card__icon">&#x1F527;</div>
-          <h3 class="card__title">MCP Tools</h3>
-          <p>Built-in Model Context Protocol tools for memory, agent messaging, credit checking, and work task creation.</p>
+          <div class="card__icon">&#x1F9CA;</div>
+          <h3 class="card__title">Ollama / Local Models</h3>
+          <p>Run Qwen, LLama, Mistral, and other local models. Weight-based concurrency prevents memory thrashing. Real-time tok/s metrics.</p>
         </div>
 
         <div class="card card--magenta">
@@ -98,9 +98,9 @@
         </div>
 
         <div class="card card--green">
-          <div class="card__icon">&#x1F512;</div>
-          <h3 class="card__title">On-Chain Identity</h3>
-          <p>Algorand wallet-based authentication. Every agent has a verifiable on-chain identity with encrypted memory storage.</p>
+          <div class="card__icon">&#x1F4F1;</div>
+          <h3 class="card__title">Dashboard &amp; Mobile</h3>
+          <p>Angular UI with analytics, system logs, work tasks, settings, and QR-based mobile connect. Dark cyberpunk aesthetic.</p>
         </div>
 
       </div>
@@ -117,7 +117,7 @@
         <div class="chip chip--green">SQLite</div>
         <div class="chip chip--cyan">Algorand</div>
         <div class="chip chip--magenta">Claude SDK</div>
-        <div class="chip chip--green">MCP</div>
+        <div class="chip chip--green">Ollama</div>
       </div>
     </div>
   </section>
@@ -162,15 +162,15 @@
         </div>
         <pre class="terminal__body"><code><span class="t-dir">corvid-agent/</span>
 <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">server/</span>          <span class="t-comment"># Bun HTTP + WebSocket server</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">index.ts</span>     <span class="t-comment"># Entry point &amp; routing</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">agent.ts</span>     <span class="t-comment"># Claude Agent SDK integration</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">council.ts</span>   <span class="t-comment"># Multi-agent deliberation</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">tools/</span>       <span class="t-comment"># MCP tool implementations</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>     <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>   <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>   <span class="t-comment"># Cron/interval task engine</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># MCP + coding tools</span>
 <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">client/</span>          <span class="t-comment"># Angular 21 UI</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">src/app/</span>     <span class="t-comment"># Components &amp; services</span>
-<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp-server/</span>      <span class="t-comment"># MCP tool server</span>
-<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">deploy/</span>          <span class="t-comment"># Docker &amp; CI/CD</span>
-<span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">tests/</span>           <span class="t-comment"># Bun test suite</span></code></pre>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">shared/</span>          <span class="t-comment"># Shared types &amp; WS protocol</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">deploy/</span>          <span class="t-comment"># Docker, systemd, Caddy, nginx</span>
+<span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">e2e/</span>             <span class="t-comment"># Playwright + Bun tests</span></code></pre>
       </div>
     </div>
   </section>

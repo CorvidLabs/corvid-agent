@@ -55,7 +55,7 @@
           <span class="terminal__label">architecture</span>
         </div>
         <div class="arch-diagram">
-          <!-- Top row: Angular UI → Bun Server → Claude SDK -->
+          <!-- Top row: Angular UI → Bun Server → LLM Providers -->
           <div class="arch-row">
             <div class="arch-box arch-box--cyan">
               <div class="arch-box__label accent-cyan">Angular UI</div>
@@ -68,8 +68,8 @@
             </div>
             <span class="arch-arrow"></span>
             <div class="arch-box arch-box--green">
-              <div class="arch-box__label accent-green">Claude SDK</div>
-              <div class="arch-box__sub">Subprocess</div>
+              <div class="arch-box__label accent-green">LLM Providers</div>
+              <div class="arch-box__sub">Claude + Ollama</div>
             </div>
           </div>
 
@@ -89,15 +89,15 @@
             <div class="arch-connector__line"></div>
           </div>
 
-          <!-- Bottom row: SQLite, MCP Server, AlgoChat -->
+          <!-- Bottom row: SQLite, Scheduler, AlgoChat -->
           <div class="arch-row">
             <div class="arch-box arch-box--cyan">
               <div class="arch-box__label accent-cyan">SQLite DB</div>
               <div class="arch-box__sub">Persistence</div>
             </div>
             <div class="arch-box arch-box--magenta">
-              <div class="arch-box__label accent-magenta">MCP Server</div>
-              <div class="arch-box__sub">9 Tools</div>
+              <div class="arch-box__label accent-magenta">Scheduler</div>
+              <div class="arch-box__sub">Cron / Interval</div>
             </div>
             <div class="arch-box arch-box--green">
               <div class="arch-box__label accent-green">AlgoChat</div>
@@ -125,10 +125,12 @@
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">algochat/</span>        <span class="t-comment"># On-chain messaging layer</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">db/</span>              <span class="t-comment"># SQLite schema &amp; queries</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">lib/</span>             <span class="t-comment"># Logger, crypto, validation</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>             <span class="t-comment"># MCP tool server &amp; handlers</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">middleware/</span>       <span class="t-comment"># Auth, CORS</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>         <span class="t-comment"># Agent lifecycle &amp; SDK integration</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>             <span class="t-comment"># MCP tool server &amp; coding tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">middleware/</span>       <span class="t-comment"># Auth, CORS, rate limiting</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>         <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>       <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">routes/</span>          <span class="t-comment"># REST API endpoints</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>       <span class="t-comment"># Cron/interval execution engine</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">work/</span>            <span class="t-comment"># Git worktree &amp; work tasks</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">ws/</span>              <span class="t-comment"># WebSocket handler</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-file">index.ts</span>         <span class="t-comment"># Entry point</span>
@@ -362,6 +364,58 @@
             <span class="api-method api-method--post">POST</span>
             <code class="api-path">/api/council-launches/:id/chat</code>
             <span class="api-desc">Follow-up chat on completed council</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedules -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Schedules</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedules</code>
+            <span class="api-desc">List schedules (?agentId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedules</code>
+            <span class="api-desc">Create schedule (cron or interval)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedules/:id</code>
+            <span class="api-desc">Get schedule details</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/schedules/:id</code>
+            <span class="api-desc">Update schedule</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/schedules/:id</code>
+            <span class="api-desc">Delete schedule</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedules/:id/executions</code>
+            <span class="api-desc">List executions for schedule</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedule-executions</code>
+            <span class="api-desc">List all executions</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedule-executions/:id/resolve</code>
+            <span class="api-desc">Approve or deny execution</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/scheduler/health</code>
+            <span class="api-desc">Scheduler health &amp; stats</span>
           </div>
         </div>
       </div>
@@ -799,7 +853,7 @@
   <section class="section" id="database">
     <div class="container">
       <h2 class="section__title">Database Schema</h2>
-      <p class="section__subtitle">SQLite via <code class="accent-cyan">bun:sqlite</code>. Schema version 23. Auto-migrates on startup.</p>
+      <p class="section__subtitle">SQLite via <code class="accent-cyan">bun:sqlite</code>. Schema version 24. Auto-migrates on startup.</p>
 
       <div class="grid grid--3">
         <div class="card card--cyan">
@@ -832,6 +886,8 @@
             <div class="schema-item"><code>council_launches</code> <span class="t-comment">&mdash; stage</span></div>
             <div class="schema-item"><code>council_launch_logs</code></div>
             <div class="schema-item"><code>council_discussion_messages</code></div>
+            <div class="schema-item"><code>schedules</code> <span class="t-comment">&mdash; cron, interval, actions</span></div>
+            <div class="schema-item"><code>schedule_executions</code> <span class="t-comment">&mdash; status, result</span></div>
             <div class="schema-item"><code>credit_ledger</code> <span class="t-comment">&mdash; wallet, balance</span></div>
             <div class="schema-item"><code>credit_transactions</code></div>
             <div class="schema-item"><code>credit_config</code></div>

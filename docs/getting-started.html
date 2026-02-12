@@ -56,12 +56,12 @@
         <div class="card card--magenta">
           <div class="card__icon">&#x1F916;</div>
           <h3 class="card__title">Anthropic API Key</h3>
-          <p>Required for the Claude Agent SDK. Get one at <a href="https://console.anthropic.com" class="accent-magenta">console.anthropic.com</a>.</p>
+          <p>Required for Claude agents. Get one at <a href="https://console.anthropic.com" class="accent-magenta">console.anthropic.com</a>. Not needed if using Ollama only.</p>
         </div>
         <div class="card card--green">
-          <div class="card__icon">&#x26D3;</div>
-          <h3 class="card__title">AlgoKit (optional)</h3>
-          <p>Only needed for on-chain AlgoChat messaging. Without it, everything still works &mdash; chat via the web UI, agents run sessions, councils deliberate. Install via <code class="accent-green">pipx install algokit</code> if you want Localnet or Testnet messaging.</p>
+          <div class="card__icon">&#x1F9CA;</div>
+          <h3 class="card__title">Ollama (optional)</h3>
+          <p>Run local models (Qwen, LLama, Mistral). Install from <a href="https://ollama.com" class="accent-green">ollama.com</a>. Agents can use any pulled model. Weight-based concurrency prevents memory thrashing.</p>
         </div>
       </div>
     </div>
@@ -105,6 +105,9 @@
 
 <span class="t-comment"># Required</span>
 ANTHROPIC_API_KEY=sk-ant-...
+
+<span class="t-comment"># Optional &mdash; for Ollama local models</span>
+OLLAMA_URL=http://localhost:11434
 
 <span class="t-comment"># Optional &mdash; for AlgoChat messaging</span>
 ALGOCHAT_MNEMONIC=your twenty five word mnemonic ...
@@ -262,19 +265,23 @@ GH_TOKEN=ghp_...</code></pre>
         </div>
 
         <div class="card card--green">
-          <h3 class="card__title">Limits</h3>
+          <h3 class="card__title">Ollama &amp; Scheduler</h3>
           <div class="config-table">
             <div class="config-row">
-              <span class="config-key accent-green">AGENT_TIMEOUT_MS</span>
-              <span class="config-val">1800000 (30 min)</span>
+              <span class="config-key accent-green">OLLAMA_URL</span>
+              <span class="config-val">http://localhost:11434</span>
             </div>
             <div class="config-row">
-              <span class="config-key accent-green">DAILY_ALGO_LIMIT_MICRO</span>
-              <span class="config-val">10000000 (10 ALGO)</span>
+              <span class="config-key accent-green">OLLAMA_MAX_PARALLEL</span>
+              <span class="config-val">3 (weight budget)</span>
             </div>
             <div class="config-row">
-              <span class="config-key accent-green">WORK_MAX_ITERATIONS</span>
-              <span class="config-val">3</span>
+              <span class="config-key accent-green">SCHEDULER_ENABLED</span>
+              <span class="config-val">true</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-green">SCHEDULER_MAX_CONCURRENT</span>
+              <span class="config-val">2</span>
             </div>
           </div>
         </div>
