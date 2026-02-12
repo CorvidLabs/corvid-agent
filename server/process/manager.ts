@@ -3,15 +3,19 @@ import type { Session } from '../../shared/types';
 import type { ClaudeStreamEvent } from './types';
 import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
+import { startDirectProcess } from './direct-process';
 import { ApprovalManager } from './approval-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
 import { getAgent } from '../db/agents';
+import { LlmProviderRegistry } from '../providers/registry';
+import type { LlmProviderType } from '../providers/types';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
+import type { SchedulerService } from '../scheduler/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -89,6 +93,7 @@ export class ProcessManager {
     private mcpWalletService: AgentWalletService | null = null;
     private mcpEncryptionConfig: { serverMnemonic?: string | null; network?: string } = {};
     private mcpWorkTaskService: WorkTaskService | null = null;
+    private mcpSchedulerService: SchedulerService | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -112,17 +117,19 @@ export class ProcessManager {
         walletService: AgentWalletService,
         encryptionConfig?: { serverMnemonic?: string | null; network?: string },
         workTaskService?: WorkTaskService,
+        schedulerService?: SchedulerService,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
         this.mcpWalletService = walletService;
         this.mcpEncryptionConfig = encryptionConfig ?? {};
         this.mcpWorkTaskService = workTaskService ?? null;
+        this.mcpSchedulerService = schedulerService ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
-    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number): McpToolContext | null {
+    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number, schedulerMode?: boolean): McpToolContext | null {
         if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
         return {
             agentId,
@@ -135,8 +142,10 @@ export class ProcessManager {
             serverMnemonic: this.mcpEncryptionConfig.serverMnemonic,
             network: this.mcpEncryptionConfig.network,
             workTaskService: this.mcpWorkTaskService ?? undefined,
+            schedulerService: this.mcpSchedulerService ?? undefined,
+            schedulerMode,
             emitStatus: sessionId
-                ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', message } as unknown as ClaudeStreamEvent)
+                ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', statusMessage: message })
                 : undefined,
             extendTimeout: sessionId
                 ? (additionalMs: number) => this.extendTimeout(sessionId, additionalMs)
@@ -157,7 +166,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -174,11 +183,18 @@ export class ProcessManager {
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
-        // All agents route through SDK path so they receive MCP tools (corvid_*)
-        this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth);
+        // Route based on provider execution mode
+        const providerType = agent?.provider as LlmProviderType | undefined;
+        const provider = providerType ? LlmProviderRegistry.getInstance().get(providerType) : undefined;
+
+        if (provider && provider.executionMode === 'direct') {
+            this.startDirectProcessWrapped(session, project, agent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
+        } else {
+            this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth, options?.schedulerMode);
+        }
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean): void {
         // Use session-level workDir override (e.g. git worktree for work tasks)
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -187,7 +203,7 @@ export class ProcessManager {
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;
@@ -213,6 +229,52 @@ export class ProcessManager {
             this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Failed to start SDK process: ${message}`, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        this.registerProcess(session, sp);
+    }
+
+    private startDirectProcessWrapped(
+        session: Session,
+        project: import('../../shared/types').Project,
+        agent: import('../../shared/types').Agent | null,
+        prompt: string,
+        provider: import('../providers/types').LlmProvider,
+        depth?: number,
+        schedulerMode?: boolean,
+    ): void {
+        const effectiveProject = session.workDir
+            ? { ...project, workingDir: session.workDir }
+            : project;
+
+        const mcpToolContext = session.agentId
+            ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode)
+            : null;
+
+        let sp: SdkProcess;
+        try {
+            sp = startDirectProcess({
+                session,
+                project: effectiveProject,
+                agent,
+                prompt,
+                provider,
+                approvalManager: this.approvalManager,
+                onEvent: (event) => this.handleEvent(session.id, event),
+                onExit: (code) => this.handleExit(session.id, code),
+                onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
+                mcpToolContext,
+                extendTimeout: (ms) => this.extendTimeout(session.id, ms),
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(`Failed to start direct process for session ${session.id}`, { error: message });
+            updateSessionStatus(this.db, session.id, 'error');
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message: `Failed to start direct process: ${message}`, type: 'spawn_error' },
             } as ClaudeStreamEvent);
             return;
         }
@@ -250,7 +312,7 @@ export class ProcessManager {
         this.eventBus.emit(sessionId, {
             type: 'approval_request',
             ...request,
-        } as unknown as ClaudeStreamEvent);
+        });
     }
 
     resumeProcess(session: Session, prompt?: string): void {
@@ -291,34 +353,56 @@ export class ProcessManager {
             addSessionMessage(this.db, session.id, 'user', prompt);
         }
 
-        const mcpServers = session.agentId
-            ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id);
-                return ctx ? [createCorvidMcpServer(ctx)] : undefined;
-            })()
-            : undefined;
+        // Route based on provider execution mode (same logic as startProcess)
+        const providerType = agent?.provider as LlmProviderType | undefined;
+        const providerInstance = providerType ? LlmProviderRegistry.getInstance().get(providerType) : undefined;
 
         let sp: SdkProcess;
         try {
-            sp = startSdkProcess({
-                session,
-                project,
-                agent,
-                prompt: resumePrompt ?? '',
-                approvalManager: this.approvalManager,
-                onEvent: (event) => this.handleEvent(session.id, event),
-                onExit: (code) => this.handleExit(session.id, code),
-                onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
-                onApiOutage: () => this.handleApiOutage(session.id),
-                mcpServers,
-            });
+            if (providerInstance && providerInstance.executionMode === 'direct') {
+                const mcpToolContext = session.agentId
+                    ? this.buildMcpContext(session.agentId, session.source, session.id)
+                    : null;
+                sp = startDirectProcess({
+                    session,
+                    project,
+                    agent,
+                    prompt: resumePrompt ?? '',
+                    provider: providerInstance,
+                    approvalManager: this.approvalManager,
+                    onEvent: (event) => this.handleEvent(session.id, event),
+                    onExit: (code) => this.handleExit(session.id, code),
+                    onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
+                    mcpToolContext,
+                    extendTimeout: (ms) => this.extendTimeout(session.id, ms),
+                });
+            } else {
+                const mcpServers = session.agentId
+                    ? (() => {
+                        const ctx = this.buildMcpContext(session.agentId, session.source, session.id);
+                        return ctx ? [createCorvidMcpServer(ctx)] : undefined;
+                    })()
+                    : undefined;
+                sp = startSdkProcess({
+                    session,
+                    project,
+                    agent,
+                    prompt: resumePrompt ?? '',
+                    approvalManager: this.approvalManager,
+                    onEvent: (event) => this.handleEvent(session.id, event),
+                    onExit: (code) => this.handleExit(session.id, code),
+                    onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
+                    onApiOutage: () => this.handleApiOutage(session.id),
+                    mcpServers,
+                });
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            log.error(`Failed to resume SDK process for session ${session.id}`, { error: message });
+            log.error(`Failed to resume process for session ${session.id}`, { error: message });
             updateSessionStatus(this.db, session.id, 'error');
             this.eventBus.emit(session.id, {
                 type: 'error',
-                error: { message: `Failed to resume SDK process: ${message}`, type: 'spawn_error' },
+                error: { message: `Failed to resume process: ${message}`, type: 'spawn_error' },
             } as ClaudeStreamEvent);
             return;
         }
@@ -463,6 +547,11 @@ export class ProcessManager {
 
     subscribe(sessionId: string, callback: EventCallback): void {
         this.eventBus.subscribe(sessionId, callback);
+        // Immediately replay current state so clients that subscribe late
+        // don't see an empty event log for running sessions.
+        if (this.processes.has(sessionId)) {
+            callback(sessionId, { type: 'thinking', thinking: true } as ClaudeStreamEvent);
+        }
     }
 
     unsubscribe(sessionId: string, callback: EventCallback): void {
@@ -635,8 +724,8 @@ export class ProcessManager {
                             });
                             this.eventBus.emit(sessionId, {
                                 type: 'system',
-                                message: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
-                            } as unknown as ClaudeStreamEvent);
+                                statusMessage: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
+                            });
                         }
                     }
                 }

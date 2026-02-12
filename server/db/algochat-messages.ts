@@ -6,6 +6,8 @@ export interface AlgoChatMessage {
     content: string;
     direction: 'inbound' | 'outbound' | 'status';
     fee: number;
+    provider?: string;
+    model?: string;
     createdAt: string;
 }
 
@@ -15,6 +17,8 @@ interface AlgoChatMessageRow {
     content: string;
     direction: string;
     fee: number;
+    provider: string;
+    model: string;
     created_at: string;
 }
 
@@ -25,6 +29,8 @@ function rowToMessage(row: AlgoChatMessageRow): AlgoChatMessage {
         content: row.content,
         direction: row.direction as AlgoChatMessage['direction'],
         fee: row.fee,
+        provider: row.provider || undefined,
+        model: row.model || undefined,
         createdAt: row.created_at,
     };
 }
@@ -36,13 +42,15 @@ export function saveAlgoChatMessage(
         content: string;
         direction: 'inbound' | 'outbound' | 'status';
         fee?: number;
+        provider?: string;
+        model?: string;
     },
 ): AlgoChatMessage {
     const stmt = db.query(
-        `INSERT INTO algochat_messages (participant, content, direction, fee)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO algochat_messages (participant, content, direction, fee, provider, model)
+         VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    stmt.run(params.participant, params.content, params.direction, params.fee ?? 0);
+    stmt.run(params.participant, params.content, params.direction, params.fee ?? 0, params.provider ?? '', params.model ?? '');
 
     const last = db.query('SELECT last_insert_rowid() as id').get() as { id: number };
     const row = db.query('SELECT * FROM algochat_messages WHERE id = ?').get(last.id) as AlgoChatMessageRow;

@@ -7,6 +7,7 @@ export interface Agent {
     systemPrompt: string;
     appendPrompt: string;
     model: string;
+    provider?: string;
     allowedTools: string;
     disallowedTools: string;
     permissionMode: PermissionMode;
@@ -27,6 +28,7 @@ export interface CreateAgentInput {
     systemPrompt?: string;
     appendPrompt?: string;
     model?: string;
+    provider?: string;
     allowedTools?: string;
     disallowedTools?: string;
     permissionMode?: PermissionMode;
@@ -38,3 +40,13 @@ export interface CreateAgentInput {
 }
 
 export type UpdateAgentInput = Partial<CreateAgentInput>;
+
+export interface ProviderInfo {
+    type: string;
+    name: string;
+    executionMode: string;
+    models: string[];
+    defaultModel: string;
+    supportsTools: boolean;
+    supportsStreaming: boolean;
+}

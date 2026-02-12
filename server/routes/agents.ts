@@ -4,13 +4,7 @@ import { listAgentMessages } from '../db/agent-messages';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema } from '../lib/validation';
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
+import { json } from '../lib/response';
 
 export function handleAgentRoutes(
     req: Request,

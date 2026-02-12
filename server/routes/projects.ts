@@ -5,15 +5,9 @@ import { dirname, resolve, sep } from 'node:path';
 import { listProjects, getProject, createProject, updateProject, deleteProject } from '../db/projects';
 import { parseBodyOrThrow, ValidationError, CreateProjectSchema, UpdateProjectSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import { json } from '../lib/response';
 
 const log = createLogger('BrowseDirs');
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
 
 export function handleProjectRoutes(
     req: Request,

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 23;
+const SCHEMA_VERSION = 26;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -330,6 +330,60 @@ const MIGRATIONS: Record<number, string[]> = {
          FROM algochat_psk_state`,
         `DROP TABLE IF EXISTS algochat_psk_state`,
         `ALTER TABLE algochat_psk_state_v2 RENAME TO algochat_psk_state`,
+    ],
+    24: [
+        // Agent schedules — cron/interval-based automation for agents and councils
+        `CREATE TABLE IF NOT EXISTS agent_schedules (
+            id                  TEXT PRIMARY KEY,
+            agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            name                TEXT NOT NULL,
+            description         TEXT DEFAULT '',
+            cron_expression     TEXT DEFAULT NULL,
+            interval_ms         INTEGER DEFAULT NULL,
+            actions             TEXT NOT NULL DEFAULT '[]',
+            approval_policy     TEXT DEFAULT 'owner_approve',
+            status              TEXT DEFAULT 'active',
+            max_executions      INTEGER DEFAULT NULL,
+            execution_count     INTEGER DEFAULT 0,
+            max_budget_per_run  REAL DEFAULT NULL,
+            last_run_at         TEXT DEFAULT NULL,
+            next_run_at         TEXT DEFAULT NULL,
+            created_at          TEXT DEFAULT (datetime('now')),
+            updated_at          TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_agent ON agent_schedules(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_status ON agent_schedules(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_next_run ON agent_schedules(next_run_at)`,
+
+        // Schedule execution log — one row per action execution
+        `CREATE TABLE IF NOT EXISTS schedule_executions (
+            id              TEXT PRIMARY KEY,
+            schedule_id     TEXT NOT NULL REFERENCES agent_schedules(id) ON DELETE CASCADE,
+            agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            status          TEXT DEFAULT 'running',
+            action_type     TEXT NOT NULL,
+            action_input    TEXT DEFAULT '{}',
+            result          TEXT DEFAULT NULL,
+            session_id      TEXT DEFAULT NULL,
+            work_task_id    TEXT DEFAULT NULL,
+            cost_usd        REAL DEFAULT 0,
+            started_at      TEXT DEFAULT (datetime('now')),
+            completed_at    TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule ON schedule_executions(schedule_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_executions_status ON schedule_executions(status)`,
+    ],
+    25: [
+        // Add config snapshot to execution records for audit/debugging
+        `ALTER TABLE schedule_executions ADD COLUMN config_snapshot TEXT DEFAULT NULL`,
+    ],
+    26: [
+        // LLM provider metadata columns
+        `ALTER TABLE agents ADD COLUMN provider TEXT DEFAULT ''`,
+        `ALTER TABLE agent_messages ADD COLUMN provider TEXT DEFAULT ''`,
+        `ALTER TABLE agent_messages ADD COLUMN model TEXT DEFAULT ''`,
+        `ALTER TABLE algochat_messages ADD COLUMN provider TEXT DEFAULT ''`,
+        `ALTER TABLE algochat_messages ADD COLUMN model TEXT DEFAULT ''`,
     ],
 };
 

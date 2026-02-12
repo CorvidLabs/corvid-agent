@@ -9,7 +9,9 @@ import { handleAllowlistRoutes } from './allowlist';
 import { handleAnalyticsRoutes } from './analytics';
 import { handleSystemLogRoutes } from './system-logs';
 import { handleSettingsRoutes } from './settings';
+import { handleScheduleRoutes } from './schedules';
 import type { ProcessManager } from '../process/manager';
+import type { SchedulerService } from '../scheduler/service';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
@@ -19,8 +21,12 @@ import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
 import { searchAlgoChatMessages, getWalletSummaries, getWalletMessages } from '../db/algochat-messages';
 import { backupDatabase } from '../db/backup';
+import { updateMemoryTxid } from '../db/agent-memories';
+import { encryptMemoryContent } from '../lib/crypto';
+import { loadAlgoChatConfig } from '../algochat/config';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
+import { json, serverError, handleRouteError, errorMessage } from '../lib/response';
 import { checkHttpAuth, loadAuthConfig, type AuthConfig } from '../middleware/auth';
 import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
 
@@ -36,13 +42,6 @@ const rateLimiter = new RateLimiter(loadRateLimitConfig());
 
 const log = createLogger('Router');
 
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
-
 /**
  * Global error handler — catches any unhandled error from route handlers
  * and returns a proper JSON 500 response instead of crashing the server.
@@ -53,7 +52,7 @@ function errorResponse(err: unknown): Response {
 
     log.error('Unhandled route error', { error: message, stack });
 
-    const response = json({ error: message, timestamp: new Date().toISOString() }, 500);
+    const response = serverError(err);
     addCors(response);
     return response;
 }
@@ -71,6 +70,7 @@ export async function handleRequest(
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
     networkSwitchFn?: NetworkSwitchFn | null,
+    schedulerService?: SchedulerService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
 
@@ -87,7 +87,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn);
+        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService);
         if (response) addCors(response);
         return response;
     } catch (err) {
@@ -108,6 +108,7 @@ async function handleRoutes(
     selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null,
     agentDirectory?: AgentDirectory | null,
     networkSwitchFn?: NetworkSwitchFn | null,
+    schedulerService?: SchedulerService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -146,6 +147,10 @@ async function handleRoutes(
         const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService);
         if (workTaskResponse) return workTaskResponse;
     }
+
+    // Schedule routes (automation)
+    const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService ?? null);
+    if (scheduleResponse) return scheduleResponse;
 
     // MCP API routes (used by stdio server subprocess)
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService
@@ -229,9 +234,7 @@ async function handleRoutes(
             await networkSwitchFn(data.network);
             return json({ ok: true, network: data.network });
         } catch (err) {
-            if (err instanceof ValidationError) return json({ error: err.message }, 400);
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: message }, 500);
+            return handleRouteError(err);
         }
     }
 
@@ -248,8 +251,7 @@ async function handleRoutes(
             const result = algochatBridge.getPSKExchangeURI();
             return json(result);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: message }, 500);
+            return handleRouteError(err);
         }
     }
 
@@ -262,8 +264,7 @@ async function handleRoutes(
             const result = algochatBridge.generatePSKExchangeURI();
             return json(result);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: message }, 500);
+            return handleRouteError(err);
         }
     }
 
@@ -273,9 +274,13 @@ async function handleRoutes(
             const result = backupDatabase(db);
             return json(result);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return json({ error: `Backup failed: ${message}` }, 500);
+            return json({ error: `Backup failed: ${errorMessage(err)}` }, 500);
         }
+    }
+
+    // Memory backfill — re-send memories with NULL txids on-chain
+    if (url.pathname === '/api/memories/backfill' && req.method === 'POST') {
+        return handleMemoryBackfill(db, agentMessenger ?? null);
     }
 
     // Self-test route
@@ -317,9 +322,7 @@ async function handleSelfTestRun(
         const result = selfTestService.run(testType);
         return json({ sessionId: result.sessionId });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
@@ -370,4 +373,58 @@ async function handleSetOperationalMode(
         if (err instanceof ValidationError) return json({ error: err.message }, 400);
         throw err;
     }
+}
+
+interface NullTxidRow {
+    id: string;
+    agent_id: string;
+    key: string;
+    content: string;
+}
+
+async function handleMemoryBackfill(
+    db: Database,
+    agentMessenger: AgentMessenger | null,
+): Promise<Response> {
+    if (!agentMessenger) {
+        return json({ error: 'Agent messenger not available' }, 503);
+    }
+
+    const rows = db.query(
+        'SELECT id, agent_id, key, content FROM agent_memories WHERE txid IS NULL ORDER BY created_at ASC',
+    ).all() as NullTxidRow[];
+
+    if (rows.length === 0) {
+        return json({ ok: true, backfilled: 0, message: 'No memories with NULL txids' });
+    }
+
+    const config = loadAlgoChatConfig();
+    const results: Array<{ id: string; key: string; agentId: string; txid: string | null; error?: string }> = [];
+
+    for (const row of rows) {
+        try {
+            const encrypted = await encryptMemoryContent(row.content, config.mnemonic, config.network);
+            const txid = await agentMessenger.sendOnChainToSelf(
+                row.agent_id,
+                `[MEMORY:${row.key}] ${encrypted}`,
+            );
+            if (txid) {
+                updateMemoryTxid(db, row.id, txid);
+            }
+            results.push({ id: row.id, key: row.key, agentId: row.agent_id, txid });
+        } catch (err) {
+            results.push({
+                id: row.id,
+                key: row.key,
+                agentId: row.agent_id,
+                txid: null,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    const succeeded = results.filter(r => r.txid !== null).length;
+    log.info('Memory backfill complete', { total: rows.length, succeeded });
+
+    return json({ ok: true, backfilled: succeeded, total: rows.length, results });
 }

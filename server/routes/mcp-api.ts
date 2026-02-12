@@ -5,19 +5,13 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents } from '../mcp/tool-handlers';
-import { parseBodyOrThrow, ValidationError, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema } from '../lib/validation';
+import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema } from '../lib/validation';
+import { json, handleRouteError } from '../lib/response';
 
 function extractResultText(result: CallToolResult): string {
     const first = result.content[0];
     if (first && 'text' in first) return first.text;
     return '';
-}
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
 }
 
 interface McpApiDeps {
@@ -72,9 +66,7 @@ async function handleSendMessageRoute(req: Request, deps: McpApiDeps): Promise<R
         const result = await handleSendMessage(ctx, { to_agent: data.toAgent, message: data.message });
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
@@ -86,9 +78,7 @@ async function handleSaveMemoryRoute(req: Request, deps: McpApiDeps): Promise<Re
         const result = await handleSaveMemory(ctx, { key: data.key, content: data.content });
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
@@ -100,9 +90,7 @@ async function handleRecallMemoryRoute(req: Request, deps: McpApiDeps): Promise<
         const result = await handleRecallMemory(ctx, { key: data.key, query: data.query });
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }
 
@@ -117,7 +105,6 @@ async function handleListAgentsRoute(url: URL, deps: McpApiDeps): Promise<Respon
         const result = await handleListAgents(ctx);
         return json({ response: extractResultText(result), isError: result.isError });
     } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 500);
+        return handleRouteError(err);
     }
 }

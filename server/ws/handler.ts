@@ -5,6 +5,7 @@ import { isClientMessage } from '../../shared/ws-protocol';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { WorkTaskService } from '../work/service';
+import type { SchedulerService } from '../scheduler/service';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
@@ -19,12 +20,15 @@ export function createWebSocketHandler(
     getBridge: () => AlgoChatBridge | null,
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
+    getSchedulerService?: () => SchedulerService | null,
 ) {
     return {
         open(ws: ServerWebSocket<WsData>) {
             ws.data = { subscriptions: new Map() };
             ws.subscribe('council');
             ws.subscribe('algochat');
+            ws.subscribe('scheduler');
+            ws.subscribe('ollama');
             log.info('WebSocket connection opened');
         },
 
@@ -41,11 +45,13 @@ export function createWebSocketHandler(
             }
 
             if (!isClientMessage(parsed)) {
+                const preview = raw.slice(0, 200);
+                log.warn('Invalid WS message format', { raw: preview });
                 sendError(ws, 'Invalid message format');
                 return;
             }
 
-            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService);
+            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService);
         },
 
         close(ws: ServerWebSocket<WsData>) {
@@ -67,6 +73,7 @@ function handleClientMessage(
     getBridge: () => AlgoChatBridge | null,
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
+    getSchedulerService?: () => SchedulerService | null,
 ): void {
     switch (msg.type) {
         case 'subscribe': {
@@ -75,16 +82,15 @@ function handleClientMessage(
             const callback: EventCallback = (sessionId, event) => {
                 // Forward approval requests as dedicated messages
                 if (event.type === 'approval_request') {
-                    const approvalEvent = event as unknown as { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number };
                     const approvalMsg: ServerMessage = {
                         type: 'approval_request',
                         request: {
-                            id: approvalEvent.id,
-                            sessionId: approvalEvent.sessionId,
-                            toolName: approvalEvent.toolName,
-                            description: approvalEvent.description,
-                            createdAt: approvalEvent.createdAt,
-                            timeoutMs: approvalEvent.timeoutMs,
+                            id: event.id as string,
+                            sessionId: event.sessionId as string,
+                            toolName: event.toolName as string,
+                            description: event.description as string,
+                            createdAt: event.createdAt as number,
+                            timeoutMs: event.timeoutMs as number,
                         },
                     };
                     ws.send(JSON.stringify(approvalMsg));
@@ -201,7 +207,7 @@ function handleClientMessage(
                             // Re-fetch the message to get the final state
                             import('../db/agent-messages').then(({ getAgentMessage }) => {
                                 const updated = getAgentMessage(
-                                    (messenger as unknown as { db: import('bun:sqlite').Database }).db,
+                                    messenger.db,
                                     result.message.id,
                                 );
                                 if (updated) {
@@ -273,7 +279,7 @@ function handleClientMessage(
 
             walletService.fundAgent(agentId, microAlgos).then(async () => {
                 const { getAgent } = await import('../db/agents');
-                const agent = getAgent((bridge as unknown as { db: import('bun:sqlite').Database }).db, agentId);
+                const agent = getAgent(bridge!.db, agentId);
                 if (!agent?.walletAddress) return;
 
                 const balance = await walletService.getBalance(agent.walletAddress);
@@ -287,6 +293,23 @@ function handleClientMessage(
             }).catch((err) => {
                 sendError(ws, `Reward error: ${err instanceof Error ? err.message : String(err)}`);
             });
+            break;
+        }
+
+        case 'schedule_approval': {
+            const scheduler = getSchedulerService?.();
+            if (!scheduler) {
+                sendError(ws, 'Scheduler service not available');
+                break;
+            }
+
+            const execution = scheduler.resolveApproval(msg.executionId, msg.approved);
+            if (!execution) {
+                sendError(ws, 'Execution not found or not awaiting approval');
+            } else {
+                const serverMsg: ServerMessage = { type: 'schedule_execution_update', execution };
+                ws.send(JSON.stringify(serverMsg));
+            }
             break;
         }
     }

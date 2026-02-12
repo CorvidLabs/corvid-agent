@@ -392,8 +392,8 @@ export class SubscriptionManager {
             }
 
             // Forward named status events from tool handlers (e.g. "Querying CorvidLabs...")
-            if ((event as { type: string }).type === 'tool_status') {
-                const message = (event as unknown as { message: string }).message;
+            if (event.type === 'tool_status') {
+                const message = event.statusMessage;
                 if (message) {
                     this.responseFormatter.emitEvent(participant, message, 'status');
 
@@ -425,7 +425,7 @@ export class SubscriptionManager {
                 } else if (block?.type === 'tool_use') {
                     // Flush any pending text before tool use starts
                     if (inTextBlock) flushTextBlock();
-                    const toolName = (block as unknown as { name?: string }).name;
+                    const toolName = block.name;
 
                     if (toolName) {
                         // Track tool usage for progress summaries
@@ -439,7 +439,7 @@ export class SubscriptionManager {
                         if (toolName === 'corvid_send_message') {
                             agentQueryCount++;
                             // Try to extract agent name from tool input
-                            const toolInput = (block as unknown as { input?: { to_agent?: string } }).input;
+                            const toolInput = block.input as { to_agent?: string } | undefined;
                             if (toolInput?.to_agent) {
                                 agentsQueried.add(toolInput.to_agent);
                                 trackProgress({
@@ -573,11 +573,24 @@ export class SubscriptionManager {
                 currentEventFn?.({ type: 'stream', chunk: event.delta.text, done: false });
             }
 
-            // Emit tool_use events
+            // Emit tool_use events (SDK mode)
             if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-                const toolName = (event.content_block as unknown as { name?: string }).name ?? 'unknown';
-                const input = JSON.stringify((event.content_block as unknown as { input?: unknown }).input ?? {});
+                const toolName = event.content_block.name ?? 'unknown';
+                const input = JSON.stringify(event.content_block.input ?? {});
                 currentEventFn?.({ type: 'tool_use', toolName, input });
+            }
+
+            // Direct-mode: tool_status events
+            if (event.type === 'tool_status' && (event as any).statusMessage) {
+                const match = (event as any).statusMessage.match(/^\[(\w+)\]\s(.*)$/);
+                if (match) {
+                    currentEventFn?.({ type: 'tool_use', toolName: match[1], input: match[2] });
+                }
+            }
+
+            // Direct-mode: thinking signal
+            if (event.type === 'thinking') {
+                currentEventFn?.({ type: 'thinking', active: !!(event as any).thinking });
             }
 
             if (event.type === 'assistant' && event.message?.content) {

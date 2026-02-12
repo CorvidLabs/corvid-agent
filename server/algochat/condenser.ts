@@ -38,22 +38,18 @@ export async function condenseMessage(
     const condenseTarget = maxBytes - refSuffixBytes;
 
     try {
-        const { default: Anthropic } = await import('@anthropic-ai/sdk');
-        const client = new Anthropic();
+        const { LlmProviderRegistry } = await import('../providers/registry');
+        const provider = LlmProviderRegistry.getInstance().getDefault();
+        if (!provider) throw new Error('No LLM provider available');
 
-        const response = await client.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
-            system: `You are a message condenser. Your job is to condense the user's message to fit within ${condenseTarget} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
-            messages: [
-                { role: 'user', content },
-            ],
+        const result = await provider.complete({
+            model: provider.getInfo().defaultModel,
+            systemPrompt: `You are a message condenser. Your job is to condense the user's message to fit within ${condenseTarget} bytes when UTF-8 encoded. Preserve the key information and intent. Output ONLY the condensed message, nothing else. Do not add any preamble or explanation.`,
+            messages: [{ role: 'user', content }],
+            maxTokens: 1024,
         });
 
-        const condensed = response.content
-            .filter((block) => block.type === 'text')
-            .map((block) => 'text' in block ? block.text : '')
-            .join('');
+        const condensed = result.content;
 
         const condensedBytes = encoder.encode(condensed).byteLength;
 

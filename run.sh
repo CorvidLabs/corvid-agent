@@ -16,6 +16,16 @@ else
     echo "[run.sh]   socat TCP-LISTEN:${DOCKER_PORT},reuseaddr,fork UNIX-CONNECT:\$HOME/.docker/run/docker.sock"
 fi
 
+# Check Ollama on Mac host (Metal GPU acceleration via socat bridge)
+OLLAMA_PORT="11434"
+if curl -sf "http://${MAC_HOST}:${OLLAMA_PORT}/api/tags" > /dev/null 2>&1; then
+    echo "[run.sh] Connected to Mac Ollama at ${MAC_HOST}:${OLLAMA_PORT} (Metal GPU)"
+else
+    echo "[run.sh] Warning: Ollama not reachable at ${MAC_HOST}:${OLLAMA_PORT}"
+    echo "[run.sh] Start the Ollama socat bridge on your Mac:"
+    echo "[run.sh]   socat TCP-LISTEN:${OLLAMA_PORT},bind=${MAC_HOST},reuseaddr,fork TCP:127.0.0.1:${OLLAMA_PORT}"
+fi
+
 # Forward Algorand localnet ports from localhost → Mac host
 # (algod uses localhost:4001 by default; the actual nodes run in Docker on the Mac)
 SOCAT_PIDS=()

@@ -11,11 +11,17 @@ import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
+import { SchedulerService } from './scheduler/service';
 import { SessionLifecycleManager } from './process/session-lifecycle';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity } from './middleware/auth';
+import { LlmProviderRegistry } from './providers/registry';
+import { AnthropicProvider } from './providers/anthropic/provider';
+import { OllamaProvider } from './providers/ollama/provider';
+import { handleOllamaRoutes } from './routes/ollama';
+import { listProjects, createProject } from './db/projects';
 
 const log = createLogger('Server');
 
@@ -31,11 +37,21 @@ const startTime = Date.now();
 // Initialize database
 const db = getDb();
 
+// Initialize LLM provider registry
+const providerRegistry = LlmProviderRegistry.getInstance();
+providerRegistry.register(new AnthropicProvider());
+const ollamaProvider = new OllamaProvider();
+providerRegistry.register(ollamaProvider);
+
+// Fire-and-forget: refresh Ollama models on startup (warn if not running)
+ollamaProvider.refreshModels().catch((err) => {
+    log.warn('Ollama not available on startup', { error: err instanceof Error ? err.message : String(err) });
+});
+
 // Ensure a project exists for the server's own codebase
 {
-    const { listProjects, createProject } = require('./db/projects');
     const projects = listProjects(db);
-    const selfProject = projects.find((p: { workingDir: string }) => p.workingDir === process.cwd());
+    const selfProject = projects.find((p) => p.workingDir === process.cwd());
     if (!selfProject) {
         createProject(db, {
             name: 'corvid-agent',
@@ -61,6 +77,9 @@ const workTaskService = new WorkTaskService(db, processManager);
 workTaskService.recoverStaleTasks().catch((err) =>
     log.error('Failed to recover stale work tasks', { error: err instanceof Error ? err.message : String(err) }),
 );
+
+// Initialize scheduler (cron/interval automation for agents)
+const schedulerService = new SchedulerService(db, processManager, workTaskService);
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -134,7 +153,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService);
+    }, workTaskService, schedulerService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -148,7 +167,7 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -186,20 +205,57 @@ const server = Bun.serve<WsData>({
 
         // Health check endpoint
         if (url.pathname === '/api/health' && req.method === 'GET') {
-            const health = {
+            const health: Record<string, unknown> = {
                 status: 'ok',
                 uptime: (Date.now() - startTime) / 1000,
                 activeSessions: processManager.getActiveSessionIds().length,
                 algochat: algochatBridge !== null,
                 timestamp: new Date().toISOString(),
             };
+            health.scheduler = schedulerService.getStats();
             return new Response(JSON.stringify(health), {
                 headers: { 'Content-Type': 'application/json' },
             });
         }
 
+        // LLM providers endpoint
+        if (url.pathname === '/api/providers' && req.method === 'GET') {
+            const providers = providerRegistry.getAll().map((p) => p.getInfo());
+            return new Response(JSON.stringify(providers), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Provider models endpoint — dynamic model listing (e.g. Ollama local models)
+        const modelsMatch = url.pathname.match(/^\/api\/providers\/([^/]+)\/models$/);
+        if (modelsMatch && req.method === 'GET') {
+            const providerType = modelsMatch[1];
+            const provider = providerRegistry.get(providerType as import('./providers/types').LlmProviderType);
+            if (!provider) {
+                return new Response(JSON.stringify({ error: `Unknown provider: ${providerType}` }), {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
+            // Refresh models if provider supports it (e.g. Ollama)
+            if ('refreshModels' in provider && typeof (provider as { refreshModels: () => Promise<string[]> }).refreshModels === 'function') {
+                await (provider as { refreshModels: () => Promise<string[]> }).refreshModels();
+            }
+            const info = provider.getInfo();
+            return new Response(JSON.stringify({ models: info.models, defaultModel: info.defaultModel }), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Ollama model management routes
+        const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
+            const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
+            server.publish('ollama', msg);
+        });
+        if (ollamaResponse) return ollamaResponse;
+
         // API routes
-        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork);
+        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService);
         if (apiResponse) return apiResponse;
 
         // Mobile chat client
@@ -252,6 +308,25 @@ onCouncilDiscussionMessage((message) => {
     server.publish('council', msg);
 });
 
+// Broadcast schedule events to all WebSocket clients
+schedulerService.onEvent((event) => {
+    const msg = JSON.stringify({ type: event.type, ...spreadScheduleEvent(event) });
+    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+});
+
+function spreadScheduleEvent(event: { type: string; data: unknown }): Record<string, unknown> {
+    switch (event.type) {
+        case 'schedule_update':
+            return { schedule: event.data };
+        case 'schedule_execution_update':
+            return { execution: event.data };
+        case 'schedule_approval_request':
+            return event.data as Record<string, unknown>;
+        default:
+            return {};
+    }
+}
+
 // Initialize AlgoChat after server starts
 initAlgoChat().then(() => {
     // Wire agent message broadcasts once messenger is available
@@ -261,8 +336,17 @@ initAlgoChat().then(() => {
             server.publish('algochat', msg);
         });
     }
+
+    // Start the scheduler now that all services are available
+    // Give it the agentMessenger if AlgoChat is initialized
+    if (agentMessenger) {
+        schedulerService.setAgentMessenger(agentMessenger);
+    }
+    schedulerService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
+    // Start scheduler even if AlgoChat fails — it can still do GitHub ops and work tasks
+    schedulerService.start();
 });
 
 // Start session lifecycle cleanup after server is running
@@ -283,28 +367,51 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (err) => {
     log.error('Uncaught exception, shutting down', { error: err.message, stack: err.stack });
-    sessionLifecycle.stop();
-    processManager.shutdown();
-    algochatBridge?.stop();
-    closeDb();
+    logShutdownDiagnostics('uncaughtException');
+    gracefulShutdown();
     process.exit(1);
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-    log.info('Shutting down (SIGINT)');
+// Shutdown diagnostics — log enough context to diagnose unexpected kills
+function logShutdownDiagnostics(signal: string): void {
+    const uptimeSeconds = Math.round((Date.now() - startTime) / 1000);
+    const mem = process.memoryUsage();
+    let parentInfo = `ppid=${process.ppid}`;
+    try {
+        // Try to identify the parent process that may have sent the signal
+        const result = Bun.spawnSync(['ps', '-p', String(process.ppid), '-o', 'comm=']);
+        const parentName = result.stdout.toString().trim();
+        if (parentName) parentInfo += ` (${parentName})`;
+    } catch { /* ignore */ }
+
+    log.info(`Shutting down (${signal})`, {
+        uptime: `${uptimeSeconds}s`,
+        parent: parentInfo,
+        activeSessions: processManager.getActiveSessionIds().length,
+        rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
+        heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
+    });
+}
+
+function gracefulShutdown(): void {
+    schedulerService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();
+}
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    logShutdownDiagnostics('SIGINT');
+    gracefulShutdown();
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    log.info('Shutting down (SIGTERM)');
-    sessionLifecycle.stop();
-    processManager.shutdown();
-    algochatBridge?.stop();
-    closeDb();
-    process.exit(0);
+    logShutdownDiagnostics('SIGTERM');
+    gracefulShutdown();
+    // Exit non-zero so launchd/run.sh know this was NOT an intentional stop.
+    // Only SIGINT (ctrl-C / manual stop) exits 0.
+    process.exit(1);
 });

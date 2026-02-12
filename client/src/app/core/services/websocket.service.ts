@@ -28,9 +28,6 @@ export class WebSocketService {
 
         this.ws.onopen = () => {
             this.connected.set(true);
-            if (this.wasConnected) {
-                this.notifications.success('Reconnected to server');
-            }
             this.wasConnected = true;
             // Re-subscribe to any sessions
             for (const sessionId of this.subscribedSessions) {
@@ -55,12 +52,6 @@ export class WebSocketService {
 
         this.ws.onclose = () => {
             this.connected.set(false);
-            if (this.wasConnected) {
-                this.notifications.warning(
-                    'Connection lost',
-                    'Attempting to reconnect...',
-                );
-            }
             this.scheduleReconnect();
         };
 
@@ -112,6 +103,10 @@ export class WebSocketService {
     createWorkTask(agentId: string, description: string, projectId?: string): void {
         this.send({ type: 'create_work_task', agentId, description, ...(projectId ? { projectId } : {}) });
     }
+
+    /** No-op — ollama topic is auto-subscribed on connect. */
+    subscribeOllama(): void {}
+    unsubscribeOllama(): void {}
 
     onMessage(handler: MessageHandler): () => void {
         this.handlers.add(handler);

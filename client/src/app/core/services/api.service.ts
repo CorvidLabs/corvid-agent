@@ -23,4 +23,8 @@ export class ApiService {
     delete<Result>(path: string): Observable<Result> {
         return this.http.delete<Result>(`${this.baseUrl}${path}`);
     }
+
+    deleteWithBody<Result>(path: string, body: unknown): Observable<Result> {
+        return this.http.delete<Result>(`${this.baseUrl}${path}`, { body });
+    }
 }

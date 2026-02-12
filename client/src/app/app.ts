@@ -24,6 +24,11 @@ import { SessionService } from './core/services/session.service';
             <app-header
                 [sidebarOpen]="sidebarOpen()"
                 (hamburgerClick)="toggleSidebar()" />
+            @if (!wsService.connected()) {
+                <div class="app-layout__banner" role="alert">
+                    Connection lost — reconnecting...
+                </div>
+            }
             <div class="app-layout__body">
                 <app-sidebar [(sidebarOpen)]="sidebarOpen" />
                 <main class="app-layout__content" role="main">
@@ -53,10 +58,20 @@ import { SessionService } from './core/services/session.service';
             position: relative;
             background: var(--bg-deep);
         }
+        .app-layout__banner {
+            padding: 0.375rem 1rem;
+            background: var(--accent-red-dim, rgba(255, 51, 85, 0.1));
+            border-bottom: 1px solid var(--accent-red, #f33);
+            color: var(--accent-red, #f33);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            letter-spacing: 0.03em;
+        }
     `,
 })
 export class App implements OnInit, OnDestroy, AfterViewInit {
-    private readonly wsService = inject(WebSocketService);
+    protected readonly wsService = inject(WebSocketService);
     private readonly sessionService = inject(SessionService);
 
     protected readonly sidebarOpen = signal(false);

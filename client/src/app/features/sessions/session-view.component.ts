@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { SessionService } from '../../core/services/session.service';
+import { AgentService } from '../../core/services/agent.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SessionOutputComponent } from './session-output.component';
@@ -37,7 +38,7 @@ import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-mess
                     </div>
                 </div>
 
-                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running'" />
+                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running'" [agentName]="agentName()" />
 
                 <app-session-input
                     [disabled]="s.status !== 'running'"
@@ -89,9 +90,11 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly sessionService = inject(SessionService);
+    private readonly agentService = inject(AgentService);
     private readonly wsService = inject(WebSocketService);
 
     protected readonly session = signal<Session | null>(null);
+    protected readonly agentName = signal('assistant');
     protected readonly messages = signal<SessionMessage[]>([]);
     protected readonly logCopied = signal(false);
     protected readonly pendingApproval = signal<ApprovalRequestWire | null>(null);
@@ -114,6 +117,12 @@ export class SessionViewComponent implements OnInit, OnDestroy {
 
         const messages = await this.sessionService.getMessages(this.sessionId);
         this.messages.set(messages);
+
+        if (session.agentId) {
+            this.agentService.getAgent(session.agentId).then((agent) => {
+                this.agentName.set(agent.name);
+            }).catch(() => {});
+        }
 
         this.sessionService.subscribeToSession(this.sessionId);
 

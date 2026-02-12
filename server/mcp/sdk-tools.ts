@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -13,10 +13,18 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_extend_timeout',
     'corvid_check_credits',
     'corvid_create_work_task',
+    'corvid_manage_schedule',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
 // corvid_grant_credits, corvid_credit_config
+
+/** Tools blocked during scheduler-initiated sessions to prevent financial/messaging side effects. */
+const SCHEDULER_BLOCKED_TOOLS = new Set([
+    'corvid_send_message',
+    'corvid_grant_credits',
+    'corvid_credit_config',
+]);
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
     const tools = [
@@ -114,6 +122,31 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 async (args) => handleCreateWorkTask(ctx, args),
             ),
         ] : []),
+        tool(
+            'corvid_manage_schedule',
+            'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
+            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, custom. ' +
+            'Use action="list" to view schedules, "create" to make one, "pause"/"resume" to control, "history" for logs.',
+            {
+                action: z.enum(['list', 'create', 'pause', 'resume', 'history']).describe('What to do'),
+                name: z.string().optional().describe('Schedule name (for create)'),
+                description: z.string().optional().describe('Schedule description (for create)'),
+                cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create)'),
+                interval_minutes: z.number().optional().describe('Run every N minutes as alternative to cron (for create)'),
+                schedule_actions: z.array(z.object({
+                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, custom'),
+                    repos: z.array(z.string()).optional().describe('Target repo(s) in owner/name format'),
+                    description: z.string().optional().describe('Work task description'),
+                    project_id: z.string().optional().describe('Project ID'),
+                    to_agent_id: z.string().optional().describe('Target agent ID (for send_message)'),
+                    message: z.string().optional().describe('Message content (for send_message)'),
+                    prompt: z.string().optional().describe('Arbitrary prompt (for custom action type)'),
+                })).optional().describe('Actions to perform (for create)'),
+                approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create)'),
+                schedule_id: z.string().optional().describe('Schedule ID (for pause/resume/history)'),
+            },
+            async (args) => handleManageSchedule(ctx, args),
+        ),
     ];
 
     // Local (web) sessions get all tools — permission scoping only applies to
@@ -124,6 +157,11 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         const permissions = agent?.mcpToolPermissions;
         const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
         filteredTools = tools.filter((t) => allowedSet.has(t.name));
+    }
+
+    // Scheduler-initiated sessions: block tools that could cause financial or messaging side effects
+    if (ctx.schedulerMode) {
+        filteredTools = filteredTools.filter((t) => !SCHEDULER_BLOCKED_TOOLS.has(t.name));
     }
 
     return createSdkMcpServer({

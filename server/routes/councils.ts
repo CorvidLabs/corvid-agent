@@ -25,6 +25,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
+import { json } from '../lib/response';
 
 const log = createLogger('CouncilRoutes');
 
@@ -80,15 +81,6 @@ function emitLog(db: Database, launchId: string, level: CouncilLogLevel, message
     if (level === 'error') log.error(message, detail ? { detail } : undefined);
     else if (level === 'warn') log.warn(message, detail ? { detail } : undefined);
     else log.info(message, detail ? { detail } : undefined);
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function json(data: unknown, status: number = 200): Response {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
@@ -735,9 +727,15 @@ async function runDiscussionRounds(
 ): Promise<void> {
     const discussionStartTime = Date.now();
 
+    // Scale timeouts based on agent count — serialized Ollama agents queue behind each other
+    const agentCount = council.agentIds.length;
+    const perRoundTimeout = Math.max(MIN_ROUND_TIMEOUT_MS, agentCount * PER_AGENT_ROUND_BUDGET_MS);
+    const totalTimeout = Math.min(totalRounds * perRoundTimeout, MAX_DISCUSSION_TOTAL_MS);
+    log.info(`Discussion timeouts: ${Math.round(perRoundTimeout / 60000)}m/round, ${Math.round(totalTimeout / 60000)}m total (${agentCount} agents, ${totalRounds} rounds)`);
+
     for (let round = 1; round <= totalRounds; round++) {
         // Check overall discussion timeout
-        if (Date.now() - discussionStartTime > DISCUSSION_TOTAL_TIMEOUT_MS) {
+        if (Date.now() - discussionStartTime > totalTimeout) {
             emitLog(db, launchId, 'warn', `Discussion timed out after ${Math.round((Date.now() - discussionStartTime) / 60000)} minutes, skipping remaining rounds`);
             break;
         }
@@ -790,7 +788,7 @@ async function runDiscussionRounds(
         if (discusserSessionIds.length === 0) {
             emitLog(db, launchId, 'warn', `No discusser sessions started for round ${round}/${totalRounds}`);
         } else {
-            await waitForSessions(processManager, discusserSessionIds);
+            await waitForSessions(processManager, discusserSessionIds, perRoundTimeout);
         }
 
         // Extract responses and store as discussion messages
@@ -875,13 +873,17 @@ ${originalPrompt}
 ${responsesText}${priorText}
 
 ## Your Task
-React to the other members' responses. You may:
-- Ask clarifying questions
-- Challenge points you disagree with
-- Build on ideas you find promising
-- Propose alternatives
+React to the other members' responses and advance the discussion. You MUST:
+- Take a clear position — agree or disagree with specific points
+- Add NEW information, analysis, or trade-offs not yet raised
+- If you disagree with someone, explain WHY with a concrete argument
 
-Keep your response focused and concise.`;
+Do NOT:
+- Repeat points already made by yourself or others
+- Ask questions that were already asked in prior rounds
+- Summarize what others said — they can read their own responses
+
+Keep your response focused, concise, and original.`;
 }
 
 function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string {
@@ -899,10 +901,12 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
     return parts.join('\n\n---\n\n');
 }
 
-const DISCUSSION_SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per round
-const DISCUSSION_TOTAL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max for all rounds combined
+// Per-agent budget per round — accounts for serialized Ollama queue (one-at-a-time inference)
+const PER_AGENT_ROUND_BUDGET_MS = 10 * 60 * 1000; // 10 minutes per agent per round
+const MIN_ROUND_TIMEOUT_MS = 20 * 60 * 1000; // minimum 20 minutes per round
+const MAX_DISCUSSION_TOTAL_MS = 3 * 60 * 60 * 1000; // hard cap at 3 hours
 
-function waitForSessions(processManager: ProcessManager, sessionIds: string[]): Promise<void> {
+function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number): Promise<void> {
     return new Promise<void>((resolve) => {
         let settled = false;
         const pending = new Set(sessionIds);
@@ -924,13 +928,14 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[]): 
         };
 
         // Timeout: resolve even if some sessions are stuck
+        const effectiveTimeout = timeoutMs ?? MIN_ROUND_TIMEOUT_MS;
         const timer = setTimeout(() => {
             if (!settled) {
                 const timedOut = Array.from(pending);
-                log.warn(`waitForSessions timed out with ${timedOut.length} sessions still pending: ${timedOut.join(', ')}`);
+                log.warn(`waitForSessions timed out (${Math.round(effectiveTimeout / 60000)}m) with ${timedOut.length} sessions still pending: ${timedOut.join(', ')}`);
                 finish();
             }
-        }, DISCUSSION_SESSION_TIMEOUT_MS);
+        }, effectiveTimeout);
 
         // Subscribe FIRST, then check isRunning — this closes the race window
         // where a process exits between the isRunning check and subscribe call.
@@ -995,15 +1000,33 @@ function watchSessionsForAutoAdvance(
 ): void {
     const pending = new Set(sessionIds);
     const callbacks = new Map<string, EventCallback>();
+    let settled = false;
 
-    const checkAllDone = (): void => {
-        if (pending.size > 0) return;
+    // Safety timeout: scale with session count (serialized Ollama agents need ~10 min each)
+    const WATCHER_TIMEOUT_MS = Math.max(30 * 60 * 1000, sessionIds.length * PER_AGENT_ROUND_BUDGET_MS);
+    const watcherTimer = setTimeout(() => {
+        if (settled || pending.size === 0) return;
+        const stuck = Array.from(pending);
+        emitLog(db, launchId, 'warn', `${role} watcher timed out with ${stuck.length} sessions still pending — force-advancing`);
+        for (const sid of stuck) {
+            try { processManager.stopProcess(sid); } catch { /* already stopped */ }
+        }
+        pending.clear();
+        advance();
+    }, WATCHER_TIMEOUT_MS);
 
-        // Clean up all subscriptions
+    const cleanup = (): void => {
+        settled = true;
+        clearTimeout(watcherTimer);
         for (const [sid, cb] of callbacks) {
             processManager.unsubscribe(sid, cb);
         }
         callbacks.clear();
+    };
+
+    const advance = (): void => {
+        if (settled) return;
+        cleanup();
 
         // Verify launch is still in the expected stage before advancing
         const launch = getCouncilLaunch(db, launchId);
@@ -1035,6 +1058,10 @@ function watchSessionsForAutoAdvance(
                 }
             }
         }
+    };
+
+    const checkAllDone = (): void => {
+        if (pending.size === 0) advance();
     };
 
     // Subscribe FIRST, then check isRunning — closes the race window where

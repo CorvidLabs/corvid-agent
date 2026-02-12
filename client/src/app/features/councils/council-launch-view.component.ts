@@ -121,23 +121,47 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                              (keydown.enter)="toggleSession(session.id)"
                              (keydown.space)="$event.preventDefault(); toggleSession(session.id)">
                             <div class="feed-meta">
-                                @if (session.status === 'running') {
+                                @if (session.status === 'running' && getDisplayStatus(session) !== 'queued') {
                                     <span class="processing-dot"></span>
                                 }
+                                @if (getDisplayStatus(session) === 'queued') {
+                                    <span class="queued-dot"></span>
+                                }
                                 <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
-                                <app-status-badge [status]="session.status" />
+                                <app-status-badge [status]="getDisplayStatus(session)" />
                                 @if (!expandedSessions().has(session.id)) {
-                                    <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
+                                    <span class="feed-preview">{{ session.status === 'running' ? (getActivity(session.agentId) || 'Waiting...') : getPreviewText(session.id) }}</span>
                                 }
                                 <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                             </div>
                             @if (expandedSessions().has(session.id)) {
                                 <div class="feed-content" (click)="$event.stopPropagation()">
-                                    <app-session-output
-                                        [messages]="getMessages(session.id)"
-                                        [events]="getEvents(session.id)"
-                                        [isRunning]="session.status === 'running'"
-                                    />
+                                    @if (session.status === 'running') {
+                                        <div class="feed-event-log">
+                                            @for (entry of getEventLog(session.id); track entry.ts) {
+                                                <div class="feed-event-entry">
+                                                    <span class="log-ts">{{ entry.time }}</span>
+                                                    <span>{{ entry.text }}</span>
+                                                </div>
+                                            } @empty {
+                                                <div class="feed-event-entry">
+                                                    @if (getDisplayStatus(session) === 'queued') {
+                                                        <span class="queued-dot"></span>
+                                                        <span>{{ getActivity(session.agentId) || 'Queued — waiting for model slot...' }}</span>
+                                                    } @else {
+                                                        <span class="processing-dot"></span>
+                                                        <span>{{ getActivity(session.agentId) || 'Waiting for model...' }}</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <app-session-output
+                                            [messages]="getMessages(session.id)"
+                                            [events]="getEvents(session.id)"
+                                            [isRunning]="false"
+                                        />
+                                    }
                                 </div>
                             }
                         </div>
@@ -207,23 +231,47 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                  (keydown.enter)="toggleSession(session.id)"
                                  (keydown.space)="$event.preventDefault(); toggleSession(session.id)">
                                 <div class="feed-meta">
-                                    @if (session.status === 'running') {
+                                    @if (session.status === 'running' && getDisplayStatus(session) !== 'queued') {
                                         <span class="processing-dot"></span>
                                     }
+                                    @if (getDisplayStatus(session) === 'queued') {
+                                        <span class="queued-dot"></span>
+                                    }
                                     <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
-                                    <app-status-badge [status]="session.status" />
+                                    <app-status-badge [status]="getDisplayStatus(session)" />
                                     @if (!expandedSessions().has(session.id)) {
-                                        <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
+                                        <span class="feed-preview">{{ session.status === 'running' ? (getActivity(session.agentId) || 'Waiting...') : getPreviewText(session.id) }}</span>
                                     }
                                     <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                                 </div>
                                 @if (expandedSessions().has(session.id)) {
                                     <div class="feed-content" (click)="$event.stopPropagation()">
-                                        <app-session-output
-                                            [messages]="getMessages(session.id)"
-                                            [events]="getEvents(session.id)"
-                                            [isRunning]="session.status === 'running'"
-                                        />
+                                        @if (session.status === 'running') {
+                                            <div class="feed-event-log">
+                                                @for (entry of getEventLog(session.id); track entry.ts) {
+                                                    <div class="feed-event-entry">
+                                                        <span class="log-ts">{{ entry.time }}</span>
+                                                        <span>{{ entry.text }}</span>
+                                                    </div>
+                                                } @empty {
+                                                    <div class="feed-event-entry">
+                                                        @if (getDisplayStatus(session) === 'queued') {
+                                                            <span class="queued-dot"></span>
+                                                            <span>{{ getActivity(session.agentId) || 'Queued — waiting for model slot...' }}</span>
+                                                        } @else {
+                                                            <span class="processing-dot"></span>
+                                                            <span>{{ getActivity(session.agentId) || 'Waiting for model...' }}</span>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        } @else {
+                                            <app-session-output
+                                                [messages]="getMessages(session.id)"
+                                                [events]="getEvents(session.id)"
+                                                [isRunning]="false"
+                                            />
+                                        }
                                     </div>
                                 }
                             </div>
@@ -287,15 +335,14 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .page__prompt { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.9rem; max-width: 600px; }
         .btn {
             padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; border: 1px solid; text-decoration: none; font-family: inherit;
-            text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s, box-shadow 0.15s;
+            cursor: pointer; border: 1px solid; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em;
         }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
+        .btn--primary:hover:not(:disabled) { background: var(--accent-cyan-dim); }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
-        .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+        .btn--secondary:hover:not(:disabled) { background: var(--bg-hover); }
         .btn--danger { background: transparent; color: var(--accent-red, #f87171); border-color: var(--accent-red, #f87171); }
-        .btn--danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.1); }
         .btn:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--sm { font-size: 0.7rem; padding: 0.35rem 0.75rem; }
 
@@ -324,15 +371,15 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .stage-connector { flex: 1; height: 2px; background: var(--border); margin: 0 0.5rem; min-width: 20px; }
         .stage-connector--done { background: var(--accent-green); }
 
-        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; box-shadow: 0 0 8px #00e5ff66; }
+        .stage-step--active[data-stage="responding"] .stage-dot { border-color: #00e5ff; background: #00e5ff; }
         .stage-step--active[data-stage="responding"] .stage-label { color: #00e5ff; }
-        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; box-shadow: 0 0 8px #fbbf2466; }
+        .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; }
         .stage-step--active[data-stage="discussing"] .stage-label { color: #fbbf24; }
-        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; box-shadow: 0 0 8px #a78bfa66; }
+        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; }
         .stage-step--active[data-stage="reviewing"] .stage-label { color: #a78bfa; }
-        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; box-shadow: 0 0 8px #f472b666; }
+        .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; }
         .stage-step--active[data-stage="synthesizing"] .stage-label { color: #f472b6; }
-        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); box-shadow: 0 0 8px #00ff8866; }
+        .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); }
         .stage-step--active[data-stage="complete"] .stage-label { color: var(--accent-green); }
 
         .actions { margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
@@ -343,7 +390,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             padding: 0.5rem; margin-bottom: 1.5rem; max-height: 250px; overflow-y: auto;
             font-family: 'Dogica Pixel', 'Dogica', monospace; font-size: 0.75rem; line-height: 1.6;
         }
-        .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 2px; }
+        .log-entry { display: flex; gap: 0.5rem; padding: 0.15rem 0.5rem; }
         .log-entry:hover { background: var(--bg-hover); }
         .log-ts { color: var(--text-tertiary); flex-shrink: 0; }
         .log-level {
@@ -368,8 +415,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             cursor: pointer; transition: background 0.1s;
         }
         .feed-entry:hover { background: var(--bg-hover); }
-        .feed-entry--expanded { background: var(--bg-raised); }
-        .feed-entry--expanded:hover { background: var(--bg-raised); }
+        .feed-entry--expanded, .feed-entry--expanded:hover { background: var(--bg-raised); }
         .feed-meta {
             display: flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap; overflow: hidden;
         }
@@ -378,6 +424,12 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
             flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
         }
+        .feed-event-log {
+            background: var(--bg-deep); border-radius: var(--radius-sm);
+            padding: 0.3rem; margin-bottom: 0.3rem; max-height: 120px;
+            overflow-y: auto; font-size: 0.7rem;
+        }
+        .feed-event-entry { display: flex; gap: 0.3rem; padding: 1px 0.3rem; color: var(--accent); }
         .feed-toggle {
             flex-shrink: 0; color: var(--text-tertiary); font-size: 0.7rem; margin-left: auto;
             user-select: none;
@@ -413,6 +465,11 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         @keyframes processing-pulse {
             0%, 100% { opacity: 0.3; transform: scale(0.8); }
             50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .queued-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent-yellow, #fbbf24); flex-shrink: 0;
+            opacity: 0.6;
         }
 
         .discussion-loading {
@@ -492,6 +549,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     private sessionMessages = signal<Map<string, import('../../core/models/session.model').SessionMessage[]>>(new Map());
     private sessionEvents = signal<Map<string, StreamEvent[]>>(new Map());
     protected readonly agentActivity = signal<Map<string, string>>(new Map());
+    protected readonly queuedAgents = signal<Set<string>>(new Set());
     private unsubscribeWs: (() => void) | null = null;
     private refreshInterval: ReturnType<typeof setInterval> | null = null;
     private activityTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
@@ -566,6 +624,32 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
                 const existing = events.get(msg.sessionId) ?? [];
                 events.set(msg.sessionId, [...existing, msg.event]);
                 this.sessionEvents.set(events);
+
+                // Surface thinking/tool activity for Ollama (direct-process) sessions
+                const agentId = this.agentIdBySession[msg.sessionId];
+                const eventData = msg.event?.data as Record<string, unknown> | undefined;
+                if (agentId && msg.event?.eventType === 'thinking') {
+                    const active = !!(eventData?.['thinking']);
+                    this.setActivity(agentId, active ? 'Thinking...' : '');
+                    if (active) {
+                        this.queuedAgents.update((s) => { const n = new Set(s); n.delete(agentId); return n; });
+                    }
+                }
+                if (agentId && msg.event?.eventType === 'queue_status') {
+                    const statusMsg = eventData?.['statusMessage'] as string | undefined;
+                    if (statusMsg) {
+                        this.setActivity(agentId, statusMsg); // No auto-clear — persists until dequeued
+                        this.queuedAgents.update((s) => { const n = new Set(s); n.add(agentId); return n; });
+                    } else {
+                        this.queuedAgents.update((s) => { const n = new Set(s); n.delete(agentId); return n; });
+                    }
+                }
+                if (agentId && msg.event?.eventType === 'tool_status') {
+                    const statusMsg = eventData?.['statusMessage'] as string | undefined;
+                    if (statusMsg) {
+                        this.setActivity(agentId, statusMsg, 5000);
+                    }
+                }
             }
             if (msg.type === 'session_status') {
                 this.refreshSessions();
@@ -630,6 +714,14 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         return this.agentNameMap[agentId] ?? agentId.slice(0, 8);
     }
 
+    /** Override session status to show "queued" when the model is waiting for a slot. */
+    protected getDisplayStatus(session: Session): string {
+        if (session.status === 'running' && session.agentId && this.queuedAgents().has(session.agentId)) {
+            return 'queued';
+        }
+        return session.status;
+    }
+
     protected agentColor(agentKey: string | null): string {
         if (!agentKey) return '#666';
         const name = this.agentNameMap[agentKey] ?? agentKey;
@@ -680,6 +772,38 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected getActivity(agentId: string | null): string {
         if (!agentId) return '';
         return this.agentActivity().get(agentId) ?? '';
+    }
+
+    protected getEventLog(sessionId: string): { ts: number; time: string; text: string }[] {
+        const events = this.sessionEvents().get(sessionId) ?? [];
+        const log: { ts: number; time: string; text: string }[] = [];
+        let lastText = '';
+        for (const evt of events) {
+            const data = evt.data as Record<string, unknown> | undefined;
+            let text = '';
+            if (evt.eventType === 'tool_status' && data?.['statusMessage']) {
+                text = data['statusMessage'] as string;
+            } else if (evt.eventType === 'queue_status' && data?.['statusMessage']) {
+                text = data['statusMessage'] as string;
+            } else if (evt.eventType === 'thinking' && data?.['thinking']) {
+                text = 'Thinking...';
+            } else if (evt.eventType === 'assistant') {
+                text = 'Generating response...';
+            } else if (evt.eventType === 'performance') {
+                const tps = data?.['tokensPerSecond'] as number | undefined;
+                const tokens = data?.['outputTokens'] as number | undefined;
+                const model = data?.['model'] as string | undefined;
+                if (tps) {
+                    text = `${model ?? 'Model'}: ${tokens ?? '?'} tokens @ ${tps} tok/s`;
+                }
+            }
+            if (text && text !== lastText) {
+                const d = new Date(evt.timestamp);
+                log.push({ ts: d.getTime(), time: d.toLocaleTimeString(), text });
+                lastText = text;
+            }
+        }
+        return log;
     }
 
     private setActivity(agentId: string, text: string, autoClearMs?: number): void {

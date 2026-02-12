@@ -59,6 +59,14 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/models"
+                        routerLinkActive="sidebar__link--active">
+                        Models
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/councils"
                         routerLinkActive="sidebar__link--active">
                         Councils
@@ -94,6 +102,14 @@ import { filter, Subscription } from 'rxjs';
                         routerLink="/work-tasks"
                         routerLinkActive="sidebar__link--active">
                         Work Tasks
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/schedules"
+                        routerLinkActive="sidebar__link--active">
+                        Schedules
                     </a>
                 </li>
                 <li>

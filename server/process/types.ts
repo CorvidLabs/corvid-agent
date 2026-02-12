@@ -11,9 +11,13 @@ export interface ClaudeStreamEvent {
         role?: string;
         content?: string | ContentBlock[];
     };
+    /** Plain-string notification for synthetic events (type: 'tool_status' | 'system'). */
+    statusMessage?: string;
     content_block?: {
         type: string;
         text?: string;
+        name?: string;
+        input?: unknown;
     };
     delta?: {
         type?: string;
@@ -28,6 +32,16 @@ export interface ClaudeStreamEvent {
         message: string;
         type: string;
     };
+    // Synthetic event fields — used by ProcessManager and direct processes
+    // for custom events emitted through the same event bus.
+
+    /** Approval request fields (type: 'approval_request') */
+    id?: string;
+    sessionId?: string;
+    toolName?: string;
+    description?: string;
+    createdAt?: number;
+    timeoutMs?: number;
 }
 
 export interface ClaudeInputMessage {
