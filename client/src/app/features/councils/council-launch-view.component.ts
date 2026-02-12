@@ -126,31 +126,26 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                 }
                                 <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                 <app-status-badge [status]="session.status" />
-                                @if (session.status === 'running') {
-                                    <span class="feed-activity">{{ getActivity(session.agentId) || 'Queued...' }}</span>
-                                }
-                                @if (!expandedSessions().has(session.id) && session.status !== 'running') {
-                                    <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
+                                @if (!expandedSessions().has(session.id)) {
+                                    <span class="feed-preview">{{ session.status === 'running' ? (getActivity(session.agentId) || 'Waiting...') : getPreviewText(session.id) }}</span>
                                 }
                                 <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                             </div>
                             @if (expandedSessions().has(session.id)) {
                                 <div class="feed-content" (click)="$event.stopPropagation()">
-                                    @if (session.status === 'running') {
-                                        <div class="feed-event-log">
-                                            @for (entry of getEventLog(session.id); track entry.ts) {
-                                                <div class="feed-event-entry">
-                                                    <span class="log-ts">{{ entry.time }}</span>
-                                                    <span>{{ entry.text }}</span>
-                                                </div>
-                                            } @empty {
-                                                <div class="feed-event-entry">
-                                                    <span class="processing-dot"></span>
-                                                    <span>Queued — waiting for model...</span>
-                                                </div>
-                                            }
-                                        </div>
-                                    }
+                                    <div class="feed-event-log">
+                                        @for (entry of getEventLog(session.id); track entry.ts) {
+                                            <div class="feed-event-entry">
+                                                <span class="log-ts">{{ entry.time }}</span>
+                                                <span>{{ entry.text }}</span>
+                                            </div>
+                                        } @empty {
+                                            <div class="feed-event-entry">
+                                                <span class="processing-dot"></span>
+                                                <span>Waiting for model...</span>
+                                            </div>
+                                        }
+                                    </div>
                                     <app-session-output
                                         [messages]="getMessages(session.id)"
                                         [events]="getEvents(session.id)"
@@ -230,31 +225,26 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                     }
                                     <span class="feed-name" [style.color]="agentColor(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                     <app-status-badge [status]="session.status" />
-                                    @if (session.status === 'running') {
-                                        <span class="feed-activity">{{ getActivity(session.agentId) || 'Queued...' }}</span>
-                                    }
-                                    @if (!expandedSessions().has(session.id) && session.status !== 'running') {
-                                        <span class="feed-preview">{{ getPreviewText(session.id) }}</span>
+                                    @if (!expandedSessions().has(session.id)) {
+                                        <span class="feed-preview">{{ session.status === 'running' ? (getActivity(session.agentId) || 'Waiting...') : getPreviewText(session.id) }}</span>
                                     }
                                     <span class="feed-toggle">{{ expandedSessions().has(session.id) ? '&#9662;' : '&#9656;' }}</span>
                                 </div>
                                 @if (expandedSessions().has(session.id)) {
                                     <div class="feed-content" (click)="$event.stopPropagation()">
-                                        @if (session.status === 'running') {
-                                            <div class="feed-event-log">
-                                                @for (entry of getEventLog(session.id); track entry.ts) {
-                                                    <div class="feed-event-entry">
-                                                        <span class="log-ts">{{ entry.time }}</span>
-                                                        <span>{{ entry.text }}</span>
-                                                    </div>
-                                                } @empty {
-                                                    <div class="feed-event-entry">
-                                                        <span class="processing-dot"></span>
-                                                        <span>Queued — waiting for model...</span>
-                                                    </div>
-                                                }
-                                            </div>
-                                        }
+                                        <div class="feed-event-log">
+                                            @for (entry of getEventLog(session.id); track entry.ts) {
+                                                <div class="feed-event-entry">
+                                                    <span class="log-ts">{{ entry.time }}</span>
+                                                    <span>{{ entry.text }}</span>
+                                                </div>
+                                            } @empty {
+                                                <div class="feed-event-entry">
+                                                    <span class="processing-dot"></span>
+                                                    <span>Waiting for model...</span>
+                                                </div>
+                                            }
+                                        </div>
                                         <app-session-output
                                             [messages]="getMessages(session.id)"
                                             [events]="getEvents(session.id)"
@@ -411,10 +401,6 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
         .feed-preview {
             flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             color: var(--text-tertiary); font-size: 0.75rem; margin-left: 0.25rem;
-        }
-        .feed-activity {
-            color: var(--accent); font-size: 0.7rem; font-style: italic;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .feed-event-log {
             background: var(--bg-deep); border-radius: var(--radius-sm);
