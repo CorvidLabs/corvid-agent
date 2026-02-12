@@ -138,9 +138,10 @@ export class WorkTaskService {
             return failed ?? task;
         }
 
-        // Install dependencies in the worktree (worktrees don't share node_modules)
+        // Install dependencies in the worktree (worktrees don't share node_modules).
+        // --ignore-scripts prevents postinstall hooks from bypassing protected-file checks.
         try {
-            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile'], {
+            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], {
                 cwd: worktreeDir,
                 stdout: 'pipe',
                 stderr: 'pipe',
@@ -154,7 +155,7 @@ export class WorkTaskService {
                     stderr: installStderr.trim(),
                 });
                 // Retry without frozen lockfile in case the lock is out of date
-                const retryProc = Bun.spawn(['bun', 'install'], {
+                const retryProc = Bun.spawn(['bun', 'install', '--ignore-scripts'], {
                     cwd: worktreeDir,
                     stdout: 'pipe',
                     stderr: 'pipe',
@@ -377,9 +378,10 @@ export class WorkTaskService {
         const outputs: string[] = [];
         let passed = true;
 
-        // Ensure dependencies are installed before validation
+        // Ensure dependencies are installed before validation.
+        // --ignore-scripts prevents postinstall hooks from bypassing protected-file checks.
         try {
-            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile'], {
+            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], {
                 cwd: workingDir,
                 stdout: 'pipe',
                 stderr: 'pipe',
@@ -390,7 +392,7 @@ export class WorkTaskService {
 
             if (installExit !== 0) {
                 // Retry without frozen lockfile
-                const retryProc = Bun.spawn(['bun', 'install'], {
+                const retryProc = Bun.spawn(['bun', 'install', '--ignore-scripts'], {
                     cwd: workingDir,
                     stdout: 'pipe',
                     stderr: 'pipe',
