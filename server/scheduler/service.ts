@@ -282,6 +282,9 @@ export class SchedulerService {
                 continue;
             }
 
+            // Notify start
+            this.notifyScheduleEvent(schedule, 'started', `Schedule "${schedule.name}" started: ${action.type}`);
+
             // Execute immediately
             this.runAction(execution.id, schedule, action);
         }
@@ -348,6 +351,16 @@ export class SchedulerService {
             const updated = getExecution(this.db, executionId);
             if (updated) {
                 this.emit({ type: 'schedule_execution_update', data: updated });
+
+                // Notify completion/failure
+                const resultSnippet = updated.result ? updated.result.slice(0, 200) : '';
+                if (updated.status === 'completed') {
+                    this.notifyScheduleEvent(schedule, 'completed',
+                        `Schedule "${schedule.name}" completed (${action.type}): ${resultSnippet}`);
+                } else if (updated.status === 'failed') {
+                    this.notifyScheduleEvent(schedule, 'failed',
+                        `Schedule "${schedule.name}" FAILED (${action.type}): ${resultSnippet}`);
+                }
 
                 // Track consecutive failures for auto-pause
                 if (updated.status === 'failed') {
@@ -678,5 +691,26 @@ export class SchedulerService {
                 log.error('Schedule event callback error', { error: err instanceof Error ? err.message : String(err) });
             }
         }
+    }
+
+    /** Send best-effort on-chain notification to the schedule's notifyAddress. */
+    private notifyScheduleEvent(
+        schedule: AgentSchedule,
+        event: 'started' | 'completed' | 'failed',
+        message: string,
+    ): void {
+        if (!schedule.notifyAddress || !this.agentMessenger) return;
+
+        this.agentMessenger.sendNotificationToAddress(
+            schedule.agentId,
+            schedule.notifyAddress,
+            `[schedule:${event}] ${message}`,
+        ).catch((err) => {
+            log.debug('Schedule notification send failed', {
+                scheduleId: schedule.id,
+                notifyAddress: schedule.notifyAddress,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
     }
 }

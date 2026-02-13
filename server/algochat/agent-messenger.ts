@@ -547,6 +547,39 @@ export class AgentMessenger {
         }
     }
 
+    /**
+     * Send a notification to an arbitrary Algorand address from an agent.
+     * Best-effort — returns txid or null, never throws.
+     */
+    async sendNotificationToAddress(
+        fromAgentId: string,
+        toAddress: string,
+        content: string,
+    ): Promise<string | null> {
+        if (!this.service) return null;
+
+        try {
+            const fromAccount = await this.agentWalletService.getAgentChatAccount(fromAgentId);
+            if (!fromAccount) return null;
+
+            const toPubKey = await this.service.algorandService.discoverPublicKey(toAddress);
+
+            const { condenseMessage } = await import('./condenser');
+            const { content: sendContent } = await condenseMessage(content, 800);
+
+            const result = await this.service.algorandService.sendMessage(
+                fromAccount.account,
+                toAddress,
+                toPubKey,
+                sendContent,
+            );
+
+            return result.txid;
+        } catch {
+            return null;
+        }
+    }
+
     /** Best-effort on-chain message send. Returns txid or null. Never throws. */
     async sendOnChainBestEffort(
         fromAgentId: string,

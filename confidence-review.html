@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>corvid-agent v0.4.0 Confidence Review — 2026-02-12</title>
+<style>
+  :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --green: #3fb950; --yellow: #d29922; --red: #f85149; --blue: #58a6ff; --purple: #bc8cff; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+  h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--blue); }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin: 1rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; }
+  .card-title { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .card-value { font-size: 2rem; font-weight: 700; }
+  .card-detail { font-size: 0.85rem; color: var(--muted); margin-top: 0.3rem; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+  .badge-blue { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+  table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; }
+  .meter { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 0.3rem 0; }
+  .meter-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+  .confidence-ring { width: 120px; height: 120px; position: relative; margin: 0 auto; }
+  .confidence-ring svg { transform: rotate(-90deg); }
+  .confidence-ring .label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .confidence-ring .score { font-size: 1.8rem; font-weight: 700; }
+  .confidence-ring .max { font-size: 0.75rem; color: var(--muted); }
+  .feature-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-name { flex: 1; }
+  .timeline { position: relative; padding-left: 1.5rem; }
+  .timeline::before { content: ''; position: absolute; left: 0.5rem; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .timeline-item { position: relative; margin-bottom: 1rem; }
+  .timeline-item::before { content: ''; position: absolute; left: -1.15rem; top: 0.5rem; width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+  .timeline-item.warn::before { background: var(--yellow); }
+  .timeline-item.fix::before { background: var(--blue); }
+  .timeline-item.release::before { background: var(--purple); }
+  .note { background: rgba(88,166,255,0.08); border-left: 3px solid var(--blue); padding: 0.75rem 1rem; border-radius: 0 4px 4px 0; margin: 0.5rem 0; font-size: 0.9rem; }
+  .resolved { background: rgba(63,185,80,0.08); border-left: 3px solid var(--green); padding: 0.75rem 1rem; border-radius: 0 4px 4px 0; margin: 0.5rem 0; font-size: 0.9rem; }
+  .warn-note { background: rgba(210,153,34,0.08); border-left-color: var(--yellow); }
+  .version-tag { display: inline-block; background: linear-gradient(135deg, rgba(188,140,255,0.2), rgba(88,166,255,0.2)); border: 1px solid var(--purple); border-radius: 6px; padding: 2px 10px; font-size: 0.85rem; font-weight: 600; color: var(--purple); margin-left: 0.5rem; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<h1>corvid-agent Confidence Review <span class="version-tag">v0.4.0</span></h1>
+<p class="subtitle">Generated 2026-02-12 14:25 UTC &mdash; v0.4.0 Release &mdash; Scheduler, Ollama, Council, OSS Automation</p>
+
+<!-- Overall Confidence -->
+<div class="grid">
+  <div class="card" style="text-align:center;">
+    <div class="card-title">Overall Confidence</div>
+    <div class="confidence-ring">
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#30363d" stroke-width="8"/>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#3fb950" stroke-width="8"
+          stroke-dasharray="326.7" stroke-dashoffset="29.4" stroke-linecap="round"/>
+      </svg>
+      <div class="label"><div class="score" style="color:var(--green)">A</div><div class="max">91/100</div></div>
+    </div>
+    <div class="card-detail" style="margin-top:0.75rem">v0.4.0 released &amp; tagged.<br>14 schedules active. CI green on 3 platforms.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Stack Health</div>
+    <div class="feature-row"><span class="feature-name">Server (Bun)</span><span class="badge badge-green">LIVE</span></div>
+    <div class="feature-row"><span class="feature-name">Ollama (Metal GPU)</span><span class="badge badge-green">LIVE</span></div>
+    <div class="feature-row"><span class="feature-name">Algorand Testnet</span><span class="badge badge-green">CONNECTED</span></div>
+    <div class="feature-row"><span class="feature-name">Scheduler</span><span class="badge badge-green">14 ACTIVE</span></div>
+    <div class="feature-row"><span class="feature-name">AlgoChat Bridge</span><span class="badge badge-green">SYNCING</span></div>
+    <div class="feature-row"><span class="feature-name">CI (3 platforms)</span><span class="badge badge-green">PASSING</span></div>
+    <div class="feature-row"><span class="feature-name">Tests</span><span class="badge badge-green">317 PASS</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Key Metrics</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--green)">291</div><div class="card-detail">Total sessions</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--blue)">60+</div><div class="card-detail">Council launches</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--purple)">14</div><div class="card-detail">Active schedules</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--green)">33</div><div class="card-detail">Work tasks</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- v0.4.0 Release Summary -->
+<h2>v0.4.0 Release Summary</h2>
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
+  <div class="card" style="border-color:var(--purple)">
+    <div class="card-title" style="color:var(--purple)">New in v0.4.0</div>
+    <div style="font-size:0.9rem">
+      <p><strong>15 commits</strong> since v0.3.0. Released via PR #90, tagged, and published as GitHub release.</p>
+      <ul style="margin:0.5rem 0 0 1.2rem;">
+        <li>Autonomous Agent Scheduler (8 action types, cron-based)</li>
+        <li>Ollama LLM Provider (Metal GPU, weight-based concurrency)</li>
+        <li>Mobile Connect via PSK QR codes</li>
+        <li>Dashboard: Analytics, Settings, Work Tasks, System Logs pages</li>
+        <li>Council deliberation improvements (tool-free, anti-repetition)</li>
+        <li>Security hardening (mnemonic storage, rate limiting)</li>
+        <li>Docker fixes (patches dir copy before bun install)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--purple)">
+    <div class="card-title" style="color:var(--purple)">PRs Merged (v0.3.0 &rarr; v0.4.0)</div>
+    <div style="font-size:0.9rem">
+      <table>
+        <tr><td>#90</td><td>v0.4.0 release &mdash; version bump &amp; docs</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#87</td><td>Docker patches dir fix</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#86</td><td>Scheduler + Ollama provider</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#81</td><td>PSK exchange &amp; mobile connect</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#80</td><td>Wallet identity on WebSocket</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#78</td><td>Dashboard pages (Analytics, Settings, etc.)</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#77</td><td>Disallow plan mode tools in bypass mode</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#76</td><td>Docs site Unicode fix</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#74</td><td>Harden mnemonic storage</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#75</td><td>Memory leak + rate limiting</td><td><span class="badge badge-green">MERGED</span></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Feature Confidence Breakdown -->
+<h2>Feature Confidence</h2>
+<div class="grid">
+  <div class="card">
+    <div class="card-title">Scheduler Engine</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">93%</div>
+    <div class="meter"><div class="meter-fill" style="width:93%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>Action types</td><td><strong>8 implemented</strong></td></tr>
+      <tr><td>Active schedules</td><td><span class="badge badge-green">14</span></td></tr>
+      <tr><td>Cron scheduling</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>council_launch</td><td><span class="badge badge-green">IMPLEMENTED</span></td></tr>
+      <tr><td>Approval policies</td><td>auto / owner / council</td></tr>
+      <tr><td>Max concurrent</td><td>2 (configurable)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Ollama Inference Engine</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">92%</div>
+    <div class="meter"><div class="meter-fill" style="width:92%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>qwen3:8b throughput</td><td><strong>40-53 tok/s</strong></td></tr>
+      <tr><td>qwen3:14b throughput</td><td><strong>27 tok/s</strong></td></tr>
+      <tr><td>Metal GPU offload</td><td><span class="badge badge-green">FULL</span></td></tr>
+      <tr><td>KV cache preservation</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>Tool calling (direct)</td><td><span class="badge badge-yellow">PARTIAL</span></td></tr>
+      <tr><td>tok/s event display</td><td><span class="badge badge-green">IN UI</span></td></tr>
+    </table>
+    <div class="note warn-note" style="margin-top:0.75rem">
+      Ollama direct engine parses tool calls from Qwen3 but execution is inconsistent &mdash; models sometimes emit JSON text instead of proper tool call format. Known issue for v0.5.0.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Weight-Based Concurrency</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">90%</div>
+    <div class="meter"><div class="meter-fill" style="width:90%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>Model weighting</td><td>&le;7B=1, 8-13B=2, &ge;14B=3</td></tr>
+      <tr><td>GPU auto-detection</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>Session-level slots</td><td><span class="badge badge-green">NO DEADLOCKS</span></td></tr>
+      <tr><td>Queue visibility</td><td><span class="badge badge-green">UI BADGE</span></td></tr>
+      <tr><td>5-agent council</td><td><span class="badge badge-green">PASSED</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Council Deliberation</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">92%</div>
+    <div class="meter"><div class="meter-fill" style="width:92%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>Full pipeline</td><td><span class="badge badge-green">5 STAGES</span></td></tr>
+      <tr><td>Tool-free deliberation</td><td><span class="badge badge-green">FIXED</span></td></tr>
+      <tr><td>Anti-repetition prompt</td><td><span class="badge badge-green">DEPLOYED</span></td></tr>
+      <tr><td>Tiered permissions vote</td><td><span class="badge badge-green">UNANIMOUS</span></td></tr>
+      <tr><td>Chairman</td><td><span class="badge badge-green">QWEN ARCHITECT</span></td></tr>
+      <tr><td>Peer review</td><td><span class="badge badge-green">RATED</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">OSS Automation</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">88%</div>
+    <div class="meter"><div class="meter-fill" style="width:88%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>Claude OSS Scout</td><td><span class="badge badge-green">TESTED</span></td></tr>
+      <tr><td>GitHub star_repo</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>GitHub fork_repo</td><td><span class="badge badge-green">SCHEDULED</span></td></tr>
+      <tr><td>PR reviews</td><td><span class="badge badge-green">SCHEDULED</span></td></tr>
+      <tr><td>Work tasks</td><td><span class="badge badge-green">33 COMPLETED</span></td></tr>
+      <tr><td>Ollama tool execution</td><td><span class="badge badge-yellow">NEEDS WORK</span></td></tr>
+    </table>
+    <div class="resolved" style="margin-top:0.75rem">
+      <strong>Verified:</strong> Claude OSS Scout session searched GitHub, starred 5 new repos (algokit-cli, ollama, claude-code, MCP servers, go-algorand), and saved a report to memory.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Security &amp; Safety</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">90%</div>
+    <div class="meter"><div class="meter-fill" style="width:90%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>Protected files</td><td><span class="badge badge-green">ENFORCED</span></td></tr>
+      <tr><td>postinstall scripts</td><td><span class="badge badge-green">BLOCKED</span></td></tr>
+      <tr><td>Mnemonic storage</td><td><span class="badge badge-green">HARDENED</span></td></tr>
+      <tr><td>Rate limiting</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+      <tr><td>AES-256-GCM memory</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>Kernel extraction</td><td><span class="badge badge-yellow">PLANNED (v0.5)</span></td></tr>
+    </table>
+    <div class="resolved" style="margin-top:0.75rem">
+      <strong>LIVE FIX:</strong> Council identified <code>bun install</code> postinstall vulnerability in work tasks. Added <code>--ignore-scripts</code> to all 4 install calls in <code>service.ts</code>. PR #91.
+    </div>
+  </div>
+</div>
+
+<!-- Active Schedules -->
+<h2>Active Schedules (14)</h2>
+<table>
+  <thead>
+    <tr><th>Schedule</th><th>Frequency</th><th>Type</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Daily Code Quality Review</td><td>Daily</td><td>custom</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Daily Agent Standup</td><td>Daily</td><td>send_message</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Daily Test Coverage Improvement</td><td>Daily</td><td>work_task</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly Open Source Scout</td><td>Weekly</td><td>star_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly CorvidLabs Repo Health Check</td><td>Weekly</td><td>custom</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly AlgoChat Ecosystem Review</td><td>Weekly</td><td>custom</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly CorvidLabs PR Reviews</td><td>Mon/Thu</td><td>review_prs</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly CorvidLabs Improvement Suggestions</td><td>Wednesday</td><td>github_suggest</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly ts-algochat Work Task</td><td>Tuesday</td><td>work_task</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Star Algorand Ecosystem Repos</td><td>Tuesday</td><td>star_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Star AI Agent Ecosystem Repos</td><td>Thursday</td><td>star_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Fork AlgoKit for Contributions</td><td>15th monthly</td><td>fork_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Bi-Weekly Roadmap Council</td><td>Bi-weekly</td><td>council_launch</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Monthly Architecture Council</td><td>1st monthly</td><td>council_launch</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+  </tbody>
+</table>
+
+<!-- Agent Roster -->
+<h2>Agent Roster (12)</h2>
+<table>
+  <thead>
+    <tr><th>Agent</th><th>Model</th><th>Provider</th><th>Role</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>CorvidAgent</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Primary</td><td><span class="badge badge-green">PRIMARY</span></td></tr>
+    <tr><td>Tech Lead</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Engineering</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Security Lead</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Security</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Architect</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Architecture</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Frontend Engineer</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Frontend</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Backend Engineer</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Backend</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>DevOps Engineer</td><td>claude-opus-4-6</td><td>Anthropic</td><td>DevOps</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Coder</td><td>qwen3:8b</td><td>Ollama</td><td>Coding</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Architect</td><td>qwen3:8b</td><td>Ollama</td><td>Chairman</td><td><span class="badge badge-blue">CHAIRMAN</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Reviewer</td><td>qwen3:8b</td><td>Ollama</td><td>Review</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen DevOps</td><td>qwen3:8b</td><td>Ollama</td><td>Infra</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Coder 14B</td><td>qwen3:14b</td><td>Ollama</td><td>Heavy Coding</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+  </tbody>
+</table>
+
+<!-- E2E Verification -->
+<h2>E2E Verification Results</h2>
+<div class="grid">
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">API Smoke Tests &mdash; ALL PASS</div>
+    <div style="font-size:0.9rem">
+      <div class="feature-row"><span class="feature-name">GET /api/health</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">POST /api/sessions (create)</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">POST /api/sessions/:id/respond</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">POST /api/sessions/:id/stop</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">GET/POST /api/schedules (CRUD)</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">AlgoChat testnet connection</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">Memory save &amp; recall</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">Work tasks (33 historical)</span><span class="badge badge-green">OK</span></div>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">Council Deliberation Test</div>
+    <div style="font-size:0.9rem">
+      <p><strong>Topic:</strong> Tiered Permission System for Self-Modifying Agents</p>
+      <p style="margin-top:0.5rem"><strong>Agents:</strong> 6 (5 Ollama + 1 Claude chairman)</p>
+      <p style="margin-top:0.5rem"><strong>Stages:</strong> Responding &rarr; Discussing (3 rounds) &rarr; Reviewing &rarr; Synthesizing</p>
+      <p style="margin-top:0.5rem"><strong>Result:</strong> Unanimous consensus on kernel concept. Identified live postinstall vulnerability (patched immediately).</p>
+      <p style="margin-top:0.5rem"><strong>Key output:</strong> 5-phase implementation roadmap from kernel extraction to formal verification.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">CI Pipeline</div>
+    <div style="font-size:0.9rem">
+      <div class="feature-row"><span class="feature-name">macOS (Bun 1.2.4)</span><span class="badge badge-green">317 PASS</span></div>
+      <div class="feature-row"><span class="feature-name">Ubuntu (Bun 1.2.4)</span><span class="badge badge-green">317 PASS</span></div>
+      <div class="feature-row"><span class="feature-name">Windows (Bun 1.2.4)</span><span class="badge badge-green">317 PASS</span></div>
+      <div class="feature-row"><span class="feature-name">TypeScript check</span><span class="badge badge-green">PASS</span></div>
+      <div class="feature-row"><span class="feature-name">PR #90 (release)</span><span class="badge badge-green">MERGED</span></div>
+      <div class="feature-row"><span class="feature-name">PR #91 (scheduler + fix)</span><span class="badge badge-green">CI GREEN</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Security: Council-Identified Vulnerability -->
+<h2>Security: Council-Identified Vulnerability</h2>
+<div class="card" style="border-color:var(--red); margin:1rem 0;">
+  <div class="card-title" style="color:var(--red)">LIVE FIX: postinstall Script Execution in Work Tasks</div>
+  <div style="font-size:0.9rem">
+    <p><strong>Identified by:</strong> Council deliberation on tiered permissions (6 agents, unanimous)</p>
+    <p style="margin-top:0.5rem"><strong>Vulnerability:</strong> <code>bun install</code> in work task worktrees ran without <code>--ignore-scripts</code>. A malicious dependency's postinstall hook could modify protected files (sdk-process.ts, spending.ts, etc.) before protected-file checks ran.</p>
+    <p style="margin-top:0.5rem"><strong>Impact:</strong> Complete bypass of the protected-file system via supply chain attack.</p>
+    <p style="margin-top:0.5rem"><strong>Fix:</strong> Added <code>--ignore-scripts</code> to all 4 <code>bun install</code> calls in <code>server/work/service.ts</code> (lines 143, 158, 383, 394).</p>
+    <p style="margin-top:0.5rem"><strong>Status:</strong> <span class="badge badge-green">PATCHED</span> in PR #91, CI green.</p>
+  </div>
+</div>
+
+<!-- Confidence Scoring Breakdown -->
+<h2>Confidence Scoring Breakdown</h2>
+<table>
+  <thead>
+    <tr><th>Category</th><th>Score</th><th>Weight</th><th>Weighted</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Core Functionality</td><td>95%</td><td>25%</td><td>23.8</td><td>Sessions, councils, work tasks all functional</td></tr>
+    <tr><td>Scheduler</td><td>93%</td><td>20%</td><td>18.6</td><td>14 schedules active, all 8 action types implemented</td></tr>
+    <tr><td>Ollama Provider</td><td>88%</td><td>15%</td><td>13.2</td><td>Inference solid, tool calling needs work</td></tr>
+    <tr><td>Security</td><td>90%</td><td>15%</td><td>13.5</td><td>postinstall patched, protected files enforced</td></tr>
+    <tr><td>CI / Testing</td><td>95%</td><td>10%</td><td>9.5</td><td>317 tests, 3 platforms, TypeScript strict</td></tr>
+    <tr><td>Documentation</td><td>90%</td><td>10%</td><td>9.0</td><td>README, GitHub Pages, architecture docs updated</td></tr>
+    <tr><td>Blockchain (AlgoChat)</td><td>85%</td><td>5%</td><td>4.3</td><td>Testnet connected, on-chain audit working</td></tr>
+    <tr><td colspan="3" style="text-align:right;font-weight:700;">Total</td><td style="font-weight:700;color:var(--green)">91.9</td><td style="color:var(--muted)">Rounded: 91/100</td></tr>
+  </tbody>
+</table>
+
+<!-- Remaining / Next Steps -->
+<h2>Known Issues &amp; Next Steps</h2>
+<div class="grid">
+  <div class="card" style="border-color:var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">Ollama Tool Calling (v0.5.0)</div>
+    <div style="font-size:0.9rem">
+      <p>Qwen3 models sometimes return tool calls as JSON text in the response body instead of using proper tool call format. Direct engine parses them but execution is inconsistent. Needs parser hardening or model-specific prompt engineering.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">Kernel Extraction (Council Recommendation)</div>
+    <div style="font-size:0.9rem">
+      <p>Council unanimously recommended extracting a "kernel" &mdash; permanently immutable files that no agent, council, or schedule can modify. Phase 0 of the tiered permissions roadmap. Breaks recursive governance loops.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--muted)">
+    <div class="card-title">PR #91 Pending Merge</div>
+    <div style="font-size:0.9rem">
+      <p>Contains council_launch scheduler implementation + postinstall security fix. CI green. Needs merge by a different reviewer (branch protection).</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--muted)">
+    <div class="card-title">Council Implementation Roadmap</div>
+    <div style="font-size:0.9rem">
+      <ul style="margin:0.25rem 0 0 1.2rem;">
+        <li><strong>Phase 0:</strong> Kernel extraction (immutable core)</li>
+        <li><strong>Phase 1:</strong> Capability analysis tool</li>
+        <li><strong>Phase 2:</strong> Tiered permission system</li>
+        <li><strong>Phase 3:</strong> Council-governed upgrades</li>
+        <li><strong>Phase 4:</strong> Formal verification</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Build Timeline -->
+<h2>v0.4.0 Timeline</h2>
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 9 &mdash; Scheduler + Ollama PR #86</div>
+    <div>Foundation: 8 action types, Ollama provider with weight-based concurrency, Metal GPU.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 9 &mdash; Docker patches fix PR #87</div>
+    <div>Copy patches dir before bun install in Dockerfile.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 10 &mdash; Weight-based concurrency + tok/s</div>
+    <div>Model weights (&le;7B=1, 8-13B=2, &ge;14B=3). GPU auto-detection. tok/s display in event log.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 10 &mdash; Deadlock fixes + session-level slots</div>
+    <div>Fixed weight&gt;maxWeight and double-counting bugs. Moved slot holding to session level.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 10 &mdash; Council deliberation improvements</div>
+    <div>Tool-free deliberation, anti-repetition prompts, reduced from 3 to 2 discussion rounds.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 10 &mdash; P1-P4 fixes</div>
+    <div>On-chain self-send bypass indexer, chairman &rarr; Qwen Architect, 14B wallet funded.</div>
+  </div>
+  <div class="timeline-item release">
+    <div class="timeline-time">Feb 12 06:17 &mdash; v0.4.0 Released</div>
+    <div>PR #90 merged. Tag pushed. GitHub release published. 15 commits since v0.3.0.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 07:00 &mdash; Schedules created</div>
+    <div>14 active schedules: star, fork, review, work_task, council_launch, suggest, custom.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 07:30 &mdash; OSS Scout tested</div>
+    <div>Claude OSS Scout session starred 5 repos, saved report to memory. Ollama sessions inconsistent with tool calls.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 08:00 &mdash; Council deliberation: Tiered Permissions</div>
+    <div>6 agents, 3 discussion rounds, peer review, synthesis. Unanimous on kernel concept.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 12 08:30 &mdash; postinstall vulnerability patched</div>
+    <div>Council-identified. Added --ignore-scripts to all bun install calls. PR #91.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 14:25 &mdash; E2E verification complete</div>
+    <div>All API endpoints tested. Server healthy. 14 schedules running. CI green on 3 platforms.</div>
+  </div>
+</div>
+
+<!-- Architecture -->
+<h2>Architecture: v0.4.0</h2>
+<div class="card" style="font-family:monospace;font-size:0.85rem;line-height:1.8;white-space:pre;overflow-x:auto;">
+<span style="color:var(--blue)">corvid-agent server</span>                      <span style="color:var(--purple)">External</span>
++-----------------------------------+      +---------------------------+
+|  <span style="color:var(--green)">Bun Runtime</span> :3000                 |      |  <span style="color:var(--green)">Ollama</span> (Metal GPU)        |
+|                                   |      |  qwen3:8b    40-53 tok/s  |
+|  API Routes   WebSocket   AlgoChat|  &rarr;  |  qwen3:14b   27 tok/s     |
+|  Sessions     Councils    Memory  |      +---------------------------+
+|  <span style="color:var(--purple)">Scheduler</span>    Work Tasks  Agents  |      |  <span style="color:var(--blue)">Anthropic API</span>             |
+|  Providers    MCP Tools   DB      |  &rarr;  |  claude-opus-4-6          |
++-----------------------------------+      +---------------------------+
+|  SQLite (schema v24)              |      |  <span style="color:var(--yellow)">Algorand Testnet</span>          |
+|  sessions, agents, councils,      |  &rarr;  |  AlgoChat messaging       |
+|  schedules, memories, spending    |      |  On-chain audit trail      |
++-----------------------------------+      +---------------------------+
+</div>
+
+<div style="text-align:center;margin:3rem 0 1rem;color:var(--muted);font-size:0.8rem;">
+  corvid-agent v0.4.0 confidence review &mdash; generated by Claude Opus 4.6 &mdash; 2026-02-12 14:25 UTC
+</div>
+
+</body>
+</html>

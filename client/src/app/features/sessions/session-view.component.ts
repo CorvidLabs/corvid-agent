@@ -41,7 +41,8 @@ import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-mess
                 <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running'" [agentName]="agentName()" />
 
                 <app-session-input
-                    [disabled]="s.status !== 'running'"
+                    [disabled]="s.status === 'deleting'"
+                    [placeholder]="s.status === 'running' ? 'Send message to session' : 'Send message to resume...'"
                     (messageSent)="onSendMessage($event)" />
             </div>
 
@@ -149,7 +150,16 @@ export class SessionViewComponent implements OnInit, OnDestroy {
 
     protected onSendMessage(content: string): void {
         if (!this.sessionId) return;
-        this.sessionService.sendMessage(this.sessionId, content);
+
+        const s = this.session();
+        if (s && s.status !== 'running') {
+            // Session is idle/stopped — resume with the new message as prompt
+            this.sessionService.resumeSession(this.sessionId, content);
+            this.session.update((cur) => cur ? { ...cur, status: 'running' } : cur);
+        } else {
+            // Process running — send message via WebSocket
+            this.sessionService.sendMessage(this.sessionId, content);
+        }
 
         // Immediately show the user's message in the output
         this.messages.update((msgs) => [

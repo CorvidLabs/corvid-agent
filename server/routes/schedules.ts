@@ -9,7 +9,9 @@ import {
     deleteSchedule,
     listExecutions,
     getExecution,
+    updateScheduleNextRun,
 } from '../db/schedules';
+import { getNextCronDate } from '../scheduler/cron-parser';
 import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
 import { json, handleRouteError, errorMessage, badRequest } from '../lib/response';
@@ -102,6 +104,14 @@ async function handleCreateSchedule(req: Request, db: Database): Promise<Respons
         const data = await parseBodyOrThrow(req, CreateScheduleSchema);
         validateScheduleFrequency(data.cronExpression, data.intervalMs);
         const schedule = createSchedule(db, data);
+
+        // Compute and persist next_run_at so the scheduler picks it up
+        const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
+        if (nextRun) {
+            updateScheduleNextRun(db, schedule.id, nextRun);
+            schedule.nextRunAt = nextRun;
+        }
+
         return json(schedule, 201);
     } catch (err) {
         if (err instanceof ValidationError) return badRequest(err.message);
@@ -128,6 +138,16 @@ async function handleUpdateSchedule(req: Request, db: Database, id: string): Pro
 
         const schedule = updateSchedule(db, id, data);
         if (!schedule) return json({ error: 'Schedule not found' }, 404);
+
+        // Recompute next_run_at if cron/interval changed
+        if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
+            const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
+            if (nextRun) {
+                updateScheduleNextRun(db, schedule.id, nextRun);
+                schedule.nextRunAt = nextRun;
+            }
+        }
+
         return json(schedule);
     } catch (err) {
         if (err instanceof ValidationError) return badRequest(err.message);
@@ -162,4 +182,18 @@ async function handleResolveApproval(
     } catch (err) {
         return handleRouteError(err);
     }
+}
+
+function computeNextRun(cronExpression: string | null, intervalMs: number | null): string | null {
+    if (cronExpression) {
+        try {
+            return getNextCronDate(cronExpression).toISOString();
+        } catch {
+            return null;
+        }
+    }
+    if (intervalMs && intervalMs > 0) {
+        return new Date(Date.now() + intervalMs).toISOString();
+    }
+    return null;
 }

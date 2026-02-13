@@ -364,6 +364,8 @@ export interface AgentSchedule {
     executionCount: number;
     /** Max USD budget per execution */
     maxBudgetPerRun: number | null;
+    /** Algorand address to notify on execution start/complete/fail */
+    notifyAddress: string | null;
     lastRunAt: string | null;
     nextRunAt: string | null;
     createdAt: string;
@@ -398,6 +400,7 @@ export interface CreateScheduleInput {
     approvalPolicy?: ScheduleApprovalPolicy;
     maxExecutions?: number;
     maxBudgetPerRun?: number;
+    notifyAddress?: string;
 }
 
 export interface UpdateScheduleInput {
@@ -410,4 +413,5 @@ export interface UpdateScheduleInput {
     status?: ScheduleStatus;
     maxExecutions?: number;
     maxBudgetPerRun?: number;
+    notifyAddress?: string | null;
 }
