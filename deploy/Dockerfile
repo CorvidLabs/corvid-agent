@@ -6,6 +6,9 @@ WORKDIR /app/client
 COPY client/package.json client/bun.lock* ./
 RUN bun install --frozen-lockfile
 
+# Copy shared types (client imports from ../shared/)
+COPY shared/ /app/shared/
+
 # Copy client source & build
 COPY client/ .
 RUN bun run build
