@@ -41,7 +41,7 @@ import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-mess
                 <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running'" [agentName]="agentName()" />
 
                 <app-session-input
-                    [disabled]="s.status === 'deleting'"
+                    [disabled]="false"
                     [placeholder]="s.status === 'running' ? 'Send message to session' : 'Send message to resume...'"
                     (messageSent)="onSendMessage($event)" />
             </div>
@@ -127,11 +127,14 @@ export class SessionViewComponent implements OnInit, OnDestroy {
 
         this.sessionService.subscribeToSession(this.sessionId);
 
-        // Listen for approval requests targeting this session
+        // Listen for approval requests and status updates targeting this session
         const sid = this.sessionId;
         this.approvalCleanup = this.wsService.onMessage((msg) => {
             if (msg.type === 'approval_request' && msg.request.sessionId === sid) {
                 this.pendingApproval.set(msg.request);
+            }
+            if (msg.type === 'session_status' && msg.sessionId === sid) {
+                this.session.update((cur) => cur ? { ...cur, status: msg.status as Session['status'] } : cur);
             }
         });
     }
