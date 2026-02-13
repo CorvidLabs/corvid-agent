@@ -242,7 +242,9 @@ setup_env() {
 
     # Network choice
     printf "\n  Choose Algorand network:\n"
-    printf "    1) localnet  — local Docker-based network (recommended for dev)\n"
+    printf "    ${BOLD}1) localnet${RESET}  — local blockchain via Docker ${GREEN}(recommended)${RESET}\n"
+    printf "       Agents get auto-funded wallets, AlgoChat messaging, and on-chain\n"
+    printf "       memory — no tokens needed, fully self-contained.\n"
     printf "    2) testnet   — Algorand public test network\n"
     printf "    3) mainnet   — Algorand production network\n"
     local net_choice
@@ -253,6 +255,12 @@ setup_env() {
         3) CHOSEN_NETWORK="mainnet" ;;
         *) CHOSEN_NETWORK="localnet" ;;
     esac
+
+    if [[ "$CHOSEN_NETWORK" != "localnet" ]]; then
+        warn "On ${CHOSEN_NETWORK}, you must fund wallets manually and provide a mnemonic."
+        detail "Localnet is strongly recommended for development — agents auto-fund"
+        detail "and AlgoChat works out of the box with zero configuration."
+    fi
 
     sed_inplace "s|^ALGORAND_NETWORK=.*|ALGORAND_NETWORK=${CHOSEN_NETWORK}|" "$env_file"
     # Set AGENT_NETWORK if commented out
@@ -445,19 +453,23 @@ setup_localnet() {
         return
     fi
 
-    step "Setting up AlgoKit localnet"
+    step "Setting up AlgoKit localnet (required for on-chain agent features)"
+    detail "Localnet provides the Algorand blockchain that powers AlgoChat messaging,"
+    detail "agent wallet auto-funding, and on-chain memory storage."
 
     # Check Docker
     if ! has_cmd docker; then
-        warn "Docker is not installed."
+        error "Docker is not installed — required for Algorand localnet."
         detail "Install from: https://docs.docker.com/get-docker/"
-        if ! confirm "Continue setup without Docker?"; then
+        warn "Without localnet, agents cannot use AlgoChat or on-chain wallets."
+        if ! confirm "Continue without Docker? (not recommended)"; then
             return
         fi
     elif ! docker info &>/dev/null 2>&1; then
-        warn "Docker daemon is not running."
+        error "Docker daemon is not running — required for Algorand localnet."
         detail "Start Docker Desktop or the Docker daemon and re-run setup."
-        if ! confirm "Continue setup without Docker?"; then
+        warn "Without localnet, agents cannot use AlgoChat or on-chain wallets."
+        if ! confirm "Continue without Docker? (not recommended)"; then
             return
         fi
     else
@@ -466,8 +478,8 @@ setup_localnet() {
 
     # Check / install AlgoKit
     if ! has_cmd algokit; then
-        warn "algokit is not installed."
-        if confirm "Install AlgoKit now?"; then
+        warn "algokit is not installed — required to run Algorand localnet."
+        if confirm "Install AlgoKit now? (recommended)"; then
             if [[ "$PLATFORM" == "macos" ]]; then
                 if has_cmd brew; then
                     brew install algorandfoundation/tap/algokit || {
@@ -517,7 +529,7 @@ setup_localnet() {
     fi
 
     # Start localnet
-    if confirm "Start AlgoKit localnet now?"; then
+    if confirm "Start AlgoKit localnet now? (recommended)"; then
         info "Starting localnet (this may pull Docker images on first run)..."
         algokit localnet start
 
@@ -583,16 +595,24 @@ print_summary() {
     step "Setup complete"
     printf "\n"
 
-    # Network
-    printf "  %-12s" "Network:"
-    printf "${GREEN}%s${RESET}\n" "$CHOSEN_NETWORK"
-
-    # Claude API
-    printf "  %-12s" "Claude:"
-    if [[ -f "$PROJECT_DIR/.env" ]] && grep -qE '^ANTHROPIC_API_KEY=.+' "$PROJECT_DIR/.env" 2>/dev/null; then
-        printf "${GREEN}configured${RESET}\n"
+    # Localnet + AlgoChat (shown first — it's the core feature)
+    if [[ "$CHOSEN_NETWORK" == "localnet" ]]; then
+        local algod_token
+        algod_token=$(printf 'a%.0s' {1..64})
+        printf "  %-12s" "Localnet:"
+        if curl -sf "http://localhost:4001/v2/status" -H "X-Algo-API-Token: ${algod_token}" >/dev/null 2>&1; then
+            printf "${GREEN}running${RESET}\n"
+            printf "  %-12s" "AlgoChat:"
+            printf "${GREEN}ready (on-chain messaging enabled)${RESET}\n"
+        else
+            printf "${RED}not running${RESET}\n"
+            printf "  %-12s" "AlgoChat:"
+            printf "${RED}unavailable — start localnet first${RESET}\n"
+            detail "Run: algokit localnet start"
+        fi
     else
-        printf "${YELLOW}not set (Ollama-only mode)${RESET}\n"
+        printf "  %-12s" "Network:"
+        printf "${GREEN}%s${RESET}\n" "$CHOSEN_NETWORK"
     fi
 
     # Ollama
@@ -605,16 +625,12 @@ print_summary() {
         printf "${YELLOW}not running${RESET}\n"
     fi
 
-    # Localnet (only for localnet network)
-    if [[ "$CHOSEN_NETWORK" == "localnet" ]]; then
-        printf "  %-12s" "Localnet:"
-        local algod_token
-        algod_token=$(printf 'a%.0s' {1..64})
-        if curl -sf "http://localhost:4001/v2/status" -H "X-Algo-API-Token: ${algod_token}" >/dev/null 2>&1; then
-            printf "${GREEN}running${RESET}\n"
-        else
-            printf "${YELLOW}not running${RESET}\n"
-        fi
+    # Claude API
+    printf "  %-12s" "Claude:"
+    if [[ -f "$PROJECT_DIR/.env" ]] && grep -qE '^ANTHROPIC_API_KEY=.+' "$PROJECT_DIR/.env" 2>/dev/null; then
+        printf "${GREEN}configured${RESET}\n"
+    else
+        printf "${YELLOW}not set (Ollama-only mode)${RESET}\n"
     fi
 
     # Client
@@ -631,7 +647,10 @@ print_summary() {
     printf "    Dashboard:           http://localhost:%s\n" "$DEFAULT_PORT"
     printf "\n"
     detail "Database auto-initializes on first run."
-    detail "Agent wallets auto-create and fund on localnet."
+    if [[ "$CHOSEN_NETWORK" == "localnet" ]]; then
+        detail "Agent wallets auto-create and auto-fund on localnet."
+        detail "AlgoChat messaging starts automatically — agents communicate on-chain."
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -641,6 +660,10 @@ main() {
     printf "\n${BOLD}corvid-agent setup v${SETUP_VERSION}${RESET}\n"
     detail "Project: ${PROJECT_DIR}"
     detail "Platform: ${PLATFORM}"
+    printf "\n"
+    detail "corvid-agent uses Algorand localnet + AlgoChat for on-chain agent"
+    detail "communication — agents save memories, send messages, and manage"
+    detail "wallets on a local blockchain. This is what makes it different."
 
     setup_prerequisites
     setup_dependencies
