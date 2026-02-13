@@ -691,12 +691,14 @@ export class AlgoChatBridge {
             }
         } else {
             if (conversation.sessionId) {
+                // Always subscribe so the reply gets sent back on-chain
+                this.subscriptionManager.subscribeForResponse(conversation.sessionId, participant);
+
                 const sent = this.processManager.sendMessage(conversation.sessionId, content);
                 if (!sent) {
                     const { getSession } = await import('../db/sessions');
                     const session = getSession(this.db, conversation.sessionId);
                     if (session) {
-                        this.subscriptionManager.subscribeForResponse(session.id, participant);
                         this.processManager.resumeProcess(session, content);
                     }
                 }
