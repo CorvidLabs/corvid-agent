@@ -154,7 +154,10 @@ async function handleRoutes(
 
     // MCP API routes (used by stdio server subprocess)
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService
-        ? { db, agentMessenger, agentDirectory, agentWalletService }
+        ? (() => {
+            const algoChatCfg = loadAlgoChatConfig();
+            return { db, agentMessenger, agentDirectory, agentWalletService, serverMnemonic: algoChatCfg.mnemonic, network: algoChatCfg.network };
+          })()
         : null;
     const mcpResponse = handleMcpApiRoutes(req, url, mcpDeps);
     if (mcpResponse) return mcpResponse;
@@ -391,11 +394,11 @@ async function handleMemoryBackfill(
     }
 
     const rows = db.query(
-        'SELECT id, agent_id, key, content FROM agent_memories WHERE txid IS NULL ORDER BY created_at ASC',
+        "SELECT id, agent_id, key, content FROM agent_memories WHERE status IN ('pending', 'failed') ORDER BY created_at ASC",
     ).all() as NullTxidRow[];
 
     if (rows.length === 0) {
-        return json({ ok: true, backfilled: 0, message: 'No memories with NULL txids' });
+        return json({ ok: true, backfilled: 0, message: 'No pending or failed memories' });
     }
 
     const config = loadAlgoChatConfig();

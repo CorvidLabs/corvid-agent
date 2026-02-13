@@ -281,6 +281,7 @@ export const CreateScheduleSchema = z.object({
     approvalPolicy: z.enum(['auto', 'owner_approve', 'council_approve']).optional(),
     maxExecutions: z.number().int().min(1).optional(),
     maxBudgetPerRun: z.number().min(0).optional(),
+    notifyAddress: z.string().min(1).optional(),
 }).refine(
     (d) => d.cronExpression || d.intervalMs,
     { message: 'Either cronExpression or intervalMs must be provided' },
@@ -296,6 +297,7 @@ export const UpdateScheduleSchema = z.object({
     status: z.enum(['active', 'paused', 'completed', 'failed']).optional(),
     maxExecutions: z.number().int().min(1).optional(),
     maxBudgetPerRun: z.number().min(0).optional(),
+    notifyAddress: z.string().min(1).nullable().optional(),
 });
 
 export const ScheduleApprovalSchema = z.object({

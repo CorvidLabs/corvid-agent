@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import type { AgentMemory } from '../../shared/types';
+import type { AgentMemory, MemoryStatus } from '../../shared/types';
 
 interface AgentMemoryRow {
     id: string;
@@ -7,6 +7,7 @@ interface AgentMemoryRow {
     key: string;
     content: string;
     txid: string | null;
+    status: string;
     created_at: string;
     updated_at: string;
 }
@@ -18,6 +19,7 @@ function rowToAgentMemory(row: AgentMemoryRow): AgentMemory {
         key: row.key,
         content: row.content,
         txid: row.txid,
+        status: row.status as MemoryStatus,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -29,10 +31,12 @@ export function saveMemory(
 ): AgentMemory {
     const id = crypto.randomUUID();
     db.query(
-        `INSERT INTO agent_memories (id, agent_id, key, content)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO agent_memories (id, agent_id, key, content, status)
+         VALUES (?, ?, ?, ?, 'pending')
          ON CONFLICT(agent_id, key) DO UPDATE SET
              content = excluded.content,
+             status = 'pending',
+             txid = NULL,
              updated_at = datetime('now')`
     ).run(id, params.agentId, params.key, params.content);
 
@@ -47,6 +51,7 @@ export function saveMemory(
         key: params.key,
         content: params.content,
         txid: null,
+        status: 'pending',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     });
@@ -97,6 +102,36 @@ export function updateMemoryTxid(
     txid: string,
 ): void {
     db.query(
-        'UPDATE agent_memories SET txid = ? WHERE id = ?'
+        "UPDATE agent_memories SET txid = ?, status = 'confirmed' WHERE id = ?"
     ).run(txid, id);
+}
+
+export function updateMemoryStatus(
+    db: Database,
+    id: string,
+    status: MemoryStatus,
+): void {
+    db.query(
+        'UPDATE agent_memories SET status = ?, updated_at = datetime(\'now\') WHERE id = ?'
+    ).run(status, id);
+}
+
+export function getPendingMemories(
+    db: Database,
+    limit: number = 20,
+): AgentMemory[] {
+    const rows = db.query(
+        `SELECT * FROM agent_memories
+         WHERE status IN ('pending', 'failed')
+         ORDER BY updated_at ASC
+         LIMIT ?`
+    ).all(limit) as AgentMemoryRow[];
+    return rows.map(rowToAgentMemory);
+}
+
+export function countPendingMemories(db: Database): number {
+    const row = db.query(
+        "SELECT COUNT(*) as count FROM agent_memories WHERE status IN ('pending', 'failed')"
+    ).get() as { count: number };
+    return row.count;
 }

@@ -27,6 +27,7 @@ function rowToSchedule(row: Record<string, unknown>): AgentSchedule {
         maxExecutions: row.max_executions as number | null,
         executionCount: (row.execution_count as number) ?? 0,
         maxBudgetPerRun: row.max_budget_per_run as number | null,
+        notifyAddress: row.notify_address as string | null,
         lastRunAt: row.last_run_at as string | null,
         nextRunAt: row.next_run_at as string | null,
         createdAt: row.created_at as string,
@@ -61,8 +62,8 @@ export function createSchedule(db: Database, input: CreateScheduleInput): AgentS
 
     db.query(`
         INSERT INTO agent_schedules (id, agent_id, name, description, cron_expression, interval_ms,
-            actions, approval_policy, max_executions, max_budget_per_run, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            actions, approval_policy, max_executions, max_budget_per_run, notify_address, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -74,6 +75,7 @@ export function createSchedule(db: Database, input: CreateScheduleInput): AgentS
         input.approvalPolicy ?? 'owner_approve',
         input.maxExecutions ?? null,
         input.maxBudgetPerRun ?? null,
+        input.notifyAddress ?? null,
         now,
         now,
     );
@@ -101,13 +103,16 @@ export function listActiveSchedules(db: Database): AgentSchedule[] {
 }
 
 export function listDueSchedules(db: Database): AgentSchedule[] {
+    // next_run_at is stored as ISO 8601 (2026-02-12T14:45:00.000Z)
+    // Use replace() to normalize to the same format for comparison
+    const now = new Date().toISOString();
     const rows = db.query(
         `SELECT * FROM agent_schedules
          WHERE status = 'active'
            AND next_run_at IS NOT NULL
-           AND next_run_at <= datetime('now')
+           AND next_run_at <= ?
          ORDER BY next_run_at ASC`
-    ).all();
+    ).all(now);
     return (rows as Record<string, unknown>[]).map(rowToSchedule);
 }
 
@@ -127,6 +132,7 @@ export function updateSchedule(db: Database, id: string, input: UpdateScheduleIn
     if (input.status !== undefined) { fields.push('status = ?'); values.push(input.status); }
     if (input.maxExecutions !== undefined) { fields.push('max_executions = ?'); values.push(input.maxExecutions); }
     if (input.maxBudgetPerRun !== undefined) { fields.push('max_budget_per_run = ?'); values.push(input.maxBudgetPerRun); }
+    if (input.notifyAddress !== undefined) { fields.push('notify_address = ?'); values.push(input.notifyAddress); }
 
     if (fields.length === 0) return existing;
 

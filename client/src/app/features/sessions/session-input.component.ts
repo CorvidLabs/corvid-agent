@@ -14,7 +14,7 @@ import { FormsModule } from '@angular/forms';
                 class="input-bar__field"
                 [(ngModel)]="messageText"
                 [disabled]="disabled()"
-                placeholder="Type a message..."
+                [placeholder]="placeholder()"
                 rows="1"
                 (keydown.enter)="onEnter($event)"
                 aria-label="Message input">
@@ -74,6 +74,7 @@ import { FormsModule } from '@angular/forms';
 })
 export class SessionInputComponent {
     readonly disabled = input(false);
+    readonly placeholder = input('Type a message...');
     readonly messageSent = output<string>();
 
     protected readonly messageText = signal('');
