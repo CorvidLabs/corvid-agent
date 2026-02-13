@@ -106,7 +106,7 @@ function simulateSessionEnd(sessionId: string, output: string) {
     // Copy the set since callbacks may unsubscribe themselves
     const cbsCopy = new Set(cbs);
     for (const cb of cbsCopy) {
-        cb(sessionId, { type: 'result' });
+        cb(sessionId, { type: 'result', total_cost_usd: 0 });
     }
 }
 
