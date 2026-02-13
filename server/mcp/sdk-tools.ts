@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleWebSearch, handleDeepResearch } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -14,6 +14,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_check_credits',
     'corvid_create_work_task',
     'corvid_manage_schedule',
+    'corvid_web_search',
+    'corvid_deep_research',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -146,6 +148,28 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 schedule_id: z.string().optional().describe('Schedule ID (for pause/resume/history)'),
             },
             async (args) => handleManageSchedule(ctx, args),
+        ),
+        tool(
+            'corvid_web_search',
+            'Search the web for current information using Brave Search. ' +
+            'Returns titles, URLs, and descriptions. Use freshness to filter by recency.',
+            {
+                query: z.string().describe('The search query'),
+                count: z.number().optional().describe('Number of results to return (1-20, default 5)'),
+                freshness: z.enum(['pd', 'pw', 'pm', 'py']).optional().describe('Freshness filter: pd (past day), pw (past week), pm (past month), py (past year)'),
+            },
+            async (args) => handleWebSearch(ctx, args),
+        ),
+        tool(
+            'corvid_deep_research',
+            'Research a topic in depth by running multiple web searches from different angles. ' +
+            'Automatically generates sub-queries (or use your own) and returns deduplicated, organized results. ' +
+            'Best for complex topics that benefit from multiple perspectives.',
+            {
+                topic: z.string().describe('The main topic to research'),
+                sub_questions: z.array(z.string()).optional().describe('Custom sub-questions to search. If omitted, auto-generates angles like "benefits", "challenges", "examples", "latest news".'),
+            },
+            async (args) => handleDeepResearch(ctx, args),
         ),
     ];
 

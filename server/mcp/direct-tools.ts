@@ -18,6 +18,8 @@ import {
     handleCreditConfig,
     handleCreateWorkTask,
     handleManageSchedule,
+    handleWebSearch,
+    handleDeepResearch,
 } from './tool-handlers';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
@@ -40,6 +42,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_check_credits',
     'corvid_create_work_task',
     'corvid_manage_schedule',
+    'corvid_web_search',
+    'corvid_deep_research',
     'read_file',
     'write_file',
     'edit_file',
@@ -264,6 +268,44 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
             return unwrapResult(await handleManageSchedule(ctx, args as Parameters<typeof handleManageSchedule>[1]));
         },
     });
+
+    tools.push(
+        {
+            name: 'corvid_web_search',
+            description: 'Search the web for current information using Brave Search. Returns titles, URLs, and descriptions.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'The search query' },
+                    count: { type: 'number', description: 'Number of results to return (1-20, default 5)' },
+                    freshness: { type: 'string', enum: ['pd', 'pw', 'pm', 'py'], description: 'Freshness filter: pd (past day), pw (past week), pm (past month), py (past year)' },
+                },
+                required: ['query'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_web_search', args, ['query']);
+                if (err) return err;
+                return unwrapResult(await handleWebSearch(ctx, args as { query: string; count?: number; freshness?: string }));
+            },
+        },
+        {
+            name: 'corvid_deep_research',
+            description: 'Research a topic in depth by running multiple web searches from different angles. Returns deduplicated, organized results.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    topic: { type: 'string', description: 'The main topic to research' },
+                    sub_questions: { type: 'array', items: { type: 'string' }, description: 'Custom sub-questions to search. If omitted, auto-generates angles.' },
+                },
+                required: ['topic'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_deep_research', args, ['topic']);
+                if (err) return err;
+                return unwrapResult(await handleDeepResearch(ctx, args as { topic: string; sub_questions?: string[] }));
+            },
+        },
+    );
     } // end if (ctx)
 
     // Merge coding tools when a coding context is provided
