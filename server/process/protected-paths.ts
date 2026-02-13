@@ -3,6 +3,8 @@
  * Agents must never modify these paths, even in full-auto mode.
  */
 
+import { analyzeBashCommand } from '../lib/bash-security';
+
 // Paths that agents must never modify, even in full-auto mode.
 // Uses basename matching to avoid false positives (e.g. "manager.ts" matching "task-manager.ts").
 export const PROTECTED_BASENAMES = new Set([
@@ -28,7 +30,7 @@ export const PROTECTED_SUBSTRINGS = [
 ];
 
 // Shell operators/commands that indicate write/destructive file operations.
-export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e)/;
+export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|perl\s+-|rsync\s|install\s|truncate\s)/;
 
 export function isProtectedPath(filePath: string): boolean {
     // Normalize to forward slashes for cross-platform matching
@@ -55,4 +57,38 @@ export function extractFilePathsFromInput(input: Record<string, unknown>): strin
         }
     }
     return paths;
+}
+
+// ── Quote-aware bash command protection ─────────────────────────────────
+
+export interface ProtectedBashResult {
+    blocked: boolean;
+    path?: string;
+    reason?: string;
+}
+
+/**
+ * Analyze a bash command for protected-path violations using quote-aware
+ * tokenization and dangerous-pattern detection.
+ */
+export function isProtectedBashCommand(command: string): ProtectedBashResult {
+    const analysis = analyzeBashCommand(command);
+
+    // Check if any extracted path targets a protected file
+    for (const path of analysis.paths) {
+        if (isProtectedPath(path)) {
+            return { blocked: true, path, reason: `Targets protected path "${path}"` };
+        }
+    }
+
+    // If the command has dangerous patterns (eval, $(), etc.) AND write operators,
+    // block it — we can't reliably determine the target paths
+    if (analysis.hasDangerousPatterns && BASH_WRITE_OPERATORS.test(command)) {
+        return {
+            blocked: true,
+            reason: `${analysis.reason} — combined with write operator, cannot verify target paths`,
+        };
+    }
+
+    return { blocked: false };
 }

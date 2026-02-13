@@ -3,8 +3,23 @@ export interface ContentBlock {
     text?: string;
 }
 
+/**
+ * Known Claude stream event types.
+ * The `(string & {})` at the end allows unknown event types from the SDK
+ * without breaking existing `event.type === 'result'` checks.
+ */
+export type ClaudeStreamEventType =
+    | 'message_start' | 'message_delta' | 'message_stop'
+    | 'content_block_start' | 'content_block_delta' | 'content_block_stop'
+    | 'assistant' | 'thinking'
+    | 'result' | 'error'
+    | 'tool_status' | 'system'
+    | 'approval_request'
+    | 'session_exited' | 'session_stopped'
+    | (string & {});
+
 export interface ClaudeStreamEvent {
-    type: string;
+    type: ClaudeStreamEventType;
     subtype?: string;
     session_id?: string;
     message?: {
@@ -66,4 +81,22 @@ export interface ProcessInfo {
     pid: number;
     proc: ReturnType<typeof Bun.spawn>;
     subscribers: Set<(event: ClaudeStreamEvent) => void>;
+}
+
+// ── Type guard functions ────────────────────────────────────────────────
+
+export function isResultEvent(e: ClaudeStreamEvent): boolean {
+    return e.type === 'result';
+}
+
+export function isErrorEvent(e: ClaudeStreamEvent): boolean {
+    return e.type === 'error';
+}
+
+export function isApprovalEvent(e: ClaudeStreamEvent): boolean {
+    return e.type === 'approval_request';
+}
+
+export function isSessionEndEvent(e: ClaudeStreamEvent): boolean {
+    return e.type === 'session_exited' || e.type === 'session_stopped';
 }
