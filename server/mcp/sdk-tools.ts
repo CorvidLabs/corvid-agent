@@ -43,8 +43,8 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         ),
         tool(
             'corvid_save_memory',
-            'Save a private encrypted note to your memory. ' +
-            'Memories persist across sessions and are stored on-chain for audit. ' +
+            'Save an encrypted memory by sending a message to yourself on Algorand. ' +
+            'Memories persist across sessions on the blockchain, with a local cache for fast recall. ' +
             'Use a descriptive key for easy recall later.',
             {
                 key: z.string().describe('A short descriptive key for this memory (e.g. "user-preferences", "project-status")'),
@@ -54,7 +54,7 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         ),
         tool(
             'corvid_recall_memory',
-            'Recall previously saved memories. ' +
+            'Recall previously saved on-chain memories. Results include blockchain confirmation status. ' +
             'Provide a key for exact lookup, a query for search, or neither to list recent memories.',
             {
                 key: z.string().optional().describe('Exact key to look up'),

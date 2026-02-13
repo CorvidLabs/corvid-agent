@@ -154,7 +154,10 @@ async function handleRoutes(
 
     // MCP API routes (used by stdio server subprocess)
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService
-        ? { db, agentMessenger, agentDirectory, agentWalletService }
+        ? (() => {
+            const algoChatCfg = loadAlgoChatConfig();
+            return { db, agentMessenger, agentDirectory, agentWalletService, serverMnemonic: algoChatCfg.mnemonic, network: algoChatCfg.network };
+          })()
         : null;
     const mcpResponse = handleMcpApiRoutes(req, url, mcpDeps);
     if (mcpResponse) return mcpResponse;

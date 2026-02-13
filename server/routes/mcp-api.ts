@@ -19,6 +19,8 @@ interface McpApiDeps {
     agentMessenger: AgentMessenger;
     agentDirectory: AgentDirectory;
     agentWalletService: AgentWalletService;
+    serverMnemonic?: string | null;
+    network?: string;
 }
 
 function buildContext(deps: McpApiDeps, agentId: string): McpToolContext {
@@ -28,6 +30,8 @@ function buildContext(deps: McpApiDeps, agentId: string): McpToolContext {
         agentMessenger: deps.agentMessenger,
         agentDirectory: deps.agentDirectory,
         agentWalletService: deps.agentWalletService,
+        serverMnemonic: deps.serverMnemonic,
+        network: deps.network,
     };
 }
 

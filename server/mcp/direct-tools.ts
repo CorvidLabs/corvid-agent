@@ -112,7 +112,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
         {
             name: 'corvid_save_memory',
-            description: 'Save a private encrypted note to your memory. Memories persist across sessions.',
+            description: 'Save an encrypted memory by sending a message to yourself on Algorand. Cached locally for fast recall.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -129,7 +129,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
         {
             name: 'corvid_recall_memory',
-            description: 'Recall previously saved memories. Provide a key for exact lookup, a query for search, or neither to list recent.',
+            description: 'Recall on-chain memories. Includes blockchain status. Key for exact lookup, query for search, or neither to list recent.',
             parameters: {
                 type: 'object',
                 properties: {
