@@ -10,6 +10,22 @@ export class RelativeTimePipe implements PipeTransform {
         const date = new Date(normalized);
         const now = new Date();
         const diffMs = now.getTime() - date.getTime();
+
+        // Future dates (negative diff) — show "in X"
+        if (diffMs < 0) {
+            const futureSec = Math.floor(-diffMs / 1000);
+            const futureMin = Math.floor(futureSec / 60);
+            const futureHour = Math.floor(futureMin / 60);
+            const futureDay = Math.floor(futureHour / 24);
+
+            if (futureSec < 60) return 'in <1m';
+            if (futureMin < 60) return `in ${futureMin}m`;
+            if (futureHour < 24) return `in ${futureHour}h`;
+            if (futureDay < 30) return `in ${futureDay}d`;
+            return date.toLocaleDateString();
+        }
+
+        // Past dates
         const diffSec = Math.floor(diffMs / 1000);
         const diffMin = Math.floor(diffSec / 60);
         const diffHour = Math.floor(diffMin / 60);
