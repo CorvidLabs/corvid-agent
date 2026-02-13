@@ -13,6 +13,7 @@ import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
 import { SchedulerService } from './scheduler/service';
 import { SessionLifecycleManager } from './process/session-lifecycle';
+import { MemorySyncService } from './db/memory-sync';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
@@ -65,6 +66,9 @@ const processManager = new ProcessManager(db);
 
 // Initialize session lifecycle manager for automatic cleanup of expired sessions
 const sessionLifecycle = new SessionLifecycleManager(db);
+
+// Initialize memory sync service (started after AlgoChat init)
+const memorySyncService = new MemorySyncService(db);
 
 // Initialize AlgoChat
 const algochatConfig = loadAlgoChatConfig();
@@ -337,6 +341,12 @@ initAlgoChat().then(() => {
         });
     }
 
+    // Start memory sync service if AlgoChat is available
+    if (agentMessenger) {
+        memorySyncService.setServices(agentMessenger, algochatConfig.mnemonic, algochatConfig.network);
+        memorySyncService.start();
+    }
+
     // Start the scheduler now that all services are available
     // Give it the agentMessenger if AlgoChat is initialized
     if (agentMessenger) {
@@ -395,6 +405,7 @@ function logShutdownDiagnostics(signal: string): void {
 
 function gracefulShutdown(): void {
     schedulerService.stop();
+    memorySyncService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
     algochatBridge?.stop();

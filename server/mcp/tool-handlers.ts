@@ -6,7 +6,7 @@ import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
 import { listSchedules, createSchedule, updateSchedule, listExecutions } from '../db/schedules';
 import { validateScheduleFrequency } from '../scheduler/service';
-import { saveMemory, recallMemory, searchMemories, listMemories, updateMemoryTxid } from '../db/agent-memories';
+import { saveMemory, recallMemory, searchMemories, listMemories, updateMemoryTxid, updateMemoryStatus } from '../db/agent-memories';
 import {
     getBalance,
     getCreditConfig,
@@ -175,7 +175,8 @@ export async function handleSaveMemory(
                     key: args.key,
                     error: err instanceof Error ? err.message : String(err),
                 });
-                return textResult(`Memory saved locally with key "${args.key}" (on-chain send failed)`);
+                updateMemoryStatus(ctx.db, memory.id, 'failed');
+                return textResult(`Memory saved with key "${args.key}" (on-chain send failed — will retry)`);
             }
         } else {
             // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)
@@ -192,6 +193,7 @@ export async function handleSaveMemory(
                 log.debug('On-chain memory send failed', {
                     error: err instanceof Error ? err.message : String(err),
                 });
+                updateMemoryStatus(ctx.db, memory.id, 'failed');
             });
 
             return textResult(`Memory saved with key "${args.key}" (on-chain send pending)`);
@@ -213,7 +215,7 @@ export async function handleRecallMemory(
             if (!memory) {
                 return textResult(`No memory found with key "${args.key}".`);
             }
-            const chainTag = memory.txid ? `(on-chain: ${memory.txid.slice(0, 8)}...)` : '(local only)';
+            const chainTag = memory.status === 'confirmed' ? `(on-chain: ${memory.txid?.slice(0, 8)}...)` : memory.status === 'pending' ? '(pending)' : '(sync-failed — will retry)';
             return textResult(`[${memory.key}] ${memory.content}\n(saved: ${memory.updatedAt}) ${chainTag}`);
         }
 
@@ -223,7 +225,7 @@ export async function handleRecallMemory(
                 return textResult(`No memories found matching "${args.query}".`);
             }
             const lines = memories.map((m) => {
-                const tag = m.txid ? `[on-chain]` : `[local only]`;
+                const tag = m.status === 'confirmed' ? `[on-chain]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
                 return `${tag} [${m.key}] ${m.content}`;
             });
             return textResult(`Found ${memories.length} memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);
@@ -235,7 +237,7 @@ export async function handleRecallMemory(
             return textResult('No memories saved yet.');
         }
         const lines = memories.map((m) => {
-            const tag = m.txid ? `[on-chain]` : `[local only]`;
+            const tag = m.status === 'confirmed' ? `[on-chain]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
             return `${tag} [${m.key}] ${m.content}`;
         });
         return textResult(`Your ${memories.length} most recent memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);

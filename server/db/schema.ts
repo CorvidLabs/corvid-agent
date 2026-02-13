@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 27;
+const SCHEMA_VERSION = 28;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -388,6 +388,13 @@ const MIGRATIONS: Record<number, string[]> = {
     27: [
         // Schedule notification address — on-chain AlgoChat notifications on execution lifecycle
         `ALTER TABLE agent_schedules ADD COLUMN notify_address TEXT DEFAULT NULL`,
+    ],
+    28: [
+        // Memory sync status tracking: pending → confirmed / failed
+        `ALTER TABLE agent_memories ADD COLUMN status TEXT DEFAULT 'confirmed'`,
+        `UPDATE agent_memories SET status = 'confirmed' WHERE txid IS NOT NULL`,
+        `UPDATE agent_memories SET status = 'pending' WHERE txid IS NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
     ],
 };
 
