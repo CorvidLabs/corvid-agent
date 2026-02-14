@@ -52,7 +52,7 @@ export class ResponseFormatter {
     private db: Database;
     private service: AlgoChatService;
     private agentWalletService: AgentWalletService | null = null;
-    private pskManager: PSKManager | null = null;
+    private pskManagerLookup: ((address: string) => PSKManager | null) | null = null;
     private eventCallbacks: Set<AlgoChatEventCallback> = new Set();
     private publicKeyCache: Map<string, CachedPublicKey> = new Map();
 
@@ -70,9 +70,9 @@ export class ResponseFormatter {
         this.agentWalletService = service;
     }
 
-    /** Inject the optional PSK manager for pre-shared-key messaging. */
-    setPskManager(manager: PSKManager | null): void {
-        this.pskManager = manager;
+    /** Inject a PSK manager lookup function for multi-contact PSK routing. */
+    setPskManagerLookup(fn: (address: string) => PSKManager | null): void {
+        this.pskManagerLookup = fn;
     }
 
     /** Register a callback for AlgoChat feed events. */
@@ -112,8 +112,9 @@ export class ResponseFormatter {
         }
 
         try {
-            // Route PSK contacts through the PSK manager
-            if (this.pskManager && participant === this.pskManager.contactAddress) {
+            // Route PSK contacts through the correct PSK manager
+            const pskManager = this.pskManagerLookup?.(participant);
+            if (pskManager) {
                 // PSK has an 878-byte payload limit per transaction.
                 // Split oversized messages into sequential sends with a delay
                 // between each so they land in different blocks (preserving order).
@@ -124,7 +125,7 @@ export class ResponseFormatter {
                     if (i > 0) {
                         await new Promise((r) => setTimeout(r, PSK_INTER_CHUNK_DELAY_MS));
                     }
-                    await this.pskManager.sendMessage(chunks[i]);
+                    await pskManager.sendMessage(chunks[i]);
                 }
                 log.info(`Sent PSK response to ${participant}`, {
                     content: content.slice(0, 100),

@@ -18,7 +18,7 @@ export interface PSKMessage {
 
 export type PSKMessageCallback = (message: PSKMessage) => void;
 
-interface PSKContactEntry {
+export interface PSKContactEntry {
     address: string;
     initialPSK: Uint8Array;
     label: string;
@@ -63,33 +63,43 @@ export class PSKManager {
     private processedTxids: Set<string> = new Set();
     /** Cached X25519 encryption public key of the contact, learned from received envelopes. */
     private contactEncryptionKey: Uint8Array | null = null;
+    /** Unique contact ID (psk_contacts.id). Used to key multi-contact maps in bridge. */
+    readonly contactId: string;
 
     constructor(
         db: Database,
         service: AlgoChatService,
         pskConfig: PSKContactConfig,
         network: AlgoChatNetwork,
+        contactId?: string,
     ) {
         this.db = db;
         this.service = service;
         this.network = network;
+        this.contactId = contactId ?? pskConfig.address;
 
-        // Try to restore state from DB, otherwise create fresh
+        // Try to restore ratchet state from DB, otherwise create fresh.
+        // Always use the PSK from pskConfig (authoritative source — psk_contacts
+        // or env config). The DB state row may have a stale PSK from a legacy
+        // manager that previously occupied the same address.
         const restored = this.loadState(pskConfig.address);
         if (restored) {
             this.contact = restored;
-            const pskFp = Array.from(restored.initialPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+            // Override the PSK with the authoritative value from the caller
+            this.contact.initialPSK = pskConfig.psk;
+            const pskFp = Array.from(pskConfig.psk.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
             log.info(
                 `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}... on ${network}`,
                 {
                     network,
                     pskFp,
-                    pskLen: restored.initialPSK.length,
+                    pskLen: pskConfig.psk.length,
                     sendCounter: restored.state.sendCounter,
                     peerLastCounter: restored.state.peerLastCounter,
                     lastRound: restored.lastRound,
                 },
             );
+            this.saveState(); // persist the correct PSK to DB
         } else {
             this.contact = {
                 address: pskConfig.address,
@@ -105,6 +115,10 @@ export class PSKManager {
 
     get contactAddress(): string {
         return this.contact.address;
+    }
+
+    get psk(): Uint8Array {
+        return this.contact.initialPSK;
     }
 
     onMessage(callback: PSKMessageCallback): void {
@@ -281,23 +295,29 @@ export class PSKManager {
                 try {
                     const envelope = algochat.decodePSKEnvelope(noteBytes);
 
-                    // Validate counter (replay protection)
+                    // Validate counter (replay protection).
+                    // Multi-device support: when multiple devices share the same
+                    // wallet and PSK, they maintain independent send counters.
+                    // A "duplicate" counter from a new txid is a different device,
+                    // not a replay. We rely on txid dedup (processedTxids) for
+                    // true replay protection instead of counter-only validation.
                     if (!algochat.validateCounter(this.contact.state, envelope.ratchetCounter)) {
-                        this.trackProcessedTxid(tx.id);
                         if (this.contact.state.seenCounters.has(envelope.ratchetCounter)) {
-                            // True replay — counter already processed
-                            continue;
+                            // Counter already seen — but if the txid is new, it's
+                            // a different device sending with the same counter.
+                            // Accept it (txid dedup prevents true replays).
+                            log.info(`Counter ${envelope.ratchetCounter} reused from new txid (multi-device)`, { txid: tx.id.slice(0, 12) });
+                        } else {
+                            // Counter is out of window — auto-resync peerLastCounter.
+                            // This handles cases where the peer's send counter drifted
+                            // (e.g. same wallet on different device, app reinstall, etc.)
+                            log.info(`Counter ${envelope.ratchetCounter} out of window (peerLast=${this.contact.state.peerLastCounter}), resyncing`);
+                            this.contact.state = {
+                                ...this.contact.state,
+                                peerLastCounter: envelope.ratchetCounter,
+                                seenCounters: new Set<number>(),
+                            };
                         }
-                        // Counter is out of window — auto-resync peerLastCounter.
-                        // This handles cases where the peer's send counter drifted
-                        // (e.g. same wallet on different device, app reinstall, etc.)
-                        // Replay protection is still enforced via seenCounters + txid dedup.
-                        log.info(`Counter ${envelope.ratchetCounter} out of window (peerLast=${this.contact.state.peerLastCounter}), resyncing`);
-                        this.contact.state = {
-                            ...this.contact.state,
-                            peerLastCounter: envelope.ratchetCounter,
-                            seenCounters: new Set<number>(),
-                        };
                     }
 
                     // Derive PSK at this counter

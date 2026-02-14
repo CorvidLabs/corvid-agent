@@ -22,7 +22,10 @@ export interface AlgoChatConfig {
     ownerAddresses: Set<string>;
 }
 
+let _cachedConfig: AlgoChatConfig | null = null;
+
 export function loadAlgoChatConfig(): AlgoChatConfig {
+    if (_cachedConfig) return _cachedConfig;
     const mnemonic = process.env.ALGOCHAT_MNEMONIC ?? null;
     const rawNetwork = (process.env.ALGORAND_NETWORK ?? 'localnet') as AlgoChatNetwork;
     const rawAgentNetwork = (process.env.AGENT_NETWORK ?? 'localnet') as AlgoChatNetwork;
@@ -40,7 +43,7 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
     // Parse owner addresses (comma-separated Algorand addresses)
     const ownerAddresses = parseOwnerAddresses(network);
 
-    return {
+    _cachedConfig = {
         mnemonic: hasMnemonic ? mnemonic.trim() : null,
         network,
         agentNetwork,
@@ -51,6 +54,7 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
         pskContact,
         ownerAddresses,
     };
+    return _cachedConfig;
 }
 
 /** Exported for testing. */

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
@@ -21,11 +21,14 @@ interface OperationalMode {
     mode: string;
 }
 
-interface PSKExchange {
-    uri: string;
-    address: string;
+interface PSKContact {
+    id: string;
+    nickname: string;
     network: string;
-    label: string;
+    mobileAddress: string | null;
+    active: boolean;
+    createdAt: string;
+    uri?: string;
 }
 
 @Component({
@@ -99,37 +102,81 @@ interface PSKExchange {
                     }
                 </div>
 
-                <!-- Connect Mobile -->
+                <!-- Connect Mobile — Multi-Contact PSK -->
                 <div class="settings__section">
                     <h3>Connect Mobile</h3>
                     <p class="connect-desc">
-                        Scan this QR code with the CorvidChat app to connect your phone to this agent via AlgoChat.
+                        Share your agent with friends. Each contact gets their own encrypted PSK channel.
                     </p>
-                    @if (pskExchange()) {
-                        <div class="qr-container">
-                            <canvas #qrCanvas class="qr-canvas"></canvas>
-                        </div>
-                        <div class="connect-info">
-                            <div class="info-item">
-                                <span class="info-label">Network</span>
-                                <span class="info-value network-badge" [attr.data-network]="pskExchange()?.network">
-                                    {{ pskExchange()?.network }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="connect-actions">
-                            <button class="save-btn" (click)="copyPSKUri()">Copy URI</button>
-                            <button class="backup-btn" (click)="regeneratePSK()">
-                                {{ generatingPSK() ? 'Generating...' : 'Regenerate' }}
-                            </button>
+
+                    <!-- Contact list -->
+                    @if (pskContacts().length > 0) {
+                        <div class="contact-list">
+                            @for (contact of pskContacts(); track contact.id) {
+                                <div class="contact-card">
+                                    <div class="contact-header">
+                                        @if (editingContactId() === contact.id) {
+                                            <input
+                                                class="contact-nickname-input"
+                                                [value]="editingNickname()"
+                                                (input)="editingNickname.set(asInputValue($event))"
+                                                (keydown.enter)="saveNickname(contact.id)"
+                                                (keydown.escape)="cancelEditNickname()"
+                                            />
+                                            <button class="icon-btn" (click)="saveNickname(contact.id)" title="Save">&#10003;</button>
+                                            <button class="icon-btn" (click)="cancelEditNickname()" title="Cancel">&#10005;</button>
+                                        } @else {
+                                            <span class="contact-nickname" (dblclick)="startEditNickname(contact)">{{ contact.nickname }}</span>
+                                            <button class="icon-btn" (click)="startEditNickname(contact)" title="Rename">&#9998;</button>
+                                        }
+                                        <span class="contact-status" [class.contact-status--active]="contact.mobileAddress"
+                                              [class.contact-status--waiting]="!contact.mobileAddress">
+                                            {{ contact.mobileAddress ? 'Connected' : 'Waiting' }}
+                                        </span>
+                                    </div>
+                                    @if (contact.mobileAddress) {
+                                        <code class="contact-address">{{ contact.mobileAddress }}</code>
+                                    }
+                                    <div class="contact-actions">
+                                        <button class="save-btn save-btn--sm" (click)="toggleQR(contact)">
+                                            {{ expandedContactId() === contact.id ? 'Hide QR' : 'Show QR' }}
+                                        </button>
+                                        <button class="save-btn save-btn--sm" (click)="copyContactUri(contact)">Copy URI</button>
+                                        <button class="cancel-btn cancel-btn--sm" (click)="cancelContact(contact)">Delete</button>
+                                    </div>
+                                    @if (expandedContactId() === contact.id && contact.uri) {
+                                        <div class="qr-container">
+                                            <canvas class="qr-canvas"></canvas>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     } @else {
-                        <button
-                            class="save-btn"
-                            [disabled]="generatingPSK()"
-                            (click)="generatePSK()"
-                        >{{ generatingPSK() ? 'Generating...' : 'Generate QR Code' }}</button>
+                        <p class="muted">No contacts yet. Add one to get started.</p>
                     }
+
+                    <!-- Add contact -->
+                    <div class="add-contact">
+                        @if (addingContact()) {
+                            <div class="add-contact-form">
+                                <input
+                                    class="contact-nickname-input"
+                                    placeholder="Nickname (e.g. Alice)"
+                                    [value]="newContactNickname()"
+                                    (input)="newContactNickname.set(asInputValue($event))"
+                                    (keydown.enter)="createContact()"
+                                    (keydown.escape)="addingContact.set(false)"
+                                />
+                                <button class="save-btn save-btn--sm" [disabled]="creatingContact()" (click)="createContact()">
+                                    {{ creatingContact() ? 'Creating...' : 'Create' }}
+                                </button>
+                                <button class="icon-btn" (click)="addingContact.set(false)">&#10005;</button>
+                            </div>
+                        } @else {
+                            <button class="save-btn" (click)="addingContact.set(true)">+ Add Contact</button>
+                        }
+                    </div>
                 </div>
 
                 <!-- Operational Mode -->
@@ -248,27 +295,100 @@ interface PSKExchange {
         .network-badge[data-network="localnet"] { color: #f5a623; }
         .algo-balance--low { color: var(--accent-red, #ff4d4f) !important; }
 
-        /* Connect Mobile */
+        /* Connect Mobile — Contact List */
         .connect-desc {
             font-size: 0.75rem;
             color: var(--text-secondary);
             margin-bottom: 1rem;
         }
+        .contact-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .contact-card {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.75rem;
+        }
+        .contact-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+        }
+        .contact-nickname {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+        .contact-nickname-input {
+            padding: 0.25rem 0.4rem;
+            background: var(--bg-input);
+            border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            font-family: inherit;
+            font-weight: 600;
+            outline: none;
+            width: 140px;
+        }
+        .contact-status {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-left: auto;
+        }
+        .contact-status--active { color: var(--accent-green); }
+        .contact-status--waiting { color: var(--accent-yellow, #f5a623); }
+        .contact-address {
+            display: block;
+            font-size: 0.6rem;
+            color: var(--accent-magenta);
+            background: var(--bg-surface);
+            padding: 2px 4px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.4rem;
+            word-break: break-all;
+        }
+        .contact-actions {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: var(--radius-sm);
+        }
+        .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface); }
         .qr-container {
             display: flex;
             justify-content: center;
-            margin-bottom: 1rem;
+            margin-top: 0.75rem;
         }
         .qr-canvas {
             border-radius: var(--radius);
             border: 2px solid var(--accent-cyan);
             box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
         }
-        .connect-info {
-            margin-bottom: 0.75rem;
+        .add-contact {
+            margin-top: 0.5rem;
         }
-        .connect-actions {
+        .add-contact-form {
             display: flex;
+            align-items: center;
             gap: 0.5rem;
         }
 
@@ -337,7 +457,7 @@ interface PSKExchange {
         }
 
         /* Buttons */
-        .save-btn, .backup-btn {
+        .save-btn, .backup-btn, .cancel-btn {
             padding: 0.5rem 1.25rem;
             border-radius: var(--radius);
             font-size: 0.75rem;
@@ -355,6 +475,10 @@ interface PSKExchange {
         }
         .save-btn:hover:not(:disabled) { background: rgba(0, 229, 255, 0.2); }
         .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .save-btn--sm, .cancel-btn--sm {
+            padding: 0.3rem 0.7rem;
+            font-size: 0.65rem;
+        }
         .backup-btn {
             background: var(--accent-magenta-dim);
             color: var(--accent-magenta);
@@ -362,6 +486,12 @@ interface PSKExchange {
         }
         .backup-btn:hover:not(:disabled) { background: rgba(255, 0, 170, 0.2); }
         .backup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .cancel-btn {
+            background: transparent;
+            color: var(--accent-red, #ff4d4f);
+            border: 1px solid var(--accent-red, #ff4d4f);
+        }
+        .cancel-btn:hover { background: rgba(255, 77, 79, 0.1); }
         .backup-result {
             font-size: 0.7rem;
             color: var(--accent-green);
@@ -373,18 +503,24 @@ export class SettingsComponent implements OnInit {
     private readonly api = inject(ApiService);
     private readonly notifications = inject(NotificationService);
     private readonly sessionService = inject(SessionService);
-
-    @ViewChild('qrCanvas') qrCanvas!: ElementRef<HTMLCanvasElement>;
+    private readonly elRef = inject(ElementRef);
 
     readonly loading = signal(true);
     readonly saving = signal(false);
     readonly backingUp = signal(false);
-    readonly generatingPSK = signal(false);
     readonly settings = signal<SettingsData | null>(null);
     readonly operationalMode = signal('normal');
     readonly backupResult = signal<string | null>(null);
     readonly algochatStatus = this.sessionService.algochatStatus;
-    readonly pskExchange = signal<PSKExchange | null>(null);
+
+    // Multi-contact PSK state
+    readonly pskContacts = signal<PSKContact[]>([]);
+    readonly expandedContactId = signal<string | null>(null);
+    readonly addingContact = signal(false);
+    readonly newContactNickname = signal('');
+    readonly creatingContact = signal(false);
+    readonly editingContactId = signal<string | null>(null);
+    readonly editingNickname = signal('');
 
     // Mutable copy for credit config editing
     private creditValues: Record<string, string> = {};
@@ -402,6 +538,11 @@ export class SettingsComponent implements OnInit {
 
     ngOnInit(): void {
         this.loadAll();
+    }
+
+    /** Helper for template input events. */
+    asInputValue(event: Event): string {
+        return (event.target as HTMLInputElement).value;
     }
 
     getCreditValue(key: string): string {
@@ -453,47 +594,145 @@ export class SettingsComponent implements OnInit {
         }
     }
 
-    async generatePSK(): Promise<void> {
-        this.generatingPSK.set(true);
-        try {
-            const result = await firstValueFrom(this.api.post<PSKExchange>('/algochat/psk-exchange'));
-            this.pskExchange.set(result);
-            this.notifications.success('PSK QR code generated');
-            // Wait for DOM update, then render QR
-            setTimeout(() => this.renderQRCode(result.uri), 50);
-        } catch {
-            this.notifications.error('Failed to generate PSK');
-        } finally {
-            this.generatingPSK.set(false);
-        }
-    }
+    // ── Multi-contact PSK methods ────────────────────────────────────
 
-    async regeneratePSK(): Promise<void> {
-        if (!confirm('Regenerating the PSK will disconnect any mobile clients currently connected. Continue?')) {
+    async createContact(): Promise<void> {
+        const nickname = this.newContactNickname().trim();
+        if (!nickname) {
+            this.notifications.error('Please enter a nickname');
             return;
         }
-        await this.generatePSK();
-    }
-
-    copyPSKUri(): void {
-        const uri = this.pskExchange()?.uri;
-        if (uri) {
-            navigator.clipboard.writeText(uri).then(() => {
-                this.notifications.success('PSK URI copied to clipboard');
-            });
+        this.creatingContact.set(true);
+        try {
+            const result = await firstValueFrom(
+                this.api.post<{ id: string; uri: string; nickname: string }>('/algochat/psk-contacts', { nickname })
+            );
+            // Reload contacts list and auto-expand the new one
+            await this.loadPSKContacts();
+            this.newContactNickname.set('');
+            this.addingContact.set(false);
+            this.notifications.success(`Contact "${result.nickname}" created`);
+            // Auto-expand QR for the new contact
+            this.toggleQR({ ...result, network: '', mobileAddress: null, active: true, createdAt: '', uri: result.uri });
+        } catch {
+            this.notifications.error('Failed to create contact');
+        } finally {
+            this.creatingContact.set(false);
         }
     }
 
-    private renderQRCode(uri: string): void {
-        if (!this.qrCanvas?.nativeElement) return;
-        QRCode.toCanvas(this.qrCanvas.nativeElement, uri, {
-            width: 280,
-            margin: 2,
-            color: {
-                dark: '#0a0a12',
-                light: '#e0f7fa',
-            },
-        });
+    async toggleQR(contact: PSKContact): Promise<void> {
+        if (this.expandedContactId() === contact.id) {
+            this.expandedContactId.set(null);
+            return;
+        }
+
+        // Load URI if not cached
+        if (!contact.uri) {
+            try {
+                const result = await firstValueFrom(
+                    this.api.get<{ uri: string }>(`/algochat/psk-contacts/${contact.id}/qr`)
+                );
+                contact.uri = result.uri;
+                // Update in the contacts array
+                this.pskContacts.update((list) => list.map((c) => c.id === contact.id ? { ...c, uri: result.uri } : c));
+            } catch {
+                this.notifications.error('Failed to load QR code');
+                return;
+            }
+        }
+
+        this.expandedContactId.set(contact.id);
+        this.renderQRWhenReady(contact.uri!);
+    }
+
+    async copyContactUri(contact: PSKContact): Promise<void> {
+        let uri = contact.uri;
+        if (!uri) {
+            try {
+                const result = await firstValueFrom(
+                    this.api.get<{ uri: string }>(`/algochat/psk-contacts/${contact.id}/qr`)
+                );
+                uri = result.uri;
+            } catch {
+                this.notifications.error('Failed to get URI');
+                return;
+            }
+        }
+        await navigator.clipboard.writeText(uri);
+        this.notifications.success('URI copied to clipboard');
+    }
+
+    async cancelContact(contact: PSKContact): Promise<void> {
+        if (!confirm(`Delete contact "${contact.nickname}"? They will no longer be able to message your agent.`)) {
+            return;
+        }
+        try {
+            await firstValueFrom(this.api.delete(`/algochat/psk-contacts/${contact.id}`));
+            this.notifications.success(`Contact "${contact.nickname}" deleted`);
+            if (this.expandedContactId() === contact.id) {
+                this.expandedContactId.set(null);
+            }
+            await this.loadPSKContacts();
+        } catch {
+            this.notifications.error('Failed to delete contact');
+        }
+    }
+
+    startEditNickname(contact: PSKContact): void {
+        this.editingContactId.set(contact.id);
+        this.editingNickname.set(contact.nickname);
+    }
+
+    cancelEditNickname(): void {
+        this.editingContactId.set(null);
+        this.editingNickname.set('');
+    }
+
+    async saveNickname(contactId: string): Promise<void> {
+        const nickname = this.editingNickname().trim();
+        if (!nickname) return;
+        try {
+            await firstValueFrom(
+                this.api.patch(`/algochat/psk-contacts/${contactId}`, { nickname })
+            );
+            this.pskContacts.update((list) => list.map((c) => c.id === contactId ? { ...c, nickname } : c));
+            this.editingContactId.set(null);
+            this.notifications.success('Contact renamed');
+        } catch {
+            this.notifications.error('Failed to rename contact');
+        }
+    }
+
+    // ── Private ──────────────────────────────────────────────────────
+
+    /** Retry rendering until the canvas element is available in the DOM. */
+    private renderQRWhenReady(uri: string, attempt = 0): void {
+        if (attempt > 20) return;
+        const canvas = this.elRef.nativeElement.querySelector('.qr-canvas') as HTMLCanvasElement | null;
+        if (canvas) {
+            QRCode.toCanvas(canvas, uri, {
+                width: 280,
+                margin: 2,
+                color: {
+                    dark: '#0a0a12',
+                    light: '#e0f7fa',
+                },
+            });
+        } else {
+            setTimeout(() => this.renderQRWhenReady(uri, attempt + 1), 50);
+        }
+    }
+
+    private async loadPSKContacts(): Promise<void> {
+        try {
+            const result = await firstValueFrom(
+                this.api.get<{ contacts: PSKContact[] }>('/algochat/psk-contacts')
+            );
+            this.pskContacts.set(result.contacts);
+        } catch {
+            // Non-critical
+        }
     }
 
     private async loadAll(): Promise<void> {
@@ -507,16 +746,8 @@ export class SettingsComponent implements OnInit {
             this.operationalMode.set(mode.mode);
             this.sessionService.loadAlgoChatStatus();
 
-            // Load existing PSK exchange URI
-            try {
-                const psk = await firstValueFrom(this.api.get<PSKExchange | null>('/algochat/psk-exchange'));
-                if (psk?.uri) {
-                    this.pskExchange.set(psk);
-                    setTimeout(() => this.renderQRCode(psk.uri), 50);
-                }
-            } catch {
-                // PSK not configured yet, that's fine
-            }
+            // Load PSK contacts
+            await this.loadPSKContacts();
         } catch {
             // Non-critical
         } finally {

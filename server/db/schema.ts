@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 28;
+const SCHEMA_VERSION = 30;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -395,6 +395,66 @@ const MIGRATIONS: Record<number, string[]> = {
         `UPDATE agent_memories SET status = 'confirmed' WHERE txid IS NOT NULL`,
         `UPDATE agent_memories SET status = 'pending' WHERE txid IS NULL`,
         `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
+    ],
+    29: [
+        // FTS5 full-text search index for agent memories — enables semantic-style search
+        // with ranking, prefix matching, phrase queries, and Boolean operators.
+        `CREATE VIRTUAL TABLE IF NOT EXISTS agent_memories_fts USING fts5(
+            key,
+            content,
+            content=agent_memories,
+            content_rowid=rowid
+        )`,
+
+        // Populate FTS index from existing memories
+        `INSERT INTO agent_memories_fts(rowid, key, content)
+         SELECT rowid, key, content FROM agent_memories`,
+
+        // Triggers to keep FTS index in sync with the main table
+        `CREATE TRIGGER IF NOT EXISTS agent_memories_ai AFTER INSERT ON agent_memories BEGIN
+            INSERT INTO agent_memories_fts(rowid, key, content)
+            VALUES (new.rowid, new.key, new.content);
+        END`,
+
+        `CREATE TRIGGER IF NOT EXISTS agent_memories_ad AFTER DELETE ON agent_memories BEGIN
+            INSERT INTO agent_memories_fts(agent_memories_fts, rowid, key, content)
+            VALUES ('delete', old.rowid, old.key, old.content);
+        END`,
+
+        `CREATE TRIGGER IF NOT EXISTS agent_memories_au AFTER UPDATE ON agent_memories BEGIN
+            INSERT INTO agent_memories_fts(agent_memories_fts, rowid, key, content)
+            VALUES ('delete', old.rowid, old.key, old.content);
+            INSERT INTO agent_memories_fts(rowid, key, content)
+            VALUES (new.rowid, new.key, new.content);
+        END`,
+    ],
+    30: [
+        // Multi-contact PSK support: registry of PSK contacts (friends)
+        `CREATE TABLE IF NOT EXISTS psk_contacts (
+            id              TEXT PRIMARY KEY,
+            nickname        TEXT NOT NULL,
+            network         TEXT NOT NULL,
+            initial_psk     BLOB NOT NULL,
+            mobile_address  TEXT DEFAULT NULL,
+            active          INTEGER DEFAULT 1,
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
+        `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
+
+        // Migrate existing single mobile-client PSK into the new contacts table.
+        // For each network that has a 'mobile-client' row, insert a contact entry.
+        `INSERT OR IGNORE INTO psk_contacts (id, nickname, network, initial_psk, active, created_at)
+         SELECT
+             'migrated-' || network,
+             'Mobile',
+             network,
+             initial_psk,
+             1,
+             created_at
+         FROM algochat_psk_state
+         WHERE address = 'mobile-client'`,
     ],
 };
 

@@ -266,6 +266,81 @@ async function handleRoutes(
         }
     }
 
+    // PSK contacts — list all for current network
+    if (url.pathname === '/api/algochat/psk-contacts' && req.method === 'GET') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        return json({ contacts: algochatBridge.listPSKContacts() });
+    }
+
+    // PSK contacts — create new contact
+    if (url.pathname === '/api/algochat/psk-contacts' && req.method === 'POST') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        try {
+            const body = await req.json() as { nickname?: string };
+            const nickname = body.nickname?.trim();
+            if (!nickname) {
+                return json({ error: 'nickname is required' }, 400);
+            }
+            const result = algochatBridge.createPSKContact(nickname);
+            return json(result);
+        } catch (err) {
+            return handleRouteError(err);
+        }
+    }
+
+    // PSK contacts — rename
+    const pskContactPatchMatch = url.pathname.match(/^\/api\/algochat\/psk-contacts\/([^/]+)$/);
+    if (pskContactPatchMatch && req.method === 'PATCH') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        try {
+            const id = decodeURIComponent(pskContactPatchMatch[1]);
+            const body = await req.json() as { nickname?: string };
+            const nickname = body.nickname?.trim();
+            if (!nickname) {
+                return json({ error: 'nickname is required' }, 400);
+            }
+            const ok = algochatBridge.renamePSKContact(id, nickname);
+            if (!ok) return json({ error: 'Contact not found' }, 404);
+            return json({ ok: true });
+        } catch (err) {
+            return handleRouteError(err);
+        }
+    }
+
+    // PSK contacts — cancel (soft-delete)
+    const pskContactDeleteMatch = url.pathname.match(/^\/api\/algochat\/psk-contacts\/([^/]+)$/);
+    if (pskContactDeleteMatch && req.method === 'DELETE') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        try {
+            const id = decodeURIComponent(pskContactDeleteMatch[1]);
+            const ok = algochatBridge.cancelPSKContact(id);
+            if (!ok) return json({ error: 'Contact not found' }, 404);
+            return json({ ok: true });
+        } catch (err) {
+            return handleRouteError(err);
+        }
+    }
+
+    // PSK contacts — get QR URI
+    const pskContactQrMatch = url.pathname.match(/^\/api\/algochat\/psk-contacts\/([^/]+)\/qr$/);
+    if (pskContactQrMatch && req.method === 'GET') {
+        if (!algochatBridge) {
+            return json({ error: 'AlgoChat not configured' }, 503);
+        }
+        const id = decodeURIComponent(pskContactQrMatch[1]);
+        const uri = algochatBridge.getPSKContactURI(id);
+        if (!uri) return json({ error: 'Contact not found' }, 404);
+        return json({ uri });
+    }
+
     // Database backup
     if (url.pathname === '/api/backup' && req.method === 'POST') {
         try {
