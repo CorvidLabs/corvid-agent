@@ -2,7 +2,7 @@
  * HTTP rate limiting middleware — sliding-window per-IP rate limiter.
  *
  * Configuration via environment variables:
- * - RATE_LIMIT_GET: max GET/HEAD/OPTIONS requests per minute per IP (default: 240)
+ * - RATE_LIMIT_GET: max GET/HEAD/OPTIONS requests per minute per IP (default: 600)
  * - RATE_LIMIT_MUTATION: max POST/PUT/DELETE requests per minute per IP (default: 60)
  *
  * Uses a sliding window algorithm: each IP tracks timestamps of recent requests,
