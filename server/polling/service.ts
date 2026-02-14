@@ -110,17 +110,24 @@ export class MentionPollingService {
         log.info('Mention polling service stopped');
     }
 
-    /** Get polling stats for health check. */
-    getStats(): { running: boolean; activePolls: number; configCount: number } {
+    /** Get polling stats for the dashboard. */
+    getStats(): { isRunning: boolean; activeConfigs: number; totalConfigs: number; totalTriggers: number } {
         try {
-            const row = this.db.query("SELECT COUNT(*) as count FROM mention_polling_configs WHERE status = 'active'").get() as { count: number } | null;
+            const row = this.db.query(`
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+                    COALESCE(SUM(trigger_count), 0) as triggers
+                FROM mention_polling_configs
+            `).get() as { total: number; active: number; triggers: number } | null;
             return {
-                running: this.running,
-                activePolls: this.activePolls.size,
-                configCount: row?.count ?? 0,
+                isRunning: this.running,
+                activeConfigs: row?.active ?? 0,
+                totalConfigs: row?.total ?? 0,
+                totalTriggers: row?.triggers ?? 0,
             };
         } catch {
-            return { running: this.running, activePolls: this.activePolls.size, configCount: 0 };
+            return { isRunning: this.running, activeConfigs: 0, totalConfigs: 0, totalTriggers: 0 };
         }
     }
 
