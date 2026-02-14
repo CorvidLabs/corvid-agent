@@ -542,6 +542,8 @@ export class MentionPollingService {
         const repo = config.repo;
         const contextType = mention.isPullRequest ? 'PR' : 'Issue';
         const isAssignment = mention.type === 'assignment';
+        // corvid_create_work_task only works for the platform's own repo
+        const isHomeRepo = repo === 'CorvidLabs/corvid-agent';
 
         const triggerLabel = isAssignment ? 'assigned to you' : '@mention detected';
         const commentType = mention.type === 'issues' ? 'issue body'
@@ -565,17 +567,31 @@ export class MentionPollingService {
             ? `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`
             : `gh issue comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
 
+        // For external repos, give explicit instructions to clone and work there
+        const codeChangeInstructions = isHomeRepo
+            ? `Use \`corvid_create_work_task\` to implement changes on a branch and open a PR.`
+            : [
+                `This issue is in the **${repo}** repository (not corvid-agent). Do NOT use \`corvid_create_work_task\` — that only works for corvid-agent.`,
+                `Instead, to make code changes:`,
+                `  1. Clone the repo: \`gh repo clone ${repo} /tmp/${repo.split('/')[1]}\``,
+                `  2. \`cd /tmp/${repo.split('/')[1]}\``,
+                `  3. Create a branch: \`git checkout -b fix/issue-${mention.number}\``,
+                `  4. Make your changes`,
+                `  5. Commit and push: \`git add -A && git commit -m "fix: ..." && git push -u origin fix/issue-${mention.number}\``,
+                `  6. Create a PR: \`gh pr create --repo ${repo} --title "..." --body "Fixes #${mention.number}"\``,
+            ].join('\n');
+
         const assignmentSteps = [
             `1. Read the ${contextType.toLowerCase()} description to understand what's being asked.`,
             `2. Analyze the request and determine the best approach.`,
-            `3. If code changes are needed, use \`corvid_create_work_task\` to implement them on a branch and open a PR.`,
+            `3. If code changes are needed:\n${codeChangeInstructions}`,
             `4. Post a comment acknowledging the assignment and explaining your plan or findings using: \`${replyCmd}\``,
         ];
 
         const mentionSteps = [
             `1. Read the mention to understand the request.`,
             `2. If the comment is a simple ping (like "@username" with no question), reply with a brief greeting and offer to help.`,
-            `3. If code changes are requested, use \`corvid_create_work_task\` to create a work task, then comment to acknowledge.`,
+            `3. If code changes are requested:\n${codeChangeInstructions}`,
             `4. Post your reply using: \`${replyCmd}\``,
         ];
 
