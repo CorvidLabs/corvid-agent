@@ -688,6 +688,60 @@ export async function handleGitHubRepoInfo(
     }
 }
 
+export async function handleGitHubUnstarRepo(
+    _ctx: McpToolContext,
+    args: { repo: string },
+): Promise<CallToolResult> {
+    try {
+        const result = await github.unstarRepo(args.repo);
+        return result.ok ? textResult(result.message) : errorResult(result.message);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return errorResult(`Failed to unstar repo: ${message}`);
+    }
+}
+
+export async function handleGitHubGetPrDiff(
+    _ctx: McpToolContext,
+    args: { repo: string; pr_number: number },
+): Promise<CallToolResult> {
+    try {
+        const result = await github.getPrDiff(args.repo, args.pr_number);
+        if (!result.ok) return errorResult(result.error ?? 'Failed to get PR diff');
+        return textResult(result.diff);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return errorResult(`Failed to get PR diff: ${message}`);
+    }
+}
+
+export async function handleGitHubCommentOnPr(
+    _ctx: McpToolContext,
+    args: { repo: string; pr_number: number; body: string },
+): Promise<CallToolResult> {
+    try {
+        const result = await github.addPrComment(args.repo, args.pr_number, args.body);
+        if (!result.ok) return errorResult(result.error ?? 'Failed to comment on PR');
+        return textResult(`Comment added to PR #${args.pr_number} in ${args.repo}.`);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return errorResult(`Failed to comment on PR: ${message}`);
+    }
+}
+
+export async function handleGitHubFollowUser(
+    _ctx: McpToolContext,
+    args: { username: string },
+): Promise<CallToolResult> {
+    try {
+        const result = await github.followUser(args.username);
+        return result.ok ? textResult(result.message) : errorResult(result.message);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return errorResult(`Failed to follow user: ${message}`);
+    }
+}
+
 /** Default sub-query suffixes appended to the topic for deep research. */
 const DEEP_RESEARCH_ANGLES = ['benefits', 'challenges', 'examples', 'latest news'];
 

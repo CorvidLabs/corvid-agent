@@ -28,6 +28,10 @@ import {
     handleGitHubCreateIssue,
     handleGitHubListIssues,
     handleGitHubRepoInfo,
+    handleGitHubUnstarRepo,
+    handleGitHubGetPrDiff,
+    handleGitHubCommentOnPr,
+    handleGitHubFollowUser,
 } from './tool-handlers';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
@@ -60,6 +64,10 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_github_create_issue',
     'corvid_github_list_issues',
     'corvid_github_repo_info',
+    'corvid_github_unstar_repo',
+    'corvid_github_get_pr_diff',
+    'corvid_github_comment_on_pr',
+    'corvid_github_follow_user',
     'read_file',
     'write_file',
     'edit_file',
@@ -76,6 +84,7 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_github_fork_repo',
     'corvid_github_create_pr',
     'corvid_github_create_issue',
+    'corvid_github_comment_on_pr',
 ]);
 
 /** Validate that required fields exist and are non-empty strings/numbers in the args object. */
@@ -468,6 +477,73 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 const err = validateRequired('corvid_github_repo_info', args, ['repo']);
                 if (err) return err;
                 return unwrapResult(await handleGitHubRepoInfo(ctx, args as { repo: string }));
+            },
+        },
+        {
+            name: 'corvid_github_unstar_repo',
+            description: 'Remove a star from a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")' },
+                },
+                required: ['repo'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_unstar_repo', args, ['repo']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubUnstarRepo(ctx, args as { repo: string }));
+            },
+        },
+        {
+            name: 'corvid_github_get_pr_diff',
+            description: 'Get the full diff/patch for a pull request.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    pr_number: { type: 'number', description: 'Pull request number' },
+                },
+                required: ['repo', 'pr_number'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_get_pr_diff', args, ['repo', 'pr_number']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubGetPrDiff(ctx, args as { repo: string; pr_number: number }));
+            },
+        },
+        {
+            name: 'corvid_github_comment_on_pr',
+            description: 'Add a comment to a pull request.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    pr_number: { type: 'number', description: 'Pull request number' },
+                    body: { type: 'string', description: 'Comment body text' },
+                },
+                required: ['repo', 'pr_number', 'body'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_comment_on_pr', args, ['repo', 'pr_number', 'body']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubCommentOnPr(ctx, args as { repo: string; pr_number: number; body: string }));
+            },
+        },
+        {
+            name: 'corvid_github_follow_user',
+            description: 'Follow a GitHub user.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    username: { type: 'string', description: 'GitHub username to follow' },
+                },
+                required: ['username'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_follow_user', args, ['username']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubFollowUser(ctx, args as { username: string }));
             },
         },
     );
