@@ -13,7 +13,6 @@
 
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
-import type { WorkTaskService } from '../work/service';
 import type { MentionPollingConfig } from '../../shared/types';
 import {
     findDuePollingConfigs,
@@ -68,7 +67,6 @@ type PollingEventCallback = (event: {
 export class MentionPollingService {
     private db: Database;
     private processManager: ProcessManager;
-    private workTaskService: WorkTaskService | null;
     private loopTimer: ReturnType<typeof setInterval> | null = null;
     private activePolls = new Set<string>(); // config IDs currently being polled
     private recentTriggers = new Map<string, number>(); // configId -> last trigger timestamp
@@ -78,11 +76,10 @@ export class MentionPollingService {
     constructor(
         db: Database,
         processManager: ProcessManager,
-        workTaskService?: WorkTaskService | null,
+        _workTaskService?: unknown,
     ) {
         this.db = db;
         this.processManager = processManager;
-        this.workTaskService = workTaskService ?? null;
     }
 
     /** Subscribe to polling events (for WebSocket broadcast). */
@@ -416,47 +413,30 @@ export class MentionPollingService {
             return;
         }
 
-        // Build a prompt similar to what the webhook service builds
+        // Always create an agent session — the session is responsible for both
+        // replying on GitHub AND deciding whether to create a work task for code
+        // changes. This ensures the person who mentioned us always gets a reply.
         const prompt = this.buildPrompt(config, mention);
-        const isWorkTask = this.isWorkTaskRequest(mention.body);
 
         this.recentTriggers.set(config.id, Date.now());
 
-        if (isWorkTask && this.workTaskService) {
-            try {
-                const task = await this.workTaskService.create({
-                    agentId: config.agentId,
-                    description: `GitHub mention poll: ${mention.body.slice(0, 500)}`,
-                    projectId: config.projectId,
-                    source: 'agent',
-                });
+        try {
+            const session = createSession(this.db, {
+                projectId: config.projectId,
+                agentId: config.agentId,
+                name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
+                initialPrompt: prompt,
+                source: 'agent',
+            });
 
-                incrementPollingTriggerCount(this.db, config.id);
-                log.info('Polling triggered work task', { configId: config.id, workTaskId: task.id, mention: mention.id });
+            this.processManager.startProcess(session, prompt, { schedulerMode: true });
 
-                this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, workTaskId: task.id } });
-            } catch (err) {
-                log.error('Failed to create work task from mention poll', { error: err instanceof Error ? err.message : String(err) });
-            }
-        } else {
-            try {
-                const session = createSession(this.db, {
-                    projectId: config.projectId,
-                    agentId: config.agentId,
-                    name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
-                    initialPrompt: prompt,
-                    source: 'agent',
-                });
+            incrementPollingTriggerCount(this.db, config.id);
+            log.info('Polling triggered agent session', { configId: config.id, sessionId: session.id, mention: mention.id });
 
-                this.processManager.startProcess(session, prompt, { schedulerMode: true });
-
-                incrementPollingTriggerCount(this.db, config.id);
-                log.info('Polling triggered agent session', { configId: config.id, sessionId: session.id, mention: mention.id });
-
-                this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, sessionId: session.id } });
-            } catch (err) {
-                log.error('Failed to create session from mention poll', { error: err instanceof Error ? err.message : String(err) });
-            }
+            this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, sessionId: session.id } });
+        } catch (err) {
+            log.error('Failed to create session from mention poll', { error: err instanceof Error ? err.message : String(err) });
         }
     }
 
@@ -529,21 +509,6 @@ export class MentionPollingService {
         ].join('\n');
 
         return context + instructions;
-    }
-
-    /**
-     * Detect if the mention is requesting code changes.
-     */
-    private isWorkTaskRequest(body: string): boolean {
-        const workKeywords = [
-            /\bfix\s+(this|the|that|it)\b/i,
-            /\bimplement\s+(this|the|that)\b/i,
-            /\bplease\s+(fix|implement|add|create|update|refactor)\b/i,
-            /\bcreate\s+a?\s*(pr|pull\s*request)\b/i,
-            /\bopen\s+a?\s*(pr|pull\s*request)\b/i,
-            /\bmake\s+(this|the|that|these)\s+change/i,
-        ];
-        return workKeywords.some(pattern => pattern.test(body));
     }
 
     private async runGh(args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
