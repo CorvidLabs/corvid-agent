@@ -216,14 +216,9 @@ async function handleRoutes(
 
     // AlgoChat routes
     if (url.pathname === '/api/algochat/status' && req.method === 'GET') {
-        const status = algochatBridge?.getStatus()
-            ?? {
-                enabled: false,
-                address: null,
-                network: 'testnet',
-                syncInterval: 30000,
-                activeConversations: 0,
-            };
+        const status = algochatBridge
+            ? await algochatBridge.getStatus()
+            : { enabled: false, address: null, network: 'testnet' as const, syncInterval: 30000, activeConversations: 0, balance: 0 };
         return json(status);
     }
 

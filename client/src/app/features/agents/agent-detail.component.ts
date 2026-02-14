@@ -47,7 +47,7 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
                         @if (a.walletAddress) {
                             <dt>Wallet</dt>
                             <dd><code>{{ a.walletAddress }}</code></dd>
-                            <dt>Balance</dt>
+                            <dt>Balance (localnet)</dt>
                             <dd>{{ walletBalance() / 1000000 | number:'1.2-6' }} ALGO</dd>
                             <dt>Total Funded</dt>
                             <dd>{{ a.walletFundedAlgo | number:'1.2-2' }} ALGO</dd>

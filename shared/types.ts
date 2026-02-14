@@ -81,6 +81,7 @@ export interface AlgoChatStatus {
     network: AlgoChatNetwork;
     syncInterval: number;
     activeConversations: number;
+    balance: number;
 }
 
 export interface CreateProjectInput {

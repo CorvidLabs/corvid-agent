@@ -211,14 +211,20 @@ export class AlgoChatBridge {
     }
 
     /** Get the current AlgoChat status. */
-    getStatus(): AlgoChatStatus {
+    async getStatus(): Promise<AlgoChatStatus> {
         const conversations = listConversations(this.db);
+        let balance = 0;
+        try {
+            const info = await this.service.algodClient.accountInformation(this.service.chatAccount.address).do();
+            balance = Number(info.amount ?? 0);
+        } catch { /* ignore — balance stays 0 */ }
         return {
             enabled: true,
             address: this.service.chatAccount.address,
             network: this.config.network,
             syncInterval: this.config.syncInterval,
             activeConversations: conversations.length,
+            balance,
         };
     }
 

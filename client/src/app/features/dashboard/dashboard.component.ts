@@ -75,7 +75,7 @@ interface AgentSummary {
                                 <div class="agent-card__stats">
                                     <div class="agent-stat">
                                         <span class="agent-stat__value" [class.agent-stat__value--zero]="summary.balance === 0">{{ (summary.balance / 1000000).toFixed(4) }}</span>
-                                        <span class="agent-stat__label">ALGO</span>
+                                        <span class="agent-stat__label">ALGO (localnet)</span>
                                     </div>
                                     <div class="agent-stat">
                                         <span class="agent-stat__value">{{ summary.messageCount }}</span>
@@ -119,6 +119,7 @@ interface AgentSummary {
                         } @else if (status.enabled) {
                             <p>Address: <code>{{ status.address }}</code></p>
                             <p>Network: <span class="network-badge" [class.network-badge--localnet]="status.network === 'localnet'" [class.network-badge--testnet]="status.network === 'testnet'" [class.network-badge--mainnet]="status.network === 'mainnet'">{{ status.network }}</span></p>
+                            <p>Balance: <span class="algo-balance" [class.algo-balance--low]="status.balance < 1000000">{{ status.balance / 1000000 | number:'1.2-4' }} ALGO</span></p>
                             <p>Active Conversations: {{ status.activeConversations }}</p>
                         } @else {
                             <p>Not configured. Set ALGOCHAT_MNEMONIC in .env to enable.</p>
@@ -279,6 +280,13 @@ interface AgentSummary {
             color: #50e3c2;
             background: rgba(80, 227, 194, 0.1);
             border-color: rgba(80, 227, 194, 0.4);
+        }
+        .algo-balance {
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+        .algo-balance--low {
+            color: var(--accent-red, #ff4d4f);
         }
         .dashboard__local-chat {
             margin-top: 1.5rem;

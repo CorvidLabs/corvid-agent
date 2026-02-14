@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -30,7 +31,7 @@ interface PSKExchange {
 @Component({
     selector: 'app-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, DecimalPipe],
     template: `
         <div class="settings">
             <h2>Settings</h2>
@@ -81,6 +82,12 @@ interface PSKExchange {
                             <div class="info-item">
                                 <span class="info-label">Network</span>
                                 <span class="info-value network-badge" [attr.data-network]="status.network">{{ status.network }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Server Balance</span>
+                                <span class="info-value" [class.algo-balance--low]="status.balance < 1000000">
+                                    {{ status.balance / 1000000 | number:'1.2-4' }} ALGO
+                                </span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Active Chats</span>
@@ -239,6 +246,7 @@ interface PSKExchange {
         .network-badge[data-network="testnet"] { color: #4a90d9; }
         .network-badge[data-network="mainnet"] { color: #50e3c2; }
         .network-badge[data-network="localnet"] { color: #f5a623; }
+        .algo-balance--low { color: var(--accent-red, #ff4d4f) !important; }
 
         /* Connect Mobile */
         .connect-desc {
