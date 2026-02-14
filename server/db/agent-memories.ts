@@ -73,6 +73,28 @@ export function searchMemories(
     agentId: string,
     query: string,
 ): AgentMemory[] {
+    // Try FTS5 full-text search first for ranked, semantic-style results
+    try {
+        const ftsQuery = sanitizeFtsQuery(query);
+        if (ftsQuery) {
+            const rows = db.query(
+                `SELECT m.*, rank
+                 FROM agent_memories_fts fts
+                 JOIN agent_memories m ON m.rowid = fts.rowid
+                 WHERE agent_memories_fts MATCH ?
+                   AND m.agent_id = ?
+                 ORDER BY rank
+                 LIMIT 20`
+            ).all(ftsQuery, agentId) as (AgentMemoryRow & { rank: number })[];
+            if (rows.length > 0) {
+                return rows.map(rowToAgentMemory);
+            }
+        }
+    } catch {
+        // FTS5 table may not exist yet or query may be invalid — fall through to LIKE
+    }
+
+    // Fallback: simple LIKE search
     const pattern = `%${query}%`;
     const rows = db.query(
         `SELECT * FROM agent_memories
@@ -81,6 +103,24 @@ export function searchMemories(
          LIMIT 20`
     ).all(agentId, pattern, pattern) as AgentMemoryRow[];
     return rows.map(rowToAgentMemory);
+}
+
+/**
+ * Sanitize a user query for FTS5 MATCH syntax.
+ * Wraps each word as a prefix match (word*) and joins with implicit AND.
+ * Returns null if the query is empty after sanitization.
+ */
+function sanitizeFtsQuery(query: string): string | null {
+    // Strip FTS5 special characters that could cause syntax errors
+    const cleaned = query.replace(/[":(){}[\]^~*\\]/g, ' ').trim();
+    if (!cleaned) return null;
+
+    const words = cleaned
+        .split(/\s+/)
+        .filter((w) => w.length > 0)
+        .map((w) => `"${w}"*`); // Prefix match per word, quoted for safety
+
+    return words.length > 0 ? words.join(' ') : null;
 }
 
 export function listMemories(

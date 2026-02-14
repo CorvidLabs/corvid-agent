@@ -84,10 +84,11 @@ export function getEncryptionPassphrase(network?: string, serverMnemonic?: strin
 
     if (serverMnemonic && serverMnemonic.trim().length > 0) return serverMnemonic.trim();
 
-    // Default key: only acceptable on localnet for dev convenience
+    // Default key: only acceptable on localnet for dev convenience.
+    // Warn once per process to avoid log spam.
     if (!warnedDefaultKey) {
         log.warn('Using default encryption key — only acceptable for localnet development');
-        warnedDefaultKey = false; // keep warning each time to raise visibility
+        warnedDefaultKey = true;
     }
     return DEFAULT_LOCALNET_KEY;
 }

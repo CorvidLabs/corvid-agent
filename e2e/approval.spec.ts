@@ -170,7 +170,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
     test('approval dialog appears on approval_request WebSocket message', async ({ page }) => {
         await navigateToSession(page, sessionId);
 
-        const requestId = await injectApprovalRequest(page, {
+        await injectApprovalRequest(page, {
             sessionId,
             toolName: 'Bash',
             description: 'rm -rf /tmp/test',
@@ -321,7 +321,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
     test('timer shows urgent styling when < 10 seconds', async ({ page }) => {
         await navigateToSession(page, sessionId);
 
-        const requestId = await injectApprovalRequest(page, {
+        await injectApprovalRequest(page, {
             sessionId,
             toolName: 'Bash',
             description: 'urgent timer test',

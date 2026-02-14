@@ -20,6 +20,10 @@ export class ApiService {
         return this.http.put<Result>(`${this.baseUrl}${path}`, body);
     }
 
+    patch<Result>(path: string, body: unknown = {}): Observable<Result> {
+        return this.http.patch<Result>(`${this.baseUrl}${path}`, body);
+    }
+
     delete<Result>(path: string): Observable<Result> {
         return this.http.delete<Result>(`${this.baseUrl}${path}`);
     }

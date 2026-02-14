@@ -18,7 +18,7 @@ export interface PSKMessage {
 
 export type PSKMessageCallback = (message: PSKMessage) => void;
 
-interface PSKContactEntry {
+export interface PSKContactEntry {
     address: string;
     initialPSK: Uint8Array;
     label: string;
@@ -58,34 +58,48 @@ export class PSKManager {
     private network: AlgoChatNetwork;
     private contact: PSKContactEntry;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
+    private pollIntervalMs: number = 0;
     private callbacks: Set<PSKMessageCallback> = new Set();
     private processedTxids: Set<string> = new Set();
     /** Cached X25519 encryption public key of the contact, learned from received envelopes. */
     private contactEncryptionKey: Uint8Array | null = null;
+    /** Unique contact ID (psk_contacts.id). Used to key multi-contact maps in bridge. */
+    readonly contactId: string;
 
     constructor(
         db: Database,
         service: AlgoChatService,
         pskConfig: PSKContactConfig,
         network: AlgoChatNetwork,
+        contactId?: string,
     ) {
         this.db = db;
         this.service = service;
         this.network = network;
+        this.contactId = contactId ?? pskConfig.address;
 
-        // Try to restore state from DB, otherwise create fresh
+        // Try to restore ratchet state from DB, otherwise create fresh.
+        // Always use the PSK from pskConfig (authoritative source — psk_contacts
+        // or env config). The DB state row may have a stale PSK from a legacy
+        // manager that previously occupied the same address.
         const restored = this.loadState(pskConfig.address);
         if (restored) {
             this.contact = restored;
+            // Override the PSK with the authoritative value from the caller
+            this.contact.initialPSK = pskConfig.psk;
+            const pskFp = Array.from(pskConfig.psk.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
             log.info(
                 `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}... on ${network}`,
                 {
                     network,
+                    pskFp,
+                    pskLen: pskConfig.psk.length,
                     sendCounter: restored.state.sendCounter,
                     peerLastCounter: restored.state.peerLastCounter,
                     lastRound: restored.lastRound,
                 },
             );
+            this.saveState(); // persist the correct PSK to DB
         } else {
             this.contact = {
                 address: pskConfig.address,
@@ -103,6 +117,10 @@ export class PSKManager {
         return this.contact.address;
     }
 
+    get psk(): Uint8Array {
+        return this.contact.initialPSK;
+    }
+
     onMessage(callback: PSKMessageCallback): void {
         this.callbacks.add(callback);
     }
@@ -113,6 +131,7 @@ export class PSKManager {
 
     start(intervalMs: number): void {
         if (this.pollTimer) return;
+        this.pollIntervalMs = intervalMs;
 
         this.pollTimer = setInterval(() => {
             this.poll().catch((err) => {
@@ -135,6 +154,35 @@ export class PSKManager {
         }
         this.saveState();
         log.info('Stopped and persisted state');
+    }
+
+    /**
+     * Reset the contact's PSK and all ratchet state.
+     * Called when a new PSK exchange URI is generated (QR code regeneration).
+     * Restarts polling automatically if it was running.
+     */
+    resetWithNewPSK(newPSK: Uint8Array): void {
+        const wasPolling = this.pollTimer !== null;
+        const interval = this.pollIntervalMs;
+
+        if (wasPolling) {
+            clearInterval(this.pollTimer!);
+            this.pollTimer = null;
+        }
+
+        this.contact.initialPSK = newPSK;
+        this.contact.state = { sendCounter: 0, peerLastCounter: 0, seenCounters: new Set() };
+        this.contact.lastRound = 0;
+        this.contactEncryptionKey = null;
+        this.processedTxids.clear();
+        this.saveState();
+
+        const pskFp = Array.from(newPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+        log.info(`Reset PSK for ${this.contact.label || this.contact.address.slice(0, 8)}...`, { pskFp, pskLen: newPSK.length });
+
+        if (wasPolling && interval > 0) {
+            this.start(interval);
+        }
     }
 
     async sendMessage(content: string): Promise<string> {
@@ -237,13 +285,39 @@ export class PSKManager {
                 // Check if this is a PSK message (protocol 0x02)
                 if (!algochat.isPSKMessage(noteBytes)) continue;
 
+                // Always advance maxRound for PSK messages so lastRound
+                // advances past them and they aren't re-fetched every poll.
+                const txRound = Number(tx.confirmedRound ?? 0);
+                if (txRound > maxRound) {
+                    maxRound = txRound;
+                }
+
                 try {
                     const envelope = algochat.decodePSKEnvelope(noteBytes);
 
-                    // Validate counter (replay protection)
+                    // Validate counter (replay protection).
+                    // Multi-device support: when multiple devices share the same
+                    // wallet and PSK, they maintain independent send counters.
+                    // A "duplicate" counter from a new txid is a different device,
+                    // not a replay. We rely on txid dedup (processedTxids) for
+                    // true replay protection instead of counter-only validation.
                     if (!algochat.validateCounter(this.contact.state, envelope.ratchetCounter)) {
-                        log.warn(`Rejected message with counter ${envelope.ratchetCounter} (replay or out of window)`);
-                        continue;
+                        if (this.contact.state.seenCounters.has(envelope.ratchetCounter)) {
+                            // Counter already seen — but if the txid is new, it's
+                            // a different device sending with the same counter.
+                            // Accept it (txid dedup prevents true replays).
+                            log.info(`Counter ${envelope.ratchetCounter} reused from new txid (multi-device)`, { txid: tx.id.slice(0, 12) });
+                        } else {
+                            // Counter is out of window — auto-resync peerLastCounter.
+                            // This handles cases where the peer's send counter drifted
+                            // (e.g. same wallet on different device, app reinstall, etc.)
+                            log.info(`Counter ${envelope.ratchetCounter} out of window (peerLast=${this.contact.state.peerLastCounter}), resyncing`);
+                            this.contact.state = {
+                                ...this.contact.state,
+                                peerLastCounter: envelope.ratchetCounter,
+                                seenCounters: new Set<number>(),
+                            };
+                        }
                     }
 
                     // Derive PSK at this counter
@@ -259,6 +333,7 @@ export class PSKManager {
 
                     if (!decrypted) {
                         log.warn(`Failed to decrypt message`, { txid: tx.id });
+                        this.trackProcessedTxid(tx.id);
                         continue;
                     }
 
@@ -279,12 +354,11 @@ export class PSKManager {
                     });
 
                     // Emit to callbacks
-                    const round = Number(tx.confirmedRound ?? 0);
                     const txAmount = tx.paymentTransaction?.amount != null ? Number(tx.paymentTransaction.amount) : undefined;
                     const msg: PSKMessage = {
                         sender: contactAddress,
                         content: decrypted.text,
-                        confirmedRound: round,
+                        confirmedRound: txRound,
                         amount: txAmount,
                     };
 
@@ -296,12 +370,10 @@ export class PSKManager {
                         }
                     }
                 } catch (err) {
+                    // Track failed decryptions too — retrying won't help since the ciphertext won't change.
+                    // After resetWithNewPSK, processedTxids is cleared so old messages get a fresh attempt.
+                    this.trackProcessedTxid(tx.id);
                     log.error(`Error processing message`, { txid: tx.id, error: err instanceof Error ? err.message : String(err) });
-                }
-
-                const txRound = Number(tx.confirmedRound ?? 0);
-                if (txRound > maxRound) {
-                    maxRound = txRound;
                 }
             }
         } while (nextToken);
@@ -356,6 +428,8 @@ export class PSKManager {
             `INSERT INTO algochat_psk_state (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))
              ON CONFLICT(address, network) DO UPDATE SET
+                initial_psk = ?3,
+                label = ?4,
                 send_counter = ?5,
                 peer_last_counter = ?6,
                 seen_counters = ?7,
