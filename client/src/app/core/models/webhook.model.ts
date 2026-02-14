@@ -24,7 +24,7 @@ export interface CreateWebhookRegistrationInput {
     repo: string;
     events: WebhookEventType[];
     mentionUsername: string;
-    projectId: string;
+    projectId?: string;
 }
 
 export interface UpdateWebhookRegistrationInput {

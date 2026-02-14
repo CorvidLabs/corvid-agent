@@ -28,104 +28,72 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
             <!-- Create Form -->
             @if (showCreateForm()) {
                 <div class="create-form">
-                    <h3>Register Webhook</h3>
+                    <h3>Register a webhook</h3>
+                    <p class="form-intro">When GitHub sends a webhook for &#64;mentions in issues or PRs, the agent responds automatically.</p>
                     <div class="form-grid">
                         <div class="form-field">
                             <label>Agent</label>
-                            <div class="agent-picker">
-                                <input
-                                    class="form-input mono"
-                                    [value]="formAgentId()"
-                                    (input)="onAgentInput($event)"
-                                    (focus)="agentDropdownOpen.set(true)"
-                                    placeholder="Select or paste agent ID..."
-                                />
-                                @if (resolvedAgentName()) {
-                                    <span class="agent-resolved">{{ resolvedAgentName() }}</span>
+                            <select class="form-select" [ngModel]="formAgentId()" (ngModelChange)="formAgentId.set($event)">
+                                <option value="">Choose an agent...</option>
+                                @for (agent of agentService.agents(); track agent.id) {
+                                    <option [value]="agent.id">{{ agent.name }}</option>
                                 }
-                                @if (agentDropdownOpen() && agentService.agents().length > 0) {
-                                    <div class="agent-dropdown">
-                                        @for (agent of agentService.agents(); track agent.id) {
-                                            <button
-                                                type="button"
-                                                class="agent-option"
-                                                [class.agent-option--selected]="formAgentId() === agent.id"
-                                                (mousedown)="selectAgent(agent.id)"
-                                            >
-                                                <span class="agent-option__name">{{ agent.name }}</span>
-                                                <span class="agent-option__id">{{ agent.id }}</span>
-                                            </button>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                            <span class="form-hint">Pick from list or paste an agent ID directly</span>
+                            </select>
                         </div>
                         <div class="form-field">
                             <label>Repository</label>
                             <input [value]="formRepo()" (input)="formRepo.set(inputValue($event))" class="form-input mono" placeholder="owner/repo" />
                         </div>
-                        <div class="form-field">
-                            <label>Mention Username</label>
-                            <input [value]="formMentionUsername()" (input)="formMentionUsername.set(inputValue($event))" class="form-input mono" placeholder="e.g. corvid-agent" />
-                            <span class="form-hint">GitHub username to match &#64;mentions for</span>
-                        </div>
-                        <div class="form-field">
-                            <label>Project</label>
-                            <div class="agent-picker">
-                                <input
-                                    class="form-input mono"
-                                    [value]="formProjectId()"
-                                    (input)="onProjectInput($event)"
-                                    (focus)="projectDropdownOpen.set(true)"
-                                    placeholder="Select or paste project ID..."
-                                />
-                                @if (resolvedProjectName()) {
-                                    <span class="agent-resolved">{{ resolvedProjectName() }}</span>
-                                }
-                                @if (projectDropdownOpen() && projectService.projects().length > 0) {
-                                    <div class="agent-dropdown">
-                                        @for (project of projectService.projects(); track project.id) {
-                                            <button
-                                                type="button"
-                                                class="agent-option"
-                                                [class.agent-option--selected]="formProjectId() === project.id"
-                                                (mousedown)="selectProject(project.id)"
-                                            >
-                                                <span class="agent-option__name">{{ project.name }}</span>
-                                                <span class="agent-option__id">{{ project.id }}</span>
-                                            </button>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                            <span class="form-hint">Pick from list or paste a project ID directly</span>
-                        </div>
                         <div class="form-field span-2">
-                            <label>Events</label>
-                            <div class="checkbox-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formEvtIssueComment()" (change)="formEvtIssueComment.set(!formEvtIssueComment())" />
-                                    Issue Comments
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formEvtIssues()" (change)="formEvtIssues.set(!formEvtIssues())" />
-                                    Issues (opened/edited)
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formEvtPrReviewComment()" (change)="formEvtPrReviewComment.set(!formEvtPrReviewComment())" />
-                                    PR Review Comments
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formEvtIssueCommentPr()" (change)="formEvtIssueCommentPr.set(!formEvtIssueCommentPr())" />
-                                    PR Conversation Comments
-                                </label>
-                            </div>
+                            <label>Watch for &#64;mentions of</label>
+                            <input [value]="formMentionUsername()" (input)="formMentionUsername.set(inputValue($event))" class="form-input mono" placeholder="github-username" />
+                            <span class="form-hint">The GitHub username to watch for. When someone writes &#64;this-name, the agent responds.</span>
                         </div>
                     </div>
-                    <div class="form-buttons">
-                        <button class="save-btn" [disabled]="creating()" (click)="create()">
-                            {{ creating() ? 'Creating...' : 'Create Webhook' }}
+
+                    <!-- Advanced toggle -->
+                    <button class="advanced-toggle" (click)="showAdvanced.set(!showAdvanced())">
+                        {{ showAdvanced() ? '\u25B2 Hide advanced' : '\u25BC Advanced options' }}
+                    </button>
+                    @if (showAdvanced()) {
+                        <div class="form-grid advanced-section">
+                            <div class="form-field">
+                                <label>Project (optional)</label>
+                                <select class="form-select" [ngModel]="formProjectId()" (ngModelChange)="formProjectId.set($event)">
+                                    <option value="">None</option>
+                                    @for (project of projectService.projects(); track project.id) {
+                                        <option [value]="project.id">{{ project.name }}</option>
+                                    }
+                                </select>
+                                <span class="form-hint">Scope to a project workspace</span>
+                            </div>
+                            <div class="form-field span-2">
+                                <label>Events</label>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formEvtIssueComment()" (change)="formEvtIssueComment.set(!formEvtIssueComment())" />
+                                        Issue comments
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formEvtIssues()" (change)="formEvtIssues.set(!formEvtIssues())" />
+                                        Issues (opened/edited)
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formEvtPrReviewComment()" (change)="formEvtPrReviewComment.set(!formEvtPrReviewComment())" />
+                                        PR review comments
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formEvtIssueCommentPr()" (change)="formEvtIssueCommentPr.set(!formEvtIssueCommentPr())" />
+                                        PR conversation comments
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="form-actions">
+                        <button class="btn-primary" [disabled]="creating()" (click)="create()">
+                            {{ creating() ? 'Creating...' : 'Register Webhook' }}
                         </button>
                     </div>
                 </div>
@@ -297,35 +265,31 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
         .webhooks__header h2{margin:0;color:var(--text-primary)}
         .webhooks__subtitle{margin:.25rem 0 0;font-size:.75rem;color:var(--text-tertiary)}
         .loading{color:var(--text-secondary)}
-        .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
-        .create-btn:hover,.save-btn:hover:not(:disabled){background:rgba(0,229,255,.2)}
-        .save-btn:disabled{opacity:.5;cursor:not-allowed}
+        .create-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
+        .create-btn:hover{background:rgba(0,229,255,.2)}
 
         .create-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
-        .create-form h3{margin:0 0 1rem;color:var(--text-primary);font-size:.85rem}
+        .create-form h3{margin:0 0 .25rem;color:var(--text-primary);font-size:.85rem}
+        .form-intro{margin:0 0 1rem;font-size:.75rem;color:var(--text-tertiary);line-height:1.4}
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
         .span-2{grid-column:span 2}
         .form-field{display:flex;flex-direction:column;gap:.25rem}
         .form-field label{font-size:.65rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
         .form-input,.form-select{padding:.45rem;background:var(--bg-input);border:1px solid var(--border-bright);border-radius:var(--radius);color:var(--text-primary);font-size:.8rem;font-family:inherit}
+        .form-select{appearance:auto}
         .form-input:focus,.form-select:focus{border-color:var(--accent-cyan);outline:none}
         .form-hint{font-size:.6rem;color:var(--text-tertiary)}
         .mono{font-family:monospace}
         .checkbox-group{display:flex;flex-direction:column;gap:.35rem}
         .checkbox-label{display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--text-secondary);cursor:pointer}
         .checkbox-label input{accent-color:var(--accent-cyan)}
-        .form-buttons{margin-top:1rem}
-        .save-btn{text-transform:uppercase}
-
-        .agent-picker{position:relative}
-        .agent-resolved{font-size:.65rem;color:var(--accent-green);font-weight:600;margin-top:.15rem;display:block}
-        .agent-dropdown{position:absolute;top:100%;left:0;right:0;z-index:50;max-height:200px;overflow-y:auto;background:var(--bg-surface);border:1px solid var(--accent-cyan);border-radius:var(--radius);margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
-        .agent-option{display:flex;justify-content:space-between;align-items:center;width:100%;padding:.45rem .6rem;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text-primary);cursor:pointer;font-family:inherit;font-size:.75rem;text-align:left}
-        .agent-option:last-child{border-bottom:none}
-        .agent-option:hover{background:var(--bg-hover)}
-        .agent-option--selected{background:var(--accent-cyan-dim)}
-        .agent-option__name{font-weight:600}
-        .agent-option__id{font-size:.6rem;color:var(--text-tertiary);font-family:monospace}
+        .advanced-toggle{background:none;border:none;color:var(--text-tertiary);font-size:.7rem;cursor:pointer;padding:.5rem 0;font-family:inherit}
+        .advanced-toggle:hover{color:var(--text-secondary)}
+        .advanced-section{margin-top:.5rem}
+        .form-actions{margin-top:1rem}
+        .btn-primary{padding:.5rem 1.25rem;background:var(--accent-cyan);color:var(--bg-base);border:none;border-radius:var(--radius);font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit}
+        .btn-primary:hover:not(:disabled){background:var(--accent-cyan-bright,#4de8ff)}
+        .btn-primary:disabled{opacity:.5;cursor:not-allowed}
 
         .webhooks__filters{display:flex;gap:.35rem;margin-bottom:1rem}
         .filter-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit}
@@ -403,13 +367,14 @@ export class WebhookListComponent implements OnInit, OnDestroy {
 
     readonly activeFilter = signal<'all' | 'active' | 'paused'>('all');
     readonly showCreateForm = signal(false);
+    readonly showAdvanced = signal(false);
     readonly creating = signal(false);
     readonly expandedRegId = signal<string | null>(null);
     readonly expandedDeliveryId = signal<string | null>(null);
     readonly regDeliveries = signal<WebhookDelivery[]>([]);
     readonly loadingDeliveries = signal(false);
 
-    // Form fields — all signals for reliable OnPush rendering
+    // Form fields
     readonly formAgentId = signal('');
     readonly formRepo = signal('');
     readonly formMentionUsername = signal('');
@@ -418,25 +383,6 @@ export class WebhookListComponent implements OnInit, OnDestroy {
     readonly formEvtIssues = signal(false);
     readonly formEvtPrReviewComment = signal(true);
     readonly formEvtIssueCommentPr = signal(false);
-
-    // Dropdown state
-    readonly agentDropdownOpen = signal(false);
-    readonly projectDropdownOpen = signal(false);
-
-    // Resolved names for pasted IDs
-    readonly resolvedAgentName = computed(() => {
-        const id = this.formAgentId();
-        if (!id) return '';
-        const agent = this.agentService.agents().find((a) => a.id === id);
-        return agent ? agent.name : '';
-    });
-
-    readonly resolvedProjectName = computed(() => {
-        const id = this.formProjectId();
-        if (!id) return '';
-        const project = this.projectService.projects().find((p) => p.id === id);
-        return project ? project.name : '';
-    });
 
     readonly activeCount = computed(() =>
         this.webhookService.registrations().filter((r) => r.status === 'active').length,
@@ -452,52 +398,20 @@ export class WebhookListComponent implements OnInit, OnDestroy {
         return all.filter((r) => r.status === filter);
     });
 
-    private clickOutsideHandler = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.agent-picker')) {
-            this.agentDropdownOpen.set(false);
-            this.projectDropdownOpen.set(false);
-        }
-    };
-
     ngOnInit(): void {
         this.webhookService.loadRegistrations();
         this.webhookService.loadDeliveries();
         this.webhookService.startListening();
         this.agentService.loadAgents();
         this.projectService.loadProjects();
-        document.addEventListener('click', this.clickOutsideHandler);
     }
 
     ngOnDestroy(): void {
         this.webhookService.stopListening();
-        document.removeEventListener('click', this.clickOutsideHandler);
     }
 
     inputValue(event: Event): string {
         return (event.target as HTMLInputElement).value;
-    }
-
-    onAgentInput(event: Event): void {
-        const value = (event.target as HTMLInputElement).value;
-        this.formAgentId.set(value);
-        this.agentDropdownOpen.set(true);
-    }
-
-    selectAgent(id: string): void {
-        this.formAgentId.set(id);
-        this.agentDropdownOpen.set(false);
-    }
-
-    onProjectInput(event: Event): void {
-        const value = (event.target as HTMLInputElement).value;
-        this.formProjectId.set(value);
-        this.projectDropdownOpen.set(true);
-    }
-
-    selectProject(id: string): void {
-        this.formProjectId.set(id);
-        this.projectDropdownOpen.set(false);
     }
 
     getAgentName(agentId: string): string {
@@ -528,8 +442,8 @@ export class WebhookListComponent implements OnInit, OnDestroy {
     }
 
     async create(): Promise<void> {
-        if (!this.formAgentId() || !this.formRepo() || !this.formMentionUsername() || !this.formProjectId()) {
-            this.notifications.error('Please fill in agent, repo, mention username, and project');
+        if (!this.formAgentId() || !this.formRepo() || !this.formMentionUsername()) {
+            this.notifications.error('Please select an agent, repo, and mention username');
             return;
         }
 
@@ -551,7 +465,7 @@ export class WebhookListComponent implements OnInit, OnDestroy {
                 repo: this.formRepo(),
                 events,
                 mentionUsername: this.formMentionUsername(),
-                projectId: this.formProjectId(),
+                ...(this.formProjectId() ? { projectId: this.formProjectId() } : {}),
             });
 
             this.notifications.success('Webhook registered');
