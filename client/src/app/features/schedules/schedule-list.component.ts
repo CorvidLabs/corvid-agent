@@ -162,19 +162,22 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
             } @else {
                 <div class="schedule-list">
                     @for (schedule of filteredSchedules(); track schedule.id) {
-                        <div class="schedule-card" [attr.data-status]="schedule.status">
+                        <div class="schedule-card" [attr.data-status]="schedule.status"
+                            [class.schedule-card--expanded]="expandedScheduleId() === schedule.id"
+                            (click)="toggleSchedule(schedule.id)">
                             <div class="schedule-card__header">
                                 <div class="schedule-card__title">
                                     <span class="schedule-status" [attr.data-status]="schedule.status">{{ schedule.status }}</span>
                                     <h3>{{ schedule.name }}</h3>
+                                    <span class="expand-indicator">{{ expandedScheduleId() === schedule.id ? '\u25B2' : '\u25BC' }}</span>
                                 </div>
                                 <div class="schedule-card__actions">
                                     @if (schedule.status === 'active') {
-                                        <button class="action-btn" (click)="toggleStatus(schedule, 'paused')">Pause</button>
+                                        <button class="action-btn" (click)="toggleStatus(schedule, 'paused'); $event.stopPropagation()">Pause</button>
                                     } @else if (schedule.status === 'paused') {
-                                        <button class="action-btn action-btn--resume" (click)="toggleStatus(schedule, 'active')">Resume</button>
+                                        <button class="action-btn action-btn--resume" (click)="toggleStatus(schedule, 'active'); $event.stopPropagation()">Resume</button>
                                     }
-                                    <button class="action-btn action-btn--danger" (click)="deleteSchedule(schedule)">Delete</button>
+                                    <button class="action-btn action-btn--danger" (click)="deleteSchedule(schedule); $event.stopPropagation()">Delete</button>
                                 </div>
                             </div>
                             @if (schedule.description) {
@@ -214,6 +217,35 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                                     </span>
                                 }
                             </div>
+                            @if (expandedScheduleId() === schedule.id) {
+                                <div class="schedule-execs" (click)="$event.stopPropagation()">
+                                    @if (loadingExecs()) {
+                                        <p class="loading-execs">Loading executions...</p>
+                                    } @else if (scheduleExecs().length === 0) {
+                                        <p class="no-execs">No executions yet.</p>
+                                    } @else {
+                                        <h4 class="execs-heading">Execution History</h4>
+                                        @for (exec of scheduleExecs(); track exec.id) {
+                                            <div class="exec-row exec-row--clickable" [attr.data-status]="exec.status" (click)="toggleExecution(exec.id)">
+                                                <span class="exec-type">{{ exec.actionType }}</span>
+                                                <span class="exec-status" [attr.data-status]="exec.status">{{ exec.status }}</span>
+                                                <span class="exec-time">{{ exec.startedAt | relativeTime }}</span>
+                                                @if (exec.result && expandedExecId() !== exec.id) {
+                                                    <span class="exec-result">{{ exec.result | slice:0:100 }}</span>
+                                                }
+                                                @if (exec.sessionId) {
+                                                    <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]" (click)="$event.stopPropagation()">Session</a>
+                                                }
+                                            </div>
+                                            @if (expandedExecId() === exec.id && exec.result) {
+                                                <div class="exec-detail">
+                                                    <pre class="exec-detail__result">{{ exec.result }}</pre>
+                                                </div>
+                                            }
+                                        }
+                                    }
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -225,17 +257,22 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                     <h3>Recent Executions</h3>
                     <div class="exec-list">
                         @for (exec of scheduleService.executions().slice(0, 20); track exec.id) {
-                            <div class="exec-row" [attr.data-status]="exec.status">
+                            <div class="exec-row exec-row--clickable" [attr.data-status]="exec.status" (click)="toggleExecution(exec.id)">
                                 <span class="exec-type">{{ exec.actionType }}</span>
                                 <span class="exec-status" [attr.data-status]="exec.status">{{ exec.status }}</span>
                                 <span class="exec-time">{{ exec.startedAt | relativeTime }}</span>
-                                @if (exec.result) {
+                                @if (exec.result && expandedExecId() !== exec.id) {
                                     <span class="exec-result">{{ exec.result | slice:0:100 }}</span>
                                 }
                                 @if (exec.sessionId) {
-                                    <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]">Session</a>
+                                    <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]" (click)="$event.stopPropagation()">Session</a>
                                 }
                             </div>
+                            @if (expandedExecId() === exec.id && exec.result) {
+                                <div class="exec-detail">
+                                    <pre class="exec-detail__result">{{ exec.result }}</pre>
+                                </div>
+                            }
                         }
                     </div>
                 </div>
@@ -308,6 +345,16 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
         .exec-status[data-status="awaiting_approval"]{color:var(--accent-amber);background:var(--accent-amber-dim)}
         .exec-time{color:var(--text-tertiary);font-size:.65rem} .exec-result{color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .exec-link{font-size:.65rem;color:var(--accent-cyan);text-decoration:none;border:1px solid var(--accent-cyan);padding:1px 6px;border-radius:var(--radius-sm)}
+        .schedule-card{cursor:pointer;transition:border-color .15s}
+        .schedule-card--expanded{border-color:var(--accent-cyan)}
+        .expand-indicator{font-size:.55rem;color:var(--text-tertiary);margin-left:.25rem}
+        .exec-row--clickable{cursor:pointer;transition:background .15s}
+        .exec-row--clickable:hover{background:var(--bg-hover)}
+        .schedule-execs{margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem}
+        .execs-heading{margin:0 0 .5rem;color:var(--text-secondary);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
+        .loading-execs,.no-execs{font-size:.7rem;color:var(--text-tertiary);margin:0}
+        .exec-detail{padding:.5rem;background:var(--bg-base);border-radius:var(--radius);margin-top:.25rem;margin-bottom:.35rem}
+        .exec-detail__result{margin:0;font-size:.7rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}
         @media(max-width:768px){.form-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.action-row{flex-direction:column}.schedule-meta{flex-direction:column;gap:.5rem}}
     `,
 })
@@ -320,6 +367,11 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     readonly showCreateForm = signal(false);
     readonly creating = signal(false);
     readonly formScheduleType = signal<'cron' | 'interval'>('cron');
+
+    readonly expandedScheduleId = signal<string | null>(null);
+    readonly expandedExecId = signal<string | null>(null);
+    readonly scheduleExecs = signal<ScheduleExecution[]>([]);
+    readonly loadingExecs = signal(false);
 
     // Form fields
     formAgentId = '';
@@ -435,6 +487,28 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         } catch {
             this.notifications.error('Failed to delete schedule');
         }
+    }
+
+    async toggleSchedule(scheduleId: string): Promise<void> {
+        if (this.expandedScheduleId() === scheduleId) {
+            this.expandedScheduleId.set(null);
+            return;
+        }
+        this.expandedScheduleId.set(scheduleId);
+        this.expandedExecId.set(null);
+        this.loadingExecs.set(true);
+        try {
+            const execs = await this.scheduleService.getScheduleExecutions(scheduleId);
+            this.scheduleExecs.set(execs);
+        } catch {
+            this.scheduleExecs.set([]);
+        } finally {
+            this.loadingExecs.set(false);
+        }
+    }
+
+    toggleExecution(execId: string): void {
+        this.expandedExecId.set(this.expandedExecId() === execId ? null : execId);
     }
 
     async resolveApproval(executionId: string, approved: boolean): Promise<void> {
