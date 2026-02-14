@@ -58,6 +58,7 @@ export class PSKManager {
     private network: AlgoChatNetwork;
     private contact: PSKContactEntry;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
+    private pollIntervalMs: number = 0;
     private callbacks: Set<PSKMessageCallback> = new Set();
     private processedTxids: Set<string> = new Set();
     /** Cached X25519 encryption public key of the contact, learned from received envelopes. */
@@ -113,6 +114,7 @@ export class PSKManager {
 
     start(intervalMs: number): void {
         if (this.pollTimer) return;
+        this.pollIntervalMs = intervalMs;
 
         this.pollTimer = setInterval(() => {
             this.poll().catch((err) => {
@@ -135,6 +137,34 @@ export class PSKManager {
         }
         this.saveState();
         log.info('Stopped and persisted state');
+    }
+
+    /**
+     * Reset the contact's PSK and all ratchet state.
+     * Called when a new PSK exchange URI is generated (QR code regeneration).
+     * Restarts polling automatically if it was running.
+     */
+    resetWithNewPSK(newPSK: Uint8Array): void {
+        const wasPolling = this.pollTimer !== null;
+        const interval = this.pollIntervalMs;
+
+        if (wasPolling) {
+            clearInterval(this.pollTimer!);
+            this.pollTimer = null;
+        }
+
+        this.contact.initialPSK = newPSK;
+        this.contact.state = { sendCounter: 0, peerLastCounter: 0, seenCounters: new Set() };
+        this.contact.lastRound = 0;
+        this.contactEncryptionKey = null;
+        this.processedTxids.clear();
+        this.saveState();
+
+        log.info(`Reset PSK for ${this.contact.label || this.contact.address.slice(0, 8)}...`);
+
+        if (wasPolling && interval > 0) {
+            this.start(interval);
+        }
     }
 
     async sendMessage(content: string): Promise<string> {

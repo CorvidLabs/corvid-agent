@@ -258,8 +258,12 @@ export class AlgoChatBridge {
         // Store in database for persistence
         this.saveMobilePSK(uri, psk, label);
 
-        // Initialize PSK manager for this mobile contact
-        // The PSK manager will handle message encryption/decryption
+        // Re-initialize the running PSK manager with the new key so
+        // incoming messages encrypted with the new PSK can be decrypted.
+        if (this.pskManager) {
+            this.pskManager.resetWithNewPSK(psk);
+        }
+
         log.info('Generated new PSK exchange URI for mobile client', { address: address.slice(0, 8) });
 
         return { uri, address, network, label };

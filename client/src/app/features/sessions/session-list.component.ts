@@ -12,14 +12,14 @@ import { DecimalPipe, SlicePipe } from '@angular/common';
     template: `
         <div class="page">
             <div class="page__header">
-                <h2>Sessions</h2>
-                <a class="btn btn--primary" routerLink="/sessions/new">New Session</a>
+                <h2>Conversations</h2>
+                <a class="btn btn--primary" routerLink="/sessions/new">New Conversation</a>
             </div>
 
             @if (sessionService.loading()) {
                 <p>Loading...</p>
             } @else if (sessionService.sessions().length === 0) {
-                <p class="empty">No sessions yet.</p>
+                <p class="empty">No conversations yet.</p>
             } @else {
                 <div class="list" role="list">
                     @for (session of sessionService.sessions(); track session.id) {
