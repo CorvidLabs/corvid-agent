@@ -49,8 +49,8 @@ export class MentionPollingService {
         this.loading.set(true);
         try {
             const path = agentId ? `/mention-polling?agentId=${agentId}` : '/mention-polling';
-            const configs = await firstValueFrom(this.api.get<MentionPollingConfig[]>(path));
-            this.configs.set(configs);
+            const result = await firstValueFrom(this.api.get<MentionPollingConfig[] | { configs: MentionPollingConfig[] }>(path));
+            this.configs.set(Array.isArray(result) ? result : result.configs);
         } finally {
             this.loading.set(false);
         }

@@ -158,10 +158,11 @@ export class MentionPollingService {
         this.activePolls.add(config.id);
 
         try {
-            log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername });
+            log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername, lastPollAt: config.lastPollAt, lastSeenId: config.lastSeenId });
 
             // Fetch recent mentions from GitHub
             const mentions = await this.fetchMentions(config);
+            log.debug('Fetch result', { configId: config.id, mentionsFound: mentions.length });
 
             // Update poll timestamp even if no mentions found
             if (mentions.length === 0) {
@@ -212,8 +213,10 @@ export class MentionPollingService {
         // Strategy: Use GitHub search API to find recent mentions in the repo.
         // We search for comments mentioning @username in the specific repo.
         // The search API is more efficient than listing all comments.
+        // lastPollAt from SQLite is UTC but lacks the 'Z' suffix — append it so
+        // JavaScript's Date parser treats it as UTC rather than local time.
         const sinceDate = config.lastPollAt
-            ? new Date(config.lastPollAt).toISOString()
+            ? new Date(config.lastPollAt.endsWith('Z') ? config.lastPollAt : config.lastPollAt + 'Z').toISOString()
             : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // Default: last 24h
 
         // Search for issue comments mentioning the user
@@ -255,17 +258,16 @@ export class MentionPollingService {
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
-                '--paginate',
                 '-f', `q=${query}`,
                 '-f', 'sort=updated',
                 '-f', 'order=desc',
                 '-f', 'per_page=30',
-                '--jq', '.items',
             ]);
 
             if (!result.ok || !result.stdout.trim()) return [];
 
-            const items = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
             const mentions: DetectedMention[] = [];
 
             for (const item of items) {
@@ -358,12 +360,12 @@ export class MentionPollingService {
                 '-f', 'sort=created',
                 '-f', 'order=desc',
                 '-f', 'per_page=20',
-                '--jq', '.items',
             ]);
 
             if (!result.ok || !result.stdout.trim()) return [];
 
-            const items = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
             const mentions: DetectedMention[] = [];
 
             for (const item of items) {
@@ -503,19 +505,26 @@ export class MentionPollingService {
             '```',
         ].join('\n');
 
+        const replyCmd = mention.isPullRequest
+            ? `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`
+            : `gh issue comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
+
         const instructions = [
             ``,
             `## Instructions`,
             ``,
-            `You were @mentioned in the above GitHub ${commentType}.`,
-            `Analyze the request and respond helpfully.`,
+            `You were @mentioned in the above GitHub ${commentType}. This is a NEW mention that you have NOT responded to yet.`,
+            `You MUST post a reply comment — do not skip this step.`,
             ``,
-            `- Use \`gh\` CLI commands to interact with GitHub (comment, review, etc.)`,
-            mention.isPullRequest
-                ? `- To reply: \`gh pr comment ${mention.number} --repo ${repo} --body "..."\``
-                : `- To reply: \`gh issue comment ${mention.number} --repo ${repo} --body "..."\``,
-            `- If code changes are requested, use \`corvid_create_work_task\` to create a work task that will implement the changes on a branch and open a PR.`,
-            `- Always leave a response comment on the issue/PR so the person who mentioned you gets a notification.`,
+            `Steps:`,
+            `1. Read the mention to understand the request.`,
+            `2. If the comment is a simple ping (like "@username" with no question), reply with a brief greeting and offer to help.`,
+            `3. If code changes are requested, use \`corvid_create_work_task\` to create a work task, then comment to acknowledge.`,
+            `4. Post your reply using: \`${replyCmd}\``,
+            ``,
+            `Rules:`,
+            `- You MUST run the \`gh\` command above to post a comment. This is mandatory — the user will not see your response otherwise.`,
+            `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this mention.`,
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 
