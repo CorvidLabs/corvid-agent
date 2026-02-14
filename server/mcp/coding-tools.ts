@@ -7,7 +7,7 @@
 
 import { resolve, relative, dirname } from 'path';
 import { mkdir } from 'fs/promises';
-import { isProtectedPath, BASH_WRITE_OPERATORS } from '../process/protected-paths';
+import { isProtectedPath, isProtectedBashCommand } from '../process/protected-paths';
 import type { DirectToolDefinition } from './direct-tools';
 
 export interface CodingToolContext {
@@ -237,16 +237,10 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                         }
                     }
 
-                    // Check write operators against protected paths
-                    if (BASH_WRITE_OPERATORS.test(command)) {
-                        // Extract potential file paths from the command and check protection
-                        const tokens = command.split(/\s+/);
-                        for (const token of tokens) {
-                            if (token.startsWith('-') || token.startsWith('|') || token.startsWith(';')) continue;
-                            if (isProtectedPath(token)) {
-                                return { text: `Command blocked: targets protected path "${token}"`, isError: true };
-                            }
-                        }
+                    // Quote-aware check for protected paths and dangerous patterns
+                    const bashCheck = isProtectedBashCommand(command);
+                    if (bashCheck.blocked) {
+                        return { text: `Command blocked: ${bashCheck.reason}`, isError: true };
                     }
 
                     const timeoutSec = Math.min(typeof args.timeout === 'number' ? args.timeout : 30, 120);

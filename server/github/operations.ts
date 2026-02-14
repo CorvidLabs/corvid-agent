@@ -199,6 +199,77 @@ export async function getRepoInfo(repo: string): Promise<{ ok: boolean; info?: R
     }
 }
 
+// ─── Follow / Unfollow ───────────────────────────────────────────────────────
+
+export async function followUser(username: string): Promise<{ ok: boolean; message: string }> {
+    log.info('Following user', { username });
+    const result = await runGh(['api', '-X', 'PUT', `/user/following/${username}`]);
+    if (result.ok) {
+        log.info('Followed user successfully', { username });
+        return { ok: true, message: `Followed ${username}` };
+    }
+    log.warn('Failed to follow user', { username, error: result.stderr });
+    return { ok: false, message: `Failed to follow ${username}: ${result.stderr}` };
+}
+
+// ─── Issues ──────────────────────────────────────────────────────────────────
+
+export interface Issue {
+    number: number;
+    title: string;
+    state: string;
+    labels: Array<{ name: string }>;
+    url: string;
+}
+
+export async function createIssue(
+    repo: string,
+    title: string,
+    body: string,
+    labels?: string[],
+): Promise<{ ok: boolean; issueUrl?: string; error?: string }> {
+    log.info('Creating issue', { repo, title });
+    const args = ['issue', 'create', '--repo', repo, '--title', title, '--body', body];
+    if (labels?.length) {
+        for (const label of labels) {
+            args.push('--label', label);
+        }
+    }
+
+    const result = await runGh(args);
+    if (result.ok) {
+        const urlMatch = result.stdout.match(/https:\/\/github\.com\/[^\s]+/);
+        const issueUrl = urlMatch?.[0] ?? result.stdout;
+        log.info('Created issue successfully', { repo, issueUrl });
+        return { ok: true, issueUrl };
+    }
+    log.warn('Failed to create issue', { repo, error: result.stderr });
+    return { ok: false, error: result.stderr };
+}
+
+export async function listIssues(
+    repo: string,
+    state: 'open' | 'closed' | 'all' = 'open',
+    limit: number = 30,
+): Promise<{ ok: boolean; issues: Issue[]; error?: string }> {
+    log.info('Listing issues', { repo, state, limit });
+    const result = await runGh([
+        'issue', 'list', '--repo', repo, '--state', state, '--limit', String(limit),
+        '--json', 'number,title,state,labels,url',
+    ]);
+
+    if (!result.ok) {
+        return { ok: false, issues: [], error: result.stderr };
+    }
+
+    try {
+        const issues = JSON.parse(result.stdout) as Issue[];
+        return { ok: true, issues };
+    } catch {
+        return { ok: false, issues: [], error: 'Failed to parse issue list' };
+    }
+}
+
 export function isGitHubConfigured(): boolean {
     return hasGhToken();
 }
