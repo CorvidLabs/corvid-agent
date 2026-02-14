@@ -415,7 +415,7 @@ export class MentionPollingService {
     ): Promise<DetectedMention[]> {
         try {
             const sinceDate = since.split('T')[0];
-            const query = `repo:${repo} assignee:${username} updated:>=${sinceDate}`;
+            const query = `repo:${repo} assignee:${username} is:open updated:>=${sinceDate}`;
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
