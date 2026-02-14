@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleWebSearch, handleDeepResearch } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleWebSearch, handleDeepResearch, handleGitHubStarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -16,6 +16,14 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_manage_schedule',
     'corvid_web_search',
     'corvid_deep_research',
+    'corvid_github_star_repo',
+    'corvid_github_fork_repo',
+    'corvid_github_list_prs',
+    'corvid_github_create_pr',
+    'corvid_github_review_pr',
+    'corvid_github_create_issue',
+    'corvid_github_list_issues',
+    'corvid_github_repo_info',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -26,6 +34,9 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_grant_credits',
     'corvid_credit_config',
+    'corvid_github_fork_repo',
+    'corvid_github_create_pr',
+    'corvid_github_create_issue',
 ]);
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
@@ -170,6 +181,81 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 sub_questions: z.array(z.string()).optional().describe('Custom sub-questions to search. If omitted, auto-generates angles like "benefits", "challenges", "examples", "latest news".'),
             },
             async (args) => handleDeepResearch(ctx, args),
+        ),
+        // ─── GitHub tools ────────────────────────────────────────────────
+        tool(
+            'corvid_github_star_repo',
+            'Star a GitHub repository.',
+            { repo: z.string().describe('Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")') },
+            async (args) => handleGitHubStarRepo(ctx, args),
+        ),
+        tool(
+            'corvid_github_fork_repo',
+            'Fork a GitHub repository.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                org: z.string().optional().describe('Organization to fork into. Omit to fork to your personal account.'),
+            },
+            async (args) => handleGitHubForkRepo(ctx, args),
+        ),
+        tool(
+            'corvid_github_list_prs',
+            'List open pull requests for a GitHub repository.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                limit: z.number().optional().describe('Maximum number of PRs to return (default 10)'),
+            },
+            async (args) => handleGitHubListPrs(ctx, args),
+        ),
+        tool(
+            'corvid_github_create_pr',
+            'Create a pull request on a GitHub repository.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                title: z.string().describe('PR title'),
+                body: z.string().describe('PR description/body'),
+                head: z.string().describe('Source branch name'),
+                base: z.string().optional().describe('Target branch name (default "main")'),
+            },
+            async (args) => handleGitHubCreatePr(ctx, args),
+        ),
+        tool(
+            'corvid_github_review_pr',
+            'Submit a review on a pull request.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                pr_number: z.number().describe('Pull request number'),
+                event: z.enum(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']).describe('Review action'),
+                body: z.string().describe('Review comment body'),
+            },
+            async (args) => handleGitHubReviewPr(ctx, args),
+        ),
+        tool(
+            'corvid_github_create_issue',
+            'Create a new issue on a GitHub repository.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                title: z.string().describe('Issue title'),
+                body: z.string().describe('Issue description/body'),
+                labels: z.array(z.string()).optional().describe('Labels to apply to the issue'),
+            },
+            async (args) => handleGitHubCreateIssue(ctx, args),
+        ),
+        tool(
+            'corvid_github_list_issues',
+            'List issues for a GitHub repository.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                state: z.enum(['open', 'closed', 'all']).optional().describe('Filter by state (default "open")'),
+                limit: z.number().optional().describe('Maximum number of issues to return (default 30)'),
+            },
+            async (args) => handleGitHubListIssues(ctx, args),
+        ),
+        tool(
+            'corvid_github_repo_info',
+            'Get information about a GitHub repository (name, description, stars, forks, etc).',
+            { repo: z.string().describe('Repository in owner/name format') },
+            async (args) => handleGitHubRepoInfo(ctx, args),
         ),
     ];
 

@@ -20,6 +20,14 @@ import {
     handleManageSchedule,
     handleWebSearch,
     handleDeepResearch,
+    handleGitHubStarRepo,
+    handleGitHubForkRepo,
+    handleGitHubListPrs,
+    handleGitHubCreatePr,
+    handleGitHubReviewPr,
+    handleGitHubCreateIssue,
+    handleGitHubListIssues,
+    handleGitHubRepoInfo,
 } from './tool-handlers';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
@@ -44,6 +52,14 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_manage_schedule',
     'corvid_web_search',
     'corvid_deep_research',
+    'corvid_github_star_repo',
+    'corvid_github_fork_repo',
+    'corvid_github_list_prs',
+    'corvid_github_create_pr',
+    'corvid_github_review_pr',
+    'corvid_github_create_issue',
+    'corvid_github_list_issues',
+    'corvid_github_repo_info',
     'read_file',
     'write_file',
     'edit_file',
@@ -57,6 +73,9 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_grant_credits',
     'corvid_credit_config',
+    'corvid_github_fork_repo',
+    'corvid_github_create_pr',
+    'corvid_github_create_issue',
 ]);
 
 /** Validate that required fields exist and are non-empty strings/numbers in the args object. */
@@ -303,6 +322,152 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 const err = validateRequired('corvid_deep_research', args, ['topic']);
                 if (err) return err;
                 return unwrapResult(await handleDeepResearch(ctx, args as { topic: string; sub_questions?: string[] }));
+            },
+        },
+    );
+
+    // ─── GitHub tools ────────────────────────────────────────────────────
+    tools.push(
+        {
+            name: 'corvid_github_star_repo',
+            description: 'Star a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")' },
+                },
+                required: ['repo'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_star_repo', args, ['repo']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubStarRepo(ctx, args as { repo: string }));
+            },
+        },
+        {
+            name: 'corvid_github_fork_repo',
+            description: 'Fork a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    org: { type: 'string', description: 'Organization to fork into. Omit to fork to personal account.' },
+                },
+                required: ['repo'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_fork_repo', args, ['repo']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubForkRepo(ctx, args as { repo: string; org?: string }));
+            },
+        },
+        {
+            name: 'corvid_github_list_prs',
+            description: 'List open pull requests for a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    limit: { type: 'number', description: 'Maximum number of PRs to return (default 10)' },
+                },
+                required: ['repo'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_list_prs', args, ['repo']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubListPrs(ctx, args as { repo: string; limit?: number }));
+            },
+        },
+        {
+            name: 'corvid_github_create_pr',
+            description: 'Create a pull request on a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    title: { type: 'string', description: 'PR title' },
+                    body: { type: 'string', description: 'PR description/body' },
+                    head: { type: 'string', description: 'Source branch name' },
+                    base: { type: 'string', description: 'Target branch name (default "main")' },
+                },
+                required: ['repo', 'title', 'body', 'head'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_create_pr', args, ['repo', 'title', 'body', 'head']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubCreatePr(ctx, args as { repo: string; title: string; body: string; head: string; base?: string }));
+            },
+        },
+        {
+            name: 'corvid_github_review_pr',
+            description: 'Submit a review on a pull request.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    pr_number: { type: 'number', description: 'Pull request number' },
+                    event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'], description: 'Review action' },
+                    body: { type: 'string', description: 'Review comment body' },
+                },
+                required: ['repo', 'pr_number', 'event', 'body'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_review_pr', args, ['repo', 'pr_number', 'event', 'body']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubReviewPr(ctx, args as { repo: string; pr_number: number; event: string; body: string }));
+            },
+        },
+        {
+            name: 'corvid_github_create_issue',
+            description: 'Create a new issue on a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    title: { type: 'string', description: 'Issue title' },
+                    body: { type: 'string', description: 'Issue description/body' },
+                    labels: { type: 'array', items: { type: 'string' }, description: 'Labels to apply' },
+                },
+                required: ['repo', 'title', 'body'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_create_issue', args, ['repo', 'title', 'body']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubCreateIssue(ctx, args as { repo: string; title: string; body: string; labels?: string[] }));
+            },
+        },
+        {
+            name: 'corvid_github_list_issues',
+            description: 'List issues for a GitHub repository.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                    state: { type: 'string', enum: ['open', 'closed', 'all'], description: 'Filter by state (default "open")' },
+                    limit: { type: 'number', description: 'Maximum number of issues (default 30)' },
+                },
+                required: ['repo'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_list_issues', args, ['repo']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubListIssues(ctx, args as { repo: string; state?: string; limit?: number }));
+            },
+        },
+        {
+            name: 'corvid_github_repo_info',
+            description: 'Get information about a GitHub repository (name, description, stars, forks, etc).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repo: { type: 'string', description: 'Repository in owner/name format' },
+                },
+                required: ['repo'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_github_repo_info', args, ['repo']);
+                if (err) return err;
+                return unwrapResult(await handleGitHubRepoInfo(ctx, args as { repo: string }));
             },
         },
     );
