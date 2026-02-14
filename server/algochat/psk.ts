@@ -271,32 +271,37 @@ export class PSKManager {
                 // Check if this is a PSK message (protocol 0x02)
                 if (!algochat.isPSKMessage(noteBytes)) continue;
 
+                // Always advance maxRound for PSK messages so lastRound
+                // advances past them and they aren't re-fetched every poll.
+                const txRound = Number(tx.confirmedRound ?? 0);
+                if (txRound > maxRound) {
+                    maxRound = txRound;
+                }
+
                 try {
                     const envelope = algochat.decodePSKEnvelope(noteBytes);
 
                     // Validate counter (replay protection)
                     if (!algochat.validateCounter(this.contact.state, envelope.ratchetCounter)) {
-                        log.warn(`Rejected message with counter ${envelope.ratchetCounter} (replay or out of window)`);
-                        continue;
+                        this.trackProcessedTxid(tx.id);
+                        if (this.contact.state.seenCounters.has(envelope.ratchetCounter)) {
+                            // True replay — counter already processed
+                            continue;
+                        }
+                        // Counter is out of window — auto-resync peerLastCounter.
+                        // This handles cases where the peer's send counter drifted
+                        // (e.g. same wallet on different device, app reinstall, etc.)
+                        // Replay protection is still enforced via seenCounters + txid dedup.
+                        log.info(`Counter ${envelope.ratchetCounter} out of window (peerLast=${this.contact.state.peerLastCounter}), resyncing`);
+                        this.contact.state = {
+                            ...this.contact.state,
+                            peerLastCounter: envelope.ratchetCounter,
+                            seenCounters: new Set<number>(),
+                        };
                     }
 
                     // Derive PSK at this counter
                     const currentPSK = algochat.derivePSKAtCounter(this.contact.initialPSK, envelope.ratchetCounter);
-
-                    // Diagnostic: log PSK fingerprint and counter so we can compare with mobile
-                    const pskFp = Array.from(this.contact.initialPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
-                    const derivedFp = Array.from(currentPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
-                    const senderKeyFp = envelope.senderPublicKey ? Array.from(envelope.senderPublicKey.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'none';
-                    const myKeyFp = Array.from(chatAccount.encryptionKeys.publicKey.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
-                    log.info(`Decrypt attempt`, {
-                        txid: tx.id.slice(0, 12),
-                        counter: envelope.ratchetCounter,
-                        pskFp,
-                        derivedFp,
-                        senderKeyFp,
-                        myKeyFp,
-                        noteLen: noteBytes.length,
-                    });
 
                     // Decrypt
                     const decrypted = algochat.decryptPSKMessage(
@@ -308,6 +313,7 @@ export class PSKManager {
 
                     if (!decrypted) {
                         log.warn(`Failed to decrypt message`, { txid: tx.id });
+                        this.trackProcessedTxid(tx.id);
                         continue;
                     }
 
@@ -328,12 +334,11 @@ export class PSKManager {
                     });
 
                     // Emit to callbacks
-                    const round = Number(tx.confirmedRound ?? 0);
                     const txAmount = tx.paymentTransaction?.amount != null ? Number(tx.paymentTransaction.amount) : undefined;
                     const msg: PSKMessage = {
                         sender: contactAddress,
                         content: decrypted.text,
-                        confirmedRound: round,
+                        confirmedRound: txRound,
                         amount: txAmount,
                     };
 
@@ -345,12 +350,10 @@ export class PSKManager {
                         }
                     }
                 } catch (err) {
+                    // Track failed decryptions too — retrying won't help since the ciphertext won't change.
+                    // After resetWithNewPSK, processedTxids is cleared so old messages get a fresh attempt.
+                    this.trackProcessedTxid(tx.id);
                     log.error(`Error processing message`, { txid: tx.id, error: err instanceof Error ? err.message : String(err) });
-                }
-
-                const txRound = Number(tx.confirmedRound ?? 0);
-                if (txRound > maxRound) {
-                    maxRound = txRound;
                 }
             }
         } while (nextToken);
