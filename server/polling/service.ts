@@ -42,7 +42,7 @@ interface DetectedMention {
     /** Unique identifier (e.g. comment ID or issue number + timestamp) */
     id: string;
     /** Event type */
-    type: 'issue_comment' | 'issues' | 'pull_request_review_comment';
+    type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'assignment';
     /** The comment/issue body containing the @mention */
     body: string;
     /** GitHub username of the author */
@@ -235,6 +235,10 @@ export class MentionPollingService {
             mentions.push(...issueMentions);
         }
 
+        // Search for issues/PRs assigned to the user
+        const assignedIssues = await this.searchAssignedIssues(config.repo, config.mentionUsername, sinceDate);
+        mentions.push(...assignedIssues);
+
         // Sort by creation time descending (newest first)
         mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -401,6 +405,60 @@ export class MentionPollingService {
         }
     }
 
+    /**
+     * Search for issues/PRs recently assigned to the username.
+     */
+    private async searchAssignedIssues(
+        repo: string,
+        username: string,
+        since: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const sinceDate = since.split('T')[0];
+            const query = `repo:${repo} assignee:${username} updated:>=${sinceDate}`;
+            const result = await this.runGh([
+                'api', 'search/issues',
+                '-X', 'GET',
+                '-f', `q=${query}`,
+                '-f', 'sort=updated',
+                '-f', 'order=desc',
+                '-f', 'per_page=20',
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
+            const mentions: DetectedMention[] = [];
+
+            for (const item of items) {
+                const body = (item.body as string) ?? '';
+                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
+                const isPR = !!(item.pull_request);
+
+                // Skip own issues
+                if (sender.toLowerCase() === username.toLowerCase()) continue;
+
+                mentions.push({
+                    id: `assigned-${item.number}`,
+                    type: 'assignment',
+                    body,
+                    sender,
+                    number: item.number as number,
+                    title: (item.title as string) ?? '',
+                    htmlUrl: (item.html_url as string) ?? '',
+                    createdAt: (item.created_at as string) ?? '',
+                    isPullRequest: isPR,
+                });
+            }
+
+            return mentions;
+        } catch (err) {
+            log.error('Error searching assigned issues', { repo, error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
     // ─── Trigger Logic ──────────────────────────────────────────────────────
 
     /**
@@ -483,17 +541,21 @@ export class MentionPollingService {
     private buildPrompt(config: MentionPollingConfig, mention: DetectedMention): string {
         const repo = config.repo;
         const contextType = mention.isPullRequest ? 'PR' : 'Issue';
-        const commentType = mention.type === 'issues' ? 'issue body' : 'comment';
+        const isAssignment = mention.type === 'assignment';
+
+        const triggerLabel = isAssignment ? 'assigned to you' : '@mention detected';
+        const commentType = mention.type === 'issues' ? 'issue body'
+            : isAssignment ? 'assignment' : 'comment';
 
         const context = [
-            `## GitHub ${contextType} ${mention.type === 'issues' ? '' : 'Comment '}— @mention detected via polling`,
+            `## GitHub ${contextType} — ${triggerLabel} via polling`,
             ``,
             `**Repository:** ${repo}`,
             `**${contextType}:** #${mention.number} "${mention.title}"`,
-            `**${mention.type === 'issues' ? 'Opened' : 'Comment'} by:** @${mention.sender}`,
+            `**${isAssignment ? 'Assigned' : mention.type === 'issues' ? 'Opened' : 'Comment'} by:** @${mention.sender}`,
             `**URL:** ${mention.htmlUrl}`,
             ``,
-            `### ${mention.type === 'issues' ? 'Issue Body' : 'Comment'}`,
+            `### ${mention.type === 'issues' ? 'Issue Body' : isAssignment ? `${contextType} Description` : 'Comment'}`,
             '```',
             mention.body,
             '```',
@@ -503,22 +565,35 @@ export class MentionPollingService {
             ? `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`
             : `gh issue comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
 
-        const instructions = [
-            ``,
-            `## Instructions`,
-            ``,
-            `You were @mentioned in the above GitHub ${commentType}. This is a NEW mention that you have NOT responded to yet.`,
-            `You MUST post a reply comment — do not skip this step.`,
-            ``,
-            `Steps:`,
+        const assignmentSteps = [
+            `1. Read the ${contextType.toLowerCase()} description to understand what's being asked.`,
+            `2. Analyze the request and determine the best approach.`,
+            `3. If code changes are needed, use \`corvid_create_work_task\` to implement them on a branch and open a PR.`,
+            `4. Post a comment acknowledging the assignment and explaining your plan or findings using: \`${replyCmd}\``,
+        ];
+
+        const mentionSteps = [
             `1. Read the mention to understand the request.`,
             `2. If the comment is a simple ping (like "@username" with no question), reply with a brief greeting and offer to help.`,
             `3. If code changes are requested, use \`corvid_create_work_task\` to create a work task, then comment to acknowledge.`,
             `4. Post your reply using: \`${replyCmd}\``,
+        ];
+
+        const instructions = [
+            ``,
+            `## Instructions`,
+            ``,
+            isAssignment
+                ? `You were assigned to the above GitHub ${contextType.toLowerCase()}. This is a NEW assignment that you have NOT responded to yet.`
+                : `You were @mentioned in the above GitHub ${commentType}. This is a NEW mention that you have NOT responded to yet.`,
+            `You MUST post a reply comment — do not skip this step.`,
+            ``,
+            `Steps:`,
+            ...(isAssignment ? assignmentSteps : mentionSteps),
             ``,
             `Rules:`,
             `- You MUST run the \`gh\` command above to post a comment. This is mandatory — the user will not see your response otherwise.`,
-            `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this mention.`,
+            `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this ${isAssignment ? 'assignment' : 'mention'}.`,
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 

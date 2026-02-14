@@ -45,7 +45,7 @@ export function createMentionPollingConfig(db: Database, input: CreateMentionPol
         input.agentId,
         input.repo,
         input.mentionUsername,
-        input.projectId,
+        input.projectId ?? null,
         input.intervalSeconds ?? 60,
         JSON.stringify(input.eventFilter ?? []),
         JSON.stringify(input.allowedUsers ?? []),
