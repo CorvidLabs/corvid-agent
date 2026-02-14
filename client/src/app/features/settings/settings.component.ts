@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef, ViewChild } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
@@ -490,8 +490,8 @@ export class SettingsComponent implements OnInit {
             width: 280,
             margin: 2,
             color: {
-                dark: '#00e5ff',
-                light: '#0a0a12',
+                dark: '#0a0a12',
+                light: '#e0f7fa',
             },
         });
     }

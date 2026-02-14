@@ -7,6 +7,7 @@ import {
     viewChild,
     AfterViewInit,
     OnDestroy,
+    signal,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
@@ -26,6 +27,7 @@ import { filter, Subscription } from 'rxjs';
         <nav
             class="sidebar"
             [class.sidebar--open]="sidebarOpen()"
+            [class.sidebar--collapsed]="collapsed()"
             role="navigation"
             aria-label="Main navigation"
             #sidebarEl>
@@ -36,108 +38,60 @@ import { filter, Subscription } from 'rxjs';
                         routerLink="/dashboard"
                         routerLinkActive="sidebar__link--active"
                         aria-current="page"
+                        title="Dashboard"
                         #firstLink>
-                        Dashboard
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/projects"
-                        routerLinkActive="sidebar__link--active">
-                        Projects
+                        <span class="sidebar__label">Dashboard</span>
+                        <span class="sidebar__abbr">D</span>
                     </a>
                 </li>
                 <li>
                     <a
                         class="sidebar__link"
                         routerLink="/agents"
-                        routerLinkActive="sidebar__link--active">
-                        Agents
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/models"
-                        routerLinkActive="sidebar__link--active">
-                        Models
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/councils"
-                        routerLinkActive="sidebar__link--active">
-                        Councils
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/wallets"
-                        routerLinkActive="sidebar__link--active">
-                        Wallets
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/feed"
-                        routerLinkActive="sidebar__link--active">
-                        Feed
+                        routerLinkActive="sidebar__link--active"
+                        title="Agents">
+                        <span class="sidebar__label">Agents</span>
+                        <span class="sidebar__abbr">A</span>
                     </a>
                 </li>
                 <li>
                     <a
                         class="sidebar__link"
                         routerLink="/sessions"
-                        routerLinkActive="sidebar__link--active">
-                        Sessions
+                        routerLinkActive="sidebar__link--active"
+                        title="Conversations">
+                        <span class="sidebar__label">Conversations</span>
+                        <span class="sidebar__abbr">Ch</span>
                     </a>
                 </li>
                 <li>
                     <a
                         class="sidebar__link"
-                        routerLink="/work-tasks"
-                        routerLinkActive="sidebar__link--active">
-                        Work Tasks
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/schedules"
-                        routerLinkActive="sidebar__link--active">
-                        Schedules
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/analytics"
-                        routerLinkActive="sidebar__link--active">
-                        Analytics
-                    </a>
-                </li>
-                <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/logs"
-                        routerLinkActive="sidebar__link--active">
-                        Logs
+                        routerLink="/councils"
+                        routerLinkActive="sidebar__link--active"
+                        title="Councils">
+                        <span class="sidebar__label">Councils</span>
+                        <span class="sidebar__abbr">Co</span>
                     </a>
                 </li>
                 <li>
                     <a
                         class="sidebar__link"
                         routerLink="/settings"
-                        routerLinkActive="sidebar__link--active">
-                        Settings
+                        routerLinkActive="sidebar__link--active"
+                        title="Settings">
+                        <span class="sidebar__label">Settings</span>
+                        <span class="sidebar__abbr">S</span>
                     </a>
                 </li>
-
             </ul>
+            <button
+                class="sidebar__collapse-btn"
+                (click)="toggleCollapse()"
+                [attr.aria-label]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+                [attr.title]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
+                {{ collapsed() ? '\u00BB' : '\u00AB' }}
+            </button>
         </nav>
     `,
     styles: `
@@ -151,6 +105,9 @@ import { filter, Subscription } from 'rxjs';
             min-height: 100%;
             padding: 1rem 0;
             border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.2s ease;
         }
         .sidebar__list {
             list-style: none;
@@ -187,6 +144,48 @@ import { filter, Subscription } from 'rxjs';
             list-style: none;
         }
 
+        /* ── Abbreviation labels (hidden by default) ── */
+        .sidebar__abbr {
+            display: none;
+        }
+
+        /* ── Collapse toggle button ── */
+        .sidebar__collapse-btn {
+            margin-top: auto;
+            padding: 0.6rem;
+            background: transparent;
+            border: none;
+            border-top: 1px solid var(--border);
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: color 0.15s, background 0.15s;
+        }
+        .sidebar__collapse-btn:hover {
+            color: var(--accent-cyan);
+            background: var(--bg-hover);
+        }
+
+        /* ── Collapsed state (desktop) ── */
+        .sidebar--collapsed {
+            width: 48px;
+        }
+        .sidebar--collapsed .sidebar__label {
+            display: none;
+        }
+        .sidebar--collapsed .sidebar__abbr {
+            display: inline;
+        }
+        .sidebar--collapsed .sidebar__link {
+            padding: 0.75rem 0;
+            text-align: center;
+            border-left-width: 2px;
+        }
+        .sidebar--collapsed .sidebar__link--active {
+            border-left-width: 2px;
+        }
+
         /* ── Mobile (<768px): slide-out overlay ── */
         @media (max-width: 767px) {
             .sidebar-backdrop {
@@ -213,6 +212,24 @@ import { filter, Subscription } from 'rxjs';
             .sidebar--open {
                 transform: translateX(0);
             }
+            /* Ignore collapsed state on mobile — full overlay always */
+            .sidebar--collapsed {
+                width: 280px;
+            }
+            .sidebar--collapsed .sidebar__label {
+                display: inline;
+            }
+            .sidebar--collapsed .sidebar__abbr {
+                display: none;
+            }
+            .sidebar--collapsed .sidebar__link {
+                padding: 0.75rem 1.5rem;
+                text-align: left;
+                border-left-width: 3px;
+            }
+            .sidebar__collapse-btn {
+                display: none;
+            }
         }
     `,
     host: {
@@ -222,6 +239,11 @@ import { filter, Subscription } from 'rxjs';
 export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Two-way binding with parent for open/close state */
     readonly sidebarOpen = model(false);
+
+    /** Collapsed state — persisted in localStorage */
+    readonly collapsed = signal(
+        typeof localStorage !== 'undefined' && localStorage.getItem('sidebar_collapsed') === 'true',
+    );
 
     private readonly router = inject(Router);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
@@ -262,6 +284,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
         setTimeout(() => {
             this.firstLink()?.nativeElement.focus();
         });
+    }
+
+    toggleCollapse(): void {
+        const next = !this.collapsed();
+        this.collapsed.set(next);
+        localStorage.setItem('sidebar_collapsed', String(next));
     }
 
     protected onEscape(): void {
