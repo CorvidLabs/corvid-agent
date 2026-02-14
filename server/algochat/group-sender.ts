@@ -132,13 +132,12 @@ export async function sendGroupMessage(
     // The bridge reassembles by sorting on the [GRP:N/M] index regardless
     // of transmission order, and external clients vary in display order,
     // so natural order is the safest default.
-    const orderedChunks = chunks;
 
     // Build one payment transaction per chunk
     const transactions: InstanceType<typeof algosdk.Transaction>[] = [];
-    for (let i = 0; i < orderedChunks.length; i++) {
+    for (let i = 0; i < chunks.length; i++) {
         const envelope = encryptMessage(
-            orderedChunks[i],
+            chunks[i],
             senderAccount.encryptionKeys.publicKey,
             recipientPublicKey,
         );

@@ -32,7 +32,12 @@ export function unavailable(message: string): Response {
 
 /** Convenience: 500 error with a timestamp (used by the global error handler). */
 export function serverError(err: unknown): Response {
-    const message = err instanceof Error ? err.message : String(err);
+    // In production, return a generic message to avoid leaking stack traces
+    // or internal error details to clients.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const message = isDev
+        ? (err instanceof Error ? err.message : String(err))
+        : 'Internal server error';
     return json({ error: message, timestamp: new Date().toISOString() }, 500);
 }
 

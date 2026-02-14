@@ -2,7 +2,10 @@ const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3
 const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
 const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
 
-// API key can be set via ?apiKey= query param on page load, or sessionStorage
+// In-memory cache for API key — avoids storing sensitive data in sessionStorage
+let _apiKeyCache: string | null = null;
+
+// API key can be set via ?apiKey= query param on page load, or from in-memory cache
 const storedKey = typeof window !== 'undefined'
     ? (() => {
         const params = new URLSearchParams(window.location.search);
@@ -18,9 +21,9 @@ const storedKey = typeof window !== 'undefined'
             window.history.replaceState(null, '', cleanUrl);
         }
 
-        const key = fromUrl ?? sessionStorage.getItem('corvid_api_key');
+        const key = fromUrl ?? _apiKeyCache;
         if (key) {
-            sessionStorage.setItem('corvid_api_key', key);
+            _apiKeyCache = key;
         }
         return key;
     })()
