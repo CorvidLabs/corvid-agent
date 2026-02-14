@@ -318,7 +318,7 @@ export const CreateWebhookRegistrationSchema = z.object({
     repo: z.string().min(1, 'repo is required (format: owner/name)').regex(/^[^/]+\/[^/]+$/, 'repo must be in owner/name format'),
     events: z.array(WebhookEventTypeSchema).min(1, 'At least one event type is required'),
     mentionUsername: z.string().min(1, 'mentionUsername is required'),
-    projectId: z.string().min(1, 'projectId is required'),
+    projectId: z.string().min(1).optional(),
 });
 
 export const UpdateWebhookRegistrationSchema = z.object({
@@ -340,7 +340,7 @@ export const CreateMentionPollingSchema = z.object({
     agentId: z.string().min(1, 'agentId is required'),
     repo: z.string().min(1, 'repo is required (format: owner/name)').regex(/^[^/]+\/[^/]+$/, 'repo must be in owner/name format'),
     mentionUsername: z.string().min(1, 'mentionUsername is required'),
-    projectId: z.string().min(1, 'projectId is required'),
+    projectId: z.string().min(1).optional(),
     intervalSeconds: z.number().int().min(30, 'Minimum polling interval is 30 seconds').max(3600, 'Maximum polling interval is 1 hour').optional(),
     eventFilter: z.array(PollingEventFilterSchema).optional(),
     allowedUsers: z.array(z.string().min(1)).optional(),

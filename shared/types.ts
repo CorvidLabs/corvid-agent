@@ -517,7 +517,7 @@ export interface CreateMentionPollingInput {
     agentId: string;
     repo: string;
     mentionUsername: string;
-    projectId: string;
+    projectId?: string;
     intervalSeconds?: number;
     eventFilter?: MentionPollingConfig['eventFilter'];
     allowedUsers?: string[];
