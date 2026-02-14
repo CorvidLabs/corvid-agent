@@ -633,7 +633,9 @@ export class AlgoChatBridge {
             }
         }
 
-        const isOwner = this.commandHandler.isOwner(participant);
+        // PSK contacts are implicitly authorized — the shared key is their credential
+        const isPskContact = this.pskManager != null && participant === this.pskManager.contactAddress;
+        const isOwner = isPskContact || this.commandHandler.isOwner(participant);
 
         // Non-owners are blocked unless guest access is enabled in the future.
         // For now, only owners can interact.

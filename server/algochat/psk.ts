@@ -386,6 +386,8 @@ export class PSKManager {
             `INSERT INTO algochat_psk_state (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))
              ON CONFLICT(address, network) DO UPDATE SET
+                initial_psk = ?3,
+                label = ?4,
                 send_counter = ?5,
                 peer_last_counter = ?6,
                 seen_counters = ?7,
