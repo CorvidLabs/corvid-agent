@@ -77,6 +77,16 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/schedules"
+                        routerLinkActive="sidebar__link--active"
+                        title="Schedules">
+                        <span class="sidebar__label">Schedules</span>
+                        <span class="sidebar__abbr">Sc</span>
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/feed"
                         routerLinkActive="sidebar__link--active"
                         title="Feed">
