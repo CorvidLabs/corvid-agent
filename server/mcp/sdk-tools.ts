@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleWebSearch, handleDeepResearch, handleGitHubStarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleWebSearch, handleDeepResearch, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -24,6 +24,10 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_github_create_issue',
     'corvid_github_list_issues',
     'corvid_github_repo_info',
+    'corvid_github_unstar_repo',
+    'corvid_github_get_pr_diff',
+    'corvid_github_comment_on_pr',
+    'corvid_github_follow_user',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -37,6 +41,7 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_github_fork_repo',
     'corvid_github_create_pr',
     'corvid_github_create_issue',
+    'corvid_github_comment_on_pr',
 ]);
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
@@ -256,6 +261,37 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
             'Get information about a GitHub repository (name, description, stars, forks, etc).',
             { repo: z.string().describe('Repository in owner/name format') },
             async (args) => handleGitHubRepoInfo(ctx, args),
+        ),
+        tool(
+            'corvid_github_unstar_repo',
+            'Remove a star from a GitHub repository.',
+            { repo: z.string().describe('Repository in owner/name format (e.g. "CorvidLabs/corvid-agent")') },
+            async (args) => handleGitHubUnstarRepo(ctx, args),
+        ),
+        tool(
+            'corvid_github_get_pr_diff',
+            'Get the full diff/patch for a pull request. Useful for reviewing code changes.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                pr_number: z.number().describe('Pull request number'),
+            },
+            async (args) => handleGitHubGetPrDiff(ctx, args),
+        ),
+        tool(
+            'corvid_github_comment_on_pr',
+            'Add a comment to a pull request.',
+            {
+                repo: z.string().describe('Repository in owner/name format'),
+                pr_number: z.number().describe('Pull request number'),
+                body: z.string().describe('Comment body (supports markdown)'),
+            },
+            async (args) => handleGitHubCommentOnPr(ctx, args),
+        ),
+        tool(
+            'corvid_github_follow_user',
+            'Follow a GitHub user.',
+            { username: z.string().describe('GitHub username to follow') },
+            async (args) => handleGitHubFollowUser(ctx, args),
         ),
     ];
 
