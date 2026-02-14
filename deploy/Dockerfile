@@ -36,14 +36,14 @@ ENV BIND_HOST=0.0.0.0
 ENV LOG_LEVEL=info
 ENV NODE_ENV=production
 
-# Run as non-root user
-RUN addgroup --system corvid && adduser --system --ingroup corvid corvid
+# Run as non-root user (oven/bun:1 is Debian-slim — use native commands)
+RUN groupadd --system corvid && useradd --system --gid corvid corvid
 RUN chown -R corvid:corvid /app
 USER corvid
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD bun -e "const r = await fetch('http://localhost:3000/api/health'); process.exit(r.ok ? 0 : 1)"
 
 CMD ["bun", "server/index.ts"]
