@@ -32,48 +32,92 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
                     <div class="form-grid">
                         <div class="form-field">
                             <label>Agent</label>
-                            <select [(ngModel)]="formAgentId" class="form-select">
-                                <option value="">Select agent...</option>
-                                @for (agent of agentService.agents(); track agent.id) {
-                                    <option [value]="agent.id">{{ agent.name }}</option>
+                            <div class="agent-picker">
+                                <input
+                                    class="form-input mono"
+                                    [value]="formAgentId()"
+                                    (input)="onAgentInput($event)"
+                                    (focus)="agentDropdownOpen.set(true)"
+                                    placeholder="Select or paste agent ID..."
+                                />
+                                @if (resolvedAgentName()) {
+                                    <span class="agent-resolved">{{ resolvedAgentName() }}</span>
                                 }
-                            </select>
+                                @if (agentDropdownOpen() && agentService.agents().length > 0) {
+                                    <div class="agent-dropdown">
+                                        @for (agent of agentService.agents(); track agent.id) {
+                                            <button
+                                                type="button"
+                                                class="agent-option"
+                                                [class.agent-option--selected]="formAgentId() === agent.id"
+                                                (mousedown)="selectAgent(agent.id)"
+                                            >
+                                                <span class="agent-option__name">{{ agent.name }}</span>
+                                                <span class="agent-option__id">{{ agent.id }}</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            <span class="form-hint">Pick from list or paste an agent ID directly</span>
                         </div>
                         <div class="form-field">
                             <label>Repository</label>
-                            <input [(ngModel)]="formRepo" class="form-input mono" placeholder="owner/repo" />
+                            <input [value]="formRepo()" (input)="formRepo.set(inputValue($event))" class="form-input mono" placeholder="owner/repo" />
                         </div>
                         <div class="form-field">
                             <label>Mention Username</label>
-                            <input [(ngModel)]="formMentionUsername" class="form-input mono" placeholder="e.g. corvid-agent" />
+                            <input [value]="formMentionUsername()" (input)="formMentionUsername.set(inputValue($event))" class="form-input mono" placeholder="e.g. corvid-agent" />
                             <span class="form-hint">GitHub username to match &#64;mentions for</span>
                         </div>
                         <div class="form-field">
                             <label>Project</label>
-                            <select [(ngModel)]="formProjectId" class="form-select">
-                                <option value="">Select project...</option>
-                                @for (project of projectService.projects(); track project.id) {
-                                    <option [value]="project.id">{{ project.name }}</option>
+                            <div class="agent-picker">
+                                <input
+                                    class="form-input mono"
+                                    [value]="formProjectId()"
+                                    (input)="onProjectInput($event)"
+                                    (focus)="projectDropdownOpen.set(true)"
+                                    placeholder="Select or paste project ID..."
+                                />
+                                @if (resolvedProjectName()) {
+                                    <span class="agent-resolved">{{ resolvedProjectName() }}</span>
                                 }
-                            </select>
+                                @if (projectDropdownOpen() && projectService.projects().length > 0) {
+                                    <div class="agent-dropdown">
+                                        @for (project of projectService.projects(); track project.id) {
+                                            <button
+                                                type="button"
+                                                class="agent-option"
+                                                [class.agent-option--selected]="formProjectId() === project.id"
+                                                (mousedown)="selectProject(project.id)"
+                                            >
+                                                <span class="agent-option__name">{{ project.name }}</span>
+                                                <span class="agent-option__id">{{ project.id }}</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            <span class="form-hint">Pick from list or paste a project ID directly</span>
                         </div>
                         <div class="form-field span-2">
                             <label>Events</label>
                             <div class="checkbox-group">
                                 <label class="checkbox-label">
-                                    <input type="checkbox" [(ngModel)]="formEvtIssueComment" />
+                                    <input type="checkbox" [checked]="formEvtIssueComment()" (change)="formEvtIssueComment.set(!formEvtIssueComment())" />
                                     Issue Comments
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" [(ngModel)]="formEvtIssues" />
+                                    <input type="checkbox" [checked]="formEvtIssues()" (change)="formEvtIssues.set(!formEvtIssues())" />
                                     Issues (opened/edited)
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" [(ngModel)]="formEvtPrReviewComment" />
+                                    <input type="checkbox" [checked]="formEvtPrReviewComment()" (change)="formEvtPrReviewComment.set(!formEvtPrReviewComment())" />
                                     PR Review Comments
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" [(ngModel)]="formEvtIssueCommentPr" />
+                                    <input type="checkbox" [checked]="formEvtIssueCommentPr()" (change)="formEvtIssueCommentPr.set(!formEvtIssueCommentPr())" />
                                     PR Conversation Comments
                                 </label>
                             </div>
@@ -135,6 +179,10 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
                                 </div>
                             </div>
                             <div class="reg-meta">
+                                <div class="meta-item">
+                                    <span class="meta-label">Agent</span>
+                                    <span class="meta-value">{{ getAgentName(reg.agentId) }}</span>
+                                </div>
                                 <div class="meta-item">
                                     <span class="meta-label">Username</span>
                                     <span class="meta-value mono">&#64;{{ reg.mentionUsername }}</span>
@@ -269,6 +317,16 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
         .form-buttons{margin-top:1rem}
         .save-btn{text-transform:uppercase}
 
+        .agent-picker{position:relative}
+        .agent-resolved{font-size:.65rem;color:var(--accent-green);font-weight:600;margin-top:.15rem;display:block}
+        .agent-dropdown{position:absolute;top:100%;left:0;right:0;z-index:50;max-height:200px;overflow-y:auto;background:var(--bg-surface);border:1px solid var(--accent-cyan);border-radius:var(--radius);margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+        .agent-option{display:flex;justify-content:space-between;align-items:center;width:100%;padding:.45rem .6rem;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text-primary);cursor:pointer;font-family:inherit;font-size:.75rem;text-align:left}
+        .agent-option:last-child{border-bottom:none}
+        .agent-option:hover{background:var(--bg-hover)}
+        .agent-option--selected{background:var(--accent-cyan-dim)}
+        .agent-option__name{font-weight:600}
+        .agent-option__id{font-size:.6rem;color:var(--text-tertiary);font-family:monospace}
+
         .webhooks__filters{display:flex;gap:.35rem;margin-bottom:1rem}
         .filter-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit}
         .filter-btn--active{border-color:var(--accent-cyan);color:var(--accent-cyan);background:var(--accent-cyan-dim)}
@@ -351,15 +409,34 @@ export class WebhookListComponent implements OnInit, OnDestroy {
     readonly regDeliveries = signal<WebhookDelivery[]>([]);
     readonly loadingDeliveries = signal(false);
 
-    // Form fields
-    formAgentId = '';
-    formRepo = '';
-    formMentionUsername = '';
-    formProjectId = '';
-    formEvtIssueComment = true;
-    formEvtIssues = false;
-    formEvtPrReviewComment = true;
-    formEvtIssueCommentPr = false;
+    // Form fields — all signals for reliable OnPush rendering
+    readonly formAgentId = signal('');
+    readonly formRepo = signal('');
+    readonly formMentionUsername = signal('');
+    readonly formProjectId = signal('');
+    readonly formEvtIssueComment = signal(true);
+    readonly formEvtIssues = signal(false);
+    readonly formEvtPrReviewComment = signal(true);
+    readonly formEvtIssueCommentPr = signal(false);
+
+    // Dropdown state
+    readonly agentDropdownOpen = signal(false);
+    readonly projectDropdownOpen = signal(false);
+
+    // Resolved names for pasted IDs
+    readonly resolvedAgentName = computed(() => {
+        const id = this.formAgentId();
+        if (!id) return '';
+        const agent = this.agentService.agents().find((a) => a.id === id);
+        return agent ? agent.name : '';
+    });
+
+    readonly resolvedProjectName = computed(() => {
+        const id = this.formProjectId();
+        if (!id) return '';
+        const project = this.projectService.projects().find((p) => p.id === id);
+        return project ? project.name : '';
+    });
 
     readonly activeCount = computed(() =>
         this.webhookService.registrations().filter((r) => r.status === 'active').length,
@@ -375,16 +452,57 @@ export class WebhookListComponent implements OnInit, OnDestroy {
         return all.filter((r) => r.status === filter);
     });
 
+    private clickOutsideHandler = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.agent-picker')) {
+            this.agentDropdownOpen.set(false);
+            this.projectDropdownOpen.set(false);
+        }
+    };
+
     ngOnInit(): void {
         this.webhookService.loadRegistrations();
         this.webhookService.loadDeliveries();
         this.webhookService.startListening();
         this.agentService.loadAgents();
         this.projectService.loadProjects();
+        document.addEventListener('click', this.clickOutsideHandler);
     }
 
     ngOnDestroy(): void {
         this.webhookService.stopListening();
+        document.removeEventListener('click', this.clickOutsideHandler);
+    }
+
+    inputValue(event: Event): string {
+        return (event.target as HTMLInputElement).value;
+    }
+
+    onAgentInput(event: Event): void {
+        const value = (event.target as HTMLInputElement).value;
+        this.formAgentId.set(value);
+        this.agentDropdownOpen.set(true);
+    }
+
+    selectAgent(id: string): void {
+        this.formAgentId.set(id);
+        this.agentDropdownOpen.set(false);
+    }
+
+    onProjectInput(event: Event): void {
+        const value = (event.target as HTMLInputElement).value;
+        this.formProjectId.set(value);
+        this.projectDropdownOpen.set(true);
+    }
+
+    selectProject(id: string): void {
+        this.formProjectId.set(id);
+        this.projectDropdownOpen.set(false);
+    }
+
+    getAgentName(agentId: string): string {
+        const agent = this.agentService.agents().find((a) => a.id === agentId);
+        return agent ? agent.name : agentId.substring(0, 8) + '...';
     }
 
     async toggleRegistration(regId: string): Promise<void> {
@@ -410,16 +528,16 @@ export class WebhookListComponent implements OnInit, OnDestroy {
     }
 
     async create(): Promise<void> {
-        if (!this.formAgentId || !this.formRepo || !this.formMentionUsername || !this.formProjectId) {
+        if (!this.formAgentId() || !this.formRepo() || !this.formMentionUsername() || !this.formProjectId()) {
             this.notifications.error('Please fill in agent, repo, mention username, and project');
             return;
         }
 
         const events: WebhookEventType[] = [];
-        if (this.formEvtIssueComment) events.push('issue_comment');
-        if (this.formEvtIssues) events.push('issues');
-        if (this.formEvtPrReviewComment) events.push('pull_request_review_comment');
-        if (this.formEvtIssueCommentPr) events.push('issue_comment_pr');
+        if (this.formEvtIssueComment()) events.push('issue_comment');
+        if (this.formEvtIssues()) events.push('issues');
+        if (this.formEvtPrReviewComment()) events.push('pull_request_review_comment');
+        if (this.formEvtIssueCommentPr()) events.push('issue_comment_pr');
 
         if (events.length === 0) {
             this.notifications.error('Please select at least one event type');
@@ -429,11 +547,11 @@ export class WebhookListComponent implements OnInit, OnDestroy {
         this.creating.set(true);
         try {
             await this.webhookService.createRegistration({
-                agentId: this.formAgentId,
-                repo: this.formRepo,
+                agentId: this.formAgentId(),
+                repo: this.formRepo(),
                 events,
-                mentionUsername: this.formMentionUsername,
-                projectId: this.formProjectId,
+                mentionUsername: this.formMentionUsername(),
+                projectId: this.formProjectId(),
             });
 
             this.notifications.success('Webhook registered');
@@ -466,13 +584,13 @@ export class WebhookListComponent implements OnInit, OnDestroy {
     }
 
     private resetForm(): void {
-        this.formAgentId = '';
-        this.formRepo = '';
-        this.formMentionUsername = '';
-        this.formProjectId = '';
-        this.formEvtIssueComment = true;
-        this.formEvtIssues = false;
-        this.formEvtPrReviewComment = true;
-        this.formEvtIssueCommentPr = false;
+        this.formAgentId.set('');
+        this.formRepo.set('');
+        this.formMentionUsername.set('');
+        this.formProjectId.set('');
+        this.formEvtIssueComment.set(true);
+        this.formEvtIssues.set(false);
+        this.formEvtPrReviewComment.set(true);
+        this.formEvtIssueCommentPr.set(false);
     }
 }
