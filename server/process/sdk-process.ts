@@ -55,8 +55,10 @@ function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, s
     if (projectEnvVars) {
         Object.assign(safe, projectEnvVars);
     }
-    // Always set the MCP stream timeout
-    safe.CLAUDE_CODE_STREAM_CLOSE_TIMEOUT = '600000';
+    // MCP stream timeout — how long the MCP stdio transport stays open.
+    // Default 10 min is too short for long autonomous sessions (polling, work tasks).
+    // Set to 2 hours to avoid tools dying mid-session.
+    safe.CLAUDE_CODE_STREAM_CLOSE_TIMEOUT = '7200000';
     return safe;
 }
 
