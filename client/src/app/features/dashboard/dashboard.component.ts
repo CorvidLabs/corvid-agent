@@ -564,37 +564,19 @@ interface AgentSummary {
         .stage-badge[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
         .stage-badge[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
 
-        /* Mobile responsive */
         @media (max-width: 768px) {
             .dashboard__mobile-tabs { display: flex; }
             .dashboard { flex-direction: column; }
             .dashboard__divider { display: none; }
-            .dashboard__left,
-            .dashboard__left--hidden,
-            .dashboard__left--full,
-            .dashboard__left--custom {
-                flex: 1 1 auto;
-                min-width: 0;
-                max-width: none;
-                width: auto !important;
-                opacity: 1;
-                pointer-events: auto;
-                padding: 0.5rem 0;
-                transition: none;
+            .dashboard__left, .dashboard__left--hidden, .dashboard__left--full, .dashboard__left--custom,
+            .dashboard__right, .dashboard__right--hidden {
+                flex: 1 1 auto; min-width: 0; max-width: none;
+                opacity: 1; pointer-events: auto; transition: none;
             }
-            .dashboard__right,
-            .dashboard__right--hidden {
-                flex: 1 1 auto;
-                min-width: 0;
-                max-width: none;
-                opacity: 1;
-                pointer-events: auto;
-                padding: 1rem 1.25rem;
-                overflow-y: auto;
-                transition: none;
-            }
+            .dashboard__left--custom { width: auto !important; }
+            .dashboard__left { padding: 0.5rem 0; }
+            .dashboard__right { padding: 1rem 1.25rem; overflow-y: auto; }
             .mobile-hidden { display: none !important; }
-            .chat-select { min-width: 120px; }
         }
     `,
 })
