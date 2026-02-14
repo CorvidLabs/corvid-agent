@@ -103,6 +103,10 @@ export class ScheduleService {
         this.schedules.update((list) => list.filter((s) => s.id !== id));
     }
 
+    async getScheduleExecutions(scheduleId: string, limit: number = 20): Promise<ScheduleExecution[]> {
+        return firstValueFrom(this.api.get<ScheduleExecution[]>(`/schedules/${scheduleId}/executions?limit=${limit}`));
+    }
+
     async loadExecutions(scheduleId?: string, limit: number = 50): Promise<void> {
         const path = scheduleId
             ? `/schedules/${scheduleId}/executions?limit=${limit}`
