@@ -170,8 +170,8 @@ export class RateLimiter {
 // Request helper
 // ---------------------------------------------------------------------------
 
-/** Paths that bypass rate limiting (monitoring probes, etc.). */
-const EXEMPT_PATHS = new Set(['/api/health']);
+/** Paths that bypass rate limiting (monitoring probes, webhooks, etc.). */
+const EXEMPT_PATHS = new Set(['/api/health', '/webhooks/github']);
 
 /**
  * Extract the client IP from a Request.

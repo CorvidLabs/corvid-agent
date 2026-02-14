@@ -118,6 +118,16 @@ export const routes: Routes = [
             import('./features/schedules/schedule-list.component').then((m) => m.ScheduleListComponent),
     },
     {
+        path: 'webhooks',
+        loadComponent: () =>
+            import('./features/webhooks/webhook-list.component').then((m) => m.WebhookListComponent),
+    },
+    {
+        path: 'mention-polling',
+        loadComponent: () =>
+            import('./features/mention-polling/mention-polling-list.component').then((m) => m.MentionPollingListComponent),
+    },
+    {
         path: 'analytics',
         loadComponent: () =>
             import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent),
