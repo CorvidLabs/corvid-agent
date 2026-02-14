@@ -56,7 +56,7 @@ export function splitMessage(content: string, maxPayload?: number): string[] {
 
     while (remaining.length > 0) {
         let chunk = remaining;
-        let chunkBytes = encoder.encode(chunk).byteLength;
+        const chunkBytes = encoder.encode(chunk).byteLength;
 
         // Binary search for the right cut point
         if (chunkBytes > multiMax) {
@@ -72,7 +72,6 @@ export function splitMessage(content: string, maxPayload?: number): string[] {
                 }
             }
             chunk = remaining.slice(0, low);
-            chunkBytes = encoder.encode(chunk).byteLength;
         }
 
         chunks.push(chunk);

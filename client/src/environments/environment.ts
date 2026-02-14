@@ -2,7 +2,10 @@ const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3
 const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
 const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
 
-// API key can be set via ?apiKey= query param on page load, or sessionStorage
+// API key can be set via ?apiKey= query param on page load, or in-memory cache.
+// We avoid sessionStorage to prevent clear-text storage of credentials (CodeQL js/clear-text-storage-of-sensitive-data).
+let _cachedApiKey: string | null = null;
+
 const storedKey = typeof window !== 'undefined'
     ? (() => {
         const params = new URLSearchParams(window.location.search);
@@ -18,9 +21,10 @@ const storedKey = typeof window !== 'undefined'
             window.history.replaceState(null, '', cleanUrl);
         }
 
-        const key = fromUrl ?? sessionStorage.getItem('corvid_api_key');
+        // Prefer URL param, then in-memory cache (from prior call within same page lifecycle)
+        const key = fromUrl ?? _cachedApiKey;
         if (key) {
-            sessionStorage.setItem('corvid_api_key', key);
+            _cachedApiKey = key;
         }
         return key;
     })()
