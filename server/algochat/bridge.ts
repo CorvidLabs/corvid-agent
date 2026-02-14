@@ -76,8 +76,17 @@ export class AlgoChatBridge {
     private agentWalletService: AgentWalletService | null = null;
     private agentDirectory: AgentDirectory | null = null;
     private approvalManager: ApprovalManager | null = null;
-    private pskManager: PSKManager | null = null;
     private sessionNotificationCallback: ((sid: string, event: ClaudeStreamEvent) => void) | null = null;
+
+    // Multi-contact PSK state
+    /** Active PSK managers keyed by contact ID (psk_contacts.id) */
+    private pskManagers: Map<string, PSKManager> = new Map();
+    /** Reverse lookup: mobile address → contact ID (populated when address is discovered) */
+    private pskAddressToId: Map<string, string> = new Map();
+    /** Discovery poller for unmatched contacts (polls TO our address, trial-decrypts) */
+    private discoveryPollTimer: ReturnType<typeof setInterval> | null = null;
+    /** Last round scanned by discovery poller (avoids re-scanning old history) */
+    private discoveryLastRound: number = 0;
 
     // Local chat state (kept here as it bridges WS handler → subscription manager)
     private localAgentSessions: Map<string, string> = new Map();
@@ -121,8 +130,11 @@ export class AlgoChatBridge {
         // Wire owner check into ProcessManager so credit deduction is skipped for owners
         this.processManager.setOwnerCheck((address) => this.commandHandler.isOwner(address));
 
+        // Wire PSK manager lookup into response formatter before setup
+        this.responseFormatter.setPskManagerLookup((address) => this.lookupPskManager(address));
+
         this.setupMessageHandler();
-        this.setupPSKManager();
+        this.setupPSKManagers();
         this.setupSessionNotifications();
     }
 
@@ -180,7 +192,15 @@ export class AlgoChatBridge {
     start(): void {
         this.discoveryService.seedConversations();
         this.service.syncManager.start();
-        this.pskManager?.start(this.config.syncInterval);
+        // Start only matched PSK managers (ones with a known mobile address).
+        // Unmatched contacts are handled by the discovery poller instead.
+        const matchedIds = new Set(this.pskAddressToId.values());
+        for (const [contactId, mgr] of this.pskManagers) {
+            if (matchedIds.has(contactId)) {
+                mgr.start(this.config.syncInterval);
+            }
+        }
+        this.startDiscoveryPoller();
         this.discoveryService.startDiscoveryPolling();
         log.info('Started listening for messages');
     }
@@ -188,7 +208,10 @@ export class AlgoChatBridge {
     /** Stop all AlgoChat services and clean up resources. */
     stop(): void {
         this.service.syncManager.stop();
-        this.pskManager?.stop();
+        for (const mgr of this.pskManagers.values()) {
+            mgr.stop();
+        }
+        this.stopDiscoveryPoller();
         this.discoveryService.cleanup();
         // Unsubscribe session notification handler
         if (this.sessionNotificationCallback) {
@@ -228,74 +251,156 @@ export class AlgoChatBridge {
         };
     }
 
-    /** Get or generate a PSK exchange URI for mobile client connections. */
+    // ── Legacy single-contact PSK API (backward compat) ──────────────
+
+    /** Get or generate a PSK exchange URI for the first contact (backward compat). */
     getPSKExchangeURI(): { uri: string; address: string; network: string; label: string } | null {
-        const stored = this.loadMobilePSK();
-        if (!stored) return null;
+        // Return first active contact's URI
+        const contacts = this.listPSKContacts();
+        if (contacts.length === 0) return null;
+        const first = contacts[0];
+        const uri = this.getPSKContactURI(first.id);
+        if (!uri) return null;
         return {
-            uri: stored,
+            uri,
             address: this.service.chatAccount.address,
             network: this.config.network,
-            label: 'CorvidAgent',
+            label: first.nickname,
         };
     }
 
-    /** Generate a new PSK exchange URI and store it. */
+    /** Generate a new PSK exchange URI (backward compat — creates a new contact named "Mobile"). */
     generatePSKExchangeURI(): { uri: string; address: string; network: string; label: string } {
+        const result = this.createPSKContact('Mobile');
+        return {
+            uri: result.uri,
+            address: this.service.chatAccount.address,
+            network: this.config.network,
+            label: result.nickname,
+        };
+    }
+
+    // ── Multi-contact PSK CRUD ─────────────────────────────────────────
+
+    /** Create a new PSK contact. Generates a fresh PSK, stores in DB, starts a PSK manager. */
+    createPSKContact(nickname: string): { id: string; uri: string; nickname: string } {
+        const id = crypto.randomUUID();
         const psk = crypto.getRandomValues(new Uint8Array(32));
-        const address = this.service.chatAccount.address;
-        const label = 'CorvidAgent';
         const network = this.config.network;
 
-        // Encode PSK as base64url
-        const pskBase64 = btoa(String.fromCharCode(...psk))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
+        this.db.prepare(`
+            INSERT INTO psk_contacts (id, nickname, network, initial_psk, active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+        `).run(id, nickname, network, psk);
 
-        const uri = `algochat-psk://v1?addr=${address}&psk=${pskBase64}&label=${encodeURIComponent(label)}&network=${network}`;
-
-        // Store in database for persistence
-        this.saveMobilePSK(uri, psk, label);
-
-        // Re-initialize the running PSK manager with the new key so
-        // incoming messages encrypted with the new PSK can be decrypted.
-        if (this.pskManager) {
-            this.pskManager.resetWithNewPSK(psk);
-        }
-
-        log.info('Generated new PSK exchange URI for mobile client', { address: address.slice(0, 8) });
-
-        return { uri, address, network, label };
-    }
-
-    private loadMobilePSK(): string | null {
-        try {
-            const row = this.db.prepare(
-                'SELECT initial_psk, label FROM algochat_psk_state WHERE address = ? AND network = ?'
-            ).get('mobile-client', this.config.network) as { initial_psk: Uint8Array; label: string } | null;
-
-            if (!row) return null;
-
-            const address = this.service.chatAccount.address;
-            const pskBase64 = btoa(String.fromCharCode(...new Uint8Array(row.initial_psk)))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=+$/, '');
-            const label = row.label || 'CorvidAgent';
-
-            return `algochat-psk://v1?addr=${address}&psk=${pskBase64}&label=${encodeURIComponent(label)}&network=${this.config.network}`;
-        } catch {
-            return null;
-        }
-    }
-
-    private saveMobilePSK(_uri: string, psk: Uint8Array, label: string): void {
+        // Also create an algochat_psk_state row so the PSKManager can operate
         this.db.prepare(`
             INSERT OR REPLACE INTO algochat_psk_state
                 (address, network, initial_psk, label, send_counter, peer_last_counter, seen_counters, last_round, updated_at)
             VALUES (?, ?, ?, ?, 0, 0, '[]', 0, datetime('now'))
-        `).run('mobile-client', this.config.network, psk, label);
+        `).run(id, network, psk, nickname);
+
+        // Create and start PSKManager (no known mobile address yet — uses contact ID as address)
+        const mgr = new PSKManager(this.db, this.service, { address: id, psk, label: nickname }, network, id);
+        this.pskManagers.set(id, mgr);
+        // Don't start polling by sender yet — discovery poller handles unmatched contacts
+        // mgr.start() will be called once the mobile address is discovered
+
+        const uri = this.buildPSKUri(psk, nickname);
+        log.info(`Created PSK contact "${nickname}"`, { id });
+
+        // Ensure discovery poller is running so we can detect the first message
+        this.startDiscoveryPoller();
+
+        return { id, uri, nickname };
+    }
+
+    /** List all PSK contacts for the current network. */
+    listPSKContacts(): Array<{
+        id: string;
+        nickname: string;
+        network: string;
+        mobileAddress: string | null;
+        active: boolean;
+        createdAt: string;
+    }> {
+        const rows = this.db.prepare(
+            'SELECT id, nickname, network, mobile_address, active, created_at FROM psk_contacts WHERE network = ? ORDER BY created_at ASC'
+        ).all(this.config.network) as Array<{
+            id: string;
+            nickname: string;
+            network: string;
+            mobile_address: string | null;
+            active: number;
+            created_at: string;
+        }>;
+        return rows.map((r) => ({
+            id: r.id,
+            nickname: r.nickname,
+            network: r.network,
+            mobileAddress: r.mobile_address,
+            active: r.active === 1,
+            createdAt: r.created_at,
+        }));
+    }
+
+    /** Rename a PSK contact. */
+    renamePSKContact(id: string, nickname: string): boolean {
+        const result = this.db.prepare(
+            "UPDATE psk_contacts SET nickname = ?, updated_at = datetime('now') WHERE id = ?"
+        ).run(nickname, id);
+        return (result.changes ?? 0) > 0;
+    }
+
+    /** Delete a PSK contact permanently. Stops its manager and removes all state. */
+    cancelPSKContact(id: string): boolean {
+        // Stop and remove the manager first
+        const mgr = this.pskManagers.get(id);
+        if (mgr) {
+            mgr.stop();
+            const addr = mgr.contactAddress;
+            if (this.pskAddressToId.get(addr) === id) {
+                this.pskAddressToId.delete(addr);
+            }
+            this.pskManagers.delete(id);
+        }
+
+        // Delete PSK ratchet state (address may be contact ID or the real mobile address)
+        const contact = this.db.prepare('SELECT mobile_address FROM psk_contacts WHERE id = ?').get(id) as { mobile_address: string | null } | null;
+        if (contact) {
+            const stateAddr = contact.mobile_address ?? id;
+            this.db.prepare('DELETE FROM algochat_psk_state WHERE address = ? AND network = ?').run(stateAddr, this.config.network);
+        }
+
+        // Hard-delete from psk_contacts
+        const result = this.db.prepare('DELETE FROM psk_contacts WHERE id = ?').run(id);
+        if ((result.changes ?? 0) === 0) return false;
+
+        log.info(`Deleted PSK contact`, { id });
+        return true;
+    }
+
+    /** Get the PSK URI for a contact (for QR display). */
+    getPSKContactURI(id: string): string | null {
+        const row = this.db.prepare(
+            'SELECT initial_psk, nickname FROM psk_contacts WHERE id = ?'
+        ).get(id) as { initial_psk: Uint8Array; nickname: string } | null;
+        if (!row) return null;
+
+        const pskBytes = row.initial_psk instanceof Uint8Array
+            ? row.initial_psk
+            : new Uint8Array(row.initial_psk as ArrayBuffer);
+        return this.buildPSKUri(pskBytes, row.nickname);
+    }
+
+    private buildPSKUri(psk: Uint8Array, label: string): string {
+        const address = this.service.chatAccount.address;
+        const network = this.config.network;
+        const pskBase64 = btoa(String.fromCharCode(...psk))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+        return `algochat-psk://v1?addr=${address}&psk=${pskBase64}&label=${encodeURIComponent(label)}&network=${network}`;
     }
 
     /**
@@ -507,19 +612,341 @@ export class AlgoChatBridge {
         }
     }
 
-    private setupPSKManager(): void {
-        if (!this.config.pskContact) return;
+    /** Load all active PSK contacts from DB and create PSKManagers for each. */
+    private setupPSKManagers(): void {
+        // Also support the legacy env-based PSK contact for backward compat
+        if (this.config.pskContact) {
+            this.setupLegacyPskContact();
+        }
 
-        this.pskManager = new PSKManager(this.db, this.service, this.config.pskContact, this.config.network);
-        this.responseFormatter.setPskManager(this.pskManager);
+        // Load multi-contact entries from psk_contacts table
+        const rows = this.db.prepare(
+            'SELECT id, nickname, network, initial_psk, mobile_address FROM psk_contacts WHERE network = ? AND active = 1'
+        ).all(this.config.network) as Array<{
+            id: string;
+            nickname: string;
+            network: string;
+            initial_psk: Uint8Array;
+            mobile_address: string | null;
+        }>;
 
-        this.pskManager.onMessage((msg) => {
+        for (const row of rows) {
+            if (this.pskManagers.has(row.id)) continue; // skip if already loaded (e.g. legacy)
+
+            const pskBytes = row.initial_psk instanceof Uint8Array
+                ? row.initial_psk
+                : new Uint8Array(row.initial_psk as ArrayBuffer);
+
+            // The PSKManager address is either the discovered mobile address or the contact ID
+            const address = row.mobile_address ?? row.id;
+
+            const mgr = new PSKManager(
+                this.db, this.service,
+                { address, psk: pskBytes, label: row.nickname },
+                this.config.network,
+                row.id,
+            );
+            this.pskManagers.set(row.id, mgr);
+
+            if (row.mobile_address) {
+                // Known mobile address: set up reverse lookup and poll by sender
+                this.pskAddressToId.set(row.mobile_address, row.id);
+                this.wirePskManagerCallbacks(mgr, row.id);
+            }
+
+            log.info(`PSK manager loaded for "${row.nickname}"`, { id: row.id, hasAddress: !!row.mobile_address });
+        }
+    }
+
+    /** Set up the legacy single PSK contact from env config. */
+    private setupLegacyPskContact(): void {
+        const cfg = this.config.pskContact!;
+
+        // Check if there's already a psk_contacts entry for this (migrated or manually created)
+        const existing = this.db.prepare(
+            "SELECT id FROM psk_contacts WHERE mobile_address = ? AND network = ? AND active = 1"
+        ).get(cfg.address, this.config.network) as { id: string } | null;
+
+        if (existing) {
+            // Already in multi-contact system; skip legacy setup
+            return;
+        }
+
+        const mgr = new PSKManager(this.db, this.service, cfg, this.config.network, `legacy-${cfg.address}`);
+        const contactId = mgr.contactId;
+        this.pskManagers.set(contactId, mgr);
+        this.pskAddressToId.set(cfg.address, contactId);
+        this.wirePskManagerCallbacks(mgr, contactId);
+
+        log.info(`Legacy PSK manager initialized`, {
+            label: cfg.label ?? null,
+            address: cfg.address.slice(0, 8) + '...',
+            contactId,
+        });
+    }
+
+    /** Wire a PSKManager's onMessage callback to handleIncomingMessage. */
+    private wirePskManagerCallbacks(mgr: PSKManager, _contactId: string): void {
+        mgr.onMessage((msg) => {
             this.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound, msg.amount).catch((err) => {
                 log.error('Error handling PSK message', { error: err instanceof Error ? err.message : String(err) });
             });
         });
+    }
 
-        log.info(`PSK manager initialized for ${this.config.pskContact.label ?? this.config.pskContact.address.slice(0, 8)}...`);
+    /** Look up a PSKManager by participant address (for response routing). */
+    private lookupPskManager(address: string): PSKManager | null {
+        const contactId = this.pskAddressToId.get(address);
+        if (!contactId) return null;
+        return this.pskManagers.get(contactId) ?? null;
+    }
+
+    // ── Discovery poller: trial-decrypt for unmatched contacts ──────────
+
+    /** Start the discovery poller that checks for PSK messages from unknown senders. */
+    private startDiscoveryPoller(): void {
+        // Only poll if there are unmatched contacts (no mobile_address)
+        if (!this.hasUnmatchedContacts()) return;
+        if (this.discoveryPollTimer) return;
+
+        this.discoveryPollTimer = setInterval(() => {
+            this.discoveryPoll().catch((err) => {
+                log.error('Discovery poll error', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }, this.config.syncInterval);
+
+        // Run immediately
+        this.discoveryPoll().catch((err) => {
+            log.error('Initial discovery poll error', { error: err instanceof Error ? err.message : String(err) });
+        });
+    }
+
+    private stopDiscoveryPoller(): void {
+        if (this.discoveryPollTimer) {
+            clearInterval(this.discoveryPollTimer);
+            this.discoveryPollTimer = null;
+        }
+    }
+
+    private hasUnmatchedContacts(): boolean {
+        const row = this.db.prepare(
+            'SELECT COUNT(*) as count FROM psk_contacts WHERE network = ? AND active = 1 AND mobile_address IS NULL'
+        ).get(this.config.network) as { count: number };
+        return row.count > 0;
+    }
+
+    /**
+     * Discovery poll: look for payment transactions TO our address from unknown senders.
+     * Trial-decrypt with each unmatched contact's PSK. On success, record the sender
+     * as the contact's mobile_address and promote to a proper polling PSKManager.
+     */
+    private async discoveryPoll(): Promise<void> {
+        const indexer = this.service.indexerClient;
+        if (!indexer) return;
+
+        // Get unmatched contacts
+        const unmatched = this.db.prepare(
+            'SELECT id, initial_psk, nickname FROM psk_contacts WHERE network = ? AND active = 1 AND mobile_address IS NULL'
+        ).all(this.config.network) as Array<{ id: string; initial_psk: Uint8Array; nickname: string }>;
+
+        if (unmatched.length === 0) {
+            this.stopDiscoveryPoller();
+            return;
+        }
+
+        const algochat = await import('@corvidlabs/ts-algochat');
+        const myAddress = this.service.chatAccount.address;
+
+        // On first poll, start from a recent window instead of scanning all history.
+        // Fetch current round to establish a baseline.
+        if (this.discoveryLastRound === 0) {
+            try {
+                const status = await this.service.algodClient.status().do();
+                const currentRound = Number(status.lastRound ?? 0);
+                // Look back ~5 minutes of blocks (~750 rounds at 0.4s/block)
+                this.discoveryLastRound = Math.max(0, currentRound - 750);
+                log.info('Discovery poller starting', { fromRound: this.discoveryLastRound, unmatchedContacts: unmatched.length });
+            } catch (err) {
+                log.error('Failed to get current round for discovery poller', { error: err instanceof Error ? err.message : String(err) });
+                return;
+            }
+        }
+
+        log.info('Discovery poll running', { minRound: this.discoveryLastRound + 1, unmatchedContacts: unmatched.length });
+
+        let maxRound = this.discoveryLastRound;
+        let nextToken: string | undefined;
+        let totalTxns = 0;
+        let pskCandidates = 0;
+
+        // Track contacts matched and senders discovered during this poll
+        // to avoid re-processing multiple old messages from the same sender.
+        const matchedContactIds = new Set<string>();
+        const discoveredSenders = new Set<string>();
+
+        try {
+            // Paginated loop to scan all new transactions since last poll
+            do {
+                let query = indexer
+                    .searchForTransactions()
+                    .address(myAddress)
+                    .addressRole('receiver')
+                    .minRound(this.discoveryLastRound + 1)
+                    .limit(50);
+
+                if (nextToken) {
+                    query = query.nextToken(nextToken);
+                }
+
+                const response = await query.do() as unknown as {
+                    transactions?: Array<{
+                        id: string;
+                        sender: string;
+                        txType: string;
+                        note?: string;
+                        confirmedRound?: bigint;
+                        paymentTransaction?: { receiver?: string; amount?: number | bigint };
+                    }>;
+                    'next-token'?: string;
+                };
+
+                const txns = response.transactions ?? [];
+                nextToken = response['next-token'];
+                totalTxns += txns.length;
+
+                for (const tx of txns) {
+                    const txRound = Number(tx.confirmedRound ?? 0);
+                    if (txRound > maxRound) maxRound = txRound;
+
+                    if (tx.txType !== 'pay') continue;
+                    if (!tx.note) continue;
+                    if (tx.paymentTransaction?.receiver !== myAddress) continue;
+
+                    // Skip senders already discovered in this poll cycle
+                    if (discoveredSenders.has(tx.sender)) continue;
+
+                    // Skip senders already matched to a multi-contact entry
+                    // (but NOT legacy-only entries — those may need migration)
+                    const existingContactId = this.pskAddressToId.get(tx.sender);
+                    if (existingContactId) {
+                        const isMultiContact = this.db.prepare(
+                            'SELECT id FROM psk_contacts WHERE id = ? AND mobile_address = ?'
+                        ).get(existingContactId, tx.sender);
+                        if (isMultiContact) continue;
+                    }
+
+                    const noteBytes = base64ToBytes(tx.note);
+                    const isPsk = algochat.isPSKMessage(noteBytes);
+                    if (!isPsk) continue;
+
+                    pskCandidates++;
+
+                    // Trial-decrypt with each unmatched contact
+                    for (const contact of unmatched) {
+                        if (matchedContactIds.has(contact.id)) continue;
+
+                        try {
+                            const envelope = algochat.decodePSKEnvelope(noteBytes);
+                            const pskBytes = contact.initial_psk instanceof Uint8Array
+                                ? contact.initial_psk
+                                : new Uint8Array(contact.initial_psk as ArrayBuffer);
+                            const currentPSK = algochat.derivePSKAtCounter(pskBytes, envelope.ratchetCounter);
+
+                            const decrypted = algochat.decryptPSKMessage(
+                                envelope,
+                                this.service.chatAccount.encryptionKeys.privateKey,
+                                this.service.chatAccount.encryptionKeys.publicKey,
+                                currentPSK,
+                            );
+
+                            if (!decrypted) continue;
+
+                            // Match found! Record the mobile address
+                            log.info(`Discovered mobile address for "${contact.nickname}"`, {
+                                contactId: contact.id,
+                                mobileAddress: tx.sender.slice(0, 8) + '...',
+                                txid: tx.id.slice(0, 12),
+                                round: txRound,
+                            });
+
+                            matchedContactIds.add(contact.id);
+                            discoveredSenders.add(tx.sender);
+
+                            this.db.prepare(
+                                "UPDATE psk_contacts SET mobile_address = ?, updated_at = datetime('now') WHERE id = ?"
+                            ).run(tx.sender, contact.id);
+
+                            // If this address was claimed by a legacy manager, stop it
+                            // (the legacy PSK can't decrypt the new contact's messages)
+                            const legacyContactId = this.pskAddressToId.get(tx.sender);
+                            if (legacyContactId && legacyContactId !== contact.id) {
+                                const legacyMgr = this.pskManagers.get(legacyContactId);
+                                if (legacyMgr) {
+                                    legacyMgr.stop();
+                                    log.info(`Stopped legacy PSK manager`, {
+                                        legacyContactId,
+                                        replacedBy: contact.id,
+                                    });
+                                }
+                                this.pskManagers.delete(legacyContactId);
+                                this.pskAddressToId.delete(tx.sender);
+                            }
+
+                            // Stop the old manager keyed by contact ID (the unmatched one with UUID address)
+                            const oldMgr = this.pskManagers.get(contact.id);
+                            if (oldMgr) oldMgr.stop();
+
+                            // Migrate algochat_psk_state from contact-id key to real address.
+                            // Delete any existing row for the real address first (legacy manager
+                            // may have created one with a different PSK).
+                            this.db.prepare(
+                                'DELETE FROM algochat_psk_state WHERE address = ? AND network = ?'
+                            ).run(tx.sender, this.config.network);
+                            this.db.prepare(
+                                'UPDATE algochat_psk_state SET address = ? WHERE address = ? AND network = ?'
+                            ).run(tx.sender, contact.id, this.config.network);
+
+                            // Create fresh manager with real address
+                            const mgr = new PSKManager(
+                                this.db, this.service,
+                                { address: tx.sender, psk: pskBytes, label: contact.nickname },
+                                this.config.network,
+                                contact.id,
+                            );
+                            this.pskManagers.set(contact.id, mgr);
+                            this.pskAddressToId.set(tx.sender, contact.id);
+                            this.wirePskManagerCallbacks(mgr, contact.id);
+                            mgr.start(this.config.syncInterval);
+
+                            // Route only the most recent message through the handler
+                            // (this is the first match for this sender, older messages are skipped)
+                            const txAmount = tx.paymentTransaction?.amount != null ? Number(tx.paymentTransaction.amount) : undefined;
+                            this.handleIncomingMessage(tx.sender, decrypted.text, txRound, txAmount).catch((err) => {
+                                log.error('Error handling discovered PSK message', { error: err instanceof Error ? err.message : String(err) });
+                            });
+
+                            break;
+                        } catch {
+                            // Decrypt failed — not this contact's PSK
+                            continue;
+                        }
+                    }
+                }
+            } while (nextToken);
+            log.info('Discovery poll complete', { totalTxns, pskCandidates, maxRound, prevRound: this.discoveryLastRound, discovered: discoveredSenders.size });
+        } catch (err) {
+            log.error('Discovery poll indexer error', { error: err instanceof Error ? err.message : String(err) });
+        }
+
+        // Advance the round cursor
+        if (maxRound > this.discoveryLastRound) {
+            this.discoveryLastRound = maxRound;
+        }
+
+        // If no unmatched contacts remain, stop the poller
+        if (!this.hasUnmatchedContacts()) {
+            this.stopDiscoveryPoller();
+        }
     }
 
     /**
@@ -560,12 +987,9 @@ export class AlgoChatBridge {
             if (!conversation) return;
 
             if (event.type === 'session_exited') {
-                if (!this.subscriptionManager.hasChainSubscription(sessionId)) {
-                    this.responseFormatter.sendResponse(
-                        conversation.participantAddr,
-                        '[Session completed]'
-                    );
-                }
+                // Don't send "[Session completed]" on-chain — it wastes a
+                // transaction fee and clutters the chat. The agent's actual
+                // response is already delivered via the subscription manager.
                 log.info(`AlgoChat session completed`, { sessionId, participant: conversation.participantAddr });
             }
 
@@ -598,15 +1022,28 @@ export class AlgoChatBridge {
     ): Promise<void> {
         log.info(`Message from ${participant}`, { content: content.slice(0, 100), amount });
 
+        // Parse device name envelope (multi-device PSK chat)
+        let deviceName: string | undefined;
+        let messageContent = content;
+        if (content.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(content);
+                if (parsed && typeof parsed === 'object' && typeof parsed.m === 'string') {
+                    messageContent = parsed.m;
+                    deviceName = typeof parsed.d === 'string' ? parsed.d : undefined;
+                }
+            } catch { /* plain text */ }
+        }
+
         // Safety guard: reject raw group chunks that weren't reassembled
-        if (/^\[GRP:\d+\/\d+\]/.test(content)) {
-            log.debug('Skipping raw group chunk in handleIncomingMessage', { content: content.slice(0, 40) });
+        if (/^\[GRP:\d+\/\d+\]/.test(messageContent)) {
+            log.debug('Skipping raw group chunk in handleIncomingMessage', { content: messageContent.slice(0, 40) });
             return;
         }
 
         // Check for approval responses before anything else
         if (this.approvalManager) {
-            const approvalResponse = parseApprovalResponse(content);
+            const approvalResponse = parseApprovalResponse(messageContent);
             if (approvalResponse) {
                 const resolved = this.approvalManager.resolveByShortId(
                     approvalResponse.shortId,
@@ -634,7 +1071,7 @@ export class AlgoChatBridge {
         }
 
         // PSK contacts are implicitly authorized — the shared key is their credential
-        const isPskContact = this.pskManager != null && participant === this.pskManager.contactAddress;
+        const isPskContact = this.pskAddressToId.has(participant);
         const isOwner = isPskContact || this.commandHandler.isOwner(participant);
 
         // Non-owners are blocked unless guest access is enabled in the future.
@@ -645,10 +1082,10 @@ export class AlgoChatBridge {
         }
 
         // Emit feed event only for external (non-agent) messages
-        this.responseFormatter.emitEvent(participant, content, 'inbound', amount);
+        this.responseFormatter.emitEvent(participant, messageContent, 'inbound', amount);
 
         // Check for commands first (owners always have access)
-        if (this.commandHandler.handleCommand(participant, content)) return;
+        if (this.commandHandler.handleCommand(participant, messageContent)) return;
 
         // Auto micro-fund agent wallet on localnet for incoming messages
         if (this.config.network === 'localnet' && this.agentWalletService) {
@@ -667,6 +1104,9 @@ export class AlgoChatBridge {
             }
         }
 
+        // Prepend device name for agent context
+        const agentContent = deviceName ? `[From: ${deviceName}] ${messageContent}` : messageContent;
+
         let conversation = getConversationByParticipant(this.db, participant);
 
         if (!conversation) {
@@ -683,7 +1123,7 @@ export class AlgoChatBridge {
                 projectId: agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId(),
                 agentId,
                 name: `AlgoChat: ${participant.slice(0, 8)}...`,
-                initialPrompt: content,
+                initialPrompt: agentContent,
                 source: 'algochat',
             });
 
@@ -693,7 +1133,7 @@ export class AlgoChatBridge {
 
             // Handle session start failure
             try {
-                this.processManager.startProcess(session, content);
+                this.processManager.startProcess(session, agentContent);
             } catch (err) {
                 log.error('Failed to start process for new conversation', {
                     sessionId: session.id,
@@ -706,12 +1146,12 @@ export class AlgoChatBridge {
                 // Always subscribe so the reply gets sent back on-chain
                 this.subscriptionManager.subscribeForResponse(conversation.sessionId, participant);
 
-                const sent = this.processManager.sendMessage(conversation.sessionId, content);
+                const sent = this.processManager.sendMessage(conversation.sessionId, agentContent);
                 if (!sent) {
                     const { getSession } = await import('../db/sessions');
                     const session = getSession(this.db, conversation.sessionId);
                     if (session) {
-                        this.processManager.resumeProcess(session, content);
+                        this.processManager.resumeProcess(session, agentContent);
                     }
                 }
             } else {
@@ -727,7 +1167,7 @@ export class AlgoChatBridge {
                             projectId: agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId(),
                             agentId,
                             name: `AlgoChat: ${participant.slice(0, 8)}...`,
-                            initialPrompt: content,
+                            initialPrompt: agentContent,
                             source: 'algochat',
                         });
                         updateConversationSession(this.db, conversation.id, session.id);
@@ -735,7 +1175,7 @@ export class AlgoChatBridge {
 
                         this.subscriptionManager.subscribeForResponse(session.id, participant);
                         try {
-                            this.processManager.startProcess(session, content);
+                            this.processManager.startProcess(session, agentContent);
                         } catch (err) {
                             log.error('Failed to start process for existing conversation', {
                                 sessionId: session.id,
@@ -750,4 +1190,15 @@ export class AlgoChatBridge {
 
         updateConversationRound(this.db, conversation.id, confirmedRound);
     }
+}
+
+/** Decode base64 string to Uint8Array (handles indexer note field encoding). */
+function base64ToBytes(input: string | Uint8Array): Uint8Array {
+    if (input instanceof Uint8Array) return input;
+    const binary = atob(input);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
 }
