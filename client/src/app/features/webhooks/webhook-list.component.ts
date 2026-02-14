@@ -91,8 +91,8 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
                         </div>
                     }
 
-                    <div class="form-actions">
-                        <button class="btn-primary" [disabled]="creating()" (click)="create()">
+                    <div class="form-buttons">
+                        <button class="save-btn" [disabled]="creating()" (click)="create()">
                             {{ creating() ? 'Creating...' : 'Register Webhook' }}
                         </button>
                     </div>
@@ -265,8 +265,8 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
         .webhooks__header h2{margin:0;color:var(--text-primary)}
         .webhooks__subtitle{margin:.25rem 0 0;font-size:.75rem;color:var(--text-tertiary)}
         .loading{color:var(--text-secondary)}
-        .create-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
-        .create-btn:hover{background:rgba(0,229,255,.2)}
+        .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer;font-family:inherit}
+        .create-btn:hover,.save-btn:hover:not(:disabled){background:rgba(0,229,255,.2)}
 
         .create-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
         .create-form h3{margin:0 0 .25rem;color:var(--text-primary);font-size:.85rem}
@@ -286,10 +286,9 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
         .advanced-toggle{background:none;border:none;color:var(--text-tertiary);font-size:.7rem;cursor:pointer;padding:.5rem 0;font-family:inherit}
         .advanced-toggle:hover{color:var(--text-secondary)}
         .advanced-section{margin-top:.5rem}
-        .form-actions{margin-top:1rem}
-        .btn-primary{padding:.5rem 1.25rem;background:var(--accent-cyan);color:var(--bg-base);border:none;border-radius:var(--radius);font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit}
-        .btn-primary:hover:not(:disabled){background:var(--accent-cyan-bright,#4de8ff)}
-        .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+        .form-buttons{margin-top:1rem}
+        .save-btn{text-transform:uppercase}
+        .save-btn:disabled{opacity:.5;cursor:not-allowed}
 
         .webhooks__filters{display:flex;gap:.35rem;margin-bottom:1rem}
         .filter-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit}
