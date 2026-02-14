@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, ChangeDetectorRef, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MentionPollingService } from '../../core/services/mention-polling.service';
 import { AgentService } from '../../core/services/agent.service';
@@ -48,110 +48,78 @@ import type { MentionPollingConfig, MentionPollingStatus } from '../../core/mode
             <!-- Create Form -->
             @if (showCreateForm()) {
                 <div class="create-form">
-                    <h3>New Polling Configuration</h3>
+                    <h3>Watch a repo for &#64;mentions</h3>
+                    <p class="form-intro">When someone &#64;mentions the username in an issue or PR, the agent starts a conversation automatically.</p>
                     <div class="form-grid">
                         <div class="form-field">
                             <label>Agent</label>
-                            <div class="agent-picker">
-                                <input
-                                    class="form-input mono"
-                                    [value]="formAgentId()"
-                                    (input)="onAgentInput($event)"
-                                    (focus)="agentDropdownOpen.set(true)"
-                                    placeholder="Select or paste agent ID..."
-                                />
-                                @if (resolvedAgentName()) {
-                                    <span class="agent-resolved">{{ resolvedAgentName() }}</span>
+                            <select class="form-select" [ngModel]="formAgentId()" (ngModelChange)="formAgentId.set($event)">
+                                <option value="">Choose an agent...</option>
+                                @for (agent of agentService.agents(); track agent.id) {
+                                    <option [value]="agent.id">{{ agent.name }}</option>
                                 }
-                                @if (agentDropdownOpen() && agentService.agents().length > 0) {
-                                    <div class="agent-dropdown">
-                                        @for (agent of agentService.agents(); track agent.id) {
-                                            <button
-                                                type="button"
-                                                class="agent-option"
-                                                [class.agent-option--selected]="formAgentId() === agent.id"
-                                                (mousedown)="selectAgent(agent.id, agent.name)"
-                                            >
-                                                <span class="agent-option__name">{{ agent.name }}</span>
-                                                <span class="agent-option__id">{{ agent.id }}</span>
-                                            </button>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                            <span class="form-hint">Pick from list or paste an agent ID directly</span>
+                            </select>
                         </div>
                         <div class="form-field">
                             <label>Repository</label>
                             <input [value]="formRepo()" (input)="formRepo.set(inputValue($event))" class="form-input mono" placeholder="owner/repo" />
                         </div>
-                        <div class="form-field">
-                            <label>Mention Username</label>
-                            <input [value]="formMentionUsername()" (input)="formMentionUsername.set(inputValue($event))" class="form-input mono" placeholder="e.g. corvid-agent" />
-                            <span class="form-hint">GitHub username to watch for &#64;mentions</span>
-                        </div>
-                        <div class="form-field">
-                            <label>Project</label>
-                            <div class="agent-picker">
-                                <input
-                                    class="form-input mono"
-                                    [value]="formProjectId()"
-                                    (input)="onProjectInput($event)"
-                                    (focus)="projectDropdownOpen.set(true)"
-                                    placeholder="Select or paste project ID..."
-                                />
-                                @if (resolvedProjectName()) {
-                                    <span class="agent-resolved">{{ resolvedProjectName() }}</span>
-                                }
-                                @if (projectDropdownOpen() && projectService.projects().length > 0) {
-                                    <div class="agent-dropdown">
-                                        @for (project of projectService.projects(); track project.id) {
-                                            <button
-                                                type="button"
-                                                class="agent-option"
-                                                [class.agent-option--selected]="formProjectId() === project.id"
-                                                (mousedown)="selectProject(project.id, project.name)"
-                                            >
-                                                <span class="agent-option__name">{{ project.name }}</span>
-                                                <span class="agent-option__id">{{ project.id }}</span>
-                                            </button>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                            <span class="form-hint">Pick from list or paste a project ID directly</span>
-                        </div>
-                        <div class="form-field">
-                            <label>Poll Interval (seconds)</label>
-                            <input type="number" [value]="formInterval()" (input)="formInterval.set(+inputValue($event) || 60)" class="form-input" min="30" max="3600" />
-                            <span class="form-hint">30s - 3600s (default: 60s)</span>
-                        </div>
-                        <div class="form-field">
-                            <label>Event Filter</label>
-                            <div class="checkbox-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formFilterIssueComment()" (change)="formFilterIssueComment.set(!formFilterIssueComment())" />
-                                    Issue Comments
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formFilterIssues()" (change)="formFilterIssues.set(!formFilterIssues())" />
-                                    Issues
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" [checked]="formFilterPrComment()" (change)="formFilterPrComment.set(!formFilterPrComment())" />
-                                    PR Review Comments
-                                </label>
-                            </div>
-                        </div>
                         <div class="form-field span-2">
-                            <label>Allowed Users (optional)</label>
-                            <input [value]="formAllowedUsers()" (input)="formAllowedUsers.set(inputValue($event))" class="form-input" placeholder="user1, user2 (empty = all users)" />
-                            <span class="form-hint">Comma-separated GitHub usernames. Leave empty for all users.</span>
+                            <label>Watch for &#64;mentions of</label>
+                            <input [value]="formMentionUsername()" (input)="formMentionUsername.set(inputValue($event))" class="form-input mono" placeholder="github-username" />
+                            <span class="form-hint">The GitHub username to watch for. When someone writes &#64;this-name, the agent responds.</span>
                         </div>
                     </div>
+
+                    <!-- Advanced toggle -->
+                    <button class="advanced-toggle" (click)="showAdvanced.set(!showAdvanced())">
+                        {{ showAdvanced() ? '\u25B2 Hide advanced' : '\u25BC Advanced options' }}
+                    </button>
+                    @if (showAdvanced()) {
+                        <div class="form-grid advanced-section">
+                            <div class="form-field">
+                                <label>Poll Interval (seconds)</label>
+                                <input type="number" [value]="formInterval()" (input)="formInterval.set(+inputValue($event) || 60)" class="form-input" min="30" max="3600" />
+                                <span class="form-hint">How often to check (default: 60s)</span>
+                            </div>
+                            <div class="form-field">
+                                <label>Project (optional)</label>
+                                <select class="form-select" [ngModel]="formProjectId()" (ngModelChange)="formProjectId.set($event)">
+                                    <option value="">None</option>
+                                    @for (project of projectService.projects(); track project.id) {
+                                        <option [value]="project.id">{{ project.name }}</option>
+                                    }
+                                </select>
+                                <span class="form-hint">Scope to a project workspace</span>
+                            </div>
+                            <div class="form-field">
+                                <label>Listen for</label>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formFilterIssueComment()" (change)="formFilterIssueComment.set(!formFilterIssueComment())" />
+                                        Issue comments
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formFilterIssues()" (change)="formFilterIssues.set(!formFilterIssues())" />
+                                        New issues
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" [checked]="formFilterPrComment()" (change)="formFilterPrComment.set(!formFilterPrComment())" />
+                                        PR review comments
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <label>Only from these users (optional)</label>
+                                <input [value]="formAllowedUsers()" (input)="formAllowedUsers.set(inputValue($event))" class="form-input" placeholder="user1, user2" />
+                                <span class="form-hint">Leave empty to respond to everyone</span>
+                            </div>
+                        </div>
+                    }
+
                     <div class="form-buttons">
                         <button class="save-btn" [disabled]="creating()" (click)="create()">
-                            {{ creating() ? 'Creating...' : 'Create Config' }}
+                            {{ creating() ? 'Creating...' : 'Start Watching' }}
                         </button>
                     </div>
                 </div>
@@ -298,7 +266,8 @@ import type { MentionPollingConfig, MentionPollingStatus } from '../../core/mode
         .stat-label{font-size:.55rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
 
         .create-form{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1.25rem}
-        .create-form h3{margin:0 0 1rem;color:var(--text-primary);font-size:.85rem}
+        .create-form h3{margin:0 0 .25rem;color:var(--text-primary);font-size:.85rem}
+        .form-intro{margin:0 0 1rem;font-size:.75rem;color:var(--text-tertiary)}
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
         .span-2{grid-column:span 2}
         .form-field{display:flex;flex-direction:column;gap:.25rem}
@@ -312,16 +281,9 @@ import type { MentionPollingConfig, MentionPollingStatus } from '../../core/mode
         .checkbox-label input{accent-color:var(--accent-cyan)}
         .form-buttons{margin-top:1rem}
         .save-btn{text-transform:uppercase}
-
-        .agent-picker{position:relative}
-        .agent-resolved{font-size:.65rem;color:var(--accent-green);font-weight:600;margin-top:.15rem;display:block}
-        .agent-dropdown{position:absolute;top:100%;left:0;right:0;z-index:50;max-height:200px;overflow-y:auto;background:var(--bg-surface);border:1px solid var(--accent-cyan);border-radius:var(--radius);margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
-        .agent-option{display:flex;justify-content:space-between;align-items:center;width:100%;padding:.45rem .6rem;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text-primary);cursor:pointer;font-family:inherit;font-size:.75rem;text-align:left}
-        .agent-option:last-child{border-bottom:none}
-        .agent-option:hover{background:var(--bg-hover)}
-        .agent-option--selected{background:var(--accent-cyan-dim)}
-        .agent-option__name{font-weight:600}
-        .agent-option__id{font-size:.6rem;color:var(--text-tertiary);font-family:monospace}
+        .advanced-toggle{display:block;margin-top:.75rem;padding:.35rem 0;background:none;border:none;color:var(--text-tertiary);font-size:.7rem;cursor:pointer;font-family:inherit}
+        .advanced-toggle:hover{color:var(--accent-cyan)}
+        .advanced-section{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)}
 
         .polling__filters{display:flex;gap:.35rem;margin-bottom:1rem}
         .filter-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit}
@@ -370,10 +332,10 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
     protected readonly agentService = inject(AgentService);
     protected readonly projectService = inject(ProjectService);
     private readonly notifications = inject(NotificationService);
-    private readonly cdr = inject(ChangeDetectorRef);
 
     readonly activeFilter = signal<'all' | 'active' | 'paused'>('all');
     readonly showCreateForm = signal(false);
+    readonly showAdvanced = signal(false);
     readonly creating = signal(false);
     readonly expandedId = signal<string | null>(null);
 
@@ -387,25 +349,6 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
     readonly formFilterIssues = signal(false);
     readonly formFilterPrComment = signal(true);
     readonly formAllowedUsers = signal('');
-
-    // Dropdown state
-    readonly agentDropdownOpen = signal(false);
-    readonly projectDropdownOpen = signal(false);
-
-    // Resolved names for pasted IDs
-    readonly resolvedAgentName = computed(() => {
-        const id = this.formAgentId();
-        if (!id) return '';
-        const agent = this.agentService.agents().find((a) => a.id === id);
-        return agent ? agent.name : '';
-    });
-
-    readonly resolvedProjectName = computed(() => {
-        const id = this.formProjectId();
-        if (!id) return '';
-        const project = this.projectService.projects().find((p) => p.id === id);
-        return project ? project.name : '';
-    });
 
     readonly activeCount = computed(() =>
         this.pollingService.configs().filter((c) => c.status === 'active').length,
@@ -421,52 +364,20 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
         return all.filter((c) => c.status === filter);
     });
 
-    private clickOutsideHandler = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.agent-picker')) {
-            this.agentDropdownOpen.set(false);
-            this.projectDropdownOpen.set(false);
-        }
-    };
-
     ngOnInit(): void {
         this.pollingService.loadConfigs();
         this.pollingService.loadStats();
         this.pollingService.startListening();
         this.agentService.loadAgents();
         this.projectService.loadProjects();
-        document.addEventListener('click', this.clickOutsideHandler);
     }
 
     ngOnDestroy(): void {
         this.pollingService.stopListening();
-        document.removeEventListener('click', this.clickOutsideHandler);
     }
 
     inputValue(event: Event): string {
         return (event.target as HTMLInputElement).value;
-    }
-
-    onAgentInput(event: Event): void {
-        const value = (event.target as HTMLInputElement).value;
-        this.formAgentId.set(value);
-        this.agentDropdownOpen.set(true);
-    }
-
-    selectAgent(id: string, name: string): void {
-        this.formAgentId.set(id);
-        this.agentDropdownOpen.set(false);
-    }
-
-    onProjectInput(event: Event): void {
-        const value = (event.target as HTMLInputElement).value;
-        this.formProjectId.set(value);
-        this.projectDropdownOpen.set(true);
-    }
-
-    selectProject(id: string, name: string): void {
-        this.formProjectId.set(id);
-        this.projectDropdownOpen.set(false);
     }
 
     getAgentName(agentId: string): string {
@@ -484,8 +395,8 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
     }
 
     async create(): Promise<void> {
-        if (!this.formAgentId() || !this.formRepo() || !this.formMentionUsername() || !this.formProjectId()) {
-            this.notifications.error('Please fill in agent, repo, mention username, and project');
+        if (!this.formAgentId() || !this.formRepo() || !this.formMentionUsername()) {
+            this.notifications.error('Please fill in agent, repository, and mention username');
             return;
         }
 
@@ -505,7 +416,7 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
                 agentId: this.formAgentId(),
                 repo: this.formRepo(),
                 mentionUsername: this.formMentionUsername(),
-                projectId: this.formProjectId(),
+                projectId: this.formProjectId() || undefined,
                 intervalSeconds: this.formInterval(),
                 eventFilter: eventFilter.length > 0 ? eventFilter : undefined,
                 allowedUsers: allowedUsers.length > 0 ? allowedUsers : undefined,

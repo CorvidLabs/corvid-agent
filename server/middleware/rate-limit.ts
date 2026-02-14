@@ -30,7 +30,7 @@ export interface RateLimitConfig {
 }
 
 export function loadRateLimitConfig(): RateLimitConfig {
-    const maxGet = parseInt(process.env.RATE_LIMIT_GET ?? '240', 10);
+    const maxGet = parseInt(process.env.RATE_LIMIT_GET ?? '600', 10);
     const maxMutation = parseInt(process.env.RATE_LIMIT_MUTATION ?? '60', 10);
     return {
         maxGet: Number.isFinite(maxGet) && maxGet > 0 ? maxGet : 240,
