@@ -419,3 +419,115 @@ export interface UpdateScheduleInput {
     maxBudgetPerRun?: number;
     notifyAddress?: string | null;
 }
+
+// MARK: - Webhooks (GitHub Event Triggers)
+
+export type WebhookEventType =
+    | 'issue_comment'     // @mention in issue comments
+    | 'issues'            // Issue opened/edited
+    | 'pull_request_review_comment' // @mention in PR review comments
+    | 'issue_comment_pr'; // @mention in PR conversation comments (GitHub sends issue_comment for PR comments too)
+
+export type WebhookRegistrationStatus = 'active' | 'paused';
+
+export interface WebhookRegistration {
+    id: string;
+    agentId: string;
+    /** GitHub repo (owner/name) this webhook listens to */
+    repo: string;
+    /** Which events trigger this webhook */
+    events: WebhookEventType[];
+    /** GitHub username to match @mentions for (e.g. 'corvid-agent') */
+    mentionUsername: string;
+    /** Project ID to use when creating sessions */
+    projectId: string;
+    status: WebhookRegistrationStatus;
+    /** Total number of times this webhook has been triggered */
+    triggerCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateWebhookRegistrationInput {
+    agentId: string;
+    repo: string;
+    events: WebhookEventType[];
+    mentionUsername: string;
+    projectId: string;
+}
+
+export interface UpdateWebhookRegistrationInput {
+    events?: WebhookEventType[];
+    mentionUsername?: string;
+    projectId?: string;
+    status?: WebhookRegistrationStatus;
+}
+
+export interface WebhookDelivery {
+    id: string;
+    registrationId: string;
+    event: string;
+    action: string;
+    repo: string;
+    sender: string;
+    /** The comment/body that triggered this delivery */
+    body: string;
+    /** URL to the issue/PR on GitHub */
+    htmlUrl: string;
+    /** Session ID created for this delivery */
+    sessionId: string | null;
+    /** Work task ID created for this delivery */
+    workTaskId: string | null;
+    status: 'processing' | 'completed' | 'failed' | 'ignored';
+    result: string | null;
+    createdAt: string;
+}
+
+// MARK: - GitHub Mention Polling
+
+export type MentionPollingStatus = 'active' | 'paused';
+
+export interface MentionPollingConfig {
+    id: string;
+    agentId: string;
+    /** GitHub repo (owner/name) to poll for mentions */
+    repo: string;
+    /** GitHub username to monitor for @mentions (e.g. 'corvid-agent') */
+    mentionUsername: string;
+    /** Project ID to use when creating triggered sessions */
+    projectId: string;
+    /** Polling interval in seconds (min 30, default 60) */
+    intervalSeconds: number;
+    status: MentionPollingStatus;
+    /** Total number of times a mention has been detected and processed */
+    triggerCount: number;
+    /** ISO timestamp of last successful poll */
+    lastPollAt: string | null;
+    /** ID of the last processed notification/comment to avoid duplicates */
+    lastSeenId: string | null;
+    /** Optional: only poll specific event types */
+    eventFilter: ('issue_comment' | 'issues' | 'pull_request_review_comment')[];
+    /** Optional: only respond to mentions from specific users (empty = all users) */
+    allowedUsers: string[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateMentionPollingInput {
+    agentId: string;
+    repo: string;
+    mentionUsername: string;
+    projectId: string;
+    intervalSeconds?: number;
+    eventFilter?: MentionPollingConfig['eventFilter'];
+    allowedUsers?: string[];
+}
+
+export interface UpdateMentionPollingInput {
+    mentionUsername?: string;
+    projectId?: string;
+    intervalSeconds?: number;
+    status?: MentionPollingStatus;
+    eventFilter?: MentionPollingConfig['eventFilter'];
+    allowedUsers?: string[];
+}

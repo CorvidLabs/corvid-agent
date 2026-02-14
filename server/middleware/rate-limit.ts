@@ -2,7 +2,7 @@
  * HTTP rate limiting middleware — sliding-window per-IP rate limiter.
  *
  * Configuration via environment variables:
- * - RATE_LIMIT_GET: max GET/HEAD/OPTIONS requests per minute per IP (default: 240)
+ * - RATE_LIMIT_GET: max GET/HEAD/OPTIONS requests per minute per IP (default: 600)
  * - RATE_LIMIT_MUTATION: max POST/PUT/DELETE requests per minute per IP (default: 60)
  *
  * Uses a sliding window algorithm: each IP tracks timestamps of recent requests,
@@ -30,7 +30,7 @@ export interface RateLimitConfig {
 }
 
 export function loadRateLimitConfig(): RateLimitConfig {
-    const maxGet = parseInt(process.env.RATE_LIMIT_GET ?? '240', 10);
+    const maxGet = parseInt(process.env.RATE_LIMIT_GET ?? '600', 10);
     const maxMutation = parseInt(process.env.RATE_LIMIT_MUTATION ?? '60', 10);
     return {
         maxGet: Number.isFinite(maxGet) && maxGet > 0 ? maxGet : 240,
@@ -170,8 +170,8 @@ export class RateLimiter {
 // Request helper
 // ---------------------------------------------------------------------------
 
-/** Paths that bypass rate limiting (monitoring probes, etc.). */
-const EXEMPT_PATHS = new Set(['/api/health']);
+/** Paths that bypass rate limiting (monitoring probes, webhooks, etc.). */
+const EXEMPT_PATHS = new Set(['/api/health', '/webhooks/github']);
 
 /**
  * Extract the client IP from a Request.

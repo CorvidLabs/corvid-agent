@@ -303,3 +303,54 @@ export const UpdateScheduleSchema = z.object({
 export const ScheduleApprovalSchema = z.object({
     approved: z.boolean({ message: 'approved (boolean) is required' }),
 });
+
+// ─── Webhooks ────────────────────────────────────────────────────────────────
+
+const WebhookEventTypeSchema = z.enum([
+    'issue_comment',
+    'issues',
+    'pull_request_review_comment',
+    'issue_comment_pr',
+]);
+
+export const CreateWebhookRegistrationSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    repo: z.string().min(1, 'repo is required (format: owner/name)').regex(/^[^/]+\/[^/]+$/, 'repo must be in owner/name format'),
+    events: z.array(WebhookEventTypeSchema).min(1, 'At least one event type is required'),
+    mentionUsername: z.string().min(1, 'mentionUsername is required'),
+    projectId: z.string().min(1, 'projectId is required'),
+});
+
+export const UpdateWebhookRegistrationSchema = z.object({
+    events: z.array(WebhookEventTypeSchema).min(1).optional(),
+    mentionUsername: z.string().min(1).optional(),
+    projectId: z.string().min(1).optional(),
+    status: z.enum(['active', 'paused']).optional(),
+});
+
+// ─── Mention Polling ────────────────────────────────────────────────────────
+
+const PollingEventFilterSchema = z.enum([
+    'issue_comment',
+    'issues',
+    'pull_request_review_comment',
+]);
+
+export const CreateMentionPollingSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    repo: z.string().min(1, 'repo is required (format: owner/name)').regex(/^[^/]+\/[^/]+$/, 'repo must be in owner/name format'),
+    mentionUsername: z.string().min(1, 'mentionUsername is required'),
+    projectId: z.string().min(1, 'projectId is required'),
+    intervalSeconds: z.number().int().min(30, 'Minimum polling interval is 30 seconds').max(3600, 'Maximum polling interval is 1 hour').optional(),
+    eventFilter: z.array(PollingEventFilterSchema).optional(),
+    allowedUsers: z.array(z.string().min(1)).optional(),
+});
+
+export const UpdateMentionPollingSchema = z.object({
+    mentionUsername: z.string().min(1).optional(),
+    projectId: z.string().min(1).optional(),
+    intervalSeconds: z.number().int().min(30).max(3600).optional(),
+    status: z.enum(['active', 'paused']).optional(),
+    eventFilter: z.array(PollingEventFilterSchema).optional(),
+    allowedUsers: z.array(z.string().min(1)).optional(),
+});

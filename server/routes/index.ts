@@ -10,8 +10,12 @@ import { handleAnalyticsRoutes } from './analytics';
 import { handleSystemLogRoutes } from './system-logs';
 import { handleSettingsRoutes } from './settings';
 import { handleScheduleRoutes } from './schedules';
+import { handleWebhookRoutes } from './webhooks';
+import { handleMentionPollingRoutes } from './mention-polling';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
+import type { WebhookService } from '../webhooks/service';
+import type { MentionPollingService } from '../polling/service';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
@@ -71,6 +75,8 @@ export async function handleRequest(
     agentDirectory?: AgentDirectory | null,
     networkSwitchFn?: NetworkSwitchFn | null,
     schedulerService?: SchedulerService | null,
+    webhookService?: WebhookService | null,
+    mentionPollingService?: MentionPollingService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
 
@@ -87,7 +93,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService);
+        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService);
         if (response) addCors(response);
         return response;
     } catch (err) {
@@ -109,6 +115,8 @@ async function handleRoutes(
     agentDirectory?: AgentDirectory | null,
     networkSwitchFn?: NetworkSwitchFn | null,
     schedulerService?: SchedulerService | null,
+    webhookService?: WebhookService | null,
+    mentionPollingService?: MentionPollingService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -151,6 +159,14 @@ async function handleRoutes(
     // Schedule routes (automation)
     const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService ?? null);
     if (scheduleResponse) return scheduleResponse;
+
+    // Webhook routes (GitHub event-driven automation)
+    const webhookResponse = handleWebhookRoutes(req, url, db, webhookService ?? null);
+    if (webhookResponse) return webhookResponse;
+
+    // Mention polling routes (local-first GitHub @mention detection)
+    const pollingResponse = handleMentionPollingRoutes(req, url, db, mentionPollingService ?? null);
+    if (pollingResponse) return pollingResponse;
 
     // MCP API routes (used by stdio server subprocess)
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService

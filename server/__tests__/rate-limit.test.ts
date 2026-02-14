@@ -151,7 +151,7 @@ describe('loadRateLimitConfig', () => {
         delete process.env.RATE_LIMIT_MUTATION;
 
         const config = loadRateLimitConfig();
-        expect(config.maxGet).toBe(240);
+        expect(config.maxGet).toBe(600);
         expect(config.maxMutation).toBe(60);
         expect(config.windowMs).toBe(60_000);
 

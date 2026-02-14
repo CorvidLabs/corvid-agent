@@ -87,6 +87,26 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/webhooks"
+                        routerLinkActive="sidebar__link--active"
+                        title="Webhooks">
+                        <span class="sidebar__label">Webhooks</span>
+                        <span class="sidebar__abbr">Wh</span>
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
+                        routerLink="/mention-polling"
+                        routerLinkActive="sidebar__link--active"
+                        title="Mention Polling">
+                        <span class="sidebar__label">Polling</span>
+                        <span class="sidebar__abbr">Mp</span>
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/feed"
                         routerLinkActive="sidebar__link--active"
                         title="Feed">

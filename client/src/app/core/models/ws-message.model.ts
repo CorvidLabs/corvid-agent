@@ -33,6 +33,9 @@ export type ServerWsMessage =
     | { type: 'schedule_execution_update'; execution: import('./schedule.model').ScheduleExecution }
     | { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
     | { type: 'ollama_pull_progress'; model: string; status: string; progress: number; downloadedBytes: number; totalBytes: number; currentLayer: string; error?: string }
+    | { type: 'webhook_update'; registration: import('./webhook.model').WebhookRegistration }
+    | { type: 'webhook_delivery'; delivery: import('./webhook.model').WebhookDelivery }
+    | { type: 'mention_polling_update'; config: import('./mention-polling.model').MentionPollingConfig }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {

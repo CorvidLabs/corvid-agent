@@ -12,6 +12,8 @@ import { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
 import { SchedulerService } from './scheduler/service';
+import { WebhookService } from './webhooks/service';
+import { MentionPollingService } from './polling/service';
 import { SessionLifecycleManager } from './process/session-lifecycle';
 import { MemorySyncService } from './db/memory-sync';
 import { existsSync } from 'node:fs';
@@ -84,6 +86,12 @@ workTaskService.recoverStaleTasks().catch((err) =>
 
 // Initialize scheduler (cron/interval automation for agents)
 const schedulerService = new SchedulerService(db, processManager, workTaskService);
+
+// Initialize webhook service (GitHub event-driven automation)
+const webhookService = new WebhookService(db, processManager, workTaskService);
+
+// Initialize mention polling service (local-first GitHub @mention detection)
+const mentionPollingService = new MentionPollingService(db, processManager, workTaskService);
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -217,6 +225,7 @@ const server = Bun.serve<WsData>({
                 timestamp: new Date().toISOString(),
             };
             health.scheduler = schedulerService.getStats();
+            health.mentionPolling = mentionPollingService.getStats();
             return new Response(JSON.stringify(health), {
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -259,7 +268,7 @@ const server = Bun.serve<WsData>({
         if (ollamaResponse) return ollamaResponse;
 
         // API routes
-        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService);
+        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService);
         if (apiResponse) return apiResponse;
 
         // Mobile chat client
@@ -331,6 +340,18 @@ function spreadScheduleEvent(event: { type: string; data: unknown }): Record<str
     }
 }
 
+// Broadcast webhook events to all WebSocket clients
+webhookService.onEvent((event) => {
+    const msg = JSON.stringify({ type: event.type, delivery: event.data });
+    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+});
+
+// Broadcast mention polling events to all WebSocket clients
+mentionPollingService.onEvent((event) => {
+    const msg = JSON.stringify({ type: event.type, ...event.data as Record<string, unknown> });
+    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+});
+
 // Initialize AlgoChat after server starts
 initAlgoChat().then(() => {
     // Wire agent message broadcasts once messenger is available
@@ -353,10 +374,12 @@ initAlgoChat().then(() => {
         schedulerService.setAgentMessenger(agentMessenger);
     }
     schedulerService.start();
+    mentionPollingService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
-    // Start scheduler even if AlgoChat fails — it can still do GitHub ops and work tasks
+    // Start scheduler and polling even if AlgoChat fails — they can still do GitHub ops and work tasks
     schedulerService.start();
+    mentionPollingService.start();
 });
 
 // Start session lifecycle cleanup after server is running
@@ -405,6 +428,7 @@ function logShutdownDiagnostics(signal: string): void {
 
 function gracefulShutdown(): void {
     schedulerService.stop();
+    mentionPollingService.stop();
     memorySyncService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
