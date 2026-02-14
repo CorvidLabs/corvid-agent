@@ -78,10 +78,13 @@ export class PSKManager {
         const restored = this.loadState(pskConfig.address);
         if (restored) {
             this.contact = restored;
+            const pskFp = Array.from(restored.initialPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
             log.info(
                 `Restored state for ${pskConfig.label ?? pskConfig.address.slice(0, 8)}... on ${network}`,
                 {
                     network,
+                    pskFp,
+                    pskLen: restored.initialPSK.length,
                     sendCounter: restored.state.sendCounter,
                     peerLastCounter: restored.state.peerLastCounter,
                     lastRound: restored.lastRound,
@@ -160,7 +163,8 @@ export class PSKManager {
         this.processedTxids.clear();
         this.saveState();
 
-        log.info(`Reset PSK for ${this.contact.label || this.contact.address.slice(0, 8)}...`);
+        const pskFp = Array.from(newPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+        log.info(`Reset PSK for ${this.contact.label || this.contact.address.slice(0, 8)}...`, { pskFp, pskLen: newPSK.length });
 
         if (wasPolling && interval > 0) {
             this.start(interval);
@@ -278,6 +282,21 @@ export class PSKManager {
 
                     // Derive PSK at this counter
                     const currentPSK = algochat.derivePSKAtCounter(this.contact.initialPSK, envelope.ratchetCounter);
+
+                    // Diagnostic: log PSK fingerprint and counter so we can compare with mobile
+                    const pskFp = Array.from(this.contact.initialPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+                    const derivedFp = Array.from(currentPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+                    const senderKeyFp = envelope.senderPublicKey ? Array.from(envelope.senderPublicKey.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('') : 'none';
+                    const myKeyFp = Array.from(chatAccount.encryptionKeys.publicKey.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+                    log.info(`Decrypt attempt`, {
+                        txid: tx.id.slice(0, 12),
+                        counter: envelope.ratchetCounter,
+                        pskFp,
+                        derivedFp,
+                        senderKeyFp,
+                        myKeyFp,
+                        noteLen: noteBytes.length,
+                    });
 
                     // Decrypt
                     const decrypted = algochat.decryptPSKMessage(
