@@ -396,6 +396,7 @@ initAlgoChat().then(() => {
     // Give it the agentMessenger if AlgoChat is initialized
     if (agentMessenger) {
         schedulerService.setAgentMessenger(agentMessenger);
+        workflowService.setAgentMessenger(agentMessenger);
     }
     schedulerService.start();
     mentionPollingService.start();
