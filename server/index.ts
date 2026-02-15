@@ -27,6 +27,19 @@ import { OllamaProvider } from './providers/ollama/provider';
 import { handleOllamaRoutes } from './routes/ollama';
 import { listProjects, createProject } from './db/projects';
 import { buildAgentCard } from './a2a/agent-card';
+import {
+    initObservability,
+    renderMetrics,
+    httpRequestsTotal,
+    httpRequestDuration,
+    activeSessions as activeSessionsGauge,
+    parseTraceparent,
+    generateTraceId,
+    generateSpanId,
+    buildTraceparent,
+} from './observability/index';
+import { runWithTraceId } from './observability/trace-context';
+import { handleAuditRoutes } from './routes/audit';
 
 const log = createLogger('Server');
 
@@ -41,6 +54,9 @@ const startTime = Date.now();
 
 // Initialize database
 const db = getDb();
+
+// Initialize observability (OpenTelemetry tracing + metrics) — non-blocking, opt-in
+initObservability().catch(() => {});
 
 // Initialize LLM provider registry
 const providerRegistry = LlmProviderRegistry.getInstance();
@@ -198,6 +214,44 @@ const server = Bun.serve<WsData>({
 
     async fetch(req, server) {
         const url = new URL(req.url);
+        const requestStart = performance.now();
+
+        // Extract or generate trace ID from W3C traceparent header
+        const traceparentHeader = req.headers.get('traceparent');
+        const parsed = parseTraceparent(traceparentHeader);
+        const traceId = parsed?.traceId ?? generateTraceId();
+        const spanId = generateSpanId();
+
+        // Helper to add trace headers and record metrics on response
+        function instrumentResponse(response: Response, route: string): Response {
+            const durationSec = (performance.now() - requestStart) / 1000;
+            const statusCode = String(response.status);
+
+            httpRequestsTotal.inc({ method: req.method, route, status_code: statusCode });
+            httpRequestDuration.observe({ method: req.method, route, status_code: statusCode }, durationSec);
+
+            // Add traceparent to response
+            response.headers.set('traceparent', buildTraceparent(traceId, spanId));
+            return response;
+        }
+
+        // Prometheus metrics endpoint
+        if (url.pathname === '/metrics' && req.method === 'GET') {
+            // Update active sessions gauge before rendering
+            activeSessionsGauge.set(processManager.getActiveSessionIds().length);
+            return instrumentResponse(
+                new Response(renderMetrics(), {
+                    headers: { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' },
+                }),
+                '/metrics',
+            );
+        }
+
+        // Audit log endpoint
+        if (url.pathname === '/api/audit-log' && req.method === 'GET') {
+            const auditResponse = handleAuditRoutes(req, url, db);
+            if (auditResponse) return instrumentResponse(auditResponse, '/api/audit-log');
+        }
 
         // WebSocket upgrade
         if (url.pathname === '/ws') {
@@ -220,105 +274,133 @@ const server = Bun.serve<WsData>({
             return new Response('WebSocket upgrade failed', { status: 400 });
         }
 
-        // Health check endpoint
-        if (url.pathname === '/api/health' && req.method === 'GET') {
-            const health: Record<string, unknown> = {
-                status: 'ok',
-                uptime: (Date.now() - startTime) / 1000,
-                activeSessions: processManager.getActiveSessionIds().length,
-                algochat: algochatBridge !== null,
-                timestamp: new Date().toISOString(),
-            };
-            health.scheduler = schedulerService.getStats();
-            health.mentionPolling = mentionPollingService.getStats();
-            health.workflows = workflowService.getStats();
-            return new Response(JSON.stringify(health), {
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-
-        // A2A Protocol: Agent Card (public, no auth required)
-        if (url.pathname === '/.well-known/agent-card.json' && req.method === 'GET') {
-            const baseUrl = `${url.protocol}//${url.host}`;
-            const card = buildAgentCard(baseUrl);
-            return new Response(JSON.stringify(card, null, 2), {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=300', // 5 min cache
-                },
-            });
-        }
-
-        // LLM providers endpoint
-        if (url.pathname === '/api/providers' && req.method === 'GET') {
-            const providers = providerRegistry.getAll().map((p) => p.getInfo());
-            return new Response(JSON.stringify(providers), {
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-
-        // Provider models endpoint — dynamic model listing (e.g. Ollama local models)
-        const modelsMatch = url.pathname.match(/^\/api\/providers\/([^/]+)\/models$/);
-        if (modelsMatch && req.method === 'GET') {
-            const providerType = modelsMatch[1];
-            const provider = providerRegistry.get(providerType as import('./providers/types').LlmProviderType);
-            if (!provider) {
-                return new Response(JSON.stringify({ error: `Unknown provider: ${providerType}` }), {
-                    status: 404,
-                    headers: { 'Content-Type': 'application/json' },
-                });
+        // Run request handler within trace context so all logs include trace ID
+        return runWithTraceId(traceId, async () => {
+            // Health check endpoint
+            if (url.pathname === '/api/health' && req.method === 'GET') {
+                const health: Record<string, unknown> = {
+                    status: 'ok',
+                    uptime: (Date.now() - startTime) / 1000,
+                    activeSessions: processManager.getActiveSessionIds().length,
+                    algochat: algochatBridge !== null,
+                    timestamp: new Date().toISOString(),
+                };
+                health.scheduler = schedulerService.getStats();
+                health.mentionPolling = mentionPollingService.getStats();
+                health.workflows = workflowService.getStats();
+                return instrumentResponse(
+                    new Response(JSON.stringify(health), {
+                        headers: { 'Content-Type': 'application/json' },
+                    }),
+                    '/api/health',
+                );
             }
-            // Refresh models if provider supports it (e.g. Ollama)
-            if ('refreshModels' in provider && typeof (provider as { refreshModels: () => Promise<string[]> }).refreshModels === 'function') {
-                await (provider as { refreshModels: () => Promise<string[]> }).refreshModels();
-            }
-            const info = provider.getInfo();
-            return new Response(JSON.stringify({ models: info.models, defaultModel: info.defaultModel }), {
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
 
-        // Ollama model management routes
-        const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
-            const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
-            server.publish('ollama', msg);
+            // A2A Protocol: Agent Card (public, no auth required)
+            if (url.pathname === '/.well-known/agent-card.json' && req.method === 'GET') {
+                const baseUrl = `${url.protocol}//${url.host}`;
+                const card = buildAgentCard(baseUrl);
+                return instrumentResponse(
+                    new Response(JSON.stringify(card, null, 2), {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*',
+                            'Cache-Control': 'public, max-age=300', // 5 min cache
+                        },
+                    }),
+                    '/.well-known/agent-card.json',
+                );
+            }
+
+            // LLM providers endpoint
+            if (url.pathname === '/api/providers' && req.method === 'GET') {
+                const providers = providerRegistry.getAll().map((p) => p.getInfo());
+                return instrumentResponse(
+                    new Response(JSON.stringify(providers), {
+                        headers: { 'Content-Type': 'application/json' },
+                    }),
+                    '/api/providers',
+                );
+            }
+
+            // Provider models endpoint — dynamic model listing (e.g. Ollama local models)
+            const modelsMatch = url.pathname.match(/^\/api\/providers\/([^/]+)\/models$/);
+            if (modelsMatch && req.method === 'GET') {
+                const providerType = modelsMatch[1];
+                const provider = providerRegistry.get(providerType as import('./providers/types').LlmProviderType);
+                if (!provider) {
+                    return instrumentResponse(
+                        new Response(JSON.stringify({ error: `Unknown provider: ${providerType}` }), {
+                            status: 404,
+                            headers: { 'Content-Type': 'application/json' },
+                        }),
+                        '/api/providers/models',
+                    );
+                }
+                // Refresh models if provider supports it (e.g. Ollama)
+                if ('refreshModels' in provider && typeof (provider as { refreshModels: () => Promise<string[]> }).refreshModels === 'function') {
+                    await (provider as { refreshModels: () => Promise<string[]> }).refreshModels();
+                }
+                const info = provider.getInfo();
+                return instrumentResponse(
+                    new Response(JSON.stringify({ models: info.models, defaultModel: info.defaultModel }), {
+                        headers: { 'Content-Type': 'application/json' },
+                    }),
+                    '/api/providers/models',
+                );
+            }
+
+            // Ollama model management routes
+            const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
+                const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
+                server.publish('ollama', msg);
+            });
+            if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
+
+            // API routes
+            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService);
+            if (apiResponse) {
+                // Normalize route for metrics (strip IDs for cardinality control)
+                const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
+                return instrumentResponse(apiResponse, route);
+            }
+
+            // Mobile chat client
+            if (url.pathname === '/chat') {
+                const chatPath = join(import.meta.dir, 'public', 'chat.html');
+                if (existsSync(chatPath)) {
+                    return instrumentResponse(
+                        new Response(Bun.file(chatPath), {
+                            headers: { 'Content-Type': 'text/html' },
+                        }),
+                        '/chat',
+                    );
+                }
+            }
+
+            // Serve Angular static files
+            if (existsSync(CLIENT_DIST)) {
+                const filePath = join(CLIENT_DIST, url.pathname);
+
+                // Check if path exists as a file
+                if (existsSync(filePath) && !filePath.endsWith('/')) {
+                    return instrumentResponse(new Response(Bun.file(filePath)), '/static');
+                }
+
+                // SPA fallback - serve index.html for unmatched routes
+                const indexPath = join(CLIENT_DIST, 'index.html');
+                if (existsSync(indexPath)) {
+                    return instrumentResponse(
+                        new Response(Bun.file(indexPath), {
+                            headers: { 'Content-Type': 'text/html' },
+                        }),
+                        '/static',
+                    );
+                }
+            }
+
+            return instrumentResponse(new Response('Not Found', { status: 404 }), '/not-found');
         });
-        if (ollamaResponse) return ollamaResponse;
-
-        // API routes
-        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService);
-        if (apiResponse) return apiResponse;
-
-        // Mobile chat client
-        if (url.pathname === '/chat') {
-            const chatPath = join(import.meta.dir, 'public', 'chat.html');
-            if (existsSync(chatPath)) {
-                return new Response(Bun.file(chatPath), {
-                    headers: { 'Content-Type': 'text/html' },
-                });
-            }
-        }
-
-        // Serve Angular static files
-        if (existsSync(CLIENT_DIST)) {
-            let filePath = join(CLIENT_DIST, url.pathname);
-
-            // Check if path exists as a file
-            if (existsSync(filePath) && !filePath.endsWith('/')) {
-                return new Response(Bun.file(filePath));
-            }
-
-            // SPA fallback - serve index.html for unmatched routes
-            const indexPath = join(CLIENT_DIST, 'index.html');
-            if (existsSync(indexPath)) {
-                return new Response(Bun.file(indexPath), {
-                    headers: { 'Content-Type': 'text/html' },
-                });
-            }
-        }
-
-        return new Response('Not Found', { status: 404 });
     },
 
     websocket: wsHandler,
