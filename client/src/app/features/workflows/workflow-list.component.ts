@@ -6,7 +6,7 @@ import { WorkflowService } from '../../core/services/workflow.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '../../core/models/workflow.model';
+import type { WorkflowNode, WorkflowEdge, WorkflowRun } from '../../core/models/workflow.model';
 
 @Component({
     selector: 'app-workflow-list',
@@ -60,6 +60,7 @@ import type { WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '
                 <button [class.active]="activeFilter() === 'all'" (click)="activeFilter.set('all')">All ({{ workflowService.workflows().length }})</button>
                 <button [class.active]="activeFilter() === 'active'" (click)="activeFilter.set('active')">Active ({{ activeCount() }})</button>
                 <button [class.active]="activeFilter() === 'paused'" (click)="activeFilter.set('paused')">Paused</button>
+                <button [class.active]="activeFilter() === 'draft'" (click)="activeFilter.set('draft')">Draft</button>
             </div>
 
             @for (workflow of filteredWorkflows(); track workflow.id) {
@@ -74,7 +75,7 @@ import type { WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '
                             @if (workflow.status === 'active') {
                                 <button class="btn btn-sm" (click)="pause(workflow.id)">Pause</button>
                                 <button class="btn btn-sm btn-primary" (click)="trigger(workflow.id)">Trigger</button>
-                            } @else if (workflow.status === 'paused') {
+                            } @else if (workflow.status === 'paused' || workflow.status === 'draft') {
                                 <button class="btn btn-sm btn-primary" (click)="activate(workflow.id)">Activate</button>
                             }
                             <button class="btn btn-sm btn-danger" (click)="remove(workflow.id)">Delete</button>
@@ -109,11 +110,11 @@ import type { WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '
                                     @if (run.error) {
                                         <span class="error-text">{{ run.error | slice:0:100 }}</span>
                                     }
-                                    @if (run.status === 'running' || run.status === 'suspended') {
+                                    @if (run.status === 'running' || run.status === 'paused') {
                                         <button class="btn btn-sm btn-danger" (click)="cancelRun(run.id); $event.stopPropagation()">Cancel</button>
                                     }
-                                    @if (run.status === 'suspended') {
-                                        <span class="suspended-hint">Waiting for approval or delay</span>
+                                    @if (run.status === 'paused') {
+                                        <span class="paused-hint">Waiting for delay or external event</span>
                                     }
                                 </div>
                             }
@@ -152,13 +153,12 @@ import type { WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '
         .workflow-meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-muted, #888); margin-top: 0.5rem; }
         .meta { font-size: 0.8rem; color: var(--text-muted, #888); }
         .status-badge { padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; }
+        .status-draft { background: #2a2a3a; color: #94a3b8; }
         .status-active { background: #1a3a1a; color: #4ade80; }
-        .status-paused { background: #3a3a1a; color: #facc15; }
-        .status-archived { background: #2a2a2a; color: #888; }
         .status-running { background: #1a2a3a; color: #60a5fa; }
+        .status-paused { background: #3a3a1a; color: #facc15; }
         .status-completed { background: #1a3a1a; color: #4ade80; }
         .status-failed { background: #3a1a1a; color: #f87171; }
-        .status-suspended { background: #3a2a1a; color: #fb923c; }
         .status-cancelled { background: #2a2a2a; color: #888; }
         .expanded-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border, #333); }
         .expanded-section h4 { margin: 0.75rem 0 0.5rem; font-size: 0.9rem; }
@@ -166,15 +166,17 @@ import type { WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '
         .node-chip { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: var(--input-bg, #2a2a2a); }
         .node-start { background: #1a3a1a; color: #4ade80; }
         .node-end { background: #3a1a1a; color: #f87171; }
-        .node-action { background: #1a2a3a; color: #60a5fa; }
+        .node-agent_session { background: #3a2a1a; color: #fb923c; }
+        .node-work_task { background: #1a2a3a; color: #60a5fa; }
         .node-condition { background: #3a3a1a; color: #facc15; }
+        .node-delay { background: #2a2a2a; color: #94a3b8; }
+        .node-webhook_wait { background: #2a2a3a; color: #a78bfa; }
+        .node-transform { background: #1a3a3a; color: #2dd4bf; }
         .node-parallel { background: #2a1a3a; color: #c084fc; }
         .node-join { background: #2a1a3a; color: #c084fc; }
-        .node-approval { background: #3a2a1a; color: #fb923c; }
-        .node-delay { background: #2a2a2a; color: #94a3b8; }
         .run-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-size: 0.8rem; }
         .error-text { color: var(--error, #f87171); font-size: 0.75rem; }
-        .suspended-hint { font-size: 0.7rem; color: var(--warning, #fb923c); font-style: italic; }
+        .paused-hint { font-size: 0.7rem; color: var(--warning, #fb923c); font-style: italic; }
         .empty { color: var(--text-muted, #888); font-size: 0.85rem; }
         .empty-state { text-align: center; padding: 3rem; color: var(--text-muted, #888); }
         .btn { padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--border, #444); background: transparent; color: var(--text, #eee); cursor: pointer; font-size: 0.85rem; }
@@ -191,7 +193,7 @@ export class WorkflowListComponent implements OnInit, OnDestroy {
     protected readonly agentService = inject(AgentService);
     private readonly notifications = inject(NotificationService);
 
-    readonly activeFilter = signal<'all' | 'active' | 'paused'>('all');
+    readonly activeFilter = signal<'all' | 'active' | 'paused' | 'draft'>('all');
     readonly showCreateForm = signal(false);
     readonly creating = signal(false);
     readonly expandedWorkflowId = signal<string | null>(null);
@@ -250,7 +252,7 @@ export class WorkflowListComponent implements OnInit, OnDestroy {
 
         this.creating.set(true);
         try {
-            // Create with minimal start → end graph
+            // Create with minimal start -> end graph
             const startNode: WorkflowNode = { id: 'start-1', type: 'start', label: 'Start', config: {} };
             const endNode: WorkflowNode = { id: 'end-1', type: 'end', label: 'End', config: {} };
             const edge: WorkflowEdge = { id: 'edge-1', sourceNodeId: 'start-1', targetNodeId: 'end-1' };

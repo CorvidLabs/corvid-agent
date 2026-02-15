@@ -37,7 +37,7 @@ export type ServerWsMessage =
     | { type: 'webhook_delivery'; delivery: import('./webhook.model').WebhookDelivery }
     | { type: 'mention_polling_update'; config: import('./mention-polling.model').MentionPollingConfig }
     | { type: 'workflow_run_update'; run: import('./workflow.model').WorkflowRun }
-    | { type: 'workflow_node_update'; nodeExecution: import('./workflow.model').WorkflowNodeExecution }
+    | { type: 'workflow_node_update'; nodeExecution: import('./workflow.model').WorkflowNodeRun }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {

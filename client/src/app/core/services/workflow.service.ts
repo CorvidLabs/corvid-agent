@@ -4,7 +4,7 @@ import { WebSocketService } from './websocket.service';
 import type {
     Workflow,
     WorkflowRun,
-    WorkflowNodeExecution,
+    WorkflowNodeRun,
     CreateWorkflowInput,
     UpdateWorkflowInput,
 } from '../models/workflow.model';
@@ -18,7 +18,7 @@ export class WorkflowService {
 
     readonly workflows = signal<Workflow[]>([]);
     readonly runs = signal<WorkflowRun[]>([]);
-    readonly nodeExecutions = signal<WorkflowNodeExecution[]>([]);
+    readonly nodeRuns = signal<WorkflowNodeRun[]>([]);
     readonly loading = signal(false);
 
     private unsubscribeWs: (() => void) | null = null;
@@ -41,15 +41,15 @@ export class WorkflowService {
             }
 
             if (msg.type === 'workflow_node_update') {
-                const exec = msg.nodeExecution as WorkflowNodeExecution;
-                this.nodeExecutions.update((list) => {
-                    const idx = list.findIndex((e) => e.id === exec.id);
+                const nodeRun = msg.nodeExecution as WorkflowNodeRun;
+                this.nodeRuns.update((list) => {
+                    const idx = list.findIndex((e) => e.id === nodeRun.id);
                     if (idx >= 0) {
                         const copy = [...list];
-                        copy[idx] = exec;
+                        copy[idx] = nodeRun;
                         return copy;
                     }
-                    return [exec, ...list];
+                    return [nodeRun, ...list];
                 });
             }
         });
@@ -116,16 +116,10 @@ export class WorkflowService {
         return run;
     }
 
-    async resolveApproval(runId: string, nodeId: string, approved: boolean): Promise<WorkflowRun> {
-        return firstValueFrom(
-            this.api.post<WorkflowRun>(`/workflow-runs/${runId}/resolve`, { nodeId, approved }),
+    async loadNodeRuns(runId: string): Promise<void> {
+        const nodeRuns = await firstValueFrom(
+            this.api.get<WorkflowNodeRun[]>(`/workflow-runs/${runId}/nodes`),
         );
-    }
-
-    async loadNodeExecutions(runId: string): Promise<void> {
-        const executions = await firstValueFrom(
-            this.api.get<WorkflowNodeExecution[]>(`/workflow-runs/${runId}/nodes`),
-        );
-        this.nodeExecutions.set(executions);
+        this.nodeRuns.set(nodeRuns);
     }
 }

@@ -1,16 +1,46 @@
-export type WorkflowStatus = 'active' | 'paused' | 'archived';
-export type WorkflowNodeType = 'start' | 'end' | 'action' | 'condition' | 'parallel' | 'join' | 'approval' | 'delay';
-export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'suspended' | 'cancelled';
-export type WorkflowNodeExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'waiting_approval' | 'waiting_delay' | 'waiting_join';
+export type WorkflowStatus = 'draft' | 'active' | 'running' | 'paused' | 'completed' | 'failed';
+
+export type WorkflowNodeType =
+    | 'start'
+    | 'agent_session'
+    | 'work_task'
+    | 'condition'
+    | 'delay'
+    | 'webhook_wait'
+    | 'transform'
+    | 'parallel'
+    | 'join'
+    | 'end';
+
+export type WorkflowRunStatus = 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+export type WorkflowNodeRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'waiting';
 
 export interface WorkflowNodeConfig {
-    actionType?: string;
-    actionPayload?: Record<string, unknown>;
-    conditionExpr?: string;
-    delayMs?: number;
-    approvalPrompt?: string;
+    // agent_session
+    agentId?: string;
     projectId?: string;
-    joinCount?: number;
+    prompt?: string;            // Supports {{prev.output}} template vars
+    maxTurns?: number;
+
+    // work_task
+    description?: string;       // Supports template vars
+
+    // condition
+    expression?: string;        // JS-like expression: "prev.output.includes('success')"
+
+    // delay
+    delayMs?: number;
+
+    // webhook_wait
+    webhookEvent?: string;      // Event type to wait for
+    timeoutMs?: number;         // Max wait time
+
+    // transform
+    template?: string;          // Template string with {{var}} placeholders
+
+    // parallel
+    branchCount?: number;       // Number of parallel branches (inferred from edges)
 }
 
 export interface WorkflowNode {
@@ -25,8 +55,8 @@ export interface WorkflowEdge {
     id: string;
     sourceNodeId: string;
     targetNodeId: string;
-    label?: string;
     condition?: string;
+    label?: string;
 }
 
 export interface Workflow {
@@ -36,8 +66,8 @@ export interface Workflow {
     description: string;
     nodes: WorkflowNode[];
     edges: WorkflowEdge[];
-    defaultProjectId: string | null;
     status: WorkflowStatus;
+    defaultProjectId: string | null;
     maxConcurrency: number;
     createdAt: string;
     updatedAt: string;
@@ -49,22 +79,27 @@ export interface WorkflowRun {
     agentId: string;
     status: WorkflowRunStatus;
     input: Record<string, unknown>;
-    context: Record<string, unknown>;
+    output: Record<string, unknown> | null;
+    workflowSnapshot: { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+    nodeRuns: WorkflowNodeRun[];
+    currentNodeIds: string[];
     error: string | null;
     startedAt: string;
     completedAt: string | null;
 }
 
-export interface WorkflowNodeExecution {
+export interface WorkflowNodeRun {
     id: string;
     runId: string;
     nodeId: string;
     nodeType: WorkflowNodeType;
-    status: WorkflowNodeExecutionStatus;
+    status: WorkflowNodeRunStatus;
     input: Record<string, unknown>;
     output: Record<string, unknown> | null;
+    sessionId: string | null;
+    workTaskId: string | null;
     error: string | null;
-    startedAt: string;
+    startedAt: string | null;
     completedAt: string | null;
 }
 
@@ -83,7 +118,7 @@ export interface UpdateWorkflowInput {
     description?: string;
     nodes?: WorkflowNode[];
     edges?: WorkflowEdge[];
-    defaultProjectId?: string | null;
     status?: WorkflowStatus;
+    defaultProjectId?: string | null;
     maxConcurrency?: number;
 }
