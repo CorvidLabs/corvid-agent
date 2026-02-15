@@ -390,10 +390,11 @@ describe('handleCreateWorkTask', () => {
         expect((result.content[0] as { text: string }).text).toContain('not available');
     });
 
-    test('rate limits after 5 tasks per day', async () => {
-        // work_tasks table created by migrations; needs project_id FK
+    test('rate limits after max tasks per day', async () => {
+        // WORK_TASK_MAX_PER_DAY defaults to 100; fill up to the limit
+        const maxPerDay = parseInt(process.env.WORK_TASK_MAX_PER_DAY ?? '100', 10);
         const project = createProject(db, { name: 'RateLimitProject', workingDir: '/tmp' });
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < maxPerDay; i++) {
             db.query(
                 `INSERT INTO work_tasks (id, agent_id, project_id, description) VALUES (?, ?, ?, ?)`
             ).run(crypto.randomUUID(), agentId, project.id, `task-${i}`);

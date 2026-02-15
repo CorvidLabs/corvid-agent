@@ -2,7 +2,6 @@ import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { recordAudit, queryAuditLog } from '../db/audit';
-import type { AuditAction } from '../db/audit';
 
 let db: Database;
 
