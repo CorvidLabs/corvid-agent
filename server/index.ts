@@ -26,6 +26,7 @@ import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { handleOllamaRoutes } from './routes/ollama';
 import { listProjects, createProject } from './db/projects';
+import { buildAgentCard } from './a2a/agent-card';
 
 const log = createLogger('Server');
 
@@ -233,6 +234,19 @@ const server = Bun.serve<WsData>({
             health.workflows = workflowService.getStats();
             return new Response(JSON.stringify(health), {
                 headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // A2A Protocol: Agent Card (public, no auth required)
+        if (url.pathname === '/.well-known/agent-card.json' && req.method === 'GET') {
+            const baseUrl = `${url.protocol}//${url.host}`;
+            const card = buildAgentCard(baseUrl);
+            return new Response(JSON.stringify(card, null, 2), {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=300', // 5 min cache
+                },
             });
         }
 

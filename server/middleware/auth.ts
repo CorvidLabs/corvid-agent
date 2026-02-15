@@ -77,8 +77,8 @@ export function validateStartupSecurity(config: AuthConfig): void {
 // HTTP Auth
 // ---------------------------------------------------------------------------
 
-/** Routes that bypass authentication (monitoring, preflight). */
-const PUBLIC_PATHS = new Set(['/api/health']);
+/** Routes that bypass authentication (monitoring, preflight, A2A discovery). */
+const PUBLIC_PATHS = new Set(['/api/health', '/.well-known/agent-card.json']);
 
 /**
  * Check whether an HTTP request is authenticated.
