@@ -18,6 +18,7 @@ import {
     handleCreditConfig,
     handleCreateWorkTask,
     handleManageSchedule,
+    handleManageWorkflow,
     handleWebSearch,
     handleDeepResearch,
     handleGitHubStarRepo,
@@ -54,6 +55,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_check_credits',
     'corvid_create_work_task',
     'corvid_manage_schedule',
+    'corvid_manage_workflow',
     'corvid_web_search',
     'corvid_deep_research',
     'corvid_github_star_repo',
@@ -294,6 +296,32 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
             const err = validateRequired('corvid_manage_schedule', args, ['action']);
             if (err) return err;
             return unwrapResult(await handleManageSchedule(ctx, args as Parameters<typeof handleManageSchedule>[1]));
+        },
+    });
+
+    tools.push({
+        name: 'corvid_manage_workflow',
+        description: 'Manage graph-based workflows for multi-step agent orchestration. Actions: list, create, get, activate, pause, trigger, runs, run_status.',
+        parameters: {
+            type: 'object',
+            properties: {
+                action: { type: 'string', enum: ['list', 'create', 'get', 'activate', 'pause', 'trigger', 'runs', 'run_status'], description: 'What to do' },
+                workflow_id: { type: 'string', description: 'Workflow ID' },
+                run_id: { type: 'string', description: 'Run ID (for run_status)' },
+                name: { type: 'string', description: 'Workflow name (for create)' },
+                description: { type: 'string', description: 'Workflow description' },
+                nodes: { type: 'array', items: { type: 'object' }, description: 'Workflow nodes (for create)' },
+                edges: { type: 'array', items: { type: 'object' }, description: 'Workflow edges (for create)' },
+                default_project_id: { type: 'string', description: 'Default project ID' },
+                max_concurrency: { type: 'number', description: 'Max concurrent nodes' },
+                input: { type: 'object', description: 'Input data for trigger' },
+            },
+            required: ['action'],
+        },
+        handler: async (args) => {
+            const err = validateRequired('corvid_manage_workflow', args, ['action']);
+            if (err) return err;
+            return unwrapResult(await handleManageWorkflow(ctx, args as Parameters<typeof handleManageWorkflow>[1]));
         },
     });
 

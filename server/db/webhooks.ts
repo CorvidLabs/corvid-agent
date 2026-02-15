@@ -62,7 +62,7 @@ export function createWebhookRegistration(db: Database, input: CreateWebhookRegi
         input.repo,
         JSON.stringify(input.events),
         input.mentionUsername,
-        input.projectId,
+        input.projectId ?? null,
         now,
         now,
     );

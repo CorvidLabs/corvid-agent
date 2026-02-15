@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 32;
+const SCHEMA_VERSION = 34;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -514,6 +514,65 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_agent ON mention_polling_configs(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_status ON mention_polling_configs(status)`,
         `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_repo ON mention_polling_configs(repo)`,
+    ],
+    33: [
+        // Track all processed mention IDs (not just the newest) to avoid missing
+        // older issues that get newly assigned after the high-water-mark was set.
+        `ALTER TABLE mention_polling_configs ADD COLUMN processed_ids TEXT NOT NULL DEFAULT '[]'`,
+    ],
+    34: [
+        // Workflows — graph-based orchestration of agent sessions, work tasks, and decisions
+        `CREATE TABLE IF NOT EXISTS workflows (
+            id                  TEXT PRIMARY KEY,
+            agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            name                TEXT NOT NULL,
+            description         TEXT DEFAULT '',
+            nodes               TEXT NOT NULL DEFAULT '[]',
+            edges               TEXT NOT NULL DEFAULT '[]',
+            status              TEXT DEFAULT 'draft',
+            default_project_id  TEXT DEFAULT NULL,
+            max_concurrency     INTEGER DEFAULT 2,
+            created_at          TEXT DEFAULT (datetime('now')),
+            updated_at          TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
+
+        // Workflow runs — one row per workflow execution
+        `CREATE TABLE IF NOT EXISTS workflow_runs (
+            id                  TEXT PRIMARY KEY,
+            workflow_id         TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+            agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            status              TEXT DEFAULT 'running',
+            input               TEXT DEFAULT '{}',
+            output              TEXT DEFAULT NULL,
+            workflow_snapshot    TEXT NOT NULL DEFAULT '{}',
+            current_node_ids    TEXT DEFAULT '[]',
+            error               TEXT DEFAULT NULL,
+            started_at          TEXT DEFAULT (datetime('now')),
+            completed_at        TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status)`,
+
+        // Workflow node runs — one row per node execution within a run
+        `CREATE TABLE IF NOT EXISTS workflow_node_runs (
+            id              TEXT PRIMARY KEY,
+            run_id          TEXT NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+            node_id         TEXT NOT NULL,
+            node_type       TEXT NOT NULL,
+            status          TEXT DEFAULT 'pending',
+            input           TEXT DEFAULT '{}',
+            output          TEXT DEFAULT NULL,
+            session_id      TEXT DEFAULT NULL,
+            work_task_id    TEXT DEFAULT NULL,
+            error           TEXT DEFAULT NULL,
+            started_at      TEXT DEFAULT NULL,
+            completed_at    TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
     ],
 };
 

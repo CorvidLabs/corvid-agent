@@ -61,8 +61,8 @@ export class WebhookService {
         this.loading.set(true);
         try {
             const path = agentId ? `/webhooks?agentId=${agentId}` : '/webhooks';
-            const regs = await firstValueFrom(this.api.get<WebhookRegistration[]>(path));
-            this.registrations.set(regs);
+            const result = await firstValueFrom(this.api.get<WebhookRegistration[] | { registrations: WebhookRegistration[] }>(path));
+            this.registrations.set(Array.isArray(result) ? result : result.registrations);
         } finally {
             this.loading.set(false);
         }
@@ -97,7 +97,7 @@ export class WebhookService {
         const path = registrationId
             ? `/webhooks/${registrationId}/deliveries?limit=${limit}`
             : `/webhooks/deliveries?limit=${limit}`;
-        const deliveries = await firstValueFrom(this.api.get<WebhookDelivery[]>(path));
-        this.deliveries.set(deliveries);
+        const result = await firstValueFrom(this.api.get<WebhookDelivery[] | { deliveries: WebhookDelivery[] }>(path));
+        this.deliveries.set(Array.isArray(result) ? result : result.deliveries);
     }
 }

@@ -24,6 +24,7 @@ function rowToConfig(row: Record<string, unknown>): MentionPollingConfig {
         triggerCount: (row.trigger_count as number) ?? 0,
         lastPollAt: row.last_poll_at as string | null,
         lastSeenId: row.last_seen_id as string | null,
+        processedIds: JSON.parse((row.processed_ids as string) ?? '[]'),
         eventFilter: JSON.parse((row.event_filter as string) ?? '[]'),
         allowedUsers: JSON.parse((row.allowed_users as string) ?? '[]'),
         createdAt: row.created_at as string,
@@ -45,7 +46,7 @@ export function createMentionPollingConfig(db: Database, input: CreateMentionPol
         input.agentId,
         input.repo,
         input.mentionUsername,
-        input.projectId,
+        input.projectId ?? null,
         input.intervalSeconds ?? 60,
         JSON.stringify(input.eventFilter ?? []),
         JSON.stringify(input.allowedUsers ?? []),
@@ -127,4 +128,21 @@ export function updatePollState(db: Database, id: string, lastSeenId?: string): 
 
 export function incrementPollingTriggerCount(db: Database, id: string): void {
     db.query(`UPDATE mention_polling_configs SET trigger_count = trigger_count + 1, updated_at = datetime('now') WHERE id = ?`).run(id);
+}
+
+/**
+ * Update the set of processed mention IDs for a config.
+ * Capped at MAX_PROCESSED_IDS to prevent unbounded growth.
+ */
+const MAX_PROCESSED_IDS = 200;
+
+export function updateProcessedIds(db: Database, id: string, processedIds: string[]): void {
+    // Keep only the most recent entries if the set grows too large
+    const capped = processedIds.length > MAX_PROCESSED_IDS
+        ? processedIds.slice(-MAX_PROCESSED_IDS)
+        : processedIds;
+    db.query(`UPDATE mention_polling_configs SET processed_ids = ?, updated_at = datetime('now') WHERE id = ?`).run(
+        JSON.stringify(capped),
+        id,
+    );
 }

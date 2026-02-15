@@ -13,12 +13,12 @@
 
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
-import type { WorkTaskService } from '../work/service';
 import type { MentionPollingConfig } from '../../shared/types';
 import {
     findDuePollingConfigs,
     updatePollState,
     incrementPollingTriggerCount,
+    updateProcessedIds,
 } from '../db/mention-polling';
 // Webhook delivery helpers not needed here — polling uses its own trigger tracking
 import { getAgent } from '../db/agents';
@@ -43,7 +43,7 @@ interface DetectedMention {
     /** Unique identifier (e.g. comment ID or issue number + timestamp) */
     id: string;
     /** Event type */
-    type: 'issue_comment' | 'issues' | 'pull_request_review_comment';
+    type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'assignment';
     /** The comment/issue body containing the @mention */
     body: string;
     /** GitHub username of the author */
@@ -68,7 +68,6 @@ type PollingEventCallback = (event: {
 export class MentionPollingService {
     private db: Database;
     private processManager: ProcessManager;
-    private workTaskService: WorkTaskService | null;
     private loopTimer: ReturnType<typeof setInterval> | null = null;
     private activePolls = new Set<string>(); // config IDs currently being polled
     private recentTriggers = new Map<string, number>(); // configId -> last trigger timestamp
@@ -78,11 +77,10 @@ export class MentionPollingService {
     constructor(
         db: Database,
         processManager: ProcessManager,
-        workTaskService?: WorkTaskService | null,
+        _workTaskService?: unknown,
     ) {
         this.db = db;
         this.processManager = processManager;
-        this.workTaskService = workTaskService ?? null;
     }
 
     /** Subscribe to polling events (for WebSocket broadcast). */
@@ -113,17 +111,24 @@ export class MentionPollingService {
         log.info('Mention polling service stopped');
     }
 
-    /** Get polling stats for health check. */
-    getStats(): { running: boolean; activePolls: number; configCount: number } {
+    /** Get polling stats for the dashboard. */
+    getStats(): { isRunning: boolean; activeConfigs: number; totalConfigs: number; totalTriggers: number } {
         try {
-            const row = this.db.query("SELECT COUNT(*) as count FROM mention_polling_configs WHERE status = 'active'").get() as { count: number } | null;
+            const row = this.db.query(`
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+                    COALESCE(SUM(trigger_count), 0) as triggers
+                FROM mention_polling_configs
+            `).get() as { total: number; active: number; triggers: number } | null;
             return {
-                running: this.running,
-                activePolls: this.activePolls.size,
-                configCount: row?.count ?? 0,
+                isRunning: this.running,
+                activeConfigs: row?.active ?? 0,
+                totalConfigs: row?.total ?? 0,
+                totalTriggers: row?.triggers ?? 0,
             };
         } catch {
-            return { running: this.running, activePolls: this.activePolls.size, configCount: 0 };
+            return { isRunning: this.running, activeConfigs: 0, totalConfigs: 0, totalTriggers: 0 };
         }
     }
 
@@ -158,7 +163,15 @@ export class MentionPollingService {
         this.activePolls.add(config.id);
 
         try {
-            log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername, lastPollAt: config.lastPollAt, lastSeenId: config.lastSeenId });
+            log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername, lastPollAt: config.lastPollAt, lastSeenId: config.lastSeenId, processedIds: config.processedIds.length });
+
+            // Migration: seed processedIds from lastSeenId if the new column is empty
+            // but lastSeenId exists (upgraded from position-based to set-based tracking).
+            if (config.processedIds.length === 0 && config.lastSeenId) {
+                config.processedIds = [config.lastSeenId];
+                updateProcessedIds(this.db, config.id, config.processedIds);
+                log.info('Migrated lastSeenId to processedIds', { configId: config.id, lastSeenId: config.lastSeenId });
+            }
 
             // Fetch recent mentions from GitHub
             const mentions = await this.fetchMentions(config);
@@ -170,8 +183,8 @@ export class MentionPollingService {
                 return;
             }
 
-            // Filter out already-seen mentions
-            const newMentions = this.filterNewMentions(mentions, config.lastSeenId);
+            // Filter out already-processed mentions using the full ID set
+            const newMentions = this.filterNewMentions(mentions, config.processedIds);
             if (newMentions.length === 0) {
                 updatePollState(this.db, config.id);
                 return;
@@ -179,13 +192,23 @@ export class MentionPollingService {
 
             log.info('Found new mentions', { configId: config.id, repo: config.repo, count: newMentions.length });
 
-            // Process each new mention
+            // Process each new mention — only track IDs that were actually handled
+            const processedNewIds: string[] = [];
             for (const mention of newMentions) {
-                await this.processMention(config, mention);
+                const handled = await this.processMention(config, mention);
+                if (handled) {
+                    processedNewIds.push(mention.id);
+                }
             }
 
-            // Update the last seen ID to the newest mention
-            const newestId = newMentions[0].id;
+            // Only persist IDs of mentions that were actually processed
+            if (processedNewIds.length > 0) {
+                const updatedIds = [...config.processedIds, ...processedNewIds];
+                updateProcessedIds(this.db, config.id, updatedIds);
+            }
+
+            // Also update lastSeenId to the newest for backward compat
+            const newestId = mentions[0].id; // mentions are sorted newest-first
             updatePollState(this.db, config.id, newestId);
 
         } catch (err) {
@@ -230,6 +253,10 @@ export class MentionPollingService {
             const issueMentions = await this.searchNewIssueMentions(config.repo, config.mentionUsername, sinceDate);
             mentions.push(...issueMentions);
         }
+
+        // Search for issues/PRs assigned to the user
+        const assignedIssues = await this.searchAssignedIssues(config.repo, config.mentionUsername, sinceDate);
+        mentions.push(...assignedIssues);
 
         // Sort by creation time descending (newest first)
         mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -397,66 +424,115 @@ export class MentionPollingService {
         }
     }
 
+    /**
+     * Search for issues/PRs recently assigned to the username.
+     */
+    private async searchAssignedIssues(
+        repo: string,
+        username: string,
+        since: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const sinceDate = since.split('T')[0];
+            const query = `repo:${repo} assignee:${username} is:open updated:>=${sinceDate}`;
+            const result = await this.runGh([
+                'api', 'search/issues',
+                '-X', 'GET',
+                '-f', `q=${query}`,
+                '-f', 'sort=updated',
+                '-f', 'order=desc',
+                '-f', 'per_page=20',
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
+            const mentions: DetectedMention[] = [];
+
+            for (const item of items) {
+                const body = (item.body as string) ?? '';
+                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
+                const isPR = !!(item.pull_request);
+
+                // Don't skip self-authored for assignments — if someone assigns
+                // the agent to its own issue, it should still act on it.
+
+                mentions.push({
+                    id: `assigned-${item.number}`,
+                    type: 'assignment',
+                    body,
+                    sender,
+                    number: item.number as number,
+                    title: (item.title as string) ?? '',
+                    htmlUrl: (item.html_url as string) ?? '',
+                    createdAt: (item.created_at as string) ?? '',
+                    isPullRequest: isPR,
+                });
+            }
+
+            return mentions;
+        } catch (err) {
+            log.error('Error searching assigned issues', { repo, error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
     // ─── Trigger Logic ──────────────────────────────────────────────────────
 
     /**
-     * Process a detected mention — create an agent session or work task.
+     * Process a detected mention — create an agent session.
+     * Returns true if a session was actually created, false if skipped.
      */
-    private async processMention(config: MentionPollingConfig, mention: DetectedMention): Promise<void> {
-        // Rate limit check
-        const lastTrigger = this.recentTriggers.get(config.id);
+    private async processMention(config: MentionPollingConfig, mention: DetectedMention): Promise<boolean> {
+        // Rate limit per mention ID — prevents re-triggering the same mention
+        // within 60s, but allows different mentions on the same config concurrently.
+        const rateLimitKey = `${config.id}:${mention.id}`;
+        const lastTrigger = this.recentTriggers.get(rateLimitKey);
         if (lastTrigger && (Date.now() - lastTrigger) < MIN_TRIGGER_GAP_MS) {
             log.debug('Skipping mention due to rate limit', { configId: config.id, mentionId: mention.id });
-            return;
+            return false;
         }
 
         const agent = getAgent(this.db, config.agentId);
         if (!agent) {
             log.error('Agent not found for polling config', { configId: config.id, agentId: config.agentId });
-            return;
+            return false;
         }
 
-        // Build a prompt similar to what the webhook service builds
+        // Resolve project: config > agent default
+        const projectId = config.projectId || agent.defaultProjectId;
+        if (!projectId) {
+            log.error('No project for polling config and agent has no default', { configId: config.id, agentId: config.agentId });
+            return false;
+        }
+
+        // Always create an agent session — the session is responsible for both
+        // replying on GitHub AND deciding whether to create a work task for code
+        // changes. This ensures the person who mentioned us always gets a reply.
         const prompt = this.buildPrompt(config, mention);
-        const isWorkTask = this.isWorkTaskRequest(mention.body);
 
-        this.recentTriggers.set(config.id, Date.now());
+        this.recentTriggers.set(rateLimitKey, Date.now());
 
-        if (isWorkTask && this.workTaskService) {
-            try {
-                const task = await this.workTaskService.create({
-                    agentId: config.agentId,
-                    description: `GitHub mention poll: ${mention.body.slice(0, 500)}`,
-                    projectId: config.projectId,
-                    source: 'agent',
-                });
+        try {
+            const session = createSession(this.db, {
+                projectId,
+                agentId: config.agentId,
+                name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
+                initialPrompt: prompt,
+                source: 'agent',
+            });
 
-                incrementPollingTriggerCount(this.db, config.id);
-                log.info('Polling triggered work task', { configId: config.id, workTaskId: task.id, mention: mention.id });
+            this.processManager.startProcess(session, prompt, { schedulerMode: true });
 
-                this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, workTaskId: task.id } });
-            } catch (err) {
-                log.error('Failed to create work task from mention poll', { error: err instanceof Error ? err.message : String(err) });
-            }
-        } else {
-            try {
-                const session = createSession(this.db, {
-                    projectId: config.projectId,
-                    agentId: config.agentId,
-                    name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
-                    initialPrompt: prompt,
-                    source: 'agent',
-                });
+            incrementPollingTriggerCount(this.db, config.id);
+            log.info('Polling triggered agent session', { configId: config.id, sessionId: session.id, mention: mention.id });
 
-                this.processManager.startProcess(session, prompt, { schedulerMode: true });
-
-                incrementPollingTriggerCount(this.db, config.id);
-                log.info('Polling triggered agent session', { configId: config.id, sessionId: session.id, mention: mention.id });
-
-                this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, sessionId: session.id } });
-            } catch (err) {
-                log.error('Failed to create session from mention poll', { error: err instanceof Error ? err.message : String(err) });
-            }
+            this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, sessionId: session.id } });
+            return true;
+        } catch (err) {
+            log.error('Failed to create session from mention poll', { error: err instanceof Error ? err.message : String(err) });
+            return false;
         }
     }
 
@@ -473,33 +549,37 @@ export class MentionPollingService {
         return regex.test(body);
     }
 
-    private filterNewMentions(mentions: DetectedMention[], lastSeenId: string | null): DetectedMention[] {
-        if (!lastSeenId) return mentions;
+    private filterNewMentions(mentions: DetectedMention[], processedIds: string[]): DetectedMention[] {
+        if (processedIds.length === 0) return mentions;
 
-        // Return only mentions with IDs we haven't seen yet
-        const idx = mentions.findIndex(m => m.id === lastSeenId);
-        if (idx === -1) {
-            // Last seen ID not found — could be very old. Return all mentions.
-            return mentions;
-        }
-        // Return mentions newer than the last seen (they're sorted newest-first)
-        return mentions.slice(0, idx);
+        // Filter out any mention whose ID is in the processed set.
+        // This handles assignments correctly: even old issues that get newly
+        // assigned will be processed, because their ID (assigned-N) won't be
+        // in the set until we actually process them.
+        const seen = new Set(processedIds);
+        return mentions.filter(m => !seen.has(m.id));
     }
 
     private buildPrompt(config: MentionPollingConfig, mention: DetectedMention): string {
         const repo = config.repo;
         const contextType = mention.isPullRequest ? 'PR' : 'Issue';
-        const commentType = mention.type === 'issues' ? 'issue body' : 'comment';
+        const isAssignment = mention.type === 'assignment';
+        // corvid_create_work_task only works for the platform's own repo
+        const isHomeRepo = repo === 'CorvidLabs/corvid-agent';
+
+        const triggerLabel = isAssignment ? 'assigned to you' : '@mention detected';
+        const commentType = mention.type === 'issues' ? 'issue body'
+            : isAssignment ? 'assignment' : 'comment';
 
         const context = [
-            `## GitHub ${contextType} ${mention.type === 'issues' ? '' : 'Comment '}— @mention detected via polling`,
+            `## GitHub ${contextType} — ${triggerLabel} via polling`,
             ``,
             `**Repository:** ${repo}`,
             `**${contextType}:** #${mention.number} "${mention.title}"`,
-            `**${mention.type === 'issues' ? 'Opened' : 'Comment'} by:** @${mention.sender}`,
+            `**${isAssignment ? 'Assigned' : mention.type === 'issues' ? 'Opened' : 'Comment'} by:** @${mention.sender}`,
             `**URL:** ${mention.htmlUrl}`,
             ``,
-            `### ${mention.type === 'issues' ? 'Issue Body' : 'Comment'}`,
+            `### ${mention.type === 'issues' ? 'Issue Body' : isAssignment ? `${contextType} Description` : 'Comment'}`,
             '```',
             mention.body,
             '```',
@@ -509,41 +589,56 @@ export class MentionPollingService {
             ? `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`
             : `gh issue comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
 
+        // For external repos, give explicit instructions to clone and work there.
+        // Use a unique path per issue to avoid conflicts when multiple sessions run concurrently.
+        const repoName = repo.split('/')[1];
+        const workDir = `/tmp/${repoName}-issue-${mention.number}`;
+        const codeChangeInstructions = isHomeRepo
+            ? `Use \`corvid_create_work_task\` to implement changes on a branch and open a PR.`
+            : [
+                `This issue is in the **${repo}** repository (not corvid-agent). Do NOT use \`corvid_create_work_task\` — that only works for corvid-agent.`,
+                `Instead, to make code changes:`,
+                `  1. Clone the repo: \`gh repo clone ${repo} ${workDir}\``,
+                `  2. \`cd ${workDir}\``,
+                `  3. Create a branch: \`git checkout -b fix/issue-${mention.number}\``,
+                `  4. Make your changes`,
+                `  5. Commit and push: \`git add -A && git commit -m "fix: ..." && git push -u origin fix/issue-${mention.number}\``,
+                `  6. Create a PR: \`gh pr create --repo ${repo} --title "..." --body "Fixes #${mention.number}"\``,
+            ].join('\n');
+
+        const assignmentSteps = [
+            `1. Read the ${contextType.toLowerCase()} description to understand what's being asked.`,
+            `2. Analyze the request and determine the best approach.`,
+            `3. If code changes are needed:\n${codeChangeInstructions}`,
+            `4. Post a comment acknowledging the assignment and explaining your plan or findings using: \`${replyCmd}\``,
+        ];
+
+        const mentionSteps = [
+            `1. Read the mention to understand the request.`,
+            `2. If the comment is a simple ping (like "@username" with no question), reply with a brief greeting and offer to help.`,
+            `3. If code changes are requested:\n${codeChangeInstructions}`,
+            `4. Post your reply using: \`${replyCmd}\``,
+        ];
+
         const instructions = [
             ``,
             `## Instructions`,
             ``,
-            `You were @mentioned in the above GitHub ${commentType}. This is a NEW mention that you have NOT responded to yet.`,
+            isAssignment
+                ? `You were assigned to the above GitHub ${contextType.toLowerCase()}. This is a NEW assignment that you have NOT responded to yet.`
+                : `You were @mentioned in the above GitHub ${commentType}. This is a NEW mention that you have NOT responded to yet.`,
             `You MUST post a reply comment — do not skip this step.`,
             ``,
             `Steps:`,
-            `1. Read the mention to understand the request.`,
-            `2. If the comment is a simple ping (like "@username" with no question), reply with a brief greeting and offer to help.`,
-            `3. If code changes are requested, use \`corvid_create_work_task\` to create a work task, then comment to acknowledge.`,
-            `4. Post your reply using: \`${replyCmd}\``,
+            ...(isAssignment ? assignmentSteps : mentionSteps),
             ``,
             `Rules:`,
             `- You MUST run the \`gh\` command above to post a comment. This is mandatory — the user will not see your response otherwise.`,
-            `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this mention.`,
+            `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this ${isAssignment ? 'assignment' : 'mention'}.`,
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 
         return context + instructions;
-    }
-
-    /**
-     * Detect if the mention is requesting code changes.
-     */
-    private isWorkTaskRequest(body: string): boolean {
-        const workKeywords = [
-            /\bfix\s+(this|the|that|it)\b/i,
-            /\bimplement\s+(this|the|that)\b/i,
-            /\bplease\s+(fix|implement|add|create|update|refactor)\b/i,
-            /\bcreate\s+a?\s*(pr|pull\s*request)\b/i,
-            /\bopen\s+a?\s*(pr|pull\s*request)\b/i,
-            /\bmake\s+(this|the|that|these)\s+change/i,
-        ];
-        return workKeywords.some(pattern => pattern.test(body));
     }
 
     private async runGh(args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {

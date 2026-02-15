@@ -57,7 +57,7 @@ export function handleMentionPollingRoutes(
 
     // ── Polling stats ──────────────────────────────────────────────────────
     if (url.pathname === '/api/mention-polling/stats' && req.method === 'GET') {
-        const stats = pollingService?.getStats() ?? { running: false, activePolls: 0, configCount: 0 };
+        const stats = pollingService?.getStats() ?? { isRunning: false, activeConfigs: 0, totalConfigs: 0, totalTriggers: 0 };
         return json(stats);
     }
 

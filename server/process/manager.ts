@@ -16,6 +16,7 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
+import type { WorkflowService } from '../workflow/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -94,6 +95,7 @@ export class ProcessManager {
     private mcpEncryptionConfig: { serverMnemonic?: string | null; network?: string } = {};
     private mcpWorkTaskService: WorkTaskService | null = null;
     private mcpSchedulerService: SchedulerService | null = null;
+    private mcpWorkflowService: WorkflowService | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -118,6 +120,7 @@ export class ProcessManager {
         encryptionConfig?: { serverMnemonic?: string | null; network?: string },
         workTaskService?: WorkTaskService,
         schedulerService?: SchedulerService,
+        workflowService?: WorkflowService,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
@@ -125,6 +128,7 @@ export class ProcessManager {
         this.mcpEncryptionConfig = encryptionConfig ?? {};
         this.mcpWorkTaskService = workTaskService ?? null;
         this.mcpSchedulerService = schedulerService ?? null;
+        this.mcpWorkflowService = workflowService ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -143,6 +147,7 @@ export class ProcessManager {
             network: this.mcpEncryptionConfig.network,
             workTaskService: this.mcpWorkTaskService ?? undefined,
             schedulerService: this.mcpSchedulerService ?? undefined,
+            workflowService: this.mcpWorkflowService ?? undefined,
             schedulerMode,
             emitStatus: sessionId
                 ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', statusMessage: message })
