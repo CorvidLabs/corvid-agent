@@ -87,6 +87,16 @@ import { filter, Subscription } from 'rxjs';
                 <li>
                     <a
                         class="sidebar__link"
+                        routerLink="/workflows"
+                        routerLinkActive="sidebar__link--active"
+                        title="Workflows">
+                        <span class="sidebar__label">Workflows</span>
+                        <span class="sidebar__abbr">Wf</span>
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="sidebar__link"
                         routerLink="/webhooks"
                         routerLinkActive="sidebar__link--active"
                         title="Webhooks">

@@ -118,6 +118,11 @@ export const routes: Routes = [
             import('./features/schedules/schedule-list.component').then((m) => m.ScheduleListComponent),
     },
     {
+        path: 'workflows',
+        loadComponent: () =>
+            import('./features/workflows/workflow-list.component').then((m) => m.WorkflowListComponent),
+    },
+    {
         path: 'webhooks',
         loadComponent: () =>
             import('./features/webhooks/webhook-list.component').then((m) => m.WebhookListComponent),

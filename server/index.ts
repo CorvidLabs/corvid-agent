@@ -396,6 +396,7 @@ initAlgoChat().then(() => {
     // Give it the agentMessenger if AlgoChat is initialized
     if (agentMessenger) {
         schedulerService.setAgentMessenger(agentMessenger);
+        workflowService.setAgentMessenger(agentMessenger);
     }
     schedulerService.start();
     mentionPollingService.start();
@@ -456,6 +457,7 @@ function gracefulShutdown(): void {
     workflowService.stop();
     schedulerService.stop();
     mentionPollingService.stop();
+    workflowService.stop();
     memorySyncService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
