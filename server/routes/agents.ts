@@ -5,6 +5,7 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema } from '../lib/validation';
 import { json } from '../lib/response';
+import { buildAgentCardForAgent } from '../a2a/agent-card';
 
 export function handleAgentRoutes(
     req: Request,
@@ -46,6 +47,16 @@ export function handleAgentRoutes(
     const messagesMatch = path.match(/^\/api\/agents\/([^/]+)\/messages$/);
     if (messagesMatch && method === 'GET') {
         return handleMessages(messagesMatch[1], db);
+    }
+
+    // A2A Agent Card for a specific agent
+    const agentCardMatch = path.match(/^\/api\/agents\/([^/]+)\/agent-card$/);
+    if (agentCardMatch && method === 'GET') {
+        const agent = getAgent(db, agentCardMatch[1]);
+        if (!agent) return json({ error: 'Not found' }, 404);
+        const baseUrl = `${new URL(req.url).protocol}//${new URL(req.url).host}`;
+        const card = buildAgentCardForAgent(agent, baseUrl);
+        return json(card);
     }
 
     const match = path.match(/^\/api\/agents\/([^/]+)$/);
