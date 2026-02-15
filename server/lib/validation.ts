@@ -354,3 +354,74 @@ export const UpdateMentionPollingSchema = z.object({
     eventFilter: z.array(PollingEventFilterSchema).optional(),
     allowedUsers: z.array(z.string().min(1)).optional(),
 });
+
+// ─── Workflows ───────────────────────────────────────────────────────────────
+
+const WorkflowNodeTypeSchema = z.enum([
+    'start', 'agent_session', 'work_task', 'condition', 'delay',
+    'webhook_wait', 'transform', 'parallel', 'join', 'end',
+]);
+
+const WorkflowNodeConfigSchema = z.object({
+    agentId: z.string().optional(),
+    projectId: z.string().optional(),
+    prompt: z.string().optional(),
+    maxTurns: z.number().int().min(1).max(100).optional(),
+    description: z.string().optional(),
+    expression: z.string().optional(),
+    delayMs: z.number().int().min(100).max(3600000).optional(),
+    webhookEvent: z.string().optional(),
+    timeoutMs: z.number().int().min(1000).max(86400000).optional(),
+    template: z.string().optional(),
+    branchCount: z.number().int().min(2).max(10).optional(),
+}).optional().default({});
+
+const WorkflowNodeSchema = z.object({
+    id: z.string().min(1),
+    type: WorkflowNodeTypeSchema,
+    label: z.string().min(1),
+    config: WorkflowNodeConfigSchema,
+    position: z.object({
+        x: z.number(),
+        y: z.number(),
+    }).optional(),
+});
+
+const WorkflowEdgeSchema = z.object({
+    id: z.string().min(1),
+    sourceNodeId: z.string().min(1),
+    targetNodeId: z.string().min(1),
+    condition: z.string().optional(),
+    label: z.string().optional(),
+});
+
+export const CreateWorkflowSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    name: z.string().min(1, 'name is required'),
+    description: z.string().optional(),
+    nodes: z.array(WorkflowNodeSchema).min(1, 'At least one node is required'),
+    edges: z.array(WorkflowEdgeSchema).default([]),
+    defaultProjectId: z.string().optional(),
+    maxConcurrency: z.number().int().min(1).max(10).optional(),
+}).refine(
+    (d) => d.nodes.some((n) => n.type === 'start'),
+    { message: 'Workflow must have at least one start node' },
+);
+
+export const UpdateWorkflowSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    nodes: z.array(WorkflowNodeSchema).min(1).optional(),
+    edges: z.array(WorkflowEdgeSchema).optional(),
+    status: z.enum(['draft', 'active', 'paused', 'completed', 'failed']).optional(),
+    defaultProjectId: z.string().nullable().optional(),
+    maxConcurrency: z.number().int().min(1).max(10).optional(),
+});
+
+export const TriggerWorkflowSchema = z.object({
+    input: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+export const WorkflowRunActionSchema = z.object({
+    action: z.enum(['pause', 'resume', 'cancel']),
+});

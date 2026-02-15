@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleWebSearch, handleDeepResearch, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -28,6 +28,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_github_get_pr_diff',
     'corvid_github_comment_on_pr',
     'corvid_github_follow_user',
+    'corvid_manage_workflow',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -164,6 +165,37 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 schedule_id: z.string().optional().describe('Schedule ID (for pause/resume/history)'),
             },
             async (args) => handleManageSchedule(ctx, args),
+        ),
+        tool(
+            'corvid_manage_workflow',
+            'Manage graph-based workflows for multi-step agent orchestration. ' +
+            'Workflows chain agent sessions, work tasks, conditions, and delays into executable graphs. ' +
+            'Use action="list" to view workflows, "create" to make one, "activate" to enable, "trigger" to run, "runs" for history, "run_status" for details.',
+            {
+                action: z.enum(['list', 'create', 'get', 'activate', 'pause', 'trigger', 'runs', 'run_status']).describe('What to do'),
+                workflow_id: z.string().optional().describe('Workflow ID (for get/activate/pause/trigger/runs)'),
+                run_id: z.string().optional().describe('Run ID (for run_status)'),
+                name: z.string().optional().describe('Workflow name (for create)'),
+                description: z.string().optional().describe('Workflow description (for create)'),
+                nodes: z.array(z.object({
+                    id: z.string().describe('Unique node ID'),
+                    type: z.string().describe('Node type: start, agent_session, work_task, condition, delay, transform, parallel, join, end'),
+                    label: z.string().describe('Human-readable label'),
+                    config: z.record(z.string(), z.unknown()).optional().describe('Node configuration (agentId, prompt, expression, delayMs, etc.)'),
+                    position: z.object({ x: z.number(), y: z.number() }).optional().describe('UI position'),
+                })).optional().describe('Workflow nodes (for create)'),
+                edges: z.array(z.object({
+                    id: z.string().describe('Unique edge ID'),
+                    sourceNodeId: z.string().describe('Source node ID'),
+                    targetNodeId: z.string().describe('Target node ID'),
+                    condition: z.string().optional().describe('Edge condition for condition nodes ("true" or "false")'),
+                    label: z.string().optional().describe('Edge label'),
+                })).optional().describe('Workflow edges (for create)'),
+                default_project_id: z.string().optional().describe('Default project ID for nodes (for create)'),
+                max_concurrency: z.number().optional().describe('Max concurrent node executions (for create, default 2)'),
+                input: z.record(z.string(), z.unknown()).optional().describe('Input data to pass to the workflow (for trigger)'),
+            },
+            async (args) => handleManageWorkflow(ctx, args),
         ),
         tool(
             'corvid_web_search',

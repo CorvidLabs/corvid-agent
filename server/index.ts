@@ -14,6 +14,7 @@ import { WorkTaskService } from './work/service';
 import { SchedulerService } from './scheduler/service';
 import { WebhookService } from './webhooks/service';
 import { MentionPollingService } from './polling/service';
+import { WorkflowService } from './workflow/service';
 import { SessionLifecycleManager } from './process/session-lifecycle';
 import { MemorySyncService } from './db/memory-sync';
 import { existsSync } from 'node:fs';
@@ -93,6 +94,9 @@ const webhookService = new WebhookService(db, processManager, workTaskService);
 // Initialize mention polling service (local-first GitHub @mention detection)
 const mentionPollingService = new MentionPollingService(db, processManager, workTaskService);
 
+// Initialize workflow service (graph-based orchestration)
+const workflowService = new WorkflowService(db, processManager, workTaskService);
+
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
 
@@ -165,7 +169,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService);
+    }, workTaskService, schedulerService, workflowService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -226,6 +230,7 @@ const server = Bun.serve<WsData>({
             };
             health.scheduler = schedulerService.getStats();
             health.mentionPolling = mentionPollingService.getStats();
+            health.workflows = workflowService.getStats();
             return new Response(JSON.stringify(health), {
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -268,7 +273,7 @@ const server = Bun.serve<WsData>({
         if (ollamaResponse) return ollamaResponse;
 
         // API routes
-        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService);
+        const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService);
         if (apiResponse) return apiResponse;
 
         // Mobile chat client
@@ -352,6 +357,25 @@ mentionPollingService.onEvent((event) => {
     server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
 });
 
+// Broadcast workflow events to all WebSocket clients
+workflowService.onEvent((event) => {
+    const msg = JSON.stringify({ type: event.type, ...spreadWorkflowEvent(event) });
+    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+});
+
+function spreadWorkflowEvent(event: { type: string; data: unknown }): Record<string, unknown> {
+    switch (event.type) {
+        case 'workflow_update':
+            return { workflow: event.data };
+        case 'workflow_run_update':
+            return { run: event.data };
+        case 'workflow_node_update':
+            return { nodeRun: event.data };
+        default:
+            return {};
+    }
+}
+
 // Initialize AlgoChat after server starts
 initAlgoChat().then(() => {
     // Wire agent message broadcasts once messenger is available
@@ -375,11 +399,13 @@ initAlgoChat().then(() => {
     }
     schedulerService.start();
     mentionPollingService.start();
+    workflowService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
-    // Start scheduler and polling even if AlgoChat fails — they can still do GitHub ops and work tasks
+    // Start scheduler, polling, and workflows even if AlgoChat fails — they can still do GitHub ops and work tasks
     schedulerService.start();
     mentionPollingService.start();
+    workflowService.start();
 });
 
 // Start session lifecycle cleanup after server is running
@@ -427,6 +453,7 @@ function logShutdownDiagnostics(signal: string): void {
 }
 
 function gracefulShutdown(): void {
+    workflowService.stop();
     schedulerService.stop();
     mentionPollingService.stop();
     memorySyncService.stop();

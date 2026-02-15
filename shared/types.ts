@@ -533,3 +533,145 @@ export interface UpdateMentionPollingInput {
     eventFilter?: MentionPollingConfig['eventFilter'];
     allowedUsers?: string[];
 }
+
+// MARK: - Workflows (Graph-based Orchestration)
+
+export type WorkflowStatus = 'draft' | 'active' | 'running' | 'paused' | 'completed' | 'failed';
+
+export type WorkflowNodeType =
+    | 'start'           // Entry point — every workflow has exactly one
+    | 'agent_session'   // Spawn an agent session with a prompt
+    | 'work_task'       // Create a work task (branch + PR)
+    | 'condition'       // Boolean branch based on previous output
+    | 'delay'           // Wait for a duration before continuing
+    | 'webhook_wait'    // Wait for an external webhook event
+    | 'transform'       // Transform data between nodes (template string)
+    | 'parallel'        // Fork into parallel branches
+    | 'join'            // Wait for all parallel branches to complete
+    | 'end';            // Terminal node
+
+export interface WorkflowNodeConfig {
+    // agent_session
+    agentId?: string;
+    projectId?: string;
+    prompt?: string;            // Supports {{prev.output}} template vars
+    maxTurns?: number;
+
+    // work_task
+    description?: string;       // Supports template vars
+
+    // condition
+    expression?: string;        // JS-like expression: "prev.output.includes('success')"
+
+    // delay
+    delayMs?: number;
+
+    // webhook_wait
+    webhookEvent?: string;      // Event type to wait for
+    timeoutMs?: number;         // Max wait time
+
+    // transform
+    template?: string;          // Template string with {{var}} placeholders
+
+    // parallel
+    branchCount?: number;       // Number of parallel branches (inferred from edges)
+}
+
+export interface WorkflowNode {
+    id: string;
+    type: WorkflowNodeType;
+    label: string;
+    config: WorkflowNodeConfig;
+    /** Position for UI graph rendering */
+    position?: { x: number; y: number };
+}
+
+export interface WorkflowEdge {
+    id: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    /** For condition nodes: 'true' or 'false' branch */
+    condition?: string;
+    /** Optional label for the edge */
+    label?: string;
+}
+
+export interface Workflow {
+    id: string;
+    agentId: string;
+    name: string;
+    description: string;
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+    status: WorkflowStatus;
+    /** Default project for nodes that don't specify one */
+    defaultProjectId: string | null;
+    /** Max concurrent node executions */
+    maxConcurrency: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateWorkflowInput {
+    agentId: string;
+    name: string;
+    description?: string;
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+    defaultProjectId?: string;
+    maxConcurrency?: number;
+}
+
+export interface UpdateWorkflowInput {
+    name?: string;
+    description?: string;
+    nodes?: WorkflowNode[];
+    edges?: WorkflowEdge[];
+    status?: WorkflowStatus;
+    defaultProjectId?: string | null;
+    maxConcurrency?: number;
+}
+
+// Workflow execution tracking
+
+export type WorkflowRunStatus = 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+export type WorkflowNodeRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'waiting';
+
+export interface WorkflowRun {
+    id: string;
+    workflowId: string;
+    agentId: string;
+    status: WorkflowRunStatus;
+    /** Input data passed to the workflow */
+    input: Record<string, unknown>;
+    /** Final output from the end node */
+    output: Record<string, unknown> | null;
+    /** Snapshot of workflow graph at run time (for audit) */
+    workflowSnapshot: { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+    /** Per-node execution state */
+    nodeRuns: WorkflowNodeRun[];
+    currentNodeIds: string[];
+    error: string | null;
+    startedAt: string;
+    completedAt: string | null;
+}
+
+export interface WorkflowNodeRun {
+    id: string;
+    runId: string;
+    nodeId: string;
+    nodeType: WorkflowNodeType;
+    status: WorkflowNodeRunStatus;
+    /** Input received from upstream node(s) */
+    input: Record<string, unknown>;
+    /** Output produced by this node */
+    output: Record<string, unknown> | null;
+    /** Session ID if this node spawned an agent session */
+    sessionId: string | null;
+    /** Work task ID if this node created a work task */
+    workTaskId: string | null;
+    error: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+}
