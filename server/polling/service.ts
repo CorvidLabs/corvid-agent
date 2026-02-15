@@ -436,8 +436,8 @@ export class MentionPollingService {
                 const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
                 const isPR = !!(item.pull_request);
 
-                // Skip own issues
-                if (sender.toLowerCase() === username.toLowerCase()) continue;
+                // Don't skip self-authored for assignments — if someone assigns
+                // the agent to its own issue, it should still act on it.
 
                 mentions.push({
                     id: `assigned-${item.number}`,
