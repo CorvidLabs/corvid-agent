@@ -192,14 +192,20 @@ export class MentionPollingService {
 
             log.info('Found new mentions', { configId: config.id, repo: config.repo, count: newMentions.length });
 
-            // Process each new mention
+            // Process each new mention — only track IDs that were actually handled
+            const processedNewIds: string[] = [];
             for (const mention of newMentions) {
-                await this.processMention(config, mention);
+                const handled = await this.processMention(config, mention);
+                if (handled) {
+                    processedNewIds.push(mention.id);
+                }
             }
 
-            // Persist the full set of processed IDs (existing + newly processed)
-            const updatedIds = [...config.processedIds, ...newMentions.map(m => m.id)];
-            updateProcessedIds(this.db, config.id, updatedIds);
+            // Only persist IDs of mentions that were actually processed
+            if (processedNewIds.length > 0) {
+                const updatedIds = [...config.processedIds, ...processedNewIds];
+                updateProcessedIds(this.db, config.id, updatedIds);
+            }
 
             // Also update lastSeenId to the newest for backward compat
             const newestId = mentions[0].id; // mentions are sorted newest-first
@@ -475,27 +481,30 @@ export class MentionPollingService {
     // ─── Trigger Logic ──────────────────────────────────────────────────────
 
     /**
-     * Process a detected mention — create an agent session or work task.
+     * Process a detected mention — create an agent session.
+     * Returns true if a session was actually created, false if skipped.
      */
-    private async processMention(config: MentionPollingConfig, mention: DetectedMention): Promise<void> {
-        // Rate limit check
-        const lastTrigger = this.recentTriggers.get(config.id);
+    private async processMention(config: MentionPollingConfig, mention: DetectedMention): Promise<boolean> {
+        // Rate limit per mention ID — prevents re-triggering the same mention
+        // within 60s, but allows different mentions on the same config concurrently.
+        const rateLimitKey = `${config.id}:${mention.id}`;
+        const lastTrigger = this.recentTriggers.get(rateLimitKey);
         if (lastTrigger && (Date.now() - lastTrigger) < MIN_TRIGGER_GAP_MS) {
             log.debug('Skipping mention due to rate limit', { configId: config.id, mentionId: mention.id });
-            return;
+            return false;
         }
 
         const agent = getAgent(this.db, config.agentId);
         if (!agent) {
             log.error('Agent not found for polling config', { configId: config.id, agentId: config.agentId });
-            return;
+            return false;
         }
 
         // Resolve project: config > agent default
         const projectId = config.projectId || agent.defaultProjectId;
         if (!projectId) {
             log.error('No project for polling config and agent has no default', { configId: config.id, agentId: config.agentId });
-            return;
+            return false;
         }
 
         // Always create an agent session — the session is responsible for both
@@ -503,7 +512,7 @@ export class MentionPollingService {
         // changes. This ensures the person who mentioned us always gets a reply.
         const prompt = this.buildPrompt(config, mention);
 
-        this.recentTriggers.set(config.id, Date.now());
+        this.recentTriggers.set(rateLimitKey, Date.now());
 
         try {
             const session = createSession(this.db, {
@@ -520,8 +529,10 @@ export class MentionPollingService {
             log.info('Polling triggered agent session', { configId: config.id, sessionId: session.id, mention: mention.id });
 
             this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, sessionId: session.id } });
+            return true;
         } catch (err) {
             log.error('Failed to create session from mention poll', { error: err instanceof Error ? err.message : String(err) });
+            return false;
         }
     }
 
