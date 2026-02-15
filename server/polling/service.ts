@@ -507,13 +507,6 @@ export class MentionPollingService {
             return false;
         }
 
-        // Resolve project: config > agent default
-        const projectId = config.projectId || agent.defaultProjectId;
-        if (!projectId) {
-            log.error('No project for polling config and agent has no default', { configId: config.id, agentId: config.agentId });
-            return;
-        }
-
         // Always create an agent session — the session is responsible for both
         // replying on GitHub AND deciding whether to create a work task for code
         // changes. This ensures the person who mentioned us always gets a reply.

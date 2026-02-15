@@ -457,7 +457,6 @@ function gracefulShutdown(): void {
     workflowService.stop();
     schedulerService.stop();
     mentionPollingService.stop();
-    workflowService.stop();
     memorySyncService.stop();
     sessionLifecycle.stop();
     processManager.shutdown();
