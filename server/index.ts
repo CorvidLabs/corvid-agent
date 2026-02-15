@@ -39,6 +39,7 @@ import {
 } from './observability/index';
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
+import { buildAgentCard } from './a2a/agent-card';
 
 const log = createLogger('Server');
 
@@ -292,6 +293,22 @@ const server = Bun.serve<WsData>({
                         headers: { 'Content-Type': 'application/json' },
                     }),
                     '/api/health',
+                );
+            }
+
+            // A2A Protocol: Agent Card (public, no auth required)
+            if (url.pathname === '/.well-known/agent-card.json' && req.method === 'GET') {
+                const baseUrl = `${url.protocol}//${url.host}`;
+                const card = buildAgentCard(baseUrl);
+                return instrumentResponse(
+                    new Response(JSON.stringify(card, null, 2), {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*',
+                            'Cache-Control': 'public, max-age=300', // 5 min cache
+                        },
+                    }),
+                    '/.well-known/agent-card.json',
                 );
             }
 

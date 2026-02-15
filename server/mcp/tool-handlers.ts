@@ -20,6 +20,7 @@ import { encryptMemoryContent } from '../lib/crypto';
 import { createLogger } from '../lib/logger';
 import { braveWebSearch, braveMultiSearch } from '../lib/web-search';
 import * as github from '../github/operations';
+import { discoverAgent } from '../a2a/client';
 
 const log = createLogger('McpToolHandlers');
 
@@ -902,6 +903,66 @@ export async function handleManageWorkflow(
         const message = err instanceof Error ? err.message : String(err);
         log.error('MCP manage_workflow failed', { error: message });
         return errorResult(`Failed to manage workflow: ${message}`);
+    }
+}
+
+// ─── A2A discovery handler ────────────────────────────────────────────────
+
+export async function handleDiscoverAgent(
+    ctx: McpToolContext,
+    args: { url: string },
+): Promise<CallToolResult> {
+    if (!args.url?.trim()) {
+        return errorResult('A URL is required (e.g. "https://agent.example.com").');
+    }
+
+    try {
+        ctx.emitStatus?.(`Discovering agent at ${args.url}...`);
+
+        const card = await discoverAgent(args.url);
+
+        if (!card) {
+            return textResult(
+                `No A2A Agent Card found at ${args.url}.\n` +
+                `The remote server may not support the A2A protocol, or the URL may be incorrect.`,
+            );
+        }
+
+        const skillLines = (card.skills ?? []).map(
+            (s) => `  - ${s.name}: ${s.description} [${s.tags?.join(', ') ?? ''}]`,
+        );
+
+        const protocolLines = (card as { supportedProtocols?: Array<{ protocol: string; description: string }> }).supportedProtocols?.map(
+            (p) => `  - ${p.protocol}: ${p.description}`,
+        ) ?? [];
+
+        const lines = [
+            `Agent: ${card.name} v${card.version}`,
+            `Description: ${card.description}`,
+            `URL: ${card.url}`,
+            card.provider ? `Provider: ${card.provider.organization} (${card.provider.url})` : null,
+            card.documentationUrl ? `Docs: ${card.documentationUrl}` : null,
+            ``,
+            `Capabilities:`,
+            `  Streaming: ${card.capabilities?.streaming ?? false}`,
+            `  Push Notifications: ${card.capabilities?.pushNotifications ?? false}`,
+            ``,
+            `Authentication: ${card.authentication?.schemes?.join(', ') ?? 'none'}`,
+            `Input Modes: ${card.defaultInputModes?.join(', ') ?? 'unknown'}`,
+            `Output Modes: ${card.defaultOutputModes?.join(', ') ?? 'unknown'}`,
+            ``,
+            skillLines.length > 0 ? `Skills (${skillLines.length}):` : 'Skills: none',
+            ...skillLines,
+            protocolLines.length > 0 ? `\nSupported Protocols:` : null,
+            ...protocolLines,
+        ].filter(Boolean);
+
+        ctx.emitStatus?.(`Discovered ${card.name} with ${card.skills?.length ?? 0} skills`);
+        return textResult(lines.join('\n'));
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('MCP discover_agent failed', { error: message });
+        return errorResult(`Failed to discover agent: ${message}`);
     }
 }
 

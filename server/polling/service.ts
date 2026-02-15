@@ -192,19 +192,27 @@ export class MentionPollingService {
 
             log.info('Found new mentions', { configId: config.id, repo: config.repo, count: newMentions.length });
 
-            // Process each new mention — only track IDs that were actually handled
-            const processedNewIds: string[] = [];
-            for (const mention of newMentions) {
-                const handled = await this.processMention(config, mention);
-                if (handled) {
-                    processedNewIds.push(mention.id);
+            // Deduplicate: collapse multiple mentions for the same issue number
+            // (e.g. comment-123, issue-8, assigned-8 all for #8) into one.
+            // We keep the first (newest, since mentions are sorted desc).
+            const seenNumbers = new Set<number>();
+            const dedupedMentions: DetectedMention[] = [];
+            for (const m of newMentions) {
+                if (!seenNumbers.has(m.number)) {
+                    seenNumbers.add(m.number);
+                    dedupedMentions.push(m);
                 }
             }
 
-            // Only persist IDs of mentions that were actually processed
-            if (processedNewIds.length > 0) {
-                const updatedIds = [...config.processedIds, ...processedNewIds];
-                updateProcessedIds(this.db, config.id, updatedIds);
+            // Process each deduplicated mention and persist IDs immediately
+            // to narrow the race window with concurrent poll cycles.
+            for (const mention of dedupedMentions) {
+                await this.processMention(config, mention);
+                // Collect ALL mention IDs for this issue number (comment-X, issue-N, assigned-N)
+                // so duplicates from other search paths don't reappear.
+                const relatedIds = newMentions.filter(m => m.number === mention.number).map(m => m.id);
+                config.processedIds = [...config.processedIds, ...relatedIds];
+                updateProcessedIds(this.db, config.id, config.processedIds);
             }
 
             // Also update lastSeenId to the newest for backward compat
@@ -500,13 +508,6 @@ export class MentionPollingService {
             return false;
         }
 
-        // Resolve project: config > agent default
-        const projectId = config.projectId || agent.defaultProjectId;
-        if (!projectId) {
-            log.error('No project for polling config and agent has no default', { configId: config.id, agentId: config.agentId });
-            return false;
-        }
-
         // Always create an agent session — the session is responsible for both
         // replying on GitHub AND deciding whether to create a work task for code
         // changes. This ensures the person who mentioned us always gets a reply.
@@ -516,7 +517,7 @@ export class MentionPollingService {
 
         try {
             const session = createSession(this.db, {
-                projectId,
+                projectId: config.projectId,
                 agentId: config.agentId,
                 name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
                 initialPrompt: prompt,
