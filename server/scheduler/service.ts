@@ -268,7 +268,7 @@ export class SchedulerService {
             // Audit log the schedule execution
             recordAudit(
                 this.db,
-                'schedule_modify',
+                'schedule_execute',
                 schedule.agentId,
                 'schedule_execution',
                 execution.id,

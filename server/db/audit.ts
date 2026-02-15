@@ -19,6 +19,7 @@ export type AuditAction =
     | 'credit_deduction'
     | 'schedule_create'
     | 'schedule_modify'
+    | 'schedule_execute'
     | 'schedule_delete'
     | 'work_task_create'
     | 'work_task_complete'
