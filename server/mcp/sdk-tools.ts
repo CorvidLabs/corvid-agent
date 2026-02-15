@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -16,6 +16,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_manage_schedule',
     'corvid_web_search',
     'corvid_deep_research',
+    'corvid_discover_agent',
     'corvid_github_star_repo',
     'corvid_github_fork_repo',
     'corvid_github_list_prs',
@@ -218,6 +219,17 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 sub_questions: z.array(z.string()).optional().describe('Custom sub-questions to search. If omitted, auto-generates angles like "benefits", "challenges", "examples", "latest news".'),
             },
             async (args) => handleDeepResearch(ctx, args),
+        ),
+        // ─── A2A discovery ───────────────────────────────────────────────
+        tool(
+            'corvid_discover_agent',
+            'Discover a remote agent by fetching its A2A Agent Card from /.well-known/agent-card.json. ' +
+            'Returns the agent\'s name, capabilities, skills, and supported protocols. ' +
+            'Use this to learn what a remote agent can do before communicating with it.',
+            {
+                url: z.string().describe('Base URL of the remote agent (e.g. "https://agent.example.com")'),
+            },
+            async (args) => handleDiscoverAgent(ctx, args),
         ),
         // ─── GitHub tools ────────────────────────────────────────────────
         tool(
