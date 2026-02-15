@@ -377,8 +377,8 @@ export async function handleCreditConfig(
     }
 }
 
-// Rate limiter for corvid_create_work_task: max 5 per agent per day (persisted via DB)
-const WORK_TASK_MAX_PER_DAY = 5;
+// Rate limiter for corvid_create_work_task (persisted via DB)
+const WORK_TASK_MAX_PER_DAY = parseInt(process.env.WORK_TASK_MAX_PER_DAY ?? '100', 10);
 
 function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
     const row = db.query(
