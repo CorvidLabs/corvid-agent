@@ -567,14 +567,17 @@ export class MentionPollingService {
             ? `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`
             : `gh issue comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
 
-        // For external repos, give explicit instructions to clone and work there
+        // For external repos, give explicit instructions to clone and work there.
+        // Use a unique path per issue to avoid conflicts when multiple sessions run concurrently.
+        const repoName = repo.split('/')[1];
+        const workDir = `/tmp/${repoName}-issue-${mention.number}`;
         const codeChangeInstructions = isHomeRepo
             ? `Use \`corvid_create_work_task\` to implement changes on a branch and open a PR.`
             : [
                 `This issue is in the **${repo}** repository (not corvid-agent). Do NOT use \`corvid_create_work_task\` — that only works for corvid-agent.`,
                 `Instead, to make code changes:`,
-                `  1. Clone the repo: \`gh repo clone ${repo} /tmp/${repo.split('/')[1]}\``,
-                `  2. \`cd /tmp/${repo.split('/')[1]}\``,
+                `  1. Clone the repo: \`gh repo clone ${repo} ${workDir}\``,
+                `  2. \`cd ${workDir}\``,
                 `  3. Create a branch: \`git checkout -b fix/issue-${mention.number}\``,
                 `  4. Make your changes`,
                 `  5. Commit and push: \`git add -A && git commit -m "fix: ..." && git push -u origin fix/issue-${mention.number}\``,
