@@ -573,6 +573,23 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
+
+        // Immutable audit log — insert-only table for security/compliance auditing.
+        // No UPDATE or DELETE operations should ever be performed on this table.
+        `CREATE TABLE IF NOT EXISTS audit_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   TEXT NOT NULL DEFAULT (datetime('now')),
+            action      TEXT NOT NULL,
+            actor       TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT,
+            detail      TEXT,
+            trace_id    TEXT,
+            ip_address  TEXT
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_log_trace_id ON audit_log(trace_id)`,
     ],
 };
 

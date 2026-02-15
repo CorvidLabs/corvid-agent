@@ -1,3 +1,5 @@
+import { hostname } from 'node:os';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
@@ -14,7 +16,15 @@ const LEVEL_LABELS: Record<LogLevel, string> = {
     error: 'ERROR',
 };
 
-const LOG_FORMAT = (process.env.LOG_FORMAT ?? 'text').toLowerCase();
+// Default to JSON in production, text otherwise. Explicit LOG_FORMAT overrides.
+const LOG_FORMAT = (() => {
+    const explicit = process.env.LOG_FORMAT?.toLowerCase();
+    if (explicit === 'json' || explicit === 'text') return explicit;
+    return process.env.NODE_ENV === 'production' ? 'json' : 'text';
+})();
+
+const HOST = hostname();
+const PID = process.pid;
 
 function getMinLevel(): LogLevel {
     const env = process.env.LOG_LEVEL?.toLowerCase();
@@ -27,14 +37,51 @@ function formatContext(ctx?: Record<string, unknown>): string {
     return ' ' + JSON.stringify(ctx);
 }
 
+/**
+ * Get trace context from AsyncLocalStorage if the observability module is loaded.
+ * We use a lazy import to avoid circular dependencies — the observability module
+ * imports the logger, so the logger must not synchronously import observability.
+ */
+let _getTraceId: (() => string | undefined) | null = null;
+let _getRequestId: (() => string | undefined) | null = null;
+let _traceContextLoaded = false;
+
+function loadTraceContext(): void {
+    if (_traceContextLoaded) return;
+    _traceContextLoaded = true;
+    try {
+        // Dynamic require to avoid circular dependency at module load time.
+        // The observability/trace-context module is side-effect-free.
+        const mod = require('../observability/trace-context');
+        _getTraceId = mod.getTraceId;
+        _getRequestId = mod.getRequestId;
+    } catch {
+        // Trace context not available — that's fine
+    }
+}
+
+function getTraceContext(): { traceId?: string; requestId?: string } {
+    loadTraceContext();
+    return {
+        traceId: _getTraceId?.(),
+        requestId: _getRequestId?.(),
+    };
+}
+
 function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<string, unknown>): string {
+    const traceCtx = getTraceContext();
+
     if (LOG_FORMAT === 'json') {
         const entry: Record<string, unknown> = {
             timestamp: new Date().toISOString(),
             level,
             module,
             message: msg,
+            pid: PID,
+            hostname: HOST,
         };
+        if (traceCtx.traceId) entry.traceId = traceCtx.traceId;
+        if (traceCtx.requestId) entry.requestId = traceCtx.requestId;
         if (ctx && Object.keys(ctx).length > 0) {
             Object.assign(entry, ctx);
         }
@@ -42,7 +89,8 @@ function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<s
     }
 
     const ts = new Date().toISOString();
-    return `${ts} ${LEVEL_LABELS[level]} [${module}] ${msg}${formatContext(ctx)}`;
+    const tracePrefix = traceCtx.traceId ? ` trace=${traceCtx.traceId.slice(0, 8)}` : '';
+    return `${ts} ${LEVEL_LABELS[level]} [${module}]${tracePrefix} ${msg}${formatContext(ctx)}`;
 }
 
 export interface Logger {

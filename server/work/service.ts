@@ -15,6 +15,7 @@ import {
     cleanupStaleWorkTasks,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('WorkTaskService');
 
@@ -96,6 +97,15 @@ export class WorkTaskService {
         }
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId });
+
+        recordAudit(
+            this.db,
+            'work_task_create',
+            input.agentId,
+            'work_task',
+            task.id,
+            `Created work task: ${input.description.slice(0, 200)}`,
+        );
 
         // Generate branch name
         const agentSlug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -339,6 +349,8 @@ export class WorkTaskService {
             const summary = sessionOutput.slice(-500).trim();
             updateWorkTaskStatus(this.db, taskId, 'completed', { prUrl, summary });
             log.info('Work task completed with PR', { taskId, prUrl });
+
+            recordAudit(this.db, 'work_task_complete', 'system', 'work_task', taskId, `Completed with PR: ${prUrl}`);
         } else {
             updateWorkTaskStatus(this.db, taskId, 'failed', {
                 error: 'Session completed but no PR URL was found in output',
