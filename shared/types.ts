@@ -505,6 +505,8 @@ export interface MentionPollingConfig {
     lastPollAt: string | null;
     /** ID of the last processed notification/comment to avoid duplicates */
     lastSeenId: string | null;
+    /** Set of all processed mention IDs to avoid re-triggering */
+    processedIds: string[];
     /** Optional: only poll specific event types */
     eventFilter: ('issue_comment' | 'issues' | 'pull_request_review_comment')[];
     /** Optional: only respond to mentions from specific users (empty = all users) */

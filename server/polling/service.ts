@@ -18,6 +18,7 @@ import {
     findDuePollingConfigs,
     updatePollState,
     incrementPollingTriggerCount,
+    updateProcessedIds,
 } from '../db/mention-polling';
 // Webhook delivery helpers not needed here — polling uses its own trigger tracking
 import { getAgent } from '../db/agents';
@@ -162,7 +163,15 @@ export class MentionPollingService {
         this.activePolls.add(config.id);
 
         try {
-            log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername, lastPollAt: config.lastPollAt, lastSeenId: config.lastSeenId });
+            log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername, lastPollAt: config.lastPollAt, lastSeenId: config.lastSeenId, processedIds: config.processedIds.length });
+
+            // Migration: seed processedIds from lastSeenId if the new column is empty
+            // but lastSeenId exists (upgraded from position-based to set-based tracking).
+            if (config.processedIds.length === 0 && config.lastSeenId) {
+                config.processedIds = [config.lastSeenId];
+                updateProcessedIds(this.db, config.id, config.processedIds);
+                log.info('Migrated lastSeenId to processedIds', { configId: config.id, lastSeenId: config.lastSeenId });
+            }
 
             // Fetch recent mentions from GitHub
             const mentions = await this.fetchMentions(config);
@@ -174,8 +183,8 @@ export class MentionPollingService {
                 return;
             }
 
-            // Filter out already-seen mentions
-            const newMentions = this.filterNewMentions(mentions, config.lastSeenId);
+            // Filter out already-processed mentions using the full ID set
+            const newMentions = this.filterNewMentions(mentions, config.processedIds);
             if (newMentions.length === 0) {
                 updatePollState(this.db, config.id);
                 return;
@@ -188,8 +197,12 @@ export class MentionPollingService {
                 await this.processMention(config, mention);
             }
 
-            // Update the last seen ID to the newest mention
-            const newestId = newMentions[0].id;
+            // Persist the full set of processed IDs (existing + newly processed)
+            const updatedIds = [...config.processedIds, ...newMentions.map(m => m.id)];
+            updateProcessedIds(this.db, config.id, updatedIds);
+
+            // Also update lastSeenId to the newest for backward compat
+            const newestId = mentions[0].id; // mentions are sorted newest-first
             updatePollState(this.db, config.id, newestId);
 
         } catch (err) {
@@ -525,17 +538,15 @@ export class MentionPollingService {
         return regex.test(body);
     }
 
-    private filterNewMentions(mentions: DetectedMention[], lastSeenId: string | null): DetectedMention[] {
-        if (!lastSeenId) return mentions;
+    private filterNewMentions(mentions: DetectedMention[], processedIds: string[]): DetectedMention[] {
+        if (processedIds.length === 0) return mentions;
 
-        // Return only mentions with IDs we haven't seen yet
-        const idx = mentions.findIndex(m => m.id === lastSeenId);
-        if (idx === -1) {
-            // Last seen ID not found — could be very old. Return all mentions.
-            return mentions;
-        }
-        // Return mentions newer than the last seen (they're sorted newest-first)
-        return mentions.slice(0, idx);
+        // Filter out any mention whose ID is in the processed set.
+        // This handles assignments correctly: even old issues that get newly
+        // assigned will be processed, because their ID (assigned-N) won't be
+        // in the set until we actually process them.
+        const seen = new Set(processedIds);
+        return mentions.filter(m => !seen.has(m.id));
     }
 
     private buildPrompt(config: MentionPollingConfig, mention: DetectedMention): string {

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 32;
+const SCHEMA_VERSION = 33;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -514,6 +514,11 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_agent ON mention_polling_configs(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_status ON mention_polling_configs(status)`,
         `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_repo ON mention_polling_configs(repo)`,
+    ],
+    33: [
+        // Track all processed mention IDs (not just the newest) to avoid missing
+        // older issues that get newly assigned after the high-water-mark was set.
+        `ALTER TABLE mention_polling_configs ADD COLUMN processed_ids TEXT NOT NULL DEFAULT '[]'`,
     ],
 };
 
