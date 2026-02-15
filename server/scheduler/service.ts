@@ -32,6 +32,7 @@ import * as github from '../github/operations';
 import { launchCouncil } from '../routes/councils';
 import { getNextCronDate } from './cron-parser';
 import { createLogger } from '../lib/logger';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('Scheduler');
 
@@ -263,6 +264,16 @@ export class SchedulerService {
             );
 
             this.emit({ type: 'schedule_execution_update', data: execution });
+
+            // Audit log the schedule execution
+            recordAudit(
+                this.db,
+                'schedule_execute',
+                schedule.agentId,
+                'schedule_execution',
+                execution.id,
+                `Executing action: ${action.type} for schedule "${schedule.name}"`,
+            );
 
             // Check if this action needs approval
             if (this.needsApproval(schedule, action)) {
