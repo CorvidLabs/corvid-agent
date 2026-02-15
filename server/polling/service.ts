@@ -508,23 +508,6 @@ export class MentionPollingService {
             return false;
         }
 
-        // Resolve project: config > agent default
-        const projectId = config.projectId || agent.defaultProjectId;
-        if (!projectId) {
-            log.error('No project for polling config and agent has no default', { configId: config.id, agentId: config.agentId });
-            return false;
-        }
-
-        // Guard: skip if there's already an active session for this issue
-        const sessionPrefix = `Poll: ${config.repo.split('/')[1]} #${mention.number}:`;
-        const existing = this.db.query(
-            `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle') AND created_at > datetime('now', '-1 hour')`
-        ).get(sessionPrefix + '%') as { id: string } | null;
-        if (existing) {
-            log.debug('Active session already exists for issue', { number: mention.number, existingId: existing.id });
-            return false;
-        }
-
         // Always create an agent session — the session is responsible for both
         // replying on GitHub AND deciding whether to create a work task for code
         // changes. This ensures the person who mentioned us always gets a reply.
@@ -534,7 +517,7 @@ export class MentionPollingService {
 
         try {
             const session = createSession(this.db, {
-                projectId,
+                projectId: config.projectId,
                 agentId: config.agentId,
                 name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
                 initialPrompt: prompt,

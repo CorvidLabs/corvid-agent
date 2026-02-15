@@ -675,3 +675,52 @@ export interface WorkflowNodeRun {
     startedAt: string | null;
     completedAt: string | null;
 }
+
+// MARK: - A2A Protocol (Agent-to-Agent Agent Card)
+
+export interface A2AAgentProvider {
+    organization: string;
+    url: string;
+}
+
+export interface A2AAgentCapabilities {
+    streaming?: boolean;
+    pushNotifications?: boolean;
+    stateTransitionHistory?: boolean;
+}
+
+export interface A2AAgentAuthentication {
+    schemes: string[];
+    credentials?: string;
+}
+
+export interface A2AAgentSkill {
+    id: string;
+    name: string;
+    description: string;
+    tags: string[];
+    inputModes: string[];
+    outputModes: string[];
+}
+
+export interface A2AProtocolExtension {
+    protocol: string;
+    description: string;
+    endpoint?: string;
+}
+
+export interface A2AAgentCard {
+    name: string;
+    description: string;
+    url: string;
+    provider?: A2AAgentProvider;
+    version: string;
+    documentationUrl?: string;
+    capabilities: A2AAgentCapabilities;
+    authentication: A2AAgentAuthentication;
+    defaultInputModes: string[];
+    defaultOutputModes: string[];
+    skills: A2AAgentSkill[];
+    /** Custom extension: supported protocols beyond A2A */
+    supportedProtocols?: A2AProtocolExtension[];
+}
