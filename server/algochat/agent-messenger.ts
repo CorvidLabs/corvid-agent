@@ -19,6 +19,10 @@ import type { WorkTaskService } from '../work/service';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { generateTraceId } from '../observability/tracing';
+import { runWithTraceId, getTraceId } from '../observability/trace-context';
+import { agentMessagesTotal } from '../observability/metrics';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('AgentMessenger');
 
@@ -127,6 +131,9 @@ export class AgentMessenger {
         const paymentMicro = request.paymentMicro ?? DEFAULT_PAYMENT_MICRO;
         const threadId = request.threadId ?? crypto.randomUUID();
 
+        // Generate or inherit trace ID for this invocation chain
+        const traceId = getTraceId() ?? generateTraceId();
+
         // Guards
         if (fromAgentId === toAgentId) {
             throw new Error('An agent cannot invoke itself');
@@ -204,8 +211,21 @@ export class AgentMessenger {
         log.info(`Agent invoke: ${fromAgent.name} → ${toAgent.name}`, {
             messageId: agentMessage.id,
             threadId,
+            traceId,
             paymentMicro,
         });
+
+        // Record audit and metrics for agent message send
+        agentMessagesTotal.inc({ direction: 'outbound', status: 'sent' });
+        recordAudit(
+            this.db,
+            'agent_message_send',
+            fromAgent.name,
+            'agent_message',
+            agentMessage.id,
+            `${fromAgent.name} → ${toAgent.name}: ${content.slice(0, 200)}`,
+            traceId,
+        );
 
         // Send on-chain payment from Agent A → Agent B
         let txid: string | null = null;
@@ -249,8 +269,10 @@ export class AgentMessenger {
         // Subscribe to session events and buffer the response
         this.subscribeForAgentResponse(agentMessage.id, session.id, fromAgentId, toAgentId);
 
-        // Start the session process (pass depth for invoke chain limiting)
-        this.processManager.startProcess(session, prompt, { depth: request.depth });
+        // Start the session process within trace context (pass depth for invoke chain limiting)
+        runWithTraceId(traceId, () => {
+            this.processManager.startProcess(session, prompt, { depth: request.depth });
+        });
 
         const updatedMessage = getAgentMessage(this.db, agentMessage.id);
         return {

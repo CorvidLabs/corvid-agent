@@ -1,5 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
+import { recordAudit } from './audit';
+import { creditsConsumedTotal } from '../observability/metrics';
 
 const log = createLogger('CreditManager');
 
@@ -205,6 +207,8 @@ export function grantCredits(
     recordTransaction(db, walletAddress, 'grant', amount, balance.credits, reference);
 
     log.info(`Credits granted`, { walletAddress: walletAddress.slice(0, 8) + '...', amount, reference });
+
+    recordAudit(db, 'credit_grant', 'system', 'credit_ledger', walletAddress, `Granted ${amount} credits (${reference ?? 'no reference'})`);
 }
 
 /**
@@ -245,6 +249,9 @@ export function deductTurnCredits(
 
     const newBalance = getBalance(db, walletAddress);
     recordTransaction(db, walletAddress, 'deduction', config.creditsPerTurn, newBalance.credits, 'turn', null, sessionId);
+
+    creditsConsumedTotal.inc({}, config.creditsPerTurn);
+    recordAudit(db, 'credit_deduction', walletAddress, 'credit_ledger', walletAddress, `Deducted ${config.creditsPerTurn} credits (turn), remaining: ${newBalance.available}`);
 
     return {
         success: true,
