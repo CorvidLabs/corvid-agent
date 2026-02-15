@@ -508,13 +508,6 @@ export class MentionPollingService {
             return false;
         }
 
-        // Resolve project: config > agent default
-        const projectId = config.projectId || agent.defaultProjectId;
-        if (!projectId) {
-            log.error('No project for polling config and agent has no default', { configId: config.id, agentId: config.agentId });
-            return false;
-        }
-
         // Guard: skip if there's already an active session for this issue
         const sessionPrefix = `Poll: ${config.repo.split('/')[1]} #${mention.number}:`;
         const existing = this.db.query(
@@ -534,7 +527,7 @@ export class MentionPollingService {
 
         try {
             const session = createSession(this.db, {
-                projectId,
+                projectId: config.projectId,
                 agentId: config.agentId,
                 name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
                 initialPrompt: prompt,
