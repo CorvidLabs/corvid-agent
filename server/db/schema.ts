@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 34;
+const SCHEMA_VERSION = 35;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -573,7 +573,9 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
+    ],
 
+    35: [
         // Immutable audit log — insert-only table for security/compliance auditing.
         // No UPDATE or DELETE operations should ever be performed on this table.
         `CREATE TABLE IF NOT EXISTS audit_log (
