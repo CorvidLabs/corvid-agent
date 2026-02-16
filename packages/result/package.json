@@ -1,0 +1,59 @@
+{
+  "name": "@corvidlabs/result",
+  "version": "1.0.0",
+  "description": "Type-safe Result<T, E> type for TypeScript - inspired by Rust and Swift",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "result",
+    "either",
+    "maybe",
+    "option",
+    "error-handling",
+    "typescript",
+    "rust",
+    "swift",
+    "functional",
+    "type-safe"
+  ],
+  "author": "CorvidLabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CorvidLabs/result.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CorvidLabs/result/issues"
+  },
+  "homepage": "https://github.com/CorvidLabs/result#readme",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^3.0.0"
+  }
+}
