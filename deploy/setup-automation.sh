@@ -264,6 +264,7 @@ DELETE_SCHEDULES=(
     "Star Algorand Ecosystem Repos"
     "Weekly CorvidLabs Repo Health Check"
     "Weekly ts-algochat Work Task"
+    "Weekly Codebase Improvement"
 )
 
 for sched_name in "${DELETE_SCHEDULES[@]}"; do
