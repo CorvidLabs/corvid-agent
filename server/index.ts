@@ -55,7 +55,9 @@ const startTime = Date.now();
 // Initialize database
 const db = getDb();
 
-// Initialize observability (OpenTelemetry tracing + metrics) — non-blocking, opt-in
+// Initialize observability (OpenTelemetry tracing + metrics) — non-blocking, opt-in.
+// Empty catch is intentional: initObservability() logs warnings internally when
+// the OTLP endpoint is unavailable, so we silently swallow the rejection here.
 initObservability().catch(() => {});
 
 // Initialize LLM provider registry
@@ -207,6 +209,20 @@ interface WsData {
     walletAddress?: string;
 }
 
+/**
+ * Check admin authentication for sensitive internal endpoints (/metrics, /api/audit-log).
+ * When ADMIN_API_KEY env var is set, requires a matching Bearer token.
+ * When no key is configured (dev mode), access is allowed without auth.
+ */
+function checkAdminAuth(req: Request): boolean {
+    const adminKey = process.env.ADMIN_API_KEY;
+    if (!adminKey) return true; // No key configured — dev mode, allow unauthenticated
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) return false;
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    return token === adminKey;
+}
+
 // Start server
 const server = Bun.serve<WsData>({
     port: PORT,
@@ -222,7 +238,8 @@ const server = Bun.serve<WsData>({
         const traceId = parsed?.traceId ?? generateTraceId();
         const spanId = generateSpanId();
 
-        // Helper to add trace headers and record metrics on response
+        // Helper to add trace headers and record metrics on response.
+        // Returns a new Response to avoid mutating the original's headers.
         function instrumentResponse(response: Response, route: string): Response {
             const durationSec = (performance.now() - requestStart) / 1000;
             const statusCode = String(response.status);
@@ -230,13 +247,24 @@ const server = Bun.serve<WsData>({
             httpRequestsTotal.inc({ method: req.method, route, status_code: statusCode });
             httpRequestDuration.observe({ method: req.method, route, status_code: statusCode }, durationSec);
 
-            // Add traceparent to response
-            response.headers.set('traceparent', buildTraceparent(traceId, spanId));
-            return response;
+            // Construct a new Response with the traceparent header instead of mutating the original
+            const headers = new Headers(response.headers);
+            headers.set('traceparent', buildTraceparent(traceId, spanId));
+            return new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers,
+            });
         }
 
-        // Prometheus metrics endpoint
+        // Prometheus metrics endpoint (requires admin auth when ADMIN_API_KEY is set)
         if (url.pathname === '/metrics' && req.method === 'GET') {
+            if (!checkAdminAuth(req)) {
+                return new Response(JSON.stringify({ error: 'Authentication required' }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+                });
+            }
             // Update active sessions gauge before rendering
             activeSessionsGauge.set(processManager.getActiveSessionIds().length);
             return instrumentResponse(
@@ -247,8 +275,14 @@ const server = Bun.serve<WsData>({
             );
         }
 
-        // Audit log endpoint
+        // Audit log endpoint (requires admin auth when ADMIN_API_KEY is set)
         if (url.pathname === '/api/audit-log' && req.method === 'GET') {
+            if (!checkAdminAuth(req)) {
+                return new Response(JSON.stringify({ error: 'Authentication required' }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+                });
+            }
             const auditResponse = handleAuditRoutes(req, url, db);
             if (auditResponse) return instrumentResponse(auditResponse, '/api/audit-log');
         }

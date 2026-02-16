@@ -10,6 +10,14 @@
 // requires starting its own HTTP server. Instead we collect metrics in-memory and
 // render them in Prometheus text format on demand.
 
+/**
+ * Escape label values for Prometheus text format.
+ * Backslashes and double-quotes must be escaped to avoid malformed output.
+ */
+function escapeLabelValue(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 interface CounterLabels {
     [key: string]: string;
 }
@@ -52,7 +60,7 @@ class Counter {
         if (this.labelNames.length === 0) return '';
         const parts = this.labelNames
             .filter(name => labels[name] !== undefined)
-            .map(name => `${name}="${labels[name]}"`);
+            .map(name => `${name}="${escapeLabelValue(labels[name])}"`);
         return parts.length > 0 ? `{${parts.join(',')}}` : '';
     }
 }
@@ -105,7 +113,7 @@ class Gauge {
         if (this.labelNames.length === 0) return '';
         const parts = this.labelNames
             .filter(name => labels[name] !== undefined)
-            .map(name => `${name}="${labels[name]}"`);
+            .map(name => `${name}="${escapeLabelValue(labels[name])}"`);
         return parts.length > 0 ? `{${parts.join(',')}}` : '';
     }
 }
@@ -198,7 +206,7 @@ class Histogram {
         if (this.labelNames.length === 0) return '';
         const parts = this.labelNames
             .filter(name => labels[name] !== undefined)
-            .map(name => `${name}="${labels[name]}"`);
+            .map(name => `${name}="${escapeLabelValue(labels[name])}"`);
         return parts.length > 0 ? `{${parts.join(',')}}` : '';
     }
 }
