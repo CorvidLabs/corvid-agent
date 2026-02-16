@@ -26,7 +26,6 @@ import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { handleOllamaRoutes } from './routes/ollama';
 import { listProjects, createProject } from './db/projects';
-import { buildAgentCard } from './a2a/agent-card';
 import {
     initObservability,
     renderMetrics,
@@ -40,6 +39,7 @@ import {
 } from './observability/index';
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
+import { buildAgentCard } from './a2a/agent-card';
 
 const log = createLogger('Server');
 

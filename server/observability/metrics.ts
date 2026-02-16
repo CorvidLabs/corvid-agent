@@ -178,13 +178,14 @@ class Histogram {
             const comma = labelSuffix ? ',' : '';
             const lbrace = labelSuffix ? labelSuffix.slice(0, -1) : '{';
 
+            let cumulativeCount = 0;
             for (const bound of this.bucketBounds) {
-                const bucketCount = entry.buckets.get(bound) ?? 0;
+                cumulativeCount += entry.buckets.get(bound) ?? 0;
                 if (labelSuffix) {
                     // has existing labels: {method="GET",route="/api"} → {method="GET",route="/api",le="0.5"}
-                    lines.push(`${this.name}_bucket${lbrace}${comma}le="${bound}"} ${bucketCount}`);
+                    lines.push(`${this.name}_bucket${lbrace}${comma}le="${bound}"} ${cumulativeCount}`);
                 } else {
-                    lines.push(`${this.name}_bucket{le="${bound}"} ${bucketCount}`);
+                    lines.push(`${this.name}_bucket{le="${bound}"} ${cumulativeCount}`);
                 }
             }
             if (labelSuffix) {
