@@ -1,0 +1,70 @@
+{
+  "name": "@corvid-agent/env",
+  "version": "1.0.0",
+  "description": "Type-safe environment variable parser for TypeScript/Node.js",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "env",
+    "environment",
+    "variables",
+    "config",
+    "configuration",
+    "typescript",
+    "type-safe",
+    "parser",
+    "validation",
+    "dotenv"
+  ],
+  "author": "CorvidLabs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/corvid-agent/env.git"
+  },
+  "homepage": "https://github.com/corvid-agent/env",
+  "bugs": {
+    "url": "https://github.com/corvid-agent/env/issues"
+  },
+  "peerDependencies": {
+    "dotenv": ">=16.0.0"
+  },
+  "peerDependenciesMeta": {
+    "dotenv": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  }
+}
