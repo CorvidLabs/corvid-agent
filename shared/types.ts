@@ -323,6 +323,8 @@ export type ScheduleActionType =
     | 'council_launch'
     | 'send_message'
     | 'github_suggest'
+    | 'codebase_review'
+    | 'dependency_audit'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';

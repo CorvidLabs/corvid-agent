@@ -178,9 +178,9 @@ export class SessionLifecycleManager {
                 WHERE session_id IN (${placeholders})
             `).run(...sessionIds);
 
-            // Delete approval requests
+            // Delete escalation queue entries
             this.db.query(`
-                DELETE FROM approval_requests
+                DELETE FROM escalation_queue
                 WHERE session_id IN (${placeholders})
             `).run(...sessionIds);
 
@@ -347,9 +347,9 @@ export class SessionLifecycleManager {
                     DELETE FROM session_messages WHERE session_id = ?
                 `).run(sessionId);
 
-                // Delete approval requests
-                const approvalsResult = this.db.query(`
-                    DELETE FROM approval_requests WHERE session_id = ?
+                // Delete escalation queue entries
+                const escalationsResult = this.db.query(`
+                    DELETE FROM escalation_queue WHERE session_id = ?
                 `).run(sessionId);
 
                 // Delete session
@@ -359,7 +359,7 @@ export class SessionLifecycleManager {
 
                 return {
                     messagesDeleted: messagesResult.changes,
-                    approvalsDeleted: approvalsResult.changes,
+                    escalationsDeleted: escalationsResult.changes,
                     sessionDeleted: sessionResult.changes > 0,
                 };
             });
@@ -369,7 +369,7 @@ export class SessionLifecycleManager {
             if (result.sessionDeleted) {
                 log.info(`Force cleaned up session ${sessionId}`, {
                     messagesDeleted: result.messagesDeleted,
-                    approvalsDeleted: result.approvalsDeleted,
+                    escalationsDeleted: result.escalationsDeleted,
                 });
                 return true;
             }

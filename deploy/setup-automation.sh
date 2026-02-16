@@ -516,6 +516,38 @@ create_schedule "Stale PR Follow-Up" "$(cat <<'SEOF'
 SEOF
 )"
 
+# 12. Codebase Review — Tuesday/Friday at 11am
+create_schedule "Codebase Review" "$(cat <<EOF
+{
+    "agentId": "$AGENT_ID",
+    "name": "Codebase Review",
+    "description": "Automated codebase analysis: type errors, test failures, TODOs, large files",
+    "cronExpression": "0 11 * * 2,5",
+    "actions": [{
+        "type": "codebase_review",
+        "description": "Automated codebase analysis: type errors, test failures, TODOs, large files"
+    }],
+    "approvalPolicy": "owner_approve"
+}
+EOF
+)"
+
+# 13. Dependency Audit — 1st of each month at 10am
+create_schedule "Dependency Audit" "$(cat <<EOF
+{
+    "agentId": "$AGENT_ID",
+    "name": "Dependency Audit",
+    "description": "Check for outdated packages, security vulnerabilities, and pinning issues",
+    "cronExpression": "0 10 1 * *",
+    "actions": [{
+        "type": "dependency_audit",
+        "description": "Check for outdated packages, security vulnerabilities, and pinning issues"
+    }],
+    "approvalPolicy": "owner_approve"
+}
+EOF
+)"
+
 # ─── Phase 5: Workflows ──────────────────────────────────────────────────────
 
 log "Setting up workflows ..."
