@@ -678,6 +678,10 @@ export interface WorkflowNodeRun {
     completedAt: string | null;
 }
 
+// MARK: - Notifications (Multi-Channel)
+
+export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat';
+
 // MARK: - A2A Protocol (Agent-to-Agent Agent Card)
 
 export interface A2AAgentProvider {

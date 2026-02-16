@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -32,6 +32,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_manage_workflow',
     'corvid_notify_owner',
     'corvid_ask_owner',
+    'corvid_configure_notifications',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -260,6 +261,20 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 timeout_minutes: z.number().optional().describe('How long to wait for a response (1-10 minutes, default 2)'),
             },
             async (args) => handleAskOwner(ctx, args),
+        ),
+        tool(
+            'corvid_configure_notifications',
+            'Manage notification channels for this agent. Channels control where corvid_notify_owner sends messages. ' +
+            'Supported channel types: discord (webhook), telegram (bot), github (issues), algochat (on-chain). ' +
+            'WebSocket is always active. Use action="list" to view, "set" to configure, "enable"/"disable" to toggle, "remove" to delete.',
+            {
+                action: z.enum(['list', 'set', 'enable', 'disable', 'remove']).describe('What to do'),
+                channel_type: z.string().optional().describe('Channel type: discord, telegram, github, or algochat'),
+                config: z.record(z.string(), z.unknown()).optional().describe(
+                    'Channel configuration. Discord: {webhookUrl}. Telegram: {botToken, chatId}. GitHub: {repo, labels?}. AlgoChat: {toAddress}.',
+                ),
+            },
+            async (args) => handleConfigureNotifications(ctx, args),
         ),
         // ─── GitHub tools ────────────────────────────────────────────────
         tool(

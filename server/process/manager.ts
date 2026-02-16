@@ -18,6 +18,7 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
 import type { WorkflowService } from '../workflow/service';
+import type { NotificationService } from '../notifications/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -99,6 +100,7 @@ export class ProcessManager {
     private mcpWorkTaskService: WorkTaskService | null = null;
     private mcpSchedulerService: SchedulerService | null = null;
     private mcpWorkflowService: WorkflowService | null = null;
+    private mcpNotificationService: NotificationService | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -131,6 +133,7 @@ export class ProcessManager {
         workTaskService?: WorkTaskService,
         schedulerService?: SchedulerService,
         workflowService?: WorkflowService,
+        notificationService?: NotificationService,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
@@ -139,6 +142,7 @@ export class ProcessManager {
         this.mcpWorkTaskService = workTaskService ?? null;
         this.mcpSchedulerService = schedulerService ?? null;
         this.mcpWorkflowService = workflowService ?? null;
+        this.mcpNotificationService = notificationService ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -170,6 +174,7 @@ export class ProcessManager {
                 : undefined,
             ownerQuestionManager: this.ownerQuestionManager,
             sessionId,
+            notificationService: this.mcpNotificationService ?? undefined,
         };
     }
 

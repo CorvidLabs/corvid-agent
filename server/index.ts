@@ -41,6 +41,7 @@ import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
 import { buildAgentCard } from './a2a/agent-card';
 import { AstParserService } from './ast/service';
+import { NotificationService } from './notifications/service';
 
 const log = createLogger('Server');
 
@@ -123,6 +124,9 @@ const mentionPollingService = new MentionPollingService(db, processManager, work
 // Initialize workflow service (graph-based orchestration)
 const workflowService = new WorkflowService(db, processManager, workTaskService);
 
+// Initialize notification service (multi-channel owner notifications)
+const notificationService = new NotificationService(db);
+
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
 
@@ -195,7 +199,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService, workflowService);
+    }, workTaskService, schedulerService, workflowService, notificationService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -450,6 +454,9 @@ const server = Bun.serve<WsData>({
 // Wire broadcast function so MCP tools can publish to WS clients
 processManager.setBroadcast((topic, data) => server.publish(topic, data));
 
+// Wire notification service broadcast (publishes to 'owner' topic)
+notificationService.setBroadcast((msg) => server.publish('owner', JSON.stringify(msg)));
+
 // Broadcast council events to all WebSocket clients
 onCouncilStageChange((launchId, stage, sessionIds) => {
     const msg = JSON.stringify({ type: 'council_stage_change', launchId, stage, sessionIds });
@@ -537,13 +544,16 @@ initAlgoChat().then(() => {
     if (agentMessenger) {
         schedulerService.setAgentMessenger(agentMessenger);
         workflowService.setAgentMessenger(agentMessenger);
+        notificationService.setAgentMessenger(agentMessenger);
     }
+    notificationService.start();
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
-    // Start scheduler, polling, and workflows even if AlgoChat fails — they can still do GitHub ops and work tasks
+    // Start scheduler, polling, workflows, and notifications even if AlgoChat fails — they can still do GitHub ops and work tasks
+    notificationService.start();
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
@@ -594,6 +604,7 @@ function logShutdownDiagnostics(signal: string): void {
 }
 
 function gracefulShutdown(): void {
+    notificationService.stop();
     workflowService.stop();
     schedulerService.stop();
     mentionPollingService.stop();
