@@ -39,7 +39,7 @@
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="hero">
     <div class="container">
-      <div class="hero__badge">v0.4.0</div>
+      <div class="hero__badge">v0.8.0</div>
       <h1 class="hero__title">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
       </h1>
@@ -120,6 +120,24 @@
           <p>OpenTelemetry tracing, Prometheus metrics, and immutable audit logging. Full trace context across agent sessions.</p>
         </div>
 
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F4E2;</div>
+          <h3 class="card__title">Multi-Channel Comms</h3>
+          <p>Notifications and two-way questions via Discord, Telegram, GitHub Issues, and AlgoChat. Per-agent config with delivery tracking.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F333;</div>
+          <h3 class="card__title">AST Parser</h3>
+          <p>Tree-sitter AST analysis for smarter code understanding. Language-aware symbol extraction across work tasks.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F4AC;</div>
+          <h3 class="card__title">Owner Communication</h3>
+          <p>Two-way agent-to-owner questions with blocking polls. Responses via GitHub checkboxes, Telegram keyboards, or AlgoChat.</p>
+        </div>
+
       </div>
     </div>
   </section>
@@ -185,7 +203,7 @@
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>     <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>   <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>   <span class="t-comment"># Cron/interval task engine</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># 26 MCP tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># 29 MCP tools</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">observability/</span> <span class="t-comment"># OpenTelemetry + audit</span>
 <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">client/</span>          <span class="t-comment"># Angular 21 UI</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">src/app/</span>     <span class="t-comment"># Components &amp; services</span>
