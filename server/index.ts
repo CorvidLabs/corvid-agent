@@ -209,7 +209,7 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -446,6 +446,9 @@ const server = Bun.serve<WsData>({
 
     websocket: wsHandler,
 });
+
+// Wire broadcast function so MCP tools can publish to WS clients
+processManager.setBroadcast((topic, data) => server.publish(topic, data));
 
 // Broadcast council events to all WebSocket clients
 onCouncilStageChange((launchId, stage, sessionIds) => {

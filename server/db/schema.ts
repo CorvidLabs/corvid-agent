@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 35;
+const SCHEMA_VERSION = 36;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -592,6 +592,24 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)`,
         `CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
         `CREATE INDEX IF NOT EXISTS idx_audit_log_trace_id ON audit_log(trace_id)`,
+    ],
+    36: [
+        // Owner questions — agent-to-owner communication (blocking questions + audit)
+        `CREATE TABLE IF NOT EXISTS owner_questions (
+            id           TEXT PRIMARY KEY,
+            session_id   TEXT NOT NULL,
+            agent_id     TEXT NOT NULL,
+            question     TEXT NOT NULL,
+            options      TEXT DEFAULT NULL,
+            context      TEXT DEFAULT NULL,
+            status       TEXT DEFAULT 'pending',
+            answer       TEXT DEFAULT NULL,
+            timeout_ms   INTEGER DEFAULT 120000,
+            created_at   TEXT DEFAULT (datetime('now')),
+            resolved_at  TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_owner_questions_session ON owner_questions(session_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_owner_questions_agent ON owner_questions(agent_id)`,
     ],
 };
 

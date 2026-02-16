@@ -7,7 +7,8 @@ export type ClientMessage =
     | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
     | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
     | { type: 'create_work_task'; agentId: string; description: string; projectId?: string }
-    | { type: 'schedule_approval'; executionId: string; approved: boolean };
+    | { type: 'schedule_approval'; executionId: string; approved: boolean }
+    | { type: 'question_response'; questionId: string; answer: string; selectedOption?: number };
 
 export type ServerMessage =
     | { type: 'session_event'; sessionId: string; event: StreamEvent }
@@ -28,6 +29,8 @@ export type ServerMessage =
     | { type: 'schedule_execution_update'; execution: import('./types').ScheduleExecution }
     | { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
     | { type: 'ollama_pull_progress'; model: string; status: string; progress: number; downloadedBytes: number; totalBytes: number; currentLayer: string; error?: string }
+    | { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
+    | { type: 'agent_question'; question: { id: string; sessionId: string; agentId: string; question: string; options: string[] | null; context: string | null; createdAt: string; timeoutMs: number } }
     | { type: 'error'; message: string };
 
 export interface StreamEvent {
@@ -63,6 +66,8 @@ export function isClientMessage(data: unknown): data is ClientMessage {
                 && (msg.projectId === undefined || typeof msg.projectId === 'string');
         case 'schedule_approval':
             return typeof msg.executionId === 'string' && typeof msg.approved === 'boolean';
+        case 'question_response':
+            return typeof msg.questionId === 'string' && typeof msg.answer === 'string';
         default:
             return false;
     }

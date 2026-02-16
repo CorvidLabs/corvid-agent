@@ -6,7 +6,8 @@ export type ClientWsMessage =
     | { type: 'agent_reward'; agentId: string; microAlgos: number }
     | { type: 'agent_invoke'; fromAgentId: string; toAgentId: string; content: string; paymentMicro?: number; projectId?: string }
     | { type: 'approval_response'; requestId: string; behavior: 'allow' | 'deny'; message?: string }
-    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string };
+    | { type: 'create_work_task'; agentId: string; description: string; projectId?: string }
+    | { type: 'question_response'; questionId: string; answer: string; selectedOption?: number };
 
 export interface StreamEvent {
     eventType: string;
@@ -38,6 +39,8 @@ export type ServerWsMessage =
     | { type: 'mention_polling_update'; config: import('./mention-polling.model').MentionPollingConfig }
     | { type: 'workflow_run_update'; run: import('./workflow.model').WorkflowRun }
     | { type: 'workflow_node_update'; nodeExecution: import('./workflow.model').WorkflowNodeRun }
+    | { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
+    | { type: 'agent_question'; question: OwnerQuestionWire }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {
@@ -46,5 +49,16 @@ export interface ApprovalRequestWire {
     toolName: string;
     description: string;
     createdAt: number;
+    timeoutMs: number;
+}
+
+export interface OwnerQuestionWire {
+    id: string;
+    sessionId: string;
+    agentId: string;
+    question: string;
+    options: string[] | null;
+    context: string | null;
+    createdAt: string;
     timeoutMs: number;
 }

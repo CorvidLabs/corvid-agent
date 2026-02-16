@@ -5,6 +5,7 @@ import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
 import { startDirectProcess } from './direct-process';
 import { ApprovalManager } from './approval-manager';
+import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
 import { getAgent } from '../db/agents';
@@ -84,6 +85,8 @@ export class ProcessManager {
     private autoResumeTimer: ReturnType<typeof setInterval> | null = null;
     private orphanPruneTimer: ReturnType<typeof setInterval> | null = null;
     readonly approvalManager: ApprovalManager;
+    readonly ownerQuestionManager: OwnerQuestionManager;
+    private broadcastFn: ((topic: string, data: string) => void) | null = null;
 
     // Owner check — injected by AlgoChatBridge so credit deduction can be skipped for owners
     private isOwnerAddress: ((address: string) => boolean) | null = null;
@@ -101,10 +104,17 @@ export class ProcessManager {
         this.db = db;
         this.approvalManager = new ApprovalManager();
         this.approvalManager.setDatabase(db);
+        this.ownerQuestionManager = new OwnerQuestionManager();
+        this.ownerQuestionManager.setDatabase(db);
         this.cleanupStaleSessions();
         this.startTimeoutChecker();
         this.startAutoResumeChecker();
         this.startOrphanPruner();
+    }
+
+    /** Set the broadcast function so MCP tools can publish to WS clients. */
+    setBroadcast(fn: (topic: string, data: string) => void): void {
+        this.broadcastFn = fn;
     }
 
     /** Set the owner check function so credit deduction can be skipped for owners. */
@@ -155,6 +165,11 @@ export class ProcessManager {
             extendTimeout: sessionId
                 ? (additionalMs: number) => this.extendTimeout(sessionId, additionalMs)
                 : undefined,
+            broadcastOwnerMessage: this.broadcastFn
+                ? (message: unknown) => this.broadcastFn!('owner', JSON.stringify(message))
+                : undefined,
+            ownerQuestionManager: this.ownerQuestionManager,
+            sessionId,
         };
     }
 
@@ -502,6 +517,7 @@ export class ProcessManager {
         this.clearStableTimer(sessionId);
         this.clearSessionTimeout(sessionId);
         this.approvalManager.cancelSession(sessionId);
+        this.ownerQuestionManager.cancelSession(sessionId);
     }
 
     /**
@@ -589,6 +605,7 @@ export class ProcessManager {
             this.orphanPruneTimer = null;
         }
         this.approvalManager.shutdown();
+        this.ownerQuestionManager.shutdown();
 
         // Kill all running processes first (stopProcess also calls cleanupSessionState)
         for (const [sessionId] of this.processes) {

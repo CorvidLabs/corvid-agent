@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -30,6 +30,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_github_comment_on_pr',
     'corvid_github_follow_user',
     'corvid_manage_workflow',
+    'corvid_notify_owner',
+    'corvid_ask_owner',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -44,6 +46,7 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_github_create_pr',
     'corvid_github_create_issue',
     'corvid_github_comment_on_pr',
+    'corvid_ask_owner',
 ]);
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
@@ -230,6 +233,33 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 url: z.string().describe('Base URL of the remote agent (e.g. "https://agent.example.com")'),
             },
             async (args) => handleDiscoverAgent(ctx, args),
+        ),
+        // ─── Owner communication tools ───────────────────────────────────
+        tool(
+            'corvid_notify_owner',
+            'Send a notification to the server owner/operator watching the dashboard. ' +
+            'Use this for status updates, warnings, completion reports, or any non-blocking communication. ' +
+            'The owner sees the notification in real-time but does not need to respond.',
+            {
+                title: z.string().optional().describe('Short notification title (optional)'),
+                message: z.string().describe('The notification message'),
+                level: z.enum(['info', 'warning', 'success', 'error']).optional().describe('Notification level (default "info")'),
+            },
+            async (args) => handleNotifyOwner(ctx, args),
+        ),
+        tool(
+            'corvid_ask_owner',
+            'Ask the server owner/operator a question and WAIT for their response. ' +
+            'This blocks your execution until the owner responds or the timeout expires. ' +
+            'Use this when you need human input, clarification, or a decision before proceeding. ' +
+            'Provide options when the question has a fixed set of choices.',
+            {
+                question: z.string().describe('The question to ask the owner'),
+                options: z.array(z.string()).optional().describe('Predefined answer options (if applicable)'),
+                context: z.string().optional().describe('Additional context to help the owner understand the question'),
+                timeout_minutes: z.number().optional().describe('How long to wait for a response (1-10 minutes, default 2)'),
+            },
+            async (args) => handleAskOwner(ctx, args),
         ),
         // ─── GitHub tools ────────────────────────────────────────────────
         tool(

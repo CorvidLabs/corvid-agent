@@ -5,6 +5,7 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
 import type { WorkflowService } from '../workflow/service';
+import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import { listSchedules, createSchedule, updateSchedule, listExecutions } from '../db/schedules';
 import { listWorkflows, createWorkflow, updateWorkflow, getWorkflow, listWorkflowRuns, getWorkflowRun } from '../db/workflows';
 import { validateScheduleFrequency } from '../scheduler/service';
@@ -75,6 +76,12 @@ export interface McpToolContext {
     extendTimeout?: (additionalMs: number) => boolean;
     /** True when the session was started by the scheduler — restricts certain tools. */
     schedulerMode?: boolean;
+    /** Broadcast a message to all connected WS clients on the 'owner' topic. */
+    broadcastOwnerMessage?: (message: unknown) => void;
+    /** Owner question manager for blocking agent→owner questions. */
+    ownerQuestionManager?: OwnerQuestionManager;
+    /** Session ID for this agent session (needed for question tracking). */
+    sessionId?: string;
 }
 
 function textResult(text: string): CallToolResult {
@@ -964,6 +971,110 @@ export async function handleDiscoverAgent(
         log.error('MCP discover_agent failed', { error: message });
         return errorResult(`Failed to discover agent: ${message}`);
     }
+}
+
+// ─── Owner communication handlers ────────────────────────────────────────
+
+export async function handleNotifyOwner(
+    ctx: McpToolContext,
+    args: { title?: string; message: string; level?: string },
+): Promise<CallToolResult> {
+    const level = args.level ?? 'info';
+    const validLevels = ['info', 'warning', 'success', 'error'];
+    if (!validLevels.includes(level)) {
+        return errorResult(`Invalid level "${level}". Use one of: ${validLevels.join(', ')}`);
+    }
+
+    if (!args.message?.trim()) {
+        return errorResult('A message is required.');
+    }
+
+    const notification = {
+        type: 'agent_notification',
+        agentId: ctx.agentId,
+        sessionId: ctx.sessionId ?? '',
+        title: args.title ?? null,
+        message: args.message,
+        level,
+        timestamp: new Date().toISOString(),
+    };
+
+    if (ctx.broadcastOwnerMessage) {
+        ctx.broadcastOwnerMessage(notification);
+    }
+
+    log.info('Agent notification sent', {
+        agentId: ctx.agentId,
+        level,
+        messagePreview: args.message.slice(0, 100),
+    });
+
+    return textResult(`Notification sent to owner: "${args.message.slice(0, 100)}${args.message.length > 100 ? '...' : ''}"`);
+}
+
+export async function handleAskOwner(
+    ctx: McpToolContext,
+    args: { question: string; options?: string[]; context?: string; timeout_minutes?: number },
+): Promise<CallToolResult> {
+    if (!ctx.ownerQuestionManager) {
+        return errorResult('Owner question service is not available.');
+    }
+
+    if (!args.question?.trim()) {
+        return errorResult('A question is required.');
+    }
+
+    const timeoutMinutes = Math.max(1, Math.min(args.timeout_minutes ?? 2, 10));
+    const timeoutMs = timeoutMinutes * 60 * 1000;
+
+    // Broadcast the question to all connected WS clients
+    const questionData = {
+        sessionId: ctx.sessionId ?? '',
+        agentId: ctx.agentId,
+        question: args.question,
+        options: args.options ?? null,
+        context: args.context ?? null,
+        timeoutMs,
+    };
+
+    // Create the blocking question — this will return the question ID
+    const responsePromise = ctx.ownerQuestionManager.createQuestion(questionData);
+
+    // Get the pending question to retrieve its ID for the broadcast
+    const pending = ctx.ownerQuestionManager.getPendingForSession(ctx.sessionId ?? '');
+    const latestQuestion = pending[pending.length - 1];
+
+    if (latestQuestion && ctx.broadcastOwnerMessage) {
+        ctx.broadcastOwnerMessage({
+            type: 'agent_question',
+            question: latestQuestion,
+        });
+    }
+
+    ctx.emitStatus?.(`Waiting for owner response (${timeoutMinutes}min timeout)...`);
+
+    const response = await responsePromise;
+
+    if (!response) {
+        log.info('Owner did not respond to question', {
+            agentId: ctx.agentId,
+            questionPreview: args.question.slice(0, 100),
+        });
+        return textResult(
+            `Owner did not respond within ${timeoutMinutes} minute${timeoutMinutes > 1 ? 's' : ''}. ` +
+            'You may proceed with your best judgment or try again later.',
+        );
+    }
+
+    log.info('Owner responded to question', {
+        agentId: ctx.agentId,
+        answerPreview: response.answer.slice(0, 100),
+    });
+
+    const optionInfo = response.selectedOption !== null && args.options
+        ? ` (selected option ${response.selectedOption + 1}: "${args.options[response.selectedOption]}")`
+        : '';
+    return textResult(`Owner response: ${response.answer}${optionInfo}`);
 }
 
 /** Default sub-query suffixes appended to the topic for deep research. */

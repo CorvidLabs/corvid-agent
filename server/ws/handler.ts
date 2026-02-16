@@ -6,6 +6,7 @@ import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
+import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
@@ -21,6 +22,7 @@ export function createWebSocketHandler(
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
     getSchedulerService?: () => SchedulerService | null,
+    getOwnerQuestionManager?: () => OwnerQuestionManager | null,
 ) {
     return {
         open(ws: ServerWebSocket<WsData>) {
@@ -29,6 +31,7 @@ export function createWebSocketHandler(
             ws.subscribe('algochat');
             ws.subscribe('scheduler');
             ws.subscribe('ollama');
+            ws.subscribe('owner');
             log.info('WebSocket connection opened');
         },
 
@@ -51,7 +54,7 @@ export function createWebSocketHandler(
                 return;
             }
 
-            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService);
+            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService, getOwnerQuestionManager);
         },
 
         close(ws: ServerWebSocket<WsData>) {
@@ -74,6 +77,7 @@ function handleClientMessage(
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
     getSchedulerService?: () => SchedulerService | null,
+    getOwnerQuestionManager?: () => OwnerQuestionManager | null,
 ): void {
     switch (msg.type) {
         case 'subscribe': {
@@ -309,6 +313,24 @@ function handleClientMessage(
             } else {
                 const serverMsg: ServerMessage = { type: 'schedule_execution_update', execution };
                 ws.send(JSON.stringify(serverMsg));
+            }
+            break;
+        }
+
+        case 'question_response': {
+            const questionManager = getOwnerQuestionManager?.();
+            if (!questionManager) {
+                sendError(ws, 'Owner question service not available');
+                break;
+            }
+
+            const resolved = questionManager.resolveQuestion(msg.questionId, {
+                questionId: msg.questionId,
+                answer: msg.answer,
+                selectedOption: msg.selectedOption ?? null,
+            });
+            if (!resolved) {
+                sendError(ws, 'Question not found or already answered');
             }
             break;
         }
