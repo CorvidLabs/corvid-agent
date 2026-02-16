@@ -40,6 +40,15 @@ export interface FailedDeliveryRow extends NotificationDelivery {
     channelConfig: Record<string, unknown>;
 }
 
+export interface QuestionDispatchRow {
+    id: number;
+    questionId: string;
+    channelType: string;
+    externalRef: string | null;
+    status: 'sent' | 'answered' | 'expired';
+    createdAt: string;
+}
+
 // ─── Row Mappers ────────────────────────────────────────────────────────────
 
 function rowToChannel(row: Record<string, unknown>): NotificationChannel {
@@ -230,4 +239,61 @@ export function listFailedDeliveries(
         },
         channelConfig: JSON.parse((row.c_config as string) ?? '{}'),
     }));
+}
+
+// ─── Question Dispatch Tracking ──────────────────────────────────────────
+
+function rowToQuestionDispatch(row: Record<string, unknown>): QuestionDispatchRow {
+    return {
+        id: row.id as number,
+        questionId: row.question_id as string,
+        channelType: row.channel_type as string,
+        externalRef: row.external_ref as string | null,
+        status: (row.status as 'sent' | 'answered' | 'expired') ?? 'sent',
+        createdAt: row.created_at as string,
+    };
+}
+
+export function createQuestionDispatch(
+    db: Database,
+    questionId: string,
+    channelType: string,
+    externalRef: string | null,
+): QuestionDispatchRow {
+    db.query(
+        `INSERT INTO owner_question_dispatches (question_id, channel_type, external_ref)
+         VALUES (?, ?, ?)`
+    ).run(questionId, channelType, externalRef);
+
+    const row = db.query(
+        `SELECT * FROM owner_question_dispatches WHERE question_id = ? AND channel_type = ? ORDER BY id DESC LIMIT 1`
+    ).get(questionId, channelType) as Record<string, unknown>;
+    return rowToQuestionDispatch(row);
+}
+
+export function listActiveQuestionDispatches(db: Database): QuestionDispatchRow[] {
+    const rows = db.query(
+        `SELECT * FROM owner_question_dispatches WHERE status = 'sent' ORDER BY created_at ASC`
+    ).all() as Record<string, unknown>[];
+    return rows.map(rowToQuestionDispatch);
+}
+
+export function updateQuestionDispatchStatus(
+    db: Database,
+    id: number,
+    status: 'sent' | 'answered' | 'expired',
+): void {
+    db.query(
+        `UPDATE owner_question_dispatches SET status = ? WHERE id = ?`
+    ).run(status, id);
+}
+
+export function getQuestionDispatchesByQuestionId(
+    db: Database,
+    questionId: string,
+): QuestionDispatchRow[] {
+    const rows = db.query(
+        `SELECT * FROM owner_question_dispatches WHERE question_id = ? ORDER BY id ASC`
+    ).all(questionId) as Record<string, unknown>[];
+    return rows.map(rowToQuestionDispatch);
 }

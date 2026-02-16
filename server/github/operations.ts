@@ -270,6 +270,63 @@ export async function listIssues(
     }
 }
 
+// ─── Issue Comments & Lifecycle ──────────────────────────────────────────
+
+export interface IssueComment {
+    id: number;
+    body: string;
+    author: string;
+    createdAt: string;
+}
+
+export async function listIssueComments(
+    repo: string,
+    issueNumber: number,
+    since?: string,
+): Promise<{ ok: boolean; comments: IssueComment[]; error?: string }> {
+    // Use the API directly with optional since filter
+    const apiArgs = since
+        ? ['api', `/repos/${repo}/issues/${issueNumber}/comments?since=${since}`]
+        : ['api', `/repos/${repo}/issues/${issueNumber}/comments`];
+
+    const result = await runGh(apiArgs);
+    if (!result.ok) {
+        return { ok: false, comments: [], error: result.stderr };
+    }
+
+    try {
+        const raw = JSON.parse(result.stdout || '[]') as Array<Record<string, unknown>>;
+        const comments: IssueComment[] = raw.map((c) => ({
+            id: c.id as number,
+            body: (c.body as string) ?? '',
+            author: ((c.user as Record<string, unknown>)?.login as string) ?? 'unknown',
+            createdAt: (c.created_at as string) ?? '',
+        }));
+        return { ok: true, comments };
+    } catch {
+        return { ok: false, comments: [], error: 'Failed to parse issue comments' };
+    }
+}
+
+export async function closeIssue(
+    repo: string,
+    issueNumber: number,
+): Promise<{ ok: boolean; error?: string }> {
+    log.info('Closing issue', { repo, issueNumber });
+    const result = await runGh(['issue', 'close', String(issueNumber), '--repo', repo]);
+    return result.ok ? { ok: true } : { ok: false, error: result.stderr };
+}
+
+export async function addIssueComment(
+    repo: string,
+    issueNumber: number,
+    body: string,
+): Promise<{ ok: boolean; error?: string }> {
+    log.info('Adding issue comment', { repo, issueNumber });
+    const result = await runGh(['issue', 'comment', String(issueNumber), '--repo', repo, '--body', body]);
+    return result.ok ? { ok: true } : { ok: false, error: result.stderr };
+}
+
 export function isGitHubConfigured(): boolean {
     return hasGhToken();
 }

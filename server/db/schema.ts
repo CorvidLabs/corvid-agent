@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 37;
+const SCHEMA_VERSION = 38;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -656,6 +656,21 @@ const MIGRATIONS: Record<number, string[]> = {
             ON notification_deliveries(notification_id)`,
         `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_status
             ON notification_deliveries(status)`,
+    ],
+    38: [
+        // Question dispatch tracking — where each owner question was sent
+        `CREATE TABLE IF NOT EXISTS owner_question_dispatches (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            question_id     TEXT NOT NULL,
+            channel_type    TEXT NOT NULL,
+            external_ref    TEXT,
+            status          TEXT NOT NULL DEFAULT 'sent',
+            created_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_question_dispatches_question
+            ON owner_question_dispatches(question_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_question_dispatches_status
+            ON owner_question_dispatches(status)`,
     ],
 };
 

@@ -32,6 +32,7 @@ import type { AgentDirectory } from './agent-directory';
 import type { AgentMessenger } from './agent-messenger';
 import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
+import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import type { WorkTaskService } from '../work/service';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 // Credit functions — will be used when guest access is enabled
@@ -76,6 +77,7 @@ export class AlgoChatBridge {
     private agentWalletService: AgentWalletService | null = null;
     private agentDirectory: AgentDirectory | null = null;
     private approvalManager: ApprovalManager | null = null;
+    private ownerQuestionManager: OwnerQuestionManager | null = null;
     private sessionNotificationCallback: ((sid: string, event: ClaudeStreamEvent) => void) | null = null;
 
     // Multi-contact PSK state
@@ -160,6 +162,11 @@ export class AlgoChatBridge {
     setApprovalManager(manager: ApprovalManager): void {
         this.approvalManager = manager;
         this.discoveryService.setApprovalManager(manager);
+    }
+
+    /** Inject the owner question manager for routing question responses from AlgoChat. */
+    setOwnerQuestionManager(manager: OwnerQuestionManager): void {
+        this.ownerQuestionManager = manager;
     }
 
     /** Inject the work task service for /work command support. */
@@ -1061,6 +1068,37 @@ export class AlgoChatBridge {
             }
         }
 
+        // Check for question responses (after approval check, before agent routing)
+        if (this.ownerQuestionManager) {
+            const questionResponse = parseQuestionResponseFromChat(messageContent);
+            if (questionResponse) {
+                // Parse option number if answer is a digit
+                let selectedOption: number | null = null;
+                let answer = questionResponse.answer;
+                const question = this.ownerQuestionManager.findByShortId(questionResponse.shortId);
+                if (question?.options) {
+                    const numMatch = answer.match(/^(\d+)$/);
+                    if (numMatch) {
+                        const idx = parseInt(numMatch[1], 10) - 1;
+                        if (idx >= 0 && idx < question.options.length) {
+                            selectedOption = idx;
+                            answer = question.options[idx];
+                        }
+                    }
+                }
+
+                const resolved = this.ownerQuestionManager.resolveByShortId(
+                    questionResponse.shortId,
+                    { answer, selectedOption },
+                );
+                if (resolved) {
+                    log.info('Resolved owner question via AlgoChat', { shortId: questionResponse.shortId });
+                    this.responseFormatter.sendResponse(participant, '[Question answered]');
+                    return;
+                }
+            }
+        }
+
         // Skip messages from known agents — handled by AgentMessenger
         if (this.agentDirectory) {
             const senderAgentId = this.agentDirectory.findAgentByAddress(participant);
@@ -1190,6 +1228,16 @@ export class AlgoChatBridge {
 
         updateConversationRound(this.db, conversation.id, confirmedRound);
     }
+}
+
+/**
+ * Parse an AlgoChat message for a question response.
+ * Matches: `[ANS:{shortId}] {answer}` or `[ANS:{shortId}] {optionNumber}`
+ */
+function parseQuestionResponseFromChat(content: string): { shortId: string; answer: string } | null {
+    const match = content.match(/^\[ANS:([a-f0-9-]{8})\]\s*(.+)$/i);
+    if (!match) return null;
+    return { shortId: match[1].toLowerCase(), answer: match[2].trim() };
 }
 
 /** Decode base64 string to Uint8Array (handles indexer note field encoding). */

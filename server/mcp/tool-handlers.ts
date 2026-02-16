@@ -7,6 +7,7 @@ import type { SchedulerService } from '../scheduler/service';
 import type { WorkflowService } from '../workflow/service';
 import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import type { NotificationService } from '../notifications/service';
+import type { QuestionDispatcher } from '../notifications/question-dispatcher';
 import {
     listChannelsForAgent,
     upsertChannel,
@@ -92,6 +93,8 @@ export interface McpToolContext {
     sessionId?: string;
     /** Notification service for multi-channel owner notifications. */
     notificationService?: NotificationService;
+    /** Question dispatcher for sending questions to external channels. */
+    questionDispatcher?: QuestionDispatcher;
 }
 
 function textResult(text: string): CallToolResult {
@@ -1088,6 +1091,13 @@ export async function handleAskOwner(
         ctx.broadcastOwnerMessage({
             type: 'agent_question',
             question: latestQuestion,
+        });
+    }
+
+    // Dispatch to configured external channels (GitHub, Telegram, AlgoChat)
+    if (ctx.questionDispatcher && latestQuestion) {
+        ctx.questionDispatcher.dispatch(latestQuestion).catch((err) => {
+            log.warn('Question channel dispatch failed', { error: err instanceof Error ? err.message : String(err) });
         });
     }
 

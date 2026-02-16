@@ -42,6 +42,8 @@ import { handleAuditRoutes } from './routes/audit';
 import { buildAgentCard } from './a2a/agent-card';
 import { AstParserService } from './ast/service';
 import { NotificationService } from './notifications/service';
+import { QuestionDispatcher } from './notifications/question-dispatcher';
+import { ResponsePollingService } from './notifications/response-poller';
 
 const log = createLogger('Server');
 
@@ -127,6 +129,10 @@ const workflowService = new WorkflowService(db, processManager, workTaskService)
 // Initialize notification service (multi-channel owner notifications)
 const notificationService = new NotificationService(db);
 
+// Initialize question dispatcher and response poller (two-way question channels)
+const questionDispatcher = new QuestionDispatcher(db);
+const responsePollingService = new ResponsePollingService(db, processManager.ownerQuestionManager);
+
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
 
@@ -190,6 +196,7 @@ async function initAlgoChat(): Promise<void> {
     agentDirectory = new AgentDirectory(db, agentWalletService);
     algochatBridge.setAgentDirectory(agentDirectory);
     algochatBridge.setApprovalManager(processManager.approvalManager);
+    algochatBridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
     algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, agentNetworkConfig, agentService, agentWalletService, agentDirectory, processManager);
     agentMessenger.setWorkTaskService(workTaskService);
@@ -199,7 +206,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService, workflowService, notificationService);
+    }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -545,8 +552,10 @@ initAlgoChat().then(() => {
         schedulerService.setAgentMessenger(agentMessenger);
         workflowService.setAgentMessenger(agentMessenger);
         notificationService.setAgentMessenger(agentMessenger);
+        questionDispatcher.setAgentMessenger(agentMessenger);
     }
     notificationService.start();
+    responsePollingService.start();
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
@@ -554,6 +563,7 @@ initAlgoChat().then(() => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
     // Start scheduler, polling, workflows, and notifications even if AlgoChat fails — they can still do GitHub ops and work tasks
     notificationService.start();
+    responsePollingService.start();
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
@@ -604,6 +614,7 @@ function logShutdownDiagnostics(signal: string): void {
 }
 
 function gracefulShutdown(): void {
+    responsePollingService.stop();
     notificationService.stop();
     workflowService.stop();
     schedulerService.stop();

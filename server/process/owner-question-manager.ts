@@ -117,6 +117,28 @@ export class OwnerQuestionManager {
         return result;
     }
 
+    /** Find a pending question by short ID prefix (first 8 chars of UUID). */
+    findByShortId(shortId: string): OwnerQuestion | null {
+        const lower = shortId.toLowerCase();
+        for (const entry of this.pending.values()) {
+            if (entry.question.id.toLowerCase().startsWith(lower)) {
+                return entry.question;
+            }
+        }
+        return null;
+    }
+
+    /** Resolve a question by short ID prefix. Returns true if found and resolved. */
+    resolveByShortId(shortId: string, response: Omit<OwnerQuestionResponse, 'questionId'>): boolean {
+        const question = this.findByShortId(shortId);
+        if (!question) return false;
+        return this.resolveQuestion(question.id, {
+            questionId: question.id,
+            answer: response.answer,
+            selectedOption: response.selectedOption,
+        });
+    }
+
     shutdown(): void {
         for (const [id, entry] of this.pending) {
             clearTimeout(entry.timer);
