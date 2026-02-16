@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CorvidAgent — AI Agent Framework on Algorand</title>
-  <meta name="description" content="AI agent framework with on-chain identity, messaging via AlgoChat on Algorand, and multi-agent orchestration powered by Claude.">
+  <title>CorvidAgent — Autonomous AI Agent Orchestration on Algorand</title>
+  <meta name="description" content="Autonomous AI agent orchestration with on-chain identity, multi-agent councils, graph workflows, and self-improving code — powered by Algorand and Claude Agent SDK.">
   <meta name="theme-color" content="#0a0a12">
 
   <!-- Open Graph -->
-  <meta property="og:title" content="CorvidAgent">
-  <meta property="og:description" content="AI agent framework with on-chain identity and messaging via AlgoChat on Algorand.">
+  <meta property="og:title" content="CorvidAgent — Autonomous AI Agent Orchestration">
+  <meta property="og:description" content="Autonomous AI agent orchestration with on-chain identity, multi-agent councils, graph workflows, and self-improving code — powered by Algorand.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/">
 
@@ -44,8 +44,7 @@
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
       </h1>
       <p class="hero__tagline">
-        AI agent framework with on-chain identity &amp; messaging via
-        <span class="accent-green">AlgoChat</span> on
+        Autonomous AI agent orchestration with on-chain identity, graph workflows &amp; self-improving code on
         <span class="accent-cyan">Algorand</span>
       </p>
       <div class="hero__actions">
@@ -103,6 +102,24 @@
           <p>Angular UI with analytics, system logs, work tasks, settings, and QR-based mobile connect. Dark cyberpunk aesthetic.</p>
         </div>
 
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F310;</div>
+          <h3 class="card__title">Graph Workflows</h3>
+          <p>Define multi-step workflows as DAGs. Condition nodes, parallel fork/join, delays, and suspend/resume across sessions.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F91D;</div>
+          <h3 class="card__title">A2A Protocol</h3>
+          <p>Agent-to-Agent interoperability via Google A2A. Agents publish Agent Cards and discover remote agent capabilities.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F50D;</div>
+          <h3 class="card__title">Observability</h3>
+          <p>OpenTelemetry tracing, Prometheus metrics, and immutable audit logging. Full trace context across agent sessions.</p>
+        </div>
+
       </div>
     </div>
   </section>
@@ -118,6 +135,9 @@
         <div class="chip chip--cyan">Algorand</div>
         <div class="chip chip--magenta">Claude SDK</div>
         <div class="chip chip--green">Ollama</div>
+        <div class="chip chip--cyan">OpenTelemetry</div>
+        <div class="chip chip--magenta">MCP</div>
+        <div class="chip chip--green">A2A Protocol</div>
       </div>
     </div>
   </section>
@@ -165,7 +185,8 @@
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>     <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>   <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>   <span class="t-comment"># Cron/interval task engine</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># MCP + coding tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># 26 MCP tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">observability/</span> <span class="t-comment"># OpenTelemetry + audit</span>
 <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">client/</span>          <span class="t-comment"># Angular 21 UI</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">src/app/</span>     <span class="t-comment"># Components &amp; services</span>
 <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">shared/</span>          <span class="t-comment"># Shared types &amp; WS protocol</span>
@@ -194,6 +215,11 @@
         <div class="card card--outline">
           <h3 class="card__title accent-green">Credit System</h3>
           <p>ALGO-backed credits prevent abuse. Each conversation turn consumes credits purchased with native tokens.</p>
+        </div>
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Audit Logging</h3>
+          <p>Immutable, insert-only audit log with trace IDs. Full forensic trail of every agent action for compliance.</p>
         </div>
 
       </div>
