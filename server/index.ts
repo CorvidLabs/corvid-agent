@@ -40,6 +40,7 @@ import {
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
 import { buildAgentCard } from './a2a/agent-card';
+import { AstParserService } from './ast/service';
 
 const log = createLogger('Server');
 
@@ -59,6 +60,12 @@ const db = getDb();
 // Empty catch is intentional: initObservability() logs warnings internally when
 // the OTLP endpoint is unavailable, so we silently swallow the rejection here.
 initObservability().catch(() => {});
+
+// Initialize AST parser service (non-critical — warn on failure)
+const astParserService = new AstParserService();
+astParserService.init().catch((err) => {
+    log.warn('AST parser service failed to initialize', { error: err instanceof Error ? err.message : String(err) });
+});
 
 // Initialize LLM provider registry
 const providerRegistry = LlmProviderRegistry.getInstance();
