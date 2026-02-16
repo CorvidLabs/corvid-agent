@@ -9,6 +9,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
+import type { AgentMessenger } from '../algochat/agent-messenger';
 import type {
     WorkflowRun,
     WorkflowNode,
@@ -45,6 +46,7 @@ export class WorkflowService {
     private db: Database;
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null;
+    private agentMessenger: AgentMessenger | null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private eventCallbacks = new Set<WorkflowEventCallback>();
     private runningNodes = new Set<string>(); // node run IDs currently executing
@@ -53,10 +55,17 @@ export class WorkflowService {
         db: Database,
         processManager: ProcessManager,
         workTaskService?: WorkTaskService | null,
+        agentMessenger?: AgentMessenger | null,
     ) {
         this.db = db;
         this.processManager = processManager;
         this.workTaskService = workTaskService ?? null;
+        this.agentMessenger = agentMessenger ?? null;
+    }
+
+    /** Update the agent messenger (set after async AlgoChat init). */
+    setAgentMessenger(messenger: AgentMessenger): void {
+        this.agentMessenger = messenger;
     }
 
     /** Start the workflow execution polling loop. */
@@ -167,6 +176,7 @@ export class WorkflowService {
         activeRuns: number;
         runningNodes: number;
         totalWorkflows: number;
+        hasMessenger: boolean;
     } {
         const activeRow = this.db.query(
             `SELECT COUNT(*) as count FROM workflow_runs WHERE status IN ('running', 'paused')`
@@ -180,6 +190,7 @@ export class WorkflowService {
             activeRuns: activeRow.count,
             runningNodes: this.runningNodes.size,
             totalWorkflows: totalRow.count,
+            hasMessenger: this.agentMessenger !== null,
         };
     }
 
