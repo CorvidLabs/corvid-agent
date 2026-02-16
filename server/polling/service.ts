@@ -508,10 +508,10 @@ export class MentionPollingService {
             return false;
         }
 
-        // Guard: skip if there's already an active session for this issue
+        // Guard: skip if there's already a running session for this issue
         const sessionPrefix = `Poll: ${config.repo.split('/')[1]} #${mention.number}:`;
         const existing = this.db.query(
-            `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle') AND created_at > datetime('now', '-1 hour')`
+            `SELECT id FROM sessions WHERE name LIKE ? AND status = 'running' AND created_at > datetime('now', '-1 hour')`
         ).get(sessionPrefix + '%') as { id: string } | null;
         if (existing) {
             log.debug('Active session already exists for issue', { number: mention.number, existingId: existing.id });
