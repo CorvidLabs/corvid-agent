@@ -133,10 +133,16 @@ describe('metrics', () => {
     });
 
     it('counter with no labels produces correct format', () => {
-        // creditsConsumedTotal has no labels
+        // creditsConsumedTotal is a shared singleton — other test files may
+        // have already incremented it, so capture baseline and check delta.
         const { creditsConsumedTotal } = require('../observability/metrics');
+        const before = creditsConsumedTotal.toPrometheus();
+        const baselineMatch = before.match(/credits_consumed_total (\d+)/);
+        const baseline = baselineMatch ? Number(baselineMatch[1]) : 0;
+
         creditsConsumedTotal.inc({}, 100);
         const output = creditsConsumedTotal.toPrometheus();
-        expect(output).toContain('credits_consumed_total 100');
+        expect(output).toContain('# TYPE credits_consumed_total counter');
+        expect(output).toContain(`credits_consumed_total ${baseline + 100}`);
     });
 });
