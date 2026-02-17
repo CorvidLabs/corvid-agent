@@ -4,7 +4,7 @@
  * - router.ts: Complexity estimation, model selection
  * - fallback.ts: Fallback chains, provider health
  */
-import { test, expect, describe, beforeEach } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
 import {
     MODEL_PRICING,
     getModelPricing,
@@ -165,13 +165,25 @@ describe('Complexity Estimation', () => {
 describe('ModelRouter', () => {
     let registry: LlmProviderRegistry;
     let router: ModelRouter;
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const savedOpenaiKey = process.env.OPENAI_API_KEY;
 
     beforeEach(() => {
+        // Set dummy API keys so registry doesn't auto-restrict to ollama-only
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+        process.env.OPENAI_API_KEY = 'sk-test-dummy';
         // Create a fresh registry (bypass singleton for tests)
         registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
         registry.register(createMockProvider('anthropic', ['claude-opus-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001']));
         registry.register(createMockProvider('openai', ['gpt-4o', 'gpt-4o-mini']));
         router = new ModelRouter(registry);
+    });
+
+    afterEach(() => {
+        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = savedOpenaiKey;
     });
 
     test('selects model for simple prompt', () => {
@@ -226,12 +238,24 @@ describe('ModelRouter', () => {
 describe('FallbackManager', () => {
     let registry: LlmProviderRegistry;
     let fallback: FallbackManager;
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const savedOpenaiKey = process.env.OPENAI_API_KEY;
 
     beforeEach(() => {
+        // Set dummy API keys so registry doesn't auto-restrict to ollama-only
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+        process.env.OPENAI_API_KEY = 'sk-test-dummy';
         registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
         registry.register(createMockProvider('anthropic', ['claude-sonnet-4-5-20250929']));
         registry.register(createMockProvider('openai', ['gpt-4o']));
         fallback = new FallbackManager(registry);
+    });
+
+    afterEach(() => {
+        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = savedOpenaiKey;
     });
 
     test('DEFAULT_FALLBACK_CHAINS has expected chains', () => {
