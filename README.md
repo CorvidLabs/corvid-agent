@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
-  <a href="https://github.com/corvid-agent/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/corvid-agent/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/github/license/corvid-agent/corvid-agent" alt="License">
+  <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
   <img src="https://img.shields.io/badge/tests-1837%20passing-brightgreen" alt="1837 Tests Passing">
@@ -18,7 +18,7 @@ Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](ht
 ## Quick Start
 
 ```bash
-git clone https://github.com/corvid-agent/corvid-agent.git
+git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
 bun install
 cp .env.example .env   # add your ANTHROPIC_API_KEY
