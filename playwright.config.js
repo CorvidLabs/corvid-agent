@@ -24,7 +24,8 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         timeout: 30_000,
         env: {
-            RATE_LIMIT_MUTATION: '1000', // Higher limit for parallel e2e tests
+            RATE_LIMIT_GET: '5000',      // Higher read limit for e2e test volume
+            RATE_LIMIT_MUTATION: '1000',  // Higher write limit for parallel e2e tests
         },
     },
 });
