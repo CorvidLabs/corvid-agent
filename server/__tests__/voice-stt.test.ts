@@ -64,7 +64,7 @@ describe('STT', () => {
         try {
             await expect(
                 transcribe({ audio: Buffer.from('fake'), format: 'mp3' })
-            ).rejects.toThrow('OpenAI Whisper API error (429)');
+            ).rejects.toThrow('Speech-to-text failed (status 429)');
         } finally {
             globalThis.fetch = originalFetch;
             delete process.env.OPENAI_API_KEY;

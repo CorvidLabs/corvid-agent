@@ -200,6 +200,9 @@ if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
     discordBridge = new DiscordBridge(db, processManager, {
         botToken: process.env.DISCORD_BOT_TOKEN,
         channelId: process.env.DISCORD_CHANNEL_ID,
+        allowedUserIds: process.env.DISCORD_ALLOWED_USER_IDS
+            ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
+            : [],
     });
     discordBridge.start();
     log.info('Discord bridge initialized');

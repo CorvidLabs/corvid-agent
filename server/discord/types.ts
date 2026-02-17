@@ -1,6 +1,7 @@
 export interface DiscordBridgeConfig {
     botToken: string;
     channelId: string;
+    allowedUserIds: string[];
 }
 
 export interface DiscordGatewayPayload {

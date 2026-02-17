@@ -5,6 +5,9 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('TTS');
 
+const MAX_TTS_TEXT_LENGTH = 4096;
+const MAX_VOICE_CACHE_ENTRIES = 10_000;
+
 /**
  * Synthesize text to speech using OpenAI TTS API.
  * Requires OPENAI_API_KEY environment variable.
@@ -13,6 +16,14 @@ export async function synthesize(options: TTSOptions): Promise<TTSResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         throw new Error('OPENAI_API_KEY is required for text-to-speech');
+    }
+
+    if (options.text.length > MAX_TTS_TEXT_LENGTH) {
+        throw new Error(`TTS text exceeds maximum length of ${MAX_TTS_TEXT_LENGTH} characters`);
+    }
+
+    if (!options.text.trim()) {
+        throw new Error('TTS text must not be empty');
     }
 
     const response = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -32,7 +43,8 @@ export async function synthesize(options: TTSOptions): Promise<TTSResult> {
 
     if (!response.ok) {
         const error = await response.text();
-        throw new Error(`OpenAI TTS API error (${response.status}): ${error}`);
+        log.error('OpenAI TTS API error', { status: response.status, error });
+        throw new Error(`Text-to-speech failed (status ${response.status})`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -90,6 +102,14 @@ export async function synthesizeWithCache(
         `INSERT INTO voice_cache (id, text_hash, voice_preset, audio_data, format, duration_ms)
          VALUES (?, ?, ?, ?, ?, ?)`
     ).run(id, textHash, voice, result.audio, result.format, result.durationMs);
+
+    // Evict oldest entries if cache exceeds max size
+    const countRow = db.query('SELECT COUNT(*) as cnt FROM voice_cache').get() as { cnt: number };
+    if (countRow.cnt > MAX_VOICE_CACHE_ENTRIES) {
+        const excess = countRow.cnt - MAX_VOICE_CACHE_ENTRIES;
+        db.query('DELETE FROM voice_cache WHERE id IN (SELECT id FROM voice_cache ORDER BY created_at ASC LIMIT ?)').run(excess);
+        log.info('Voice cache evicted old entries', { evicted: excess });
+    }
 
     log.info('TTS synthesized and cached', { textHash: textHash.slice(0, 8), voice, bytes: result.audio.length });
     return result;

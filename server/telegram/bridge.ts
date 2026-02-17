@@ -28,6 +28,11 @@ export class TelegramBridge {
     // Map Telegram userId → active sessionId
     private userSessions: Map<number, string> = new Map();
 
+    // Per-user rate limiting: userId → timestamps of recent messages
+    private userMessageTimestamps: Map<number, number[]> = new Map();
+    private readonly RATE_LIMIT_WINDOW_MS = 60_000;
+    private readonly RATE_LIMIT_MAX_MESSAGES = 10;
+
     constructor(db: Database, processManager: ProcessManager, config: TelegramBridgeConfig) {
         this.db = db;
         this.processManager = processManager;
@@ -86,6 +91,16 @@ export class TelegramBridge {
         }
     }
 
+    private checkRateLimit(userId: number): boolean {
+        const now = Date.now();
+        const timestamps = this.userMessageTimestamps.get(userId) ?? [];
+        const recent = timestamps.filter(t => now - t < this.RATE_LIMIT_WINDOW_MS);
+        if (recent.length >= this.RATE_LIMIT_MAX_MESSAGES) return false;
+        recent.push(now);
+        this.userMessageTimestamps.set(userId, recent);
+        return true;
+    }
+
     private async handleMessage(message: TelegramMessage): Promise<void> {
         const userId = message.from?.id;
         if (!userId) return;
@@ -93,7 +108,13 @@ export class TelegramBridge {
         // Authorization check
         if (this.config.allowedUserIds.length > 0 && !this.config.allowedUserIds.includes(String(userId))) {
             log.warn('Unauthorized Telegram user', { userId });
-            await this.sendText(message.chat.id, 'Unauthorized. Your user ID is not in TELEGRAM_ALLOWED_USER_IDS.');
+            await this.sendText(message.chat.id, 'Unauthorized.');
+            return;
+        }
+
+        // Per-user rate limiting
+        if (!this.checkRateLimit(userId)) {
+            await this.sendText(message.chat.id, 'Rate limit exceeded. Please wait before sending more messages.');
             return;
         }
 
@@ -101,6 +122,13 @@ export class TelegramBridge {
 
         // Handle voice messages via STT
         if (message.voice) {
+            // Reject oversized voice files (max 10 MB)
+            const MAX_VOICE_FILE_SIZE = 10 * 1024 * 1024;
+            if (message.voice.file_size && message.voice.file_size > MAX_VOICE_FILE_SIZE) {
+                await this.sendText(message.chat.id, 'Voice message too large (max 10 MB).');
+                return;
+            }
+
             try {
                 const audioBuffer = await this.downloadFile(message.voice.file_id);
                 const result = await transcribe({ audio: audioBuffer, format: 'ogg' });
@@ -127,12 +155,8 @@ export class TelegramBridge {
 
         // Handle /status command
         if (text === '/status') {
-            const activeIds = this.processManager.getActiveSessionIds();
-            const agents = listAgents(this.db);
-            await this.sendText(
-                message.chat.id,
-                `Active sessions: ${activeIds.length}\nAgents: ${agents.length}\nYour session: ${this.userSessions.get(userId) ?? 'none'}`,
-            );
+            const sessionId = this.userSessions.get(userId) ?? 'none';
+            await this.sendText(message.chat.id, `Your session: ${sessionId}`);
             return;
         }
 
@@ -341,8 +365,10 @@ export class TelegramBridge {
         );
 
         if (!response.ok) {
+            // Log full error internally but don't expose token or full API response
             const error = await response.text();
-            throw new Error(`Telegram API error (${method}, ${response.status}): ${error}`);
+            log.error('Telegram API error', { method, status: response.status, error });
+            throw new Error(`Telegram API error (${method}): status ${response.status}`);
         }
 
         return response.json() as Promise<{ result: unknown }>;

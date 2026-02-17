@@ -3,6 +3,8 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('STT');
 
+const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25 MB — OpenAI Whisper limit
+
 const FORMAT_MIME: Record<string, string> = {
     ogg: 'audio/ogg',
     mp3: 'audio/mpeg',
@@ -18,6 +20,10 @@ export async function transcribe(options: STTOptions): Promise<STTResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         throw new Error('OPENAI_API_KEY is required for speech-to-text');
+    }
+
+    if (options.audio.length > MAX_AUDIO_SIZE) {
+        throw new Error(`Audio file too large (${Math.round(options.audio.length / 1024 / 1024)} MB). Maximum is 25 MB.`);
     }
 
     const format = options.format ?? 'ogg';
@@ -41,7 +47,8 @@ export async function transcribe(options: STTOptions): Promise<STTResult> {
 
     if (!response.ok) {
         const error = await response.text();
-        throw new Error(`OpenAI Whisper API error (${response.status}): ${error}`);
+        log.error('OpenAI Whisper API error', { status: response.status, error });
+        throw new Error(`Speech-to-text failed (status ${response.status})`);
     }
 
     const result = await response.json() as { text: string };
