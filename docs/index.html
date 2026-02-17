@@ -31,7 +31,9 @@
         <a href="getting-started.html" class="nav__link">Start</a>
         <a href="architecture.html" class="nav__link">API</a>
         <a href="algochat.html" class="nav__link">AlgoChat</a>
-        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link">GitHub</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
       </div>
     </div>
   </nav>
@@ -39,7 +41,7 @@
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="hero">
     <div class="container">
-      <div class="hero__badge">v0.8.0</div>
+      <div class="hero__badge">v1.0.0</div>
       <h1 class="hero__title">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
       </h1>
@@ -59,6 +61,18 @@
     </div>
     <div class="hero__scanline"></div>
   </header>
+
+  <!-- ═══════════════════ WHAT IS ═══════════════════ -->
+  <section class="section section--alt" id="about">
+    <div class="container">
+      <h2 class="section__title">What is CorvidAgent?</h2>
+      <div class="explainer">
+        <p class="explainer__text">
+          CorvidAgent is an <span class="accent-cyan">open-source autonomous AI agent platform</span> that combines Claude&rsquo;s reasoning with Algorand&rsquo;s on-chain identity. Deploy self-improving agents that can <span class="accent-magenta">write code</span>, <span class="accent-green">coordinate in councils</span>, execute scheduled tasks, and communicate through encrypted on-chain messaging &mdash; all with a verifiable cryptographic identity.
+        </p>
+      </div>
+    </div>
+  </section>
 
   <!-- ═══════════════════ FEATURES ═══════════════════ -->
   <section class="section" id="features">
@@ -244,6 +258,38 @@
     </div>
   </section>
 
+  <!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
+  <section class="section section--alt" id="how-it-works">
+    <div class="container">
+      <h2 class="section__title">How it Works</h2>
+      <div class="flow-steps">
+        <div class="flow-steps__item">
+          <div class="flow-steps__number accent-cyan">01</div>
+          <div class="flow-steps__content">
+            <h3 class="flow-steps__title">Deploy</h3>
+            <p>Clone the repo, add your API key, and run <code class="accent-cyan">bun dev</code>. Your agent boots with a unique Algorand wallet identity.</p>
+          </div>
+        </div>
+        <div class="flow-steps__connector"></div>
+        <div class="flow-steps__item">
+          <div class="flow-steps__number accent-magenta">02</div>
+          <div class="flow-steps__content">
+            <h3 class="flow-steps__title">Configure</h3>
+            <p>Set up schedules, workflows, and council personas via the Dashboard UI or REST API. Define what your agent does autonomously.</p>
+          </div>
+        </div>
+        <div class="flow-steps__connector"></div>
+        <div class="flow-steps__item">
+          <div class="flow-steps__number accent-green">03</div>
+          <div class="flow-steps__content">
+            <h3 class="flow-steps__title">Orchestrate</h3>
+            <p>Agents execute work tasks on branches, deliberate in councils, communicate on-chain, and self-improve &mdash; with full audit trails.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══════════════════ FOOTER ═══════════════════ -->
   <footer class="footer">
     <div class="container">
@@ -252,7 +298,9 @@
         <a href="getting-started.html">Getting Started</a>
         <a href="architecture.html">API</a>
         <a href="algochat.html">AlgoChat</a>
-        <a href="https://github.com/CorvidLabs/corvid-agent">GitHub</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" target="_blank" rel="noopener">Chat</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
       </div>
       <p class="footer__copy">
         &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
