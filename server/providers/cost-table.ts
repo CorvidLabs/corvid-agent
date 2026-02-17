@@ -26,6 +26,12 @@ export interface ModelPricing {
     supportsTools: boolean;
     /** Whether this model supports extended thinking */
     supportsThinking: boolean;
+    /** Whether this model supports spawning subagents */
+    supportsSubagents?: boolean;
+    /** Whether this model has built-in web search */
+    supportsWebSearch?: boolean;
+    /** Whether this is an Ollama cloud model (runs remotely, not local) */
+    isCloud?: boolean;
 }
 
 /**
@@ -132,6 +138,52 @@ export const MODEL_PRICING: ModelPricing[] = [
         supportsTools: true,
         supportsThinking: false,
     },
+    // ─── Ollama Cloud (remote, pay-per-use via Ollama) ──────────────────
+    {
+        model: 'minimax-m2.5:cloud',
+        provider: 'ollama',
+        displayName: 'MiniMax M2.5 (Cloud)',
+        inputPricePerMillion: 0,   // Pricing TBD — Ollama cloud billing
+        outputPricePerMillion: 0,
+        maxContextTokens: 1_000_000,
+        maxOutputTokens: 32_000,
+        capabilityTier: 1,
+        supportsTools: true,
+        supportsThinking: true,
+        supportsSubagents: true,
+        supportsWebSearch: true,
+        isCloud: true,
+    },
+    {
+        model: 'glm-5:cloud',
+        provider: 'ollama',
+        displayName: 'GLM-5 (Cloud)',
+        inputPricePerMillion: 0,
+        outputPricePerMillion: 0,
+        maxContextTokens: 128_000,
+        maxOutputTokens: 16_000,
+        capabilityTier: 2,
+        supportsTools: true,
+        supportsThinking: true,
+        supportsSubagents: true,
+        supportsWebSearch: true,
+        isCloud: true,
+    },
+    {
+        model: 'kimi-k2.5:cloud',
+        provider: 'ollama',
+        displayName: 'Kimi K2.5 (Cloud)',
+        inputPricePerMillion: 0,
+        outputPricePerMillion: 0,
+        maxContextTokens: 128_000,
+        maxOutputTokens: 16_000,
+        capabilityTier: 2,
+        supportsTools: true,
+        supportsThinking: true,
+        supportsSubagents: true,
+        supportsWebSearch: true,
+        isCloud: true,
+    },
 ];
 
 /**
@@ -162,6 +214,27 @@ export function estimateCost(
  */
 export function getModelsForProvider(provider: string): ModelPricing[] {
     return MODEL_PRICING.filter((m) => m.provider === provider);
+}
+
+/**
+ * Get models that support subagent spawning.
+ */
+export function getSubagentCapableModels(): ModelPricing[] {
+    return MODEL_PRICING.filter((m) => m.supportsSubagents === true);
+}
+
+/**
+ * Get models that support built-in web search.
+ */
+export function getWebSearchCapableModels(): ModelPricing[] {
+    return MODEL_PRICING.filter((m) => m.supportsWebSearch === true);
+}
+
+/**
+ * Get Ollama cloud models (remote, not local).
+ */
+export function getOllamaCloudModels(): ModelPricing[] {
+    return MODEL_PRICING.filter((m) => m.provider === 'ollama' && m.isCloud === true);
 }
 
 /**

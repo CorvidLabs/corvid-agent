@@ -33,6 +33,10 @@ interface ComplexitySignals {
     complexityKeywords: number;
     /** Whether multi-step reasoning is needed */
     multiStep: boolean;
+    /** Whether the task benefits from subagent spawning */
+    suggestsSubagents: boolean;
+    /** Whether the task needs web search */
+    suggestsWebSearch: boolean;
 }
 
 /**
@@ -47,6 +51,16 @@ const COMPLEXITY_KEYWORDS = [
 const SIMPLE_KEYWORDS = [
     'list', 'show', 'get', 'status', 'help', 'describe',
     'count', 'check', 'find', 'search', 'read',
+];
+
+const SUBAGENT_KEYWORDS = [
+    'subagent', 'parallel', 'spawn', 'concurrent', 'research',
+    'explore', 'investigate', 'compare', 'audit multiple',
+];
+
+const WEB_SEARCH_KEYWORDS = [
+    'latest', 'current', 'recent', 'today', 'news',
+    'look up', 'search the web', 'what is the price',
 ];
 
 /**
@@ -76,12 +90,20 @@ export function estimateComplexity(prompt: string): { level: ComplexityLevel; si
     const requiresThinking = complexityKeywords >= 3 || multiStep ||
         prompt.length > 2000 || lower.includes('reason') || lower.includes('think');
 
+    // Subagent detection
+    const suggestsSubagents = SUBAGENT_KEYWORDS.some((kw) => lower.includes(kw));
+
+    // Web search detection
+    const suggestsWebSearch = WEB_SEARCH_KEYWORDS.some((kw) => lower.includes(kw));
+
     const signals: ComplexitySignals = {
         inputTokenEstimate,
         requiresTools,
         requiresThinking,
         complexityKeywords,
         multiStep,
+        suggestsSubagents,
+        suggestsWebSearch,
     };
 
     // Determine level
@@ -130,6 +152,8 @@ export class ModelRouter {
         options?: {
             requiresTools?: boolean;
             requiresThinking?: boolean;
+            requiresSubagents?: boolean;
+            requiresWebSearch?: boolean;
             maxCostPerMillion?: number;
             preferredProvider?: LlmProviderType;
         },
@@ -152,6 +176,12 @@ export class ModelRouter {
 
             // Must support thinking if needed
             if ((options?.requiresThinking ?? signals.requiresThinking) && !m.supportsThinking) return false;
+
+            // Prefer subagent-capable models when requested or detected
+            if (options?.requiresSubagents && !m.supportsSubagents) return false;
+
+            // Prefer web-search-capable models when requested or detected
+            if (options?.requiresWebSearch && !m.supportsWebSearch) return false;
 
             // Must be within cost limit if specified
             if (options?.maxCostPerMillion !== undefined) {
@@ -222,9 +252,12 @@ export class ModelRouter {
     /**
      * Get a fallback chain for a complexity level.
      */
-    getFallbackChain(complexity: ComplexityLevel): FallbackChain {
-        // In local-only mode, always use the local chain
+    getFallbackChain(complexity: ComplexityLevel, options?: { preferCloud?: boolean }): FallbackChain {
+        // In local-only mode, use cloud chain if available, otherwise local
         if (isLocalOnly()) {
+            if (options?.preferCloud) {
+                return DEFAULT_FALLBACK_CHAINS['cloud'];
+            }
             return DEFAULT_FALLBACK_CHAINS['local'];
         }
 

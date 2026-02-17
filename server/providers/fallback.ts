@@ -63,6 +63,14 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'ollama', model: 'qwen3:4b' },
         ],
     },
+    'cloud': {
+        chain: [
+            { provider: 'ollama', model: 'minimax-m2.5:cloud' },
+            { provider: 'ollama', model: 'glm-5:cloud' },
+            { provider: 'ollama', model: 'kimi-k2.5:cloud' },
+            { provider: 'ollama', model: 'qwen3:32b' },
+        ],
+    },
 };
 
 export class FallbackManager {
