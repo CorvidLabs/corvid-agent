@@ -1,6 +1,6 @@
 import type { PluginRegistry } from '../plugins/registry';
 import { grantCapability, revokeCapability, isValidCapability } from '../plugins/permissions';
-import { json } from '../lib/response';
+import { json, handleRouteError } from '../lib/response';
 import type { Database } from 'bun:sqlite';
 import type { PluginCapability } from '../plugins/types';
 
@@ -66,7 +66,8 @@ async function handleLoad(req: Request, registry: PluginRegistry): Promise<Respo
         }
         return json({ ok: true, message: `Plugin loaded from ${packageName}` });
     } catch (err) {
-        return json({ error: err instanceof Error ? err.message : String(err) }, 500);
+        console.error('[plugins] Failed to load plugin:', err);
+        return handleRouteError(err);
     }
 }
 
@@ -88,7 +89,8 @@ async function handleGrant(req: Request, db: Database, pluginName: string): Prom
         grantCapability(db, pluginName, cap as PluginCapability);
         return json({ ok: true, message: `${cap} granted to ${pluginName}` });
     } catch (err) {
-        return json({ error: err instanceof Error ? err.message : String(err) }, 500);
+        console.error('[plugins] Failed to grant capability:', err);
+        return handleRouteError(err);
     }
 }
 
@@ -102,6 +104,7 @@ async function handleRevoke(req: Request, db: Database, pluginName: string): Pro
         revokeCapability(db, pluginName, cap as PluginCapability);
         return json({ ok: true, message: `${cap} revoked from ${pluginName}` });
     } catch (err) {
-        return json({ error: err instanceof Error ? err.message : String(err) }, 500);
+        console.error('[plugins] Failed to revoke capability:', err);
+        return handleRouteError(err);
     }
 }

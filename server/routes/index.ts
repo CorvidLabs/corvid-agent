@@ -32,7 +32,7 @@ import { encryptMemoryContent } from '../lib/crypto';
 import { loadAlgoChatConfig } from '../algochat/config';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
-import { json, serverError, handleRouteError, errorMessage } from '../lib/response';
+import { json, serverError, handleRouteError } from '../lib/response';
 import { checkHttpAuth, loadAuthConfig, type AuthConfig } from '../middleware/auth';
 import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
 
@@ -371,7 +371,8 @@ async function handleRoutes(
             const result = backupDatabase(db);
             return json(result);
         } catch (err) {
-            return json({ error: `Backup failed: ${errorMessage(err)}` }, 500);
+            console.error('[backup] Backup failed:', err);
+            return json({ error: 'Backup failed' }, 500);
         }
     }
 
