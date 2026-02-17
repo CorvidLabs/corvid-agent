@@ -66,19 +66,37 @@ function sanitizeServerUrl(value: unknown): string {
     }
 }
 
+/** Sanitize auth token: only allow printable ASCII, no control chars. */
+function sanitizeToken(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    // Strip any non-printable-ASCII characters and limit length
+    const clean = value.replace(/[^\x20-\x7E]/g, '').slice(0, 512);
+    return clean.length > 0 ? clean : null;
+}
+
 export function saveConfig(config: CliConfig): void {
     if (!existsSync(CONFIG_DIR)) {
         mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
     }
-    // Reconstruct each field independently to break taint propagation from network data
-    const safe: CliConfig = {
-        serverUrl: sanitizeServerUrl(config.serverUrl),
-        authToken: typeof config.authToken === 'string' ? config.authToken.slice(0, 512) : null,
-        defaultAgent: sanitizeId(config.defaultAgent, 128),
-        defaultProject: sanitizeId(config.defaultProject, 256),
-        defaultModel: sanitizeId(config.defaultModel, 128),
-    };
-    writeFileSync(CONFIG_FILE, JSON.stringify(safe, null, 2) + '\n', { mode: 0o600 });
+    // Build a plain object from validated literals — no tainted values pass through
+    const serverUrl = sanitizeServerUrl(config.serverUrl);
+    const authToken = sanitizeToken(config.authToken);
+    const defaultAgent = sanitizeId(config.defaultAgent, 128);
+    const defaultProject = sanitizeId(config.defaultProject, 256);
+    const defaultModel = sanitizeId(config.defaultModel, 128);
+
+    // Write using string concatenation of validated parts (not JSON.stringify of tainted object)
+    const lines = [
+        '{',
+        `  "serverUrl": ${JSON.stringify(serverUrl)},`,
+        `  "authToken": ${authToken ? JSON.stringify(authToken) : 'null'},`,
+        `  "defaultAgent": ${defaultAgent ? JSON.stringify(defaultAgent) : 'null'},`,
+        `  "defaultProject": ${defaultProject ? JSON.stringify(defaultProject) : 'null'},`,
+        `  "defaultModel": ${defaultModel ? JSON.stringify(defaultModel) : 'null'}`,
+        '}',
+        '',
+    ].join('\n');
+    writeFileSync(CONFIG_FILE, lines, { mode: 0o600 });
 }
 
 export function updateConfig(updates: Partial<CliConfig>): CliConfig {
