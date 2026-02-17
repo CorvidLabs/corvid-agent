@@ -1,11 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Component, input, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import {
     TerminalChatComponent,
     TerminalMessage,
     ToolEvent,
 } from './terminal-chat.component';
-import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 
 /**
  * Test host component that wraps TerminalChatComponent,

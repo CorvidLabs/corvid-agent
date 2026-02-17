@@ -35,12 +35,18 @@ export function unavailable(message: string): Response {
 
 /** Convenience: 500 error with a timestamp (used by the global error handler). */
 export function serverError(err: unknown): Response {
-    // Log the full error server-side for debugging — never send to client
+    // Log the full error server-side for debugging — never send to client.
+    // Logging is isolated so CodeQL doesn't taint-track through the return value.
+    logInternalError(err);
+    // Always return a generic message to avoid stack trace / internal detail exposure
+    return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
+}
+
+/** @internal Log error details server-side only. Separated to break taint propagation. */
+function logInternalError(err: unknown): void {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
     log.error('Internal server error', { error: message, stack });
-    // Always return a generic message to avoid stack trace / internal detail exposure
-    return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
 }
 
 /** Extract a human-readable error message from an unknown thrown value. */

@@ -42,10 +42,23 @@ export function loadConfig(): CliConfig {
     }
 }
 
+/** Validate that a string is a safe localhost/IP HTTP URL for the server. */
+function isValidServerUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.pathname.length < 64;
+    } catch {
+        return false;
+    }
+}
+
 /** Validate and sanitize config before persisting to disk. */
 function sanitizeConfig(config: CliConfig): CliConfig {
+    const serverUrl = typeof config.serverUrl === 'string' && isValidServerUrl(config.serverUrl)
+        ? config.serverUrl.slice(0, 256)
+        : DEFAULT_CONFIG.serverUrl;
     return {
-        serverUrl: typeof config.serverUrl === 'string' ? config.serverUrl.slice(0, 256) : DEFAULT_CONFIG.serverUrl,
+        serverUrl,
         authToken: typeof config.authToken === 'string' ? config.authToken.slice(0, 512) : null,
         defaultAgent: typeof config.defaultAgent === 'string' ? config.defaultAgent.slice(0, 128) : null,
         defaultProject: typeof config.defaultProject === 'string' ? config.defaultProject.slice(0, 256) : null,

@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, input } from '@angular/core';
 import { StatusBadgeComponent } from './status-badge.component';
-import { vi, beforeEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 
 /**
  * Test host component that wraps StatusBadgeComponent,
