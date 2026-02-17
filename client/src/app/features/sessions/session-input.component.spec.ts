@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
 import { SessionInputComponent } from './session-input.component';
-import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 
 /**
  * Test host component that wraps SessionInputComponent,
@@ -111,8 +111,6 @@ describe('SessionInputComponent', () => {
 
         // The button should be disabled for whitespace-only input, but also
         // test onSend directly by simulating the flow
-        const button = hostEl.querySelector<HTMLButtonElement>('button.input-bar__send')!;
-
         // Button is disabled for whitespace, so we verify no emission
         expect(fixture.componentInstance.lastSent).toBeNull();
 

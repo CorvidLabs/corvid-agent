@@ -73,7 +73,20 @@ export class DiscordBridge {
     }
 
     private connect(resumeUrl?: string): void {
-        const url = resumeUrl ?? GATEWAY_URL;
+        // Validate resume URL to prevent SSRF — must be a wss:// Discord gateway
+        let url = GATEWAY_URL;
+        if (resumeUrl) {
+            try {
+                const parsed = new URL(resumeUrl);
+                if (parsed.protocol === 'wss:' && parsed.hostname.endsWith('.discord.gg')) {
+                    url = resumeUrl;
+                } else {
+                    log.warn('Ignoring invalid resume gateway URL', { resumeUrl: resumeUrl.slice(0, 100) });
+                }
+            } catch {
+                log.warn('Ignoring unparseable resume gateway URL');
+            }
+        }
         log.info('Connecting to Discord gateway', { url: url.replace(/\?.*/, '') });
 
         this.ws = new WebSocket(url);
@@ -216,8 +229,15 @@ export class DiscordBridge {
     private startHeartbeat(intervalMs: number): void {
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
 
+        // Clamp interval to prevent resource exhaustion from malicious/malformed values
+        // Discord typically sends ~41250ms; valid range: 10s – 120s
+        const clampedInterval = Math.max(10_000, Math.min(intervalMs, 120_000));
+        if (clampedInterval !== intervalMs) {
+            log.warn('Heartbeat interval clamped', { original: intervalMs, clamped: clampedInterval });
+        }
+
         // Send first heartbeat after jitter
-        setTimeout(() => this.heartbeat(), Math.random() * intervalMs);
+        setTimeout(() => this.heartbeat(), Math.random() * clampedInterval);
 
         this.heartbeatTimer = setInterval(() => {
             if (!this.heartbeatAcked) {
@@ -226,7 +246,7 @@ export class DiscordBridge {
                 return;
             }
             this.heartbeat();
-        }, intervalMs);
+        }, clampedInterval);
     }
 
     private heartbeat(): void {

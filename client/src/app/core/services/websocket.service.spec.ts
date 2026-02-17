@@ -109,7 +109,7 @@ describe('WebSocketService', () => {
     });
 
     it('should not create a duplicate WebSocket if already open', () => {
-        const ws = connectAndOpen();
+        connectAndOpen();
         // Second call while open should be a no-op
         service.connect();
         expect(MockWebSocket.instances).toHaveLength(1);
