@@ -90,7 +90,9 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         mcpToolPermissions,
     );
 
-    return getAgent(db, id) as Agent;
+    const created = getAgent(db, id);
+    if (!created) throw new Error(`createAgent: INSERT succeeded but SELECT returned null for id=${id}`);
+    return created;
 }
 
 export function updateAgent(db: Database, id: string, input: UpdateAgentInput): Agent | null {
