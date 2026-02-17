@@ -1,19 +1,22 @@
 # corvid-agent
 
-Agent orchestration platform — manages Claude agent sessions with MCP tools, AlgoChat messaging, and on-chain wallet integration.
+Agent orchestration platform — manages Claude agent sessions with MCP tools, AlgoChat messaging, on-chain wallet integration, bidirectional Telegram/Discord bridges, persona system, skill bundles, and voice TTS/STT.
 
 ## Architecture
 
 ```
 server/          — Bun server (API, WebSocket, process management)
   algochat/      — On-chain messaging, wallets, agent directory
-  db/            — SQLite via bun:sqlite (sessions, agents, projects, spending, credits)
+  db/            — SQLite via bun:sqlite (sessions, agents, projects, spending, credits, personas, skills)
+  discord/       — Bidirectional Discord bridge (raw WebSocket gateway, no discord.js)
   lib/           — Shared utilities (logger, crypto, validation)
   mcp/           — MCP tool definitions and handlers (corvid_* tools)
   middleware/    — HTTP/WS auth, CORS, startup security checks
-  process/       — Session lifecycle, SDK integration, approval flow
-  routes/        — HTTP API routes
+  process/       — Session lifecycle, SDK integration, approval flow, persona/skill injection
+  routes/        — HTTP API routes (26 modules including personas and skill bundles)
   selftest/      — Self-test service
+  telegram/      — Bidirectional Telegram bridge (long-polling, voice notes, STT)
+  voice/         — TTS via OpenAI tts-1, STT via Whisper, audio caching
   work/          — Work task service (branch, run agent, validate, PR)
   ws/            — WebSocket handler
 client/          — Angular 21 mobile-first dashboard
@@ -25,11 +28,12 @@ e2e/             — Playwright end-to-end tests
 ## Tech Stack
 
 - **Runtime:** Bun
-- **Database:** bun:sqlite
+- **Database:** bun:sqlite (47 migrations)
 - **Agent SDK:** @anthropic-ai/claude-agent-sdk
 - **MCP:** @modelcontextprotocol/sdk
 - **Frontend:** Angular (standalone components, signals)
 - **Blockchain:** Algorand (AlgoChat, wallets)
+- **Voice:** OpenAI TTS (tts-1) and Whisper (STT)
 
 ## Protected Files
 
@@ -80,6 +84,29 @@ Add table creation / migration SQL in `server/db/schema.ts` inside the `MIGRATIO
 ### API Endpoints
 
 Add route handlers in `server/routes/` and register in `server/routes/index.ts`.
+
+### Personas
+
+Persona CRUD lives in `server/db/personas.ts`. Routes in `server/routes/personas.ts`.
+`composePersonaPrompt()` builds the system prompt section. Injected via `server/process/manager.ts`.
+
+### Skill Bundles
+
+Bundle CRUD and assignment in `server/db/skill-bundles.ts`. Routes in `server/routes/skill-bundles.ts`.
+`resolveAgentPromptAdditions()` and `resolveAgentTools()` merge bundles at session start.
+
+### Bidirectional Bridges
+
+- **Telegram:** `server/telegram/bridge.ts` — long-polling, voice notes via STT, voice responses via TTS
+- **Discord:** `server/discord/bridge.ts` — raw WebSocket gateway, heartbeat, reconnect
+
+Both are initialized in `server/index.ts` when their env vars are set. Both use the same session routing pattern: find-or-create a session per user, subscribe for responses, debounce and send back.
+
+### Voice (TTS/STT)
+
+- `server/voice/tts.ts` — `synthesize()` and `synthesizeWithCache()` (hashes text, checks `voice_cache` table)
+- `server/voice/stt.ts` — `transcribe()` calls OpenAI Whisper API
+- Both gated behind `OPENAI_API_KEY`
 
 ## Self-Improvement Workflow
 

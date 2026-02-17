@@ -62,6 +62,10 @@ export interface DirectProcessOptions {
     mcpToolContext: McpToolContext | null;
     /** Called to reset the session timeout when the agent is still active. */
     extendTimeout?: (additionalMs: number) => void;
+    /** Persona system prompt section (from agent_personas table) */
+    personaPrompt?: string;
+    /** Skill bundle prompt additions (from assigned skill_bundles) */
+    skillPrompt?: string;
 }
 
 let nextPseudoPid = 800_000;
@@ -79,6 +83,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         onApprovalRequest,
         mcpToolContext,
         extendTimeout,
+        personaPrompt,
+        skillPrompt,
     } = options;
 
     const pseudoPid = nextPseudoPid++;
@@ -113,7 +119,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     // Build system prompt (with tool instructions if tools are available)
     const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-    const systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession);
+    const systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt);
 
     // Conversation history for the current session
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
@@ -434,6 +440,8 @@ function buildSystemPrompt(
     toolDefs: ToolDef[],
     hasTools: boolean,
     isDeliberation = false,
+    personaPrompt?: string,
+    skillPrompt?: string,
 ): string {
     const parts: string[] = [];
 
@@ -452,6 +460,7 @@ function buildSystemPrompt(
         if (agent?.appendPrompt) {
             parts.push('', agent.appendPrompt);
         }
+        if (personaPrompt) parts.push('', personaPrompt);
         return parts.join('\n');
     }
 
@@ -467,6 +476,10 @@ function buildSystemPrompt(
     if (agent?.appendPrompt) {
         parts.push('', agent.appendPrompt);
     }
+
+    // Inject persona and skill prompts
+    if (personaPrompt) parts.push('', personaPrompt);
+    if (skillPrompt) parts.push('', `## Skill Instructions\n${skillPrompt}`);
 
     // Append tool-specific instructions when tools are available
     const toolNames = toolDefs.map((t) => t.name);

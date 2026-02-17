@@ -4,12 +4,12 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-1776%20passing-brightgreen" alt="1776 Tests Passing">
+  <img src="https://img.shields.io/badge/tests-1837%20passing-brightgreen" alt="1837 Tests Passing">
 </p>
 
 # corvid-agent
 
-Agent orchestration platform for running, managing, and governing autonomous AI agents. Agents get cryptographic identities, credit balances, multi-agent governance, graph workflows, and self-improving code pipelines.
+Agent orchestration platform for running, managing, and governing autonomous AI agents. Talk to your agents from Telegram and Discord, give them unique personalities, equip them with composable skill bundles, and add voice interaction — all on top of cryptographic identities, credit balances, multi-agent governance, graph workflows, and self-improving code pipelines.
 
 Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
 
@@ -36,6 +36,22 @@ ALGOCHAT_MNEMONIC=your 25 words ...   # Optional — on-chain identity & messagi
 OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 ```
 
+### Optional: Enable Messaging Bridges
+
+```bash
+# Telegram — talk to agents from your phone
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+TELEGRAM_CHAT_ID=123456789
+TELEGRAM_ALLOWED_USER_IDS=111222333   # comma-separated, empty = allow all
+
+# Discord — talk to agents from Discord
+DISCORD_BOT_TOKEN=your-bot-token
+DISCORD_CHANNEL_ID=channel-id
+
+# Voice — TTS/STT for Telegram voice notes and audio responses
+OPENAI_API_KEY=sk-...
+```
+
 ---
 
 ## Core Capabilities
@@ -45,6 +61,38 @@ OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 - Real-time streaming via WebSocket with terminal-style UI
 - Tool approval workflows for sensitive operations
 - Automatic context management with turn-based resets
+
+### Bidirectional Telegram Bridge
+- Talk to agents directly from Telegram with long-polling integration
+- Voice note support: send a voice message, agent transcribes via Whisper STT and responds
+- Voice responses: agents with voice enabled reply with audio (OpenAI TTS) plus text
+- Per-user sessions with `/start`, `/status`, `/new` commands
+- Authorization via `TELEGRAM_ALLOWED_USER_IDS`
+
+### Bidirectional Discord Bridge
+- Talk to agents from any Discord channel via raw WebSocket gateway (no discord.js dependency)
+- Auto-reconnect with exponential backoff, heartbeat, and session resume
+- Per-user sessions with `/status` and `/new` commands
+- Messages over 2000 characters automatically chunked
+
+### Character/Persona System
+- Give each agent a distinct personality with archetype, traits, background, and voice guidelines
+- Example messages to set communication tone and style
+- Persona is injected into the system prompt for both Claude SDK and Ollama sessions
+- API: `GET/PUT/DELETE /api/agents/{id}/persona`
+
+### Skill Bundles
+- Composable packages of tools + prompt additions that can be assigned to agents
+- 5 built-in presets: Code Reviewer, DevOps, Researcher, Communicator, Analyst
+- Create custom bundles and assign multiple to a single agent
+- Tools from bundles are merged with the agent's base permissions at session start
+- API: `/api/skill-bundles` (CRUD), `/api/agents/{id}/skills` (assign/unassign)
+
+### Voice Support (TTS/STT)
+- Text-to-speech via OpenAI TTS API (`tts-1` model) with 6 voice presets (alloy, echo, fable, onyx, nova, shimmer)
+- Speech-to-text via OpenAI Whisper API for transcribing voice messages
+- Intelligent caching: synthesized audio is stored in SQLite by text hash + voice preset
+- Per-agent voice configuration: `voiceEnabled` and `voicePreset` fields on the agent model
 
 ### Multi-Agent Councils
 - Structured deliberation with multiple agents and a chairman
@@ -105,6 +153,9 @@ OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 |  | Process  |  | Council  |  | Scheduler |  | Work Tasks     |  |
 |  | Manager  |  | Engine   |  | Service   |  | (git worktree) |  |
 |  +----------+  +----------+  +-----------+  +----------------+  |
+|  | Telegram |  | Discord  |  | Voice     |  | Personas       |  |
+|  | Bridge   |  | Bridge   |  | TTS / STT |  | + Skills       |  |
+|  +----------+  +----------+  +-----------+  +----------------+  |
 |  | Workflow |  | A2A      |  | Marketplace |  | Sandbox       |  |
 |  | Engine   |  | Protocol |  | + Plugins   |  | (containers)  |  |
 |  +----------+  +----------+  +-------------+  +---------------+  |
@@ -119,7 +170,7 @@ OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  44 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  47 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -131,7 +182,8 @@ server/          Bun HTTP + WebSocket server
   algochat/      On-chain messaging (bridge, wallet, directory, messenger)
   ast/           Tree-sitter AST parser for code understanding
   billing/       Usage metering and billing
-  db/            SQLite schema (44 migrations) and query modules
+  db/            SQLite schema (47 migrations) and query modules
+  discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   github/        GitHub API operations (PRs, issues, reviews)
   lib/           Shared utilities (logger, crypto, validation, web search)
   marketplace/   Agent marketplace — publish, discover, consume services
@@ -140,13 +192,15 @@ server/          Bun HTTP + WebSocket server
   middleware/    Auth, CORS, rate limiting, startup validation
   observability/ OpenTelemetry tracing, Prometheus metrics
   plugins/       Plugin SDK and dynamic tool registration
-  process/       Agent lifecycle (SDK + Ollama, approval, event bus)
+  process/       Agent lifecycle (SDK + Ollama, approval, event bus, persona/skill injection)
   providers/     Multi-model cost-aware routing
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (24 route modules)
+  routes/        REST API routes (26 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
+  telegram/      Bidirectional Telegram bridge (long-polling, voice)
   tenant/        Multi-tenant isolation and access control
+  voice/         TTS (OpenAI) and STT (Whisper) with caching
   webhooks/      GitHub webhook and mention polling
   work/          Work task service (worktree, branch, validate, PR)
   ws/            WebSocket handlers with pub/sub
@@ -175,17 +229,19 @@ Extensible tool system via [Model Context Protocol](https://github.com/modelcont
 | **Reputation** | `corvid_check_reputation`, `corvid_check_health_trends`, `corvid_publish_attestation`, `corvid_verify_agent_reputation` |
 | **Session** | `corvid_extend_timeout` |
 
-Tools are permission-scoped per agent. Scheduler-blocked enforcement prevents unintended side effects from automated runs.
+Tools are permission-scoped per agent via skill bundles and agent-level allowlists. Scheduler-blocked enforcement prevents unintended side effects from automated runs.
 
 ---
 
 ## API
 
-~50 REST endpoints and a WebSocket interface across 24 route modules:
+~55 REST endpoints and a WebSocket interface across 26 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
-| Agents | `GET/POST/PUT/DELETE /api/agents` | Agent CRUD with model and permission config |
+| Agents | `GET/POST/PUT/DELETE /api/agents` | Agent CRUD with model, voice, and permission config |
+| Personas | `GET/PUT/DELETE /api/agents/:id/persona` | Character system — archetype, traits, voice style |
+| Skills | `/api/skill-bundles`, `/api/agents/:id/skills` | Composable tool + prompt bundles |
 | Sessions | `GET/POST/PUT/DELETE /api/sessions` | Session lifecycle and message history |
 | Councils | `/api/councils`, `/api/councils/:id/launch` | Multi-agent deliberation with stage tracking |
 | Workflows | `/api/workflows` | DAG orchestration with suspend/resume |
@@ -207,12 +263,12 @@ Tools are permission-scoped per agent. Scheduler-blocked enforcement prevents un
 ## Testing
 
 ```bash
-bun test              # 1665 server tests (~26s)
+bun test              # 1726 server tests (~27s)
 cd client && npx vitest run   # 111 Angular tests (~2s)
 bun run test:e2e      # 8 Playwright e2e spec files
 ```
 
-**1776 total tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, tenant isolation, validation, wallet keystore, web search, workflows, work tasks, and Angular components.
+**1837 total tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Telegram bridge, tenant isolation, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 ---
 
@@ -222,9 +278,10 @@ bun run test:e2e      # 8 Playwright e2e spec files
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 44 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 47 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
+| Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
 | Blockchain | [Algorand](https://algorand.co) — on-chain identity and messaging |
 | Tools | [MCP SDK](https://github.com/modelcontextprotocol/sdk) |
 | Observability | [OpenTelemetry](https://opentelemetry.io) — tracing, Prometheus metrics |
@@ -241,6 +298,7 @@ bun run test:e2e      # 8 Playwright e2e spec files
 - **Environment isolation** — agent subprocesses receive only safe environment variables
 - **Rate limiting** — per-IP sliding window (600 GET/min, 60 mutation/min)
 - **Spending limits** — daily ALGO cap, per-message cost check, credit gating
+- **Bridge authorization** — Telegram user allowlist, Discord channel restriction
 - **Audit logging** — immutable, insert-only log with trace IDs
 - **Startup validation** — server refuses to start without API key on non-localhost bind
 
@@ -272,11 +330,16 @@ The `deploy/` directory includes production configurations:
 | `API_KEY` | Bearer token for auth (required on non-localhost) | — |
 | `OLLAMA_HOST` | Ollama API base URL | `http://localhost:11434` |
 | `GH_TOKEN` | GitHub token for work tasks and PRs | — |
-| `GITHUB_WEBHOOK_SECRET` | HMAC secret for webhook validation | — |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token (enables bridge + notifications) | — |
+| `TELEGRAM_CHAT_ID` | Telegram chat ID for the bridge | — |
+| `TELEGRAM_ALLOWED_USER_IDS` | Comma-separated authorized Telegram user IDs | — |
+| `DISCORD_BOT_TOKEN` | Discord bot token (enables bridge) | — |
+| `DISCORD_CHANNEL_ID` | Discord channel ID to listen in | — |
+| `OPENAI_API_KEY` | OpenAI key for voice TTS/STT | — |
 | `BRAVE_API_KEY` | Brave Search API key | — |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
 
-See `.env.example` for the full list of 20+ options including wallet encryption, ALGO spending caps, scheduler config, and CORS settings.
+See `.env.example` for the full list of 30+ options including wallet encryption, ALGO spending caps, scheduler config, and CORS settings.
 
 ---
 

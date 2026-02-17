@@ -108,6 +108,8 @@ export const UpdateProjectSchema = z.object({
 
 // ─── Agents ───────────────────────────────────────────────────────────────────
 
+const VoicePresetSchema = z.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']);
+
 export const CreateAgentSchema = z.object({
     name: z.string().min(1, 'name is required'),
     description: z.string().optional(),
@@ -124,6 +126,8 @@ export const CreateAgentSchema = z.object({
     customFlags: z.record(z.string(), z.string()).optional(),
     defaultProjectId: z.string().nullable().optional(),
     mcpToolPermissions: z.array(z.string()).nullable().optional(),
+    voiceEnabled: z.boolean().optional(),
+    voicePreset: VoicePresetSchema.optional(),
 });
 
 export const UpdateAgentSchema = z.object({
@@ -142,6 +146,8 @@ export const UpdateAgentSchema = z.object({
     customFlags: z.record(z.string(), z.string()).optional(),
     defaultProjectId: z.string().nullable().optional(),
     mcpToolPermissions: z.array(z.string()).nullable().optional(),
+    voiceEnabled: z.boolean().optional(),
+    voicePreset: VoicePresetSchema.optional(),
 });
 
 export const FundAgentSchema = z.object({
@@ -507,4 +513,37 @@ export const CreateSubscriptionSchema = z.object({
     plan: z.string().min(1, 'plan is required'),
     periodStart: z.string().min(1, 'periodStart is required'),
     periodEnd: z.string().min(1, 'periodEnd is required'),
+});
+
+// ─── Personas ───────────────────────────────────────────────────────────────
+
+const PersonaArchetypeSchema = z.enum(['custom', 'professional', 'friendly', 'technical', 'creative', 'formal']);
+
+export const UpsertPersonaSchema = z.object({
+    archetype: PersonaArchetypeSchema.optional(),
+    traits: z.array(z.string()).optional(),
+    voiceGuidelines: z.string().optional(),
+    background: z.string().optional(),
+    exampleMessages: z.array(z.string()).optional(),
+});
+
+// ─── Skill Bundles ──────────────────────────────────────────────────────────
+
+export const CreateSkillBundleSchema = z.object({
+    name: z.string().min(1, 'name is required'),
+    description: z.string().optional(),
+    tools: z.array(z.string()).optional(),
+    promptAdditions: z.string().optional(),
+});
+
+export const UpdateSkillBundleSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    tools: z.array(z.string()).optional(),
+    promptAdditions: z.string().optional(),
+});
+
+export const AssignSkillBundleSchema = z.object({
+    bundleId: z.string().min(1, 'bundleId is required'),
+    sortOrder: z.number().int().min(0).optional(),
 });

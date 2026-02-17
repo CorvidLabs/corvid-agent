@@ -20,6 +20,8 @@ import { handleBillingRoutes } from './billing';
 import { handleAuthFlowRoutes } from './auth-flow';
 import { handleA2ARoutes } from './a2a';
 import { handlePluginRoutes } from './plugins';
+import { handlePersonaRoutes } from './personas';
+import { handleSkillBundleRoutes } from './skill-bundles';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -191,6 +193,14 @@ async function handleRoutes(
 
     const agentResponse = handleAgentRoutes(req, url, db, agentWalletService, agentMessenger);
     if (agentResponse) return agentResponse;
+
+    // Persona routes (agent identity/personality)
+    const personaResponse = handlePersonaRoutes(req, url, db);
+    if (personaResponse) return personaResponse;
+
+    // Skill bundle routes (composable tool + prompt packages)
+    const skillBundleResponse = handleSkillBundleRoutes(req, url, db);
+    if (skillBundleResponse) return skillBundleResponse;
 
     const allowlistResponse = handleAllowlistRoutes(req, url, db);
     if (allowlistResponse) return allowlistResponse;

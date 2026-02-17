@@ -64,6 +64,8 @@ beforeAll(() => {
             wallet_mnemonic_encrypted TEXT DEFAULT NULL,
             wallet_funded_algo REAL DEFAULT 0,
             mcp_tool_permissions TEXT DEFAULT NULL,
+            voice_enabled INTEGER DEFAULT 0,
+            voice_preset TEXT DEFAULT 'alloy',
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         );
