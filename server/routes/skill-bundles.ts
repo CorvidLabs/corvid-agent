@@ -86,7 +86,7 @@ async function handleCreateBundle(req: Request, db: Database): Promise<Response>
         const bundle = createBundle(db, data);
         return json(bundle, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -98,7 +98,7 @@ async function handleUpdateBundle(req: Request, db: Database, id: string): Promi
         if (!bundle) return json({ error: 'Not found' }, 404);
         return json(bundle);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -113,7 +113,7 @@ async function handleAssignBundle(req: Request, db: Database, agentId: string): 
         if (!assigned) return json({ error: 'Bundle not found' }, 404);
         return json({ ok: true }, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }

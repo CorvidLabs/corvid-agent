@@ -93,7 +93,7 @@ async function handleRecordEvent(
         scorer.recordEvent(body);
         return json({ ok: true }, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }

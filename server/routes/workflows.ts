@@ -117,7 +117,7 @@ async function handleCreateWorkflow(req: Request, db: Database): Promise<Respons
         const workflow = createWorkflow(db, data);
         return json(workflow, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }
@@ -129,7 +129,7 @@ async function handleUpdateWorkflow(req: Request, db: Database, id: string): Pro
         if (!workflow) return json({ error: 'Workflow not found' }, 404);
         return json(workflow);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }
@@ -149,10 +149,10 @@ async function handleTriggerWorkflow(
         const run = await workflowService.triggerWorkflow(workflowId, data.input);
         return json(run, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('not found') || message.includes('not active')) {
-            return json({ error: message }, 400);
+        if (err instanceof ValidationError) return badRequest(err.detail);
+        const errMsg = err instanceof Error ? err.message : '';
+        if (errMsg.includes('not found') || errMsg.includes('not active')) {
+            return badRequest('Workflow not found or not active');
         }
         return handleRouteError(err);
     }
@@ -190,7 +190,7 @@ async function handleRunAction(
                 return json({ error: `Unknown action: ${data.action}` }, 400);
         }
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }

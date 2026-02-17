@@ -4,7 +4,7 @@ import { listAgentMessages } from '../db/agent-messages';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema } from '../lib/validation';
-import { json } from '../lib/response';
+import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
 
 export function handleAgentRoutes(
@@ -99,7 +99,7 @@ async function handleCreate(
 
         return json(agent, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -142,7 +142,7 @@ async function handleFund(
 
         return json({ balance, address: agent.walletAddress, funded: data.microAlgos / 1_000_000 });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -153,7 +153,7 @@ async function handleUpdate(req: Request, db: Database, id: string): Promise<Res
         const agent = updateAgent(db, id, data);
         return agent ? json(agent) : json({ error: 'Not found' }, 404);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -188,9 +188,8 @@ async function handleInvoke(
             sessionId: result.sessionId,
         }, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        return handleRouteError(err);
     }
 }
 

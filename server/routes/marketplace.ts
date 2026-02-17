@@ -145,7 +145,7 @@ async function handleCreateListing(
         const listing = marketplace.createListing(body);
         return json(listing, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }
@@ -160,7 +160,7 @@ async function handleUpdateListing(
         const listing = marketplace.updateListing(id, body);
         return listing ? json(listing) : notFound('Listing not found');
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }
@@ -178,7 +178,7 @@ async function handleCreateReview(
         });
         return json(review, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }
@@ -194,7 +194,7 @@ async function handleRegisterInstance(
         const instance = federation.registerInstance(body.url, body.name);
         return json(instance, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }

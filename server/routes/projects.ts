@@ -53,7 +53,7 @@ async function handleCreate(req: Request, db: Database): Promise<Response> {
         const project = createProject(db, data);
         return json(project, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -64,7 +64,7 @@ async function handleUpdate(req: Request, db: Database, id: string): Promise<Res
         const project = updateProject(db, id, data);
         return project ? json(project) : json({ error: 'Not found' }, 404);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }

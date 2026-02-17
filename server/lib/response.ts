@@ -68,6 +68,6 @@ export function safeNumParam(value: string | null, defaultValue: number): number
  * Use in catch blocks: `catch (err) { return handleRouteError(err); }`
  */
 export function handleRouteError(err: unknown): Response {
-    if (err instanceof ValidationError) return badRequest(err.message);
+    if (err instanceof ValidationError) return badRequest(err.detail);
     return serverError(err);
 }
