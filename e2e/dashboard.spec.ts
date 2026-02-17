@@ -13,7 +13,7 @@ test.describe('Dashboard', () => {
 
         // Verify the count cards are present
         const cardTitles = await page.locator('.card__title').allTextContents();
-        expect(cardTitles).toEqual(['Projects', 'Agents', 'Councils', 'Sessions', 'Running']);
+        expect(cardTitles).toEqual(['Projects', 'Agents', 'Councils', 'Conversations', 'Running']);
     });
 
     test('AlgoChat status section renders', async ({ page }) => {

@@ -71,9 +71,15 @@ export async function createContainer(
         args.push('-v', `${mount}:${mount}:ro`);
     }
 
-    // Working directory
+    // Working directory — validate to prevent path traversal attacks
     if (config.workDir) {
-        args.push('-v', `${config.workDir}:/workspace`);
+        const { resolve } = await import('node:path');
+        const resolved = resolve(config.workDir);
+        // Block paths that escape via traversal or target system directories
+        if (resolved !== config.workDir && config.workDir.includes('..')) {
+            throw new Error(`Invalid workDir: path traversal detected in '${config.workDir}'`);
+        }
+        args.push('-v', `${resolved}:/workspace`);
         args.push('-w', '/workspace');
     }
 

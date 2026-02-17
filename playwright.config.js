@@ -5,7 +5,7 @@ export default defineConfig({
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    workers: process.env.CI ? 1 : 2,
     reporter: 'line',
     timeout: 120_000,
     use: {
@@ -23,5 +23,8 @@ export default defineConfig({
         url: 'http://localhost:3000/api/health',
         reuseExistingServer: !process.env.CI,
         timeout: 30_000,
+        env: {
+            RATE_LIMIT_MUTATION: '1000', // Higher limit for parallel e2e tests
+        },
     },
 });

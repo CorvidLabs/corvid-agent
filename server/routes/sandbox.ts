@@ -70,7 +70,12 @@ async function handleSetPolicy(req: Request, db: Database, agentId: string): Pro
 
         if (typeof body.cpuLimit === 'number') limits.cpuLimit = body.cpuLimit;
         if (typeof body.memoryLimitMb === 'number') limits.memoryLimitMb = body.memoryLimitMb;
-        if (typeof body.networkPolicy === 'string') limits.networkPolicy = body.networkPolicy;
+        if (typeof body.networkPolicy === 'string') {
+            if (!['none', 'host', 'restricted'].includes(body.networkPolicy)) {
+                return badRequest('networkPolicy must be one of: none, host, restricted');
+            }
+            limits.networkPolicy = body.networkPolicy;
+        }
         if (typeof body.timeoutSeconds === 'number') limits.timeoutSeconds = body.timeoutSeconds;
 
         setAgentPolicy(db, agentId, limits as Record<string, number | string>);

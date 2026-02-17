@@ -489,6 +489,7 @@ const ReputationEventTypeSchema = z.enum([
     'task_completed', 'task_failed', 'review_received',
     'credit_spent', 'credit_earned', 'security_violation',
     'session_completed', 'attestation_published', 'improvement_loop_completed',
+    'improvement_loop_failed',
 ]);
 
 export const RecordReputationEventSchema = z.object({
