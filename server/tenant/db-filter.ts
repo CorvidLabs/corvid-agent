@@ -102,6 +102,9 @@ export function tenantQueryGet<T>(
  * Validate that a resource belongs to the given tenant.
  * Used for mutation operations (UPDATE, DELETE) to prevent cross-tenant access.
  */
+/** Allowlist of valid identifier characters for SQL column/table names. */
+const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+
 export function validateTenantOwnership(
     db: Database,
     table: string,
@@ -110,6 +113,14 @@ export function validateTenantOwnership(
     idColumn: string = 'id',
 ): boolean {
     if (tenantId === DEFAULT_TENANT_ID) return true;
+
+    // Validate identifiers against allowlist to prevent SQL injection
+    if (!TENANT_SCOPED_TABLES.includes(table as typeof TENANT_SCOPED_TABLES[number])) {
+        throw new Error(`validateTenantOwnership: table '${table}' is not in TENANT_SCOPED_TABLES`);
+    }
+    if (!SAFE_IDENTIFIER.test(idColumn)) {
+        throw new Error(`validateTenantOwnership: invalid idColumn '${idColumn}'`);
+    }
 
     const row = db.query(
         `SELECT ${idColumn} FROM ${table} WHERE ${idColumn} = ? AND tenant_id = ?`,

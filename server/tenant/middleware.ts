@@ -51,17 +51,6 @@ export function extractTenantId(
 }
 
 /**
- * Hash an API key for lookup (SHA-256).
- */
-async function hashKeyAsync(key: string): Promise<string> {
-    const data = new TextEncoder().encode(key);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-}
-
-/**
  * Synchronous hash for key lookup (uses Bun's built-in hasher).
  */
 function hashKey(key: string): string {
@@ -97,5 +86,3 @@ export function revokeApiKey(db: Database, key: string): boolean {
     return result.changes > 0;
 }
 
-// Re-export for testing
-export { hashKeyAsync };

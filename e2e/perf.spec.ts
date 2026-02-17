@@ -7,6 +7,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
         test('create session via API and verify it appears in list without reload', async ({ page, api }) => {
             const project = await api.seedProject('Perf Session Project');
             const agent = await api.seedAgent('Perf Session Agent');
+            const uniqueName = `Opt Session ${Date.now()}`;
 
             await page.goto('/sessions');
             await page.waitForLoadState('networkidle');
@@ -18,7 +19,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
                 body: JSON.stringify({
                     projectId: project.id,
                     agentId: agent.id,
-                    name: 'Optimistic Session',
+                    name: uniqueName,
                     initialPrompt: 'Say hello briefly',
                 }),
             });
@@ -28,7 +29,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             // Navigate to sessions page — session should appear without a full page reload cycle
             await page.goto('/sessions');
             await page.waitForLoadState('networkidle');
-            await expect(page.locator(`.list__item:has-text("Optimistic Session")`)).toBeVisible({ timeout: 5000 });
+            await expect(page.locator(`.list__item:has-text("${uniqueName}")`).first()).toBeVisible({ timeout: 5000 });
 
             // Stop the session
             await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
@@ -39,7 +40,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await page.waitForLoadState('networkidle');
 
             // Session should still be in the list
-            await expect(page.locator(`.list__item:has-text("Optimistic Session")`)).toBeVisible();
+            await expect(page.locator(`.list__item:has-text("${uniqueName}")`).first()).toBeVisible();
 
             // Delete the session
             await fetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
@@ -47,12 +48,15 @@ test.describe('Optimistic Updates & Render Performance', () => {
             // Verify removal
             await page.goto('/sessions');
             await page.waitForLoadState('networkidle');
-            await expect(page.locator(`.list__item:has-text("Optimistic Session")`)).not.toBeVisible({ timeout: 5000 });
+            await expect(page.locator(`.list__item:has-text("${uniqueName}")`)).not.toBeVisible({ timeout: 5000 });
         });
     });
 
     test.describe('Agent optimistic updates', () => {
         test('create agent via API and verify it appears in list without reload', async ({ page }) => {
+            const uniqueName = `Opt Agent ${Date.now()}`;
+            const renamedName = `Renamed ${Date.now()}`;
+
             await page.goto('/agents');
             await page.waitForLoadState('networkidle');
 
@@ -60,7 +64,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             const res = await fetch(`${BASE_URL}/api/agents`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: 'Optimistic Agent', model: 'claude-sonnet-4-20250514' }),
+                body: JSON.stringify({ name: uniqueName, model: 'claude-sonnet-4-20250514' }),
             });
             expect(res.ok).toBe(true);
             const agent = await res.json();
@@ -68,19 +72,19 @@ test.describe('Optimistic Updates & Render Performance', () => {
             // Navigate to agents list
             await page.goto('/agents');
             await page.waitForLoadState('networkidle');
-            await expect(page.locator(`.list__item:has-text("Optimistic Agent")`)).toBeVisible({ timeout: 5000 });
+            await expect(page.locator(`.list__item:has-text("${uniqueName}")`).first()).toBeVisible({ timeout: 5000 });
 
             // Update the agent name
             await fetch(`${BASE_URL}/api/agents/${agent.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: 'Renamed Agent' }),
+                body: JSON.stringify({ name: renamedName }),
             });
 
             // Reload and verify name changed
             await page.goto('/agents');
             await page.waitForLoadState('networkidle');
-            await expect(page.locator(`.list__item:has-text("Renamed Agent")`)).toBeVisible({ timeout: 5000 });
+            await expect(page.locator(`.list__item:has-text("${renamedName}")`)).toBeVisible({ timeout: 5000 });
 
             // Delete the agent
             await fetch(`${BASE_URL}/api/agents/${agent.id}`, { method: 'DELETE' });
@@ -88,7 +92,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             // Verify removal
             await page.goto('/agents');
             await page.waitForLoadState('networkidle');
-            await expect(page.locator(`.list__item:has-text("Renamed Agent")`)).not.toBeVisible({ timeout: 5000 });
+            await expect(page.locator(`.list__item:has-text("${renamedName}")`)).not.toBeVisible({ timeout: 5000 });
         });
     });
 
