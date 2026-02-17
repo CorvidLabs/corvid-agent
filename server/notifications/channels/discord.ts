@@ -10,11 +10,29 @@ const LEVEL_COLORS: Record<string, number> = {
     error: 0xe74c3c,    // red
 };
 
+function validateWebhookUrl(url: string): void {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        throw new Error('Invalid webhook URL');
+    }
+    if (parsed.protocol !== 'https:') {
+        throw new Error('Discord webhook URL must use HTTPS');
+    }
+    const hostname = parsed.hostname;
+    if (!hostname.endsWith('.discord.com') && hostname !== 'discord.com' && !hostname.endsWith('.discordapp.com') && hostname !== 'discordapp.com') {
+        throw new Error('Discord webhook URL must point to discord.com or discordapp.com');
+    }
+}
+
 export async function sendDiscord(
     webhookUrl: string,
     payload: NotificationPayload,
 ): Promise<ChannelSendResult> {
     try {
+        validateWebhookUrl(webhookUrl);
+
         const embed = {
             title: payload.title ?? 'Agent Notification',
             description: payload.message,

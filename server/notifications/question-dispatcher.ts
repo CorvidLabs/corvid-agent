@@ -5,6 +5,8 @@ import { listChannelsForAgent, createQuestionDispatch } from '../db/notification
 import { sendGitHubQuestion } from './channels/github-question';
 import { sendTelegramQuestion } from './channels/telegram-question';
 import { sendAlgoChatQuestion } from './channels/algochat-question';
+import { sendWhatsAppQuestion } from './channels/whatsapp-question';
+import { sendSignalQuestion } from './channels/signal-question';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('QuestionDispatcher');
@@ -116,6 +118,40 @@ export class QuestionDispatcher {
                     question.id,
                     question.question,
                     question.options,
+                    question.agentId,
+                );
+            }
+            case 'whatsapp': {
+                const phoneId = config.phoneNumberId as string;
+                const accessToken = (config.accessToken as string) || process.env.WHATSAPP_ACCESS_TOKEN;
+                const recipientPhone = config.recipientPhone as string;
+                if (!phoneId || !accessToken || !recipientPhone)
+                    return { success: false, error: 'WhatsApp phoneNumberId, accessToken, and recipientPhone required' };
+                return sendWhatsAppQuestion(
+                    phoneId,
+                    accessToken,
+                    recipientPhone,
+                    question.id,
+                    question.question,
+                    question.options,
+                    question.context,
+                    question.agentId,
+                );
+            }
+            case 'signal': {
+                const signalApiUrl = (config.apiUrl as string) || process.env.SIGNAL_API_URL || 'http://localhost:8080';
+                const senderNumber = (config.senderNumber as string) || process.env.SIGNAL_SENDER_NUMBER;
+                const recipientNumber = config.recipientNumber as string;
+                if (!senderNumber || !recipientNumber)
+                    return { success: false, error: 'Signal senderNumber and recipientNumber required' };
+                return sendSignalQuestion(
+                    signalApiUrl,
+                    senderNumber,
+                    recipientNumber,
+                    question.id,
+                    question.question,
+                    question.options,
+                    question.context,
                     question.agentId,
                 );
             }

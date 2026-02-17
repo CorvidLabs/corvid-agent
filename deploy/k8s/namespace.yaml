@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: corvid-agent
+  labels:
+    app.kubernetes.io/name: corvid-agent
+    app.kubernetes.io/part-of: corvid-agent

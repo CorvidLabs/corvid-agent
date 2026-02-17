@@ -49,8 +49,8 @@ export class AstParserService {
         if (!lang) return null;
 
         try {
-            // Read file first, then check size from the buffer to avoid
-            // TOCTOU race between stat and read (CodeQL js/file-system-race).
+            // Read first, then stat — avoids TOCTOU race where file changes between
+            // stat (size check) and read (CodeQL js/file-system-race).
             const source = await readFile(filePath, 'utf-8');
             if (Buffer.byteLength(source, 'utf-8') > MAX_FILE_SIZE) {
                 log.debug('Skipping large file', { filePath });

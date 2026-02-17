@@ -8,7 +8,11 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
+import type { AutonomousLoopService } from '../improvement/service';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { ReputationScorer } from '../reputation/scorer';
+import type { ReputationAttestation } from '../reputation/attestation';
+import { summarizeOldMemories } from '../memory/summarizer';
 import type {
     AgentSchedule,
     ScheduleAction,
@@ -82,6 +86,9 @@ export class SchedulerService {
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null;
     private agentMessenger: AgentMessenger | null;
+    private improvementLoopService: AutonomousLoopService | null = null;
+    private reputationScorer: ReputationScorer | null = null;
+    private reputationAttestation: ReputationAttestation | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private runningExecutions = new Set<string>();
     private eventCallbacks = new Set<ScheduleEventCallback>();
@@ -102,6 +109,17 @@ export class SchedulerService {
     /** Update the agent messenger (set after async AlgoChat init). */
     setAgentMessenger(messenger: AgentMessenger): void {
         this.agentMessenger = messenger;
+    }
+
+    /** Set the improvement loop service (set after service initialization). */
+    setImprovementLoopService(service: AutonomousLoopService): void {
+        this.improvementLoopService = service;
+    }
+
+    /** Set reputation services (for attestation publishing schedule). */
+    setReputationServices(scorer: ReputationScorer, attestation: ReputationAttestation): void {
+        this.reputationScorer = scorer;
+        this.reputationAttestation = attestation;
     }
 
     /** Start the scheduler polling loop. */
@@ -311,6 +329,7 @@ export class SchedulerService {
             'fork_repo',
             'codebase_review',
             'dependency_audit',
+            'improvement_loop',
         ];
 
         if (schedule.approvalPolicy === 'owner_approve') {
@@ -352,6 +371,15 @@ export class SchedulerService {
                     break;
                 case 'dependency_audit':
                     await this.execDependencyAudit(executionId, schedule, action);
+                    break;
+                case 'improvement_loop':
+                    await this.execImprovementLoop(executionId, schedule, action);
+                    break;
+                case 'memory_maintenance':
+                    await this.execMemoryMaintenance(executionId, schedule);
+                    break;
+                case 'reputation_attestation':
+                    await this.execReputationAttestation(executionId, schedule);
                     break;
                 case 'custom':
                     await this.execCustom(executionId, schedule, action);
@@ -730,6 +758,40 @@ export class SchedulerService {
         });
     }
 
+    private async execImprovementLoop(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        if (!this.improvementLoopService) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Improvement loop service not configured' });
+            return;
+        }
+
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
+            return;
+        }
+
+        const projectId = action.projectId ?? agent.defaultProjectId;
+        if (!projectId) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No project configured for agent' });
+            return;
+        }
+
+        updateExecutionStatus(this.db, executionId, 'running');
+
+        const result = await this.improvementLoopService.run(schedule.agentId, projectId, {
+            maxTasks: action.maxImprovementTasks ?? 3,
+            focusArea: action.focusArea,
+        });
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: `Improvement loop session started: ${result.sessionId}. ` +
+                `Health: ${result.health.tscErrorCount} tsc errors, ${result.health.testFailureCount} test failures. ` +
+                `Reputation: ${result.reputationScore} (${result.trustLevel}). ` +
+                `Max tasks: ${result.maxTasksAllowed}.`,
+            sessionId: result.sessionId,
+        });
+    }
+
     private async execCustom(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
         if (!action.prompt) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'No prompt provided for custom action' });
@@ -763,6 +825,57 @@ export class SchedulerService {
             result: `Custom action session started: ${session.id}`,
             sessionId: session.id,
         });
+    }
+
+    private async execMemoryMaintenance(executionId: string, schedule: AgentSchedule): Promise<void> {
+        try {
+            const archived = summarizeOldMemories(this.db, schedule.agentId, 30);
+            updateExecutionStatus(this.db, executionId, 'completed', {
+                result: `Memory maintenance completed: ${archived} memories archived and summarized.`,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
+    }
+
+    private async execReputationAttestation(executionId: string, schedule: AgentSchedule): Promise<void> {
+        if (!this.reputationScorer || !this.reputationAttestation) {
+            updateExecutionStatus(this.db, executionId, 'failed', {
+                result: 'Reputation services not configured',
+            });
+            return;
+        }
+
+        try {
+            const score = this.reputationScorer.computeScore(schedule.agentId);
+            const hash = await this.reputationAttestation.createAttestation(score);
+
+            // Attempt on-chain publish via agent messenger
+            let txid: string | null = null;
+            if (this.agentMessenger) {
+                try {
+                    const note = `corvid-reputation:${schedule.agentId}:${hash}`;
+                    txid = await this.agentMessenger.sendOnChainToSelf(schedule.agentId, note);
+                    if (txid) {
+                        this.reputationAttestation.publishOnChain(
+                            schedule.agentId, hash, async () => txid!,
+                        );
+                    }
+                } catch {
+                    // On-chain publish is best-effort
+                }
+            }
+
+            this.reputationScorer.setAttestationHash(schedule.agentId, hash);
+
+            updateExecutionStatus(this.db, executionId, 'completed', {
+                result: `Attestation created: hash=${hash.slice(0, 16)}... score=${score.overallScore} trust=${score.trustLevel}${txid ? ` txid=${txid}` : ' (off-chain)'}`,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
     }
 
     // ─── Cron helpers ────────────────────────────────────────────────────────

@@ -82,7 +82,13 @@ export const CreateProjectSchema = z.object({
     description: z.string().optional(),
     allowedTools: z.array(z.string()).optional(),
     customInstructions: z.string().optional(),
-    mcpServers: z.array(z.any()).optional(),
+    mcpServers: z.array(z.object({
+        name: z.string().min(1),
+        command: z.string().min(1).optional(),
+        args: z.array(z.string()).optional(),
+        url: z.string().optional(),
+        env: z.record(z.string(), z.string()).optional(),
+    }).passthrough()).optional(),
 });
 
 export const UpdateProjectSchema = z.object({
@@ -91,7 +97,13 @@ export const UpdateProjectSchema = z.object({
     description: z.string().optional(),
     allowedTools: z.array(z.string()).optional(),
     customInstructions: z.string().optional(),
-    mcpServers: z.array(z.any()).optional(),
+    mcpServers: z.array(z.object({
+        name: z.string().min(1),
+        command: z.string().min(1).optional(),
+        args: z.array(z.string()).optional(),
+        url: z.string().optional(),
+        env: z.record(z.string(), z.string()).optional(),
+    }).passthrough()).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field to update is required' });
 
 // ─── Agents ───────────────────────────────────────────────────────────────────
@@ -259,7 +271,7 @@ export const OllamaDeleteModelSchema = z.object({
 // ─── Schedules ───────────────────────────────────────────────────────────────
 
 const ScheduleActionSchema = z.object({
-    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'codebase_review', 'dependency_audit', 'custom']),
+    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'codebase_review', 'dependency_audit', 'improvement_loop', 'memory_maintenance', 'reputation_attestation', 'custom']),
     repos: z.array(z.string()).optional(),
     description: z.string().optional(),
     projectId: z.string().optional(),
@@ -269,6 +281,8 @@ const ScheduleActionSchema = z.object({
     maxPrs: z.number().int().min(1).max(50).optional(),
     autoCreatePr: z.boolean().optional(),
     prompt: z.string().optional(),
+    maxImprovementTasks: z.number().int().min(1).max(5).optional(),
+    focusArea: z.string().optional(),
 });
 
 export const CreateScheduleSchema = z.object({
@@ -424,4 +438,72 @@ export const TriggerWorkflowSchema = z.object({
 
 export const WorkflowRunActionSchema = z.object({
     action: z.enum(['pause', 'resume', 'cancel']),
+});
+
+// ─── Marketplace ─────────────────────────────────────────────────────────────
+
+const ListingCategorySchema = z.enum([
+    'coding', 'research', 'writing', 'data', 'devops', 'security', 'general',
+]);
+
+const PricingModelSchema = z.enum(['free', 'per_use', 'subscription']);
+
+export const CreateListingSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    name: z.string().min(1, 'name is required'),
+    description: z.string().min(1, 'description is required'),
+    longDescription: z.string().optional(),
+    category: ListingCategorySchema,
+    tags: z.array(z.string()).optional(),
+    pricingModel: PricingModelSchema.optional(),
+    priceCredits: z.number().int().min(0).optional(),
+});
+
+export const UpdateListingSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    longDescription: z.string().optional(),
+    category: ListingCategorySchema.optional(),
+    tags: z.array(z.string()).optional(),
+    pricingModel: PricingModelSchema.optional(),
+    priceCredits: z.number().int().min(0).optional(),
+    status: z.enum(['draft', 'published', 'unlisted', 'suspended']).optional(),
+});
+
+export const CreateReviewSchema = z.object({
+    listingId: z.string().optional(), // Usually provided via URL path param
+    reviewerAgentId: z.string().optional(),
+    reviewerAddress: z.string().optional(),
+    rating: z.number().int().min(1, 'rating must be at least 1').max(5, 'rating must be at most 5'),
+    comment: z.string().min(1, 'comment is required'),
+});
+
+export const RegisterFederationInstanceSchema = z.object({
+    url: z.string().url('url must be a valid URL'),
+    name: z.string().min(1, 'name is required'),
+});
+
+// ─── Reputation ──────────────────────────────────────────────────────────────
+
+const ReputationEventTypeSchema = z.enum([
+    'task_completed', 'task_failed', 'review_received',
+    'credit_spent', 'credit_earned', 'security_violation',
+    'session_completed', 'attestation_published', 'improvement_loop_completed',
+]);
+
+export const RecordReputationEventSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    eventType: ReputationEventTypeSchema,
+    scoreImpact: z.number({ message: 'scoreImpact must be a number' }),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+// ─── Billing ─────────────────────────────────────────────────────────────────
+
+export const CreateSubscriptionSchema = z.object({
+    tenantId: z.string().min(1, 'tenantId is required'),
+    stripeSubscriptionId: z.string().min(1, 'stripeSubscriptionId is required'),
+    plan: z.string().min(1, 'plan is required'),
+    periodStart: z.string().min(1, 'periodStart is required'),
+    periodEnd: z.string().min(1, 'periodEnd is required'),
 });

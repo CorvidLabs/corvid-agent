@@ -83,6 +83,7 @@ export function searchMemories(
                  JOIN agent_memories m ON m.rowid = fts.rowid
                  WHERE agent_memories_fts MATCH ?
                    AND m.agent_id = ?
+                   AND m.archived = 0
                  ORDER BY rank
                  LIMIT 20`
             ).all(ftsQuery, agentId) as (AgentMemoryRow & { rank: number })[];
@@ -99,6 +100,7 @@ export function searchMemories(
     const rows = db.query(
         `SELECT * FROM agent_memories
          WHERE agent_id = ? AND (key LIKE ? OR content LIKE ?)
+           AND archived = 0
          ORDER BY updated_at DESC
          LIMIT 20`
     ).all(agentId, pattern, pattern) as AgentMemoryRow[];
@@ -130,6 +132,7 @@ export function listMemories(
     const rows = db.query(
         `SELECT * FROM agent_memories
          WHERE agent_id = ?
+           AND archived = 0
          ORDER BY updated_at DESC
          LIMIT 20`
     ).all(agentId) as AgentMemoryRow[];

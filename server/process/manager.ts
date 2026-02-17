@@ -20,6 +20,9 @@ import type { SchedulerService } from '../scheduler/service';
 import type { WorkflowService } from '../workflow/service';
 import type { NotificationService } from '../notifications/service';
 import type { QuestionDispatcher } from '../notifications/question-dispatcher';
+import type { ReputationScorer } from '../reputation/scorer';
+import type { ReputationAttestation } from '../reputation/attestation';
+import type { ReputationVerifier } from '../reputation/verifier';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -103,6 +106,9 @@ export class ProcessManager {
     private mcpWorkflowService: WorkflowService | null = null;
     private mcpNotificationService: NotificationService | null = null;
     private mcpQuestionDispatcher: QuestionDispatcher | null = null;
+    private mcpReputationScorer: ReputationScorer | null = null;
+    private mcpReputationAttestation: ReputationAttestation | null = null;
+    private mcpReputationVerifier: ReputationVerifier | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -137,6 +143,9 @@ export class ProcessManager {
         workflowService?: WorkflowService,
         notificationService?: NotificationService,
         questionDispatcher?: QuestionDispatcher,
+        reputationScorer?: ReputationScorer,
+        reputationAttestation?: ReputationAttestation,
+        reputationVerifier?: ReputationVerifier,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
@@ -147,6 +156,9 @@ export class ProcessManager {
         this.mcpWorkflowService = workflowService ?? null;
         this.mcpNotificationService = notificationService ?? null;
         this.mcpQuestionDispatcher = questionDispatcher ?? null;
+        this.mcpReputationScorer = reputationScorer ?? null;
+        this.mcpReputationAttestation = reputationAttestation ?? null;
+        this.mcpReputationVerifier = reputationVerifier ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -180,6 +192,9 @@ export class ProcessManager {
             sessionId,
             notificationService: this.mcpNotificationService ?? undefined,
             questionDispatcher: this.mcpQuestionDispatcher ?? undefined,
+            reputationScorer: this.mcpReputationScorer ?? undefined,
+            reputationAttestation: this.mcpReputationAttestation ?? undefined,
+            reputationVerifier: this.mcpReputationVerifier ?? undefined,
         };
     }
 

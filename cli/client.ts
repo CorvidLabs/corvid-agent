@@ -14,6 +14,16 @@ function validateServerUrl(raw: string): string {
     return url.origin + url.pathname.replace(/\/+$/, '');
 }
 
+/** Auth tokens must be printable ASCII with reasonable length. */
+const TOKEN_PATTERN = /^[\x20-\x7E]{1,512}$/;
+
+function sanitizeToken(raw: string): string {
+    if (!TOKEN_PATTERN.test(raw)) {
+        throw new Error('Invalid auth token format');
+    }
+    return raw;
+}
+
 export interface ApiError {
     status: number;
     message: string;
@@ -27,7 +37,7 @@ export class CorvidClient {
         this.baseUrl = validateServerUrl(config.serverUrl);
         this.headers = { 'Content-Type': 'application/json' };
         if (config.authToken) {
-            this.headers['Authorization'] = `Bearer ${config.authToken}`;
+            this.headers['Authorization'] = `Bearer ${sanitizeToken(config.authToken)}`;
         }
     }
 

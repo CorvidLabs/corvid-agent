@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -33,6 +33,11 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_notify_owner',
     'corvid_ask_owner',
     'corvid_configure_notifications',
+    'corvid_check_reputation',
+    'corvid_check_health_trends',
+    'corvid_publish_attestation',
+    'corvid_verify_agent_reputation',
+    'corvid_invoke_remote_agent',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -50,7 +55,7 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_ask_owner',
 ]);
 
-export function createCorvidMcpServer(ctx: McpToolContext) {
+export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnType<typeof tool>[]) {
     const tools = [
         tool(
             'corvid_send_message',
@@ -382,7 +387,64 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
             { username: z.string().describe('GitHub username to follow') },
             async (args) => handleGitHubFollowUser(ctx, args),
         ),
+        // ─── Reputation & trust tools ───────────────────────────────────
+        tool(
+            'corvid_check_reputation',
+            'Check the reputation score and trust level for yourself or another agent. ' +
+            'Shows overall score, component breakdown, and recent reputation events.',
+            {
+                agent_id: z.string().optional().describe('Agent ID to check. Omit to check your own.'),
+            },
+            async (args) => handleCheckReputation(ctx, args),
+        ),
+        tool(
+            'corvid_check_health_trends',
+            'View codebase health metric trends across recent improvement cycles. ' +
+            'Shows whether metrics like TSC errors, test failures, and code markers are improving, stable, or regressing.',
+            {
+                agent_id: z.string().optional().describe('Agent ID. Omit to use your own.'),
+                project_id: z.string().describe('Project ID to check health trends for'),
+                limit: z.number().optional().describe('Number of recent snapshots to analyze (default 10)'),
+            },
+            async (args) => handleCheckHealthTrends(ctx, args),
+        ),
+        tool(
+            'corvid_publish_attestation',
+            'Compute your reputation score and publish a cryptographic attestation hash on the Algorand blockchain. ' +
+            'This creates a verifiable, tamper-proof record of your trust level.',
+            {
+                agent_id: z.string().optional().describe('Agent ID. Omit to publish your own.'),
+            },
+            async (args) => handlePublishAttestation(ctx, args),
+        ),
+        tool(
+            'corvid_verify_agent_reputation',
+            'Verify a remote agent\'s reputation by scanning their on-chain attestation transactions. ' +
+            'Returns trust level derived from attestation count and details.',
+            {
+                wallet_address: z.string().optional().describe('Algorand wallet address to scan for attestations'),
+            },
+            async (args) => handleVerifyAgentReputation(ctx, args),
+        ),
+        tool(
+            'corvid_invoke_remote_agent',
+            'Send a task to a remote A2A-compatible agent and wait for the result. ' +
+            'The remote agent must expose /a2a/tasks/send endpoint.',
+            {
+                agent_url: z.string().describe('Base URL of the remote agent (e.g. "https://agent.example.com")'),
+                message: z.string().describe('The task message to send'),
+                skill: z.string().optional().describe('Specific skill to invoke on the remote agent'),
+                timeout_minutes: z.number().optional().describe('How long to wait for a response (default 5 minutes)'),
+                min_trust: z.string().optional().describe('Minimum trust level required (untrusted/low/medium/high/verified)'),
+            },
+            async (args) => handleInvokeRemoteAgent(ctx, args),
+        ),
     ];
+
+    // Merge plugin tools if provided
+    if (pluginTools && pluginTools.length > 0) {
+        tools.push(...pluginTools);
+    }
 
     // Local (web) sessions get all tools — permission scoping only applies to
     // remote sessions (algochat, agent-to-agent) where untrusted input is possible.

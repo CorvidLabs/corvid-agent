@@ -13,6 +13,8 @@ import { sendDiscord } from './channels/discord';
 import { sendTelegram } from './channels/telegram';
 import { sendGitHub } from './channels/github';
 import { sendAlgoChat } from './channels/algochat';
+import { sendWhatsApp } from './channels/whatsapp';
+import { sendSignal } from './channels/signal';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('NotificationService');
@@ -166,6 +168,32 @@ export class NotificationService {
                         break;
                     }
                     result = await sendAlgoChat(this.agentMessenger, toAddress, payload);
+                    break;
+                }
+                case 'whatsapp': {
+                    const phoneId = config.phoneNumberId as string;
+                    const accessToken = (config.accessToken as string) || process.env.WHATSAPP_ACCESS_TOKEN;
+                    const recipientPhone = config.recipientPhone as string;
+                    if (!phoneId || !accessToken) {
+                        result = { success: false, error: 'WhatsApp phoneNumberId and accessToken required' };
+                        break;
+                    }
+                    if (!recipientPhone) {
+                        result = { success: false, error: 'WhatsApp recipientPhone required' };
+                        break;
+                    }
+                    result = await sendWhatsApp(phoneId, accessToken, recipientPhone, payload);
+                    break;
+                }
+                case 'signal': {
+                    const signalApiUrl = (config.apiUrl as string) || process.env.SIGNAL_API_URL || 'http://localhost:8080';
+                    const senderNumber = (config.senderNumber as string) || process.env.SIGNAL_SENDER_NUMBER;
+                    const recipientNumber = config.recipientNumber as string;
+                    if (!senderNumber || !recipientNumber) {
+                        result = { success: false, error: 'Signal senderNumber and recipientNumber required' };
+                        break;
+                    }
+                    result = await sendSignal(signalApiUrl, senderNumber, recipientNumber, payload);
                     break;
                 }
                 default:

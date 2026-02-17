@@ -4,6 +4,7 @@
  */
 
 import { createLogger } from '../lib/logger';
+import { buildSafeGhEnv } from '../lib/env';
 
 const log = createLogger('GitHubOps');
 
@@ -21,7 +22,7 @@ async function runGh(args: string[], cwd?: string): Promise<{ ok: boolean; stdou
             cwd: cwd ?? process.cwd(),
             stdout: 'pipe',
             stderr: 'pipe',
-            env: { ...process.env },
+            env: buildSafeGhEnv(),
         });
 
         const stdout = await new Response(proc.stdout).text();

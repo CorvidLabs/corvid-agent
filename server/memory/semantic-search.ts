@@ -16,6 +16,7 @@ import {
     IDFCorpus,
     cosineSimilaritySparse,
 } from './embeddings';
+import { applyDecay } from './decay';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('SemanticSearch');
@@ -130,9 +131,10 @@ export function fastSearch(
         }
     }
 
-    // Sort by score descending, take top limit
+    // Sort by score descending, apply temporal decay, take top limit
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, limit);
+    const decayed = applyDecay(scored);
+    return decayed.slice(0, limit);
 }
 
 // ─── Deep Search ─────────────────────────────────────────────────────────────

@@ -23,7 +23,7 @@ import {
     listDeliveries,
 } from '../db/webhooks';
 import { parseBodyOrThrow, CreateWebhookRegistrationSchema, UpdateWebhookRegistrationSchema } from '../lib/validation';
-import { json, handleRouteError } from '../lib/response';
+import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebhookRoutes');
@@ -139,7 +139,7 @@ export function handleWebhookRoutes(
 
     // ── List all recent deliveries ──────────────────────────────────────────
     if (url.pathname === '/api/webhooks/deliveries' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const deliveries = listDeliveries(db, undefined, limit);
         return json({ deliveries });
     }
@@ -182,7 +182,7 @@ export function handleWebhookRoutes(
     const deliveriesMatch = url.pathname.match(/^\/api\/webhooks\/([^/]+)\/deliveries$/);
     if (deliveriesMatch && req.method === 'GET') {
         const registrationId = deliveriesMatch[1];
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const deliveries = listDeliveries(db, registrationId, limit);
         return json({ deliveries });
     }

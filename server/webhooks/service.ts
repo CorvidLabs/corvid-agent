@@ -106,8 +106,8 @@ export class WebhookService {
      */
     async validateSignature(payload: string, signature: string | null): Promise<boolean> {
         if (!this.webhookSecret) {
-            log.debug('No webhook secret configured — skipping signature validation');
-            return true;
+            log.warn('Webhook rejected: no GITHUB_WEBHOOK_SECRET configured — set it to accept webhooks');
+            return false;
         }
 
         if (!signature) {
