@@ -177,8 +177,8 @@ test.describe('Councils', () => {
         const getLaunchRes = await fetch(`http://localhost:3000/api/council-launches/${launch.launchId}`);
         expect(getLaunchRes.ok).toBe(true);
         const launchData = await getLaunchRes.json();
-        // Stage may be 'responding' or 'reviewing' if auto-advance triggered
-        expect(['responding', 'reviewing']).toContain(launchData.stage);
+        // Stage may be 'responding', 'discussing', or 'reviewing' if auto-advance triggered
+        expect(['responding', 'discussing', 'reviewing']).toContain(launchData.stage);
         expect(launchData.sessionIds.length).toBeGreaterThanOrEqual(2);
         expect(launchData.prompt).toBe('Say hello');
 

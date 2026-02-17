@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, describe } from 'bun:test';
+import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { LlmProviderRegistry } from '../providers/registry';
 import { BaseLlmProvider } from '../providers/base';
 import type {
@@ -65,9 +65,23 @@ function resetRegistrySingleton(): void {
 // ─── LlmProviderRegistry ────────────────────────────────────────────────────
 
 describe('LlmProviderRegistry', () => {
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const savedOpenaiKey = process.env.OPENAI_API_KEY;
+
     beforeEach(() => {
         resetRegistrySingleton();
         delete process.env.ENABLED_PROVIDERS;
+        // Set dummy API keys so auto-restrict to ollama-only doesn't kick in
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+        process.env.OPENAI_API_KEY = 'sk-test-dummy';
+    });
+
+    afterEach(() => {
+        // Restore original env
+        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = savedOpenaiKey;
     });
 
     // ── Singleton ────────────────────────────────────────────────────────

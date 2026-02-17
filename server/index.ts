@@ -89,6 +89,31 @@ providerRegistry.register(new AnthropicProvider());
 const ollamaProvider = new OllamaProvider();
 providerRegistry.register(ollamaProvider);
 
+// Ollama startup validation — health-check when Ollama is the only enabled provider
+const isOllamaOnly = !providerRegistry.get('anthropic') && !providerRegistry.get('openai');
+if (isOllamaOnly) {
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    try {
+        const tagsResponse = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(5_000) });
+        if (tagsResponse.ok) {
+            const tagsData = (await tagsResponse.json()) as { models?: Array<{ name: string }> };
+            const modelCount = tagsData.models?.length ?? 0;
+            if (modelCount === 0) {
+                log.warn('Ollama is running but no models are pulled. Suggested: ollama pull qwen3:8b');
+            } else {
+                log.info(`Ollama health check OK — ${modelCount} model(s) available`);
+            }
+        } else {
+            log.error(`Ollama health check failed (HTTP ${tagsResponse.status}). Is Ollama running at ${ollamaHost}?`);
+        }
+    } catch (err) {
+        log.error('Ollama is unreachable — install from https://ollama.com and run: ollama serve', {
+            host: ollamaHost,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
 // Fire-and-forget: refresh Ollama models on startup (warn if not running)
 ollamaProvider.refreshModels().catch((err) => {
     log.warn('Ollama not available on startup', { error: err instanceof Error ? err.message : String(err) });

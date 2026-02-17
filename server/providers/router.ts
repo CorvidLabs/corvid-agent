@@ -12,6 +12,14 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('ModelRouter');
 
+/**
+ * Returns true when no cloud API keys are configured — the platform
+ * should route everything through local Ollama models.
+ */
+export function isLocalOnly(): boolean {
+    return !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY;
+}
+
 export type ComplexityLevel = 'simple' | 'moderate' | 'complex' | 'expert';
 
 interface ComplexitySignals {
@@ -129,8 +137,13 @@ export class ModelRouter {
         const { level, signals } = estimateComplexity(prompt);
         const minTier = minTierForComplexity(level);
 
+        // In local-only mode, restrict candidates to Ollama models
+        const localOnly = isLocalOnly();
+
         // Filter models that meet requirements
         let candidates = MODEL_PRICING.filter((m) => {
+            // Local-only: skip cloud providers entirely
+            if (localOnly && m.provider !== 'ollama') return false;
             // Must meet capability tier
             if (m.capabilityTier > minTier) return false;
 
@@ -210,6 +223,11 @@ export class ModelRouter {
      * Get a fallback chain for a complexity level.
      */
     getFallbackChain(complexity: ComplexityLevel): FallbackChain {
+        // In local-only mode, always use the local chain
+        if (isLocalOnly()) {
+            return DEFAULT_FALLBACK_CHAINS['local'];
+        }
+
         switch (complexity) {
             case 'expert':
                 return DEFAULT_FALLBACK_CHAINS['high-capability'];

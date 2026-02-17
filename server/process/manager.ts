@@ -336,6 +336,12 @@ export class ProcessManager {
             if (sp2) skillPrompt = sp2;
         }
 
+        // COUNCIL_MODEL override: use a bigger model for council chairman/synthesis
+        const councilModel = process.env.COUNCIL_MODEL;
+        const modelOverride = (session.councilRole === 'chairman' && councilModel)
+            ? councilModel
+            : undefined;
+
         let sp: SdkProcess;
         try {
             sp = startDirectProcess({
@@ -352,6 +358,7 @@ export class ProcessManager {
                 extendTimeout: (ms) => this.extendTimeout(session.id, ms),
                 personaPrompt,
                 skillPrompt,
+                modelOverride,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -458,6 +465,11 @@ export class ProcessManager {
                 const mcpToolContext = session.agentId
                     ? this.buildMcpContext(session.agentId, session.source, session.id)
                     : null;
+                // COUNCIL_MODEL override for resumed sessions
+                const councilModelResume = process.env.COUNCIL_MODEL;
+                const modelOverrideResume = (session.councilRole === 'chairman' && councilModelResume)
+                    ? councilModelResume
+                    : undefined;
                 sp = startDirectProcess({
                     session,
                     project,
@@ -470,6 +482,7 @@ export class ProcessManager {
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     mcpToolContext,
                     extendTimeout: (ms) => this.extendTimeout(session.id, ms),
+                    modelOverride: modelOverrideResume,
                 });
             } else {
                 const mcpServers = session.agentId
