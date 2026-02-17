@@ -230,7 +230,17 @@ export class ProcessManager {
 
         // Route based on provider execution mode
         const providerType = agent?.provider as LlmProviderType | undefined;
-        const provider = providerType ? LlmProviderRegistry.getInstance().get(providerType) : undefined;
+        const registry = LlmProviderRegistry.getInstance();
+        let provider = providerType ? registry.get(providerType) : undefined;
+
+        // Auto-fallback: no explicit provider + no Anthropic API key → try Ollama
+        if (!provider && !providerType && !process.env.ANTHROPIC_API_KEY) {
+            const ollamaFallback = registry.get('ollama');
+            if (ollamaFallback) {
+                log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for session ${session.id}`);
+                provider = ollamaFallback;
+            }
+        }
 
         if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, project, agent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
@@ -400,7 +410,17 @@ export class ProcessManager {
 
         // Route based on provider execution mode (same logic as startProcess)
         const providerType = agent?.provider as LlmProviderType | undefined;
-        const providerInstance = providerType ? LlmProviderRegistry.getInstance().get(providerType) : undefined;
+        const registry = LlmProviderRegistry.getInstance();
+        let providerInstance = providerType ? registry.get(providerType) : undefined;
+
+        // Auto-fallback: no explicit provider + no Anthropic API key → try Ollama
+        if (!providerInstance && !providerType && !process.env.ANTHROPIC_API_KEY) {
+            const ollamaFallback = registry.get('ollama');
+            if (ollamaFallback) {
+                log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for resumed session ${session.id}`);
+                providerInstance = ollamaFallback;
+            }
+        }
 
         let sp: SdkProcess;
         try {

@@ -36,6 +36,7 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'anthropic', model: 'claude-opus-4-6' },
             { provider: 'openai', model: 'gpt-4o' },
             { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
+            { provider: 'ollama', model: 'qwen3:32b' },
         ],
     },
     'balanced': {
@@ -44,6 +45,7 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'openai', model: 'gpt-4o' },
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
             { provider: 'openai', model: 'gpt-4o-mini' },
+            { provider: 'ollama', model: 'llama3.3' },
         ],
     },
     'cost-optimized': {
