@@ -668,12 +668,24 @@ export class OllamaProvider extends BaseLlmProvider {
                     const parsed = JSON.parse(candidate);
                     const arr = Array.isArray(parsed) ? parsed : [parsed];
                     for (const item of arr) {
-                        if (item && typeof item === 'object' && typeof item.name === 'string' && toolNames.has(item.name)) {
-                            calls.push({
-                                id: crypto.randomUUID().slice(0, 8),
-                                name: item.name,
-                                arguments: item.arguments ?? item.parameters ?? {},
-                            });
+                        if (item && typeof item === 'object' && typeof item.name === 'string') {
+                            // Exact match first
+                            let resolvedName = toolNames.has(item.name) ? item.name : null;
+                            // Fuzzy: model may add/remove "corvid_" prefix
+                            if (!resolvedName && item.name.startsWith('corvid_')) {
+                                const bare = item.name.slice(7); // strip "corvid_"
+                                if (toolNames.has(bare)) resolvedName = bare;
+                            }
+                            if (!resolvedName && toolNames.has(`corvid_${item.name}`)) {
+                                resolvedName = `corvid_${item.name}`;
+                            }
+                            if (resolvedName) {
+                                calls.push({
+                                    id: crypto.randomUUID().slice(0, 8),
+                                    name: resolvedName,
+                                    arguments: item.arguments ?? item.parameters ?? {},
+                                });
+                            }
                         }
                     }
                     if (calls.length > 0) break; // Found valid tool calls

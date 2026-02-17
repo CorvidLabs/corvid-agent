@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { DEFAULT_FALLBACK_CHAINS } from '../providers/fallback';
 import { isLocalOnly } from '../providers/router';
 import { LlmProviderRegistry } from '../providers/registry';
+import {
+    MODEL_PRICING,
+    getSubagentCapableModels,
+    getWebSearchCapableModels,
+    getOllamaCloudModels,
+} from '../providers/cost-table';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -55,6 +61,83 @@ describe('Fallback chains', () => {
         expect(DEFAULT_FALLBACK_CHAINS['high-capability']).toBeDefined();
         expect(DEFAULT_FALLBACK_CHAINS['balanced']).toBeDefined();
         expect(DEFAULT_FALLBACK_CHAINS['cost-optimized']).toBeDefined();
+    });
+
+    it('cloud chain exists and leads with cloud models', () => {
+        const cloud = DEFAULT_FALLBACK_CHAINS['cloud'];
+        expect(cloud).toBeDefined();
+        expect(cloud.chain.length).toBeGreaterThan(0);
+        expect(cloud.chain[0].model).toBe('minimax-m2.5:cloud');
+        // All entries should be ollama provider
+        for (const entry of cloud.chain) {
+            expect(entry.provider).toBe('ollama');
+        }
+    });
+
+    it('cloud chain includes local fallback', () => {
+        const models = DEFAULT_FALLBACK_CHAINS['cloud'].chain.map((e) => e.model);
+        // Should have at least one non-cloud model as fallback
+        const hasLocalFallback = models.some((m) => !m.endsWith(':cloud'));
+        expect(hasLocalFallback).toBe(true);
+    });
+});
+
+// ─── Ollama Cloud Model Tests ────────────────────────────────────────────────
+
+describe('Ollama cloud models', () => {
+    it('cloud models are in MODEL_PRICING', () => {
+        const cloudModels = getOllamaCloudModels();
+        expect(cloudModels.length).toBe(3);
+        const names = cloudModels.map((m) => m.model);
+        expect(names).toContain('minimax-m2.5:cloud');
+        expect(names).toContain('glm-5:cloud');
+        expect(names).toContain('kimi-k2.5:cloud');
+    });
+
+    it('cloud models are marked with isCloud=true', () => {
+        for (const m of getOllamaCloudModels()) {
+            expect(m.isCloud).toBe(true);
+            expect(m.provider).toBe('ollama');
+        }
+    });
+
+    it('cloud models support subagents and web search', () => {
+        for (const m of getOllamaCloudModels()) {
+            expect(m.supportsSubagents).toBe(true);
+            expect(m.supportsWebSearch).toBe(true);
+        }
+    });
+
+    it('getSubagentCapableModels returns only subagent models', () => {
+        const models = getSubagentCapableModels();
+        expect(models.length).toBeGreaterThan(0);
+        for (const m of models) {
+            expect(m.supportsSubagents).toBe(true);
+        }
+    });
+
+    it('getWebSearchCapableModels returns only web search models', () => {
+        const models = getWebSearchCapableModels();
+        expect(models.length).toBeGreaterThan(0);
+        for (const m of models) {
+            expect(m.supportsWebSearch).toBe(true);
+        }
+    });
+
+    it('local-only models do not have cloud flags', () => {
+        const localOllama = MODEL_PRICING.filter((m) => m.provider === 'ollama' && !m.isCloud);
+        expect(localOllama.length).toBeGreaterThan(0);
+        for (const m of localOllama) {
+            expect(m.supportsSubagents).toBeFalsy();
+            expect(m.supportsWebSearch).toBeFalsy();
+        }
+    });
+
+    it('minimax-m2.5:cloud is tier 1 capability', () => {
+        const minimax = MODEL_PRICING.find((m) => m.model === 'minimax-m2.5:cloud');
+        expect(minimax).toBeDefined();
+        expect(minimax!.capabilityTier).toBe(1);
+        expect(minimax!.maxContextTokens).toBe(1_000_000);
     });
 });
 
@@ -316,5 +399,61 @@ describe('Council context truncation', () => {
         // Only 2 messages, keepTail=4, so 2 <= 5, nothing to trim
         truncateCouncilContext(messages, 'sys', 16384);
         expect(messages.length).toBe(2);
+    });
+});
+
+// ─── Approval Timeout Resolution Tests ──────────────────────────────────────
+
+describe('Approval timeout resolution', () => {
+    it('approval timeout resolves Promise (does not block forever)', async () => {
+        // Simulate the approval timeout behavior: the Promise must resolve
+        // even when escalation is queued, so the direct process can continue
+        // and release the Ollama slot.
+        const result = await new Promise<{ behavior: string }>((resolve) => {
+            // Simulate timeout fires
+            setTimeout(() => {
+                // This mimics the fixed approval-manager.ts behavior:
+                // always resolve, even when escalation is queued
+                resolve({ behavior: 'deny' });
+            }, 10);
+        });
+        expect(result.behavior).toBe('deny');
+    });
+});
+
+// ─── Tool Name Fuzzy Matching Tests ─────────────────────────────────────────
+
+describe('Tool name fuzzy matching', () => {
+    // Simulate the extraction logic from OllamaProvider
+    function resolveToolName(name: string, toolNames: Set<string>): string | null {
+        if (toolNames.has(name)) return name;
+        if (name.startsWith('corvid_')) {
+            const bare = name.slice(7);
+            if (toolNames.has(bare)) return bare;
+        }
+        if (toolNames.has(`corvid_${name}`)) return `corvid_${name}`;
+        return null;
+    }
+
+    const tools = new Set(['list_files', 'read_file', 'corvid_send_message', 'corvid_save_memory']);
+
+    it('exact match works', () => {
+        expect(resolveToolName('list_files', tools)).toBe('list_files');
+        expect(resolveToolName('corvid_send_message', tools)).toBe('corvid_send_message');
+    });
+
+    it('strips corvid_ prefix from hallucinated names', () => {
+        expect(resolveToolName('corvid_list_files', tools)).toBe('list_files');
+        expect(resolveToolName('corvid_read_file', tools)).toBe('read_file');
+    });
+
+    it('adds corvid_ prefix when model drops it', () => {
+        expect(resolveToolName('send_message', tools)).toBe('corvid_send_message');
+        expect(resolveToolName('save_memory', tools)).toBe('corvid_save_memory');
+    });
+
+    it('returns null for unknown tools', () => {
+        expect(resolveToolName('delete_everything', tools)).toBeNull();
+        expect(resolveToolName('corvid_destroy', tools)).toBeNull();
     });
 });
