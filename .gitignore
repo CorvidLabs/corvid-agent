@@ -6,3 +6,13 @@ wallet-keystore.json
 .env
 dist/
 test-results/
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.idea/
+playwright-report/
+blob-report/
+backups/
