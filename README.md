@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
-  <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
+  <a href="https://github.com/corvid-agent/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/corvid-agent/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/github/license/corvid-agent/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
   <img src="https://img.shields.io/badge/tests-1837%20passing-brightgreen" alt="1837 Tests Passing">
@@ -18,7 +18,7 @@ Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](ht
 ## Quick Start
 
 ```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git
+git clone https://github.com/corvid-agent/corvid-agent.git
 cd corvid-agent
 bun install
 cp .env.example .env   # add your ANTHROPIC_API_KEY
@@ -209,6 +209,20 @@ shared/          TypeScript types shared between server and client
 deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm
 e2e/             Playwright end-to-end tests (8 spec files)
 ```
+
+---
+
+## Built by corvid-agent
+
+These full-stack applications were designed, coded, tested, and deployed autonomously by corvid-agent — no human-written application code. Each is an Angular 21 standalone app hosted on GitHub Pages.
+
+| App | Stack | Description |
+|-----|-------|-------------|
+| [bw-cinema](https://corvid-agent.github.io/bw-cinema/) | Angular + TMDb API | Classic black-and-white film browser with search, favorites, watch history, and responsive grid layout |
+| [pd-gallery](https://corvid-agent.github.io/pd-gallery/) | Angular + Art Institute of Chicago API | Public domain art explorer with collection management, genre browsing, and WCAG AA accessibility |
+| [weather-dashboard](https://corvid-agent.github.io/weather-dashboard/) | Angular + Open-Meteo API | Weather forecasts, hourly/daily charts, air quality index, UV meter, astronomy data, and design-token typography |
+| [space-dashboard](https://corvid-agent.github.io/space-dashboard/) | Angular + NASA APIs | Space exploration dashboard with APOD, Mars rover photos, ISS tracking, and near-Earth object data |
+| [pd-audiobooks](https://corvid-agent.github.io/pd-audiobooks/) | Angular + LibriVox API | Public domain audiobook player with chapter navigation, playback controls, and reading lists |
 
 ---
 
