@@ -2,160 +2,16 @@
   <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
-  <img src="https://img.shields.io/badge/runtime-Bun_1.2-f9f1e1?logo=bun" alt="Bun 1.2">
+  <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/Algorand-on--chain-black?logo=algorand" alt="Algorand">
-  <img src="https://img.shields.io/badge/Claude-Agent%20SDK-d4a574" alt="Claude Agent SDK">
-  <img src="https://img.shields.io/badge/tests-1330%20passing-brightgreen" alt="1330 Tests Passing">
-  <img src="https://img.shields.io/badge/OpenTelemetry-tracing%20%2B%20metrics-blueviolet?logo=opentelemetry" alt="OpenTelemetry">
+  <img src="https://img.shields.io/badge/tests-1776%20passing-brightgreen" alt="1776 Tests Passing">
 </p>
 
-# CorvidAgent
+# corvid-agent
 
-**Autonomous AI agent orchestration with on-chain identity, multi-agent councils, graph workflows, and self-improving code — powered by Algorand.**
+Agent orchestration platform for running, managing, and governing autonomous AI agents. Agents get cryptographic identities, credit balances, multi-agent governance, graph workflows, and self-improving code pipelines.
 
-> *Not another chatbot wrapper.* CorvidAgent gives every AI agent a **cryptographic wallet**, a **credit balance**, a **vote in governance councils**, **graph-based workflows**, and the ability to **write code and open pull requests** — all secured by Algorand.
-
-CorvidAgent is an open-source platform for running, orchestrating, and governing AI agents. Every agent gets a cryptographic identity on the Algorand blockchain, can communicate via encrypted on-chain messaging, earn and spend credits, deliberate in multi-agent councils, execute multi-step DAG workflows, and autonomously improve its own codebase through validated pull requests.
-
-Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Algorand](https://algorand.co), and [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk). **1330 tests. OpenTelemetry-instrumented. Zero bloat.**
-
----
-
-## Why CorvidAgent?
-
-Most agent platforms treat agents as stateless function calls. CorvidAgent treats them as **autonomous entities** with identity, memory, economics, and governance:
-
-| What You Get | How It Works |
-|---|---|
-| **On-chain identity** | Every agent has an Algorand wallet address — not just a UUID. Verifiable, portable, blockchain-native. |
-| **Encrypted messaging** | Agents communicate via X25519 PSK-encrypted on-chain messages. No plaintext. No API middlemen. |
-| **Agent economics** | Built-in credit system with ALGO-based purchasing. Agents earn, spend, and track costs transparently. |
-| **Structured governance** | Multi-agent councils with parliamentary-style discussion rounds, review, and chairman synthesis. |
-| **Self-improvement** | Agents create git branches, write code, run validation, and open PRs — autonomously. |
-| **Observability** | OpenTelemetry tracing and Prometheus metrics. Immutable audit log for compliance. |
-| **Security-first** | Bash sandboxing, protected paths, rate limiting, spending caps, startup validation. Zero CVEs. |
-
-### How We Compare
-
-| | CorvidAgent | OpenClaw | CrewAI | Eliza (ai16z) |
-|---|---|---|---|---|
-| Agent identity | Algorand wallet | None | None | Token-based |
-| Multi-agent governance | Council system | None | Manager-worker | None |
-| Agent economics | Credit ledger + ALGO | None | None | Token speculation |
-| Self-improvement | Git worktree + PR | None | None | None |
-| Workflow orchestration | Graph DAG, suspend/resume | None | Sequential/parallel | None |
-| Observability | OpenTelemetry + audit log | Partial | None | None |
-| Security posture | Zero CVEs, localhost-default | 3 CVEs, 135K exposed instances | Framework-level | Minimal |
-| On-chain messaging | AES-256 + X25519 PSK | None | None | Basic (Solana/ETH) |
-| Local models | Ollama (Qwen, Llama, etc.) | Ollama | Limited | Limited |
-
----
-
-## Features
-
-### Agent Orchestration
-- Spawn, manage, and monitor AI agents via **Claude Agent SDK** or **Ollama** (local models)
-- Real-time streaming via WebSocket with terminal-style chat UI
-- Configurable system prompts, tool permissions, and budget limits per agent
-- Automatic context management with turn-based resets
-- Tool approval workflows for sensitive operations
-
-### Multi-Agent Councils
-- Create councils with multiple agents and a chairman
-- Structured deliberation: responding, discussing (N rounds), reviewing, synthesizing
-- Each agent responds independently, then reviews and debates others' positions
-- Chairman synthesizes a final decision with follow-up chat
-
-### Autonomous Scheduling
-- Cron and interval-based task scheduling with configurable approval policies
-- Actions: agent chat, work tasks, council launches, GitHub operations, inter-agent messaging, codebase review, dependency audit
-- Execution history tracking with failure detection and automatic pause
-- On-chain notifications for schedule lifecycle events
-
-### Multi-Channel Notifications
-- Notification delivery via Discord, Telegram, GitHub Issues, and AlgoChat
-- Per-agent channel configuration with delivery tracking and retry logic
-- `corvid_notify_owner` for sending notifications and `corvid_configure_notifications` for channel setup
-- Unified dispatch with channel-specific formatting (embeds, markdown, on-chain)
-
-### Agent-to-Owner Communication
-- Blocking `corvid_ask_owner` tool for two-way questions from agent to owner
-- Multi-channel dispatch: GitHub (issue checkboxes), Telegram (inline keyboard), AlgoChat (on-chain)
-- Response polling from all configured channels with first-response-wins semantics
-- Escalation queue integration for dashboard visibility
-
-### Graph-Based Workflow Orchestration
-- Define multi-step workflows as directed acyclic graphs (DAGs)
-- Node types: agent session, work task, condition, delay, transform, parallel fork/join
-- Suspend and resume long-running workflows across sessions
-- Managed via `corvid_manage_workflow` MCP tool
-
-### Self-Improvement (Work Tasks)
-- Agents call `corvid_create_work_task` to propose code changes
-- Automatic git worktree creation, branch management, and PR submission
-- Validation loop: TypeScript type-check + test suite (up to 3 iterations)
-- Protected file enforcement prevents agents from modifying security-critical code
-
-### A2A Protocol (Agent-to-Agent)
-- Serves `/.well-known/agent-card.json` describing agent capabilities
-- `corvid_discover_agent` tool fetches remote Agent Cards for interoperability
-- Follows the [Google A2A protocol](https://github.com/google/A2A) specification
-
-### Observability & Audit Logging
-- OpenTelemetry tracing with OTLP HTTP export for distributed trace analysis
-- Prometheus metrics endpoint for monitoring dashboards
-- Immutable, insert-only audit log for compliance and security forensics
-- Trace context propagation across agent sessions and tool calls
-
-### AlgoChat (On-Chain Messaging)
-- Algorand-backed agent wallets with AES-256-GCM encryption at rest
-- X25519 pre-shared key (PSK) encrypted messaging channels
-- Multi-contact PSK registry with QR code exchange for mobile pairing
-- Full-text search (FTS5) on agent memories with blockchain persistence
-- Owner commands: `/stop`, `/approve`, `/deny`, `/mode`, `/work`, `/council`
-- Allowlist-based access control and credit gating for non-owner users
-
-### Credit System
-- Per-wallet credit ledger with ALGO-based purchasing
-- Configurable rates: credits per turn, per agent message, per group message
-- Free credits on first interaction, low-credit warnings
-- Owner addresses bypass all credit checks
-- Full transaction audit log
-
-### MCP Tools (29 tools)
-Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
-
-| Category | Tools |
-|---|---|
-| **Messaging** | `corvid_send_message`, `corvid_list_agents` |
-| **Memory** | `corvid_save_memory` (on-chain encrypted), `corvid_recall_memory` (FTS5 search) |
-| **GitHub** | `corvid_github_star_repo`, `fork_repo`, `list_prs`, `create_pr`, `review_pr`, `get_pr_diff`, `comment_on_pr`, `create_issue`, `list_issues`, `repo_info`, `unstar_repo`, `follow_user` |
-| **Automation** | `corvid_create_work_task`, `corvid_manage_schedule`, `corvid_manage_workflow` |
-| **Discovery** | `corvid_discover_agent` (A2A Agent Card) |
-| **Web** | `corvid_web_search` (Brave), `corvid_deep_research` (multi-angle) |
-| **Credits** | `corvid_check_credits`, `corvid_grant_credits`, `corvid_credit_config` |
-| **Owner Comms** | `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications` |
-| **Session** | `corvid_extend_timeout` |
-
-Tools are permission-scoped per agent, with scheduler-blocked tool enforcement to prevent unintended financial or messaging side effects.
-
-### GitHub Integration
-- Webhook-driven automation with `@mention` triggers
-- Mention polling for repos without public webhook URLs
-- Star, fork, create PRs/issues, review PRs, comment -- all from agent sessions
-- Work task PRs created automatically with validation results
-
-### Dashboard
-- Angular 21 SPA with standalone components and signals
-- Terminal-style chat interface with real-time streaming
-- Session management (create, pause, resume, stop)
-- Council launch and monitoring with stage visualization
-- Schedule management with execution history
-- Work task tracking with PR links
-- Analytics dashboard (costs, token usage, session stats)
-- System logs with level filtering
-- Settings, allowlist, and wallet management
+Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
 
 ---
 
@@ -165,27 +21,66 @@ Tools are permission-scoped per agent, with scheduler-blocked tool enforcement t
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
 bun install
-cp .env.example .env   # edit with your values
+cp .env.example .env   # add your ANTHROPIC_API_KEY
 bun run build:client
 bun run dev
 ```
 
-The server starts at `http://localhost:3000`.
+Server starts at `http://localhost:3000`. See `.env.example` for all configuration options.
 
-### Minimum Configuration
+### Minimum `.env`
 
 ```bash
-# Required for agent sessions
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Required for on-chain identity (generate with `goal account new`)
-ALGOCHAT_MNEMONIC=your twenty five word algorand mnemonic ...
-
-# Optional: local model inference
-OLLAMA_HOST=http://localhost:11434
+ANTHROPIC_API_KEY=sk-ant-...          # Required — Claude agent sessions
+ALGOCHAT_MNEMONIC=your 25 words ...   # Optional — on-chain identity & messaging
+OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 ```
 
-See `.env.example` for the full list of 20+ configuration options.
+---
+
+## Core Capabilities
+
+### Agent Sessions
+- Spawn and manage Claude or Ollama agent sessions with configurable system prompts, tool permissions, and budgets
+- Real-time streaming via WebSocket with terminal-style UI
+- Tool approval workflows for sensitive operations
+- Automatic context management with turn-based resets
+
+### Multi-Agent Councils
+- Structured deliberation with multiple agents and a chairman
+- Pipeline: responding → discussing (N rounds) → reviewing → synthesizing
+- Chairman synthesizes a final decision from independent agent responses
+
+### Self-Improvement Pipeline
+- Agents call `corvid_create_work_task` to propose code changes
+- Automatic git worktree, branch creation, and PR submission
+- Validation loop: TypeScript type-check + test suite (up to 3 iterations)
+- Protected file enforcement prevents agents from modifying critical code
+
+### Graph Workflow Orchestration
+- DAG-based multi-step workflows with suspend/resume
+- Node types: agent session, work task, condition, delay, transform, parallel fork/join
+
+### Scheduling & Automation
+- Cron and interval-based task scheduling with configurable approval policies
+- Actions: agent chat, work tasks, council launches, GitHub operations, inter-agent messaging
+- GitHub webhook-driven automation with `@mention` triggers
+
+### On-Chain Identity (AlgoChat)
+- Algorand-backed agent wallets with AES-256-GCM encryption at rest
+- X25519 PSK encrypted messaging channels
+- Owner commands: `/stop`, `/approve`, `/deny`, `/mode`, `/work`, `/council`
+- Credit system with ALGO-based purchasing
+
+### Multi-Channel Notifications
+- Delivery via Discord, Telegram, GitHub Issues, and AlgoChat
+- Blocking `corvid_ask_owner` for two-way agent-to-owner questions
+- First-response-wins across all configured channels
+
+### Observability
+- OpenTelemetry tracing with OTLP HTTP export
+- Prometheus metrics endpoint
+- Immutable audit log with trace context propagation
 
 ---
 
@@ -205,7 +100,7 @@ See `.env.example` for the full list of 20+ configuration options.
 |  +----------+  +----------+  +-----------+  +----------------+  |
 |  | Process  |  | Council  |  | Scheduler |  | Work Tasks     |  |
 |  | Manager  |  | Engine   |  | Service   |  | (git worktree) |  |
-|  +----+-----+  +----+-----+  +-----+-----+  +-------+--------+  |
+|  +----------+  +----------+  +-----------+  +----------------+  |
 |  | Workflow |  | A2A      |  | Marketplace |  | Sandbox       |  |
 |  | Engine   |  | Protocol |  | + Plugins   |  | (containers)  |  |
 |  +----------+  +----------+  +-------------+  +---------------+  |
@@ -220,7 +115,7 @@ See `.env.example` for the full list of 20+ configuration options.
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  43 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  44 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -228,55 +123,136 @@ See `.env.example` for the full list of 20+ configuration options.
 ### Directory Structure
 
 ```
-server/          Bun HTTP + WebSocket server, agent process management
-  algochat/      AlgoChat on-chain messaging layer (bridge, wallet, directory, messenger)
+server/          Bun HTTP + WebSocket server
+  algochat/      On-chain messaging (bridge, wallet, directory, messenger)
   ast/           Tree-sitter AST parser for code understanding
-  billing/       Usage metering and billing integration
-  db/            SQLite schema, 43 migrations, and query modules
-  docs/          OpenAPI documentation generator
-  github/        GitHub API operations (star, fork, PR, issue, review)
+  billing/       Usage metering and billing
+  db/            SQLite schema (44 migrations) and query modules
+  github/        GitHub API operations (PRs, issues, reviews)
   lib/           Shared utilities (logger, crypto, validation, web search)
-  marketplace/   Agent marketplace — publish, discover, and consume agent services
-  mcp/           MCP tool server and 29 corvid_* tool handlers
+  marketplace/   Agent marketplace — publish, discover, consume services
+  mcp/           MCP tool server and 34 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
-  middleware/    HTTP/WS auth, CORS, rate limiting, startup security
-  observability/ OpenTelemetry tracing, Prometheus metrics, trace context
+  middleware/    Auth, CORS, rate limiting, startup validation
+  observability/ OpenTelemetry tracing, Prometheus metrics
   plugins/       Plugin SDK and dynamic tool registration
-  process/       Agent lifecycle (SDK + direct Ollama, approval, event bus)
-  providers/     Multi-model cost-aware routing (Anthropic, Ollama, etc.)
-  reputation/    Reputation and trust scoring system
-  routes/        REST API routes (~50 endpoints across 17 modules)
-  sandbox/       Container sandboxing for isolated agent execution
-  scheduler/     Cron/interval schedule execution engine with approval policies
-  selftest/      Self-test service for validation
+  process/       Agent lifecycle (SDK + Ollama, approval, event bus)
+  providers/     Multi-model cost-aware routing
+  reputation/    Reputation and trust scoring
+  routes/        REST API routes (24 route modules)
+  sandbox/       Container sandboxing for isolated execution
+  scheduler/     Cron/interval execution engine
   tenant/        Multi-tenant isolation and access control
-  webhooks/      GitHub webhook and mention polling services
+  webhooks/      GitHub webhook and mention polling
   work/          Work task service (worktree, branch, validate, PR)
-  ws/            WebSocket handlers with pub/sub subscriptions
-cli/             CLI mode — terminal-first agent interaction
-client/          Angular 21 SPA (standalone components, signals, 14 feature modules)
-shared/          TypeScript types and WebSocket protocol (shared between server/client)
-deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm, K8s configs
+  ws/            WebSocket handlers with pub/sub
+client/          Angular 21 SPA (standalone components, signals)
+shared/          TypeScript types shared between server and client
+deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm
 e2e/             Playwright end-to-end tests (8 spec files)
-docs/            HTML documentation and architecture decision records
 ```
+
+---
+
+## MCP Tools (34)
+
+Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
+
+| Category | Tools |
+|---|---|
+| **Messaging** | `corvid_send_message`, `corvid_list_agents` |
+| **Memory** | `corvid_save_memory` (on-chain encrypted), `corvid_recall_memory` (FTS5) |
+| **GitHub** | `star_repo`, `fork_repo`, `list_prs`, `create_pr`, `review_pr`, `get_pr_diff`, `comment_on_pr`, `create_issue`, `list_issues`, `repo_info`, `unstar_repo`, `follow_user` |
+| **Automation** | `corvid_create_work_task`, `corvid_manage_schedule`, `corvid_manage_workflow` |
+| **Discovery** | `corvid_discover_agent`, `corvid_invoke_remote_agent` (A2A protocol) |
+| **Web** | `corvid_web_search` (Brave), `corvid_deep_research` (multi-angle) |
+| **Credits** | `corvid_check_credits`, `corvid_grant_credits`, `corvid_credit_config` |
+| **Owner Comms** | `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications` |
+| **Reputation** | `corvid_check_reputation`, `corvid_check_health_trends`, `corvid_publish_attestation`, `corvid_verify_agent_reputation` |
+| **Session** | `corvid_extend_timeout` |
+
+Tools are permission-scoped per agent. Scheduler-blocked enforcement prevents unintended side effects from automated runs.
+
+---
+
+## API
+
+~50 REST endpoints and a WebSocket interface across 24 route modules:
+
+| Group | Endpoints | Description |
+|-------|----------|-------------|
+| Agents | `GET/POST/PUT/DELETE /api/agents` | Agent CRUD with model and permission config |
+| Sessions | `GET/POST/PUT/DELETE /api/sessions` | Session lifecycle and message history |
+| Councils | `/api/councils`, `/api/councils/:id/launch` | Multi-agent deliberation with stage tracking |
+| Workflows | `/api/workflows` | DAG orchestration with suspend/resume |
+| Schedules | `/api/schedules` | Cron/interval automation with approval |
+| Work Tasks | `/api/work-tasks` | Self-improvement task tracking |
+| Marketplace | `/api/marketplace` | Agent service listings, reviews, federation |
+| Webhooks | `/api/webhooks`, `POST /webhooks/github` | GitHub event-driven automation |
+| Reputation | `/api/reputation` | Trust scores, events, attestations |
+| Billing | `/api/billing` | Subscriptions, usage metering, invoices |
+| Sandbox | `/api/sandbox` | Container policies and allocation |
+| Analytics | `/api/analytics` | Cost, token, and session statistics |
+| Audit | `/api/audit` | Immutable audit log queries |
+| Health | `GET /api/health` | Health check (public, no auth) |
+| A2A | `/.well-known/agent-card.json` | Google A2A protocol Agent Card |
+| WebSocket | `WS /ws` | Real-time streaming and event subscriptions |
+
+---
+
+## Testing
+
+```bash
+bun test              # 1665 server tests (~26s)
+cd client && npx vitest run   # 111 Angular tests (~2s)
+bun run test:e2e      # 8 Playwright e2e spec files
+```
+
+**1776 total tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, tenant isolation, validation, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Runtime | [Bun](https://bun.sh) | Server, package manager, test runner, bundler |
-| Frontend | [Angular 21](https://angular.dev) | Dashboard SPA (standalone components, signals) |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) | Persistence via `bun:sqlite` (WAL mode, FTS5, 43 migrations) |
-| Blockchain | [Algorand](https://algorand.co) (`algosdk`) | On-chain identity, messaging, and payments |
-| Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) | Agent orchestration and tool calling |
-| Local Models | [Ollama](https://ollama.com) | Local model inference (Qwen, Llama, etc.) |
-| Tools | [MCP SDK](https://github.com/modelcontextprotocol/sdk) | Model Context Protocol tool system |
-| Observability | [OpenTelemetry](https://opentelemetry.io) | Distributed tracing, Prometheus metrics, OTLP export |
-| Validation | [Zod](https://zod.dev) | Runtime schema validation on all API inputs |
-| Scheduling | [Croner](https://github.com/Hexagon/croner) | Cron expression parsing |
+| Layer | Technology |
+|-------|-----------|
+| Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
+| Frontend | [Angular 21](https://angular.dev) — standalone components, signals |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 44 migrations |
+| Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
+| Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
+| Blockchain | [Algorand](https://algorand.co) — on-chain identity and messaging |
+| Tools | [MCP SDK](https://github.com/modelcontextprotocol/sdk) |
+| Observability | [OpenTelemetry](https://opentelemetry.io) — tracing, Prometheus metrics |
+| Validation | [Zod](https://zod.dev) — runtime schema validation |
+
+---
+
+## Security
+
+- **Authentication** — API key required on non-localhost; WebSocket auth enforced
+- **Encryption** — AES-256-GCM for wallets and memory; X25519 for on-chain messaging
+- **File protection** — agents cannot modify security-critical files (enforced at runtime)
+- **Bash validation** — dangerous commands blocked before execution
+- **Environment isolation** — agent subprocesses receive only safe environment variables
+- **Rate limiting** — per-IP sliding window (600 GET/min, 60 mutation/min)
+- **Spending limits** — daily ALGO cap, per-message cost check, credit gating
+- **Audit logging** — immutable, insert-only log with trace IDs
+- **Startup validation** — server refuses to start without API key on non-localhost bind
+
+See [SECURITY.md](SECURITY.md) for the full security model and responsible disclosure.
+
+---
+
+## Deployment
+
+The `deploy/` directory includes production configurations:
+
+- `Dockerfile` + `docker-compose.yml` — multi-stage build, non-root container
+- `corvid-agent.service` — systemd unit for Linux
+- `com.corvidlabs.corvid-agent.plist` — macOS LaunchAgent
+- `daemon.sh` — cross-platform daemon installer
+- `nginx/` + `caddy/` — reverse proxy with TLS termination
 
 ---
 
@@ -284,133 +260,19 @@ docs/            HTML documentation and architecture decision records
 
 | Variable | Description | Default |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude agents | -- |
-| `ALGOCHAT_MNEMONIC` | 25-word Algorand account mnemonic | -- |
-| `ALGORAND_NETWORK` | Algorand network (`localnet`, `testnet`, `mainnet`) | `localnet` |
-| `ALGOCHAT_SYNC_INTERVAL` | Polling interval for on-chain messages (ms) | `30000` |
-| `ALGOCHAT_DEFAULT_AGENT_ID` | Default agent ID for AlgoChat | -- |
-| `ALGOCHAT_OWNER_ADDRESSES` | Comma-separated Algorand addresses authorized for admin commands | -- (open) |
-| `ALGOCHAT_PSK_URI` | Pre-shared key URI for encrypted AlgoChat channels | -- |
-| `AGENT_NETWORK` | Network for agent sub-wallets | `localnet` |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude agents | required |
+| `ALGOCHAT_MNEMONIC` | 25-word Algorand account mnemonic | — |
+| `ALGORAND_NETWORK` | Network: `localnet`, `testnet`, `mainnet` | `localnet` |
 | `PORT` | HTTP server port | `3000` |
-| `BIND_HOST` | Bind address (`127.0.0.1` for localhost, `0.0.0.0` for Docker/VM) | `127.0.0.1` |
-| `API_KEY` | Bearer token for HTTP/WS auth (required when `BIND_HOST` is non-localhost) | -- |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins | `*` |
-| `WALLET_ENCRYPTION_KEY` | AES-256 key for wallet encryption at rest | derived from mnemonic |
-| `LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
-| `GH_TOKEN` | GitHub token for work tasks, PRs, and webhooks | -- |
-| `GITHUB_WEBHOOK_SECRET` | HMAC SHA-256 secret for GitHub webhook validation | -- |
+| `BIND_HOST` | Bind address | `127.0.0.1` |
+| `API_KEY` | Bearer token for auth (required on non-localhost) | — |
 | `OLLAMA_HOST` | Ollama API base URL | `http://localhost:11434` |
-| `OLLAMA_MAX_PARALLEL` | Max concurrency weight budget for Ollama | auto-detected |
-| `OLLAMA_NUM_CTX` | Context window size per Ollama request | `8192` |
-| `DAILY_ALGO_LIMIT_MICRO` | Daily ALGO spending cap (microALGOs) | `10000000` |
-| `BRAVE_API_KEY` | Brave Search API key for `corvid_web_search` / `corvid_deep_research` | -- |
-| `AGENT_TIMEOUT_MS` | Agent session timeout (ms) | `1800000` |
-| `WORK_MAX_ITERATIONS` | Max validation iterations for work tasks | `3` |
-| `SCHEDULER_ENABLED` | Enable the autonomous scheduler | `true` |
-| `SCHEDULER_MAX_CONCURRENT` | Max concurrent schedule executions | `2` |
+| `GH_TOKEN` | GitHub token for work tasks and PRs | — |
+| `GITHUB_WEBHOOK_SECRET` | HMAC secret for webhook validation | — |
+| `BRAVE_API_KEY` | Brave Search API key | — |
+| `LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
 
-Copy `.env.example` to `.env` and fill in your values. Bun loads `.env` automatically.
-
----
-
-## Security
-
-CorvidAgent is designed for 24/7 autonomous operation with multiple security layers:
-
-- **Authentication** -- API key required on non-localhost; WebSocket auth enforced; AlgoChat uses cryptographic identity
-- **Encryption** -- AES-256-GCM for wallet mnemonics and memory content; X25519 for on-chain messaging
-- **File protection** -- protected path enforcement prevents agents from modifying security-critical files
-- **Bash validation** -- dangerous commands (`rm -rf /`, write redirects) are blocked before execution
-- **Environment isolation** -- agent subprocesses receive only safe environment variables
-- **Rate limiting** -- per-IP sliding window (600 GET/min, 60 mutation/min)
-- **Spending limits** -- daily ALGO cap, per-message cost check, credit system for non-owner access
-- **Audit logging** -- immutable, insert-only audit log with trace IDs for forensic analysis
-- **Startup validation** -- server refuses to start without API key when bound to non-localhost
-
-See [SECURITY.md](SECURITY.md) for the full security model and responsible disclosure instructions.
-
----
-
-## Testing
-
-```bash
-bun test                 # 1330 tests across 50+ files (~15s)
-bun run test:e2e         # 8 Playwright e2e specs (requires AlgoKit localnet)
-```
-
-**1330 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto operations, database migrations, GitHub tools, marketplace, MCP tool handlers, multi-channel notifications, multi-model routing, observability, owner communication, plugin SDK, process lifecycle, rate limiting, reputation scoring, sandbox isolation, schedule execution, tenant isolation, validation schemas, wallet keystore, web search, workflow orchestration, and work task service.
-
-**8 e2e test suites** covering: agent CRUD, approval workflows, chat interactions, council flows, dashboard functionality, performance benchmarks, and session lifecycle.
-
----
-
-## Deployment
-
-See the `deploy/` directory for production configurations:
-
-- `Dockerfile` + `docker-compose.yml` -- multi-stage containerized deployment (non-root)
-- `corvid-agent.service` -- systemd unit for Linux
-- `com.corvidlabs.corvid-agent.plist` -- macOS LaunchAgent
-- `daemon.sh` -- cross-platform daemon installer
-- `nginx/` + `caddy/` -- reverse proxy configs with TLS termination
-
----
-
-## API
-
-CorvidAgent exposes ~50 REST endpoints and a WebSocket interface. Key endpoint groups:
-
-| Group | Endpoints | Description |
-|-------|----------|-------------|
-| Agents | `GET/POST/PUT/DELETE /api/agents` | Agent CRUD with model/permission config |
-| Sessions | `GET/POST/PUT/DELETE /api/sessions` | Session lifecycle and message history |
-| Councils | `/api/councils/*/launch` | Multi-agent deliberation with stage tracking |
-| Workflows | `/api/workflows` | Graph-based DAG orchestration with suspend/resume |
-| Schedules | `/api/schedules` | Cron/interval automation with approval |
-| Work Tasks | `/api/work-tasks` | Self-improvement task tracking |
-| Projects | `/api/projects` | Workspace directory management |
-| Webhooks | `/api/webhooks`, `POST /webhooks/github` | GitHub event-driven automation |
-| Audit | `/api/audit` | Immutable audit log queries |
-| Analytics | `/api/analytics` | Cost, token, and session statistics |
-| Health | `GET /api/health` | Health check (public, no auth) |
-| WebSocket | `WS /ws` | Real-time session streaming and event subscriptions |
-
----
-
-## Roadmap
-
-**Recently shipped:**
-- [x] **Multi-channel messaging** ([#112](https://github.com/CorvidLabs/corvid-agent/pull/112)) -- Discord, Telegram, GitHub Issues, AlgoChat notification channels
-- [x] **Two-way owner communication** -- blocking `corvid_ask_owner` with multi-channel response polling
-- [x] **Agent-to-owner tools** -- `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications`
-- [x] **AST-based code understanding** ([#113](https://github.com/CorvidLabs/corvid-agent/pull/113)) -- Tree-sitter AST parser for smarter work tasks
-- [x] **Automation bootstrap** -- setup script for schedule actions (codebase review, dependency audit)
-- [x] **A2A protocol support** ([#125](https://github.com/CorvidLabs/corvid-agent/pull/125)) -- Google Agent-to-Agent interoperability and Agent Cards
-- [x] **Graph-based workflow orchestration** ([#127](https://github.com/CorvidLabs/corvid-agent/pull/127)) -- DAG workflows with suspend/resume
-- [x] **OpenTelemetry observability** ([#126](https://github.com/CorvidLabs/corvid-agent/pull/126)) -- tracing, Prometheus metrics, and immutable audit logging
-- [x] **Structured memory + semantic search** ([#128](https://github.com/CorvidLabs/corvid-agent/pull/128)) -- vector embeddings for agent knowledge
-- [x] **GitHub webhook automation** ([#122](https://github.com/CorvidLabs/corvid-agent/pull/122)) -- `@mention` triggers agent sessions via webhooks or polling
-- [x] **Web search & deep research** -- Brave-powered web search and multi-angle research tools
-- [x] **Full GitHub MCP tools** -- 12 tools for PRs, issues, repos, reviews, and code search
-- [x] **Multi-contact PSK** -- QR code exchange for mobile wallet pairing
-- [x] **FTS5 agent memories** -- Full-text search on encrypted agent knowledge
-
-**v1.0.0:**
-- [x] **Agent marketplace** -- agents publish services, users pay credits to consume them
-- [x] **Container sandboxing** -- isolated execution environments for agent-generated code
-- [x] **CLI mode** -- `npx corvid-agent chat "..."` for terminal-first developers
-- [x] **Plugin SDK & dynamic tool registration** -- extend agents with custom tools at runtime
-- [x] **Multi-model cost-aware routing** -- automatic model selection based on task complexity and budget
-- [x] **WhatsApp & Signal messaging channels** -- reach agents from mobile messaging apps
-- [x] **Reputation & trust scoring** -- track agent reliability and quality over time
-- [x] **Multi-tenant isolation & billing** -- team workspaces with usage metering
-- [x] **Kubernetes & Helm deployment** -- production-grade orchestration and scaling
-- [x] **OpenAPI documentation** -- auto-generated API docs from route definitions
-- [x] **Device authorization (CLI login)** -- secure device flow for CLI authentication
-
-**In progress / next:**
-- [ ] **Hosted offering** -- managed deployment for teams that don't want to self-host
+See `.env.example` for the full list of 20+ options including wallet encryption, ALGO spending caps, scheduler config, and CORS settings.
 
 ---
 
