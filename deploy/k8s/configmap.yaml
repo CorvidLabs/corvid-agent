@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: corvid-agent-config
+  namespace: corvid-agent
+  labels:
+    app.kubernetes.io/name: corvid-agent
+data:
+  NODE_ENV: "production"
+  PORT: "3578"
+  DB_PATH: "/data/corvid-agent.db"
+  LOG_LEVEL: "info"
+  # Sandbox (requires Docker-in-Docker or privileged mode)
+  # SANDBOX_ENABLED: "false"
+  # AlgoChat network
+  # ALGOCHAT_NETWORK: "testnet"

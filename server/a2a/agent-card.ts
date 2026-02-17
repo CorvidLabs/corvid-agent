@@ -55,6 +55,11 @@ const TOOL_TAG_MAP: Record<string, string[]> = {
     corvid_github_get_pr_diff: ['github', 'pull-requests', 'review'],
     corvid_github_comment_on_pr: ['github', 'pull-requests', 'communication'],
     corvid_github_follow_user: ['github', 'social'],
+    corvid_check_reputation: ['reputation', 'trust'],
+    corvid_check_health_trends: ['health', 'monitoring'],
+    corvid_publish_attestation: ['reputation', 'blockchain'],
+    corvid_verify_agent_reputation: ['reputation', 'trust', 'blockchain'],
+    corvid_invoke_remote_agent: ['a2a', 'communication'],
 };
 
 /** Tool descriptions used when building skills. Matches sdk-tools.ts. */
@@ -84,6 +89,11 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     corvid_github_get_pr_diff: 'Get the full diff/patch for a pull request.',
     corvid_github_comment_on_pr: 'Add a comment to a pull request.',
     corvid_github_follow_user: 'Follow a GitHub user.',
+    corvid_check_reputation: 'Check reputation score and trust level for an agent.',
+    corvid_check_health_trends: 'View codebase health metric trends over improvement cycles.',
+    corvid_publish_attestation: 'Publish a reputation attestation hash on Algorand.',
+    corvid_verify_agent_reputation: 'Verify a remote agent\'s on-chain reputation attestations.',
+    corvid_invoke_remote_agent: 'Send a task to a remote A2A agent and get the result.',
 };
 
 /** Convert a tool name like "corvid_github_star_repo" to "GitHub Star Repo". */
@@ -124,7 +134,7 @@ function getSupportedProtocols(baseUrl: string): A2AProtocolExtension[] {
         {
             protocol: 'A2A',
             description: 'Google A2A (Agent-to-Agent) protocol for agent interoperability',
-            endpoint: `${baseUrl}/.well-known/agent-card.json`,
+            endpoint: `${baseUrl}/a2a/tasks/send`,
         },
         {
             protocol: 'AlgoChat',

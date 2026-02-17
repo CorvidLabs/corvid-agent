@@ -24,6 +24,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { buildSafeGhEnv } from '../lib/env';
 
 const log = createLogger('MentionPoller');
 
@@ -661,7 +662,7 @@ export class MentionPollingService {
             const proc = Bun.spawn(['gh', ...args], {
                 stdout: 'pipe',
                 stderr: 'pipe',
-                env: { ...process.env },
+                env: buildSafeGhEnv(),
             });
 
             const stdout = await new Response(proc.stdout).text();

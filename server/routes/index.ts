@@ -13,6 +13,12 @@ import { handleScheduleRoutes } from './schedules';
 import { handleWebhookRoutes } from './webhooks';
 import { handleMentionPollingRoutes } from './mention-polling';
 import { handleWorkflowRoutes } from './workflows';
+import { handleSandboxRoutes } from './sandbox';
+import { handleMarketplaceRoutes } from './marketplace';
+import { handleReputationRoutes } from './reputation';
+import { handleBillingRoutes } from './billing';
+import { handleAuthFlowRoutes } from './auth-flow';
+import { handleA2ARoutes } from './a2a';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -32,9 +38,16 @@ import { encryptMemoryContent } from '../lib/crypto';
 import { loadAlgoChatConfig } from '../algochat/config';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
-import { json, serverError, handleRouteError } from '../lib/response';
-import { checkHttpAuth, loadAuthConfig, type AuthConfig } from '../middleware/auth';
+import { json, serverError, handleRouteError, safeNumParam } from '../lib/response';
+import { checkHttpAuth, buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
 import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
+import type { SandboxManager } from '../sandbox/manager';
+import type { MarketplaceService } from '../marketplace/service';
+import type { MarketplaceFederation } from '../marketplace/federation';
+import type { ReputationScorer } from '../reputation/scorer';
+import type { ReputationAttestation } from '../reputation/attestation';
+import type { BillingService } from '../billing/service';
+import type { UsageMeter } from '../billing/meter';
 
 // Load auth config once at module level
 let authConfig: AuthConfig | null = null;
@@ -58,12 +71,33 @@ function errorResponse(err: unknown): Response {
 
     log.error('Unhandled route error', { error: message, stack });
 
-    const response = serverError(err);
-    addCors(response);
-    return response;
+    return serverError(err);
 }
 
 export type NetworkSwitchFn = (network: 'testnet' | 'mainnet') => Promise<void>;
+
+export interface RouteServices {
+    db: Database;
+    processManager: ProcessManager;
+    algochatBridge: AlgoChatBridge | null;
+    agentWalletService?: AgentWalletService | null;
+    agentMessenger?: AgentMessenger | null;
+    workTaskService?: WorkTaskService | null;
+    selfTestService?: { run(testType: 'unit' | 'e2e' | 'all'): { sessionId: string } } | null;
+    agentDirectory?: AgentDirectory | null;
+    networkSwitchFn?: NetworkSwitchFn | null;
+    schedulerService?: SchedulerService | null;
+    webhookService?: WebhookService | null;
+    mentionPollingService?: MentionPollingService | null;
+    workflowService?: WorkflowService | null;
+    sandboxManager?: SandboxManager | null;
+    marketplace?: MarketplaceService | null;
+    marketplaceFederation?: MarketplaceFederation | null;
+    reputationScorer?: ReputationScorer | null;
+    reputationAttestation?: ReputationAttestation | null;
+    billing?: BillingService | null;
+    usageMeter?: UsageMeter | null;
+}
 
 export async function handleRequest(
     req: Request,
@@ -80,24 +114,41 @@ export async function handleRequest(
     webhookService?: WebhookService | null,
     mentionPollingService?: MentionPollingService | null,
     workflowService?: WorkflowService | null,
+    sandboxManager?: SandboxManager | null,
+    marketplace?: MarketplaceService | null,
+    marketplaceFederation?: MarketplaceFederation | null,
+    reputationScorer?: ReputationScorer | null,
+    reputationAttestation?: ReputationAttestation | null,
+    billing?: BillingService | null,
+    usageMeter?: UsageMeter | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
+    const config = getAuthConfig();
 
-    // CORS preflight — allow everything (local sandbox)
+    // CORS preflight — use configured CORS headers
     if (req.method === 'OPTIONS') {
-        return new Response(null, { status: 204, headers: CORS_HEADERS });
+        const corsHeaders = buildCorsHeaders(req, config);
+        corsHeaders['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+        return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     // Rate limiting — check before auth or route dispatch
     const rateLimited = checkRateLimit(req, url, rateLimiter);
     if (rateLimited) {
-        addCors(rateLimited);
+        applyCors(rateLimited, req, config);
         return rateLimited;
     }
 
+    // Authentication — check all routes (public paths are exempted inside checkHttpAuth)
+    const authDenied = checkHttpAuth(req, url, config);
+    if (authDenied) {
+        applyCors(authDenied, req, config);
+        return authDenied;
+    }
+
     try {
-        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService);
-        if (response) addCors(response);
+        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter);
+        if (response) applyCors(response, req, config);
         return response;
     } catch (err) {
         return errorResponse(err);
@@ -121,13 +172,16 @@ async function handleRoutes(
     webhookService?: WebhookService | null,
     mentionPollingService?: MentionPollingService | null,
     workflowService?: WorkflowService | null,
+    sandboxManager?: SandboxManager | null,
+    marketplace?: MarketplaceService | null,
+    marketplaceFederation?: MarketplaceFederation | null,
+    reputationScorer?: ReputationScorer | null,
+    reputationAttestation?: ReputationAttestation | null,
+    billing?: BillingService | null,
+    usageMeter?: UsageMeter | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
-        // Auth check — browse-dirs exposes the filesystem, so require authentication
-        const authDenied = checkHttpAuth(req, url, getAuthConfig());
-        if (authDenied) return authDenied;
-
         return handleBrowseDirs(req, url, db);
     }
 
@@ -176,6 +230,30 @@ async function handleRoutes(
     const workflowResponse = handleWorkflowRoutes(req, url, db, workflowService ?? null);
     if (workflowResponse) return workflowResponse;
 
+    // Sandbox routes (container management)
+    const sandboxResponse = handleSandboxRoutes(req, url, db, sandboxManager);
+    if (sandboxResponse) return sandboxResponse;
+
+    // Marketplace routes
+    const marketplaceResponse = handleMarketplaceRoutes(req, url, db, marketplace, marketplaceFederation);
+    if (marketplaceResponse) return marketplaceResponse;
+
+    // Reputation routes
+    const reputationResponse = handleReputationRoutes(req, url, db, reputationScorer, reputationAttestation);
+    if (reputationResponse) return reputationResponse;
+
+    // Billing routes
+    const billingResponse = await handleBillingRoutes(req, url, db, billing, usageMeter);
+    if (billingResponse) return billingResponse;
+
+    // Auth flow routes (device authorization for CLI login)
+    const authFlowResponse = handleAuthFlowRoutes(req, url, db);
+    if (authFlowResponse) return authFlowResponse;
+
+    // A2A inbound task routes
+    const a2aResponse = await handleA2ARoutes(req, url, db, processManager);
+    if (a2aResponse) return a2aResponse;
+
     // MCP API routes (used by stdio server subprocess)
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService
         ? (() => {
@@ -219,8 +297,8 @@ async function handleRoutes(
 
     // Feed history — returns recent agent messages AND algochat messages for the AlgoChat Feed
     if (url.pathname === '/api/feed/history' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
-        const offset = Number(url.searchParams.get('offset') ?? '0');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
+        const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const search = url.searchParams.get('search') ?? undefined;
         const agentId = url.searchParams.get('agentId') ?? undefined;
         const threadId = url.searchParams.get('threadId') ?? undefined;
@@ -371,7 +449,7 @@ async function handleRoutes(
             const result = backupDatabase(db);
             return json(result);
         } catch (err) {
-            console.error('[backup] Backup failed:', err);
+            log.error('Backup failed', { error: err instanceof Error ? err.message : String(err) });
             return json({ error: 'Backup failed' }, 500);
         }
     }
@@ -400,8 +478,8 @@ async function handleRoutes(
     const walletMsgMatch = url.pathname.match(/^\/api\/wallets\/([^/]+)\/messages$/);
     if (walletMsgMatch && req.method === 'GET') {
         const address = decodeURIComponent(walletMsgMatch[1]);
-        const limit = Number(url.searchParams.get('limit') ?? '50');
-        const offset = Number(url.searchParams.get('offset') ?? '0');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
+        const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const result = getWalletMessages(db, address, limit, offset);
         return json(result);
     }
@@ -424,20 +502,6 @@ async function handleSelfTestRun(
     }
 }
 
-// Simple CORS — allow everything. This is a local sandbox; the only external
-// boundary is AlgoChat (on-chain identity). If you deploy on a server, restrict
-// Access-Control-Allow-Origin to your dashboard's origin.
-const CORS_HEADERS: Record<string, string> = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-function addCors(response: Response): void {
-    for (const [key, value] of Object.entries(CORS_HEADERS)) {
-        response.headers.set(key, value);
-    }
-}
 
 async function handleEscalationResolve(
     req: Request,

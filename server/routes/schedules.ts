@@ -14,7 +14,7 @@ import {
 import { getNextCronDate } from '../scheduler/cron-parser';
 import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
-import { json, handleRouteError, errorMessage, badRequest } from '../lib/response';
+import { json, handleRouteError, errorMessage, badRequest, safeNumParam } from '../lib/response';
 
 export function handleScheduleRoutes(
     req: Request,
@@ -57,14 +57,14 @@ export function handleScheduleRoutes(
     // List executions for a schedule
     const execsMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/executions$/);
     if (execsMatch && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const executions = listExecutions(db, execsMatch[1], limit);
         return json(executions);
     }
 
     // List all executions
     if (url.pathname === '/api/schedule-executions' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const executions = listExecutions(db, undefined, limit);
         return json(executions);
     }

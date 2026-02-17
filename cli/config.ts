@@ -42,11 +42,23 @@ export function loadConfig(): CliConfig {
     }
 }
 
+/** Validate and sanitize config before persisting to disk. */
+function sanitizeConfig(config: CliConfig): CliConfig {
+    return {
+        serverUrl: typeof config.serverUrl === 'string' ? config.serverUrl.slice(0, 256) : DEFAULT_CONFIG.serverUrl,
+        authToken: typeof config.authToken === 'string' ? config.authToken.slice(0, 512) : null,
+        defaultAgent: typeof config.defaultAgent === 'string' ? config.defaultAgent.slice(0, 128) : null,
+        defaultProject: typeof config.defaultProject === 'string' ? config.defaultProject.slice(0, 256) : null,
+        defaultModel: typeof config.defaultModel === 'string' ? config.defaultModel.slice(0, 128) : null,
+    };
+}
+
 export function saveConfig(config: CliConfig): void {
     if (!existsSync(CONFIG_DIR)) {
         mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
     }
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
+    const safe = sanitizeConfig(config);
+    writeFileSync(CONFIG_FILE, JSON.stringify(safe, null, 2) + '\n', { mode: 0o600 });
 }
 
 export function updateConfig(updates: Partial<CliConfig>): CliConfig {

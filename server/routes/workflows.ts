@@ -18,7 +18,7 @@ import {
     TriggerWorkflowSchema,
     WorkflowRunActionSchema,
 } from '../lib/validation';
-import { json, handleRouteError, badRequest } from '../lib/response';
+import { json, handleRouteError, badRequest, safeNumParam } from '../lib/response';
 
 export function handleWorkflowRoutes(
     req: Request,
@@ -67,14 +67,14 @@ export function handleWorkflowRoutes(
     // List runs for a workflow
     const runsMatch = url.pathname.match(/^\/api\/workflows\/([^/]+)\/runs$/);
     if (runsMatch && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const runs = listWorkflowRuns(db, runsMatch[1], limit);
         return json(runs);
     }
 
     // List all workflow runs
     if (url.pathname === '/api/workflow-runs' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const runs = listWorkflowRuns(db, undefined, limit);
         return json(runs);
     }

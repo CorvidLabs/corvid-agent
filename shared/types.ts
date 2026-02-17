@@ -325,6 +325,9 @@ export type ScheduleActionType =
     | 'github_suggest'
     | 'codebase_review'
     | 'dependency_audit'
+    | 'improvement_loop'
+    | 'memory_maintenance'
+    | 'reputation_attestation'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
@@ -349,6 +352,10 @@ export interface ScheduleAction {
     autoCreatePr?: boolean;
     /** Arbitrary prompt for custom action type */
     prompt?: string;
+    /** Max improvement tasks per loop run (for improvement_loop, default 3, max 5) */
+    maxImprovementTasks?: number;
+    /** Optional focus hint for improvement loop (e.g. "type safety") */
+    focusArea?: string;
 }
 
 export interface AgentSchedule {
@@ -680,7 +687,7 @@ export interface WorkflowNodeRun {
 
 // MARK: - Notifications (Multi-Channel)
 
-export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat';
+export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat' | 'whatsapp' | 'signal';
 
 // MARK: - A2A Protocol (Agent-to-Agent Agent Card)
 

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: corvid-agent
+description: Agent orchestration platform with MCP tools, AlgoChat messaging, and on-chain wallet integration
+type: application
+version: 0.11.0
+appVersion: "0.11.0"
+keywords:
+  - ai
+  - agent
+  - orchestration
+  - mcp
+  - algorand
+home: https://github.com/corvidlabs/corvid-agent
+maintainers:
+  - name: corvidlabs

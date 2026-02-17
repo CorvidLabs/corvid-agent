@@ -1,0 +1,25 @@
+# Base sandbox image for corvid-agent containers.
+# Provides a minimal Bun runtime environment for sandboxed agent execution.
+#
+# Build:  docker build -t corvid-agent-sandbox:latest -f server/sandbox/Dockerfile.agent .
+# Usage:  Managed by SandboxManager — not invoked directly.
+
+FROM oven/bun:1-slim
+
+# Install git (needed for agent work tasks) and basic tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git ca-certificates curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user for sandboxed execution
+RUN groupadd -r sandbox && useradd -r -g sandbox -m -s /bin/bash sandbox
+
+# Working directory
+WORKDIR /workspace
+
+# Drop privileges
+USER sandbox
+
+# Default entrypoint: sleep so the container stays alive for exec commands
+ENTRYPOINT ["sleep", "infinity"]

@@ -126,3 +126,105 @@ export async function discoverAgent(baseUrl: string): Promise<A2AAgentCard | nul
 export function clearAgentCardCache(): void {
     cache.clear();
 }
+
+// ---------------------------------------------------------------------------
+// Remote Agent Invocation (A2A tasks/send)
+// ---------------------------------------------------------------------------
+
+export interface RemoteInvocationResult {
+    success: boolean;
+    taskId: string;
+    responseText: string | null;
+    error: string | null;
+}
+
+/**
+ * Invoke a remote A2A agent by POSTing to /a2a/tasks/send
+ * and polling /a2a/tasks/:id until completed or timed out.
+ */
+export async function invokeRemoteAgent(
+    baseUrl: string,
+    message: string,
+    options: { skill?: string; timeoutMs?: number } = {},
+): Promise<RemoteInvocationResult> {
+    const normalizedUrl = baseUrl.replace(/\/+$/, '');
+    const timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
+
+    log.info('Invoking remote agent', { url: normalizedUrl, messagePreview: message.slice(0, 80) });
+
+    // Step 1: Submit the task
+    const submitResponse = await fetch(`${normalizedUrl}/a2a/tasks/send`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'CorvidAgent/A2A-Client',
+        },
+        body: JSON.stringify({
+            params: {
+                message,
+                skill: options.skill,
+                timeoutMs,
+            },
+        }),
+        signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!submitResponse.ok) {
+        const errorText = await submitResponse.text().catch(() => 'unknown');
+        return {
+            success: false,
+            taskId: '',
+            responseText: null,
+            error: `Submit failed: HTTP ${submitResponse.status} — ${errorText}`,
+        };
+    }
+
+    const task = await submitResponse.json() as { id: string; state: string };
+    const taskId = task.id;
+
+    // Step 2: Poll until completed/failed/timeout
+    const deadline = Date.now() + timeoutMs;
+    const pollIntervalMs = 3000;
+
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+        try {
+            const pollResponse = await fetch(`${normalizedUrl}/a2a/tasks/${taskId}`, {
+                headers: { 'User-Agent': 'CorvidAgent/A2A-Client' },
+                signal: AbortSignal.timeout(10_000),
+            });
+
+            if (!pollResponse.ok) continue;
+
+            const pollResult = await pollResponse.json() as {
+                id: string;
+                state: string;
+                messages?: Array<{ role: string; parts: Array<{ text: string }> }>;
+            };
+
+            if (pollResult.state === 'completed' || pollResult.state === 'failed') {
+                // Extract the last agent message
+                const agentMessages = (pollResult.messages ?? []).filter((m) => m.role === 'agent');
+                const lastMessage = agentMessages[agentMessages.length - 1];
+                const responseText = lastMessage?.parts?.[0]?.text ?? null;
+
+                return {
+                    success: pollResult.state === 'completed',
+                    taskId,
+                    responseText,
+                    error: pollResult.state === 'failed' ? (responseText ?? 'Task failed') : null,
+                };
+            }
+        } catch {
+            // Poll failed — retry
+        }
+    }
+
+    return {
+        success: false,
+        taskId,
+        responseText: null,
+        error: `Timed out after ${timeoutMs}ms`,
+    };
+}

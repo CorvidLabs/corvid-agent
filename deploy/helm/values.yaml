@@ -1,0 +1,74 @@
+# Default values for corvid-agent
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/corvidlabs/corvid-agent
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to Chart appVersion
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3578
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: corvid-agent.example.com
+  tls: []
+  #  - secretName: corvid-agent-tls
+  #    hosts:
+  #      - corvid-agent.example.com
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "2"
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 5Gi
+
+config:
+  NODE_ENV: production
+  PORT: "3578"
+  DB_PATH: /data/corvid-agent.db
+  LOG_LEVEL: info
+  # SANDBOX_ENABLED: "false"
+  # ALGOCHAT_NETWORK: testnet
+
+secrets:
+  API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  # DISCORD_WEBHOOK_URL: ""
+  # TELEGRAM_BOT_TOKEN: ""
+  # TELEGRAM_CHAT_ID: ""
+  # WHATSAPP_PHONE_NUMBER_ID: ""
+  # WHATSAPP_ACCESS_TOKEN: ""
+  # WHATSAPP_RECIPIENT_PHONE: ""
+  # SIGNAL_API_URL: ""
+  # SIGNAL_SENDER_NUMBER: ""
+  # SIGNAL_RECIPIENT_NUMBER: ""
+  # ALGOCHAT_MNEMONIC: ""
+  # WALLET_ENCRYPTION_KEY: ""
+
+probes:
+  liveness:
+    path: /api/health
+    initialDelaySeconds: 10
+    periodSeconds: 30
+  readiness:
+    path: /api/health
+    initialDelaySeconds: 5
+    periodSeconds: 10
