@@ -77,6 +77,10 @@ OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 - Blocking `corvid_ask_owner` for two-way agent-to-owner questions
 - First-response-wins across all configured channels
 
+### AST Code Understanding
+- Tree-sitter parser for TypeScript, JavaScript, Python, Go, Rust, and more
+- Extracts functions, classes, imports, and call graphs for smarter work tasks
+
 ### Observability
 - OpenTelemetry tracing with OTLP HTTP export
 - Prometheus metrics endpoint

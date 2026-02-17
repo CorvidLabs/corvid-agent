@@ -19,6 +19,7 @@ import { handleReputationRoutes } from './reputation';
 import { handleBillingRoutes } from './billing';
 import { handleAuthFlowRoutes } from './auth-flow';
 import { handleA2ARoutes } from './a2a';
+import { handlePluginRoutes } from './plugins';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -249,6 +250,10 @@ async function handleRoutes(
     // Auth flow routes (device authorization for CLI login)
     const authFlowResponse = handleAuthFlowRoutes(req, url, db);
     if (authFlowResponse) return authFlowResponse;
+
+    // Plugin routes (registry not yet instantiated — returns 503 until enabled)
+    const pluginResponse = handlePluginRoutes(req, url, db, null);
+    if (pluginResponse) return pluginResponse;
 
     // A2A inbound task routes
     const a2aResponse = await handleA2ARoutes(req, url, db, processManager);
