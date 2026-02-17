@@ -49,13 +49,15 @@ export class AstParserService {
         if (!lang) return null;
 
         try {
-            const fileStat = await stat(filePath);
-            if (fileStat.size > MAX_FILE_SIZE) {
-                log.debug('Skipping large file', { filePath, size: fileStat.size });
+            // Read file first, then check size from the buffer to avoid
+            // TOCTOU race between stat and read (CodeQL js/file-system-race).
+            const source = await readFile(filePath, 'utf-8');
+            if (Buffer.byteLength(source, 'utf-8') > MAX_FILE_SIZE) {
+                log.debug('Skipping large file', { filePath });
                 return null;
             }
 
-            const source = await readFile(filePath, 'utf-8');
+            const fileStat = await stat(filePath);
             const symbols = await this.parseSource(source, lang);
 
             return {

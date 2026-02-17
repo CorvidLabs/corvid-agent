@@ -3,6 +3,17 @@ import type { ServerMessage, ClientMessage } from '../shared/ws-protocol';
 
 // ─── HTTP Client ────────────────────────────────────────────────────────────
 
+const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
+
+/** Validate the server URL is well-formed and uses an allowed protocol. */
+function validateServerUrl(raw: string): string {
+    const url = new URL(raw);
+    if (!ALLOWED_PROTOCOLS.has(url.protocol)) {
+        throw new Error(`Unsupported protocol: ${url.protocol} — only http/https allowed`);
+    }
+    return url.origin + url.pathname.replace(/\/+$/, '');
+}
+
 export interface ApiError {
     status: number;
     message: string;
@@ -13,7 +24,7 @@ export class CorvidClient {
     private headers: Record<string, string>;
 
     constructor(config: CliConfig) {
-        this.baseUrl = config.serverUrl.replace(/\/+$/, '');
+        this.baseUrl = validateServerUrl(config.serverUrl);
         this.headers = { 'Content-Type': 'application/json' };
         if (config.authToken) {
             this.headers['Authorization'] = `Bearer ${config.authToken}`;
