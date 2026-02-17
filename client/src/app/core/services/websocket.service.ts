@@ -100,6 +100,10 @@ export class WebSocketService {
         this.send({ type: 'approval_response', requestId, behavior, ...(message ? { message } : {}) });
     }
 
+    sendQuestionResponse(questionId: string, answer: string, selectedOption?: number): void {
+        this.send({ type: 'question_response', questionId, answer, ...(selectedOption !== undefined ? { selectedOption } : {}) });
+    }
+
     createWorkTask(agentId: string, description: string, projectId?: string): void {
         this.send({ type: 'create_work_task', agentId, description, ...(projectId ? { projectId } : {}) });
     }

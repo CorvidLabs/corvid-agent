@@ -8,7 +8,8 @@ import { SessionOutputComponent } from './session-output.component';
 import { SessionInputComponent } from './session-input.component';
 import { ApprovalDialogComponent, type ApprovalDecision } from './approval-dialog.component';
 import type { Session, SessionMessage } from '../../core/models/session.model';
-import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-message.model';
+import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '../../core/models/ws-message.model';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
     selector: 'app-session-view',
@@ -51,6 +52,29 @@ import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-mess
                     [request]="approval"
                     (decided)="onApprovalDecision($event)" />
             }
+
+            @if (pendingQuestion(); as q) {
+                <div class="question-card" [class]="'question-card--' + (q.context ? 'with-context' : 'simple')">
+                    <div class="question-card__header">Agent Question</div>
+                    <p class="question-card__text">{{ q.question }}</p>
+                    @if (q.context) {
+                        <p class="question-card__context">{{ q.context }}</p>
+                    }
+                    @if (q.options && q.options.length > 0) {
+                        <div class="question-card__options">
+                            @for (opt of q.options; track opt; let i = $index) {
+                                <button class="btn btn--secondary" (click)="onQuestionOption(q, i, opt)">{{ opt }}</button>
+                            }
+                        </div>
+                    } @else {
+                        <div class="question-card__input">
+                            <input #answerInput type="text" placeholder="Type your answer..."
+                                (keyup.enter)="onQuestionAnswer(q, answerInput.value); answerInput.value = ''" />
+                            <button class="btn btn--primary" (click)="onQuestionAnswer(q, answerInput.value); answerInput.value = ''">Send</button>
+                        </div>
+                    }
+                </div>
+            }
         } @else {
             <div class="page"><p>Loading...</p></div>
         }
@@ -85,6 +109,22 @@ import type { StreamEvent, ApprovalRequestWire } from '../../core/models/ws-mess
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); box-shadow: 0 0 8px rgba(255, 51, 85, 0.25); }
         .page { padding: 1.5rem; color: var(--text-primary); }
+        .question-card {
+            margin: 0.75rem 1rem; padding: 1rem; border-radius: var(--radius);
+            background: var(--bg-surface); border: 1px solid var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+        .question-card__header { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-cyan); margin-bottom: 0.5rem; font-weight: 700; }
+        .question-card__text { margin: 0 0 0.5rem; color: var(--text-primary); font-size: 0.875rem; }
+        .question-card__context { margin: 0 0 0.75rem; color: var(--text-secondary); font-size: 0.75rem; font-style: italic; }
+        .question-card__options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .question-card__input { display: flex; gap: 0.5rem; }
+        .question-card__input input {
+            flex: 1; padding: 0.375rem 0.75rem; border-radius: var(--radius);
+            background: var(--bg-primary); border: 1px solid var(--border-bright);
+            color: var(--text-primary); font-size: 0.8rem; font-family: inherit;
+        }
+        .question-card__input input:focus { outline: none; border-color: var(--accent-cyan); }
     `,
 })
 export class SessionViewComponent implements OnInit, OnDestroy {
@@ -93,12 +133,14 @@ export class SessionViewComponent implements OnInit, OnDestroy {
     private readonly sessionService = inject(SessionService);
     private readonly agentService = inject(AgentService);
     private readonly wsService = inject(WebSocketService);
+    private readonly notifications = inject(NotificationService);
 
     protected readonly session = signal<Session | null>(null);
     protected readonly agentName = signal('assistant');
     protected readonly messages = signal<SessionMessage[]>([]);
     protected readonly logCopied = signal(false);
     protected readonly pendingApproval = signal<ApprovalRequestWire | null>(null);
+    protected readonly pendingQuestion = signal<OwnerQuestionWire | null>(null);
 
     protected readonly events = computed(() => {
         const s = this.session();
@@ -108,6 +150,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
 
     private sessionId: string | null = null;
     private approvalCleanup: (() => void) | null = null;
+    private questionTimeout: ReturnType<typeof setTimeout> | null = null;
 
     async ngOnInit(): Promise<void> {
         this.sessionId = this.route.snapshot.paramMap.get('id');
@@ -127,7 +170,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
 
         this.sessionService.subscribeToSession(this.sessionId);
 
-        // Listen for approval requests and status updates targeting this session
+        // Listen for approval requests, questions, notifications, and status updates
         const sid = this.sessionId;
         this.approvalCleanup = this.wsService.onMessage((msg) => {
             if (msg.type === 'approval_request' && msg.request.sessionId === sid) {
@@ -135,6 +178,23 @@ export class SessionViewComponent implements OnInit, OnDestroy {
             }
             if (msg.type === 'session_status' && msg.sessionId === sid) {
                 this.session.update((cur) => cur ? { ...cur, status: msg.status as Session['status'] } : cur);
+            }
+            if (msg.type === 'agent_notification' && msg.sessionId === sid) {
+                const level = msg.level as 'info' | 'warning' | 'success' | 'error';
+                const text = msg.title ? `${msg.title}: ${msg.message}` : msg.message;
+                if (level === 'error') this.notifications.error(text);
+                else if (level === 'warning') this.notifications.warning(text);
+                else if (level === 'success') this.notifications.success(text);
+                else this.notifications.info(text);
+            }
+            if (msg.type === 'agent_question' && msg.question.sessionId === sid) {
+                this.pendingQuestion.set(msg.question);
+                // Auto-dismiss on timeout
+                if (this.questionTimeout) clearTimeout(this.questionTimeout);
+                this.questionTimeout = setTimeout(() => {
+                    this.pendingQuestion.set(null);
+                    this.questionTimeout = null;
+                }, msg.question.timeoutMs);
             }
         });
     }
@@ -144,11 +204,27 @@ export class SessionViewComponent implements OnInit, OnDestroy {
             this.sessionService.unsubscribeFromSession(this.sessionId);
         }
         this.approvalCleanup?.();
+        if (this.questionTimeout) {
+            clearTimeout(this.questionTimeout);
+        }
     }
 
     protected onApprovalDecision(decision: ApprovalDecision): void {
         this.pendingApproval.set(null);
         this.wsService.sendApprovalResponse(decision.requestId, decision.behavior);
+    }
+
+    protected onQuestionOption(q: OwnerQuestionWire, index: number, option: string): void {
+        this.wsService.sendQuestionResponse(q.id, option, index);
+        this.pendingQuestion.set(null);
+        if (this.questionTimeout) { clearTimeout(this.questionTimeout); this.questionTimeout = null; }
+    }
+
+    protected onQuestionAnswer(q: OwnerQuestionWire, answer: string): void {
+        if (!answer.trim()) return;
+        this.wsService.sendQuestionResponse(q.id, answer);
+        this.pendingQuestion.set(null);
+        if (this.questionTimeout) { clearTimeout(this.questionTimeout); this.questionTimeout = null; }
     }
 
     protected onSendMessage(content: string): void {

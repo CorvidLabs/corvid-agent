@@ -323,6 +323,8 @@ export type ScheduleActionType =
     | 'council_launch'
     | 'send_message'
     | 'github_suggest'
+    | 'codebase_review'
+    | 'dependency_audit'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
@@ -675,6 +677,10 @@ export interface WorkflowNodeRun {
     startedAt: string | null;
     completedAt: string | null;
 }
+
+// MARK: - Notifications (Multi-Channel)
+
+export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat';
 
 // MARK: - A2A Protocol (Agent-to-Agent Agent Card)
 

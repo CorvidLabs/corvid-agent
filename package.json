@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.4.0",
+  "version": "0.8.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",
@@ -43,6 +43,8 @@
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "algosdk": "^3.5.2",
     "croner": "^10.0.1",
+    "tree-sitter-wasms": "^0.1.12",
+    "web-tree-sitter": "^0.25.3",
     "zod": "^4.3.6"
   },
   "patchedDependencies": {

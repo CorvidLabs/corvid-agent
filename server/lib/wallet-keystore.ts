@@ -17,7 +17,10 @@ import { createLogger } from './logger';
 
 const log = createLogger('WalletKeystore');
 
-export const KEYSTORE_PATH = process.env.WALLET_KEYSTORE_PATH ?? './wallet-keystore.json';
+/** Resolve keystore path lazily so env overrides work even after module caching. */
+export function getKeystorePath(): string {
+    return process.env.WALLET_KEYSTORE_PATH ?? './wallet-keystore.json';
+}
 
 /** Required file mode: owner read/write only (0o600). */
 const REQUIRED_MODE = 0o600;
@@ -46,18 +49,19 @@ function verifyFilePermissions(): boolean {
 
     try {
         const fs = require('node:fs') as typeof import('node:fs');
-        const stat = fs.statSync(KEYSTORE_PATH);
+        const kpath = getKeystorePath();
+        const stat = fs.statSync(kpath);
         const mode = stat.mode & 0o777; // Extract permission bits
 
         if (mode !== REQUIRED_MODE) {
             log.warn('Keystore file has overly permissive permissions — fixing', {
-                path: KEYSTORE_PATH,
+                path: kpath,
                 currentMode: '0o' + mode.toString(8),
                 requiredMode: '0o' + REQUIRED_MODE.toString(8),
             });
             // Auto-fix: tighten permissions
             try {
-                fs.chmodSync(KEYSTORE_PATH, REQUIRED_MODE);
+                fs.chmodSync(kpath, REQUIRED_MODE);
                 log.info('Fixed keystore file permissions', { mode: '0o' + REQUIRED_MODE.toString(8) });
             } catch (chmodErr) {
                 log.error('Failed to fix keystore permissions — refusing to read', {
@@ -79,7 +83,7 @@ export function readKeystore(): KeystoreData {
             return {};
         }
         const fs = require('node:fs') as typeof import('node:fs');
-        const text = fs.readFileSync(KEYSTORE_PATH, 'utf-8');
+        const text = fs.readFileSync(getKeystorePath(), 'utf-8');
         const parsed = JSON.parse(text);
 
         // Basic schema validation: must be a plain object with string-keyed entries
@@ -113,7 +117,8 @@ export function readKeystore(): KeystoreData {
  * This prevents corruption if the process crashes mid-write.
  */
 function writeKeystore(data: KeystoreData): void {
-    const tmpPath = KEYSTORE_PATH + '.tmp';
+    const kpath = getKeystorePath();
+    const tmpPath = kpath + '.tmp';
     try {
         const fs = require('node:fs') as typeof import('node:fs');
         const content = JSON.stringify(data, null, 2);
@@ -123,17 +128,17 @@ function writeKeystore(data: KeystoreData): void {
         fs.writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: REQUIRED_MODE });
 
         // Atomic rename
-        fs.renameSync(tmpPath, KEYSTORE_PATH);
+        fs.renameSync(tmpPath, kpath);
 
         // Ensure final file has correct permissions (rename preserves source perms,
         // but belt-and-suspenders for cross-platform safety).
         // Skip on Windows where chmod is a no-op.
         if (!IS_WINDOWS) {
-            fs.chmodSync(KEYSTORE_PATH, REQUIRED_MODE);
+            fs.chmodSync(kpath, REQUIRED_MODE);
         }
     } catch (err) {
         log.error('Failed to write wallet keystore', {
-            path: KEYSTORE_PATH,
+            path: kpath,
             error: err instanceof Error ? err.message : String(err),
         });
         // Clean up temp file on failure

@@ -40,6 +40,10 @@ import {
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
 import { buildAgentCard } from './a2a/agent-card';
+import { AstParserService } from './ast/service';
+import { NotificationService } from './notifications/service';
+import { QuestionDispatcher } from './notifications/question-dispatcher';
+import { ResponsePollingService } from './notifications/response-poller';
 
 const log = createLogger('Server');
 
@@ -59,6 +63,12 @@ const db = getDb();
 // Empty catch is intentional: initObservability() logs warnings internally when
 // the OTLP endpoint is unavailable, so we silently swallow the rejection here.
 initObservability().catch(() => {});
+
+// Initialize AST parser service (non-critical — warn on failure)
+const astParserService = new AstParserService();
+astParserService.init().catch((err) => {
+    log.warn('AST parser service failed to initialize', { error: err instanceof Error ? err.message : String(err) });
+});
 
 // Initialize LLM provider registry
 const providerRegistry = LlmProviderRegistry.getInstance();
@@ -115,6 +125,13 @@ const mentionPollingService = new MentionPollingService(db, processManager, work
 
 // Initialize workflow service (graph-based orchestration)
 const workflowService = new WorkflowService(db, processManager, workTaskService);
+
+// Initialize notification service (multi-channel owner notifications)
+const notificationService = new NotificationService(db);
+
+// Initialize question dispatcher and response poller (two-way question channels)
+const questionDispatcher = new QuestionDispatcher(db);
+const responsePollingService = new ResponsePollingService(db, processManager.ownerQuestionManager);
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -179,6 +196,7 @@ async function initAlgoChat(): Promise<void> {
     agentDirectory = new AgentDirectory(db, agentWalletService);
     algochatBridge.setAgentDirectory(agentDirectory);
     algochatBridge.setApprovalManager(processManager.approvalManager);
+    algochatBridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
     algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, agentNetworkConfig, agentService, agentWalletService, agentDirectory, processManager);
     agentMessenger.setWorkTaskService(workTaskService);
@@ -188,7 +206,7 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService, workflowService);
+    }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -202,7 +220,7 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -440,6 +458,12 @@ const server = Bun.serve<WsData>({
     websocket: wsHandler,
 });
 
+// Wire broadcast function so MCP tools can publish to WS clients
+processManager.setBroadcast((topic, data) => server.publish(topic, data));
+
+// Wire notification service broadcast (publishes to 'owner' topic)
+notificationService.setBroadcast((msg) => server.publish('owner', JSON.stringify(msg)));
+
 // Broadcast council events to all WebSocket clients
 onCouncilStageChange((launchId, stage, sessionIds) => {
     const msg = JSON.stringify({ type: 'council_stage_change', launchId, stage, sessionIds });
@@ -527,13 +551,19 @@ initAlgoChat().then(() => {
     if (agentMessenger) {
         schedulerService.setAgentMessenger(agentMessenger);
         workflowService.setAgentMessenger(agentMessenger);
+        notificationService.setAgentMessenger(agentMessenger);
+        questionDispatcher.setAgentMessenger(agentMessenger);
     }
+    notificationService.start();
+    responsePollingService.start();
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
-    // Start scheduler, polling, and workflows even if AlgoChat fails — they can still do GitHub ops and work tasks
+    // Start scheduler, polling, workflows, and notifications even if AlgoChat fails — they can still do GitHub ops and work tasks
+    notificationService.start();
+    responsePollingService.start();
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
@@ -584,6 +614,8 @@ function logShutdownDiagnostics(signal: string): void {
 }
 
 function gracefulShutdown(): void {
+    responsePollingService.stop();
+    notificationService.stop();
     workflowService.stop();
     schedulerService.stop();
     mentionPollingService.stop();

@@ -18,6 +18,6 @@
       "@shared/*": ["./shared/*"]
     }
   },
-  "include": ["shared/**/*.ts", "server/**/*.ts"],
+  "include": ["shared/**/*.ts", "server/**/*.ts", "cli/**/*.ts"],
   "exclude": ["node_modules", "dist", "client"]
 }

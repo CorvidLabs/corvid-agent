@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 35;
+const SCHEMA_VERSION = 38;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -592,6 +592,85 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)`,
         `CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp)`,
         `CREATE INDEX IF NOT EXISTS idx_audit_log_trace_id ON audit_log(trace_id)`,
+    ],
+    36: [
+        // Owner questions — agent-to-owner communication (blocking questions + audit)
+        `CREATE TABLE IF NOT EXISTS owner_questions (
+            id           TEXT PRIMARY KEY,
+            session_id   TEXT NOT NULL,
+            agent_id     TEXT NOT NULL,
+            question     TEXT NOT NULL,
+            options      TEXT DEFAULT NULL,
+            context      TEXT DEFAULT NULL,
+            status       TEXT DEFAULT 'pending',
+            answer       TEXT DEFAULT NULL,
+            timeout_ms   INTEGER DEFAULT 120000,
+            created_at   TEXT DEFAULT (datetime('now')),
+            resolved_at  TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_owner_questions_session ON owner_questions(session_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_owner_questions_agent ON owner_questions(agent_id)`,
+    ],
+    37: [
+        // Per-agent notification channel configs (Discord, Telegram, GitHub, AlgoChat)
+        `CREATE TABLE IF NOT EXISTS notification_channels (
+            id           TEXT PRIMARY KEY,
+            agent_id     TEXT NOT NULL,
+            channel_type TEXT NOT NULL,
+            config       TEXT NOT NULL DEFAULT '{}',
+            enabled      INTEGER NOT NULL DEFAULT 1,
+            created_at   TEXT DEFAULT (datetime('now')),
+            updated_at   TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_channels_agent_type
+            ON notification_channels(agent_id, channel_type)`,
+
+        // Persistent notification log — never lost even if all channels fail
+        `CREATE TABLE IF NOT EXISTS owner_notifications (
+            id         TEXT PRIMARY KEY,
+            agent_id   TEXT NOT NULL,
+            session_id TEXT DEFAULT NULL,
+            title      TEXT DEFAULT NULL,
+            message    TEXT NOT NULL,
+            level      TEXT NOT NULL DEFAULT 'info',
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_owner_notifications_agent
+            ON owner_notifications(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_owner_notifications_created
+            ON owner_notifications(created_at)`,
+
+        // Per-channel delivery tracking with retry support
+        `CREATE TABLE IF NOT EXISTS notification_deliveries (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            notification_id TEXT NOT NULL REFERENCES owner_notifications(id) ON DELETE CASCADE,
+            channel_type    TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            attempts        INTEGER NOT NULL DEFAULT 0,
+            last_attempt_at TEXT DEFAULT NULL,
+            error           TEXT DEFAULT NULL,
+            external_ref    TEXT DEFAULT NULL,
+            created_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_notification
+            ON notification_deliveries(notification_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_notification_deliveries_status
+            ON notification_deliveries(status)`,
+    ],
+    38: [
+        // Question dispatch tracking — where each owner question was sent
+        `CREATE TABLE IF NOT EXISTS owner_question_dispatches (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            question_id     TEXT NOT NULL,
+            channel_type    TEXT NOT NULL,
+            external_ref    TEXT,
+            status          TEXT NOT NULL DEFAULT 'sent',
+            created_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_question_dispatches_question
+            ON owner_question_dispatches(question_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_question_dispatches_status
+            ON owner_question_dispatches(status)`,
     ],
 };
 

@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -30,6 +30,9 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_github_comment_on_pr',
     'corvid_github_follow_user',
     'corvid_manage_workflow',
+    'corvid_notify_owner',
+    'corvid_ask_owner',
+    'corvid_configure_notifications',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -44,6 +47,7 @@ const SCHEDULER_BLOCKED_TOOLS = new Set([
     'corvid_github_create_pr',
     'corvid_github_create_issue',
     'corvid_github_comment_on_pr',
+    'corvid_ask_owner',
 ]);
 
 export function createCorvidMcpServer(ctx: McpToolContext) {
@@ -145,7 +149,7 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
         tool(
             'corvid_manage_schedule',
             'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
-            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, custom. ' +
+            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, custom. ' +
             'Use action="list" to view schedules, "create" to make one, "pause"/"resume" to control, "history" for logs.',
             {
                 action: z.enum(['list', 'create', 'pause', 'resume', 'history']).describe('What to do'),
@@ -154,7 +158,7 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create)'),
                 interval_minutes: z.number().optional().describe('Run every N minutes as alternative to cron (for create)'),
                 schedule_actions: z.array(z.object({
-                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, custom'),
+                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, codebase_review, dependency_audit, custom'),
                     repos: z.array(z.string()).optional().describe('Target repo(s) in owner/name format'),
                     description: z.string().optional().describe('Work task description'),
                     project_id: z.string().optional().describe('Project ID'),
@@ -230,6 +234,47 @@ export function createCorvidMcpServer(ctx: McpToolContext) {
                 url: z.string().describe('Base URL of the remote agent (e.g. "https://agent.example.com")'),
             },
             async (args) => handleDiscoverAgent(ctx, args),
+        ),
+        // ─── Owner communication tools ───────────────────────────────────
+        tool(
+            'corvid_notify_owner',
+            'Send a notification to the server owner/operator watching the dashboard. ' +
+            'Use this for status updates, warnings, completion reports, or any non-blocking communication. ' +
+            'The owner sees the notification in real-time but does not need to respond.',
+            {
+                title: z.string().optional().describe('Short notification title (optional)'),
+                message: z.string().describe('The notification message'),
+                level: z.enum(['info', 'warning', 'success', 'error']).optional().describe('Notification level (default "info")'),
+            },
+            async (args) => handleNotifyOwner(ctx, args),
+        ),
+        tool(
+            'corvid_ask_owner',
+            'Ask the server owner/operator a question and WAIT for their response. ' +
+            'This blocks your execution until the owner responds or the timeout expires. ' +
+            'Use this when you need human input, clarification, or a decision before proceeding. ' +
+            'Provide options when the question has a fixed set of choices.',
+            {
+                question: z.string().describe('The question to ask the owner'),
+                options: z.array(z.string()).optional().describe('Predefined answer options (if applicable)'),
+                context: z.string().optional().describe('Additional context to help the owner understand the question'),
+                timeout_minutes: z.number().optional().describe('How long to wait for a response (1-10 minutes, default 2)'),
+            },
+            async (args) => handleAskOwner(ctx, args),
+        ),
+        tool(
+            'corvid_configure_notifications',
+            'Manage notification channels for this agent. Channels control where corvid_notify_owner sends messages. ' +
+            'Supported channel types: discord (webhook), telegram (bot), github (issues), algochat (on-chain). ' +
+            'WebSocket is always active. Use action="list" to view, "set" to configure, "enable"/"disable" to toggle, "remove" to delete.',
+            {
+                action: z.enum(['list', 'set', 'enable', 'disable', 'remove']).describe('What to do'),
+                channel_type: z.string().optional().describe('Channel type: discord, telegram, github, or algochat'),
+                config: z.record(z.string(), z.unknown()).optional().describe(
+                    'Channel configuration. Discord: {webhookUrl}. Telegram: {botToken, chatId}. GitHub: {repo, labels?}. AlgoChat: {toAddress}.',
+                ),
+            },
+            async (args) => handleConfigureNotifications(ctx, args),
         ),
         // ─── GitHub tools ────────────────────────────────────────────────
         tool(

@@ -259,7 +259,7 @@ export const OllamaDeleteModelSchema = z.object({
 // ─── Schedules ───────────────────────────────────────────────────────────────
 
 const ScheduleActionSchema = z.object({
-    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'custom']),
+    type: z.enum(['star_repo', 'fork_repo', 'review_prs', 'work_task', 'council_launch', 'send_message', 'github_suggest', 'codebase_review', 'dependency_audit', 'custom']),
     repos: z.array(z.string()).optional(),
     description: z.string().optional(),
     projectId: z.string().optional(),

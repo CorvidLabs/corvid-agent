@@ -5,6 +5,7 @@ import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
 import { startDirectProcess } from './direct-process';
 import { ApprovalManager } from './approval-manager';
+import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
 import { getAgent } from '../db/agents';
@@ -17,6 +18,8 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
 import type { WorkflowService } from '../workflow/service';
+import type { NotificationService } from '../notifications/service';
+import type { QuestionDispatcher } from '../notifications/question-dispatcher';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -84,6 +87,8 @@ export class ProcessManager {
     private autoResumeTimer: ReturnType<typeof setInterval> | null = null;
     private orphanPruneTimer: ReturnType<typeof setInterval> | null = null;
     readonly approvalManager: ApprovalManager;
+    readonly ownerQuestionManager: OwnerQuestionManager;
+    private broadcastFn: ((topic: string, data: string) => void) | null = null;
 
     // Owner check — injected by AlgoChatBridge so credit deduction can be skipped for owners
     private isOwnerAddress: ((address: string) => boolean) | null = null;
@@ -96,15 +101,24 @@ export class ProcessManager {
     private mcpWorkTaskService: WorkTaskService | null = null;
     private mcpSchedulerService: SchedulerService | null = null;
     private mcpWorkflowService: WorkflowService | null = null;
+    private mcpNotificationService: NotificationService | null = null;
+    private mcpQuestionDispatcher: QuestionDispatcher | null = null;
 
     constructor(db: Database) {
         this.db = db;
         this.approvalManager = new ApprovalManager();
         this.approvalManager.setDatabase(db);
+        this.ownerQuestionManager = new OwnerQuestionManager();
+        this.ownerQuestionManager.setDatabase(db);
         this.cleanupStaleSessions();
         this.startTimeoutChecker();
         this.startAutoResumeChecker();
         this.startOrphanPruner();
+    }
+
+    /** Set the broadcast function so MCP tools can publish to WS clients. */
+    setBroadcast(fn: (topic: string, data: string) => void): void {
+        this.broadcastFn = fn;
     }
 
     /** Set the owner check function so credit deduction can be skipped for owners. */
@@ -121,6 +135,8 @@ export class ProcessManager {
         workTaskService?: WorkTaskService,
         schedulerService?: SchedulerService,
         workflowService?: WorkflowService,
+        notificationService?: NotificationService,
+        questionDispatcher?: QuestionDispatcher,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
@@ -129,6 +145,8 @@ export class ProcessManager {
         this.mcpWorkTaskService = workTaskService ?? null;
         this.mcpSchedulerService = schedulerService ?? null;
         this.mcpWorkflowService = workflowService ?? null;
+        this.mcpNotificationService = notificationService ?? null;
+        this.mcpQuestionDispatcher = questionDispatcher ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -155,6 +173,13 @@ export class ProcessManager {
             extendTimeout: sessionId
                 ? (additionalMs: number) => this.extendTimeout(sessionId, additionalMs)
                 : undefined,
+            broadcastOwnerMessage: this.broadcastFn
+                ? (message: unknown) => this.broadcastFn!('owner', JSON.stringify(message))
+                : undefined,
+            ownerQuestionManager: this.ownerQuestionManager,
+            sessionId,
+            notificationService: this.mcpNotificationService ?? undefined,
+            questionDispatcher: this.mcpQuestionDispatcher ?? undefined,
         };
     }
 
@@ -502,6 +527,7 @@ export class ProcessManager {
         this.clearStableTimer(sessionId);
         this.clearSessionTimeout(sessionId);
         this.approvalManager.cancelSession(sessionId);
+        this.ownerQuestionManager.cancelSession(sessionId);
     }
 
     /**
@@ -589,6 +615,7 @@ export class ProcessManager {
             this.orphanPruneTimer = null;
         }
         this.approvalManager.shutdown();
+        this.ownerQuestionManager.shutdown();
 
         // Kill all running processes first (stopProcess also calls cleanupSessionState)
         for (const [sessionId] of this.processes) {

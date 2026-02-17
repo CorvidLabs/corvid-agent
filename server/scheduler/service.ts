@@ -309,6 +309,8 @@ export class SchedulerService {
             'work_task',
             'github_suggest',
             'fork_repo',
+            'codebase_review',
+            'dependency_audit',
         ];
 
         if (schedule.approvalPolicy === 'owner_approve') {
@@ -344,6 +346,12 @@ export class SchedulerService {
                     break;
                 case 'github_suggest':
                     await this.execGithubSuggest(executionId, schedule, action);
+                    break;
+                case 'codebase_review':
+                    await this.execCodebaseReview(executionId, schedule, action);
+                    break;
+                case 'dependency_audit':
+                    await this.execDependencyAudit(executionId, schedule, action);
                     break;
                 case 'custom':
                     await this.execCustom(executionId, schedule, action);
@@ -635,6 +643,89 @@ export class SchedulerService {
 
         updateExecutionStatus(this.db, executionId, 'completed', {
             result: `Analysis session started: ${session.id}`,
+            sessionId: session.id,
+        });
+    }
+
+    private async execCodebaseReview(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
+            return;
+        }
+
+        const projectId = action.projectId ?? agent.defaultProjectId;
+        if (!projectId) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No project configured for agent' });
+            return;
+        }
+
+        const prompt = `You are performing an automated codebase review.\n\n` +
+            `## Instructions\n` +
+            `1. Run \`bunx tsc --noEmit 2>&1\` and collect any TypeScript errors.\n` +
+            `2. Run \`bun test 2>&1 | tail -50\` and collect any test failures.\n` +
+            `3. Search for TODO, FIXME, and HACK comments in the source code.\n` +
+            `4. Identify files over 500 lines that may need refactoring.\n` +
+            `5. Prioritize findings by severity (type errors > test failures > code smells).\n` +
+            `6. Create 1-3 work tasks via corvid_create_work_task for the most impactful fixes.\n` +
+            `7. Use corvid_notify_owner to report a summary of findings and created tasks.\n\n` +
+            `${action.description ? `Context: ${action.description}\n\n` : ''}` +
+            `Focus on actionable improvements. Quality over quantity.`;
+
+        const session = createSession(this.db, {
+            projectId,
+            agentId: schedule.agentId,
+            name: `Scheduled Codebase Review`,
+            initialPrompt: prompt,
+            source: 'agent',
+        });
+
+        updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
+        this.processManager.startProcess(session, prompt, { schedulerMode: true });
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: `Codebase review session started: ${session.id}`,
+            sessionId: session.id,
+        });
+    }
+
+    private async execDependencyAudit(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
+        const agent = getAgent(this.db, schedule.agentId);
+        if (!agent) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
+            return;
+        }
+
+        const projectId = action.projectId ?? agent.defaultProjectId;
+        if (!projectId) {
+            updateExecutionStatus(this.db, executionId, 'failed', { result: 'No project configured for agent' });
+            return;
+        }
+
+        const prompt = `You are performing an automated dependency audit.\n\n` +
+            `## Instructions\n` +
+            `1. Check for outdated dependencies: \`bun outdated 2>&1\` (or \`npm outdated 2>&1\` as fallback).\n` +
+            `2. Check for known vulnerabilities: \`bun audit 2>&1\` (or \`npm audit 2>&1\` as fallback).\n` +
+            `3. Review \`package.json\` for pinning issues (exact versions vs ranges).\n` +
+            `4. Identify any deprecated or unmaintained packages.\n` +
+            `5. Create work tasks via corvid_create_work_task for critical updates (security vulnerabilities, major version bumps).\n` +
+            `6. Use corvid_notify_owner to report a summary of findings and recommendations.\n\n` +
+            `${action.description ? `Context: ${action.description}\n\n` : ''}` +
+            `Prioritize security fixes over feature updates.`;
+
+        const session = createSession(this.db, {
+            projectId,
+            agentId: schedule.agentId,
+            name: `Scheduled Dependency Audit`,
+            initialPrompt: prompt,
+            source: 'agent',
+        });
+
+        updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
+        this.processManager.startProcess(session, prompt, { schedulerMode: true });
+
+        updateExecutionStatus(this.db, executionId, 'completed', {
+            result: `Dependency audit session started: ${session.id}`,
             sessionId: session.id,
         });
     }

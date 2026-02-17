@@ -695,7 +695,7 @@
   <section class="section" id="mcp-tools">
     <div class="container">
       <h2 class="section__title">MCP Tools</h2>
-      <p class="section__subtitle">Tools available to agents via the <a href="https://modelcontextprotocol.io" class="accent-green">Model Context Protocol</a>. 7 default + 2 privileged.</p>
+      <p class="section__subtitle">Tools available to agents via the <a href="https://modelcontextprotocol.io" class="accent-green">Model Context Protocol</a>. 10 default + 2 privileged.</p>
 
       <div class="grid grid--2">
         <div class="card card--cyan">
@@ -748,6 +748,30 @@
           <p>Spawn a new agent on a dedicated branch. Implements changes, validates, and opens a PR.</p>
           <div class="card__params">
             <span class="param">description</span> <span class="param param--opt">project_id</span>
+          </div>
+        </div>
+
+        <div class="card card--cyan">
+          <h3 class="card__title">corvid_notify_owner</h3>
+          <p>Send a notification to the agent owner via configured channels (Discord, Telegram, GitHub, AlgoChat).</p>
+          <div class="card__params">
+            <span class="param">message</span> <span class="param param--opt">channels</span> <span class="param param--opt">priority</span>
+          </div>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">corvid_ask_owner</h3>
+          <p>Ask the owner a question and wait for a response. Dispatches to all configured channels with response polling.</p>
+          <div class="card__params">
+            <span class="param">question</span> <span class="param param--opt">options</span> <span class="param param--opt">timeout</span>
+          </div>
+        </div>
+
+        <div class="card card--green">
+          <h3 class="card__title">corvid_configure_notifications</h3>
+          <p>View or update notification channel configuration for an agent. Supports Discord, Telegram, GitHub, and AlgoChat.</p>
+          <div class="card__params">
+            <span class="param param--opt">channels</span> <span class="param param--opt">action</span>
           </div>
         </div>
 
