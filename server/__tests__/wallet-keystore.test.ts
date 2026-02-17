@@ -21,7 +21,7 @@ const {
     getKeystoreEntry,
     saveKeystoreEntry,
     removeKeystoreEntry,
-    KEYSTORE_PATH,
+    getKeystorePath,
 } = await import('../lib/wallet-keystore');
 
 function cleanup(): void {
@@ -35,7 +35,7 @@ describe('wallet-keystore', () => {
     afterEach(cleanup);
 
     it('uses the overridden keystore path', () => {
-        expect(KEYSTORE_PATH).toBe(TEST_KEYSTORE_PATH);
+        expect(getKeystorePath()).toBe(TEST_KEYSTORE_PATH);
     });
 
     it('returns empty data when file does not exist', () => {
