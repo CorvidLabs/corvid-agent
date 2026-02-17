@@ -52,6 +52,8 @@ import { ReputationAttestation } from './reputation/attestation';
 import { ReputationVerifier } from './reputation/verifier';
 import { MemoryManager } from './memory/index';
 import { AutonomousLoopService } from './improvement/service';
+import { TelegramBridge } from './telegram/bridge';
+import { DiscordBridge } from './discord/bridge';
 import { TenantService } from './tenant/context';
 import { BillingService } from './billing/service';
 import { UsageMeter } from './billing/meter';
@@ -179,6 +181,29 @@ new TenantService(db, multiTenant);
 // Initialize billing
 const billingService = new BillingService(db);
 const usageMeter = new UsageMeter(db, billingService);
+
+// Initialize bidirectional Telegram bridge (opt-in via env vars)
+let telegramBridge: TelegramBridge | null = null;
+if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+    telegramBridge = new TelegramBridge(db, processManager, {
+        botToken: process.env.TELEGRAM_BOT_TOKEN,
+        chatId: process.env.TELEGRAM_CHAT_ID,
+        allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    });
+    telegramBridge.start();
+    log.info('Telegram bridge initialized');
+}
+
+// Initialize bidirectional Discord bridge (opt-in via env vars)
+let discordBridge: DiscordBridge | null = null;
+if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
+    discordBridge = new DiscordBridge(db, processManager, {
+        botToken: process.env.DISCORD_BOT_TOKEN,
+        channelId: process.env.DISCORD_CHANNEL_ID,
+    });
+    discordBridge.start();
+    log.info('Discord bridge initialized');
+}
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -674,6 +699,8 @@ function gracefulShutdown(): void {
     usageMeter.stop();
     marketplaceFederation.stopPeriodicSync();
     if (sandboxManager) sandboxManager.shutdown();
+    telegramBridge?.stop();
+    discordBridge?.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();

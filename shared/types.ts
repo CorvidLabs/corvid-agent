@@ -26,6 +26,8 @@ export interface Agent {
     customFlags: Record<string, string>;
     defaultProjectId: string | null;
     mcpToolPermissions: string[] | null;
+    voiceEnabled: boolean;
+    voicePreset: VoicePreset;
     walletAddress: string | null;
     walletFundedAlgo: number;
     createdAt: string;
@@ -33,7 +35,7 @@ export interface Agent {
 }
 
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'stopped' | 'error';
-export type SessionSource = 'web' | 'algochat' | 'agent';
+export type SessionSource = 'web' | 'algochat' | 'agent' | 'telegram' | 'discord';
 
 export interface Session {
     id: string;
@@ -116,6 +118,8 @@ export interface CreateAgentInput {
     customFlags?: Record<string, string>;
     defaultProjectId?: string | null;
     mcpToolPermissions?: string[] | null;
+    voiceEnabled?: boolean;
+    voicePreset?: VoicePreset;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
@@ -688,6 +692,66 @@ export interface WorkflowNodeRun {
 // MARK: - Notifications (Multi-Channel)
 
 export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat' | 'whatsapp' | 'signal';
+
+// MARK: - Voice
+
+export type VoicePreset = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+
+// MARK: - Agent Personas
+
+export type PersonaArchetype = 'custom' | 'professional' | 'friendly' | 'technical' | 'creative' | 'formal';
+
+export interface AgentPersona {
+    agentId: string;
+    archetype: PersonaArchetype;
+    traits: string[];
+    voiceGuidelines: string;
+    background: string;
+    exampleMessages: string[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UpsertPersonaInput {
+    archetype?: PersonaArchetype;
+    traits?: string[];
+    voiceGuidelines?: string;
+    background?: string;
+    exampleMessages?: string[];
+}
+
+// MARK: - Skill Bundles
+
+export interface SkillBundle {
+    id: string;
+    name: string;
+    description: string;
+    tools: string[];
+    promptAdditions: string;
+    preset: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSkillBundleInput {
+    name: string;
+    description?: string;
+    tools?: string[];
+    promptAdditions?: string;
+}
+
+export interface UpdateSkillBundleInput {
+    name?: string;
+    description?: string;
+    tools?: string[];
+    promptAdditions?: string;
+}
+
+export interface AgentSkillAssignment {
+    agentId: string;
+    bundleId: string;
+    sortOrder: number;
+}
 
 // MARK: - A2A Protocol (Agent-to-Agent Agent Card)
 

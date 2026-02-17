@@ -96,6 +96,10 @@ export interface SdkProcessOptions {
     onApprovalRequest: (request: ApprovalRequestWire) => void;
     onApiOutage?: () => void;
     mcpServers?: McpSdkServerConfigWithInstance[];
+    /** Persona system prompt section (from agent_personas table) */
+    personaPrompt?: string;
+    /** Skill bundle prompt additions (from assigned skill_bundles) */
+    skillPrompt?: string;
 }
 
 export interface SdkProcess {
@@ -118,6 +122,8 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         onApprovalRequest,
         onApiOutage,
         mcpServers,
+        personaPrompt,
+        skillPrompt,
     } = options;
 
     const abortController = new AbortController();
@@ -225,22 +231,30 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         sdkOptions.model = agent.model;
     }
 
-    if (agent?.systemPrompt) {
-        if (agent.appendPrompt) {
+    // Build combined append content from agent config + persona + skills
+    const appendParts: string[] = [];
+    if (agent?.systemPrompt) appendParts.push(agent.systemPrompt);
+    if (agent?.appendPrompt) appendParts.push(agent.appendPrompt);
+    if (personaPrompt) appendParts.push(personaPrompt);
+    if (skillPrompt) appendParts.push(`## Skill Instructions\n${skillPrompt}`);
+
+    if (appendParts.length > 0) {
+        const combinedAppend = appendParts.join('\n\n');
+        if (agent?.systemPrompt) {
+            // Agent has a full system prompt — use preset+append pattern
             sdkOptions.systemPrompt = {
                 type: 'preset',
                 preset: 'claude_code',
-                append: `${agent.systemPrompt}\n\n${agent.appendPrompt}`,
+                append: combinedAppend,
             };
         } else {
-            sdkOptions.systemPrompt = agent.systemPrompt;
+            // Only append content (no full override) — append to claude_code preset
+            sdkOptions.systemPrompt = {
+                type: 'preset',
+                preset: 'claude_code',
+                append: combinedAppend,
+            };
         }
-    } else if (agent?.appendPrompt) {
-        sdkOptions.systemPrompt = {
-            type: 'preset',
-            preset: 'claude_code',
-            append: agent.appendPrompt,
-        };
     }
 
     // NOTE: In the SDK, allowedTools means "auto-approve these tools without calling

@@ -26,6 +26,8 @@ import type { ReputationVerifier } from '../reputation/verifier';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
+import { getPersona, composePersonaPrompt } from '../db/personas';
+import { resolveAgentPromptAdditions } from '../db/skill-bundles';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
@@ -263,6 +265,18 @@ export class ProcessManager {
             })()
             : undefined;
 
+        // Resolve persona and skill bundle prompts for this agent
+        let personaPrompt: string | undefined;
+        let skillPrompt: string | undefined;
+        if (agent) {
+            const persona = getPersona(this.db, agent.id);
+            const pp = composePersonaPrompt(persona);
+            if (pp) personaPrompt = pp;
+
+            const sp2 = resolveAgentPromptAdditions(this.db, agent.id);
+            if (sp2) skillPrompt = sp2;
+        }
+
         let sp: SdkProcess;
         try {
             sp = startSdkProcess({
@@ -276,6 +290,8 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 onApiOutage: () => this.handleApiOutage(session.id),
                 mcpServers,
+                personaPrompt,
+                skillPrompt,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -308,6 +324,18 @@ export class ProcessManager {
             ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode)
             : null;
 
+        // Resolve persona and skill bundle prompts for this agent
+        let personaPrompt: string | undefined;
+        let skillPrompt: string | undefined;
+        if (agent) {
+            const persona = getPersona(this.db, agent.id);
+            const pp = composePersonaPrompt(persona);
+            if (pp) personaPrompt = pp;
+
+            const sp2 = resolveAgentPromptAdditions(this.db, agent.id);
+            if (sp2) skillPrompt = sp2;
+        }
+
         let sp: SdkProcess;
         try {
             sp = startDirectProcess({
@@ -322,6 +350,8 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 mcpToolContext,
                 extendTimeout: (ms) => this.extendTimeout(session.id, ms),
+                personaPrompt,
+                skillPrompt,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);

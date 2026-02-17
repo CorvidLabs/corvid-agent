@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 44;
+const SCHEMA_VERSION = 47;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -879,6 +879,65 @@ const MIGRATIONS: Record<number, string[]> = {
 
         // Memory archival support — archived memories are excluded from search
         `ALTER TABLE agent_memories ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`,
+    ],
+    45: [
+        // Agent personas — personality and identity for agents
+        `CREATE TABLE IF NOT EXISTS agent_personas (
+            agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+            archetype TEXT DEFAULT 'custom',
+            traits TEXT NOT NULL DEFAULT '[]',
+            voice_guidelines TEXT DEFAULT '',
+            background TEXT DEFAULT '',
+            example_messages TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+    ],
+    46: [
+        // Skill bundles — composable tool + prompt packages
+        `CREATE TABLE IF NOT EXISTS skill_bundles (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT DEFAULT '',
+            tools TEXT NOT NULL DEFAULT '[]',
+            prompt_additions TEXT DEFAULT '',
+            preset INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE TABLE IF NOT EXISTS agent_skills (
+            agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            bundle_id TEXT NOT NULL REFERENCES skill_bundles(id) ON DELETE CASCADE,
+            sort_order INTEGER DEFAULT 0,
+            PRIMARY KEY (agent_id, bundle_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
+        // Preset skill bundles
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-code-reviewer', 'Code Reviewer', 'Review pull requests and provide feedback', '["corvid_github_list_prs","corvid_github_review_pr","corvid_github_get_pr_diff","corvid_github_comment_on_pr"]', 'You are an expert code reviewer. Focus on code quality, security, performance, and maintainability. Provide specific, actionable feedback.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-devops', 'DevOps', 'Infrastructure and deployment automation', '["corvid_create_work_task","corvid_github_create_pr","corvid_github_fork_repo"]', 'You specialize in DevOps practices. Focus on CI/CD, infrastructure-as-code, monitoring, and deployment automation.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-researcher', 'Researcher', 'Deep research and information gathering', '["corvid_web_search","corvid_deep_research","corvid_save_memory","corvid_recall_memory"]', 'You are a thorough researcher. Gather comprehensive information, cross-reference sources, and synthesize findings into clear summaries.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-communicator', 'Communicator', 'Inter-agent and external communication', '["corvid_send_message","corvid_list_agents","corvid_discover_agent","corvid_invoke_remote_agent"]', 'You excel at communication and coordination. Draft clear messages, manage conversations, and facilitate collaboration between agents.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-analyst', 'Analyst', 'Code analysis and health monitoring', '["corvid_check_health_trends","corvid_check_reputation","corvid_github_repo_info","corvid_github_list_issues"]', 'You are a data-driven analyst. Examine metrics, identify trends, and provide actionable insights from codebase health and project data.', 1)`,
+    ],
+    47: [
+        // Voice support — TTS/STT for agent communication
+        `ALTER TABLE agents ADD COLUMN voice_enabled INTEGER DEFAULT 0`,
+        `ALTER TABLE agents ADD COLUMN voice_preset TEXT DEFAULT 'alloy'`,
+        `CREATE TABLE IF NOT EXISTS voice_cache (
+            id TEXT PRIMARY KEY,
+            text_hash TEXT NOT NULL,
+            voice_preset TEXT NOT NULL,
+            audio_data BLOB NOT NULL,
+            format TEXT DEFAULT 'mp3',
+            duration_ms INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_cache_hash ON voice_cache(text_hash, voice_preset)`,
     ],
 };
 

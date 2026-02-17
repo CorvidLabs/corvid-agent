@@ -7,12 +7,15 @@
  * Skills are auto-generated from registered MCP tools in sdk-tools.ts.
  */
 
+import type { Database } from 'bun:sqlite';
 import type {
     A2AAgentCard,
     A2AAgentSkill,
     A2AProtocolExtension,
     Agent,
 } from '../../shared/types';
+import { getPersona } from '../db/personas';
+import { getAgentBundles } from '../db/skill-bundles';
 
 // Package version is read once at module load time
 const PKG_VERSION = (() => {
@@ -231,6 +234,7 @@ export function buildAgentCard(baseUrl?: string): A2AAgentCard {
 export function buildAgentCardForAgent(
     agent: Agent,
     baseUrl?: string,
+    db?: Database,
 ): A2AAgentCard {
     const port = parseInt(process.env.PORT ?? '3000', 10);
     const host = process.env.BIND_HOST || '127.0.0.1';
@@ -242,9 +246,22 @@ export function buildAgentCardForAgent(
         .filter((name) => TOOL_DESCRIPTIONS[name] || TOOL_TAG_MAP[name])
         .map(toolToSkill);
 
+    // Enrich description with persona and skills if db is provided
+    let enrichedDescription = agent.description || 'CorvidAgent instance';
+    if (db) {
+        const persona = getPersona(db, agent.id);
+        if (persona && persona.archetype !== 'custom') {
+            enrichedDescription += ` | Archetype: ${persona.archetype}`;
+        }
+        const bundles = getAgentBundles(db, agent.id);
+        if (bundles.length > 0) {
+            enrichedDescription += ` | Skills: ${bundles.map(b => b.name).join(', ')}`;
+        }
+    }
+
     return {
         name: agent.name,
-        description: agent.description || 'CorvidAgent instance',
+        description: enrichedDescription,
         url: `${url}/api/agents/${agent.id}`,
         provider: {
             organization: 'CorvidLabs',

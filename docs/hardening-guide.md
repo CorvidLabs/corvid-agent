@@ -52,6 +52,26 @@
 - [ ] Set up alerting for failed notification deliveries
 - [ ] Monitor for unusual notification volume
 
+### Telegram Bridge
+
+- [ ] Set `TELEGRAM_ALLOWED_USER_IDS` to restrict access to authorized users
+- [ ] Do NOT leave `TELEGRAM_ALLOWED_USER_IDS` empty in production (allows all users)
+- [ ] Use a dedicated bot token (not shared with other services)
+- [ ] Monitor for unauthorized access attempts in logs (`[TelegramBridge]`)
+
+### Discord Bridge
+
+- [ ] Use a bot with minimal permissions (only MESSAGE_CONTENT intent)
+- [ ] Restrict `DISCORD_CHANNEL_ID` to a dedicated channel (not a public channel)
+- [ ] Use a dedicated bot token separate from notification webhooks
+- [ ] Monitor reconnection frequency for gateway abuse
+
+### Voice (TTS/STT)
+
+- [ ] Monitor OpenAI API costs — TTS/STT calls are pay-per-use
+- [ ] Review voice cache growth (`voice_cache` table stores audio BLOBs)
+- [ ] Consider periodic cache cleanup for disk space management
+
 ### Monitoring & Logging
 
 - [ ] Set `LOG_LEVEL=info` (not `debug` in production)
