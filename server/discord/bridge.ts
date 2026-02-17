@@ -20,25 +20,6 @@ const GATEWAY_URL = 'wss://gateway.discord.gg/?v=10&encoding=json';
 const MAX_MESSAGE_LENGTH = 2000;
 
 /**
- * Validate a resume gateway URL from Discord, returning a safe URL string.
- * Constructs a new URL from validated parts to break taint propagation.
- * Returns the default GATEWAY_URL if the resume URL is invalid.
- */
-function sanitizeGatewayUrl(resumeUrl?: string): string {
-    if (!resumeUrl) return GATEWAY_URL;
-    try {
-        const parsed = new URL(resumeUrl);
-        if (parsed.protocol !== 'wss:' || !parsed.hostname.endsWith('.discord.gg')) {
-            return GATEWAY_URL;
-        }
-        // Reconstruct from validated parts — not the original tainted string
-        return `wss://${parsed.hostname}${parsed.pathname}${parsed.search}`;
-    } catch {
-        return GATEWAY_URL;
-    }
-}
-
-/**
  * Bidirectional Discord bridge using raw WebSocket gateway.
  * No external Discord library dependencies.
  */
@@ -52,7 +33,8 @@ export class DiscordBridge {
     private heartbeatAcked = true;
     private sequence: number | null = null;
     private sessionId: string | null = null;
-    private resumeGatewayUrl: string | null = null;
+    // Note: resume_gateway_url from Discord READY is intentionally not stored
+    // to avoid SSRF risk. We always reconnect via the hardcoded gateway URL.
     private running = false;
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 10;
@@ -91,14 +73,12 @@ export class DiscordBridge {
         log.info('Discord bridge stopped');
     }
 
-    private connect(resumeUrl?: string): void {
-        // Validate and reconstruct resume URL to prevent SSRF.
-        // We parse the untrusted URL, validate each component, then build a new
-        // string from the validated parts — this breaks CodeQL's taint chain.
-        const url = sanitizeGatewayUrl(resumeUrl);
-        log.info('Connecting to Discord gateway', { url: url.replace(/\?.*/, '') });
+    private connect(): void {
+        // Always use the hardcoded gateway URL to prevent SSRF.
+        // Discord handles re-identification when we don't use the resume URL.
+        log.info('Connecting to Discord gateway');
 
-        this.ws = new WebSocket(url);
+        this.ws = new WebSocket(GATEWAY_URL);
 
         this.ws.onopen = () => {
             log.info('Discord gateway connected');
@@ -186,7 +166,7 @@ export class DiscordBridge {
             case 'READY': {
                 const data = payload.d as DiscordReadyData;
                 this.sessionId = data.session_id;
-                this.resumeGatewayUrl = data.resume_gateway_url;
+                // resume_gateway_url intentionally not stored (SSRF prevention)
                 log.info('Discord gateway ready', { sessionId: this.sessionId });
                 break;
             }
@@ -288,7 +268,7 @@ export class DiscordBridge {
 
         setTimeout(() => {
             if (this.running) {
-                this.connect(this.resumeGatewayUrl ?? undefined);
+                this.connect();
             }
         }, delay);
     }
