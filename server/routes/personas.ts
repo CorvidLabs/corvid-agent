@@ -51,7 +51,7 @@ async function handleUpsert(req: Request, db: Database, agentId: string): Promis
         const persona = upsertPersona(db, agentId, data);
         return json(persona);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }

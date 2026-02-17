@@ -41,7 +41,7 @@ import { encryptMemoryContent } from '../lib/crypto';
 import { loadAlgoChatConfig } from '../algochat/config';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
-import { json, serverError, handleRouteError, safeNumParam } from '../lib/response';
+import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { checkHttpAuth, buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
 import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
 import type { SandboxManager } from '../sandbox/manager';
@@ -69,12 +69,14 @@ const log = createLogger('Router');
  * and returns a proper JSON 500 response instead of crashing the server.
  */
 function errorResponse(err: unknown): Response {
-    const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
-
-    log.error('Unhandled route error', { error: message, stack });
-
-    return serverError(err);
+    // Log full error details server-side — never expose to client
+    if (err instanceof Error) {
+        log.error('Unhandled route error', { error: err.message, stack: err.stack });
+    } else {
+        log.error('Unhandled route error', { error: String(err) });
+    }
+    // Return a generic 500 — serverError() never includes error details in response
+    return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
 }
 
 export type NetworkSwitchFn = (network: 'testnet' | 'mainnet') => Promise<void>;
@@ -532,7 +534,7 @@ async function handleEscalationResolve(
         }
         return json({ error: `Escalation #${queueId} not found or already resolved` }, 404);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -547,7 +549,7 @@ async function handleSetOperationalMode(
         processManager.approvalManager.operationalMode = data.mode;
         return json({ ok: true, mode: data.mode });
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -595,7 +597,7 @@ async function handleMemoryBackfill(
                 key: row.key,
                 agentId: row.agent_id,
                 txid: null,
-                error: err instanceof Error ? err.message : String(err),
+                error: 'Failed to publish memory',
             });
         }
     }

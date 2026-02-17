@@ -38,9 +38,8 @@ export async function handleA2ARoutes(
 
             return json(task);
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error('A2A tasks/send failed', { error: message });
-            return badRequest(message);
+            log.error('A2A tasks/send failed', { error: err instanceof Error ? err.message : String(err) });
+            return badRequest('Failed to send A2A task');
         }
     }
 

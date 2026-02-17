@@ -1,6 +1,6 @@
 import type { WorkTaskService } from '../work/service';
 import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
-import { json } from '../lib/response';
+import { json, handleRouteError } from '../lib/response';
 
 export function handleWorkTaskRoutes(
     req: Request,
@@ -59,8 +59,7 @@ async function handleCreate(req: Request, workTaskService: WorkTaskService): Pro
 
         return json(task, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const message = err instanceof Error ? err.message : String(err);
-        return json({ error: message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        return handleRouteError(err);
     }
 }

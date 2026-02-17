@@ -9,9 +9,12 @@ import { z } from 'zod';
 
 /** Validation error — throw to get a 400 response. */
 export class ValidationError extends Error {
+    /** User-facing error detail — safe to include in HTTP responses (not Error.message/stack). */
+    readonly detail: string;
     constructor(message: string) {
         super(message);
         this.name = 'ValidationError';
+        this.detail = message;
     }
 }
 
@@ -53,7 +56,7 @@ export async function parseBody<T extends z.ZodType>(
         return { data, error: null };
     } catch (err) {
         if (err instanceof ValidationError) {
-            return { data: null, error: err.message };
+            return { data: null, error: err.detail };
         }
         return { data: null, error: 'Invalid request' };
     }

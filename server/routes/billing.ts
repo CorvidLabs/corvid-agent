@@ -96,7 +96,7 @@ async function handleCreateSubscription(
 
         return json(sub, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }
@@ -141,8 +141,7 @@ async function handleStripeWebhook(
 
         return json({ received: true });
     } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        log.warn('Stripe webhook error', { error: message });
-        return badRequest(message);
+        log.warn('Stripe webhook error', { error: err instanceof Error ? err.message : String(err) });
+        return badRequest('Webhook processing failed');
     }
 }

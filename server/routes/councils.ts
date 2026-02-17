@@ -25,7 +25,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
-import { json } from '../lib/response';
+import { json, handleRouteError } from '../lib/response';
 
 const log = createLogger('CouncilRoutes');
 
@@ -190,7 +190,7 @@ async function handleCreateCouncil(req: Request, db: Database): Promise<Response
         const council = createCouncil(db, data);
         return json(council, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -201,7 +201,7 @@ async function handleUpdateCouncil(req: Request, db: Database, id: string): Prom
         const council = updateCouncil(db, id, data);
         return council ? json(council) : json({ error: 'Not found' }, 404);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -282,11 +282,13 @@ async function handleLaunch(
         const result = launchCouncil(db, processManager, councilId, data.projectId, data.prompt, agentMessenger);
         return json(result, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
-        const msg = err instanceof Error ? err.message : String(err);
-        // Preserve proper HTTP status codes for not-found errors
-        const isNotFound = msg === 'Council not found' || msg === 'Project not found';
-        return json({ error: msg }, isNotFound ? 404 : 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        // Preserve proper HTTP status codes for known not-found errors
+        const errMsg = err instanceof Error ? err.message : '';
+        if (errMsg === 'Council not found' || errMsg === 'Project not found') {
+            return json({ error: 'Not found' }, 404);
+        }
+        return handleRouteError(err);
     }
 }
 

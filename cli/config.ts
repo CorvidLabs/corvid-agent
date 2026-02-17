@@ -42,35 +42,42 @@ export function loadConfig(): CliConfig {
     }
 }
 
-/** Validate that a string is a safe localhost/IP HTTP URL for the server. */
-function isValidServerUrl(url: string): boolean {
-    try {
-        const parsed = new URL(url);
-        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.pathname.length < 64;
-    } catch {
-        return false;
-    }
+/** Regex for safe alphanumeric-ish config values (ids, model names). */
+const SAFE_ID_RE = /^[a-zA-Z0-9_\-.:/ ]{1,128}$/;
+
+/** Sanitize a short identifier field, returning null if invalid. */
+function sanitizeId(value: unknown, maxLen: number): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim().slice(0, maxLen);
+    return SAFE_ID_RE.test(trimmed) ? trimmed : null;
 }
 
-/** Validate and sanitize config before persisting to disk. */
-function sanitizeConfig(config: CliConfig): CliConfig {
-    const serverUrl = typeof config.serverUrl === 'string' && isValidServerUrl(config.serverUrl)
-        ? config.serverUrl.slice(0, 256)
-        : DEFAULT_CONFIG.serverUrl;
-    return {
-        serverUrl,
-        authToken: typeof config.authToken === 'string' ? config.authToken.slice(0, 512) : null,
-        defaultAgent: typeof config.defaultAgent === 'string' ? config.defaultAgent.slice(0, 128) : null,
-        defaultProject: typeof config.defaultProject === 'string' ? config.defaultProject.slice(0, 256) : null,
-        defaultModel: typeof config.defaultModel === 'string' ? config.defaultModel.slice(0, 128) : null,
-    };
+/** Validate and reconstruct a safe server URL, or return the default. */
+function sanitizeServerUrl(value: unknown): string {
+    if (typeof value !== 'string') return DEFAULT_CONFIG.serverUrl;
+    try {
+        const parsed = new URL(value);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return DEFAULT_CONFIG.serverUrl;
+        // Reconstruct from validated parts to break taint propagation
+        const port = parsed.port ? `:${parsed.port}` : '';
+        return `${parsed.protocol}//${parsed.hostname}${port}`;
+    } catch {
+        return DEFAULT_CONFIG.serverUrl;
+    }
 }
 
 export function saveConfig(config: CliConfig): void {
     if (!existsSync(CONFIG_DIR)) {
         mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
     }
-    const safe = sanitizeConfig(config);
+    // Reconstruct each field independently to break taint propagation from network data
+    const safe: CliConfig = {
+        serverUrl: sanitizeServerUrl(config.serverUrl),
+        authToken: typeof config.authToken === 'string' ? config.authToken.slice(0, 512) : null,
+        defaultAgent: sanitizeId(config.defaultAgent, 128),
+        defaultProject: sanitizeId(config.defaultProject, 256),
+        defaultModel: sanitizeId(config.defaultModel, 128),
+    };
     writeFileSync(CONFIG_FILE, JSON.stringify(safe, null, 2) + '\n', { mode: 0o600 });
 }
 
