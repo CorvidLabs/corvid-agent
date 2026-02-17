@@ -1,15 +1,15 @@
 import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
-import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 describe('CLI Config', () => {
-    const testDir = join(tmpdir(), `corvid-cli-test-${Date.now()}`);
-    const configFile = join(testDir, 'config.json');
+    let testDir: string;
+    let configFile: string;
 
     beforeEach(() => {
-        if (existsSync(testDir)) rmSync(testDir, { recursive: true });
-        mkdirSync(testDir, { recursive: true });
+        testDir = mkdtempSync(join(tmpdir(), 'corvid-cli-test-'));
+        configFile = join(testDir, 'config.json');
     });
 
     afterEach(() => {
