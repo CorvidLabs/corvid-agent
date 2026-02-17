@@ -638,8 +638,8 @@ Answer the user's questions about the council's decision. Draw from the synthesi
     try {
         processManager.startProcess(session);
     } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        return json({ error: `Failed to start chat session: ${errMsg}` }, 500);
+        console.error('[council-chat] Failed to start session:', err);
+        return json({ error: 'Failed to start chat session' }, 500);
     }
 
     return json({ sessionId: session.id, created: true }, 201);
