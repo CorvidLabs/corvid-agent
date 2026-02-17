@@ -948,6 +948,22 @@ a {
     align-items: center;
   }
 
+  /* Flow Steps */
+  .flow-steps__number {
+    font-size: 16px;
+    min-width: 40px;
+  }
+
+  .flow-steps__connector {
+    margin-left: 19px;
+  }
+
+  /* Explainer */
+  .explainer__text {
+    font-size: 9px;
+    line-height: 2.2;
+  }
+
   /* Callout */
   .callout {
     padding: 16px 18px;
@@ -1193,6 +1209,83 @@ a {
 .callout p {
   font-size: 9px;
   color: var(--text-secondary);
+}
+
+/* ═══════════════════ EXTERNAL LINK ICON ═══════════════════ */
+.ext-icon {
+  font-size: 7px;
+  opacity: 0.5;
+  margin-left: 2px;
+  transition: opacity 0.2s;
+}
+
+a:hover .ext-icon {
+  opacity: 1;
+}
+
+/* ═══════════════════ EXPLAINER ═══════════════════ */
+.explainer {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.explainer__text {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 2.4;
+}
+
+/* ═══════════════════ FLOW STEPS (How it Works) ═══════════════════ */
+.flow-steps {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.flow-steps__item {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 20px 0;
+}
+
+.flow-steps__number {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  min-width: 48px;
+  flex-shrink: 0;
+}
+
+.flow-steps__content {
+  flex: 1;
+}
+
+.flow-steps__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.flow-steps__content p {
+  font-size: 9px;
+  color: var(--text-secondary);
+  line-height: 2;
+}
+
+.flow-steps__content code {
+  font-family: 'Dogica Pixel', monospace;
+}
+
+.flow-steps__connector {
+  width: 1px;
+  height: 20px;
+  background: var(--border-bright);
+  margin-left: 23px;
 }
 
 /* ─── Subtle animation ─── */
