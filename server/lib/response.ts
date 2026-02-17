@@ -32,17 +32,13 @@ export function unavailable(message: string): Response {
 
 /** Convenience: 500 error with a timestamp (used by the global error handler). */
 export function serverError(err: unknown): Response {
-    // Log the full error server-side for debugging
-    const fullMessage = err instanceof Error ? err.message : String(err);
+    // Log the full error server-side only — never expose to clients
     if (err instanceof Error && err.stack) {
         console.error('[serverError]', err.stack);
+    } else {
+        console.error('[serverError]', err);
     }
-    // Return a generic message to the client to avoid stack trace / internal detail exposure
-    // (CodeQL js/stack-trace-exposure)
-    const safeMessage = process.env.NODE_ENV === 'development'
-        ? fullMessage
-        : 'Internal server error';
-    return json({ error: safeMessage, timestamp: new Date().toISOString() }, 500);
+    return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
 }
 
 /** Extract a human-readable error message from an unknown thrown value. */
