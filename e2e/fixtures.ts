@@ -110,7 +110,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                         const data = await res.json();
                         if (data.stage === stage) return;
                         // If we've already passed the target stage, stop waiting
-                        const stages = ['responding', 'reviewing', 'synthesizing', 'complete'];
+                        const stages = ['responding', 'discussing', 'reviewing', 'synthesizing', 'complete'];
                         if (stages.indexOf(data.stage) > stages.indexOf(stage)) return;
                     }
                     await new Promise((r) => setTimeout(r, 500));

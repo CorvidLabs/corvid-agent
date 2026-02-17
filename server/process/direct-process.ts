@@ -24,6 +24,51 @@ const MAX_TOOL_ITERATIONS = 25;
 const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
 
+/** Rough token count estimate (~4 chars per token). */
+function estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+}
+
+/**
+ * Truncate council synthesis messages if they exceed 70% of the context window.
+ * Keeps the system prompt contribution (already separate), first user message,
+ * and the most recent N messages. Logs a warning when truncation occurs.
+ */
+function truncateCouncilContext(
+    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
+    systemPrompt: string,
+): void {
+    const ctxSize = parseInt(process.env.OLLAMA_NUM_CTX ?? '16384', 10);
+    const threshold = Math.floor(ctxSize * 0.7);
+
+    const systemTokens = estimateTokens(systemPrompt);
+    let messageTokens = 0;
+    for (const m of messages) {
+        messageTokens += estimateTokens(m.content);
+    }
+
+    const totalTokens = systemTokens + messageTokens;
+    if (totalTokens <= threshold) return;
+
+    // Keep first user message + last 4 messages
+    const keepTail = 4;
+    if (messages.length <= keepTail + 1) return; // Nothing to trim
+
+    const first = messages[0];
+    const tail = messages.slice(-keepTail);
+
+    if (tail.includes(first)) {
+        messages.length = 0;
+        messages.push(...tail);
+    } else {
+        messages.length = 0;
+        messages.push(first, ...tail);
+    }
+
+    const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+    log.warn(`Council context truncated: ${totalTokens} → ${newTokens} estimated tokens (threshold: ${threshold})`);
+}
+
 /**
  * Trim conversation history to bound memory usage.
  * Keeps the first user message (original prompt context) and the most recent
@@ -66,6 +111,8 @@ export interface DirectProcessOptions {
     personaPrompt?: string;
     /** Skill bundle prompt additions (from assigned skill_bundles) */
     skillPrompt?: string;
+    /** Override the agent/provider default model (e.g. COUNCIL_MODEL for chairman). */
+    modelOverride?: string;
 }
 
 let nextPseudoPid = 800_000;
@@ -85,6 +132,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         extendTimeout,
         personaPrompt,
         skillPrompt,
+        modelOverride,
     } = options;
 
     const pseudoPid = nextPseudoPid++;
@@ -115,7 +163,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         toolMap.set(t.name, t);
     }
 
-    const model = agent?.model || provider.getInfo().defaultModel;
+    const model = modelOverride ?? agent?.model ?? provider.getInfo().defaultModel;
 
     // Build system prompt (with tool instructions if tools are available)
     const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
@@ -142,6 +190,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     async function runLoop(userMessage: string): Promise<void> {
         processing = true;
         messages.push({ role: 'user', content: userMessage });
+
+        // Council synthesis prompts can be very long — truncate if needed
+        if (session.councilRole === 'chairman') {
+            truncateCouncilContext(messages, systemPrompt);
+        }
 
         // Signal that the agent is working
         onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);

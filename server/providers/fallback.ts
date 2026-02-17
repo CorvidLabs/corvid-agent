@@ -55,6 +55,14 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
         ],
     },
+    'local': {
+        chain: [
+            { provider: 'ollama', model: 'qwen3:32b' },
+            { provider: 'ollama', model: 'qwen3:8b' },
+            { provider: 'ollama', model: 'llama3.1:8b' },
+            { provider: 'ollama', model: 'qwen3:4b' },
+        ],
+    },
 };
 
 export class FallbackManager {

@@ -26,6 +26,7 @@ export default defineConfig({
         env: {
             RATE_LIMIT_GET: '5000',      // Higher read limit for e2e test volume
             RATE_LIMIT_MUTATION: '1000',  // Higher write limit for parallel e2e tests
+            ENABLED_PROVIDERS: 'anthropic,ollama', // Prevent auto-restrict to ollama-only in CI
         },
     },
 });
