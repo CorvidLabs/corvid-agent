@@ -391,6 +391,26 @@ CorvidAgent exposes ~50 REST endpoints and a WebSocket interface. Key endpoint g
 
 ---
 
+## Built by corvid-agent
+
+These apps were designed, coded, tested, and deployed autonomously by corvid-agent — no human-written application code. Each is an Angular 21 standalone app hosted on GitHub Pages.
+
+**Ecosystem landing page:** [corvid-agent.github.io](https://corvid-agent.github.io)
+
+| App | API | Description |
+|-----|-----|-------------|
+| [weather-dashboard](https://corvid-agent.github.io/weather-dashboard/) | Open-Meteo | Forecasts, hourly/daily charts, air quality, UV meter, wind compass, astronomy |
+| [bw-cinema](https://corvid-agent.github.io/bw-cinema/) | TMDb + Internet Archive | Classic black-and-white film browser with search, favorites, and streaming |
+| [space-dashboard](https://corvid-agent.github.io/space-dashboard/) | NASA | APOD gallery, Mars rover photos, ISS tracker, near-Earth objects |
+| [pd-gallery](https://corvid-agent.github.io/pd-gallery/) | Art Institute of Chicago | 130k+ public domain artworks with collections and genre browsing |
+| [pd-audiobooks](https://corvid-agent.github.io/pd-audiobooks/) | LibriVox | Public domain audiobook player with chapter navigation and reading lists |
+| [poetry-atlas](https://corvid-agent.github.io/poetry-atlas/) | PoetryDB | Classic poetry explorer with 129 poets, search, favorites, and discovery |
+| [quake-tracker](https://corvid-agent.github.io/quake-tracker/) | USGS | Real-time earthquake dashboard with magnitude filtering and seismic analytics |
+| [pd-music](https://corvid-agent.github.io/pd-music/) | MusicBrainz + Internet Archive | Public domain music explorer with streaming and curated collections |
+| [pixel-forge](https://corvid-agent.github.io/pixel-forge/) | Canvas API | Pixel art editor with drawing tools, palette presets, and gallery |
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
