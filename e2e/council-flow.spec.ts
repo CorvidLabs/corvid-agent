@@ -1,6 +1,12 @@
 import { test, expect } from './fixtures';
 
+// Council sessions require a working Claude API — skip in CI without it
+const skipNoKey = !!process.env.CI && !process.env.ANTHROPIC_API_KEY;
+
 test.describe.serial('Council Deliberation Flow', () => {
+    // eslint-disable-next-line playwright/no-skipped-test
+    test.skip(skipNoKey, 'Requires ANTHROPIC_API_KEY for SDK sessions');
+
     let projectId: string;
     let agent1Id: string;
     let agent2Id: string;
