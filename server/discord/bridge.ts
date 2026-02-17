@@ -41,6 +41,11 @@ export class DiscordBridge {
     // Map Discord userId → active sessionId
     private userSessions: Map<string, string> = new Map();
 
+    // Per-user rate limiting: userId → timestamps of recent messages
+    private userMessageTimestamps: Map<string, number[]> = new Map();
+    private readonly RATE_LIMIT_WINDOW_MS = 60_000;
+    private readonly RATE_LIMIT_MAX_MESSAGES = 10;
+
     constructor(db: Database, processManager: ProcessManager, config: DiscordBridgeConfig) {
         this.db = db;
         this.processManager = processManager;
@@ -258,6 +263,16 @@ export class DiscordBridge {
         }, delay);
     }
 
+    private checkRateLimit(userId: string): boolean {
+        const now = Date.now();
+        const timestamps = this.userMessageTimestamps.get(userId) ?? [];
+        const recent = timestamps.filter(t => now - t < this.RATE_LIMIT_WINDOW_MS);
+        if (recent.length >= this.RATE_LIMIT_MAX_MESSAGES) return false;
+        recent.push(now);
+        this.userMessageTimestamps.set(userId, recent);
+        return true;
+    }
+
     private async handleMessage(data: DiscordMessageData): Promise<void> {
         // Ignore bot messages
         if (data.author.bot) return;
@@ -270,14 +285,23 @@ export class DiscordBridge {
 
         const userId = data.author.id;
 
+        // Authorization check
+        if (this.config.allowedUserIds.length > 0 && !this.config.allowedUserIds.includes(userId)) {
+            log.warn('Unauthorized Discord user', { userId, username: data.author.username });
+            await this.sendMessage(data.channel_id, 'Unauthorized.');
+            return;
+        }
+
+        // Per-user rate limiting (10 messages per 60 seconds)
+        if (!this.checkRateLimit(userId)) {
+            await this.sendMessage(data.channel_id, 'Rate limit exceeded. Please wait before sending more messages.');
+            return;
+        }
+
         // Handle /status command
         if (text === '/status') {
-            const activeIds = this.processManager.getActiveSessionIds();
-            const agents = listAgents(this.db);
-            await this.sendMessage(
-                data.channel_id,
-                `Active sessions: ${activeIds.length}\nAgents: ${agents.length}\nYour session: ${this.userSessions.get(userId) ?? 'none'}`,
-            );
+            const sessionId = this.userSessions.get(userId) ?? 'none';
+            await this.sendMessage(data.channel_id, `Your session: ${sessionId}`);
             return;
         }
 
@@ -413,7 +437,7 @@ export class DiscordBridge {
 
             if (!response.ok) {
                 const error = await response.text();
-                log.error('Failed to send Discord message', { status: response.status, error });
+                log.error('Failed to send Discord message', { status: response.status, error: error.slice(0, 200) });
             }
         }
     }

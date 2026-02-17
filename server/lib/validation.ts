@@ -521,26 +521,28 @@ const PersonaArchetypeSchema = z.enum(['custom', 'professional', 'friendly', 'te
 
 export const UpsertPersonaSchema = z.object({
     archetype: PersonaArchetypeSchema.optional(),
-    traits: z.array(z.string()).optional(),
-    voiceGuidelines: z.string().optional(),
-    background: z.string().optional(),
-    exampleMessages: z.array(z.string()).optional(),
+    traits: z.array(z.string().max(100, 'each trait must be 100 chars or less')).max(20, 'maximum 20 traits').optional(),
+    voiceGuidelines: z.string().max(2000, 'voiceGuidelines must be 2000 chars or less').optional(),
+    background: z.string().max(4000, 'background must be 4000 chars or less').optional(),
+    exampleMessages: z.array(z.string().max(500, 'each example must be 500 chars or less')).max(10, 'maximum 10 examples').optional(),
 });
 
 // ─── Skill Bundles ──────────────────────────────────────────────────────────
 
+const ToolNameSchema = z.string().min(1).max(100).regex(/^[a-zA-Z0-9_\-:.*]+$/, 'tool name contains invalid characters');
+
 export const CreateSkillBundleSchema = z.object({
-    name: z.string().min(1, 'name is required'),
-    description: z.string().optional(),
-    tools: z.array(z.string()).optional(),
-    promptAdditions: z.string().optional(),
+    name: z.string().min(1, 'name is required').max(100, 'name must be 100 chars or less'),
+    description: z.string().max(1000, 'description must be 1000 chars or less').optional(),
+    tools: z.array(ToolNameSchema).max(50, 'maximum 50 tools per bundle').optional(),
+    promptAdditions: z.string().max(4000, 'promptAdditions must be 4000 chars or less').optional(),
 });
 
 export const UpdateSkillBundleSchema = z.object({
-    name: z.string().min(1).optional(),
-    description: z.string().optional(),
-    tools: z.array(z.string()).optional(),
-    promptAdditions: z.string().optional(),
+    name: z.string().min(1).max(100, 'name must be 100 chars or less').optional(),
+    description: z.string().max(1000, 'description must be 1000 chars or less').optional(),
+    tools: z.array(ToolNameSchema).max(50, 'maximum 50 tools per bundle').optional(),
+    promptAdditions: z.string().max(4000, 'promptAdditions must be 4000 chars or less').optional(),
 });
 
 export const AssignSkillBundleSchema = z.object({

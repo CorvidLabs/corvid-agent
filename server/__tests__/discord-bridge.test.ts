@@ -33,6 +33,7 @@ describe('DiscordBridge', () => {
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: 'test-channel',
+            allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
         expect(bridge).toBeDefined();
@@ -51,6 +52,7 @@ describe('DiscordBridge', () => {
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: 'test-channel',
+            allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
 
@@ -74,6 +76,7 @@ describe('DiscordBridge', () => {
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: 'my-channel',
+            allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
 
@@ -96,6 +99,7 @@ describe('DiscordBridge', () => {
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: 'test-channel',
+            allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
 
@@ -126,6 +130,7 @@ describe('DiscordBridge', () => {
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: 'test-channel',
+            allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
 
