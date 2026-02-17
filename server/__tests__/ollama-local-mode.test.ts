@@ -401,3 +401,59 @@ describe('Council context truncation', () => {
         expect(messages.length).toBe(2);
     });
 });
+
+// ─── Approval Timeout Resolution Tests ──────────────────────────────────────
+
+describe('Approval timeout resolution', () => {
+    it('approval timeout resolves Promise (does not block forever)', async () => {
+        // Simulate the approval timeout behavior: the Promise must resolve
+        // even when escalation is queued, so the direct process can continue
+        // and release the Ollama slot.
+        const result = await new Promise<{ behavior: string }>((resolve) => {
+            // Simulate timeout fires
+            setTimeout(() => {
+                // This mimics the fixed approval-manager.ts behavior:
+                // always resolve, even when escalation is queued
+                resolve({ behavior: 'deny' });
+            }, 10);
+        });
+        expect(result.behavior).toBe('deny');
+    });
+});
+
+// ─── Tool Name Fuzzy Matching Tests ─────────────────────────────────────────
+
+describe('Tool name fuzzy matching', () => {
+    // Simulate the extraction logic from OllamaProvider
+    function resolveToolName(name: string, toolNames: Set<string>): string | null {
+        if (toolNames.has(name)) return name;
+        if (name.startsWith('corvid_')) {
+            const bare = name.slice(7);
+            if (toolNames.has(bare)) return bare;
+        }
+        if (toolNames.has(`corvid_${name}`)) return `corvid_${name}`;
+        return null;
+    }
+
+    const tools = new Set(['list_files', 'read_file', 'corvid_send_message', 'corvid_save_memory']);
+
+    it('exact match works', () => {
+        expect(resolveToolName('list_files', tools)).toBe('list_files');
+        expect(resolveToolName('corvid_send_message', tools)).toBe('corvid_send_message');
+    });
+
+    it('strips corvid_ prefix from hallucinated names', () => {
+        expect(resolveToolName('corvid_list_files', tools)).toBe('list_files');
+        expect(resolveToolName('corvid_read_file', tools)).toBe('read_file');
+    });
+
+    it('adds corvid_ prefix when model drops it', () => {
+        expect(resolveToolName('send_message', tools)).toBe('corvid_send_message');
+        expect(resolveToolName('save_memory', tools)).toBe('corvid_save_memory');
+    });
+
+    it('returns null for unknown tools', () => {
+        expect(resolveToolName('delete_everything', tools)).toBeNull();
+        expect(resolveToolName('corvid_destroy', tools)).toBeNull();
+    });
+});

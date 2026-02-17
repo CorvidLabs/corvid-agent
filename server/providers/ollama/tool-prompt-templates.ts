@@ -167,6 +167,7 @@ function getFamilySpecificPrompt(family: ModelFamily): string | null {
 [{"name": "tool_name", "arguments": {"param1": "value1"}}]
 - Do not wrap tool calls in markdown code blocks or add any surrounding text.
 - Output EITHER a tool call OR a text response, never both in the same message.
+- CRITICAL: Use tool names EXACTLY as listed above. Do NOT add prefixes — e.g., use "list_files" not "corvid_list_files". Only corvid_* tools already have that prefix.
 - When chaining multiple operations, process each tool result and immediately proceed to the next step.
 - Provide your final answer as plain text only after all tool operations are complete.`;
 
