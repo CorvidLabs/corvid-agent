@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 47;
+const SCHEMA_VERSION = 49;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -938,6 +938,46 @@ const MIGRATIONS: Record<number, string[]> = {
             created_at TEXT DEFAULT (datetime('now'))
         )`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_cache_hash ON voice_cache(text_hash, voice_preset)`,
+    ],
+    48: [
+        // Make sessions.project_id nullable — sessions without a project are general/unbound
+        `CREATE TABLE sessions_new (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT REFERENCES projects(id),
+            agent_id        TEXT REFERENCES agents(id),
+            name            TEXT DEFAULT '',
+            status          TEXT DEFAULT 'idle',
+            source          TEXT DEFAULT 'web',
+            initial_prompt  TEXT DEFAULT '',
+            pid             INTEGER DEFAULT NULL,
+            total_cost_usd  REAL DEFAULT 0,
+            total_algo_spent REAL DEFAULT 0,
+            total_turns     INTEGER DEFAULT 0,
+            council_launch_id TEXT DEFAULT NULL,
+            council_role    TEXT DEFAULT NULL,
+            work_dir        TEXT DEFAULT NULL,
+            credits_consumed REAL DEFAULT 0,
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `INSERT INTO sessions_new SELECT id, project_id, agent_id, name, status, source, initial_prompt, pid, total_cost_usd, total_algo_spent, total_turns, council_launch_id, council_role, work_dir, credits_consumed, created_at, updated_at FROM sessions`,
+        `DROP TABLE sessions`,
+        `ALTER TABLE sessions_new RENAME TO sessions`,
+    ],
+    49: [
+        `CREATE TABLE IF NOT EXISTS mcp_server_configs (
+            id          TEXT PRIMARY KEY,
+            agent_id    TEXT DEFAULT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            name        TEXT NOT NULL,
+            command     TEXT NOT NULL,
+            args        TEXT NOT NULL DEFAULT '[]',
+            env_vars    TEXT NOT NULL DEFAULT '{}',
+            cwd         TEXT DEFAULT NULL,
+            enabled     INTEGER NOT NULL DEFAULT 1,
+            created_at  TEXT DEFAULT (datetime('now')),
+            updated_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_agent ON mcp_server_configs(agent_id)`,
     ],
 };
 

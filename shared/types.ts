@@ -39,7 +39,7 @@ export type SessionSource = 'web' | 'algochat' | 'agent' | 'telegram' | 'discord
 
 export interface Session {
     id: string;
-    projectId: string;
+    projectId: string | null;
     agentId: string | null;
     name: string;
     status: SessionStatus;
@@ -125,7 +125,7 @@ export interface CreateAgentInput {
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
 
 export interface CreateSessionInput {
-    projectId: string;
+    projectId?: string | null;
     agentId?: string;
     name?: string;
     initialPrompt?: string;
@@ -778,6 +778,40 @@ export interface A2AAgentSkill {
     tags: string[];
     inputModes: string[];
     outputModes: string[];
+}
+
+// ─── External MCP Server Config ─────────────────────────────────────────────
+
+export interface McpServerConfig {
+    id: string;
+    agentId: string | null;       // null = global (all agents)
+    name: string;
+    command: string;
+    args: string[];
+    envVars: Record<string, string>;
+    cwd: string | null;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateMcpServerConfigInput {
+    agentId?: string | null;
+    name: string;
+    command: string;
+    args?: string[];
+    envVars?: Record<string, string>;
+    cwd?: string | null;
+    enabled?: boolean;
+}
+
+export interface UpdateMcpServerConfigInput {
+    name?: string;
+    command?: string;
+    args?: string[];
+    envVars?: Record<string, string>;
+    cwd?: string | null;
+    enabled?: boolean;
 }
 
 export interface A2AProtocolExtension {

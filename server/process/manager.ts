@@ -8,10 +8,10 @@ import { ApprovalManager } from './approval-manager';
 import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
-import { getAgent } from '../db/agents';
+import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
 import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
-import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
+import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, updateSessionAgent, addSessionMessage } from '../db/sessions';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
@@ -28,6 +28,7 @@ import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
 import { getPersona, composePersonaPrompt } from '../db/personas';
 import { resolveAgentPromptAdditions } from '../db/skill-bundles';
+import { getActiveServersForAgent } from '../db/mcp-servers';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
@@ -218,8 +219,8 @@ export class ProcessManager {
             this.stopProcess(session.id);
         }
 
-        const project = getProject(this.db, session.projectId);
-        if (!project) {
+        const project = session.projectId ? getProject(this.db, session.projectId) : null;
+        if (session.projectId && !project) {
             this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Project ${session.projectId} not found`, type: 'not_found' },
@@ -244,10 +245,22 @@ export class ProcessManager {
             }
         }
 
+        // Use a minimal default project when session has no project
+        const effectiveProject = project ?? {
+            id: 'general',
+            name: 'General',
+            description: '',
+            workingDir: process.cwd(),
+            claudeMd: '',
+            envVars: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, project, agent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
+            this.startDirectProcessWrapped(session, effectiveProject, agent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
         } else {
-            this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth, options?.schedulerMode);
+            this.startSdkProcessWrapped(session, effectiveProject, agent, resolvedPrompt, options?.depth, options?.schedulerMode);
         }
     }
 
@@ -336,6 +349,11 @@ export class ProcessManager {
             if (sp2) skillPrompt = sp2;
         }
 
+        // Query external MCP server configs for this agent
+        const externalMcpConfigs = session.agentId
+            ? getActiveServersForAgent(this.db, session.agentId)
+            : [];
+
         // COUNCIL_MODEL override: use a bigger model for council chairman/synthesis
         const councilModel = process.env.COUNCIL_MODEL;
         const modelOverride = (session.councilRole === 'chairman' && councilModel)
@@ -344,6 +362,9 @@ export class ProcessManager {
 
         let sp: SdkProcess;
         try {
+            // Poll-triggered sessions only need run_command to execute gh CLI commands.
+            // Giving small models the full tool set causes them to call random tools.
+            const isPollSession = session.name.startsWith('Poll:');
             sp = startDirectProcess({
                 session,
                 project: effectiveProject,
@@ -359,6 +380,8 @@ export class ProcessManager {
                 personaPrompt,
                 skillPrompt,
                 modelOverride,
+                externalMcpConfigs,
+                toolAllowList: isPollSession ? ['run_command'] : undefined,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -428,8 +451,18 @@ export class ProcessManager {
             }
         }
 
-        const project = getProject(this.db, session.projectId);
-        if (!project) return;
+        const project = session.projectId ? getProject(this.db, session.projectId) : null;
+        // Use a minimal default project when session has no project
+        const effectiveProject = project ?? {
+            id: 'general',
+            name: 'General',
+            description: '',
+            workingDir: process.cwd(),
+            claudeMd: '',
+            envVars: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
 
         const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
@@ -472,7 +505,7 @@ export class ProcessManager {
                     : undefined;
                 sp = startDirectProcess({
                     session,
-                    project,
+                    project: effectiveProject,
                     agent,
                     prompt: resumePrompt ?? '',
                     provider: providerInstance,
@@ -493,7 +526,7 @@ export class ProcessManager {
                     : undefined;
                 sp = startSdkProcess({
                     session,
-                    project,
+                    project: effectiveProject,
                     agent,
                     prompt: resumePrompt ?? '',
                     approvalManager: this.approvalManager,
@@ -903,8 +936,27 @@ export class ProcessManager {
                 return;
             }
 
+            // Don't restart sessions that have been manually stopped
+            if (session.status === 'stopped') {
+                log.info(`Session ${sessionId} was stopped, skipping restart`);
+                this.sessionMeta.delete(sessionId);
+                return;
+            }
+
             // Only restart if not already running (user may have manually restarted)
             if (this.processes.has(sessionId)) return;
+
+            // For algochat sessions, resolve the current algochat-enabled agent
+            // so restarts always use the right model/provider
+            if (session.source === 'algochat' && session.agentId) {
+                const agents = getAlgochatEnabledAgents(this.db);
+                const currentAgent = agents.find((a) => a.algochatAuto) ?? agents[0];
+                if (currentAgent && currentAgent.id !== session.agentId) {
+                    log.info(`Reassigning session ${sessionId} from agent ${session.agentId} to ${currentAgent.id} (${currentAgent.name})`);
+                    updateSessionAgent(this.db, sessionId, currentAgent.id);
+                    session.agentId = currentAgent.id;
+                }
+            }
 
             log.info(`Auto-restarting session ${sessionId}`, { attempt: meta.restartCount });
             this.resumeProcess(session);

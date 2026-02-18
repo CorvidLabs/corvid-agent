@@ -176,7 +176,7 @@ export class MentionPollingService {
 
             // Fetch recent mentions from GitHub
             const mentions = await this.fetchMentions(config);
-            log.debug('Fetch result', { configId: config.id, mentionsFound: mentions.length });
+            log.debug('Fetch result', { configId: config.id, repo: config.repo, mentionsFound: mentions.length });
 
             // Update poll timestamp even if no mentions found
             if (mentions.length === 0) {
@@ -247,9 +247,15 @@ export class MentionPollingService {
         // The search API is more efficient than listing all comments.
         // lastPollAt from SQLite is UTC but lacks the 'Z' suffix — append it so
         // JavaScript's Date parser treats it as UTC rather than local time.
-        const sinceDate = config.lastPollAt
-            ? new Date(config.lastPollAt.endsWith('Z') ? config.lastPollAt : config.lastPollAt + 'Z').toISOString()
-            : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // Default: last 24h
+        //
+        // GitHub search `updated:` only supports date precision (no time), so we
+        // subtract 1 day from lastPollAt to avoid missing mentions near midnight.
+        // Duplicate prevention is handled by the processedIds set, not the date filter.
+        const lastPollDate = config.lastPollAt
+            ? new Date(config.lastPollAt.endsWith('Z') ? config.lastPollAt : config.lastPollAt + 'Z')
+            : new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const paddedDate = new Date(lastPollDate.getTime() - 24 * 60 * 60 * 1000);
+        const sinceDate = paddedDate.toISOString();
 
         // Search for issue comments mentioning the user
         if (this.shouldPollEventType(config, 'issue_comment')) {
@@ -290,7 +296,7 @@ export class MentionPollingService {
         try {
             // Use the GitHub search API for issues/PRs mentioning the user in the repo
             // This finds issues/PRs where the user is mentioned (including in comments)
-            const query = `repo:${repo} mentions:${username} updated:>=${since.split('T')[0]}`;
+            const query = `${this.repoQualifier(repo)} mentions:${username} updated:>=${since.split('T')[0]}`;
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
@@ -310,7 +316,9 @@ export class MentionPollingService {
                 // For each issue/PR that mentions us, fetch recent comments to find the actual mention
                 const number = item.number as number;
                 const isPR = !!(item.pull_request);
-                const commentMentions = await this.fetchRecentComments(repo, number, username, since, isPR, item);
+                // Resolve the actual owner/repo from the item URL (needed when config.repo is an org/user)
+                const itemRepo = this.resolveFullRepo(repo, (item.html_url as string) ?? '');
+                const commentMentions = await this.fetchRecentComments(itemRepo, number, username, since, isPR, item);
                 mentions.push(...commentMentions);
             }
 
@@ -388,7 +396,7 @@ export class MentionPollingService {
     ): Promise<DetectedMention[]> {
         try {
             const sinceDate = since.split('T')[0];
-            const query = `repo:${repo} mentions:${username} is:issue created:>=${sinceDate}`;
+            const query = `${this.repoQualifier(repo)} mentions:${username} is:issue created:>=${sinceDate}`;
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
@@ -443,7 +451,7 @@ export class MentionPollingService {
     ): Promise<DetectedMention[]> {
         try {
             const sinceDate = since.split('T')[0];
-            const query = `repo:${repo} assignee:${username} is:open updated:>=${sinceDate}`;
+            const query = `${this.repoQualifier(repo)} assignee:${username} is:open updated:>=${sinceDate}`;
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
@@ -509,8 +517,12 @@ export class MentionPollingService {
             return false;
         }
 
+        // Resolve the actual owner/repo from the mention URL
+        const fullRepo = this.resolveFullRepo(config.repo, mention.htmlUrl);
+        const repoShortName = fullRepo.includes('/') ? fullRepo.split('/')[1] : fullRepo;
+
         // Guard: skip if there's already a running session for this issue
-        const sessionPrefix = `Poll: ${config.repo.split('/')[1]} #${mention.number}:`;
+        const sessionPrefix = `Poll: ${repoShortName} #${mention.number}:`;
         const existing = this.db.query(
             `SELECT id FROM sessions WHERE name LIKE ? AND status = 'running' AND created_at > datetime('now', '-1 hour')`
         ).get(sessionPrefix + '%') as { id: string } | null;
@@ -530,7 +542,7 @@ export class MentionPollingService {
             const session = createSession(this.db, {
                 projectId: config.projectId,
                 agentId: config.agentId,
-                name: `Poll: ${config.repo.split('/')[1]} #${mention.number}: ${mention.title.slice(0, 40)}`,
+                name: `Poll: ${repoShortName} #${mention.number}: ${mention.title.slice(0, 40)}`,
                 initialPrompt: prompt,
                 source: 'agent',
             });
@@ -549,6 +561,32 @@ export class MentionPollingService {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /**
+     * Build the GitHub search qualifier for the repo field.
+     * If it contains a '/' it's a specific repo (repo:owner/name).
+     * Otherwise it's an org or user — use org: which covers both.
+     */
+    private repoQualifier(repo: string): string {
+        if (repo.includes('/')) return `repo:${repo}`;
+        return `org:${repo}`;
+    }
+
+    /**
+     * Resolve the full owner/repo from the mention's HTML URL when the config
+     * repo is just an org/user name (no '/').
+     * e.g. config.repo="CorvidLabs", htmlUrl="https://github.com/CorvidLabs/site/..."
+     *  → "CorvidLabs/site"
+     */
+    private resolveFullRepo(configRepo: string, htmlUrl: string): string {
+        if (configRepo.includes('/')) return configRepo;
+        try {
+            const url = new URL(htmlUrl);
+            const parts = url.pathname.split('/').filter(Boolean);
+            if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+        } catch { /* ignore */ }
+        return configRepo;
+    }
 
     private shouldPollEventType(config: MentionPollingConfig, type: string): boolean {
         // If no filter set, poll all types
@@ -573,7 +611,9 @@ export class MentionPollingService {
     }
 
     private buildPrompt(config: MentionPollingConfig, mention: DetectedMention): string {
-        const repo = config.repo;
+        // Resolve the actual owner/repo from the mention URL when config.repo is an org/user name.
+        // e.g. htmlUrl "https://github.com/CorvidLabs/site/pull/22#..." → "CorvidLabs/site"
+        const repo = this.resolveFullRepo(config.repo, mention.htmlUrl);
         const contextType = mention.isPullRequest ? 'PR' : 'Issue';
         const isAssignment = mention.type === 'assignment';
         // corvid_create_work_task only works for the platform's own repo
@@ -625,7 +665,20 @@ export class MentionPollingService {
             `4. Post a comment acknowledging the assignment and explaining your plan or findings using: \`${replyCmd}\``,
         ];
 
-        const mentionSteps = [
+        // Detect review requests so we can give the model explicit steps
+        const isReviewRequest = mention.isPullRequest &&
+            /\breview\b/i.test(mention.body);
+
+        const reviewSteps = [
+            `1. Run this EXACT command to get the diff:\n   \`run_command({"command": "gh pr diff ${mention.number} --repo ${repo}"})\``,
+            `2. Read the diff output. Note: bugs, style issues, missing edge cases.`,
+            `3. Run this command to submit your review (replace YOUR_REVIEW with your findings):\n   \`run_command({"command": "gh pr review ${mention.number} --repo ${repo} --approve --body \\"YOUR_REVIEW\\""})\``,
+            `   Use --request-changes instead of --approve if you found serious issues.`,
+            ``,
+            `IMPORTANT: You are ONLY reviewing. Do NOT clone the repo, edit files, run git commands, or make any code changes. Only run the two gh commands above.`,
+        ];
+
+        const mentionSteps = isReviewRequest ? reviewSteps : [
             `1. Read the mention to understand the request.`,
             `2. If the comment is a simple ping (like "@username" with no question), reply with a brief greeting and offer to help.`,
             `3. If code changes are requested:\n${codeChangeInstructions}`,

@@ -520,7 +520,7 @@ export class OllamaProvider extends BaseLlmProvider {
                 content = content.replace(/\s*<\|python_tag\|>[\s\S]*$/, '').trim();
                 // Strip JSON array tool calls (Mistral format) - with or without code fences
                 content = content.replace(/\s*```(?:json)?\s*\[[\s\S]*?\]\s*```\s*/g, '').trim();
-                content = content.replace(/\s*\[\s*\{\s*"name"\s*:\s*"[\w]+"\s*,[\s\S]*?\}\s*\]\s*/g, '').trim();
+                content = this.stripJsonToolCallArrays(content);
                 // Also strip plain function calls from content
                 if (params.tools) {
                     for (const tool of params.tools) {
@@ -669,21 +669,41 @@ export class OllamaProvider extends BaseLlmProvider {
                     const arr = Array.isArray(parsed) ? parsed : [parsed];
                     for (const item of arr) {
                         if (item && typeof item === 'object' && typeof item.name === 'string') {
+                            const itemArgs = item.arguments ?? item.parameters ?? {};
                             // Exact match first
-                            let resolvedName = toolNames.has(item.name) ? item.name : null;
+                            let resolvedName: string | undefined = toolNames.has(item.name) ? item.name : undefined;
+                            let resolvedArgs = itemArgs;
+
                             // Fuzzy: model may add/remove "corvid_" prefix
                             if (!resolvedName && item.name.startsWith('corvid_')) {
-                                const bare = item.name.slice(7); // strip "corvid_"
+                                const bare = item.name.slice(7);
                                 if (toolNames.has(bare)) resolvedName = bare;
                             }
                             if (!resolvedName && toolNames.has(`corvid_${item.name}`)) {
                                 resolvedName = `corvid_${item.name}`;
                             }
+
+                            // Rescue: model put an entire command in the "name" field
+                            if (!resolvedName && item.name.includes(' ') && toolNames.has('run_command')) {
+                                let fullCmd = item.name;
+                                const bodyArg = itemArgs.body ?? itemArgs.text ?? itemArgs.content;
+                                if (typeof bodyArg === 'string') {
+                                    fullCmd += ` "${bodyArg.replace(/"/g, '\\"')}"`;
+                                }
+                                resolvedName = 'run_command';
+                                resolvedArgs = { command: fullCmd };
+                                log.info(`Rescued command-as-name: "${item.name.slice(0, 60)}..." → run_command`);
+                            }
+
+                            // Fuzzy match: model may hallucinate short names like "gh"
+                            if (!resolvedName && tools) {
+                                resolvedName = this.fuzzyMatchToolName(item.name, itemArgs, tools);
+                            }
                             if (resolvedName) {
                                 calls.push({
                                     id: crypto.randomUUID().slice(0, 8),
                                     name: resolvedName,
-                                    arguments: item.arguments ?? item.parameters ?? {},
+                                    arguments: resolvedArgs,
                                 });
                             }
                         }
@@ -763,6 +783,99 @@ export class OllamaProvider extends BaseLlmProvider {
             }
         }
         return result;
+    }
+
+    /**
+     * Strip JSON arrays that look like tool call objects from content text.
+     * Uses balanced-bracket counting instead of regex to handle nested braces
+     * (e.g., `"arguments": {"command": "ls"}` inside the outer `[...]`).
+     */
+    private stripJsonToolCallArrays(content: string): string {
+        let result = content;
+        let searchFrom = 0;
+        while (searchFrom < result.length) {
+            const start = result.indexOf('[', searchFrom);
+            if (start === -1) break;
+
+            const preview = result.slice(start, start + 50);
+            if (!/^\[\s*\{\s*"name"\s*:/.test(preview)) {
+                searchFrom = start + 1;
+                continue;
+            }
+
+            // Balanced bracket counting to find matching ]
+            let depth = 0;
+            let end = -1;
+            for (let j = start; j < result.length; j++) {
+                if (result[j] === '[') depth++;
+                else if (result[j] === ']') {
+                    depth--;
+                    if (depth === 0) {
+                        end = j;
+                        break;
+                    }
+                }
+            }
+
+            if (end === -1) break;
+
+            // Verify it's valid JSON before stripping
+            try {
+                JSON.parse(result.slice(start, end + 1));
+                const before = result.slice(0, start).replace(/\s+$/, '');
+                const after = result.slice(end + 1).replace(/^\s+/, '');
+                result = before + after;
+                searchFrom = before.length;
+            } catch {
+                searchFrom = start + 1;
+            }
+        }
+        return result.trim();
+    }
+
+    /**
+     * Fuzzy-match a hallucinated tool name to a real tool.
+     * Small models sometimes emit short names like "gh" or "bash" instead of
+     * "run_command", or "read" instead of "read_file". We match by checking
+     * if the hallucinated name appears in the real tool's name/description,
+     * or if the arguments fit a single tool's schema.
+     */
+    private fuzzyMatchToolName(
+        name: string,
+        args: Record<string, unknown>,
+        tools: LlmToolDefinition[],
+    ): string | undefined {
+        const lower = name.toLowerCase();
+        const argKeys = Object.keys(args);
+
+        // If args contain "command", it's almost certainly run_command
+        if (argKeys.includes('command')) {
+            const cmdTool = tools.find(t => t.name === 'run_command');
+            if (cmdTool) {
+                log.info(`Fuzzy-matched hallucinated tool "${name}" → run_command (has "command" arg)`);
+                return cmdTool.name;
+            }
+        }
+
+        // Check if hallucinated name is a substring of any real tool name
+        for (const tool of tools) {
+            const toolLower = tool.name.toLowerCase();
+            if (toolLower.includes(lower) || lower.includes(toolLower)) {
+                log.info(`Fuzzy-matched hallucinated tool "${name}" → ${tool.name} (substring match)`);
+                return tool.name;
+            }
+        }
+
+        // Check if the hallucinated name appears in any tool's description
+        for (const tool of tools) {
+            if (tool.description?.toLowerCase().includes(lower)) {
+                log.info(`Fuzzy-matched hallucinated tool "${name}" → ${tool.name} (description match)`);
+                return tool.name;
+            }
+        }
+
+        log.warn(`Could not match hallucinated tool name "${name}" to any known tool`);
+        return undefined;
     }
 
     /**

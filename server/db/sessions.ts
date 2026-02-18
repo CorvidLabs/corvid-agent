@@ -115,7 +115,7 @@ export function createSession(db: Database, input: CreateSessionInput): Session 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
-        input.projectId,
+        input.projectId ?? null,
         input.agentId ?? null,
         input.name ?? '',
         input.source ?? 'web',
@@ -158,6 +158,10 @@ export function updateSession(db: Database, id: string, input: UpdateSessionInpu
 
     db.query(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
     return getSession(db, id);
+}
+
+export function updateSessionAgent(db: Database, id: string, agentId: string): void {
+    db.query("UPDATE sessions SET agent_id = ?, updated_at = datetime('now') WHERE id = ?").run(agentId, id);
 }
 
 export function updateSessionPid(db: Database, id: string, pid: number | null): void {
@@ -258,6 +262,10 @@ export function updateConversationRound(db: Database, id: string, lastRound: num
 
 export function updateConversationSession(db: Database, id: string, sessionId: string): void {
     db.query('UPDATE algochat_conversations SET session_id = ? WHERE id = ?').run(sessionId, id);
+}
+
+export function updateConversationAgent(db: Database, id: string, agentId: string, sessionId: string): void {
+    db.query('UPDATE algochat_conversations SET agent_id = ?, session_id = ? WHERE id = ?').run(agentId, sessionId, id);
 }
 
 /**
