@@ -314,8 +314,8 @@ export class AgentMessenger {
                     log.info(`Agent message completed`, { messageId, responseTxid });
                 })
                 .catch((err) => {
-                    // Still mark completed even if on-chain response fails
-                    updateAgentMessageStatus(this.db, messageId, 'completed', { response });
+                    // Mark failed — response was generated but on-chain send didn't succeed
+                    updateAgentMessageStatus(this.db, messageId, 'failed', { response });
                     this.emitMessageUpdate(messageId);
                     log.warn('On-chain response send failed', {
                         messageId,
