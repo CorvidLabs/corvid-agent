@@ -5,6 +5,7 @@ import { chatCommand } from './commands/chat';
 import { sessionCommand } from './commands/session';
 import { agentCommand } from './commands/agent';
 import { configCommand } from './commands/config';
+import { interactiveCommand } from './commands/interactive';
 import { c, printError } from './render';
 
 // ─── Argument Parsing ───────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ function getPositional(index: number): string | undefined {
 
 // ─── Version ────────────────────────────────────────────────────────────────
 
-const VERSION = '0.9.0';
+const VERSION = '0.8.0';
 
 // ─── Help ───────────────────────────────────────────────────────────────────
 
@@ -44,16 +45,18 @@ function printHelp(): void {
 ${c.bold}corvid-agent${c.reset} v${VERSION} — Agent orchestration CLI
 
 ${c.bold}Usage:${c.reset}
+  corvid-agent                          Launch interactive REPL
   corvid-agent <command> [options]
 
 ${c.bold}Commands:${c.reset}
+  ${c.cyan('(no args)')}                         Interactive chat REPL
   ${c.cyan('status')}                          Check server health
   ${c.cyan('chat')} <prompt>                    Send a message to an agent
   ${c.cyan('session')} list|get|stop|resume     Manage sessions
   ${c.cyan('agent')} list|get|create            Manage agents
   ${c.cyan('config')} show|get|set              Manage CLI configuration
 
-${c.bold}Chat Options:${c.reset}
+${c.bold}Global Options:${c.reset}
   --agent <id>       Agent ID (or set default via config)
   --project <id>     Project ID (or set default via config)
   --model <model>    Model override
@@ -64,6 +67,7 @@ ${c.bold}Agent Create Options:${c.reset}
   --model <model>    Model (default: claude-sonnet-4-5-20250929)
 
 ${c.bold}Examples:${c.reset}
+  corvid-agent                                    # interactive REPL
   corvid-agent status
   corvid-agent config set serverUrl http://localhost:3578
   corvid-agent config set authToken my-api-key
@@ -78,8 +82,14 @@ ${c.bold}Examples:${c.reset}
 // ─── Dispatch ───────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-    if (!command || command === '--help' || command === '-h') {
+    if (command === '--help' || command === '-h') {
         printHelp();
+        return;
+    }
+
+    // No command → interactive REPL
+    if (!command || (command.startsWith('--') && command !== '--version' && command !== '-v')) {
+        await interactiveCommand({ agent: getFlag('agent') });
         return;
     }
 

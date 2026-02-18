@@ -5,8 +5,10 @@ import { c, printError, Spinner } from '../render';
 interface HealthResponse {
     status: string;
     uptime: number;
-    sessions: { active: number; total: number };
-    algochat?: { enabled: boolean; address: string | null; network: string };
+    activeSessions: number;
+    algochat: boolean;
+    scheduler?: { running: boolean; activeSchedules: number; runningExecutions: number };
+    workflows?: { running: boolean; activeRuns: number; totalWorkflows: number };
 }
 
 export async function statusCommand(): Promise<void> {
@@ -22,12 +24,19 @@ export async function statusCommand(): Promise<void> {
         console.log(`${c.green('●')} Server ${c.bold}${health.status}${c.reset}`);
         console.log(`  URL:      ${c.cyan(config.serverUrl)}`);
         console.log(`  Uptime:   ${formatUptime(health.uptime)}`);
-        console.log(`  Sessions: ${health.sessions.active} active / ${health.sessions.total} total`);
+        console.log(`  Sessions: ${health.activeSessions} active`);
 
-        if (health.algochat) {
-            const ac = health.algochat;
-            const statusIcon = ac.enabled ? c.green('●') : c.gray('○');
-            console.log(`  AlgoChat: ${statusIcon} ${ac.network}${ac.address ? ` (${ac.address.slice(0, 8)}...)` : ''}`);
+        const algochatIcon = health.algochat ? c.green('●') : c.gray('○');
+        console.log(`  AlgoChat: ${algochatIcon} ${health.algochat ? 'enabled' : 'disabled'}`);
+
+        if (health.scheduler) {
+            const sIcon = health.scheduler.running ? c.green('●') : c.gray('○');
+            console.log(`  Scheduler: ${sIcon} ${health.scheduler.activeSchedules} schedules, ${health.scheduler.runningExecutions} running`);
+        }
+
+        if (health.workflows) {
+            const wIcon = health.workflows.running ? c.green('●') : c.gray('○');
+            console.log(`  Workflows: ${wIcon} ${health.workflows.totalWorkflows} total, ${health.workflows.activeRuns} running`);
         }
     } catch (err) {
         spinner.stop();
