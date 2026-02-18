@@ -94,6 +94,9 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
     // Public paths bypass auth
     if (PUBLIC_PATHS.has(url.pathname)) return null;
 
+    // A2A endpoints require auth when API key is configured
+    // (agent-card discovery at /.well-known/agent-card.json is already in PUBLIC_PATHS)
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
         return new Response(JSON.stringify({ error: 'Authentication required' }), {
@@ -203,7 +206,7 @@ export function applyCors(response: Response, req: Request, config: AuthConfig):
  * Constant-time string comparison to prevent timing attacks on API key validation.
  * Uses the same approach as crypto.timingSafeEqual but works with strings.
  */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
     const encoder = new TextEncoder();
     const bufA = encoder.encode(a);
     const bufB = encoder.encode(b);

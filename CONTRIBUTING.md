@@ -39,13 +39,16 @@ bun run build:client
 ```
 server/           # Bun HTTP server, routes, and core logic
   algochat/       # On-chain messaging bridge
-  db/             # SQLite database access layer
+  db/             # SQLite database access layer (47 migrations)
+  discord/        # Bidirectional Discord bridge (raw WebSocket)
   lib/            # Shared utilities (logger, crypto, validation)
   mcp/            # MCP tool server
   middleware/     # HTTP/WS auth, CORS, startup security checks
-  process/        # Claude Agent SDK process management
-  routes/         # REST API route handlers
+  process/        # Agent lifecycle (SDK + Ollama, persona/skill injection)
+  routes/         # REST API route handlers (26 modules)
   selftest/       # Self-test service
+  telegram/       # Bidirectional Telegram bridge (long-polling, voice)
+  voice/          # TTS (OpenAI) and STT (Whisper) with caching
   work/           # Work task service (branch, agent, validate, PR)
   ws/             # WebSocket handler
 client/           # Angular 21 mobile-first UI

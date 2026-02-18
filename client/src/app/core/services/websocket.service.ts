@@ -22,7 +22,7 @@ export class WebSocketService {
         if (this.ws?.readyState === WebSocket.OPEN) return;
 
         const wsUrl = environment.apiKey
-            ? `${environment.wsUrl}?token=${encodeURIComponent(environment.apiKey)}`
+            ? `${environment.wsUrl}?key=${encodeURIComponent(environment.apiKey)}`
             : environment.wsUrl;
         this.ws = new WebSocket(wsUrl);
 

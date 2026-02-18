@@ -166,7 +166,7 @@ async function handlePullModel(
             status: status ?? { model, status: 'pulling', progress: 0 },
         }, 202);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -186,7 +186,7 @@ async function handleDeleteModel(req: Request): Promise<Response> {
         }
         return json({ error: result.error }, 500);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }

@@ -12,21 +12,43 @@ interface ApiHelpers {
     waitForStage(launchId: string, stage: string, timeoutMs?: number): Promise<void>;
 }
 
+/** Retry-aware fetch that handles 429 (rate-limited) responses. */
+async function fetchWithRetry(
+    url: string,
+    init: RequestInit,
+    maxRetries: number = 3,
+): Promise<Response> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(url, init);
+        if (res.status === 429 && attempt < maxRetries) {
+            const retryAfter = parseInt(res.headers.get('Retry-After') ?? '2', 10);
+            await new Promise((r) => setTimeout(r, retryAfter * 1000));
+            continue;
+        }
+        return res;
+    }
+    // Unreachable, but TypeScript needs it
+    return fetch(url, init);
+}
+
 export const test = base.extend<{ api: ApiHelpers }>({
     api: async ({}, use) => {
         const helpers: ApiHelpers = {
             async seedProject(name = 'E2E Test Project') {
-                const res = await fetch(`${BASE_URL}/api/projects`, {
+                const res = await fetchWithRetry(`${BASE_URL}/api/projects`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, workingDir: '/tmp' }),
                 });
-                expect(res.ok).toBe(true);
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedProject failed: ${res.status} ${res.statusText} — ${body}`);
+                }
                 return res.json();
             },
 
             async seedAgent(name = 'E2E Test Agent') {
-                const res = await fetch(`${BASE_URL}/api/agents`, {
+                const res = await fetchWithRetry(`${BASE_URL}/api/agents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -35,17 +57,23 @@ export const test = base.extend<{ api: ApiHelpers }>({
                         algochatEnabled: true,
                     }),
                 });
-                expect(res.ok).toBe(true);
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedAgent failed: ${res.status} ${res.statusText} — ${body}`);
+                }
                 return res.json();
             },
 
             async seedCouncil(agentIds: string[], name = 'E2E Test Council', chairmanAgentId?: string) {
-                const res = await fetch(`${BASE_URL}/api/councils`, {
+                const res = await fetchWithRetry(`${BASE_URL}/api/councils`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, agentIds, chairmanAgentId }),
                 });
-                expect(res.ok).toBe(true);
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedCouncil failed: ${res.status} ${res.statusText} — ${body}`);
+                }
                 return res.json();
             },
 
@@ -56,12 +84,15 @@ export const test = base.extend<{ api: ApiHelpers }>({
             },
 
             async launchCouncil(councilId: string, projectId: string, prompt: string) {
-                const res = await fetch(`${BASE_URL}/api/councils/${councilId}/launch`, {
+                const res = await fetchWithRetry(`${BASE_URL}/api/councils/${councilId}/launch`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ projectId, prompt }),
                 });
-                expect(res.ok).toBe(true);
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`launchCouncil failed: ${res.status} ${res.statusText} — ${body}`);
+                }
                 return res.json();
             },
 
@@ -79,7 +110,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                         const data = await res.json();
                         if (data.stage === stage) return;
                         // If we've already passed the target stage, stop waiting
-                        const stages = ['responding', 'reviewing', 'synthesizing', 'complete'];
+                        const stages = ['responding', 'discussing', 'reviewing', 'synthesizing', 'complete'];
                         if (stages.indexOf(data.stage) > stages.indexOf(stage)) return;
                     }
                     await new Promise((r) => setTimeout(r, 500));

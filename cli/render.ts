@@ -115,20 +115,184 @@ export function renderMarkdown(text: string): string {
 // ─── Tool Use Display ───────────────────────────────────────────────────────
 
 export function renderToolUse(toolName: string, input: string): void {
-    const truncated = input.length > 200 ? input.slice(0, 200) + '...' : input;
-    console.log(`  ${c.gray('┃')} ${c.magenta(toolName)} ${c.dim}${truncated}${c.reset}`);
+    // Filter redundant status messages from direct-mode providers (Ollama).
+    // These arrive as tool_status events like "Running run_command..." and "Done".
+    if (input === 'Done' || input === 'done') return;
+    if (/^Running \w+\.{3}$/.test(input)) return;
+
+    // Try to extract a meaningful summary from JSON tool input (SDK mode)
+    const detail = summarizeToolInput(toolName, input);
+    console.log(`${c.cyan('│')} ${c.magenta(toolName)} ${c.dim}${detail}${c.reset}`);
+}
+
+function summarizeToolInput(_toolName: string, input: string): string {
+    // Try parsing as JSON for SDK-mode tool calls
+    try {
+        const parsed = JSON.parse(input) as Record<string, unknown>;
+        // Show the most relevant field based on tool name
+        if (parsed.command && typeof parsed.command === 'string') {
+            return truncateStr(parsed.command, 200);
+        }
+        if (parsed.path && typeof parsed.path === 'string') {
+            return truncateStr(parsed.path, 200);
+        }
+        if (parsed.query && typeof parsed.query === 'string') {
+            return truncateStr(parsed.query, 200);
+        }
+        // Fallback: show truncated JSON
+        return truncateStr(input, 200);
+    } catch {
+        // Not JSON — plain text status message from direct-mode
+        return truncateStr(input, 200);
+    }
+}
+
+function truncateStr(s: string, max: number): string {
+    return s.length > max ? s.slice(0, max) + '...' : s;
 }
 
 export function renderThinking(active: boolean): void {
     if (active) {
-        process.stderr.write(`  ${c.gray('┃')} ${c.yellow('thinking...')}\r`);
+        process.stderr.write(`${c.cyan('│')} ${c.yellow('thinking...')}\r`);
     } else {
         process.stderr.write('\r\x1b[K');
     }
 }
 
+// ─── Agent Framing ─────────────────────────────────────────────────────────
+
+const FRAME_WIDTH = 48;
+
+export function renderAgentPrefix(): void {
+    _atLineStart = true;
+    _currentCol = 0;
+    const bar = '─'.repeat(FRAME_WIDTH - 9);
+    console.log(`\n${c.cyan(`┌─ Agent ${bar}`)}`);
+}
+
+export function renderAgentSuffix(): void {
+    if (!_atLineStart) {
+        process.stdout.write('\n');
+        _atLineStart = true;
+    }
+    console.log(`${c.cyan(`└${'─'.repeat(FRAME_WIDTH - 1)}`)}`);
+}
+
+// ─── REPL Prompt ───────────────────────────────────────────────────────────
+
+export function printPrompt(): void {
+    process.stdout.write(`${c.green('You')} ${c.cyan('>')} `);
+}
+
 // ─── Stream Chunk Display ───────────────────────────────────────────────────
 
+let _atLineStart = true;
+let _currentCol = 0;
+
+export function resetStreamState(): void {
+    _atLineStart = true;
+    _currentCol = 0;
+}
+
+const BORDER_PREFIX_WIDTH = 2; // "│ " is 2 visible columns
+
 export function renderStreamChunk(chunk: string): void {
-    process.stdout.write(chunk);
+    const cleaned = deduplicateContent(stripLeakedToolCalls(chunk));
+    if (!cleaned) return;
+
+    const contentWidth = (process.stdout.columns || 80) - BORDER_PREFIX_WIDTH;
+    let output = '';
+    for (const ch of cleaned) {
+        if (_atLineStart) {
+            output += `${c.cyan('│')} `;
+            _atLineStart = false;
+            _currentCol = 0;
+        }
+        if (ch === '\n') {
+            output += ch;
+            _atLineStart = true;
+        } else {
+            if (_currentCol >= contentWidth) {
+                // Soft-wrap: start a new bordered line
+                output += `\n${c.cyan('│')} `;
+                _currentCol = 0;
+            }
+            output += ch;
+            _currentCol++;
+        }
+    }
+    process.stdout.write(output);
+}
+
+// ─── Content Deduplication ─────────────────────────────────────────────────
+
+/**
+ * Detect if text consists of the same content repeated 2–4 times and
+ * collapse it to a single copy. Handles the case where the server
+ * accumulates duplicate assistant events into one response buffer.
+ */
+function deduplicateContent(text: string): string {
+    const trimmed = text.trimEnd();
+    if (trimmed.length < 20) return text;
+
+    for (const n of [2, 3, 4]) {
+        if (trimmed.length % n !== 0) continue;
+        const unitLen = trimmed.length / n;
+        if (unitLen < 10) continue;
+        const unit = trimmed.slice(0, unitLen);
+        if (unit.repeat(n) === trimmed) {
+            return unit;
+        }
+    }
+    return text;
+}
+
+// ─── Tool Call Stripping ───────────────────────────────────────────────────
+
+/**
+ * Safety net: remove JSON arrays that look like tool call objects from
+ * displayed text. Uses bracket counting to handle nested braces.
+ */
+export function stripLeakedToolCalls(text: string): string {
+    let result = text;
+    let searchFrom = 0;
+    while (searchFrom < result.length) {
+        const start = result.indexOf('[', searchFrom);
+        if (start === -1) break;
+
+        // Quick check: does this look like a tool call array?
+        const preview = result.slice(start, start + 50);
+        if (!/^\[\s*\{\s*"name"\s*:/.test(preview)) {
+            searchFrom = start + 1;
+            continue;
+        }
+
+        // Count brackets to find the matching ]
+        let depth = 0;
+        let end = -1;
+        for (let j = start; j < result.length; j++) {
+            if (result[j] === '[') depth++;
+            else if (result[j] === ']') {
+                depth--;
+                if (depth === 0) {
+                    end = j;
+                    break;
+                }
+            }
+        }
+
+        if (end === -1) {
+            // Unmatched bracket — likely a partial chunk, leave it
+            break;
+        }
+
+        // Strip the matched array. Don't require valid JSON — models often
+        // produce malformed tool call JSON with unescaped quotes or broken
+        // structure. The [{"name": pattern + balanced brackets is sufficient.
+        const before = result.slice(0, start).replace(/\s+$/, '');
+        const after = result.slice(end + 1).replace(/^\s+/, '');
+        result = before + after;
+        searchFrom = before.length;
+    }
+    return result;
 }

@@ -4,21 +4,21 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { json } from '../lib/response';
+import { json, safeNumParam } from '../lib/response';
 
 export function handleSystemLogRoutes(req: Request, url: URL, db: Database): Response | null {
     // GET /api/system-logs — aggregated system logs
     if (url.pathname === '/api/system-logs' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '100');
-        const offset = Number(url.searchParams.get('offset') ?? '0');
+        const limit = safeNumParam(url.searchParams.get('limit'), 100);
+        const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const type = url.searchParams.get('type') ?? 'all';
         return handleLogs(db, limit, offset, type);
     }
 
     // GET /api/system-logs/credit-transactions — credit ledger
     if (url.pathname === '/api/system-logs/credit-transactions' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
-        const offset = Number(url.searchParams.get('offset') ?? '0');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
+        const offset = safeNumParam(url.searchParams.get('offset'), 0);
         return handleCreditTransactions(db, limit, offset);
     }
 

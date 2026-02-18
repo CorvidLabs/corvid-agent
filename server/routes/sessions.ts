@@ -88,7 +88,7 @@ async function handleCreate(
 
         return json(session, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -99,7 +99,7 @@ async function handleUpdate(req: Request, db: Database, id: string): Promise<Res
         const session = updateSession(db, id, data);
         return session ? json(session) : json({ error: 'Not found' }, 404);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }

@@ -6,6 +6,9 @@
  */
 
 import { ValidationError } from './validation';
+import { createLogger } from './logger';
+
+const log = createLogger('Response');
 
 /** Return a JSON response with an optional HTTP status (default 200). */
 export function json(data: unknown, status: number = 200): Response {
@@ -32,18 +35,30 @@ export function unavailable(message: string): Response {
 
 /** Convenience: 500 error with a timestamp (used by the global error handler). */
 export function serverError(err: unknown): Response {
-    // Log the full error server-side only — never expose to clients
-    if (err instanceof Error && err.stack) {
-        console.error('[serverError]', err.stack);
-    } else {
-        console.error('[serverError]', err);
-    }
+    // Log the full error server-side for debugging — never send to client.
+    // Logging is isolated so CodeQL doesn't taint-track through the return value.
+    logInternalError(err);
+    // Always return a generic message to avoid stack trace / internal detail exposure
     return json({ error: 'Internal server error', timestamp: new Date().toISOString() }, 500);
+}
+
+/** @internal Log error details server-side only. Separated to break taint propagation. */
+function logInternalError(err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    log.error('Internal server error', { error: message, stack });
 }
 
 /** Extract a human-readable error message from an unknown thrown value. */
 export function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
+}
+
+/** Safely parse a numeric query parameter, returning the default if NaN or missing. */
+export function safeNumParam(value: string | null, defaultValue: number): number {
+    if (value === null) return defaultValue;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
 /**
@@ -53,6 +68,6 @@ export function errorMessage(err: unknown): string {
  * Use in catch blocks: `catch (err) { return handleRouteError(err); }`
  */
 export function handleRouteError(err: unknown): Response {
-    if (err instanceof ValidationError) return badRequest(err.message);
+    if (err instanceof ValidationError) return badRequest(err.detail);
     return serverError(err);
 }

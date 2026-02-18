@@ -5,7 +5,7 @@
  * clients are unaware of the difference between SDK and direct mode.
  */
 
-import type { Session, Agent, Project } from '../../shared/types';
+import type { Session, Agent, Project, McpServerConfig } from '../../shared/types';
 import type { ClaudeStreamEvent } from './types';
 import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
@@ -16,6 +16,7 @@ import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
 import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { ExternalMcpClientManager } from '../mcp/external-client';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DirectProcess');
@@ -23,6 +24,51 @@ const log = createLogger('DirectProcess');
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
+
+/** Rough token count estimate (~4 chars per token). */
+function estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+}
+
+/**
+ * Truncate council synthesis messages if they exceed 70% of the context window.
+ * Keeps the system prompt contribution (already separate), first user message,
+ * and the most recent N messages. Logs a warning when truncation occurs.
+ */
+function truncateCouncilContext(
+    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
+    systemPrompt: string,
+): void {
+    const ctxSize = parseInt(process.env.OLLAMA_NUM_CTX ?? '16384', 10);
+    const threshold = Math.floor(ctxSize * 0.7);
+
+    const systemTokens = estimateTokens(systemPrompt);
+    let messageTokens = 0;
+    for (const m of messages) {
+        messageTokens += estimateTokens(m.content);
+    }
+
+    const totalTokens = systemTokens + messageTokens;
+    if (totalTokens <= threshold) return;
+
+    // Keep first user message + last 4 messages
+    const keepTail = 4;
+    if (messages.length <= keepTail + 1) return; // Nothing to trim
+
+    const first = messages[0];
+    const tail = messages.slice(-keepTail);
+
+    if (tail.includes(first)) {
+        messages.length = 0;
+        messages.push(...tail);
+    } else {
+        messages.length = 0;
+        messages.push(first, ...tail);
+    }
+
+    const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+    log.warn(`Council context truncated: ${totalTokens} → ${newTokens} estimated tokens (threshold: ${threshold})`);
+}
 
 /**
  * Trim conversation history to bound memory usage.
@@ -62,6 +108,16 @@ export interface DirectProcessOptions {
     mcpToolContext: McpToolContext | null;
     /** Called to reset the session timeout when the agent is still active. */
     extendTimeout?: (additionalMs: number) => void;
+    /** Persona system prompt section (from agent_personas table) */
+    personaPrompt?: string;
+    /** Skill bundle prompt additions (from assigned skill_bundles) */
+    skillPrompt?: string;
+    /** Override the agent/provider default model (e.g. COUNCIL_MODEL for chairman). */
+    modelOverride?: string;
+    /** External MCP server configs to connect to. */
+    externalMcpConfigs?: McpServerConfig[];
+    /** If set, only these tool names are available (all others filtered out). */
+    toolAllowList?: string[];
 }
 
 let nextPseudoPid = 800_000;
@@ -79,6 +135,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         onApprovalRequest,
         mcpToolContext,
         extendTimeout,
+        personaPrompt,
+        skillPrompt,
+        modelOverride,
+        externalMcpConfigs,
     } = options;
 
     const pseudoPid = nextPseudoPid++;
@@ -102,18 +162,40 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         env: buildSafeEnvForCoding(),
     };
 
+    // External MCP client manager for third-party MCP servers
+    const externalMcpManager = new ExternalMcpClientManager();
+
     // Build tools — skip for council deliberation sessions
-    const directTools = isDeliberationSession ? [] : buildDirectTools(mcpToolContext, codingCtx);
+    let directTools = isDeliberationSession ? [] : buildDirectTools(mcpToolContext, codingCtx);
+    // Filter to allowlist if specified (e.g. poll sessions only need run_command)
+    if (options.toolAllowList && options.toolAllowList.length > 0) {
+        const allowed = new Set(options.toolAllowList);
+        directTools = directTools.filter(t => allowed.has(t.name));
+    }
     const toolMap = new Map<string, DirectToolDefinition>();
     for (const t of directTools) {
         toolMap.set(t.name, t);
     }
 
-    const model = agent?.model || provider.getInfo().defaultModel;
+    const model = modelOverride ?? agent?.model ?? provider.getInfo().defaultModel;
 
-    // Build system prompt (with tool instructions if tools are available)
-    const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-    const systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession);
+    // Connect external MCP servers and merge their tools before starting the loop
+    const initPromise = (async () => {
+        if (!isDeliberationSession && externalMcpConfigs && externalMcpConfigs.length > 0) {
+            await externalMcpManager.connectAll(externalMcpConfigs);
+            const externalTools = externalMcpManager.getAllTools();
+            for (const t of externalTools) {
+                directTools.push(t);
+                toolMap.set(t.name, t);
+            }
+            if (externalTools.length > 0) {
+                log.info(`Added ${externalTools.length} external MCP tools for session ${session.id}`);
+            }
+        }
+    })();
+
+    // Build system prompt (with tool instructions if tools are available) — deferred until external tools are loaded
+    let systemPrompt = '';
 
     // Conversation history for the current session
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
@@ -121,8 +203,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
     const effectivePrompt = prependRoutingContext(prompt, session.source);
 
-    // Start the main loop
-    runLoop(effectivePrompt).catch((err) => {
+    // Wait for external MCP initialization, then build system prompt and start loop
+    initPromise.then(() => {
+        const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
+        systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt);
+        return runLoop(effectivePrompt);
+    }).catch((err) => {
         if (aborted) return;
         const errorMsg = err instanceof Error ? err.message : String(err);
         log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
@@ -136,6 +222,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     async function runLoop(userMessage: string): Promise<void> {
         processing = true;
         messages.push({ role: 'user', content: userMessage });
+
+        // Council synthesis prompts can be very long — truncate if needed
+        if (session.councilRole === 'chairman') {
+            truncateCouncilContext(messages, systemPrompt);
+        }
 
         // Signal that the agent is working
         onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
@@ -188,6 +279,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let iteration = 0;
         let lastToolCallKey = '';
         let repeatCount = 0;
+        let toolsEverCalled = false;
         const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
 
         try {
@@ -217,6 +309,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     tools: providerTools,
                     signal: abortController.signal,
                     onActivity: activityCallback,
+                    onStream: (text) => onEvent({
+                        type: 'content_block_delta',
+                        delta: { text },
+                    } as ClaudeStreamEvent),
                 });
             } catch (err) {
                 clearInterval(heartbeat);
@@ -233,6 +329,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         messages,
                         signal: abortController.signal,
                         onActivity: activityCallback,
+                        onStream: (text) => onEvent({
+                            type: 'content_block_delta',
+                            delta: { text },
+                        } as ClaudeStreamEvent),
                     });
                 } else {
                     throw err;
@@ -267,6 +367,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
             // Handle tool calls
             if (result.toolCalls && result.toolCalls.length > 0) {
+                toolsEverCalled = true;
                 // Detect repeated identical tool calls (small models get stuck in loops)
                 const callKey = result.toolCalls.map(tc => `${tc.name}:${JSON.stringify(tc.arguments)}`).join('|');
                 if (callKey === lastToolCallKey) {
@@ -329,8 +430,29 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 continue;
             }
 
-            // No tool calls — model is done
-            messages.push({ role: 'assistant', content: result.content || '' });
+            // No tool calls — check if the model stopped prematurely
+            const responseText = (result.content || '').trim();
+            messages.push({ role: 'assistant', content: responseText });
+
+            // Detect incomplete responses that need a nudge to use tools:
+            // (a) promised future action, (b) very short early reply,
+            // (c) wrote substantive content on iter 1 but never called a tool.
+            // Only nudge if the model has never successfully called a tool yet.
+            // Once it has used tools, a text-only response means it's genuinely done.
+            const promisedAction = !toolsEverCalled && /\b(shortly|will .*(review|check|analyze|look|fetch|investigate)|let me|i('ll| will)|working on|getting|one moment)\b/i.test(responseText);
+            const tooShort = !toolsEverCalled && responseText.length < 100 && iteration <= 2;
+            const wroteButDidntPost = !toolsEverCalled && iteration === 1 && responseText.length > 200 && !toolsDisabled;
+
+            if ((promisedAction || tooShort || wroteButDidntPost) && iteration < MAX_TOOL_ITERATIONS - 1) {
+                const reason = promisedAction ? 'promisedAction' : tooShort ? 'tooShort' : 'wroteButDidntPost';
+                log.info(`Nudging model to continue (iteration=${iteration}, reason=${reason})`);
+                const nudge = wroteButDidntPost
+                    ? 'You wrote your response as text, but the user cannot see it. You MUST use the run_command tool to post it. For example: run_command({"command": "gh pr comment ... --body \\"YOUR TEXT\\""}). Do this now.'
+                    : 'Continue. Use the tools available to you to complete the task. Do not just describe what you will do — actually do it now by calling the appropriate tool.';
+                messages.push({ role: 'user', content: nudge });
+                continue;
+            }
+
             break;
         }
 
@@ -404,6 +526,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         aborted = true;
         abortController.abort();
         approvalManager.cancelSession(session.id);
+        // Clean up external MCP server connections
+        externalMcpManager.disconnectAll().catch((err: unknown) => {
+            log.warn(`Error cleaning up external MCP connections for session ${session.id}`, {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
     }
 
     return { pid: pseudoPid, sendMessage, kill };
@@ -434,6 +562,8 @@ function buildSystemPrompt(
     toolDefs: ToolDef[],
     hasTools: boolean,
     isDeliberation = false,
+    personaPrompt?: string,
+    skillPrompt?: string,
 ): string {
     const parts: string[] = [];
 
@@ -452,6 +582,7 @@ function buildSystemPrompt(
         if (agent?.appendPrompt) {
             parts.push('', agent.appendPrompt);
         }
+        if (personaPrompt) parts.push('', personaPrompt);
         return parts.join('\n');
     }
 
@@ -467,6 +598,10 @@ function buildSystemPrompt(
     if (agent?.appendPrompt) {
         parts.push('', agent.appendPrompt);
     }
+
+    // Inject persona and skill prompts
+    if (personaPrompt) parts.push('', personaPrompt);
+    if (skillPrompt) parts.push('', `## Skill Instructions\n${skillPrompt}`);
 
     // Append tool-specific instructions when tools are available
     const toolNames = toolDefs.map((t) => t.name);

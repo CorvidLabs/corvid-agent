@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 38;
+const SCHEMA_VERSION = 49;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -198,6 +198,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
         `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
     ],
+    // Version 11 intentionally skipped (removed during development; cannot renumber without breaking existing DBs)
     12: [
         `ALTER TABLE agent_messages ADD COLUMN thread_id TEXT DEFAULT NULL`,
         `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
@@ -671,6 +672,312 @@ const MIGRATIONS: Record<number, string[]> = {
             ON owner_question_dispatches(question_id)`,
         `CREATE INDEX IF NOT EXISTS idx_question_dispatches_status
             ON owner_question_dispatches(status)`,
+    ],
+    39: [
+        // Plugin registry — dynamically loaded tool plugins
+        `CREATE TABLE IF NOT EXISTS plugins (
+            name TEXT PRIMARY KEY,
+            package_name TEXT NOT NULL,
+            version TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            author TEXT DEFAULT '',
+            capabilities TEXT NOT NULL DEFAULT '[]',
+            status TEXT DEFAULT 'active',
+            loaded_at TEXT DEFAULT (datetime('now')),
+            config TEXT DEFAULT '{}'
+        )`,
+        `CREATE TABLE IF NOT EXISTS plugin_capabilities (
+            plugin_name TEXT NOT NULL REFERENCES plugins(name) ON DELETE CASCADE,
+            capability TEXT NOT NULL,
+            granted INTEGER DEFAULT 0,
+            granted_at TEXT DEFAULT NULL,
+            PRIMARY KEY (plugin_name, capability)
+        )`,
+    ],
+    40: [
+        // Container sandbox configurations per agent
+        `CREATE TABLE IF NOT EXISTS sandbox_configs (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL UNIQUE,
+            image TEXT DEFAULT 'corvid-agent-sandbox:latest',
+            cpu_limit REAL DEFAULT 1.0,
+            memory_limit_mb INTEGER DEFAULT 512,
+            network_policy TEXT DEFAULT 'restricted',
+            timeout_seconds INTEGER DEFAULT 600,
+            read_only_mounts TEXT DEFAULT '[]',
+            work_dir TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+    ],
+    41: [
+        // Agent marketplace — listings and reviews
+        `CREATE TABLE IF NOT EXISTS marketplace_listings (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            long_description TEXT DEFAULT '',
+            category TEXT NOT NULL,
+            tags TEXT DEFAULT '[]',
+            pricing_model TEXT DEFAULT 'free',
+            price_credits INTEGER DEFAULT 0,
+            instance_url TEXT DEFAULT NULL,
+            status TEXT DEFAULT 'draft',
+            use_count INTEGER DEFAULT 0,
+            avg_rating REAL DEFAULT 0,
+            review_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_agent ON marketplace_listings(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_status ON marketplace_listings(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_category ON marketplace_listings(category)`,
+
+        `CREATE TABLE IF NOT EXISTS marketplace_reviews (
+            id TEXT PRIMARY KEY,
+            listing_id TEXT NOT NULL,
+            reviewer_agent_id TEXT DEFAULT NULL,
+            reviewer_address TEXT DEFAULT NULL,
+            rating INTEGER NOT NULL,
+            comment TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_reviews_listing ON marketplace_reviews(listing_id)`,
+
+        // Cross-instance federation registry
+        `CREATE TABLE IF NOT EXISTS federated_instances (
+            url TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            last_sync_at TEXT DEFAULT NULL,
+            listing_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active'
+        )`,
+    ],
+    42: [
+        // Agent reputation — scoring and trust attestation
+        `CREATE TABLE IF NOT EXISTS agent_reputation (
+            agent_id TEXT PRIMARY KEY,
+            overall_score INTEGER DEFAULT 0,
+            trust_level TEXT DEFAULT 'untrusted',
+            task_completion INTEGER DEFAULT 0,
+            peer_rating INTEGER DEFAULT 0,
+            credit_pattern INTEGER DEFAULT 0,
+            security_compliance INTEGER DEFAULT 0,
+            activity_level INTEGER DEFAULT 0,
+            attestation_hash TEXT DEFAULT NULL,
+            computed_at TEXT DEFAULT (datetime('now'))
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS reputation_events (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            score_impact REAL DEFAULT 0,
+            metadata TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_reputation_events_agent ON reputation_events(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_reputation_events_type ON reputation_events(event_type)`,
+
+        `CREATE TABLE IF NOT EXISTS reputation_attestations (
+            agent_id TEXT NOT NULL,
+            hash TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            txid TEXT DEFAULT NULL,
+            published_at TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (agent_id, hash)
+        )`,
+    ],
+    43: [
+        // Multi-tenant isolation
+        `CREATE TABLE IF NOT EXISTS tenants (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            owner_email TEXT NOT NULL,
+            stripe_customer_id TEXT DEFAULT NULL,
+            plan TEXT DEFAULT 'free',
+            max_agents INTEGER DEFAULT 3,
+            max_concurrent_sessions INTEGER DEFAULT 2,
+            sandbox_enabled INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS api_keys (
+            key_hash TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            label TEXT DEFAULT 'default',
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
+
+        // Usage-based billing
+        `CREATE TABLE IF NOT EXISTS subscriptions (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            stripe_subscription_id TEXT NOT NULL,
+            plan TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            current_period_start TEXT NOT NULL,
+            current_period_end TEXT NOT NULL,
+            cancel_at_period_end INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id)`,
+
+        `CREATE TABLE IF NOT EXISTS usage_records (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            credits_used INTEGER DEFAULT 0,
+            api_calls INTEGER DEFAULT 0,
+            session_count INTEGER DEFAULT 0,
+            storage_mb REAL DEFAULT 0,
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            reported INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_usage_records_tenant ON usage_records(tenant_id)`,
+
+        `CREATE TABLE IF NOT EXISTS invoices (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            stripe_invoice_id TEXT NOT NULL,
+            amount_cents INTEGER NOT NULL,
+            currency TEXT DEFAULT 'usd',
+            status TEXT DEFAULT 'open',
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            paid_at TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id)`,
+    ],
+    44: [
+        // Health snapshots for improvement loop trend analysis
+        `CREATE TABLE IF NOT EXISTS health_snapshots (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            tsc_error_count INTEGER DEFAULT 0,
+            tsc_passed INTEGER DEFAULT 0,
+            tests_passed INTEGER DEFAULT 0,
+            test_failure_count INTEGER DEFAULT 0,
+            todo_count INTEGER DEFAULT 0,
+            fixme_count INTEGER DEFAULT 0,
+            hack_count INTEGER DEFAULT 0,
+            large_file_count INTEGER DEFAULT 0,
+            outdated_dep_count INTEGER DEFAULT 0,
+            collected_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_health_snap_agent ON health_snapshots(agent_id, project_id)`,
+
+        // Memory archival support — archived memories are excluded from search
+        `ALTER TABLE agent_memories ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`,
+    ],
+    45: [
+        // Agent personas — personality and identity for agents
+        `CREATE TABLE IF NOT EXISTS agent_personas (
+            agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+            archetype TEXT DEFAULT 'custom',
+            traits TEXT NOT NULL DEFAULT '[]',
+            voice_guidelines TEXT DEFAULT '',
+            background TEXT DEFAULT '',
+            example_messages TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+    ],
+    46: [
+        // Skill bundles — composable tool + prompt packages
+        `CREATE TABLE IF NOT EXISTS skill_bundles (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT DEFAULT '',
+            tools TEXT NOT NULL DEFAULT '[]',
+            prompt_additions TEXT DEFAULT '',
+            preset INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE TABLE IF NOT EXISTS agent_skills (
+            agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            bundle_id TEXT NOT NULL REFERENCES skill_bundles(id) ON DELETE CASCADE,
+            sort_order INTEGER DEFAULT 0,
+            PRIMARY KEY (agent_id, bundle_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_skills_agent ON agent_skills(agent_id)`,
+        // Preset skill bundles
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-code-reviewer', 'Code Reviewer', 'Review pull requests and provide feedback', '["corvid_github_list_prs","corvid_github_review_pr","corvid_github_get_pr_diff","corvid_github_comment_on_pr"]', 'You are an expert code reviewer. Focus on code quality, security, performance, and maintainability. Provide specific, actionable feedback.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-devops', 'DevOps', 'Infrastructure and deployment automation', '["corvid_create_work_task","corvid_github_create_pr","corvid_github_fork_repo"]', 'You specialize in DevOps practices. Focus on CI/CD, infrastructure-as-code, monitoring, and deployment automation.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-researcher', 'Researcher', 'Deep research and information gathering', '["corvid_web_search","corvid_deep_research","corvid_save_memory","corvid_recall_memory"]', 'You are a thorough researcher. Gather comprehensive information, cross-reference sources, and synthesize findings into clear summaries.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-communicator', 'Communicator', 'Inter-agent and external communication', '["corvid_send_message","corvid_list_agents","corvid_discover_agent","corvid_invoke_remote_agent"]', 'You excel at communication and coordination. Draft clear messages, manage conversations, and facilitate collaboration between agents.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-analyst', 'Analyst', 'Code analysis and health monitoring', '["corvid_check_health_trends","corvid_check_reputation","corvid_github_repo_info","corvid_github_list_issues"]', 'You are a data-driven analyst. Examine metrics, identify trends, and provide actionable insights from codebase health and project data.', 1)`,
+    ],
+    47: [
+        // Voice support — TTS/STT for agent communication
+        `ALTER TABLE agents ADD COLUMN voice_enabled INTEGER DEFAULT 0`,
+        `ALTER TABLE agents ADD COLUMN voice_preset TEXT DEFAULT 'alloy'`,
+        `CREATE TABLE IF NOT EXISTS voice_cache (
+            id TEXT PRIMARY KEY,
+            text_hash TEXT NOT NULL,
+            voice_preset TEXT NOT NULL,
+            audio_data BLOB NOT NULL,
+            format TEXT DEFAULT 'mp3',
+            duration_ms INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_cache_hash ON voice_cache(text_hash, voice_preset)`,
+    ],
+    48: [
+        // Make sessions.project_id nullable — sessions without a project are general/unbound
+        `CREATE TABLE sessions_new (
+            id              TEXT PRIMARY KEY,
+            project_id      TEXT REFERENCES projects(id),
+            agent_id        TEXT REFERENCES agents(id),
+            name            TEXT DEFAULT '',
+            status          TEXT DEFAULT 'idle',
+            source          TEXT DEFAULT 'web',
+            initial_prompt  TEXT DEFAULT '',
+            pid             INTEGER DEFAULT NULL,
+            total_cost_usd  REAL DEFAULT 0,
+            total_algo_spent REAL DEFAULT 0,
+            total_turns     INTEGER DEFAULT 0,
+            council_launch_id TEXT DEFAULT NULL,
+            council_role    TEXT DEFAULT NULL,
+            work_dir        TEXT DEFAULT NULL,
+            credits_consumed REAL DEFAULT 0,
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `INSERT INTO sessions_new SELECT id, project_id, agent_id, name, status, source, initial_prompt, pid, total_cost_usd, total_algo_spent, total_turns, council_launch_id, council_role, work_dir, credits_consumed, created_at, updated_at FROM sessions`,
+        `DROP TABLE sessions`,
+        `ALTER TABLE sessions_new RENAME TO sessions`,
+    ],
+    49: [
+        `CREATE TABLE IF NOT EXISTS mcp_server_configs (
+            id          TEXT PRIMARY KEY,
+            agent_id    TEXT DEFAULT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            name        TEXT NOT NULL,
+            command     TEXT NOT NULL,
+            args        TEXT NOT NULL DEFAULT '[]',
+            env_vars    TEXT NOT NULL DEFAULT '{}',
+            cwd         TEXT DEFAULT NULL,
+            enabled     INTEGER NOT NULL DEFAULT 1,
+            created_at  TEXT DEFAULT (datetime('now')),
+            updated_at  TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_agent ON mcp_server_configs(agent_id)`,
     ],
 };
 

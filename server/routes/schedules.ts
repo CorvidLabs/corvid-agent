@@ -14,7 +14,7 @@ import {
 import { getNextCronDate } from '../scheduler/cron-parser';
 import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
-import { json, handleRouteError, errorMessage, badRequest } from '../lib/response';
+import { json, handleRouteError, badRequest, safeNumParam } from '../lib/response';
 
 export function handleScheduleRoutes(
     req: Request,
@@ -57,14 +57,14 @@ export function handleScheduleRoutes(
     // List executions for a schedule
     const execsMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/executions$/);
     if (execsMatch && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const executions = listExecutions(db, execsMatch[1], limit);
         return json(executions);
     }
 
     // List all executions
     if (url.pathname === '/api/schedule-executions' && req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const executions = listExecutions(db, undefined, limit);
         return json(executions);
     }
@@ -114,13 +114,17 @@ async function handleCreateSchedule(req: Request, db: Database): Promise<Respons
 
         return json(schedule, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
-        const msg = errorMessage(err);
-        if (msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short')) {
-            return badRequest(msg);
-        }
+        if (err instanceof ValidationError) return badRequest(err.detail);
+        if (isScheduleFrequencyError(err)) return badRequest('Schedule frequency too high');
         return handleRouteError(err);
     }
+}
+
+/** Check if an error is a known schedule frequency validation error. */
+function isScheduleFrequencyError(err: unknown): boolean {
+    if (!(err instanceof Error)) return false;
+    const msg = err.message;
+    return msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short');
 }
 
 async function handleUpdateSchedule(req: Request, db: Database, id: string): Promise<Response> {
@@ -150,11 +154,8 @@ async function handleUpdateSchedule(req: Request, db: Database, id: string): Pro
 
         return json(schedule);
     } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.message);
-        const msg = errorMessage(err);
-        if (msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short')) {
-            return badRequest(msg);
-        }
+        if (err instanceof ValidationError) return badRequest(err.detail);
+        if (isScheduleFrequencyError(err)) return badRequest('Schedule frequency too high');
         return handleRouteError(err);
     }
 }

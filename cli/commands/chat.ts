@@ -1,7 +1,9 @@
 import { CorvidClient } from '../client';
 import { loadConfig } from '../config';
+import { pickAgent } from './pick-agent';
+import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
-import { c, printError, renderStreamChunk, renderToolUse, renderThinking, Spinner } from '../render';
+import { printError, renderStreamChunk, renderToolUse, renderThinking, Spinner } from '../render';
 
 interface ChatOptions {
     agent?: string;
@@ -11,22 +13,27 @@ interface ChatOptions {
 
 export async function chatCommand(prompt: string, options: ChatOptions): Promise<void> {
     const config = loadConfig();
-    const agentId = options.agent ?? config.defaultAgent;
-    const projectId = options.project ?? config.defaultProject;
-
-    if (!agentId) {
-        printError('No agent specified. Use --agent <id> or set a default with: corvid-agent config set defaultAgent <id>');
-        process.exit(1);
-    }
-
     const client = new CorvidClient(config);
+
+    // Resolve project: flag → config default → auto-detect from cwd
+    const projectId = options.project ?? config.defaultProject ?? await resolveProjectFromCwd(client);
+
+    // Resolve agent: flag → config default → interactive picker
+    const agentId = options.agent ?? await pickAgent(client, config);
+
     const spinner = new Spinner('Connecting...');
     spinner.start();
 
     let done = false;
+    let hasStreamContent = false;
+
+    const markDone = () => {
+        if (done) return;
+        done = true;
+    };
 
     const ws = client.connectWebSocket((msg: ServerMessage) => {
-        handleMessage(msg, agentId, spinner, () => { done = true; });
+        handleMessage(msg, agentId, spinner, hasStreamContent, markDone, () => { hasStreamContent = true; });
     }, () => {
         if (!done) {
             spinner.stop();
@@ -69,17 +76,37 @@ function handleMessage(
     msg: ServerMessage,
     agentId: string,
     spinner: Spinner,
+    hasStreamContent: boolean,
     onDone: () => void,
+    onContent: () => void,
 ): void {
     switch (msg.type) {
         case 'chat_stream':
             if (msg.agentId === agentId) {
                 spinner.stop();
                 if (msg.done) {
-                    onDone();
-                } else {
+                    // If we already have streamed content, we're done.
+                    // If not, wait for algochat_message which carries the full response
+                    // for non-streaming providers (e.g. Ollama).
+                    if (hasStreamContent) {
+                        onDone();
+                    }
+                } else if (msg.chunk) {
+                    onContent();
                     renderStreamChunk(msg.chunk);
                 }
+            }
+            break;
+
+        case 'algochat_message':
+            // Non-streaming providers send the full response as algochat_message.
+            // For streaming providers, content was already displayed via chat_stream.
+            if (msg.direction === 'outbound') {
+                spinner.stop();
+                if (!hasStreamContent && msg.content) {
+                    renderStreamChunk(msg.content);
+                }
+                onDone();
             }
             break;
 
@@ -97,9 +124,9 @@ function handleMessage(
             break;
 
         case 'chat_session':
+            // Suppress — session IDs are noise for one-shot chat
             if (msg.agentId === agentId) {
                 spinner.stop();
-                console.log(c.gray(`session: ${msg.sessionId}`));
             }
             break;
 
@@ -109,4 +136,18 @@ function handleMessage(
             onDone();
             break;
     }
+}
+
+async function resolveProjectFromCwd(client: CorvidClient): Promise<string | undefined> {
+    try {
+        const projects = await client.get<Project[]>('/api/projects');
+        const cwd = process.cwd();
+        const exact = projects.find(p => p.workingDir === cwd);
+        if (exact) return exact.id;
+        const prefix = projects.find(p => cwd.startsWith(p.workingDir + '/'));
+        if (prefix) return prefix.id;
+    } catch {
+        // Silently ignore — fall back to server default
+    }
+    return undefined;
 }

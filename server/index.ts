@@ -20,7 +20,7 @@ import { MemorySyncService } from './db/memory-sync';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
-import { checkWsAuth, loadAuthConfig, validateStartupSecurity } from './middleware/auth';
+import { checkWsAuth, loadAuthConfig, validateStartupSecurity, timingSafeEqual } from './middleware/auth';
 import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
@@ -44,6 +44,19 @@ import { AstParserService } from './ast/service';
 import { NotificationService } from './notifications/service';
 import { QuestionDispatcher } from './notifications/question-dispatcher';
 import { ResponsePollingService } from './notifications/response-poller';
+import { SandboxManager } from './sandbox/manager';
+import { MarketplaceService } from './marketplace/service';
+import { MarketplaceFederation } from './marketplace/federation';
+import { ReputationScorer } from './reputation/scorer';
+import { ReputationAttestation } from './reputation/attestation';
+import { ReputationVerifier } from './reputation/verifier';
+import { MemoryManager } from './memory/index';
+import { AutonomousLoopService } from './improvement/service';
+import { TelegramBridge } from './telegram/bridge';
+import { DiscordBridge } from './discord/bridge';
+import { TenantService } from './tenant/context';
+import { BillingService } from './billing/service';
+import { UsageMeter } from './billing/meter';
 
 const log = createLogger('Server');
 
@@ -75,6 +88,31 @@ const providerRegistry = LlmProviderRegistry.getInstance();
 providerRegistry.register(new AnthropicProvider());
 const ollamaProvider = new OllamaProvider();
 providerRegistry.register(ollamaProvider);
+
+// Ollama startup validation — health-check when Ollama is the only enabled provider
+const isOllamaOnly = !providerRegistry.get('anthropic') && !providerRegistry.get('openai');
+if (isOllamaOnly) {
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    try {
+        const tagsResponse = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(5_000) });
+        if (tagsResponse.ok) {
+            const tagsData = (await tagsResponse.json()) as { models?: Array<{ name: string }> };
+            const modelCount = tagsData.models?.length ?? 0;
+            if (modelCount === 0) {
+                log.warn('Ollama is running but no models are pulled. Suggested: ollama pull qwen3:8b');
+            } else {
+                log.info(`Ollama health check OK — ${modelCount} model(s) available`);
+            }
+        } else {
+            log.error(`Ollama health check failed (HTTP ${tagsResponse.status}). Is Ollama running at ${ollamaHost}?`);
+        }
+    } catch (err) {
+        log.error('Ollama is unreachable — install from https://ollama.com and run: ollama serve', {
+            host: ollamaHost,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
 
 // Fire-and-forget: refresh Ollama models on startup (warn if not running)
 ollamaProvider.refreshModels().catch((err) => {
@@ -132,6 +170,68 @@ const notificationService = new NotificationService(db);
 // Initialize question dispatcher and response poller (two-way question channels)
 const questionDispatcher = new QuestionDispatcher(db);
 const responsePollingService = new ResponsePollingService(db, processManager.ownerQuestionManager);
+
+// Initialize sandbox manager (opt-in via SANDBOX_ENABLED=true)
+const sandboxEnabled = process.env.SANDBOX_ENABLED === 'true';
+const sandboxManager = sandboxEnabled ? new SandboxManager(db) : null;
+if (sandboxManager) {
+    sandboxManager.initialize().catch((err: Error) => {
+        log.warn('Sandbox manager failed to initialize', { error: err.message });
+    });
+}
+
+// Initialize marketplace
+const marketplaceService = new MarketplaceService(db);
+const marketplaceFederation = new MarketplaceFederation(db);
+
+// Initialize reputation system
+const reputationScorer = new ReputationScorer(db);
+const reputationAttestation = new ReputationAttestation(db);
+const reputationVerifier = new ReputationVerifier();
+
+// Initialize memory manager (for structured memory with semantic search)
+const memoryManager = new MemoryManager(db);
+
+// Initialize autonomous improvement loop service
+const improvementLoopService = new AutonomousLoopService(
+    db, processManager, workTaskService, memoryManager, reputationScorer,
+);
+schedulerService.setImprovementLoopService(improvementLoopService);
+schedulerService.setReputationServices(reputationScorer, reputationAttestation);
+
+// Initialize multi-tenant (opt-in via MULTI_TENANT=true)
+const multiTenant = process.env.MULTI_TENANT === 'true';
+new TenantService(db, multiTenant);
+
+// Initialize billing
+const billingService = new BillingService(db);
+const usageMeter = new UsageMeter(db, billingService);
+
+// Initialize bidirectional Telegram bridge (opt-in via env vars)
+let telegramBridge: TelegramBridge | null = null;
+if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+    telegramBridge = new TelegramBridge(db, processManager, {
+        botToken: process.env.TELEGRAM_BOT_TOKEN,
+        chatId: process.env.TELEGRAM_CHAT_ID,
+        allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    });
+    telegramBridge.start();
+    log.info('Telegram bridge initialized');
+}
+
+// Initialize bidirectional Discord bridge (opt-in via env vars)
+let discordBridge: DiscordBridge | null = null;
+if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
+    discordBridge = new DiscordBridge(db, processManager, {
+        botToken: process.env.DISCORD_BOT_TOKEN,
+        channelId: process.env.DISCORD_CHANNEL_ID,
+        allowedUserIds: process.env.DISCORD_ALLOWED_USER_IDS
+            ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
+            : [],
+    });
+    discordBridge.start();
+    log.info('Discord bridge initialized');
+}
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -206,7 +306,8 @@ async function initAlgoChat(): Promise<void> {
     processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher);
+    }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher,
+    reputationScorer, reputationAttestation, reputationVerifier);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
@@ -238,7 +339,7 @@ function checkAdminAuth(req: Request): boolean {
     const authHeader = req.headers.get('authorization');
     if (!authHeader) return false;
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    return token === adminKey;
+    return timingSafeEqual(token, adminKey);
 }
 
 // Start server
@@ -410,7 +511,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService);
+            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
@@ -559,6 +660,7 @@ initAlgoChat().then(() => {
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
+    usageMeter.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
     // Start scheduler, polling, workflows, and notifications even if AlgoChat fails — they can still do GitHub ops and work tasks
@@ -567,6 +669,7 @@ initAlgoChat().then(() => {
     schedulerService.start();
     mentionPollingService.start();
     workflowService.start();
+    usageMeter.start();
 });
 
 // Start session lifecycle cleanup after server is running
@@ -621,6 +724,11 @@ function gracefulShutdown(): void {
     mentionPollingService.stop();
     memorySyncService.stop();
     sessionLifecycle.stop();
+    usageMeter.stop();
+    marketplaceFederation.stopPeriodicSync();
+    if (sandboxManager) sandboxManager.shutdown();
+    telegramBridge?.stop();
+    discordBridge?.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();

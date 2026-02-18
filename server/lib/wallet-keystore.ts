@@ -17,7 +17,7 @@ import { createLogger } from './logger';
 
 const log = createLogger('WalletKeystore');
 
-/** Resolve keystore path lazily so env overrides work even after module caching. */
+/** Read the keystore path lazily so env overrides work even with module caching. */
 export function getKeystorePath(): string {
     return process.env.WALLET_KEYSTORE_PATH ?? './wallet-keystore.json';
 }
@@ -49,19 +49,19 @@ function verifyFilePermissions(): boolean {
 
     try {
         const fs = require('node:fs') as typeof import('node:fs');
-        const kpath = getKeystorePath();
-        const stat = fs.statSync(kpath);
+        const path = getKeystorePath();
+        const stat = fs.statSync(path);
         const mode = stat.mode & 0o777; // Extract permission bits
 
         if (mode !== REQUIRED_MODE) {
             log.warn('Keystore file has overly permissive permissions — fixing', {
-                path: kpath,
+                path,
                 currentMode: '0o' + mode.toString(8),
                 requiredMode: '0o' + REQUIRED_MODE.toString(8),
             });
             // Auto-fix: tighten permissions
             try {
-                fs.chmodSync(kpath, REQUIRED_MODE);
+                fs.chmodSync(path, REQUIRED_MODE);
                 log.info('Fixed keystore file permissions', { mode: '0o' + REQUIRED_MODE.toString(8) });
             } catch (chmodErr) {
                 log.error('Failed to fix keystore permissions — refusing to read', {
@@ -117,8 +117,8 @@ export function readKeystore(): KeystoreData {
  * This prevents corruption if the process crashes mid-write.
  */
 function writeKeystore(data: KeystoreData): void {
-    const kpath = getKeystorePath();
-    const tmpPath = kpath + '.tmp';
+    const path = getKeystorePath();
+    const tmpPath = path + '.tmp';
     try {
         const fs = require('node:fs') as typeof import('node:fs');
         const content = JSON.stringify(data, null, 2);
@@ -128,17 +128,17 @@ function writeKeystore(data: KeystoreData): void {
         fs.writeFileSync(tmpPath, content, { encoding: 'utf-8', mode: REQUIRED_MODE });
 
         // Atomic rename
-        fs.renameSync(tmpPath, kpath);
+        fs.renameSync(tmpPath, path);
 
         // Ensure final file has correct permissions (rename preserves source perms,
         // but belt-and-suspenders for cross-platform safety).
         // Skip on Windows where chmod is a no-op.
         if (!IS_WINDOWS) {
-            fs.chmodSync(kpath, REQUIRED_MODE);
+            fs.chmodSync(path, REQUIRED_MODE);
         }
     } catch (err) {
         log.error('Failed to write wallet keystore', {
-            path: kpath,
+            path,
             error: err instanceof Error ? err.message : String(err),
         });
         // Clean up temp file on failure

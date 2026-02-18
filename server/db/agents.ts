@@ -18,6 +18,8 @@ interface AgentRow {
     custom_flags: string;
     default_project_id: string | null;
     mcp_tool_permissions: string | null;
+    voice_enabled: number;
+    voice_preset: string;
     wallet_address: string | null;
     wallet_mnemonic_encrypted: string | null;
     wallet_funded_algo: number;
@@ -43,6 +45,8 @@ function rowToAgent(row: AgentRow): Agent {
         customFlags: JSON.parse(row.custom_flags),
         defaultProjectId: row.default_project_id ?? null,
         mcpToolPermissions: row.mcp_tool_permissions ? JSON.parse(row.mcp_tool_permissions) : null,
+        voiceEnabled: row.voice_enabled === 1,
+        voicePreset: (row.voice_preset || 'alloy') as Agent['voicePreset'],
         walletAddress: row.wallet_address ?? null,
         walletFundedAlgo: row.wallet_funded_algo ?? 0,
         createdAt: row.created_at,
@@ -69,8 +73,9 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
     db.query(
         `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
-         algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions,
+         voice_enabled, voice_preset)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -88,6 +93,8 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         customFlags,
         input.defaultProjectId ?? null,
         mcpToolPermissions,
+        input.voiceEnabled ? 1 : 0,
+        input.voicePreset ?? 'alloy',
     );
 
     const created = getAgent(db, id);
@@ -144,6 +151,14 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
     if (input.mcpToolPermissions !== undefined) {
         fields.push('mcp_tool_permissions = ?');
         values.push(input.mcpToolPermissions ? JSON.stringify(input.mcpToolPermissions) : null);
+    }
+    if (input.voiceEnabled !== undefined) {
+        fields.push('voice_enabled = ?');
+        values.push(input.voiceEnabled ? 1 : 0);
+    }
+    if (input.voicePreset !== undefined) {
+        fields.push('voice_preset = ?');
+        values.push(input.voicePreset);
     }
 
     if (fields.length === 0) return existing;

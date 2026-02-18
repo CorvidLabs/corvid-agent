@@ -201,7 +201,7 @@ function handleClientMessage(
                     type: 'agent_message_update',
                     message: result.message,
                 };
-                ws.send(JSON.stringify(serverMsg));
+                safeSend(ws, serverMsg);
 
                 // Subscribe to status updates for this session
                 if (result.sessionId) {
@@ -219,8 +219,10 @@ function handleClientMessage(
                                         type: 'agent_message_update',
                                         message: updated,
                                     };
-                                    ws.send(JSON.stringify(updateMsg));
+                                    safeSend(ws, updateMsg);
                                 }
+                            }).catch((err) => {
+                                log.warn('Failed to re-fetch agent message', { error: err instanceof Error ? err.message : String(err) });
                             });
                         }
                     };
@@ -254,12 +256,12 @@ function handleClientMessage(
                 projectId: msg.projectId,
             }).then((task) => {
                 const serverMsg: ServerMessage = { type: 'work_task_update', task };
-                ws.send(JSON.stringify(serverMsg));
+                safeSend(ws, serverMsg);
 
                 // Register for completion update
                 workTaskService.onComplete(task.id, (completedTask) => {
                     const updateMsg: ServerMessage = { type: 'work_task_update', task: completedTask };
-                    ws.send(JSON.stringify(updateMsg));
+                    safeSend(ws, updateMsg);
                 });
             }).catch((err) => {
                 sendError(ws, `Work task error: ${err instanceof Error ? err.message : String(err)}`);
@@ -293,7 +295,7 @@ function handleClientMessage(
                     balance,
                     funded: agent.walletFundedAlgo,
                 };
-                ws.send(JSON.stringify(balanceMsg));
+                safeSend(ws, balanceMsg);
             }).catch((err) => {
                 sendError(ws, `Reward error: ${err instanceof Error ? err.message : String(err)}`);
             });
@@ -312,7 +314,7 @@ function handleClientMessage(
                 sendError(ws, 'Execution not found or not awaiting approval');
             } else {
                 const serverMsg: ServerMessage = { type: 'schedule_execution_update', execution };
-                ws.send(JSON.stringify(serverMsg));
+                safeSend(ws, serverMsg);
             }
             break;
         }
@@ -337,9 +339,17 @@ function handleClientMessage(
     }
 }
 
+/** Send a message to a WebSocket, guarding against closed connections. */
+function safeSend(ws: ServerWebSocket<WsData>, msg: ServerMessage): void {
+    try {
+        ws.send(JSON.stringify(msg));
+    } catch {
+        // Connection closed before async callback fired — ignore
+    }
+}
+
 function sendError(ws: ServerWebSocket<WsData>, message: string): void {
-    const msg: ServerMessage = { type: 'error', message };
-    ws.send(JSON.stringify(msg));
+    safeSend(ws, { type: 'error', message });
 }
 
 export function broadcastAlgoChatMessage(

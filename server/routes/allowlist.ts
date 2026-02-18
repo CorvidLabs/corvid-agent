@@ -59,7 +59,7 @@ async function handleAdd(req: Request, db: Database): Promise<Response> {
         const entry = addToAllowlist(db, address, data.label);
         return json(entry, 201);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }
@@ -71,7 +71,7 @@ async function handleUpdate(req: Request, db: Database, address: string): Promis
         const entry = updateAllowlistEntry(db, address, String(data.label));
         return entry ? json(entry) : json({ error: 'Not found' }, 404);
     } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.message }, 400);
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
     }
 }

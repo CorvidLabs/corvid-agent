@@ -8,10 +8,10 @@ import { ApprovalManager } from './approval-manager';
 import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
-import { getAgent } from '../db/agents';
+import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
 import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
-import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
+import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, updateSessionAgent, addSessionMessage } from '../db/sessions';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
@@ -20,9 +20,15 @@ import type { SchedulerService } from '../scheduler/service';
 import type { WorkflowService } from '../workflow/service';
 import type { NotificationService } from '../notifications/service';
 import type { QuestionDispatcher } from '../notifications/question-dispatcher';
+import type { ReputationScorer } from '../reputation/scorer';
+import type { ReputationAttestation } from '../reputation/attestation';
+import type { ReputationVerifier } from '../reputation/verifier';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
+import { getPersona, composePersonaPrompt } from '../db/personas';
+import { resolveAgentPromptAdditions } from '../db/skill-bundles';
+import { getActiveServersForAgent } from '../db/mcp-servers';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
@@ -103,6 +109,9 @@ export class ProcessManager {
     private mcpWorkflowService: WorkflowService | null = null;
     private mcpNotificationService: NotificationService | null = null;
     private mcpQuestionDispatcher: QuestionDispatcher | null = null;
+    private mcpReputationScorer: ReputationScorer | null = null;
+    private mcpReputationAttestation: ReputationAttestation | null = null;
+    private mcpReputationVerifier: ReputationVerifier | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -137,6 +146,9 @@ export class ProcessManager {
         workflowService?: WorkflowService,
         notificationService?: NotificationService,
         questionDispatcher?: QuestionDispatcher,
+        reputationScorer?: ReputationScorer,
+        reputationAttestation?: ReputationAttestation,
+        reputationVerifier?: ReputationVerifier,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
@@ -147,6 +159,9 @@ export class ProcessManager {
         this.mcpWorkflowService = workflowService ?? null;
         this.mcpNotificationService = notificationService ?? null;
         this.mcpQuestionDispatcher = questionDispatcher ?? null;
+        this.mcpReputationScorer = reputationScorer ?? null;
+        this.mcpReputationAttestation = reputationAttestation ?? null;
+        this.mcpReputationVerifier = reputationVerifier ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -180,6 +195,9 @@ export class ProcessManager {
             sessionId,
             notificationService: this.mcpNotificationService ?? undefined,
             questionDispatcher: this.mcpQuestionDispatcher ?? undefined,
+            reputationScorer: this.mcpReputationScorer ?? undefined,
+            reputationAttestation: this.mcpReputationAttestation ?? undefined,
+            reputationVerifier: this.mcpReputationVerifier ?? undefined,
         };
     }
 
@@ -201,8 +219,8 @@ export class ProcessManager {
             this.stopProcess(session.id);
         }
 
-        const project = getProject(this.db, session.projectId);
-        if (!project) {
+        const project = session.projectId ? getProject(this.db, session.projectId) : null;
+        if (session.projectId && !project) {
             this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Project ${session.projectId} not found`, type: 'not_found' },
@@ -210,17 +228,44 @@ export class ProcessManager {
             return;
         }
 
-        const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+        let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
         // Route based on provider execution mode
-        const providerType = agent?.provider as LlmProviderType | undefined;
-        const provider = providerType ? LlmProviderRegistry.getInstance().get(providerType) : undefined;
+        const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
+        const registry = LlmProviderRegistry.getInstance();
+        let provider = providerType ? registry.get(providerType) : undefined;
+
+        // Auto-fallback: no explicit provider + no Anthropic API key → try Ollama
+        if (!provider && !providerType && !process.env.ANTHROPIC_API_KEY) {
+            const ollamaFallback = registry.get('ollama');
+            if (ollamaFallback) {
+                log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for session ${session.id}`);
+                provider = ollamaFallback;
+                // Clear agent's non-Ollama model so direct-process uses the Ollama default
+                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model — will use Ollama default`, { agentId: effectiveAgent.id });
+                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                }
+            }
+        }
+
+        // Use a minimal default project when session has no project
+        const effectiveProject = project ?? {
+            id: 'general',
+            name: 'General',
+            description: '',
+            workingDir: process.cwd(),
+            claudeMd: '',
+            envVars: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, project, agent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
         } else {
-            this.startSdkProcessWrapped(session, project, agent, resolvedPrompt, options?.depth, options?.schedulerMode);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode);
         }
     }
 
@@ -238,6 +283,18 @@ export class ProcessManager {
             })()
             : undefined;
 
+        // Resolve persona and skill bundle prompts for this agent
+        let personaPrompt: string | undefined;
+        let skillPrompt: string | undefined;
+        if (agent) {
+            const persona = getPersona(this.db, agent.id);
+            const pp = composePersonaPrompt(persona);
+            if (pp) personaPrompt = pp;
+
+            const sp2 = resolveAgentPromptAdditions(this.db, agent.id);
+            if (sp2) skillPrompt = sp2;
+        }
+
         let sp: SdkProcess;
         try {
             sp = startSdkProcess({
@@ -251,6 +308,8 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 onApiOutage: () => this.handleApiOutage(session.id),
                 mcpServers,
+                personaPrompt,
+                skillPrompt,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -283,8 +342,34 @@ export class ProcessManager {
             ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode)
             : null;
 
+        // Resolve persona and skill bundle prompts for this agent
+        let personaPrompt: string | undefined;
+        let skillPrompt: string | undefined;
+        if (agent) {
+            const persona = getPersona(this.db, agent.id);
+            const pp = composePersonaPrompt(persona);
+            if (pp) personaPrompt = pp;
+
+            const sp2 = resolveAgentPromptAdditions(this.db, agent.id);
+            if (sp2) skillPrompt = sp2;
+        }
+
+        // Query external MCP server configs for this agent
+        const externalMcpConfigs = session.agentId
+            ? getActiveServersForAgent(this.db, session.agentId)
+            : [];
+
+        // COUNCIL_MODEL override: use a bigger model for council chairman/synthesis
+        const councilModel = process.env.COUNCIL_MODEL;
+        const modelOverride = (session.councilRole === 'chairman' && councilModel)
+            ? councilModel
+            : undefined;
+
         let sp: SdkProcess;
         try {
+            // Poll-triggered sessions only need run_command to execute gh CLI commands.
+            // Giving small models the full tool set causes them to call random tools.
+            const isPollSession = session.name.startsWith('Poll:');
             sp = startDirectProcess({
                 session,
                 project: effectiveProject,
@@ -297,6 +382,11 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 mcpToolContext,
                 extendTimeout: (ms) => this.extendTimeout(session.id, ms),
+                personaPrompt,
+                skillPrompt,
+                modelOverride,
+                externalMcpConfigs,
+                toolAllowList: isPollSession ? ['run_command'] : undefined,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -366,10 +456,20 @@ export class ProcessManager {
             }
         }
 
-        const project = getProject(this.db, session.projectId);
-        if (!project) return;
+        const project = session.projectId ? getProject(this.db, session.projectId) : null;
+        // Use a minimal default project when session has no project
+        const effectiveProject = project ?? {
+            id: 'general',
+            name: 'General',
+            description: '',
+            workingDir: process.cwd(),
+            claudeMd: '',
+            envVars: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
 
-        const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+        let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
         // Start a fresh process — our session IDs are not Claude conversation IDs,
         // so --resume would fail. Build a prompt that includes conversation history
@@ -384,8 +484,23 @@ export class ProcessManager {
         }
 
         // Route based on provider execution mode (same logic as startProcess)
-        const providerType = agent?.provider as LlmProviderType | undefined;
-        const providerInstance = providerType ? LlmProviderRegistry.getInstance().get(providerType) : undefined;
+        const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
+        const registry = LlmProviderRegistry.getInstance();
+        let providerInstance = providerType ? registry.get(providerType) : undefined;
+
+        // Auto-fallback: no explicit provider + no Anthropic API key → try Ollama
+        if (!providerInstance && !providerType && !process.env.ANTHROPIC_API_KEY) {
+            const ollamaFallback = registry.get('ollama');
+            if (ollamaFallback) {
+                log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for resumed session ${session.id}`);
+                providerInstance = ollamaFallback;
+                // Clear agent's non-Ollama model so direct-process uses the Ollama default
+                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model — will use Ollama default`, { agentId: effectiveAgent.id });
+                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                }
+            }
+        }
 
         let sp: SdkProcess;
         try {
@@ -393,10 +508,15 @@ export class ProcessManager {
                 const mcpToolContext = session.agentId
                     ? this.buildMcpContext(session.agentId, session.source, session.id)
                     : null;
+                // COUNCIL_MODEL override for resumed sessions
+                const councilModelResume = process.env.COUNCIL_MODEL;
+                const modelOverrideResume = (session.councilRole === 'chairman' && councilModelResume)
+                    ? councilModelResume
+                    : undefined;
                 sp = startDirectProcess({
                     session,
-                    project,
-                    agent,
+                    project: effectiveProject,
+                    agent: effectiveAgent,
                     prompt: resumePrompt ?? '',
                     provider: providerInstance,
                     approvalManager: this.approvalManager,
@@ -405,6 +525,7 @@ export class ProcessManager {
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     mcpToolContext,
                     extendTimeout: (ms) => this.extendTimeout(session.id, ms),
+                    modelOverride: modelOverrideResume,
                 });
             } else {
                 const mcpServers = session.agentId
@@ -415,8 +536,8 @@ export class ProcessManager {
                     : undefined;
                 sp = startSdkProcess({
                     session,
-                    project,
-                    agent,
+                    project: effectiveProject,
+                    agent: effectiveAgent,
                     prompt: resumePrompt ?? '',
                     approvalManager: this.approvalManager,
                     onEvent: (event) => this.handleEvent(session.id, event),
@@ -825,8 +946,27 @@ export class ProcessManager {
                 return;
             }
 
+            // Don't restart sessions that have been manually stopped
+            if (session.status === 'stopped') {
+                log.info(`Session ${sessionId} was stopped, skipping restart`);
+                this.sessionMeta.delete(sessionId);
+                return;
+            }
+
             // Only restart if not already running (user may have manually restarted)
             if (this.processes.has(sessionId)) return;
+
+            // For algochat sessions, resolve the current algochat-enabled agent
+            // so restarts always use the right model/provider
+            if (session.source === 'algochat' && session.agentId) {
+                const agents = getAlgochatEnabledAgents(this.db);
+                const currentAgent = agents.find((a) => a.algochatAuto) ?? agents[0];
+                if (currentAgent && currentAgent.id !== session.agentId) {
+                    log.info(`Reassigning session ${sessionId} from agent ${session.agentId} to ${currentAgent.id} (${currentAgent.name})`);
+                    updateSessionAgent(this.db, sessionId, currentAgent.id);
+                    session.agentId = currentAgent.id;
+                }
+            }
 
             log.info(`Auto-restarting session ${sessionId}`, { attempt: meta.restartCount });
             this.resumeProcess(session);

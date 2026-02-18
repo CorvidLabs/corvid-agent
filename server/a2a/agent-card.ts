@@ -7,12 +7,15 @@
  * Skills are auto-generated from registered MCP tools in sdk-tools.ts.
  */
 
+import type { Database } from 'bun:sqlite';
 import type {
     A2AAgentCard,
     A2AAgentSkill,
     A2AProtocolExtension,
     Agent,
 } from '../../shared/types';
+import { getPersona } from '../db/personas';
+import { getAgentBundles } from '../db/skill-bundles';
 
 // Package version is read once at module load time
 const PKG_VERSION = (() => {
@@ -55,6 +58,11 @@ const TOOL_TAG_MAP: Record<string, string[]> = {
     corvid_github_get_pr_diff: ['github', 'pull-requests', 'review'],
     corvid_github_comment_on_pr: ['github', 'pull-requests', 'communication'],
     corvid_github_follow_user: ['github', 'social'],
+    corvid_check_reputation: ['reputation', 'trust'],
+    corvid_check_health_trends: ['health', 'monitoring'],
+    corvid_publish_attestation: ['reputation', 'blockchain'],
+    corvid_verify_agent_reputation: ['reputation', 'trust', 'blockchain'],
+    corvid_invoke_remote_agent: ['a2a', 'communication'],
 };
 
 /** Tool descriptions used when building skills. Matches sdk-tools.ts. */
@@ -84,6 +92,11 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     corvid_github_get_pr_diff: 'Get the full diff/patch for a pull request.',
     corvid_github_comment_on_pr: 'Add a comment to a pull request.',
     corvid_github_follow_user: 'Follow a GitHub user.',
+    corvid_check_reputation: 'Check reputation score and trust level for an agent.',
+    corvid_check_health_trends: 'View codebase health metric trends over improvement cycles.',
+    corvid_publish_attestation: 'Publish a reputation attestation hash on Algorand.',
+    corvid_verify_agent_reputation: 'Verify a remote agent\'s on-chain reputation attestations.',
+    corvid_invoke_remote_agent: 'Send a task to a remote A2A agent and get the result.',
 };
 
 /** Convert a tool name like "corvid_github_star_repo" to "GitHub Star Repo". */
@@ -124,7 +137,7 @@ function getSupportedProtocols(baseUrl: string): A2AProtocolExtension[] {
         {
             protocol: 'A2A',
             description: 'Google A2A (Agent-to-Agent) protocol for agent interoperability',
-            endpoint: `${baseUrl}/.well-known/agent-card.json`,
+            endpoint: `${baseUrl}/a2a/tasks/send`,
         },
         {
             protocol: 'AlgoChat',
@@ -221,6 +234,7 @@ export function buildAgentCard(baseUrl?: string): A2AAgentCard {
 export function buildAgentCardForAgent(
     agent: Agent,
     baseUrl?: string,
+    db?: Database,
 ): A2AAgentCard {
     const port = parseInt(process.env.PORT ?? '3000', 10);
     const host = process.env.BIND_HOST || '127.0.0.1';
@@ -232,9 +246,22 @@ export function buildAgentCardForAgent(
         .filter((name) => TOOL_DESCRIPTIONS[name] || TOOL_TAG_MAP[name])
         .map(toolToSkill);
 
+    // Enrich description with persona and skills if db is provided
+    let enrichedDescription = agent.description || 'CorvidAgent instance';
+    if (db) {
+        const persona = getPersona(db, agent.id);
+        if (persona && persona.archetype !== 'custom') {
+            enrichedDescription += ` | Archetype: ${persona.archetype}`;
+        }
+        const bundles = getAgentBundles(db, agent.id);
+        if (bundles.length > 0) {
+            enrichedDescription += ` | Skills: ${bundles.map(b => b.name).join(', ')}`;
+        }
+    }
+
     return {
         name: agent.name,
-        description: agent.description || 'CorvidAgent instance',
+        description: enrichedDescription,
         url: `${url}/api/agents/${agent.id}`,
         provider: {
             organization: 'CorvidLabs',

@@ -110,24 +110,20 @@ export class ApprovalManager {
             const timer = setTimeout(() => {
                 this.pending.delete(request.id);
 
-                // Instead of auto-deny on timeout, persist to escalation queue
+                // Persist to escalation queue for later review, but always
+                // resolve immediately so the direct process loop doesn't
+                // block indefinitely (which would leak the Ollama slot).
                 if (this.db) {
                     const queued = enqueueRequest(this.db, request.sessionId, request.toolName, request.toolInput);
                     log.info(`Approval request ${request.id} timed out — queued as escalation #${queued.id}`);
-
-                    this.queuedResolvers.set(queued.id, {
-                        sessionId: request.sessionId,
-                        resolve,
-                        requestId: request.id,
-                    });
                 } else {
                     log.info(`Approval request ${request.id} timed out after ${request.timeoutMs}ms`);
-                    resolve({
-                        requestId: request.id,
-                        behavior: 'deny',
-                        message: 'Approval timed out',
-                    });
                 }
+                resolve({
+                    requestId: request.id,
+                    behavior: 'deny',
+                    message: 'Approval timed out',
+                });
             }, request.timeoutMs);
 
             this.pending.set(request.id, { request, resolve, timer, senderAddress });

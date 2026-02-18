@@ -38,6 +38,7 @@ export async function agentCommand(action: AgentAction, idOrOptions?: string | C
 }
 
 async function listAgents(client: CorvidClient): Promise<void> {
+    const config = loadConfig();
     const spinner = new Spinner('Fetching agents...');
     spinner.start();
     try {
@@ -50,19 +51,29 @@ async function listAgents(client: CorvidClient): Promise<void> {
         }
 
         printTable(
-            ['ID', 'Name', 'Model', 'Mode', 'AlgoChat'],
-            agents.map(a => [
-                a.id.slice(0, 8),
-                a.name,
-                a.model,
-                a.permissionMode,
-                a.algochatEnabled ? c.green('on') : c.gray('off'),
-            ]),
+            ['ID', 'Name', 'Model', 'Provider', 'Mode', 'AlgoChat', ''],
+            agents.map(a => {
+                const isDefault = config.defaultAgent === a.id;
+                const desc = a.description ? truncate(a.description, 40) : '';
+                return [
+                    a.id.slice(0, 8),
+                    isDefault ? c.green(a.name) : a.name,
+                    a.model,
+                    a.provider ?? c.gray('-'),
+                    a.permissionMode,
+                    a.algochatEnabled ? c.green('on') : c.gray('off'),
+                    isDefault ? c.green('★ default') : desc ? c.gray(desc) : '',
+                ];
+            }),
         );
     } catch (err) {
         spinner.stop();
         handleError(err);
     }
+}
+
+function truncate(s: string, max: number): string {
+    return s.length > max ? s.slice(0, max - 1) + '…' : s;
 }
 
 async function getAgent(client: CorvidClient, id: string): Promise<void> {

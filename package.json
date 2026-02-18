@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",
@@ -10,6 +10,9 @@
   "author": "CorvidLabs",
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "corvid-agent": "./cli/index.ts"
+  },
   "scripts": {
     "dev": "bun --watch server/index.ts",
     "start": "bun server/index.ts",

@@ -26,6 +26,8 @@ export interface Agent {
     customFlags: Record<string, string>;
     defaultProjectId: string | null;
     mcpToolPermissions: string[] | null;
+    voiceEnabled: boolean;
+    voicePreset: VoicePreset;
     walletAddress: string | null;
     walletFundedAlgo: number;
     createdAt: string;
@@ -33,11 +35,11 @@ export interface Agent {
 }
 
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'stopped' | 'error';
-export type SessionSource = 'web' | 'algochat' | 'agent';
+export type SessionSource = 'web' | 'algochat' | 'agent' | 'telegram' | 'discord';
 
 export interface Session {
     id: string;
-    projectId: string;
+    projectId: string | null;
     agentId: string | null;
     name: string;
     status: SessionStatus;
@@ -116,12 +118,14 @@ export interface CreateAgentInput {
     customFlags?: Record<string, string>;
     defaultProjectId?: string | null;
     mcpToolPermissions?: string[] | null;
+    voiceEnabled?: boolean;
+    voicePreset?: VoicePreset;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
 
 export interface CreateSessionInput {
-    projectId: string;
+    projectId?: string | null;
     agentId?: string;
     name?: string;
     initialPrompt?: string;
@@ -325,6 +329,9 @@ export type ScheduleActionType =
     | 'github_suggest'
     | 'codebase_review'
     | 'dependency_audit'
+    | 'improvement_loop'
+    | 'memory_maintenance'
+    | 'reputation_attestation'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
@@ -349,6 +356,10 @@ export interface ScheduleAction {
     autoCreatePr?: boolean;
     /** Arbitrary prompt for custom action type */
     prompt?: string;
+    /** Max improvement tasks per loop run (for improvement_loop, default 3, max 5) */
+    maxImprovementTasks?: number;
+    /** Optional focus hint for improvement loop (e.g. "type safety") */
+    focusArea?: string;
 }
 
 export interface AgentSchedule {
@@ -680,7 +691,67 @@ export interface WorkflowNodeRun {
 
 // MARK: - Notifications (Multi-Channel)
 
-export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat';
+export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat' | 'whatsapp' | 'signal';
+
+// MARK: - Voice
+
+export type VoicePreset = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+
+// MARK: - Agent Personas
+
+export type PersonaArchetype = 'custom' | 'professional' | 'friendly' | 'technical' | 'creative' | 'formal';
+
+export interface AgentPersona {
+    agentId: string;
+    archetype: PersonaArchetype;
+    traits: string[];
+    voiceGuidelines: string;
+    background: string;
+    exampleMessages: string[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UpsertPersonaInput {
+    archetype?: PersonaArchetype;
+    traits?: string[];
+    voiceGuidelines?: string;
+    background?: string;
+    exampleMessages?: string[];
+}
+
+// MARK: - Skill Bundles
+
+export interface SkillBundle {
+    id: string;
+    name: string;
+    description: string;
+    tools: string[];
+    promptAdditions: string;
+    preset: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSkillBundleInput {
+    name: string;
+    description?: string;
+    tools?: string[];
+    promptAdditions?: string;
+}
+
+export interface UpdateSkillBundleInput {
+    name?: string;
+    description?: string;
+    tools?: string[];
+    promptAdditions?: string;
+}
+
+export interface AgentSkillAssignment {
+    agentId: string;
+    bundleId: string;
+    sortOrder: number;
+}
 
 // MARK: - A2A Protocol (Agent-to-Agent Agent Card)
 
@@ -707,6 +778,40 @@ export interface A2AAgentSkill {
     tags: string[];
     inputModes: string[];
     outputModes: string[];
+}
+
+// ─── External MCP Server Config ─────────────────────────────────────────────
+
+export interface McpServerConfig {
+    id: string;
+    agentId: string | null;       // null = global (all agents)
+    name: string;
+    command: string;
+    args: string[];
+    envVars: Record<string, string>;
+    cwd: string | null;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateMcpServerConfigInput {
+    agentId?: string | null;
+    name: string;
+    command: string;
+    args?: string[];
+    envVars?: Record<string, string>;
+    cwd?: string | null;
+    enabled?: boolean;
+}
+
+export interface UpdateMcpServerConfigInput {
+    name?: string;
+    command?: string;
+    args?: string[];
+    envVars?: Record<string, string>;
+    cwd?: string | null;
+    enabled?: boolean;
 }
 
 export interface A2AProtocolExtension {

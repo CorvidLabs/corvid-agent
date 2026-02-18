@@ -4,7 +4,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import { json } from '../lib/response';
+import { json, safeNumParam } from '../lib/response';
 
 interface DailySpendingRow {
     date: string;
@@ -48,7 +48,7 @@ export function handleAnalyticsRoutes(req: Request, url: URL, db: Database): Res
 
     // GET /api/analytics/spending — daily spending over time
     if (url.pathname === '/api/analytics/spending' && req.method === 'GET') {
-        const days = Number(url.searchParams.get('days') ?? '30');
+        const days = safeNumParam(url.searchParams.get('days'), 30);
         return handleSpending(db, days);
     }
 
