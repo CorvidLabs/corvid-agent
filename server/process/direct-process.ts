@@ -519,7 +519,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         abortController.abort();
         approvalManager.cancelSession(session.id);
         // Clean up external MCP server connections
-        externalMcpManager.disconnectAll().catch((err) => {
+        externalMcpManager.disconnectAll().catch((err: unknown) => {
             log.warn(`Error cleaning up external MCP connections for session ${session.id}`, {
                 error: err instanceof Error ? err.message : String(err),
             });

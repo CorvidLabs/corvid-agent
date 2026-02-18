@@ -552,3 +552,24 @@ export const AssignSkillBundleSchema = z.object({
     bundleId: z.string().min(1, 'bundleId is required'),
     sortOrder: z.number().int().min(0).optional(),
 });
+
+// ─── External MCP Server Configs ────────────────────────────────────────────
+
+export const CreateMcpServerConfigSchema = z.object({
+    agentId: z.string().nullable().optional(),
+    name: z.string().min(1, 'name is required').max(100, 'name must be 100 chars or less'),
+    command: z.string().min(1, 'command is required').max(500, 'command must be 500 chars or less'),
+    args: z.array(z.string().max(1000)).max(50, 'maximum 50 args').optional(),
+    envVars: z.record(z.string(), z.string().max(4000)).optional(),
+    cwd: z.string().max(500).nullable().optional(),
+    enabled: z.boolean().optional(),
+});
+
+export const UpdateMcpServerConfigSchema = z.object({
+    name: z.string().min(1).max(100, 'name must be 100 chars or less').optional(),
+    command: z.string().min(1).max(500, 'command must be 500 chars or less').optional(),
+    args: z.array(z.string().max(1000)).max(50, 'maximum 50 args').optional(),
+    envVars: z.record(z.string(), z.string().max(4000)).optional(),
+    cwd: z.string().max(500).nullable().optional(),
+    enabled: z.boolean().optional(),
+});

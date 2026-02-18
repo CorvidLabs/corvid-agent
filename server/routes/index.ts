@@ -22,6 +22,7 @@ import { handleA2ARoutes } from './a2a';
 import { handlePluginRoutes } from './plugins';
 import { handlePersonaRoutes } from './personas';
 import { handleSkillBundleRoutes } from './skill-bundles';
+import { handleMcpServerRoutes } from './mcp-servers';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -203,6 +204,10 @@ async function handleRoutes(
     // Skill bundle routes (composable tool + prompt packages)
     const skillBundleResponse = handleSkillBundleRoutes(req, url, db);
     if (skillBundleResponse) return skillBundleResponse;
+
+    // External MCP server config routes
+    const mcpServerResponse = handleMcpServerRoutes(req, url, db);
+    if (mcpServerResponse) return mcpServerResponse;
 
     const allowlistResponse = handleAllowlistRoutes(req, url, db);
     if (allowlistResponse) return allowlistResponse;
