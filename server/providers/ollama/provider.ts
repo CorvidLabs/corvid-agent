@@ -452,6 +452,7 @@ export class OllamaProvider extends BaseLlmProvider {
                         const chunk = JSON.parse(line) as OllamaChatResponse;
                         if (chunk.message?.content) {
                             content += chunk.message.content;
+                            params.onStream?.(chunk.message.content);
                         }
                         if (chunk.message?.thinking) {
                             thinking += chunk.message.thinking;

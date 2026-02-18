@@ -309,6 +309,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     tools: providerTools,
                     signal: abortController.signal,
                     onActivity: activityCallback,
+                    onStream: (text) => onEvent({
+                        type: 'content_block_delta',
+                        delta: { text },
+                    } as ClaudeStreamEvent),
                 });
             } catch (err) {
                 clearInterval(heartbeat);
@@ -325,6 +329,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         messages,
                         signal: abortController.signal,
                         onActivity: activityCallback,
+                        onStream: (text) => onEvent({
+                            type: 'content_block_delta',
+                            delta: { text },
+                        } as ClaudeStreamEvent),
                     });
                 } else {
                     throw err;

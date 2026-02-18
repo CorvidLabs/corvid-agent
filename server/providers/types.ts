@@ -26,6 +26,8 @@ export interface LlmCompletionParams {
     onActivity?: () => void;
     /** Called when the provider's queue status changes (e.g. "Queued...", or "" when cleared). */
     onStatus?: (message: string) => void;
+    /** Called with each text token as it arrives during streaming. */
+    onStream?: (text: string) => void;
 }
 
 export interface LlmCompletionResult {
