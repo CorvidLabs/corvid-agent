@@ -2,11 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0] - 2026-02-17
+## [0.8.0] - 2026-02-17
 
-Major release: CorvidAgent reaches v1.0.0 with 1726 server tests, 47 database migrations, and full-stack agent orchestration across five development phases.
+Major release with 1757 server tests, 47 database migrations, and full-stack agent orchestration across five development phases.
 
-### Phase 5 — Bridges, Personas, Skills, Voice (v1.0 release features)
+### Phase 5 — Bridges, Personas, Skills, Voice
 
 - **Bidirectional Telegram bridge** — talk to agents from your phone via long-polling; voice note support with automatic STT transcription; per-user sessions; authorization via `TELEGRAM_ALLOWED_USER_IDS`
 - **Bidirectional Discord bridge** — talk to agents from Discord via raw WebSocket gateway (no discord.js dependency); auto-reconnect with exponential backoff; heartbeat and session resume; per-user sessions
