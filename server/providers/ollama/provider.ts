@@ -688,7 +688,7 @@ export class OllamaProvider extends BaseLlmProvider {
                                 let fullCmd = item.name;
                                 const bodyArg = itemArgs.body ?? itemArgs.text ?? itemArgs.content;
                                 if (typeof bodyArg === 'string') {
-                                    fullCmd += ` "${bodyArg.replace(/"/g, '\\"')}"`;
+                                    fullCmd += ` "${bodyArg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
                                 }
                                 resolvedName = 'run_command';
                                 resolvedArgs = { command: fullCmd };
@@ -696,7 +696,7 @@ export class OllamaProvider extends BaseLlmProvider {
                             }
 
                             // Fuzzy match: model may hallucinate short names like "gh"
-                            if (!resolvedName && tools) {
+                            if (!resolvedName) {
                                 resolvedName = this.fuzzyMatchToolName(item.name, itemArgs, tools);
                             }
                             if (resolvedName) {
