@@ -228,11 +228,11 @@ export class ProcessManager {
             return;
         }
 
-        const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+        let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
         // Route based on provider execution mode
-        const providerType = agent?.provider as LlmProviderType | undefined;
+        const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
         const registry = LlmProviderRegistry.getInstance();
         let provider = providerType ? registry.get(providerType) : undefined;
 
@@ -242,6 +242,11 @@ export class ProcessManager {
             if (ollamaFallback) {
                 log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for session ${session.id}`);
                 provider = ollamaFallback;
+                // Clear agent's non-Ollama model so direct-process uses the Ollama default
+                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model — will use Ollama default`, { agentId: effectiveAgent.id });
+                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                }
             }
         }
 
@@ -258,9 +263,9 @@ export class ProcessManager {
         };
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, agent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, agent, resolvedPrompt, options?.depth, options?.schedulerMode);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode);
         }
     }
 
@@ -464,7 +469,7 @@ export class ProcessManager {
             updatedAt: new Date().toISOString(),
         };
 
-        const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+        let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
         // Start a fresh process — our session IDs are not Claude conversation IDs,
         // so --resume would fail. Build a prompt that includes conversation history
@@ -479,7 +484,7 @@ export class ProcessManager {
         }
 
         // Route based on provider execution mode (same logic as startProcess)
-        const providerType = agent?.provider as LlmProviderType | undefined;
+        const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
         const registry = LlmProviderRegistry.getInstance();
         let providerInstance = providerType ? registry.get(providerType) : undefined;
 
@@ -489,6 +494,11 @@ export class ProcessManager {
             if (ollamaFallback) {
                 log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for resumed session ${session.id}`);
                 providerInstance = ollamaFallback;
+                // Clear agent's non-Ollama model so direct-process uses the Ollama default
+                if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
+                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model — will use Ollama default`, { agentId: effectiveAgent.id });
+                    effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
+                }
             }
         }
 
@@ -506,7 +516,7 @@ export class ProcessManager {
                 sp = startDirectProcess({
                     session,
                     project: effectiveProject,
-                    agent,
+                    agent: effectiveAgent,
                     prompt: resumePrompt ?? '',
                     provider: providerInstance,
                     approvalManager: this.approvalManager,
@@ -527,7 +537,7 @@ export class ProcessManager {
                 sp = startSdkProcess({
                     session,
                     project: effectiveProject,
-                    agent,
+                    agent: effectiveAgent,
                     prompt: resumePrompt ?? '',
                     approvalManager: this.approvalManager,
                     onEvent: (event) => this.handleEvent(session.id, event),
