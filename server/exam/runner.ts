@@ -21,6 +21,19 @@ const log = createLogger('ExamRunner');
 const EXAM_PROJECT_NAME = 'Model Exam';
 const EXAM_AGENT_NAME = 'Exam Proctor';
 const CASE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes per case
+const MIN_MODEL_SIZE_B = 8; // Minimum 8B parameters
+
+/** Parse parameter count in billions from a model name or size string. */
+export function parseModelSizeB(input: string): number | null {
+    // Match patterns like ":8b", ":14b", ":671b", "4.0B", "14.8B"
+    const match = input.match(/[\s:_-](\d+(?:\.\d+)?)\s*[bB](?:[^a-zA-Z]|$)/);
+    return match ? parseFloat(match[1]) : null;
+}
+
+/** Check if a model is a cloud model (proxied through Ollama cloud). */
+export function isCloudModel(model: string): boolean {
+    return model.includes('-cloud');
+}
 
 /** Strip <think>...</think> blocks that some models emit for chain-of-thought reasoning. */
 function stripThinkBlocks(text: string): string {
@@ -78,25 +91,71 @@ export class ExamRunner {
     }
 
     private detectProvider(model: string): string {
+        // Claude models always go through Anthropic
+        if (model.startsWith('claude-')) {
+            return 'anthropic';
+        }
+        // Cloud models go through Ollama (proxied to their cloud)
+        if (isCloudModel(model)) {
+            return 'ollama';
+        }
         // Ollama models typically have format "name:tag" (e.g. qwen3:8b, llama3.1:8b)
         // or are known open-source model families
         const ollamaPatterns = [
             /:/, // contains colon (qwen3:8b, llama3:70b, etc.)
-            /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder)/i,
+            /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder|minimax|glm|kimi|gpt-oss)/i,
         ];
         if (ollamaPatterns.some(p => p.test(model))) {
             return 'ollama';
-        }
-        // Claude models
-        if (model.startsWith('claude-')) {
-            return 'anthropic';
         }
         // Default to ollama for exam (most likely local model testing)
         return 'ollama';
     }
 
+    /** Query Ollama's /api/show endpoint for model parameter size. */
+    private async queryModelSize(model: string): Promise<number | null> {
+        try {
+            const host = process.env.OLLAMA_HOST || 'http://localhost:11434';
+            const response = await fetch(`${host}/api/show`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: model }),
+                signal: AbortSignal.timeout(5_000),
+            });
+            if (!response.ok) return null;
+            const data = await response.json() as { details?: { parameter_size?: string } };
+            const sizeStr = data.details?.parameter_size;
+            if (!sizeStr) return null;
+            return parseModelSizeB(`:${sizeStr}`);
+        } catch {
+            return null;
+        }
+    }
+
     async runExam(model: string, categories?: ExamCategory[]): Promise<ExamScorecard> {
         const startTime = Date.now();
+
+        // Enforce minimum model size (cloud models are exempt — they're huge)
+        if (!isCloudModel(model)) {
+            const sizeFromName = parseModelSizeB(model);
+            if (sizeFromName !== null && sizeFromName < MIN_MODEL_SIZE_B) {
+                throw new Error(
+                    `Model "${model}" is ${sizeFromName}B parameters — minimum is ${MIN_MODEL_SIZE_B}B. ` +
+                    `Small models are too slow and unreliable for agent tasks.`
+                );
+            }
+            // If we can't parse from name, check Ollama API
+            if (sizeFromName === null) {
+                const apiSize = await this.queryModelSize(model);
+                if (apiSize !== null && apiSize < MIN_MODEL_SIZE_B) {
+                    throw new Error(
+                        `Model "${model}" is ${apiSize}B parameters — minimum is ${MIN_MODEL_SIZE_B}B. ` +
+                        `Small models are too slow and unreliable for agent tasks.`
+                    );
+                }
+            }
+        }
+
         const { projectId, agentId } = this.ensureSetup(model);
 
         const casesToRun = categories
