@@ -33,8 +33,34 @@ jobs:
       - name: Unit tests
         run: bun test
 
+      - name: Spec check
+        run: bun run spec:check
+
       - name: Build client
         run: bun run build:client
+
+  review:
+    name: PR Review
+    runs-on: ubuntu-latest
+    needs: build
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Approve or request changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ needs.build.result }}" = "success" ]; then
+            gh pr review ${{ github.event.pull_request.number }} \
+              --approve \
+              --body "All CI checks passed (tsc, tests, spec:check, client build) across ubuntu, macos, and windows."
+          else
+            gh pr review ${{ github.event.pull_request.number }} \
+              --request-changes \
+              --body "CI checks failed. Please review the build logs and fix the issues before merging."
+          fi
 
   e2e:
     name: E2E Tests
