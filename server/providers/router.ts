@@ -12,12 +12,31 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('ModelRouter');
 
+/** Cached result of claude CLI detection (checked once at startup). */
+let claudeCliAvailable: boolean | null = null;
+
+function detectClaudeCli(): boolean {
+    if (claudeCliAvailable !== null) return claudeCliAvailable;
+    claudeCliAvailable = Bun.which('claude') !== null;
+    return claudeCliAvailable;
+}
+
+/** Returns true if Claude access is available (API key or subscription). */
+export function hasClaudeAccess(): boolean {
+    return !!process.env.ANTHROPIC_API_KEY || detectClaudeCli();
+}
+
+/** Reset claude CLI detection cache (for testing only). */
+export function _resetClaudeCliCache(value?: boolean | null): void {
+    claudeCliAvailable = value ?? null;
+}
+
 /**
  * Returns true when no cloud API keys are configured — the platform
  * should route everything through local Ollama models.
  */
 export function isLocalOnly(): boolean {
-    return !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY;
+    return !hasClaudeAccess() && !process.env.OPENAI_API_KEY;
 }
 
 export type ComplexityLevel = 'simple' | 'moderate' | 'complex' | 'expert';
