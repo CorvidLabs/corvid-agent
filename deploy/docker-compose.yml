@@ -3,6 +3,8 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${PORT:-3000}:3000"
     volumes:
@@ -20,6 +22,9 @@ services:
       - ALGOCHAT_DEFAULT_AGENT_ID=${ALGOCHAT_DEFAULT_AGENT_ID:-}
       - ALGOCHAT_PSK_URI=${ALGOCHAT_PSK_URI:-}
       - AGENT_TIMEOUT_MS=${AGENT_TIMEOUT_MS:-1800000}
+      - LOCALNET_ALGOD_URL=${LOCALNET_ALGOD_URL:-}
+      - LOCALNET_KMD_URL=${LOCALNET_KMD_URL:-}
+      - LOCALNET_INDEXER_URL=${LOCALNET_INDEXER_URL:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
