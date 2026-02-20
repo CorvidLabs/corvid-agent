@@ -20,7 +20,8 @@
     "test:e2e": "npx playwright test --config=playwright.config.js",
     "test:e2e:ui": "npx playwright test --config=playwright.config.js --ui",
     "build:client": "cd client && bun run build",
-    "dev:client": "cd client && bun run start"
+    "dev:client": "cd client && bun run start",
+    "spec:check": "bun scripts/spec-check.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"

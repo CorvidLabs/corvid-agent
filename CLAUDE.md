@@ -49,6 +49,22 @@ Uses basename matching for unique filenames and substring matching for paths.
 - `server/index.ts`, `server/algochat/bridge.ts`, `server/algochat/config.ts`
 - `server/selftest/`
 
+## Module Specifications
+
+Specs in `specs/` are the source of truth for module behavior.
+
+Before modifying any file listed in a spec's `files:` frontmatter,
+read the corresponding spec and understand its invariants.
+
+After modifying, run `bun run spec:check` alongside the existing
+verification commands.
+
+If your change violates a spec invariant, update the spec first
+(add a Change Log entry) before proceeding.
+
+Specs take precedence over code comments. If code contradicts
+the spec, the code is the bug.
+
 ## Verification
 
 Always run before committing:
@@ -56,9 +72,10 @@ Always run before committing:
 ```bash
 bunx tsc --noEmit --skipLibCheck
 bun test
+bun run spec:check
 ```
 
-Both must pass. Work tasks auto-validate with these commands and will iterate up to 3 times on failure.
+All must pass. Work tasks auto-validate with tsc and test commands and will iterate up to 3 times on failure.
 
 ## Coding Conventions
 
