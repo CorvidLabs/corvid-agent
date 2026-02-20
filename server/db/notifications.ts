@@ -46,6 +46,7 @@ export interface QuestionDispatchRow {
     channelType: string;
     externalRef: string | null;
     status: 'sent' | 'answered' | 'expired';
+    answeredAt: string | null;
     createdAt: string;
 }
 
@@ -250,6 +251,7 @@ function rowToQuestionDispatch(row: Record<string, unknown>): QuestionDispatchRo
         channelType: row.channel_type as string,
         externalRef: row.external_ref as string | null,
         status: (row.status as 'sent' | 'answered' | 'expired') ?? 'sent',
+        answeredAt: (row.answered_at as string) ?? null,
         createdAt: row.created_at as string,
     };
 }
@@ -286,6 +288,17 @@ export function updateQuestionDispatchStatus(
     db.query(
         `UPDATE owner_question_dispatches SET status = ? WHERE id = ?`
     ).run(status, id);
+}
+
+/**
+ * Atomically mark a dispatch as answered only if it's still in 'sent' status.
+ * Returns true only if this call actually transitioned the status (idempotency guard).
+ */
+export function markDispatchAnswered(db: Database, id: number): boolean {
+    const result = db.query(
+        `UPDATE owner_question_dispatches SET status = 'answered', answered_at = datetime('now') WHERE id = ? AND status = 'sent'`
+    ).run(id);
+    return result.changes > 0;
 }
 
 export function getQuestionDispatchesByQuestionId(

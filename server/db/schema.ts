@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 49;
+const SCHEMA_VERSION = 50;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -978,6 +978,9 @@ const MIGRATIONS: Record<number, string[]> = {
             updated_at  TEXT DEFAULT (datetime('now'))
         )`,
         `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_agent ON mcp_server_configs(agent_id)`,
+    ],
+    50: [
+        `ALTER TABLE owner_question_dispatches ADD COLUMN answered_at TEXT DEFAULT NULL`,
     ],
 };
 

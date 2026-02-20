@@ -414,9 +414,15 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     emitToolStatus(toolCall.name, `Running ${toolCall.name}...`, false);
                     try {
                         const toolResult = await toolDef.handler(toolCall.arguments);
+                        const MAX_TOOL_RESULT_CHARS = 20_000; // ~5K tokens
+                        let resultText = toolResult.text;
+                        if (resultText.length > MAX_TOOL_RESULT_CHARS) {
+                            log.warn(`Truncated tool result for ${toolCall.name}`, { original: resultText.length, truncated: MAX_TOOL_RESULT_CHARS });
+                            resultText = resultText.slice(0, MAX_TOOL_RESULT_CHARS) + `\n\n[... truncated, ${toolResult.text.length - MAX_TOOL_RESULT_CHARS} chars omitted]`;
+                        }
                         messages.push({
                             role: 'tool',
-                            content: toolResult.text,
+                            content: resultText,
                             toolCallId: toolCall.id,
                         });
                         emitToolStatus(toolCall.name, toolResult.isError ? `Error: ${toolResult.text.slice(0, 200)}` : `Done`, false);

@@ -521,10 +521,10 @@ export class MentionPollingService {
         const fullRepo = this.resolveFullRepo(config.repo, mention.htmlUrl);
         const repoShortName = fullRepo.includes('/') ? fullRepo.split('/')[1] : fullRepo;
 
-        // Guard: skip if there's already a running session for this issue
+        // Guard: skip if there's already a running or recently completed session for this issue
         const sessionPrefix = `Poll: ${repoShortName} #${mention.number}:`;
         const existing = this.db.query(
-            `SELECT id FROM sessions WHERE name LIKE ? AND status = 'running' AND created_at > datetime('now', '-1 hour')`
+            `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle', 'completed') AND created_at > datetime('now', '-1 hour')`
         ).get(sessionPrefix + '%') as { id: string } | null;
         if (existing) {
             log.debug('Active session already exists for issue', { number: mention.number, existingId: existing.id });
@@ -699,6 +699,9 @@ export class MentionPollingService {
             ``,
             `Rules:`,
             `- You MUST run the \`gh\` command above to post a comment. This is mandatory — the user will not see your response otherwise.`,
+            `- Before posting your comment, check if you or another agent already replied by running:`,
+            `  \`gh issue view ${mention.number} --repo ${repo} --comments\``,
+            `  If a substantive reply already exists (not just the original post), do NOT post a duplicate.`,
             `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this ${isAssignment ? 'assignment' : 'mention'}.`,
             `- Be concise, helpful, and professional.`,
         ].join('\n');
