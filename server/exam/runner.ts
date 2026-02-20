@@ -20,7 +20,18 @@ const log = createLogger('ExamRunner');
 
 const EXAM_PROJECT_NAME = 'Model Exam';
 const EXAM_AGENT_NAME = 'Exam Proctor';
-const CASE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes per case
+const CASE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes per case
+
+/** Strip <think>...</think> blocks that some models emit for chain-of-thought reasoning. */
+function stripThinkBlocks(text: string): string {
+    return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+}
+
+/** Detect API error messages that get stored as assistant content. */
+function isApiError(text: string): string | undefined {
+    const match = text.match(/^API Error:\s*(\d+)\s*(.*)/s);
+    return match ? `API ${match[1]}: ${match[2].slice(0, 100)}` : undefined;
+}
 
 export class ExamRunner {
     private db: Database;
@@ -32,6 +43,9 @@ export class ExamRunner {
     }
 
     private ensureSetup(model: string): { projectId: string; agentId: string } {
+        // Detect provider from model name — Ollama models contain ':' or known prefixes
+        const provider = this.detectProvider(model);
+
         const projects = listProjects(this.db);
         let project = projects.find(p => p.name === EXAM_PROJECT_NAME);
         if (!project) {
@@ -50,16 +64,35 @@ export class ExamRunner {
                 name: EXAM_AGENT_NAME,
                 systemPrompt: 'You are being tested. Follow instructions precisely.',
                 model,
+                provider,
                 permissionMode: 'full-auto' as const,
                 maxBudgetUsd: 5.0,
                 algochatEnabled: false,
             });
-            log.info('Created exam agent', { id: agent.id });
+            log.info('Created exam agent', { id: agent.id, provider });
         } else {
-            updateAgent(this.db, agent.id, { model });
+            updateAgent(this.db, agent.id, { model, provider });
         }
 
         return { projectId: project.id, agentId: agent.id };
+    }
+
+    private detectProvider(model: string): string {
+        // Ollama models typically have format "name:tag" (e.g. qwen3:8b, llama3.1:8b)
+        // or are known open-source model families
+        const ollamaPatterns = [
+            /:/, // contains colon (qwen3:8b, llama3:70b, etc.)
+            /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder)/i,
+        ];
+        if (ollamaPatterns.some(p => p.test(model))) {
+            return 'ollama';
+        }
+        // Claude models
+        if (model.startsWith('claude-')) {
+            return 'anthropic';
+        }
+        // Default to ollama for exam (most likely local model testing)
+        return 'ollama';
     }
 
     async runExam(model: string, categories?: ExamCategory[]): Promise<ExamScorecard> {
@@ -199,7 +232,12 @@ export class ExamRunner {
                             }
 
                             cleanup();
-                            resolve({ content: contentParts.join('\n'), toolCalls, turns, error });
+                            const rawContent = contentParts.join('\n');
+                            const content = stripThinkBlocks(rawContent);
+                            // Detect API errors captured as assistant content
+                            const apiError = isApiError(content);
+                            if (apiError && !error) error = apiError;
+                            resolve({ content: apiError ? '' : content, toolCalls, turns, error });
                         }
                         break;
                 }
