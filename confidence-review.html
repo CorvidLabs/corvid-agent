@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>corvid-agent v0.9.0 Confidence Review — 2026-02-20</title>
+<title>corvid-agent v0.4.0 Confidence Review — 2026-02-12</title>
 <style>
   :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --green: #3fb950; --yellow: #d29922; --red: #f85149; --blue: #58a6ff; --purple: #bc8cff; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -51,8 +51,8 @@
 </head>
 <body>
 
-<h1>corvid-agent Confidence Review <span class="version-tag">v0.9.0</span></h1>
-<p class="subtitle">Generated 2026-02-20 &mdash; v0.9.0 &mdash; Cloud Models, Model Exam, Module Specs, AST Navigation, 2069 Tests</p>
+<h1>corvid-agent Confidence Review <span class="version-tag">v0.4.0</span></h1>
+<p class="subtitle">Generated 2026-02-12 14:25 UTC &mdash; v0.4.0 Release &mdash; Scheduler, Ollama, Council, OSS Automation</p>
 
 <!-- Overall Confidence -->
 <div class="grid">
@@ -62,75 +62,67 @@
       <svg width="120" height="120" viewBox="0 0 120 120">
         <circle cx="60" cy="60" r="52" fill="none" stroke="#30363d" stroke-width="8"/>
         <circle cx="60" cy="60" r="52" fill="none" stroke="#3fb950" stroke-width="8"
-          stroke-dasharray="326.7" stroke-dashoffset="16.3" stroke-linecap="round"/>
+          stroke-dasharray="326.7" stroke-dashoffset="29.4" stroke-linecap="round"/>
       </svg>
-      <div class="label"><div class="score" style="color:var(--green)">A+</div><div class="max">95/100</div></div>
+      <div class="label"><div class="score" style="color:var(--green)">A</div><div class="max">91/100</div></div>
     </div>
-    <div class="card-detail" style="margin-top:0.75rem">v0.9.0 released &amp; tagged. 2069 tests.<br>Cloud + local Ollama. 16 module specs. CI green.</div>
+    <div class="card-detail" style="margin-top:0.75rem">v0.4.0 released &amp; tagged.<br>14 schedules active. CI green on 3 platforms.</div>
   </div>
 
   <div class="card">
     <div class="card-title">Stack Health</div>
-    <div class="feature-row"><span class="feature-name">Server (Bun 1.3.8)</span><span class="badge badge-green">LIVE</span></div>
-    <div class="feature-row"><span class="feature-name">Ollama Local (Metal GPU)</span><span class="badge badge-green">3 MODELS</span></div>
-    <div class="feature-row"><span class="feature-name">Ollama Cloud</span><span class="badge badge-green">2 MODELS</span></div>
+    <div class="feature-row"><span class="feature-name">Server (Bun)</span><span class="badge badge-green">LIVE</span></div>
+    <div class="feature-row"><span class="feature-name">Ollama (Metal GPU)</span><span class="badge badge-green">LIVE</span></div>
     <div class="feature-row"><span class="feature-name">Algorand Testnet</span><span class="badge badge-green">CONNECTED</span></div>
-    <div class="feature-row"><span class="feature-name">Module Specs</span><span class="badge badge-green">16 VALID</span></div>
+    <div class="feature-row"><span class="feature-name">Scheduler</span><span class="badge badge-green">14 ACTIVE</span></div>
+    <div class="feature-row"><span class="feature-name">AlgoChat Bridge</span><span class="badge badge-green">SYNCING</span></div>
     <div class="feature-row"><span class="feature-name">CI (3 platforms)</span><span class="badge badge-green">PASSING</span></div>
-    <div class="feature-row"><span class="feature-name">Tests</span><span class="badge badge-green">2069 PASS</span></div>
+    <div class="feature-row"><span class="feature-name">Tests</span><span class="badge badge-green">317 PASS</span></div>
   </div>
 
   <div class="card">
     <div class="card-title">Key Metrics</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
-      <div><div class="card-value" style="font-size:1.5rem;color:var(--green)">159</div><div class="card-detail">Total commits</div></div>
-      <div><div class="card-value" style="font-size:1.5rem;color:var(--blue)">102</div><div class="card-detail">Test files</div></div>
-      <div><div class="card-value" style="font-size:1.5rem;color:var(--purple)">36</div><div class="card-detail">MCP tools</div></div>
-      <div><div class="card-value" style="font-size:1.5rem;color:var(--green)">47</div><div class="card-detail">DB migrations</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--green)">291</div><div class="card-detail">Total sessions</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--blue)">60+</div><div class="card-detail">Council launches</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--purple)">14</div><div class="card-detail">Active schedules</div></div>
+      <div><div class="card-value" style="font-size:1.5rem;color:var(--green)">33</div><div class="card-detail">Work tasks</div></div>
     </div>
   </div>
 </div>
 
-<!-- v0.9.0 Release Summary -->
-<h2>v0.4.0 &rarr; v0.9.0 Release Summary</h2>
+<!-- v0.4.0 Release Summary -->
+<h2>v0.4.0 Release Summary</h2>
 <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
   <div class="card" style="border-color:var(--purple)">
-    <div class="card-title" style="color:var(--purple)">New since v0.4.0</div>
+    <div class="card-title" style="color:var(--purple)">New in v0.4.0</div>
     <div style="font-size:0.9rem">
-      <p><strong>51 commits</strong>, 409 files changed, +66,914 lines.</p>
+      <p><strong>15 commits</strong> since v0.3.0. Released via PR #90, tagged, and published as GitHub release.</p>
       <ul style="margin:0.5rem 0 0 1.2rem;">
-        <li>Ollama Cloud Models (qwen3-coder:480b, deepseek-v3.1:671b)</li>
-        <li>Model Exam system &mdash; confidence scorecard for any model</li>
-        <li>Module Specification system (16 specs, spec:check CI job)</li>
-        <li>AST code navigation (tree-sitter, 5 languages)</li>
-        <li>Personas &amp; Skill Bundles</li>
-        <li>Voice TTS/STT (OpenAI tts-1 + Whisper)</li>
-        <li>Telegram &amp; Discord bidirectional bridges</li>
-        <li>OpenTelemetry observability + Prometheus metrics</li>
-        <li>Playwright E2E tests</li>
-        <li>Text-based tool calling with hallucination detection</li>
-        <li>Final-summary epilogue for broken tool loops</li>
-        <li>Work task fallback PR creation (service-level)</li>
-        <li>9 autonomous Angular apps on GitHub Pages</li>
+        <li>Autonomous Agent Scheduler (8 action types, cron-based)</li>
+        <li>Ollama LLM Provider (Metal GPU, weight-based concurrency)</li>
+        <li>Mobile Connect via PSK QR codes</li>
+        <li>Dashboard: Analytics, Settings, Work Tasks, System Logs pages</li>
+        <li>Council deliberation improvements (tool-free, anti-repetition)</li>
+        <li>Security hardening (mnemonic storage, rate limiting)</li>
+        <li>Docker fixes (patches dir copy before bun install)</li>
       </ul>
     </div>
   </div>
   <div class="card" style="border-color:var(--purple)">
-    <div class="card-title" style="color:var(--purple)">PRs Merged (v0.4.0 &rarr; v0.9.0)</div>
+    <div class="card-title" style="color:var(--purple)">PRs Merged (v0.3.0 &rarr; v0.4.0)</div>
     <div style="font-size:0.9rem">
       <table>
-        <tr><td>#186</td><td>Ollama reliability: specs, tool parser, retry logic</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#185</td><td>spec:check + PR review job in CI</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#184</td><td>WebSocket auth + AST work task repo maps</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#183</td><td>Ollama reliability + AST code navigation</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#180</td><td>Fix Ollama multi-tool chain hallucination</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#178</td><td>Module specification system</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#177</td><td>Context-aware truncation, smarter nudges</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#175</td><td>Skill bundle presets + project-level skills</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#162</td><td>Ollama cloud models + subagent + web search</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#145</td><td>v0.9.0 release &mdash; 1776 tests</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#136</td><td>Redesign automation schedules</td><td><span class="badge badge-green">MERGED</span></td></tr>
-        <tr><td>#131</td><td>OpenTelemetry observability + audit logging</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#90</td><td>v0.4.0 release &mdash; version bump &amp; docs</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#87</td><td>Docker patches dir fix</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#86</td><td>Scheduler + Ollama provider</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#81</td><td>PSK exchange &amp; mobile connect</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#80</td><td>Wallet identity on WebSocket</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#78</td><td>Dashboard pages (Analytics, Settings, etc.)</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#77</td><td>Disallow plan mode tools in bypass mode</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#76</td><td>Docs site Unicode fix</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#74</td><td>Harden mnemonic storage</td><td><span class="badge badge-green">MERGED</span></td></tr>
+        <tr><td>#75</td><td>Memory leak + rate limiting</td><td><span class="badge badge-green">MERGED</span></td></tr>
       </table>
     </div>
   </div>
@@ -140,178 +132,195 @@
 <h2>Feature Confidence</h2>
 <div class="grid">
   <div class="card">
-    <div class="card-title">Ollama Local Models</div>
-    <div class="card-value" style="font-size:1.3rem;color:var(--green)">94%</div>
-    <div class="meter"><div class="meter-fill" style="width:94%;background:var(--green)"></div></div>
+    <div class="card-title">Scheduler Engine</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">93%</div>
+    <div class="meter"><div class="meter-fill" style="width:93%;background:var(--green)"></div></div>
     <table>
-      <tr><td>qwen3:8b throughput</td><td><strong>40-53 tok/s</strong></td></tr>
-      <tr><td>qwen3:14b throughput</td><td><strong>27 tok/s</strong></td></tr>
-      <tr><td>Text-based tool calling</td><td><span class="badge badge-green">WORKING</span></td></tr>
-      <tr><td>Hallucination detection</td><td><span class="badge badge-green">DEPLOYED</span></td></tr>
-      <tr><td>Final-summary epilogue</td><td><span class="badge badge-green">DEPLOYED</span></td></tr>
-      <tr><td>Repeat/loop detection</td><td><span class="badge badge-green">3 STRATEGIES</span></td></tr>
-      <tr><td>Min model size gate</td><td><span class="badge badge-green">8B MIN</span></td></tr>
+      <tr><td>Action types</td><td><strong>8 implemented</strong></td></tr>
+      <tr><td>Active schedules</td><td><span class="badge badge-green">14</span></td></tr>
+      <tr><td>Cron scheduling</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>council_launch</td><td><span class="badge badge-green">IMPLEMENTED</span></td></tr>
+      <tr><td>Approval policies</td><td>auto / owner / council</td></tr>
+      <tr><td>Max concurrent</td><td>2 (configurable)</td></tr>
     </table>
-    <div class="resolved" style="margin-top:0.75rem">
-      <strong>Fixed (today):</strong> Cleaned up save_memory response to eliminate "on-chain send failed" noise that caused Ollama models to retry. Added 12 new model families to inferFromName fallback.
-    </div>
   </div>
 
   <div class="card">
-    <div class="card-title">Ollama Cloud Models</div>
-    <div class="card-value" style="font-size:1.3rem;color:var(--green)">90%</div>
-    <div class="meter"><div class="meter-fill" style="width:90%;background:var(--green)"></div></div>
-    <table>
-      <tr><td>qwen3-coder:480b</td><td><span class="badge badge-purple">CLOUD</span></td></tr>
-      <tr><td>deepseek-v3.1:671b</td><td><span class="badge badge-purple">CLOUD</span></td></tr>
-      <tr><td>Cloud routing</td><td><span class="badge badge-green">hostForModel</span></td></tr>
-      <tr><td>Merged model listing</td><td><span class="badge badge-green">LOCAL+REMOTE</span></td></tr>
-      <tr><td>Size gating exempt</td><td><span class="badge badge-green">CLOUD BYPASS</span></td></tr>
-    </table>
-    <div class="note" style="margin-top:0.75rem">
-      Cloud models proxy through local Ollama for auth. <code>hostForModel()</code> redirects cloud requests to localhost even when OLLAMA_HOST points to a remote GPU server.
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Model Exam System</div>
+    <div class="card-title">Ollama Inference Engine</div>
     <div class="card-value" style="font-size:1.3rem;color:var(--green)">92%</div>
     <div class="meter"><div class="meter-fill" style="width:92%;background:var(--green)"></div></div>
     <table>
-      <tr><td>Test cases</td><td><strong>18 across 6 categories</strong></td></tr>
-      <tr><td>Categories</td><td>coding, context, tools, algochat, council, instruction</td></tr>
-      <tr><td>Provider detection</td><td><span class="badge badge-green">AUTO</span></td></tr>
-      <tr><td>Think-block stripping</td><td><span class="badge badge-green">WORKING</span></td></tr>
-      <tr><td>Scorecard output</td><td><span class="badge badge-green">PER-CATEGORY</span></td></tr>
-      <tr><td>Min 8B enforcement</td><td><span class="badge badge-green">GATE</span></td></tr>
+      <tr><td>qwen3:8b throughput</td><td><strong>40-53 tok/s</strong></td></tr>
+      <tr><td>qwen3:14b throughput</td><td><strong>27 tok/s</strong></td></tr>
+      <tr><td>Metal GPU offload</td><td><span class="badge badge-green">FULL</span></td></tr>
+      <tr><td>KV cache preservation</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>Tool calling (direct)</td><td><span class="badge badge-yellow">PARTIAL</span></td></tr>
+      <tr><td>tok/s event display</td><td><span class="badge badge-green">IN UI</span></td></tr>
     </table>
+    <div class="note warn-note" style="margin-top:0.75rem">
+      Ollama direct engine parses tool calls from Qwen3 but execution is inconsistent &mdash; models sometimes emit JSON text instead of proper tool call format. Known issue for v0.5.0.
+    </div>
   </div>
 
   <div class="card">
-    <div class="card-title">Module Specifications</div>
-    <div class="card-value" style="font-size:1.3rem;color:var(--green)">95%</div>
-    <div class="meter"><div class="meter-fill" style="width:95%;background:var(--green)"></div></div>
+    <div class="card-title">Weight-Based Concurrency</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">90%</div>
+    <div class="meter"><div class="meter-fill" style="width:90%;background:var(--green)"></div></div>
     <table>
-      <tr><td>Specs</td><td><strong>16 .spec.md files</strong></td></tr>
-      <tr><td>Validation</td><td><span class="badge badge-green">spec:check CI JOB</span></td></tr>
-      <tr><td>Coverage</td><td>db, process, mcp, algochat, providers, scheduler, work</td></tr>
-      <tr><td>Export tracking</td><td><span class="badge badge-green">107/109 DOCUMENTED</span></td></tr>
-      <tr><td>Dependency graph</td><td><span class="badge badge-green">VALIDATED</span></td></tr>
+      <tr><td>Model weighting</td><td>&le;7B=1, 8-13B=2, &ge;14B=3</td></tr>
+      <tr><td>GPU auto-detection</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>Session-level slots</td><td><span class="badge badge-green">NO DEADLOCKS</span></td></tr>
+      <tr><td>Queue visibility</td><td><span class="badge badge-green">UI BADGE</span></td></tr>
+      <tr><td>5-agent council</td><td><span class="badge badge-green">PASSED</span></td></tr>
     </table>
   </div>
 
   <div class="card">
-    <div class="card-title">AST Code Navigation</div>
+    <div class="card-title">Council Deliberation</div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">92%</div>
+    <div class="meter"><div class="meter-fill" style="width:92%;background:var(--green)"></div></div>
+    <table>
+      <tr><td>Full pipeline</td><td><span class="badge badge-green">5 STAGES</span></td></tr>
+      <tr><td>Tool-free deliberation</td><td><span class="badge badge-green">FIXED</span></td></tr>
+      <tr><td>Anti-repetition prompt</td><td><span class="badge badge-green">DEPLOYED</span></td></tr>
+      <tr><td>Tiered permissions vote</td><td><span class="badge badge-green">UNANIMOUS</span></td></tr>
+      <tr><td>Chairman</td><td><span class="badge badge-green">QWEN ARCHITECT</span></td></tr>
+      <tr><td>Peer review</td><td><span class="badge badge-green">RATED</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">OSS Automation</div>
     <div class="card-value" style="font-size:1.3rem;color:var(--green)">88%</div>
     <div class="meter"><div class="meter-fill" style="width:88%;background:var(--green)"></div></div>
     <table>
-      <tr><td>Languages</td><td>TypeScript, JavaScript, Python, Go, Rust</td></tr>
-      <tr><td>Parser</td><td>tree-sitter (WASM)</td></tr>
-      <tr><td>Work task repo maps</td><td><span class="badge badge-green">INTEGRATED</span></td></tr>
-      <tr><td>corvid_code_symbols</td><td><span class="badge badge-yellow">OPEN #139</span></td></tr>
-      <tr><td>corvid_find_references</td><td><span class="badge badge-yellow">OPEN #140</span></td></tr>
+      <tr><td>Claude OSS Scout</td><td><span class="badge badge-green">TESTED</span></td></tr>
+      <tr><td>GitHub star_repo</td><td><span class="badge badge-green">WORKING</span></td></tr>
+      <tr><td>GitHub fork_repo</td><td><span class="badge badge-green">SCHEDULED</span></td></tr>
+      <tr><td>PR reviews</td><td><span class="badge badge-green">SCHEDULED</span></td></tr>
+      <tr><td>Work tasks</td><td><span class="badge badge-green">33 COMPLETED</span></td></tr>
+      <tr><td>Ollama tool execution</td><td><span class="badge badge-yellow">NEEDS WORK</span></td></tr>
     </table>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Messaging Channels</div>
-    <div class="card-value" style="font-size:1.3rem;color:var(--green)">91%</div>
-    <div class="meter"><div class="meter-fill" style="width:91%;background:var(--green)"></div></div>
-    <table>
-      <tr><td>Telegram bridge</td><td><span class="badge badge-green">BIDIRECTIONAL</span></td></tr>
-      <tr><td>Discord bridge</td><td><span class="badge badge-green">RAW WEBSOCKET</span></td></tr>
-      <tr><td>AlgoChat</td><td><span class="badge badge-green">ON-CHAIN</span></td></tr>
-      <tr><td>Voice (TTS/STT)</td><td><span class="badge badge-green">6 PRESETS</span></td></tr>
-      <tr><td>Slack</td><td><span class="badge badge-yellow">OPEN #143</span></td></tr>
-    </table>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Testing &amp; CI</div>
-    <div class="card-value" style="font-size:1.3rem;color:var(--green)">97%</div>
-    <div class="meter"><div class="meter-fill" style="width:97%;background:var(--green)"></div></div>
-    <table>
-      <tr><td>Unit tests</td><td><strong>2069 passing</strong></td></tr>
-      <tr><td>Test files</td><td><strong>102</strong></td></tr>
-      <tr><td>expect() calls</td><td><strong>5167</strong></td></tr>
-      <tr><td>E2E (Playwright)</td><td><span class="badge badge-green">CONFIGURED</span></td></tr>
-      <tr><td>CI platforms</td><td>macOS, Ubuntu, Windows</td></tr>
-      <tr><td>TypeScript strict</td><td><span class="badge badge-green">CLEAN</span></td></tr>
-      <tr><td>Spec validation</td><td><span class="badge badge-green">16/16 PASS</span></td></tr>
-    </table>
+    <div class="resolved" style="margin-top:0.75rem">
+      <strong>Verified:</strong> Claude OSS Scout session searched GitHub, starred 5 new repos (algokit-cli, ollama, claude-code, MCP servers, go-algorand), and saved a report to memory.
+    </div>
   </div>
 
   <div class="card">
     <div class="card-title">Security &amp; Safety</div>
-    <div class="card-value" style="font-size:1.3rem;color:var(--green)">93%</div>
-    <div class="meter"><div class="meter-fill" style="width:93%;background:var(--green)"></div></div>
+    <div class="card-value" style="font-size:1.3rem;color:var(--green)">90%</div>
+    <div class="meter"><div class="meter-fill" style="width:90%;background:var(--green)"></div></div>
     <table>
       <tr><td>Protected files</td><td><span class="badge badge-green">ENFORCED</span></td></tr>
       <tr><td>postinstall scripts</td><td><span class="badge badge-green">BLOCKED</span></td></tr>
       <tr><td>Mnemonic storage</td><td><span class="badge badge-green">HARDENED</span></td></tr>
       <tr><td>Rate limiting</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
       <tr><td>AES-256-GCM memory</td><td><span class="badge badge-green">WORKING</span></td></tr>
-      <tr><td>WebSocket auth</td><td><span class="badge badge-green">DEPLOYED #184</span></td></tr>
-      <tr><td>Auth middleware</td><td><span class="badge badge-yellow">OPEN #156</span></td></tr>
+      <tr><td>Kernel extraction</td><td><span class="badge badge-yellow">PLANNED (v0.5)</span></td></tr>
     </table>
+    <div class="resolved" style="margin-top:0.75rem">
+      <strong>LIVE FIX:</strong> Council identified <code>bun install</code> postinstall vulnerability in work tasks. Added <code>--ignore-scripts</code> to all 4 install calls in <code>service.ts</code>. PR #91.
+    </div>
   </div>
 </div>
 
-<!-- Ollama Model Inventory -->
-<h2>Ollama Model Inventory</h2>
+<!-- Active Schedules -->
+<h2>Active Schedules (14)</h2>
 <table>
   <thead>
-    <tr><th>Model</th><th>Parameters</th><th>Type</th><th>Tool Support</th><th>Exam Eligible</th></tr>
+    <tr><th>Schedule</th><th>Frequency</th><th>Type</th><th>Status</th></tr>
   </thead>
   <tbody>
-    <tr><td>qwen3:4b</td><td>4.0B</td><td><span class="badge badge-purple">LOCAL</span></td><td><span class="badge badge-green">TEXT-BASED</span></td><td><span class="badge badge-red">BLOCKED (&lt;8B)</span></td></tr>
-    <tr><td>qwen3:8b</td><td>8.2B</td><td><span class="badge badge-purple">LOCAL</span></td><td><span class="badge badge-green">TEXT-BASED</span></td><td><span class="badge badge-green">ELIGIBLE</span></td></tr>
-    <tr><td>qwen3:14b</td><td>14.8B</td><td><span class="badge badge-purple">LOCAL</span></td><td><span class="badge badge-green">TEXT-BASED</span></td><td><span class="badge badge-green">ELIGIBLE</span></td></tr>
-    <tr style="background:rgba(188,140,255,0.05)"><td>qwen3-coder:480b-cloud</td><td>480B</td><td><span class="badge badge-blue">CLOUD</span></td><td><span class="badge badge-green">TEXT-BASED</span></td><td><span class="badge badge-green">EXEMPT</span></td></tr>
-    <tr style="background:rgba(188,140,255,0.05)"><td>deepseek-v3.1:671b-cloud</td><td>671B</td><td><span class="badge badge-green">TEXT-BASED</span></td><td><span class="badge badge-blue">CLOUD</span></td><td><span class="badge badge-green">EXEMPT</span></td></tr>
+    <tr><td>Daily Code Quality Review</td><td>Daily</td><td>custom</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Daily Agent Standup</td><td>Daily</td><td>send_message</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Daily Test Coverage Improvement</td><td>Daily</td><td>work_task</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly Open Source Scout</td><td>Weekly</td><td>star_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly CorvidLabs Repo Health Check</td><td>Weekly</td><td>custom</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly AlgoChat Ecosystem Review</td><td>Weekly</td><td>custom</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly CorvidLabs PR Reviews</td><td>Mon/Thu</td><td>review_prs</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly CorvidLabs Improvement Suggestions</td><td>Wednesday</td><td>github_suggest</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Weekly ts-algochat Work Task</td><td>Tuesday</td><td>work_task</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Star Algorand Ecosystem Repos</td><td>Tuesday</td><td>star_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Star AI Agent Ecosystem Repos</td><td>Thursday</td><td>star_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Fork AlgoKit for Contributions</td><td>15th monthly</td><td>fork_repo</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Bi-Weekly Roadmap Council</td><td>Bi-weekly</td><td>council_launch</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Monthly Architecture Council</td><td>1st monthly</td><td>council_launch</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
   </tbody>
 </table>
 
-<!-- Tool-Capable Model Families -->
-<h2>Tool-Capable Model Families</h2>
-<div class="card" style="margin:1rem 0;">
-  <div style="font-size:0.9rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
-    <span class="badge badge-green">llama</span>
-    <span class="badge badge-green">qwen2</span>
-    <span class="badge badge-green">qwen3</span>
-    <span class="badge badge-green">qwen3moe</span>
-    <span class="badge badge-green">mistral</span>
-    <span class="badge badge-green">command-r</span>
-    <span class="badge badge-green">firefunction</span>
-    <span class="badge badge-green">hermes</span>
-    <span class="badge badge-green">nemotron</span>
-    <span class="badge badge-green">deepseek2</span>
+<!-- Agent Roster -->
+<h2>Agent Roster (12)</h2>
+<table>
+  <thead>
+    <tr><th>Agent</th><th>Model</th><th>Provider</th><th>Role</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>CorvidAgent</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Primary</td><td><span class="badge badge-green">PRIMARY</span></td></tr>
+    <tr><td>Tech Lead</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Engineering</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Security Lead</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Security</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Architect</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Architecture</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Frontend Engineer</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Frontend</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>Backend Engineer</td><td>claude-opus-4-6</td><td>Anthropic</td><td>Backend</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr><td>DevOps Engineer</td><td>claude-opus-4-6</td><td>Anthropic</td><td>DevOps</td><td><span class="badge badge-green">ACTIVE</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Coder</td><td>qwen3:8b</td><td>Ollama</td><td>Coding</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Architect</td><td>qwen3:8b</td><td>Ollama</td><td>Chairman</td><td><span class="badge badge-blue">CHAIRMAN</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Reviewer</td><td>qwen3:8b</td><td>Ollama</td><td>Review</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen DevOps</td><td>qwen3:8b</td><td>Ollama</td><td>Infra</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+    <tr style="background:rgba(188,140,255,0.05)"><td>Qwen Coder 14B</td><td>qwen3:14b</td><td>Ollama</td><td>Heavy Coding</td><td><span class="badge badge-purple">LOCAL</span></td></tr>
+  </tbody>
+</table>
+
+<!-- E2E Verification -->
+<h2>E2E Verification Results</h2>
+<div class="grid">
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">API Smoke Tests &mdash; ALL PASS</div>
+    <div style="font-size:0.9rem">
+      <div class="feature-row"><span class="feature-name">GET /api/health</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">POST /api/sessions (create)</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">POST /api/sessions/:id/respond</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">POST /api/sessions/:id/stop</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">GET/POST /api/schedules (CRUD)</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">AlgoChat testnet connection</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">Memory save &amp; recall</span><span class="badge badge-green">OK</span></div>
+      <div class="feature-row"><span class="feature-name">Work tasks (33 historical)</span><span class="badge badge-green">OK</span></div>
+    </div>
   </div>
-  <div class="card-detail" style="margin-top:0.75rem">10 families with tool calling support. inferFromName fallback updated to detect all families from model name alone (no API required).</div>
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">Council Deliberation Test</div>
+    <div style="font-size:0.9rem">
+      <p><strong>Topic:</strong> Tiered Permission System for Self-Modifying Agents</p>
+      <p style="margin-top:0.5rem"><strong>Agents:</strong> 6 (5 Ollama + 1 Claude chairman)</p>
+      <p style="margin-top:0.5rem"><strong>Stages:</strong> Responding &rarr; Discussing (3 rounds) &rarr; Reviewing &rarr; Synthesizing</p>
+      <p style="margin-top:0.5rem"><strong>Result:</strong> Unanimous consensus on kernel concept. Identified live postinstall vulnerability (patched immediately).</p>
+      <p style="margin-top:0.5rem"><strong>Key output:</strong> 5-phase implementation roadmap from kernel extraction to formal verification.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">CI Pipeline</div>
+    <div style="font-size:0.9rem">
+      <div class="feature-row"><span class="feature-name">macOS (Bun 1.2.4)</span><span class="badge badge-green">317 PASS</span></div>
+      <div class="feature-row"><span class="feature-name">Ubuntu (Bun 1.2.4)</span><span class="badge badge-green">317 PASS</span></div>
+      <div class="feature-row"><span class="feature-name">Windows (Bun 1.2.4)</span><span class="badge badge-green">317 PASS</span></div>
+      <div class="feature-row"><span class="feature-name">TypeScript check</span><span class="badge badge-green">PASS</span></div>
+      <div class="feature-row"><span class="feature-name">PR #90 (release)</span><span class="badge badge-green">MERGED</span></div>
+      <div class="feature-row"><span class="feature-name">PR #91 (scheduler + fix)</span><span class="badge badge-green">CI GREEN</span></div>
+    </div>
+  </div>
 </div>
 
-<!-- Open Issues -->
-<h2>Open Issues (21)</h2>
-<table>
-  <thead>
-    <tr><th>#</th><th>Title</th><th>Label</th><th>Priority</th></tr>
-  </thead>
-  <tbody>
-    <tr><td>182</td><td>Ollama: work task PR creation unreliable</td><td><span class="badge badge-blue">enhancement</span></td><td><span class="badge badge-yellow">P1</span></td></tr>
-    <tr><td>181</td><td>Ollama: model doesn't produce final summary after multi-tool chain</td><td><span class="badge badge-blue">enhancement</span></td><td><span class="badge badge-yellow">P1</span></td></tr>
-    <tr><td>156</td><td>Security: Wire auth middleware into request + WebSocket pipeline</td><td><span class="badge badge-purple">council</span></td><td><span class="badge badge-yellow">P1</span></td></tr>
-    <tr><td>150</td><td>Extract [WORK] command routing from bridge.ts</td><td><span class="badge badge-purple">council</span></td><td><span class="badge badge-yellow">P1</span></td></tr>
-    <tr><td>149</td><td>Add correlation IDs &mdash; thread traceId via EventContext</td><td><span class="badge badge-purple">council</span></td><td><span class="badge badge-yellow">P1</span></td></tr>
-    <tr><td>168</td><td>Landing page redesign</td><td><span class="badge badge-blue">enhancement</span></td><td>P2</td></tr>
-    <tr><td>167</td><td>Add PWA support to remaining Angular apps</td><td><span class="badge badge-blue">enhancement</span></td><td>P2</td></tr>
-    <tr><td>165</td><td>Add unit tests for CLI chat rendering</td><td><span class="badge badge-green">testing</span></td><td>P2</td></tr>
-    <tr><td>143</td><td>Channels: Add Slack integration</td><td><span class="badge badge-blue">enhancement</span></td><td>P3</td></tr>
-    <tr><td>142</td><td>Channels: ChannelAdapter interface refactor</td><td><span class="badge badge-blue">enhancement</span></td><td>P3</td></tr>
-    <tr><td>141</td><td>AST: Integrate symbol context into work tasks</td><td><span class="badge badge-blue">enhancement</span></td><td>P3</td></tr>
-    <tr><td>140</td><td>AST: Add corvid_find_references MCP tool</td><td><span class="badge badge-blue">enhancement</span></td><td>P3</td></tr>
-    <tr><td>139</td><td>AST: Add corvid_code_symbols MCP tool</td><td><span class="badge badge-blue">enhancement</span></td><td>P3</td></tr>
-  </tbody>
-</table>
+<!-- Security: Council-Identified Vulnerability -->
+<h2>Security: Council-Identified Vulnerability</h2>
+<div class="card" style="border-color:var(--red); margin:1rem 0;">
+  <div class="card-title" style="color:var(--red)">LIVE FIX: postinstall Script Execution in Work Tasks</div>
+  <div style="font-size:0.9rem">
+    <p><strong>Identified by:</strong> Council deliberation on tiered permissions (6 agents, unanimous)</p>
+    <p style="margin-top:0.5rem"><strong>Vulnerability:</strong> <code>bun install</code> in work task worktrees ran without <code>--ignore-scripts</code>. A malicious dependency's postinstall hook could modify protected files (sdk-process.ts, spending.ts, etc.) before protected-file checks ran.</p>
+    <p style="margin-top:0.5rem"><strong>Impact:</strong> Complete bypass of the protected-file system via supply chain attack.</p>
+    <p style="margin-top:0.5rem"><strong>Fix:</strong> Added <code>--ignore-scripts</code> to all 4 <code>bun install</code> calls in <code>server/work/service.ts</code> (lines 143, 158, 383, 394).</p>
+    <p style="margin-top:0.5rem"><strong>Status:</strong> <span class="badge badge-green">PATCHED</span> in PR #91, CI green.</p>
+  </div>
+</div>
 
 <!-- Confidence Scoring Breakdown -->
 <h2>Confidence Scoring Breakdown</h2>
@@ -320,111 +329,125 @@
     <tr><th>Category</th><th>Score</th><th>Weight</th><th>Weighted</th><th>Notes</th></tr>
   </thead>
   <tbody>
-    <tr><td>Core Functionality</td><td>96%</td><td>20%</td><td>19.2</td><td>Sessions, councils, work tasks, personas, skill bundles</td></tr>
-    <tr><td>Testing &amp; CI</td><td>97%</td><td>15%</td><td>14.6</td><td>2069 tests, 102 files, 3 platforms, spec validation</td></tr>
-    <tr><td>Ollama Local</td><td>94%</td><td>15%</td><td>14.1</td><td>Text-based tools, hallucination detection, summary epilogue</td></tr>
-    <tr><td>Ollama Cloud</td><td>90%</td><td>10%</td><td>9.0</td><td>Cloud routing, merged listing, 2 cloud models live</td></tr>
-    <tr><td>Security</td><td>93%</td><td>10%</td><td>9.3</td><td>Protected files, WebSocket auth, rate limiting</td></tr>
-    <tr><td>Module Specs</td><td>95%</td><td>10%</td><td>9.5</td><td>16 specs, CI-enforced, export tracking</td></tr>
-    <tr><td>Messaging Channels</td><td>91%</td><td>10%</td><td>9.1</td><td>Telegram, Discord, AlgoChat, voice TTS/STT</td></tr>
-    <tr><td>AST &amp; Code Nav</td><td>88%</td><td>5%</td><td>4.4</td><td>tree-sitter for 5 langs, repo maps in work tasks</td></tr>
-    <tr><td>Blockchain</td><td>88%</td><td>5%</td><td>4.4</td><td>Testnet connected, encrypted memory, audit trail</td></tr>
-    <tr><td colspan="3" style="text-align:right;font-weight:700;">Total</td><td style="font-weight:700;color:var(--green)">93.6</td><td style="color:var(--muted)">Rounded: 95/100 (with momentum bonus)</td></tr>
+    <tr><td>Core Functionality</td><td>95%</td><td>25%</td><td>23.8</td><td>Sessions, councils, work tasks all functional</td></tr>
+    <tr><td>Scheduler</td><td>93%</td><td>20%</td><td>18.6</td><td>14 schedules active, all 8 action types implemented</td></tr>
+    <tr><td>Ollama Provider</td><td>88%</td><td>15%</td><td>13.2</td><td>Inference solid, tool calling needs work</td></tr>
+    <tr><td>Security</td><td>90%</td><td>15%</td><td>13.5</td><td>postinstall patched, protected files enforced</td></tr>
+    <tr><td>CI / Testing</td><td>95%</td><td>10%</td><td>9.5</td><td>317 tests, 3 platforms, TypeScript strict</td></tr>
+    <tr><td>Documentation</td><td>90%</td><td>10%</td><td>9.0</td><td>README, GitHub Pages, architecture docs updated</td></tr>
+    <tr><td>Blockchain (AlgoChat)</td><td>85%</td><td>5%</td><td>4.3</td><td>Testnet connected, on-chain audit working</td></tr>
+    <tr><td colspan="3" style="text-align:right;font-weight:700;">Total</td><td style="font-weight:700;color:var(--green)">91.9</td><td style="color:var(--muted)">Rounded: 91/100</td></tr>
   </tbody>
 </table>
 
-<!-- Autonomous Apps -->
-<h2>Autonomous Angular Apps (9)</h2>
-<div class="card" style="margin:1rem 0">
-  <div style="font-size:0.9rem">
-    <p>All built autonomously by corvid-agent (zero human-written code). Hosted on GitHub Pages.</p>
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.5rem; margin-top:0.75rem;">
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">weather-dashboard</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">space-dashboard</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">pd-gallery</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">pd-audiobooks</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">poetry-atlas</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">quake-tracker</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">pd-music</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">pixel-forge</span></div>
-      <div class="feature-row" style="border:none;padding:0.3rem 0"><span class="feature-name">bw-cinema</span></div>
+<!-- Remaining / Next Steps -->
+<h2>Known Issues &amp; Next Steps</h2>
+<div class="grid">
+  <div class="card" style="border-color:var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">Ollama Tool Calling (v0.5.0)</div>
+    <div style="font-size:0.9rem">
+      <p>Qwen3 models sometimes return tool calls as JSON text in the response body instead of using proper tool call format. Direct engine parses them but execution is inconsistent. Needs parser hardening or model-specific prompt engineering.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">Kernel Extraction (Council Recommendation)</div>
+    <div style="font-size:0.9rem">
+      <p>Council unanimously recommended extracting a "kernel" &mdash; permanently immutable files that no agent, council, or schedule can modify. Phase 0 of the tiered permissions roadmap. Breaks recursive governance loops.</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--muted)">
+    <div class="card-title">PR #91 Pending Merge</div>
+    <div style="font-size:0.9rem">
+      <p>Contains council_launch scheduler implementation + postinstall security fix. CI green. Needs merge by a different reviewer (branch protection).</p>
+    </div>
+  </div>
+  <div class="card" style="border-color:var(--muted)">
+    <div class="card-title">Council Implementation Roadmap</div>
+    <div style="font-size:0.9rem">
+      <ul style="margin:0.25rem 0 0 1.2rem;">
+        <li><strong>Phase 0:</strong> Kernel extraction (immutable core)</li>
+        <li><strong>Phase 1:</strong> Capability analysis tool</li>
+        <li><strong>Phase 2:</strong> Tiered permission system</li>
+        <li><strong>Phase 3:</strong> Council-governed upgrades</li>
+        <li><strong>Phase 4:</strong> Formal verification</li>
+      </ul>
     </div>
   </div>
 </div>
 
-<!-- Architecture -->
-<h2>Architecture: v0.9.0</h2>
-<div class="card" style="font-family:monospace;font-size:0.85rem;line-height:1.8;white-space:pre;overflow-x:auto;">
-<span style="color:var(--blue)">corvid-agent server (Bun 1.3.8)</span>              <span style="color:var(--purple)">External Services</span>
-+--------------------------------------------+    +-----------------------------+
-|  API Routes (28)  WebSocket  AlgoChat      |    |  <span style="color:var(--green)">Ollama Local</span> (Metal GPU)    |
-|  Sessions   Councils   Work Tasks          |    |  qwen3:8b      40-53 tok/s  |
-|  Personas   Skill Bundles   Scheduling     | &rarr; |  qwen3:14b     27 tok/s     |
-|  MCP Tools (36)   AST Nav   Voice TTS/STT  |    +-----------------------------+
-|  Telegram Bridge   Discord Bridge          |    |  <span style="color:var(--purple)">Ollama Cloud</span>                |
-|  Module Specs (16)   Model Exam            |    |  qwen3-coder:480b           |
-|  OpenTelemetry   Prometheus   Audit        | &rarr; |  deepseek-v3.1:671b         |
-+--------------------------------------------+    +-----------------------------+
-|  SQLite (schema v47)                       |    |  <span style="color:var(--blue)">Anthropic API</span>               |
-|  sessions, agents, councils, schedules,    | &rarr; |  claude-opus-4-6            |
-|  memories, spending, personas, skills,     |    +-----------------------------+
-|  plugins, reputation, notifications        |    |  <span style="color:var(--yellow)">Algorand Testnet</span>            |
-+--------------------------------------------+ &rarr; |  AlgoChat + audit trail      |
-|  Tests: 2069 pass / 102 files / 5167 exp   |    +-----------------------------+
-+--------------------------------------------+
+<!-- Build Timeline -->
+<h2>v0.4.0 Timeline</h2>
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 9 &mdash; Scheduler + Ollama PR #86</div>
+    <div>Foundation: 8 action types, Ollama provider with weight-based concurrency, Metal GPU.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 9 &mdash; Docker patches fix PR #87</div>
+    <div>Copy patches dir before bun install in Dockerfile.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 10 &mdash; Weight-based concurrency + tok/s</div>
+    <div>Model weights (&le;7B=1, 8-13B=2, &ge;14B=3). GPU auto-detection. tok/s display in event log.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 10 &mdash; Deadlock fixes + session-level slots</div>
+    <div>Fixed weight&gt;maxWeight and double-counting bugs. Moved slot holding to session level.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 10 &mdash; Council deliberation improvements</div>
+    <div>Tool-free deliberation, anti-repetition prompts, reduced from 3 to 2 discussion rounds.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 10 &mdash; P1-P4 fixes</div>
+    <div>On-chain self-send bypass indexer, chairman &rarr; Qwen Architect, 14B wallet funded.</div>
+  </div>
+  <div class="timeline-item release">
+    <div class="timeline-time">Feb 12 06:17 &mdash; v0.4.0 Released</div>
+    <div>PR #90 merged. Tag pushed. GitHub release published. 15 commits since v0.3.0.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 07:00 &mdash; Schedules created</div>
+    <div>14 active schedules: star, fork, review, work_task, council_launch, suggest, custom.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 07:30 &mdash; OSS Scout tested</div>
+    <div>Claude OSS Scout session starred 5 repos, saved report to memory. Ollama sessions inconsistent with tool calls.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 08:00 &mdash; Council deliberation: Tiered Permissions</div>
+    <div>6 agents, 3 discussion rounds, peer review, synthesis. Unanimous on kernel concept.</div>
+  </div>
+  <div class="timeline-item fix">
+    <div class="timeline-time">Feb 12 08:30 &mdash; postinstall vulnerability patched</div>
+    <div>Council-identified. Added --ignore-scripts to all bun install calls. PR #91.</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-time">Feb 12 14:25 &mdash; E2E verification complete</div>
+    <div>All API endpoints tested. Server healthy. 14 schedules running. CI green on 3 platforms.</div>
+  </div>
 </div>
 
-<!-- Timeline since v0.4.0 -->
-<h2>Timeline (v0.4.0 &rarr; v0.9.0)</h2>
-<div class="timeline">
-  <div class="timeline-item release">
-    <div class="timeline-time">Feb 12 &mdash; v0.4.0 Released</div>
-    <div>Scheduler, Ollama provider, council, 317 tests.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 15 &mdash; OpenTelemetry + audit logging (#131)</div>
-    <div>Tracing, Prometheus metrics, structured audit trail.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 16 &mdash; Automation redesign (#135, #136)</div>
-    <div>Deleted 15 redundant schedules. Created 11 purposeful ones.</div>
-  </div>
-  <div class="timeline-item release">
-    <div class="timeline-time">Feb 17 &mdash; v0.9.0 Released (#145)</div>
-    <div>1776 tests. Personas, skill bundles, voice, Telegram/Discord bridges, OSS packages.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 17 &mdash; Ollama cloud models (#162)</div>
-    <div>qwen3-coder:480b-cloud and deepseek-v3.1:671b-cloud with subagent + web search support.</div>
-  </div>
-  <div class="timeline-item fix">
-    <div class="timeline-time">Feb 18 &mdash; Memory status + auth fixes (#171, #172)</div>
-    <div>Fixed on-chain send status tracking. Added Claude Code subscription auth support.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 20 &mdash; Ollama reliability sprint (#173-#177)</div>
-    <div>Slot weight leak fix, mention dedup, context-aware truncation, smarter nudges, fuzzy repeat detection.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 20 &mdash; Module specification system (#178)</div>
-    <div>16 .spec.md files. spec:check validates structure, exports, dependencies, and DB tables.</div>
-  </div>
-  <div class="timeline-item fix">
-    <div class="timeline-time">Feb 20 &mdash; Tool calling hardening (#180, #186)</div>
-    <div>Hallucination detection for text-based tool calling. Testable tool parser. Retry logic. Final-summary epilogue.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 20 &mdash; AST + WebSocket auth (#183, #184)</div>
-    <div>tree-sitter for 5 languages. Work task repo maps. WebSocket auth pipeline.</div>
-  </div>
-  <div class="timeline-item">
-    <div class="timeline-time">Feb 20 &mdash; Model exam + cloud routing (v0.9.0)</div>
-    <div>18-case confidence scorecard. Cloud model routing. Min 8B size gate. 12 model families in inferFromName. Cleaner save_memory responses. 2069 tests.</div>
-  </div>
+<!-- Architecture -->
+<h2>Architecture: v0.4.0</h2>
+<div class="card" style="font-family:monospace;font-size:0.85rem;line-height:1.8;white-space:pre;overflow-x:auto;">
+<span style="color:var(--blue)">corvid-agent server</span>                      <span style="color:var(--purple)">External</span>
++-----------------------------------+      +---------------------------+
+|  <span style="color:var(--green)">Bun Runtime</span> :3000                 |      |  <span style="color:var(--green)">Ollama</span> (Metal GPU)        |
+|                                   |      |  qwen3:8b    40-53 tok/s  |
+|  API Routes   WebSocket   AlgoChat|  &rarr;  |  qwen3:14b   27 tok/s     |
+|  Sessions     Councils    Memory  |      +---------------------------+
+|  <span style="color:var(--purple)">Scheduler</span>    Work Tasks  Agents  |      |  <span style="color:var(--blue)">Anthropic API</span>             |
+|  Providers    MCP Tools   DB      |  &rarr;  |  claude-opus-4-6          |
++-----------------------------------+      +---------------------------+
+|  SQLite (schema v24)              |      |  <span style="color:var(--yellow)">Algorand Testnet</span>          |
+|  sessions, agents, councils,      |  &rarr;  |  AlgoChat messaging       |
+|  schedules, memories, spending    |      |  On-chain audit trail      |
++-----------------------------------+      +---------------------------+
 </div>
 
 <div style="text-align:center;margin:3rem 0 1rem;color:var(--muted);font-size:0.8rem;">
-  corvid-agent v0.9.0 confidence review &mdash; generated by Claude Opus 4.6 &mdash; 2026-02-20
+  corvid-agent v0.4.0 confidence review &mdash; generated by Claude Opus 4.6 &mdash; 2026-02-12 14:25 UTC
 </div>
 
 </body>
