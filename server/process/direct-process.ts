@@ -338,6 +338,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let nudgeCount = 0;
         let midChainNudgeCount = 0;
         let toolsEverCalled = false;
+        let needsSummary = false; // Set true when loop breaks abnormally (repeat/max-iter)
         const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
         const MAX_SAME_TOOL = 4; // Break if same tool name called 5 times (even with different args)
         const MAX_NUDGES = 2; // Don't nudge more than twice — model isn't going to start using tools
@@ -437,6 +438,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     if (repeatCount >= MAX_REPEATS) {
                         log.warn(`Breaking tool loop: same call repeated ${repeatCount + 1} times`, { calls: callKey.slice(0, 200) });
                         messages.push({ role: 'assistant', content: result.content || '' });
+                        needsSummary = true;
                         break;
                     }
                 } else {
@@ -452,6 +454,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     if (sameToolNameCount >= MAX_SAME_TOOL) {
                         log.warn(`Breaking tool loop: same tool name repeated ${sameToolNameCount + 1} times with varying args`, { tools: toolNames });
                         messages.push({ role: 'assistant', content: result.content || '' });
+                        needsSummary = true;
                         break;
                     }
                 } else {
@@ -575,6 +578,52 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             }
 
             break;
+        }
+
+        // Max iterations reached — also needs a summary epilogue
+        if (iteration >= MAX_TOOL_ITERATIONS && toolsEverCalled) {
+            needsSummary = true;
+        }
+
+        // Final summary epilogue: when the tool loop broke abnormally (repeat
+        // detection, same-tool detection, or max iterations), the model never
+        // got a chance to produce a coherent text conclusion. Run one last
+        // inference call with tools disabled so it can summarize its work.
+        if (needsSummary && toolsEverCalled && !aborted) {
+            log.info('Running final summary call (tools disabled)', { sessionId: session.id, iteration });
+            messages.push({
+                role: 'user',
+                content: 'Summarize what you accomplished. Be concise — state the key actions taken and their results.',
+            });
+            try {
+                trimMessages(messages, systemPrompt);
+                const summaryResult = await provider.complete({
+                    model,
+                    systemPrompt,
+                    messages,
+                    // No tools — force a text-only response
+                    signal: abortController.signal,
+                    onStream: (text) => onEvent({
+                        type: 'content_block_delta',
+                        delta: { text },
+                    } as ClaudeStreamEvent),
+                });
+                if (summaryResult.content && !aborted) {
+                    messages.push({ role: 'assistant', content: summaryResult.content });
+                    onEvent({
+                        type: 'assistant',
+                        message: {
+                            role: 'assistant',
+                            content: [{ type: 'text', text: summaryResult.content }],
+                        },
+                    } as ClaudeStreamEvent);
+                }
+            } catch (err) {
+                log.warn('Final summary call failed', {
+                    sessionId: session.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
         }
 
         } finally {

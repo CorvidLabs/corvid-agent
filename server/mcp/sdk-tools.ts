@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences } from './tool-handlers';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -38,6 +38,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_publish_attestation',
     'corvid_verify_agent_reputation',
     'corvid_invoke_remote_agent',
+    'corvid_code_symbols',
+    'corvid_find_references',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -439,6 +441,32 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             },
             async (args) => handleInvokeRemoteAgent(ctx, args),
         ),
+        // ─── AST / Code navigation tools ─────────────────────────────────
+        ...(ctx.astParserService ? [
+            tool(
+                'corvid_code_symbols',
+                'Search for code symbols (functions, classes, interfaces, types, etc.) in a project using AST parsing. ' +
+                'Returns symbol names, kinds, line ranges, and export status. Use this for structural code navigation.',
+                {
+                    query: z.string().describe('Symbol name or partial name to search for'),
+                    project_dir: z.string().optional().describe('Project directory to search. Omit to use the agent default project.'),
+                    kinds: z.array(z.enum(['function', 'class', 'interface', 'type_alias', 'enum', 'import', 'export', 'variable', 'method'])).optional().describe('Filter by symbol kind(s)'),
+                    limit: z.number().optional().describe('Maximum results to return (default 50)'),
+                },
+                async (args) => handleCodeSymbols(ctx, args),
+            ),
+            tool(
+                'corvid_find_references',
+                'Find all references to a symbol across the project. Combines AST-based definition lookup with text search. ' +
+                'Returns both the definition location(s) and all file:line references.',
+                {
+                    symbol_name: z.string().describe('Exact symbol name to find references for'),
+                    project_dir: z.string().optional().describe('Project directory to search. Omit to use the agent default project.'),
+                    limit: z.number().optional().describe('Maximum reference lines to return (default 50)'),
+                },
+                async (args) => handleFindReferences(ctx, args),
+            ),
+        ] : []),
     ];
 
     // Merge plugin tools if provided

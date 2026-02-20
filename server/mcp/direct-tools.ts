@@ -33,6 +33,8 @@ import {
     handleGitHubGetPrDiff,
     handleGitHubCommentOnPr,
     handleGitHubFollowUser,
+    handleCodeSymbols,
+    handleFindReferences,
 } from './tool-handlers';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
@@ -76,6 +78,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'run_command',
     'list_files',
     'search_files',
+    'corvid_code_symbols',
+    'corvid_find_references',
 ]);
 
 /** Tools blocked during scheduler-initiated sessions. */
@@ -575,6 +579,49 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
             },
         },
     );
+
+    // ─── AST / Code navigation tools ─────────────────────────────────────
+    if (ctx.astParserService) {
+        tools.push(
+            {
+                name: 'corvid_code_symbols',
+                description: 'Search for code symbols (functions, classes, interfaces, types, etc.) in a project using AST parsing. Returns symbol names, kinds, line ranges, and export status.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        query: { type: 'string', description: 'Symbol name or partial name to search for' },
+                        project_dir: { type: 'string', description: 'Project directory to search. Omit to use agent default project.' },
+                        kinds: { type: 'array', items: { type: 'string', enum: ['function', 'class', 'interface', 'type_alias', 'enum', 'import', 'export', 'variable', 'method'] }, description: 'Filter by symbol kind(s)' },
+                        limit: { type: 'number', description: 'Maximum results to return (default 50)' },
+                    },
+                    required: ['query'],
+                },
+                handler: async (args) => {
+                    const err = validateRequired('corvid_code_symbols', args, ['query']);
+                    if (err) return err;
+                    return unwrapResult(await handleCodeSymbols(ctx, args as { query: string; project_dir?: string; kinds?: string[]; limit?: number }));
+                },
+            },
+            {
+                name: 'corvid_find_references',
+                description: 'Find all references to a symbol across the project. Combines AST-based definition lookup with text search. Returns definition locations and file:line references.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        symbol_name: { type: 'string', description: 'Exact symbol name to find references for' },
+                        project_dir: { type: 'string', description: 'Project directory to search. Omit to use agent default project.' },
+                        limit: { type: 'number', description: 'Maximum reference lines to return (default 50)' },
+                    },
+                    required: ['symbol_name'],
+                },
+                handler: async (args) => {
+                    const err = validateRequired('corvid_find_references', args, ['symbol_name']);
+                    if (err) return err;
+                    return unwrapResult(await handleFindReferences(ctx, args as { symbol_name: string; project_dir?: string; limit?: number }));
+                },
+            },
+        );
+    }
     } // end if (ctx)
 
     // Merge coding tools when a coding context is provided

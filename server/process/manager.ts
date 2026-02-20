@@ -24,6 +24,7 @@ import type { QuestionDispatcher } from '../notifications/question-dispatcher';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { ReputationAttestation } from '../reputation/attestation';
 import type { ReputationVerifier } from '../reputation/verifier';
+import type { AstParserService } from '../ast/service';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
@@ -113,6 +114,7 @@ export class ProcessManager {
     private mcpReputationScorer: ReputationScorer | null = null;
     private mcpReputationAttestation: ReputationAttestation | null = null;
     private mcpReputationVerifier: ReputationVerifier | null = null;
+    private mcpAstParserService: AstParserService | null = null;
 
     constructor(db: Database) {
         this.db = db;
@@ -150,6 +152,7 @@ export class ProcessManager {
         reputationScorer?: ReputationScorer,
         reputationAttestation?: ReputationAttestation,
         reputationVerifier?: ReputationVerifier,
+        astParserService?: AstParserService,
     ): void {
         this.mcpMessenger = messenger;
         this.mcpDirectory = directory;
@@ -163,6 +166,7 @@ export class ProcessManager {
         this.mcpReputationScorer = reputationScorer ?? null;
         this.mcpReputationAttestation = reputationAttestation ?? null;
         this.mcpReputationVerifier = reputationVerifier ?? null;
+        this.mcpAstParserService = astParserService ?? null;
         log.info('MCP services registered — agent sessions will receive corvid_* tools');
     }
 
@@ -200,6 +204,7 @@ export class ProcessManager {
             reputationAttestation: this.mcpReputationAttestation ?? undefined,
             reputationVerifier: this.mcpReputationVerifier ?? undefined,
             resolvedToolPermissions,
+            astParserService: this.mcpAstParserService ?? undefined,
         };
     }
 
