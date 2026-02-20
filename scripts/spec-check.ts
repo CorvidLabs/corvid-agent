@@ -107,7 +107,7 @@ function getSchemaTableNames(): Set<string> {
     if (!existsSync(SCHEMA_FILE)) return tables;
 
     const content = readFileSync(SCHEMA_FILE, 'utf-8');
-    const regex = /CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)/g;
+    const regex = /CREATE (?:VIRTUAL )?TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)/g;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(content)) !== null) {
         tables.add(match[1]);
