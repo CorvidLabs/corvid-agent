@@ -342,10 +342,15 @@ export class WorkTaskService {
     }
 
     private async finalizeTask(taskId: string, sessionOutput: string): Promise<void> {
-        const prMatch = sessionOutput.match(PR_URL_REGEX);
+        let prUrl = sessionOutput.match(PR_URL_REGEX)?.[0] ?? null;
 
-        if (prMatch) {
-            const prUrl = prMatch[0];
+        // Service-level fallback: if the agent didn't produce a PR URL (common with
+        // Ollama models), push the branch and create the PR ourselves.
+        if (!prUrl) {
+            prUrl = await this.createPrFallback(taskId, sessionOutput);
+        }
+
+        if (prUrl) {
             const summary = sessionOutput.slice(-500).trim();
             updateWorkTaskStatus(this.db, taskId, 'completed', { prUrl, summary });
             log.info('Work task completed with PR', { taskId, prUrl });
@@ -353,7 +358,7 @@ export class WorkTaskService {
             recordAudit(this.db, 'work_task_complete', 'system', 'work_task', taskId, `Completed with PR: ${prUrl}`);
         } else {
             updateWorkTaskStatus(this.db, taskId, 'failed', {
-                error: 'Session completed but no PR URL was found in output',
+                error: 'Session completed but no PR URL was found in output and service-level PR creation failed',
                 summary: sessionOutput.slice(-500).trim(),
             });
             log.warn('Work task completed without PR URL', { taskId });
@@ -364,6 +369,78 @@ export class WorkTaskService {
 
         // Notify callbacks
         this.notifyCallbacks(taskId);
+    }
+
+    /**
+     * Fallback PR creation: push the branch and run `gh pr create` at the service level.
+     * Called when the agent session completed successfully (validation passed) but
+     * did not output a PR URL — common with Ollama models that struggle with gh CLI.
+     */
+    private async createPrFallback(taskId: string, sessionOutput: string): Promise<string | null> {
+        const task = getWorkTask(this.db, taskId);
+        if (!task?.branchName || !task.worktreeDir) return null;
+
+        const cwd = task.worktreeDir;
+
+        try {
+            // Ensure all changes are committed (agent may have left unstaged changes)
+            const statusProc = Bun.spawn(['git', 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+            await statusProc.exited;
+            if (await statusProc.exited !== 0) {
+                // There are uncommitted changes — commit them
+                const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+                await addProc.exited;
+                const commitProc = Bun.spawn(
+                    ['git', 'commit', '-m', `Work task: ${task.description.slice(0, 60)}`],
+                    { cwd, stdout: 'pipe', stderr: 'pipe' },
+                );
+                await commitProc.exited;
+            }
+
+            // Push the branch
+            log.info('Fallback: pushing branch', { taskId, branch: task.branchName });
+            const pushProc = Bun.spawn(
+                ['git', 'push', '-u', 'origin', task.branchName],
+                { cwd, stdout: 'pipe', stderr: 'pipe' },
+            );
+            const pushStderr = await new Response(pushProc.stderr).text();
+            const pushExit = await pushProc.exited;
+
+            if (pushExit !== 0) {
+                log.warn('Fallback: git push failed', { taskId, stderr: pushStderr.trim() });
+                return null;
+            }
+
+            // Create PR via gh CLI
+            const title = `[Agent] ${task.description.slice(0, 60)}`;
+            const body = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sessionOutput.slice(-300).trim()}`;
+            log.info('Fallback: creating PR', { taskId, branch: task.branchName });
+
+            const prProc = Bun.spawn(
+                ['gh', 'pr', 'create', '--title', title, '--body', body, '--head', task.branchName],
+                { cwd, stdout: 'pipe', stderr: 'pipe' },
+            );
+            const prStdout = await new Response(prProc.stdout).text();
+            const prStderr = await new Response(prProc.stderr).text();
+            const prExit = await prProc.exited;
+
+            if (prExit !== 0) {
+                log.warn('Fallback: gh pr create failed', { taskId, stderr: prStderr.trim() });
+                return null;
+            }
+
+            const prUrl = prStdout.match(PR_URL_REGEX)?.[0] ?? null;
+            if (prUrl) {
+                log.info('Fallback: PR created successfully', { taskId, prUrl });
+            }
+            return prUrl;
+        } catch (err) {
+            log.warn('Fallback PR creation error', {
+                taskId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return null;
+        }
     }
 
     private notifyCallbacks(taskId: string): void {

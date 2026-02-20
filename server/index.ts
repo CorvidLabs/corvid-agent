@@ -307,7 +307,7 @@ async function initAlgoChat(): Promise<void> {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
     }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher,
-    reputationScorer, reputationAttestation, reputationVerifier);
+    reputationScorer, reputationAttestation, reputationVerifier, astParserService);
 
     // Forward AlgoChat events to WebSocket clients
     algochatBridge.onEvent((participant, content, direction) => {
