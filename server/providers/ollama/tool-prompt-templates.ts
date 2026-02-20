@@ -12,7 +12,7 @@
  * 4. Response routing — when NOT to use corvid_send_message
  */
 
-export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'unknown';
+export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'unknown';
 
 /**
  * Detect model family from a model name string.
@@ -30,6 +30,7 @@ export function detectModelFamily(modelName: string): ModelFamily {
     if (lower.includes('nemotron')) return 'nemotron';
     if (lower.includes('phi')) return 'phi';
     if (lower.includes('gemma')) return 'gemma';
+    if (lower.includes('deepseek')) return 'deepseek';
 
     return 'unknown';
 }
@@ -64,7 +65,7 @@ export function getToolInstructionPrompt(
     }
 
     // Family-specific guidance
-    const familyPrompt = getFamilySpecificPrompt(family);
+    const familyPrompt = getFamilySpecificPrompt(family, toolNames);
     if (familyPrompt) {
         parts.push(familyPrompt);
     }
@@ -146,7 +147,10 @@ ${toolList}
 5. Do not invent or hallucinate tool names — only use tools from the available list.`;
 }
 
-function getFamilySpecificPrompt(family: ModelFamily): string | null {
+function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []): string | null {
+    // Build a dynamic few-shot example using the first available tool
+    const exampleTool = toolNames[0] ?? 'tool_name';
+
     switch (family) {
         case 'llama':
             return `### Llama-specific guidance
@@ -164,12 +168,13 @@ function getFamilySpecificPrompt(family: ModelFamily): string | null {
         case 'qwen3':
             return `### Qwen3 Tool Calling Format
 - To call a tool, output ONLY a JSON array on its own with this exact format:
-[{"name": "tool_name", "arguments": {"param1": "value1"}}]
-- Do not wrap tool calls in markdown code blocks or add any surrounding text.
-- Output EITHER a tool call OR a text response, never both in the same message.
-- CRITICAL: Use tool names EXACTLY as listed above. Do NOT add prefixes — e.g., use "list_files" not "corvid_list_files". Only corvid_* tools already have that prefix.
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Do NOT wrap tool calls in markdown code blocks (\`\`\`). Output raw JSON only.
+- Do NOT write any text before or after the JSON array. Either output a tool call OR text, never both.
+- CRITICAL: Use tool names EXACTLY as listed above. Do NOT invent tool names or add prefixes — e.g., use "list_files" not "corvid_list_files". Only corvid_* tools already have that prefix.
 - Tool results will be provided inside «tool_output»...«/tool_output» tags. Wait for these before proceeding.
 - NEVER generate fake tool results yourself. NEVER write «tool_output» tags. Only the system writes those.
+- NEVER pretend a tool was called or fabricate output. If you need information, call the tool.
 - When chaining multiple operations, call ONE tool at a time and wait for its result before calling the next.
 - Provide your final answer as plain text only after all tool operations are complete.`;
 
@@ -196,7 +201,32 @@ function getFamilySpecificPrompt(family: ModelFamily): string | null {
 - Provide concise final responses after tool operations complete.`;
 
         case 'phi':
+            return `### Phi-specific guidance
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Do not narrate your actions. Either call a tool OR provide your final text answer.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
         case 'gemma':
+            return `### Gemma-specific guidance
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Do not wrap tool calls in code blocks or add surrounding text. Output raw JSON only.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
+        case 'deepseek':
+            return `### DeepSeek-specific guidance
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Call one tool at a time and wait for its result before calling the next.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
         case 'unknown':
         default:
             return null;
