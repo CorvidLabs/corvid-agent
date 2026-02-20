@@ -15,7 +15,7 @@ depends_on:
 
 ## Purpose
 
-Ollama LLM provider with weight-based concurrency limiting, streaming inference, and multi-format tool call extraction. Implements the `LlmProvider` interface for local Ollama models, handling GPU auto-detection, model management (pull/delete/list), and text-based tool calling for model families that degrade with native tool APIs.
+Ollama LLM provider with weight-based concurrency limiting, streaming inference, and multi-format tool call extraction. Implements the `LlmProvider` interface for local and cloud Ollama models, handling GPU auto-detection, model management (pull/delete/list), cloud model routing, and text-based tool calling for model families that degrade with native tool APIs.
 
 ## Public API
 
@@ -62,14 +62,16 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 1. **Weight-based concurrency**: `activeWeight` never exceeds `maxWeight` and never goes negative. If negative is detected, clamp to 0 and log a warning
 2. **Slot always released**: Every `acquireSlot` that returns `true` must have a corresponding `releaseSlot` call, even on abort or error. The direct-process wraps the agentic loop in a try/finally to guarantee this
 3. **Text-based tool calling for qwen3**: Models in `TEXT_BASED_TOOL_FAMILIES` never receive the native `tools` API parameter. Tool calls are extracted from text output only
-4. **GPU auto-detection on first completion**: After the first `releaseSlot`, probes `/api/ps` to check VRAM allocation. If GPU detected, upgrades `maxWeight` based on VRAM tier (<10GB=3, 10-40GB=5, >40GB=8)
-5. **Stream idle timeout (2 min)**: If no data arrives from Ollama stream for 120 seconds, the request is aborted with an error
-6. **Model cache TTL (30s)**: `refreshModels()` returns cached results within 30 seconds of last fetch
-7. **Tool call normalization**: After extraction, tool arguments are normalized via substring key matching to map common aliases (e.g., `file_path` -> `path`) to expected schema parameter names. Existing keys are never overwritten
-8. **Thinking mode disabled for qwen3**: Models in `THINKING_MODEL_FAMILIES` get `think: false` to prevent empty content responses
-9. **Request timeout (30 min)**: Combined abort signal uses both external signal and 30-minute timeout. Configurable via `OLLAMA_REQUEST_TIMEOUT`
-10. **Retry on transient errors**: Retryable errors (connection reset, 503, 429, OOM) are retried up to 3 times with exponential backoff (1s, 2s, 4s) + jitter. Permanent errors (model not found, invalid request) fail immediately
-11. **Pull status cleanup**: Terminal pull statuses are removed from the map after 60 seconds
+4. **Cloud model routing**: Models with `-cloud` suffix are routed to the local Ollama instance (`localhost`) even when `OLLAMA_HOST` points to a remote GPU server. Cloud models require local Ollama for auth proxying
+5. **Merged model listing**: `refreshModels()` queries both the configured host and localhost (when different). Cloud models from localhost are merged into the model list
+6. **GPU auto-detection on first completion**: After the first `releaseSlot`, probes `/api/ps` to check VRAM allocation. If GPU detected, upgrades `maxWeight` based on VRAM tier (<10GB=3, 10-40GB=5, >40GB=8)
+7. **Stream idle timeout (2 min)**: If no data arrives from Ollama stream for 120 seconds, the request is aborted with an error
+8. **Model cache TTL (30s)**: `refreshModels()` returns cached results within 30 seconds of last fetch
+9. **Tool call normalization**: After extraction, tool arguments are normalized via substring key matching to map common aliases (e.g., `file_path` -> `path`) to expected schema parameter names. Existing keys are never overwritten
+10. **Thinking mode disabled for qwen3**: Models in `THINKING_MODEL_FAMILIES` get `think: false` to prevent empty content responses
+11. **Request timeout (30 min)**: Combined abort signal uses both external signal and 30-minute timeout. Configurable via `OLLAMA_REQUEST_TIMEOUT`
+12. **Retry on transient errors**: Retryable errors (connection reset, 503, 429, OOM) are retried up to 3 times with exponential backoff (1s, 2s, 4s) + jitter. Permanent errors (model not found, invalid request) fail immediately
+13. **Pull status cleanup**: Terminal pull statuses are removed from the map after 60 seconds
 
 ## Behavioral Examples
 
@@ -103,6 +105,20 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 - **Then** `gpuDetected` is set to `true`
 - **And** `maxWeight` is upgraded based on VRAM tier
 - **And** queued waiters are released if they now fit
+
+### Scenario: Cloud model routed to localhost
+
+- **Given** `OLLAMA_HOST=http://gpu-server:11434` and model `qwen3-coder:480b-cloud`
+- **When** `hostForModel` resolves the endpoint
+- **Then** the request is sent to `http://localhost:11434` (not gpu-server)
+- **And** a log message notes the redirect
+
+### Scenario: Merged model listing with cloud models
+
+- **Given** `OLLAMA_HOST=http://gpu-server:11434` with 3 local models
+- **And** localhost has 2 cloud models (`-cloud` suffix)
+- **When** `refreshModels()` is called
+- **Then** the returned list contains all 5 models (3 local + 2 cloud)
 
 ### Scenario: Retry on transient error
 
@@ -161,3 +177,4 @@ Ollama LLM provider with weight-based concurrency limiting, streaming inference,
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-02-20 | corvid-agent | Add cloud model routing (hostForModel), merged model listing, invariants 4-5 |
