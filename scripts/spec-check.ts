@@ -258,12 +258,12 @@ function findSpecFiles(dir: string): string[] {
 
 function validateSpec(specPath: string, schemaTables: Set<string>): ValidationResult {
     const result: ValidationResult = {
-        specPath: specPath.replace(ROOT + '/', ''),
+        specPath: specPath.replace(ROOT + '/', '').replace(ROOT + '\\', ''),
         errors: [],
         warnings: [],
     };
 
-    const content = readFileSync(specPath, 'utf-8');
+    const content = readFileSync(specPath, 'utf-8').replace(/\r\n/g, '\n');
     const parsed = parseFrontmatter(content);
 
     if (!parsed) {
