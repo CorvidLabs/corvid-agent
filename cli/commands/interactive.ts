@@ -13,7 +13,7 @@ interface InteractiveOptions {
     agent?: string;
 }
 
-interface Turn {
+export interface Turn {
     role: 'user' | 'assistant';
     content: string;
 }
@@ -36,7 +36,7 @@ async function resolveProjectFromCwd(client: CorvidClient): Promise<string | und
  * Build a prompt that includes conversation history so one-shot providers
  * (Ollama direct mode) maintain context across turns.
  */
-function buildPromptWithHistory(history: Turn[], currentMessage: string): string {
+export function buildPromptWithHistory(history: Turn[], currentMessage: string): string {
     if (history.length === 0) return currentMessage;
 
     // Trim oldest turns if history is too long
@@ -222,7 +222,7 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
     promptUser();
 }
 
-function handleMessage(
+export function handleMessage(
     msg: ServerMessage,
     agentId: string,
     getHasStreamContent: () => boolean,
