@@ -7,18 +7,22 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { WorkTaskService } from '../work/service';
 import type { SchedulerService } from '../scheduler/service';
 import type { OwnerQuestionManager } from '../process/owner-question-manager';
+import type { AuthConfig } from '../middleware/auth';
+import { timingSafeEqual } from '../middleware/auth';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
 
-interface WsData {
+export interface WsData {
     subscriptions: Map<string, EventCallback>;
     walletAddress?: string;
+    authenticated: boolean;
 }
 
 export function createWebSocketHandler(
     processManager: ProcessManager,
     getBridge: () => AlgoChatBridge | null,
+    authConfig: AuthConfig,
     getMessenger?: () => AgentMessenger | null,
     getWorkTaskService?: () => WorkTaskService | null,
     getSchedulerService?: () => SchedulerService | null,
@@ -26,13 +30,21 @@ export function createWebSocketHandler(
 ) {
     return {
         open(ws: ServerWebSocket<WsData>) {
-            ws.data = { subscriptions: new Map() };
-            ws.subscribe('council');
-            ws.subscribe('algochat');
-            ws.subscribe('scheduler');
-            ws.subscribe('ollama');
-            ws.subscribe('owner');
-            log.info('WebSocket connection opened');
+            // authenticated flag is set during upgrade in index.ts
+            const isAuthenticated = ws.data?.authenticated ?? false;
+            ws.data = { subscriptions: new Map(), walletAddress: ws.data?.walletAddress, authenticated: isAuthenticated };
+
+            if (isAuthenticated) {
+                // Pre-authenticated at upgrade — subscribe to broadcast topics immediately
+                ws.subscribe('council');
+                ws.subscribe('algochat');
+                ws.subscribe('scheduler');
+                ws.subscribe('ollama');
+                ws.subscribe('owner');
+                log.info('WebSocket connection opened (pre-authenticated)');
+            } else {
+                log.info('WebSocket connection opened (awaiting auth)');
+            }
         },
 
         message(ws: ServerWebSocket<WsData>, message: string | Buffer) {
@@ -54,6 +66,38 @@ export function createWebSocketHandler(
                 return;
             }
 
+            // Handle first-message authentication
+            if (parsed.type === 'auth') {
+                if (ws.data.authenticated) {
+                    sendError(ws, 'Already authenticated');
+                    return;
+                }
+                if (!authConfig.apiKey) {
+                    // No API key configured — auto-authenticate
+                    ws.data.authenticated = true;
+                    subscribeToTopics(ws);
+                    safeSend(ws, { type: 'error', message: 'Authenticated (no key required)' });
+                    return;
+                }
+                if (timingSafeEqual(parsed.key, authConfig.apiKey)) {
+                    ws.data.authenticated = true;
+                    subscribeToTopics(ws);
+                    log.info('WebSocket authenticated via first-message auth');
+                    safeSend(ws, { type: 'error', message: 'Authenticated' });
+                    return;
+                }
+                log.warn('WebSocket auth failed: invalid key');
+                sendError(ws, 'Invalid API key');
+                ws.close(4001, 'Invalid API key');
+                return;
+            }
+
+            // Gate all other messages behind authentication
+            if (!ws.data.authenticated) {
+                sendError(ws, 'Authentication required. Send { "type": "auth", "key": "<key>" } first.');
+                return;
+            }
+
             handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService, getOwnerQuestionManager);
         },
 
@@ -67,6 +111,14 @@ export function createWebSocketHandler(
             }
         },
     };
+}
+
+function subscribeToTopics(ws: ServerWebSocket<WsData>): void {
+    ws.subscribe('council');
+    ws.subscribe('algochat');
+    ws.subscribe('scheduler');
+    ws.subscribe('ollama');
+    ws.subscribe('owner');
 }
 
 function handleClientMessage(

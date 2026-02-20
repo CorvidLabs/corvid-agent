@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from '../ws/handler';
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { ProcessManager, EventCallback } from '../process/manager';
+import type { AuthConfig } from '../middleware/auth';
 
 /**
  * WebSocket handler tests.
@@ -11,22 +12,33 @@ import type { ProcessManager, EventCallback } from '../process/manager';
  * message-type handler.
  */
 
+// ─── Auth config helpers ──────────────────────────────────────────────────
+
+/** Auth disabled (localhost mode) — all connections auto-authenticate */
+const noAuthConfig: AuthConfig = { apiKey: null, allowedOrigins: [], bindHost: '127.0.0.1' };
+
+/** Auth enabled — connections must authenticate via upgrade or first-message */
+const withAuthConfig: AuthConfig = { apiKey: 'test-secret-key-1234', allowedOrigins: [], bindHost: '0.0.0.0' };
+
 // ─── Mock helpers ──────────────────────────────────────────────────────────
 
-function createMockWs() {
+function createMockWs(authenticated = true) {
     const sent: string[] = [];
     const subscribed: string[] = [];
     const unsubscribed: string[] = [];
+    let closed = false;
     return {
         ws: {
-            data: { subscriptions: new Map() } as { subscriptions: Map<string, EventCallback>; walletAddress?: string },
+            data: { subscriptions: new Map(), authenticated } as { subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean },
             send: mock((msg: string) => { sent.push(msg); }),
             subscribe: mock((topic: string) => { subscribed.push(topic); }),
             unsubscribe: mock((topic: string) => { unsubscribed.push(topic); }),
+            close: mock((_code?: number, _reason?: string) => { closed = true; }),
         } as any,
         sent,
         subscribed,
         unsubscribed,
+        get closed() { return closed; },
     };
 }
 
@@ -68,6 +80,12 @@ describe('isClientMessage', () => {
 
     it('rejects unknown type', () => {
         expect(isClientMessage({ type: 'unknown_msg' })).toBe(false);
+    });
+
+    it('validates auth', () => {
+        expect(isClientMessage({ type: 'auth', key: 'my-key' })).toBe(true);
+        expect(isClientMessage({ type: 'auth' })).toBe(false);
+        expect(isClientMessage({ type: 'auth', key: 123 })).toBe(false);
     });
 
     it('validates subscribe', () => {
@@ -135,7 +153,7 @@ describe('createWebSocketHandler', () => {
 
     describe('open', () => {
         it('initializes data and subscribes to global topics', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, subscribed } = createMockWs();
 
             handler.open(ws);
@@ -152,7 +170,7 @@ describe('createWebSocketHandler', () => {
 
     describe('message — parsing', () => {
         it('sends error for invalid JSON', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, 'not{json');
@@ -164,7 +182,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('sends error for invalid message format', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({ type: 'bogus' }));
@@ -176,7 +194,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('handles Buffer messages', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, Buffer.from(JSON.stringify({ type: 'subscribe', sessionId: 's1' })));
@@ -189,7 +207,7 @@ describe('createWebSocketHandler', () => {
 
     describe('subscribe/unsubscribe lifecycle', () => {
         it('subscribes to a session and receives events', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
             handler.open(ws);
 
@@ -209,7 +227,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('forwards approval_request as dedicated message', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
             handler.open(ws);
 
@@ -234,7 +252,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('ignores duplicate subscription', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws } = createMockWs();
             handler.open(ws);
 
@@ -245,7 +263,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('unsubscribes from a session', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws } = createMockWs();
             handler.open(ws);
 
@@ -257,7 +275,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('ignores unsubscribe for non-existent subscription', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws } = createMockWs();
             handler.open(ws);
 
@@ -269,7 +287,7 @@ describe('createWebSocketHandler', () => {
 
     describe('close', () => {
         it('cleans up all subscriptions', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws } = createMockWs();
             handler.open(ws);
 
@@ -283,7 +301,7 @@ describe('createWebSocketHandler', () => {
         });
 
         it('handles close with no data gracefully', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const ws = { data: undefined } as any;
 
             // Should not throw
@@ -293,7 +311,7 @@ describe('createWebSocketHandler', () => {
 
     describe('send_message', () => {
         it('sends message to running session', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({ type: 'send_message', sessionId: 'sess-1', content: 'hello' }));
@@ -308,7 +326,7 @@ describe('createWebSocketHandler', () => {
             const pmNotRunning = createMockProcessManager({
                 sendMessage: mock(() => false),
             } as any);
-            const handler = createWebSocketHandler(pmNotRunning, () => null);
+            const handler = createWebSocketHandler(pmNotRunning, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({ type: 'send_message', sessionId: 'sess-1', content: 'hello' }));
@@ -322,7 +340,7 @@ describe('createWebSocketHandler', () => {
 
     describe('chat_send', () => {
         it('sends error when bridge is null', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({ type: 'chat_send', agentId: 'a1', content: 'hi' }));
@@ -336,7 +354,7 @@ describe('createWebSocketHandler', () => {
 
     describe('approval_response', () => {
         it('resolves an approval request', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws } = createMockWs();
 
             handler.message(ws, JSON.stringify({
@@ -355,7 +373,7 @@ describe('createWebSocketHandler', () => {
 
     describe('create_work_task', () => {
         it('sends error when work task service is null', () => {
-            const handler = createWebSocketHandler(pm, () => null, undefined, undefined);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({
@@ -373,7 +391,7 @@ describe('createWebSocketHandler', () => {
 
     describe('agent_invoke', () => {
         it('sends error when messenger is null', () => {
-            const handler = createWebSocketHandler(pm, () => null, undefined);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({
@@ -392,7 +410,7 @@ describe('createWebSocketHandler', () => {
 
     describe('agent_reward', () => {
         it('sends error when wallet service is null', () => {
-            const handler = createWebSocketHandler(pm, () => null);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({
@@ -410,7 +428,7 @@ describe('createWebSocketHandler', () => {
 
     describe('schedule_approval', () => {
         it('sends error when scheduler is null', () => {
-            const handler = createWebSocketHandler(pm, () => null, undefined, undefined, undefined);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, undefined);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({
@@ -428,7 +446,7 @@ describe('createWebSocketHandler', () => {
 
     describe('question_response', () => {
         it('sends error when question manager is null', () => {
-            const handler = createWebSocketHandler(pm, () => null, undefined, undefined, undefined, undefined);
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, undefined, undefined);
             const { ws, sent } = createMockWs();
 
             handler.message(ws, JSON.stringify({
@@ -441,6 +459,108 @@ describe('createWebSocketHandler', () => {
             const msg = JSON.parse(sent[0]);
             expect(msg.type).toBe('error');
             expect(msg.message).toContain('Owner question service not available');
+        });
+    });
+
+    describe('authentication', () => {
+        it('subscribes to topics on open when pre-authenticated', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, subscribed } = createMockWs(true);
+
+            handler.open(ws);
+
+            expect(subscribed).toContain('council');
+            expect(subscribed).toContain('algochat');
+            expect(subscribed).toContain('owner');
+        });
+
+        it('does not subscribe to topics on open when not pre-authenticated', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, subscribed } = createMockWs(false);
+
+            handler.open(ws);
+
+            expect(subscribed.length).toBe(0);
+        });
+
+        it('rejects non-auth messages when not authenticated', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, sent } = createMockWs(false);
+            handler.open(ws);
+
+            handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-1' }));
+
+            expect(sent.length).toBe(1);
+            const msg = JSON.parse(sent[0]);
+            expect(msg.type).toBe('error');
+            expect(msg.message).toContain('Authentication required');
+        });
+
+        it('authenticates via first-message auth with valid key', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, sent, subscribed } = createMockWs(false);
+            handler.open(ws);
+
+            handler.message(ws, JSON.stringify({ type: 'auth', key: 'test-secret-key-1234' }));
+
+            expect(ws.data.authenticated).toBe(true);
+            expect(subscribed).toContain('council');
+            expect(sent.length).toBe(1);
+            expect(JSON.parse(sent[0]).message).toContain('Authenticated');
+        });
+
+        it('rejects first-message auth with invalid key and closes', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, sent } = createMockWs(false);
+            handler.open(ws);
+
+            handler.message(ws, JSON.stringify({ type: 'auth', key: 'wrong-key' }));
+
+            expect(ws.data.authenticated).toBe(false);
+            expect(sent.length).toBe(1);
+            expect(JSON.parse(sent[0]).message).toContain('Invalid API key');
+            expect(ws.close).toHaveBeenCalledWith(4001, 'Invalid API key');
+        });
+
+        it('allows messages after first-message auth', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, sent } = createMockWs(false);
+            handler.open(ws);
+
+            // Authenticate first
+            handler.message(ws, JSON.stringify({ type: 'auth', key: 'test-secret-key-1234' }));
+            sent.length = 0; // Clear auth response
+
+            // Now regular messages should work
+            handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-1' }));
+
+            expect(pm.subscribe).toHaveBeenCalledTimes(1);
+        });
+
+        it('rejects duplicate auth messages', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, sent } = createMockWs(true);
+            handler.open(ws);
+
+            handler.message(ws, JSON.stringify({ type: 'auth', key: 'test-secret-key-1234' }));
+
+            expect(sent.length).toBe(1);
+            expect(JSON.parse(sent[0]).message).toContain('Already authenticated');
+        });
+
+        it('auto-authenticates when no API key configured', () => {
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+            const { ws, subscribed } = createMockWs(false);
+            handler.open(ws);
+
+            // Even without pre-auth, open should work since no key is configured
+            // The handler checks ws.data.authenticated which is false, so no topics yet
+            expect(subscribed.length).toBe(0);
+
+            // But sending auth message auto-succeeds
+            handler.message(ws, JSON.stringify({ type: 'auth', key: 'anything' }));
+            expect(ws.data.authenticated).toBe(true);
+            expect(subscribed).toContain('council');
         });
     });
 });

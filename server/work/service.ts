@@ -1,4 +1,4 @@
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, relative } from 'node:path';
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTask, CreateWorkTaskInput } from '../../shared/types';
@@ -16,6 +16,8 @@ import {
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
+import type { AstParserService } from '../ast/service';
+import type { AstSymbol } from '../ast/types';
 
 const log = createLogger('WorkTaskService');
 
@@ -28,11 +30,13 @@ type CompletionCallback = (task: WorkTask) => void;
 export class WorkTaskService {
     private db: Database;
     private processManager: ProcessManager;
+    private astParserService: AstParserService | null;
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
 
-    constructor(db: Database, processManager: ProcessManager) {
+    constructor(db: Database, processManager: ProcessManager, astParserService?: AstParserService) {
         this.db = db;
         this.processManager = processManager;
+        this.astParserService = astParserService ?? null;
     }
 
     /**
@@ -188,8 +192,11 @@ export class WorkTaskService {
             iterationCount: 1,
         });
 
+        // Generate repo map for structural awareness (best-effort)
+        const repoMap = await this.generateRepoMap(worktreeDir);
+
         // Build work prompt
-        const prompt = this.buildWorkPrompt(branchName, input.description);
+        const prompt = this.buildWorkPrompt(branchName, input.description, repoMap ?? undefined);
 
         // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
@@ -602,12 +609,16 @@ Important: You MUST ensure all validation passes and output the PR URL.`;
         }
     }
 
-    private buildWorkPrompt(branchName: string, description: string): string {
+    private buildWorkPrompt(branchName: string, description: string, repoMap?: string): string {
+        const repoMapSection = repoMap
+            ? `\n## Repository Map\nTop-level exported symbols per file:\n\`\`\`\n${repoMap}\`\`\`\n`
+            : '';
+
         return `You are working on a task. A git branch "${branchName}" has been created and checked out.
 
 ## Task
 ${description}
-
+${repoMapSection}
 ## Instructions
 1. Explore the codebase as needed to understand the context.
 2. Implement the changes on this branch.
@@ -621,5 +632,51 @@ ${description}
 6. Output the PR URL as the final line of your response.
 
 Important: You MUST create a PR when finished. The PR URL will be captured to report back to the requester.`;
+    }
+
+    /**
+     * Generate a lightweight repo map showing exported symbols per file.
+     * Returns null if AST service is unavailable or indexing fails.
+     */
+    private async generateRepoMap(projectDir: string): Promise<string | null> {
+        if (!this.astParserService) return null;
+
+        try {
+            const index = await this.astParserService.indexProject(projectDir);
+            const lines: string[] = [];
+            const RELEVANT_KINDS = new Set(['function', 'class', 'interface', 'type_alias', 'enum', 'variable']);
+
+            // Sort files for deterministic output
+            const sortedFiles = [...index.files.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+            for (const [filePath, fileIndex] of sortedFiles) {
+                const relPath = relative(projectDir, filePath);
+                const exported = fileIndex.symbols.filter(
+                    (s: AstSymbol) => s.isExported && RELEVANT_KINDS.has(s.kind),
+                );
+                if (exported.length === 0) continue;
+
+                const symbolList = exported.map((s: AstSymbol) => {
+                    const kindLabel = s.kind === 'type_alias' ? 'type' : s.kind;
+                    const children = s.children?.filter((c: AstSymbol) => RELEVANT_KINDS.has(c.kind));
+                    if (children && children.length > 0) {
+                        const methodNames = children.map((c: AstSymbol) => c.name).join(', ');
+                        return `${kindLabel} ${s.name} { ${methodNames} }`;
+                    }
+                    return `${kindLabel} ${s.name}`;
+                });
+
+                lines.push(`${relPath}: ${symbolList.join(', ')}`);
+            }
+
+            if (lines.length === 0) return null;
+            return lines.join('\n') + '\n';
+        } catch (err) {
+            log.warn('Failed to generate repo map', {
+                projectDir,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return null;
+        }
     }
 }
