@@ -30,6 +30,38 @@ function estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
 }
 
+/** Get the configured context window size in tokens. */
+function getContextBudget(): number {
+    return parseInt(process.env.OLLAMA_NUM_CTX ?? '8192', 10);
+}
+
+/**
+ * Calculate the maximum tool result size based on remaining context budget.
+ * Ensures a single tool result never consumes more than 30% of the total
+ * context window, and scales down further when context is already full.
+ *
+ * Returns max chars (not tokens).
+ */
+function calculateMaxToolResultChars(
+    messages: Array<{ role: string; content: string }>,
+    systemPrompt: string,
+): number {
+    const ctxSize = getContextBudget();
+    // Absolute max: 30% of context window for a single result
+    const absoluteMax = Math.floor(ctxSize * 0.3) * 4; // tokens → chars
+    // Absolute min: always allow at least 1K chars for errors etc.
+    const absoluteMin = 1_000;
+
+    const usedTokens = estimateTokens(systemPrompt) +
+        messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+    const remainingTokens = ctxSize - usedTokens;
+
+    // Reserve 40% of remaining for the model's response
+    const availableForResult = Math.floor(remainingTokens * 0.6) * 4; // tokens → chars
+
+    return Math.max(absoluteMin, Math.min(absoluteMax, availableForResult));
+}
+
 /**
  * Truncate council synthesis messages if they exceed 70% of the context window.
  * Keeps the system prompt contribution (already separate), first user message,
@@ -72,16 +104,35 @@ function truncateCouncilContext(
 
 /**
  * Trim conversation history to bound memory usage.
+ * Two triggers:
+ * 1. Message count exceeds MAX_MESSAGES (40)
+ * 2. Estimated tokens exceed 70% of context window (token-budget trim)
+ *
  * Keeps the first user message (original prompt context) and the most recent
- * KEEP_RECENT messages so the model retains enough context to continue.
+ * messages so the model retains enough context to continue.
  */
 function trimMessages(
     messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
+    systemPrompt?: string,
 ): void {
-    if (messages.length <= MAX_MESSAGES) return;
+    const ctxSize = getContextBudget();
+    const threshold = Math.floor(ctxSize * 0.7);
+    const systemTokens = systemPrompt ? estimateTokens(systemPrompt) : 0;
+    const messageTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+    const totalTokens = systemTokens + messageTokens;
+
+    const overCount = messages.length > MAX_MESSAGES;
+    const overBudget = totalTokens > threshold;
+
+    if (!overCount && !overBudget) return;
+
+    // When over budget, keep fewer messages to leave room for generation
+    const keepCount = overBudget
+        ? Math.max(6, Math.min(KEEP_RECENT, Math.floor(messages.length * 0.4)))
+        : KEEP_RECENT;
 
     const first = messages[0];
-    const recent = messages.slice(-KEEP_RECENT);
+    const recent = messages.slice(-keepCount);
 
     // Avoid duplicating the first message if it's already in the recent window
     if (recent[0] === first) {
@@ -92,7 +143,9 @@ function trimMessages(
         messages.push(first, ...recent);
     }
 
-    log.info(`Trimmed conversation history to ${messages.length} messages`);
+    const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+    const reason = overBudget ? `token budget (${totalTokens}→${newTokens} of ${threshold})` : `message count (>${MAX_MESSAGES})`;
+    log.info(`Trimmed conversation to ${messages.length} messages — ${reason}`);
 }
 
 export interface DirectProcessOptions {
@@ -280,8 +333,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let iteration = 0;
         let lastToolCallKey = '';
         let repeatCount = 0;
+        let nudgeCount = 0;
         let toolsEverCalled = false;
         const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
+        const MAX_NUDGES = 2; // Don't nudge more than twice — model isn't going to start using tools
 
         try {
 
@@ -302,7 +357,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
             let result;
             try {
-                trimMessages(messages);
+                trimMessages(messages, systemPrompt);
                 result = await provider.complete({
                     model,
                     systemPrompt,
@@ -323,7 +378,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     log.warn(`Model ${model} does not support tools — disabling for this session`);
                     toolsDisabled = true;
                     // Retry without tools
-                    trimMessages(messages);
+                    trimMessages(messages, systemPrompt);
                     result = await provider.complete({
                         model,
                         systemPrompt,
@@ -369,8 +424,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             // Handle tool calls
             if (result.toolCalls && result.toolCalls.length > 0) {
                 toolsEverCalled = true;
-                // Detect repeated identical tool calls (small models get stuck in loops)
-                const callKey = result.toolCalls.map(tc => `${tc.name}:${JSON.stringify(tc.arguments)}`).join('|');
+                // Detect repeated tool calls — uses normalized comparison to catch
+                // near-identical loops (same tool, args differ only in whitespace/order)
+                const callKey = normalizeToolCallKey(result.toolCalls);
                 if (callKey === lastToolCallKey) {
                     repeatCount++;
                     if (repeatCount >= MAX_REPEATS) {
@@ -414,11 +470,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     emitToolStatus(toolCall.name, `Running ${toolCall.name}...`, false);
                     try {
                         const toolResult = await toolDef.handler(toolCall.arguments);
-                        const MAX_TOOL_RESULT_CHARS = 20_000; // ~5K tokens
+                        const maxChars = calculateMaxToolResultChars(messages, systemPrompt);
                         let resultText = toolResult.text;
-                        if (resultText.length > MAX_TOOL_RESULT_CHARS) {
-                            log.warn(`Truncated tool result for ${toolCall.name}`, { original: resultText.length, truncated: MAX_TOOL_RESULT_CHARS });
-                            resultText = resultText.slice(0, MAX_TOOL_RESULT_CHARS) + `\n\n[... truncated, ${toolResult.text.length - MAX_TOOL_RESULT_CHARS} chars omitted]`;
+                        if (resultText.length > maxChars) {
+                            log.warn(`Truncated tool result for ${toolCall.name}`, { original: resultText.length, maxChars, contextBudget: getContextBudget() });
+                            // For structured data (JSON), try to keep head + tail
+                            if (resultText.startsWith('{') || resultText.startsWith('[')) {
+                                const headSize = Math.floor(maxChars * 0.7);
+                                const tailSize = Math.floor(maxChars * 0.2);
+                                resultText = resultText.slice(0, headSize)
+                                    + `\n\n[... ${toolResult.text.length - headSize - tailSize} chars omitted ...]\n\n`
+                                    + resultText.slice(-tailSize);
+                            } else {
+                                resultText = resultText.slice(0, maxChars) + `\n\n[... truncated, ${toolResult.text.length - maxChars} chars omitted]`;
+                            }
                         }
                         messages.push({
                             role: 'tool',
@@ -441,21 +506,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             const responseText = (result.content || '').trim();
             messages.push({ role: 'assistant', content: responseText });
 
-            // Detect incomplete responses that need a nudge to use tools:
-            // (a) promised future action, (b) very short early reply,
-            // (c) wrote substantive content on iter 1 but never called a tool.
+            // Skip nudging if we've already nudged too many times or tools are disabled
+            if (nudgeCount >= MAX_NUDGES || toolsDisabled || toolsEverCalled) {
+                break;
+            }
+
+            // Detect incomplete responses that need a nudge to use tools.
             // Only nudge if the model has never successfully called a tool yet.
             // Once it has used tools, a text-only response means it's genuinely done.
-            const promisedAction = !toolsEverCalled && /\b(shortly|will .*(review|check|analyze|look|fetch|investigate)|let me|i('ll| will)|working on|getting|one moment)\b/i.test(responseText);
-            const tooShort = !toolsEverCalled && responseText.length < 100 && iteration <= 2;
-            const wroteButDidntPost = !toolsEverCalled && iteration === 1 && responseText.length > 200 && !toolsDisabled;
+            const nudgeReason = detectNudgeReason(responseText, iteration, directTools);
 
-            if ((promisedAction || tooShort || wroteButDidntPost) && iteration < MAX_TOOL_ITERATIONS - 1) {
-                const reason = promisedAction ? 'promisedAction' : tooShort ? 'tooShort' : 'wroteButDidntPost';
-                log.info(`Nudging model to continue (iteration=${iteration}, reason=${reason})`);
-                const nudge = wroteButDidntPost
-                    ? 'You wrote your response as text, but the user cannot see it. You MUST use the run_command tool to post it. For example: run_command({"command": "gh pr comment ... --body \\"YOUR TEXT\\""}). Do this now.'
-                    : 'Continue. Use the tools available to you to complete the task. Do not just describe what you will do — actually do it now by calling the appropriate tool.';
+            if (nudgeReason && iteration < MAX_TOOL_ITERATIONS - 1) {
+                nudgeCount++;
+                log.info(`Nudging model to continue (iteration=${iteration}, reason=${nudgeReason}, nudge=${nudgeCount}/${MAX_NUDGES})`);
+                const nudge = buildNudgeMessage(nudgeReason, directTools);
                 messages.push({ role: 'user', content: nudge });
                 continue;
             }
@@ -543,6 +607,105 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     return { pid: pseudoPid, sendMessage, kill };
 }
+
+// ── Nudge system ──────────────────────────────────────────────────────────
+
+type NudgeReason = 'promisedAction' | 'tooShort' | 'wroteButDidntAct' | 'askedInsteadOfActing';
+
+/**
+ * Detect if the model's response indicates it should have called a tool but didn't.
+ * Returns the reason string or null if no nudge is needed.
+ */
+function detectNudgeReason(
+    responseText: string,
+    iteration: number,
+    tools: DirectToolDefinition[],
+): NudgeReason | null {
+    if (!responseText || tools.length === 0) return null;
+
+    // (a) Model promised future action without doing it
+    // More targeted regex — avoid matching genuine explanations
+    const promisedAction = /\b(i('ll| will) (now |proceed to )?(review|check|analyze|look|fetch|investigate|read|search|run|execute)|let me (start|begin|check|review|look|examine|read)|working on (it|this|that)|one moment|getting (the|that|this))\b/i.test(responseText);
+    if (promisedAction && iteration <= 3) return 'promisedAction';
+
+    // (b) Very short early reply — model didn't engage with the task
+    if (responseText.length < 100 && iteration <= 2) return 'tooShort';
+
+    // (c) Model asked what to do instead of acting (Qwen3 pattern)
+    const askedInstead = /\b(would you like me to|shall i|do you want me to|what would you like|which (file|tool|command|approach)|should i)\b/i.test(responseText);
+    if (askedInstead && iteration <= 2) return 'askedInsteadOfActing';
+
+    // (d) On first iteration, model wrote substantial text but never called a tool
+    // This catches cases where the model writes a PR review as text instead of
+    // actually using tools to interact with the system
+    if (iteration === 1 && responseText.length > 300) return 'wroteButDidntAct';
+
+    return null;
+}
+
+/**
+ * Build a targeted nudge message based on the detected reason.
+ * Different nudge messages for different failure modes.
+ */
+function buildNudgeMessage(reason: NudgeReason, tools: DirectToolDefinition[]): string {
+    const toolNames = tools.map(t => t.name);
+    const hasRunCommand = toolNames.includes('run_command');
+    const hasReadFile = toolNames.includes('read_file');
+
+    switch (reason) {
+        case 'promisedAction':
+            return 'Do not describe what you will do — call the tool now. ' +
+                (hasReadFile ? 'For example: [{"name": "read_file", "arguments": {"path": "..."}}]' : 'Output ONLY the JSON tool call array.');
+
+        case 'tooShort':
+            return 'Your response was too brief. You have tools available — use them to complete the task. ' +
+                'Output a tool call as a JSON array: [{"name": "tool_name", "arguments": {...}}]';
+
+        case 'askedInsteadOfActing':
+            return 'Do not ask what to do — take action now. Use the tools available to you. ' +
+                'Start by reading relevant files or running a command. ' +
+                'Output ONLY the JSON tool call, no surrounding text.';
+
+        case 'wroteButDidntAct':
+            if (hasRunCommand) {
+                return 'You wrote your response as text, but you need to use tools to take action. ' +
+                    'If you need to post a comment, use run_command with gh. ' +
+                    'If you need to make changes, use the file editing tools. ' +
+                    'Output ONLY the JSON tool call array.';
+            }
+            return 'You wrote a text response, but this task requires using tools. ' +
+                'Call the appropriate tool now as a JSON array: [{"name": "tool_name", "arguments": {...}}]';
+    }
+}
+
+// ── Repeat detection ──────────────────────────────────────────────────────
+
+/**
+ * Normalize a tool call sequence into a canonical string for repeat detection.
+ * Sorts JSON object keys so `{"a":1,"b":2}` and `{"b":2,"a":1}` match.
+ * Strips whitespace differences in string values.
+ */
+function normalizeToolCallKey(toolCalls: LlmToolCall[]): string {
+    return toolCalls.map(tc => {
+        const normalizedArgs = normalizeArgsForComparison(tc.arguments);
+        return `${tc.name}:${normalizedArgs}`;
+    }).join('|');
+}
+
+/** Recursively sort object keys and normalize string values for comparison. */
+function normalizeArgsForComparison(obj: unknown): string {
+    if (obj === null || obj === undefined) return '';
+    if (typeof obj === 'string') return obj.trim().replace(/\s+/g, ' ');
+    if (typeof obj !== 'object') return String(obj);
+    if (Array.isArray(obj)) {
+        return '[' + obj.map(normalizeArgsForComparison).join(',') + ']';
+    }
+    // Sort keys for stable comparison
+    const sorted = Object.keys(obj as Record<string, unknown>).sort();
+    return '{' + sorted.map(k => `${k}:${normalizeArgsForComparison((obj as Record<string, unknown>)[k])}`).join(',') + '}';
+}
+
+// ── Routing helpers ───────────────────────────────────────────────────────
 
 /**
  * For AlgoChat/agent-sourced messages, prepend a routing hint so the model
