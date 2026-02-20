@@ -167,3 +167,74 @@ export function resolveAgentPromptAdditions(db: Database, agentId: string): stri
 
     return additions.join('\n\n');
 }
+
+// ─── Project-Bundle Assignments ─────────────────────────────────────────────
+
+export function getProjectBundles(db: Database, projectId: string): SkillBundle[] {
+    const rows = db.query(
+        `SELECT sb.* FROM skill_bundles sb
+         INNER JOIN project_skills ps ON sb.id = ps.bundle_id
+         WHERE ps.project_id = ?
+         ORDER BY ps.sort_order ASC`
+    ).all(projectId) as BundleRow[];
+    return rows.map(rowToBundle);
+}
+
+export function assignProjectBundle(db: Database, projectId: string, bundleId: string, sortOrder: number = 0): boolean {
+    const bundle = getBundle(db, bundleId);
+    if (!bundle) return false;
+
+    db.query(
+        `INSERT OR REPLACE INTO project_skills (project_id, bundle_id, sort_order) VALUES (?, ?, ?)`
+    ).run(projectId, bundleId, sortOrder);
+    return true;
+}
+
+export function unassignProjectBundle(db: Database, projectId: string, bundleId: string): boolean {
+    const result = db.query(
+        'DELETE FROM project_skills WHERE project_id = ? AND bundle_id = ?'
+    ).run(projectId, bundleId);
+    return result.changes > 0;
+}
+
+/**
+ * Resolve the effective tool permissions by merging base permissions
+ * with tools from project-level skill bundles.
+ */
+export function resolveProjectTools(db: Database, projectId: string, basePermissions: string[] | null): string[] | null {
+    const bundles = getProjectBundles(db, projectId);
+    if (bundles.length === 0) return basePermissions;
+
+    const bundleTools = new Set<string>();
+    for (const bundle of bundles) {
+        for (const tool of bundle.tools) {
+            bundleTools.add(tool);
+        }
+    }
+
+    if (bundleTools.size === 0) return basePermissions;
+
+    if (basePermissions === null) {
+        return [...bundleTools];
+    }
+
+    const merged = new Set(basePermissions);
+    for (const tool of bundleTools) {
+        merged.add(tool);
+    }
+    return [...merged];
+}
+
+/**
+ * Resolve all prompt additions from project-level skill bundles, concatenated.
+ */
+export function resolveProjectPromptAdditions(db: Database, projectId: string): string {
+    const bundles = getProjectBundles(db, projectId);
+    if (bundles.length === 0) return '';
+
+    const additions = bundles
+        .map(b => b.promptAdditions)
+        .filter(Boolean);
+
+    return additions.join('\n\n');
+}

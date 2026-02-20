@@ -450,8 +450,10 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
     // remote sessions (algochat, agent-to-agent) where untrusted input is possible.
     let filteredTools = tools;
     if (ctx.sessionSource !== 'web') {
-        const agent = getAgent(ctx.db, ctx.agentId);
-        const permissions = agent?.mcpToolPermissions;
+        // Prefer pre-resolved permissions (includes skill bundle merging)
+        const permissions = ctx.resolvedToolPermissions !== undefined
+            ? ctx.resolvedToolPermissions
+            : getAgent(ctx.db, ctx.agentId)?.mcpToolPermissions ?? null;
         const allowedSet = permissions ? new Set(permissions) : DEFAULT_ALLOWED_TOOLS;
         filteredTools = tools.filter((t) => allowedSet.has(t.name));
     }

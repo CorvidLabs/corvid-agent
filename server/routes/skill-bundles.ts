@@ -2,8 +2,10 @@ import type { Database } from 'bun:sqlite';
 import {
     listBundles, getBundle, createBundle, updateBundle, deleteBundle,
     getAgentBundles, assignBundle, unassignBundle,
+    getProjectBundles, assignProjectBundle, unassignProjectBundle,
 } from '../db/skill-bundles';
 import { getAgent } from '../db/agents';
+import { getProject } from '../db/projects';
 import { parseBodyOrThrow, ValidationError, CreateSkillBundleSchema, UpdateSkillBundleSchema, AssignSkillBundleSchema } from '../lib/validation';
 import { json } from '../lib/response';
 
@@ -77,6 +79,35 @@ export function handleSkillBundleRoutes(
         return json({ ok: true });
     }
 
+    // ─── Project-Bundle Assignment ────────────────────────────────────────
+
+    // GET /api/projects/:id/skills
+    const projectSkillsGet = path.match(/^\/api\/projects\/([^/]+)\/skills$/);
+    if (projectSkillsGet && method === 'GET') {
+        const projectId = projectSkillsGet[1];
+        const project = getProject(db, projectId);
+        if (!project) return json({ error: 'Project not found' }, 404);
+        return json(getProjectBundles(db, projectId));
+    }
+
+    // POST /api/projects/:id/skills
+    if (projectSkillsGet && method === 'POST') {
+        return handleAssignProjectBundle(req, db, projectSkillsGet[1]);
+    }
+
+    // DELETE /api/projects/:id/skills/:bundleId
+    const projectSkillDelete = path.match(/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/);
+    if (projectSkillDelete && method === 'DELETE') {
+        const projectId = projectSkillDelete[1];
+        const bundleId = projectSkillDelete[2];
+        const project = getProject(db, projectId);
+        if (!project) return json({ error: 'Project not found' }, 404);
+
+        const removed = unassignProjectBundle(db, projectId, bundleId);
+        if (!removed) return json({ error: 'Assignment not found' }, 404);
+        return json({ ok: true });
+    }
+
     return null;
 }
 
@@ -110,6 +141,21 @@ async function handleAssignBundle(req: Request, db: Database, agentId: string): 
 
         const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
         const assigned = assignBundle(db, agentId, data.bundleId, data.sortOrder ?? 0);
+        if (!assigned) return json({ error: 'Bundle not found' }, 404);
+        return json({ ok: true }, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
+    }
+}
+
+async function handleAssignProjectBundle(req: Request, db: Database, projectId: string): Promise<Response> {
+    try {
+        const project = getProject(db, projectId);
+        if (!project) return json({ error: 'Project not found' }, 404);
+
+        const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
+        const assigned = assignProjectBundle(db, projectId, data.bundleId, data.sortOrder ?? 0);
         if (!assigned) return json({ error: 'Bundle not found' }, 404);
         return json({ ok: true }, 201);
     } catch (err) {

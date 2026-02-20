@@ -582,17 +582,19 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         tools.push(...buildCodingTools(codingCtx));
     }
 
-    // Permission filtering — apply agent's explicit mcp_tool_permissions regardless
-    // of session source. For non-web sessions without explicit permissions, fall back
-    // to DEFAULT_ALLOWED_TOOLS. This is critical for small Ollama models that cannot
-    // handle 10+ tool definitions efficiently.
+    // Permission filtering — apply resolved tool permissions (agent base + skill bundles
+    // + project bundles) or fall back to the agent's explicit mcp_tool_permissions.
+    // For non-web sessions without explicit permissions, fall back to DEFAULT_ALLOWED_TOOLS.
+    // This is critical for small Ollama models that cannot handle 10+ tool definitions.
     let filtered = tools;
 
     if (ctx) {
-        const agent = getAgent(ctx.db, ctx.agentId);
-        const permissions = agent?.mcpToolPermissions;
+        // Prefer pre-resolved permissions (includes skill bundle merging)
+        const permissions = ctx.resolvedToolPermissions !== undefined
+            ? ctx.resolvedToolPermissions
+            : getAgent(ctx.db, ctx.agentId)?.mcpToolPermissions ?? null;
         if (permissions) {
-            // Agent has explicit tool permissions — always apply
+            // Agent has explicit or resolved tool permissions — always apply
             const allowedSet = new Set(permissions);
             filtered = filtered.filter((t) => allowedSet.has(t.name));
         } else if (ctx.sessionSource !== 'web') {
