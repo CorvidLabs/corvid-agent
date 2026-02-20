@@ -11,6 +11,7 @@ import { getProject } from '../db/projects';
 import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
 import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
+import { hasClaudeAccess } from '../providers/router';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, updateSessionAgent, addSessionMessage } from '../db/sessions';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentDirectory } from '../algochat/agent-directory';
@@ -236,11 +237,11 @@ export class ProcessManager {
         const registry = LlmProviderRegistry.getInstance();
         let provider = providerType ? registry.get(providerType) : undefined;
 
-        // Auto-fallback: no explicit provider + no Anthropic API key → try Ollama
-        if (!provider && !providerType && !process.env.ANTHROPIC_API_KEY) {
+        // Auto-fallback: no explicit provider + no Claude access → try Ollama
+        if (!provider && !providerType && !hasClaudeAccess()) {
             const ollamaFallback = registry.get('ollama');
             if (ollamaFallback) {
-                log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for session ${session.id}`);
+                log.info(`No Claude access — falling back to Ollama for session ${session.id}`);
                 provider = ollamaFallback;
                 // Clear agent's non-Ollama model so direct-process uses the Ollama default
                 if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
@@ -488,11 +489,11 @@ export class ProcessManager {
         const registry = LlmProviderRegistry.getInstance();
         let providerInstance = providerType ? registry.get(providerType) : undefined;
 
-        // Auto-fallback: no explicit provider + no Anthropic API key → try Ollama
-        if (!providerInstance && !providerType && !process.env.ANTHROPIC_API_KEY) {
+        // Auto-fallback: no explicit provider + no Claude access → try Ollama
+        if (!providerInstance && !providerType && !hasClaudeAccess()) {
             const ollamaFallback = registry.get('ollama');
             if (ollamaFallback) {
-                log.info(`No ANTHROPIC_API_KEY — falling back to Ollama for resumed session ${session.id}`);
+                log.info(`No Claude access — falling back to Ollama for resumed session ${session.id}`);
                 providerInstance = ollamaFallback;
                 // Clear agent's non-Ollama model so direct-process uses the Ollama default
                 if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { DEFAULT_FALLBACK_CHAINS } from '../providers/fallback';
-import { isLocalOnly } from '../providers/router';
+import { isLocalOnly, hasClaudeAccess, _resetClaudeCliCache } from '../providers/router';
 import { LlmProviderRegistry } from '../providers/registry';
 import {
     MODEL_PRICING,
@@ -144,15 +144,33 @@ describe('Ollama cloud models', () => {
 // ─── isLocalOnly Tests ──────────────────────────────────────────────────────
 
 describe('isLocalOnly()', () => {
-    it('returns true when no cloud API keys are set', () => {
+    it('returns true when no cloud API keys and no claude CLI', () => {
         const env = withEnv({
             ANTHROPIC_API_KEY: undefined,
             OPENAI_API_KEY: undefined,
         });
         env.setup();
+        _resetClaudeCliCache(false);
         try {
             expect(isLocalOnly()).toBe(true);
         } finally {
+            _resetClaudeCliCache(null);
+            env.teardown();
+        }
+    });
+
+    it('returns false when claude CLI is available (subscription auth)', () => {
+        const env = withEnv({
+            ANTHROPIC_API_KEY: undefined,
+            OPENAI_API_KEY: undefined,
+        });
+        env.setup();
+        _resetClaudeCliCache(true);
+        try {
+            expect(isLocalOnly()).toBe(false);
+            expect(hasClaudeAccess()).toBe(true);
+        } finally {
+            _resetClaudeCliCache(null);
             env.teardown();
         }
     });
@@ -163,9 +181,11 @@ describe('isLocalOnly()', () => {
             OPENAI_API_KEY: undefined,
         });
         env.setup();
+        _resetClaudeCliCache(false);
         try {
             expect(isLocalOnly()).toBe(false);
         } finally {
+            _resetClaudeCliCache(null);
             env.teardown();
         }
     });
@@ -176,9 +196,11 @@ describe('isLocalOnly()', () => {
             OPENAI_API_KEY: 'sk-test',
         });
         env.setup();
+        _resetClaudeCliCache(false);
         try {
             expect(isLocalOnly()).toBe(false);
         } finally {
+            _resetClaudeCliCache(null);
             env.teardown();
         }
     });
@@ -192,6 +214,7 @@ describe('isLocalOnly()', () => {
         try {
             expect(isLocalOnly()).toBe(false);
         } finally {
+            _resetClaudeCliCache(null);
             env.teardown();
         }
     });
@@ -206,13 +229,14 @@ describe('Provider registry auto-restrict', () => {
         (LlmProviderRegistry as unknown as { instance: null }).instance = null;
     });
 
-    it('skips non-ollama providers when no cloud keys and no ENABLED_PROVIDERS', () => {
+    it('skips non-ollama providers when no cloud keys, no CLI, and no ENABLED_PROVIDERS', () => {
         const env = withEnv({
             ANTHROPIC_API_KEY: undefined,
             OPENAI_API_KEY: undefined,
             ENABLED_PROVIDERS: undefined,
         });
         env.setup();
+        _resetClaudeCliCache(false);
         try {
             const registry = LlmProviderRegistry.getInstance();
 
@@ -238,6 +262,7 @@ describe('Provider registry auto-restrict', () => {
             registry.register(mockOllama);
             expect(registry.get('ollama')).toBeDefined();
         } finally {
+            _resetClaudeCliCache(null);
             env.teardown();
         }
     });
