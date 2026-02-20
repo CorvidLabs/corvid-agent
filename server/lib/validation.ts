@@ -3,6 +3,8 @@
  * Centralised here so route handlers stay lean and schemas are reusable in tests.
  */
 
+// Input validation schemas and parsing utilities for HTTP routes
+
 import { z } from 'zod';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
