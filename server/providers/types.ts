@@ -65,7 +65,7 @@ export interface LlmProvider {
      * so the model stays loaded in memory (avoids KV cache eviction between
      * turns). No-op for providers without concurrency limits.
      */
-    acquireSlot?(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<void>;
+    acquireSlot?(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<boolean>;
 
     /** Release a previously acquired slot. */
     releaseSlot?(model: string): void;

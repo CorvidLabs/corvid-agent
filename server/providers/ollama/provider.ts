@@ -192,34 +192,53 @@ export class OllamaProvider extends BaseLlmProvider {
      * weight budget is available. Called once before an agent's agentic loop
      * so the model stays loaded (preserves KV cache across turns).
      */
-    async acquireSlot(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<void> {
+    async acquireSlot(model: string, signal?: AbortSignal, onStatus?: (msg: string) => void): Promise<boolean> {
         const weight = this.getModelWeight(model);
         if (this.activeWeight > 0 && this.activeWeight + weight > this.maxWeight) {
             const mode = this.gpuDetected === null ? 'detecting' : (this.gpuDetected ? 'GPU' : 'CPU');
             onStatus?.(`Queued — waiting for model slot (need ${weight}, ${this.activeWeight}/${this.maxWeight} in use, ${mode})`);
+            // Track whether releaseWaiters() granted us the slot before abort fired
+            let granted = false;
             await new Promise<void>((resolve) => {
-                this.waitQueue.push({ weight, resolve });
+                const waiter = { weight, resolve };
+                this.waitQueue.push(waiter);
                 // If caller aborts while queued, remove from wait queue
                 signal?.addEventListener('abort', () => {
-                    const idx = this.waitQueue.findIndex(w => w.resolve === resolve);
+                    const idx = this.waitQueue.indexOf(waiter);
                     if (idx >= 0) {
+                        // Still in queue — activeWeight was never incremented
                         this.waitQueue.splice(idx, 1);
-                        resolve(); // unblock the await
+                    } else {
+                        // releaseWaiters() already popped us and incremented activeWeight
+                        granted = true;
                     }
+                    resolve(); // unblock the await
                 }, { once: true });
             });
-            if (signal?.aborted) return; // Aborted while queued
+            if (signal?.aborted) {
+                if (granted) {
+                    // Slot was acquired by releaseWaiters before abort — caller owns it
+                    log.info(`Slot acquired (via race) for ${model} before abort (weight=${weight}, active=${this.activeWeight}/${this.maxWeight})`);
+                    return true;
+                }
+                return false; // Aborted before slot was acquired
+            }
         } else {
             this.activeWeight += weight;
         }
         onStatus?.(''); // Clear queued status
         log.info(`Slot acquired for ${model} (weight=${weight}, active=${this.activeWeight}/${this.maxWeight})`);
+        return true;
     }
 
     /** Release a previously acquired slot and unblock queued waiters. */
     releaseSlot(model: string): void {
         const weight = this.getModelWeight(model);
         this.activeWeight -= weight;
+        if (this.activeWeight < 0) {
+            log.warn(`activeWeight went negative (${this.activeWeight}) after releasing ${model} — clamping to 0`);
+            this.activeWeight = 0;
+        }
         log.info(`Slot released for ${model} (weight=${weight}, active=${this.activeWeight}/${this.maxWeight})`);
         // Probe GPU after first release to potentially upgrade concurrency
         if (this.gpuDetected === null) {

@@ -266,13 +266,14 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             onEvent({ type: 'thinking', thinking: true } as ClaudeStreamEvent);
         }, 10_000);
 
+        let slotAcquired = false;
         if (provider.acquireSlot) {
-            await provider.acquireSlot(model, abortController.signal, onSlotStatus);
+            slotAcquired = await provider.acquireSlot(model, abortController.signal, onSlotStatus);
         }
         clearInterval(slotHeartbeat);
 
         if (aborted) {
-            provider.releaseSlot?.(model);
+            if (slotAcquired) provider.releaseSlot?.(model);
             return;
         }
 
@@ -458,7 +459,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
         } finally {
             // Release the slot so the next agent can run
-            provider.releaseSlot?.(model);
+            if (slotAcquired) provider.releaseSlot?.(model);
         }
 
         if (aborted) return;
