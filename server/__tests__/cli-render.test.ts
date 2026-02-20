@@ -14,6 +14,7 @@ import {
     renderAgentSuffix,
     renderStreamChunk,
     resetStreamState,
+    flushStreamBuffer,
     stripLeakedToolCalls,
     printPrompt,
 } from '../../cli/render';
@@ -431,6 +432,84 @@ describe('renderStreamChunk', () => {
         } finally {
             Object.defineProperty(process.stdout, 'columns', { value: origColumns, writable: true, configurable: true });
         }
+    });
+});
+
+// ─── Cross-chunk tool call stripping ─────────────────────────────────────────
+
+describe('renderStreamChunk cross-chunk tool call stripping', () => {
+    beforeEach(() => {
+        resetStreamState();
+    });
+
+    test('strips tool call JSON split across two chunks', () => {
+        const output = captureStdout(() => {
+            renderStreamChunk('[{"name": "corvid_list');
+            renderStreamChunk('_agents", "arguments": {}}]');
+            flushStreamBuffer();
+        });
+        const plain = stripAnsi(output);
+        // Tool call JSON should be completely stripped
+        expect(plain).not.toContain('corvid_list_agents');
+        expect(plain).not.toContain('"name"');
+    });
+
+    test('strips tool call JSON arriving one char at a time', () => {
+        const toolCall = '[{"name": "read_file", "arguments": {"path": "/tmp"}}]';
+        const output = captureStdout(() => {
+            for (const ch of toolCall) {
+                renderStreamChunk(ch);
+            }
+            flushStreamBuffer();
+        });
+        const plain = stripAnsi(output);
+        expect(plain).not.toContain('read_file');
+        expect(plain).not.toContain('"name"');
+    });
+
+    test('preserves text before and after tool call in separate chunks', () => {
+        const output = captureStdout(() => {
+            renderStreamChunk('Hello ');
+            renderStreamChunk('[{"name": "tool", "arguments": {}}]');
+            renderStreamChunk(' World');
+            flushStreamBuffer();
+        });
+        const plain = stripAnsi(output);
+        expect(plain).toContain('Hello');
+        expect(plain).toContain('World');
+        expect(plain).not.toContain('"name"');
+    });
+
+    test('flushes partial non-tool bracket content on flush', () => {
+        const output = captureStdout(() => {
+            renderStreamChunk('items [1, 2, 3]');
+            flushStreamBuffer();
+        });
+        const plain = stripAnsi(output);
+        expect(plain).toContain('items [1, 2, 3]');
+    });
+
+    test('handles normal brackets without false buffering', () => {
+        const output = captureStdout(() => {
+            renderStreamChunk('array[0] = value');
+            flushStreamBuffer();
+        });
+        const plain = stripAnsi(output);
+        expect(plain).toContain('array[0] = value');
+    });
+
+    test('strips multiple tool calls in sequence', () => {
+        const output = captureStdout(() => {
+            renderStreamChunk('start [{"name": "a", "arguments": {}}]');
+            renderStreamChunk(' middle [{"name": "b", "arguments": {}}]');
+            renderStreamChunk(' end');
+            flushStreamBuffer();
+        });
+        const plain = stripAnsi(output);
+        expect(plain).toContain('start');
+        expect(plain).toContain('middle');
+        expect(plain).toContain('end');
+        expect(plain).not.toContain('"name"');
     });
 });
 

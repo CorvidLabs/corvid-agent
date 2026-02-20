@@ -3,7 +3,7 @@ import { loadConfig } from '../config';
 import { pickAgent, fetchAgent } from './pick-agent';
 import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
-import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, Spinner } from '../render';
+import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, flushStreamBuffer, Spinner } from '../render';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
 
 const VERSION = '0.9.0';
@@ -114,6 +114,7 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
 
     const completeTurn = () => {
         if (!responding) return;
+        flushStreamBuffer();
         if (headerPrinted) {
             renderAgentSuffix();
             headerPrinted = false;

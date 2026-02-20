@@ -3,7 +3,7 @@ import { loadConfig } from '../config';
 import { pickAgent } from './pick-agent';
 import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
-import { printError, renderStreamChunk, renderToolUse, renderThinking, Spinner } from '../render';
+import { printError, renderStreamChunk, renderToolUse, renderThinking, flushStreamBuffer, Spinner } from '../render';
 
 interface ChatOptions {
     agent?: string;
@@ -29,6 +29,7 @@ export async function chatCommand(prompt: string, options: ChatOptions): Promise
 
     const markDone = () => {
         if (done) return;
+        flushStreamBuffer();
         done = true;
     };
 
