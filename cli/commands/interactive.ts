@@ -6,7 +6,7 @@ import type { ServerMessage } from '../../shared/ws-protocol';
 import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, Spinner } from '../render';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
 
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 const MAX_HISTORY_CHARS = 12_000; // Trim oldest turns when history exceeds this
 
 interface InteractiveOptions {
