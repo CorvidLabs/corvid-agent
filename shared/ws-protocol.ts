@@ -1,4 +1,5 @@
 export type ClientMessage =
+    | { type: 'auth'; key: string }
     | { type: 'subscribe'; sessionId: string }
     | { type: 'unsubscribe'; sessionId: string }
     | { type: 'send_message'; sessionId: string; content: string }
@@ -45,6 +46,8 @@ export function isClientMessage(data: unknown): data is ClientMessage {
     if (typeof msg.type !== 'string') return false;
 
     switch (msg.type) {
+        case 'auth':
+            return typeof msg.key === 'string';
         case 'subscribe':
         case 'unsubscribe':
             return typeof msg.sessionId === 'string';

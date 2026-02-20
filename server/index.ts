@@ -147,7 +147,7 @@ let agentWalletService: AgentWalletService | null = null;
 let agentMessenger: AgentMessenger | null = null;
 let agentDirectory: AgentDirectory | null = null;
 const selfTestService = new SelfTestService(db, processManager);
-const workTaskService = new WorkTaskService(db, processManager);
+const workTaskService = new WorkTaskService(db, processManager, astParserService);
 workTaskService.recoverStaleTasks().catch((err) =>
     log.error('Failed to recover stale work tasks', { error: err instanceof Error ? err.message : String(err) }),
 );
@@ -321,11 +321,12 @@ async function initAlgoChat(): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, () => agentMessenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
+const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, authConfig, () => agentMessenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
     walletAddress?: string;
+    authenticated: boolean;
 }
 
 /**
@@ -408,12 +409,8 @@ const server = Bun.serve<WsData>({
 
         // WebSocket upgrade
         if (url.pathname === '/ws') {
-            if (!checkWsAuth(req, url, authConfig)) {
-                return new Response(JSON.stringify({ error: 'Authentication required' }), {
-                    status: 401,
-                    headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
-                });
-            }
+            // Check upgrade-level auth (header or query param)
+            const preAuthenticated = checkWsAuth(req, url, authConfig);
             // Extract wallet address if provided (from chat client)
             const walletAddress = url.searchParams.get('wallet') || undefined;
             if (walletAddress) {
@@ -421,7 +418,7 @@ const server = Bun.serve<WsData>({
             }
 
             const upgraded = server.upgrade(req, {
-                data: { subscriptions: new Map(), walletAddress },
+                data: { subscriptions: new Map(), walletAddress, authenticated: preAuthenticated },
             });
             if (upgraded) return undefined as unknown as Response;
             return new Response('WebSocket upgrade failed', { status: 400 });
