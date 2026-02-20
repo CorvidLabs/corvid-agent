@@ -208,11 +208,13 @@ export class ProcessManager {
         const agent = getAgent(this.db, agentId);
         const basePermissions = agent?.mcpToolPermissions ?? null;
 
-        // Merge agent-level skill bundle tools
+        // Merge agent-level skill bundle tools (explicitly assigned by owner)
         let merged = resolveAgentTools(this.db, agentId, basePermissions);
 
-        // Merge project-level skill bundle tools
-        if (projectId) {
+        // Merge project-level skill bundle tools ONLY if agent has no explicit tool permissions.
+        // Agents with explicit mcp_tool_permissions have been deliberately scoped — project bundles
+        // contribute prompt additions but should not expand the tool set.
+        if (projectId && basePermissions === null) {
             merged = resolveProjectTools(this.db, projectId, merged);
         }
 
