@@ -25,9 +25,22 @@ const MAX_TOOL_ITERATIONS = 25;
 const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
 
-/** Rough token count estimate (~4 chars per token). */
+/**
+ * Content-aware token estimation.
+ * Code-heavy content averages ~0.33 tokens/char (more tokens per char due to
+ * operators, short identifiers, indentation). Prose averages ~0.25 tokens/char.
+ * We use a simple heuristic: if the text has many code indicators, use the
+ * code factor; otherwise use prose.
+ */
 function estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
+    if (!text) return 0;
+    // Simple heuristic: count code-like characters
+    const codeIndicators = (text.match(/[{}();=<>[\]|&!+\-*/\\^~`]/g) || []).length;
+    const codeRatio = codeIndicators / text.length;
+    // If >8% of chars are code-like, use code factor (3 chars/token)
+    // Otherwise use prose factor (4 chars/token)
+    const charsPerToken = codeRatio > 0.08 ? 3 : 4;
+    return Math.ceil(text.length / charsPerToken);
 }
 
 /** Get the configured context window size in tokens. */
@@ -132,20 +145,39 @@ function trimMessages(
         : KEEP_RECENT;
 
     const first = messages[0];
+    const discarded = messages.slice(1, -keepCount);
     const recent = messages.slice(-keepCount);
+
+    // Summarize discarded tool results so the model retains some context
+    const summaries: string[] = [];
+    for (const msg of discarded) {
+        if (msg.role === 'tool' && msg.content.length > 0) {
+            // Extract a brief summary from the tool result
+            const preview = msg.content.slice(0, 80).replace(/\n/g, ' ').trim();
+            const lineCount = (msg.content.match(/\n/g) || []).length + 1;
+            summaries.push(`[Previous tool result: ${preview}${msg.content.length > 80 ? '...' : ''} (${lineCount} lines)]`);
+        }
+    }
 
     // Avoid duplicating the first message if it's already in the recent window
     if (recent[0] === first) {
         messages.length = 0;
+        if (summaries.length > 0) {
+            messages.push({ role: 'user', content: summaries.join('\n') });
+        }
         messages.push(...recent);
     } else {
         messages.length = 0;
-        messages.push(first, ...recent);
+        messages.push(first);
+        if (summaries.length > 0) {
+            messages.push({ role: 'user', content: summaries.join('\n') });
+        }
+        messages.push(...recent);
     }
 
     const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
     const reason = overBudget ? `token budget (${totalTokens}→${newTokens} of ${threshold})` : `message count (>${MAX_MESSAGES})`;
-    log.info(`Trimmed conversation to ${messages.length} messages — ${reason}`);
+    log.info(`Trimmed conversation to ${messages.length} messages (${summaries.length} tool results summarized) — ${reason}`);
 }
 
 export interface DirectProcessOptions {
