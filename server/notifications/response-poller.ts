@@ -5,6 +5,7 @@ import {
     updateQuestionDispatchStatus,
     getQuestionDispatchesByQuestionId,
     listChannelsForAgent,
+    markDispatchAnswered,
 } from '../db/notifications';
 import * as github from '../github/operations';
 import { createLogger } from '../lib/logger';
@@ -105,12 +106,16 @@ export class ResponsePollingService {
                         issueNumber,
                     });
 
-                    // Mark all dispatches for this question as answered
-                    this.markAllAnswered(dispatch.questionId);
+                    // Atomic guard: only post acknowledgment if we're the first to mark it
+                    const marked = markDispatchAnswered(this.db, dispatch.id);
+                    if (marked) {
+                        // Also mark other dispatches for this question (Telegram, etc.)
+                        this.markAllAnswered(dispatch.questionId);
 
-                    // Close the issue and add acknowledgment
-                    github.addIssueComment(repo, issueNumber, 'Answer received. Thank you!').catch(() => {});
-                    github.closeIssue(repo, issueNumber).catch(() => {});
+                        // Close the issue and add acknowledgment
+                        github.addIssueComment(repo, issueNumber, 'Answer received. Thank you!').catch(() => {});
+                        github.closeIssue(repo, issueNumber).catch(() => {});
+                    }
                 }
             } catch (err) {
                 log.warn('GitHub poll error', {

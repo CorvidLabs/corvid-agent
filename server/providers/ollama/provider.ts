@@ -479,8 +479,8 @@ export class OllamaProvider extends BaseLlmProvider {
                         if (chunk.done) {
                             finalData = chunk;
                         }
-                    } catch {
-                        // skip malformed lines
+                    } catch (parseErr) {
+                        log.debug('Skipped malformed stream line', { line: line.slice(0, 200), model: params.model });
                     }
                 }
 
@@ -505,8 +505,8 @@ export class OllamaProvider extends BaseLlmProvider {
                     if (chunk.done) {
                         finalData = chunk;
                     }
-                } catch {
-                    // skip
+                } catch (parseErr) {
+                    log.debug('Skipped malformed stream buffer', { line: streamBuffer.slice(0, 200), model: params.model });
                 }
             }
         } finally {
@@ -765,6 +765,16 @@ export class OllamaProvider extends BaseLlmProvider {
             }
         }
 
+        // Log diagnostic info when no tool calls were extracted from non-trivial content
+        if (calls.length === 0 && content.length > 50) {
+            log.debug('No tool calls extracted from content', {
+                contentPreview: content.slice(0, 300),
+                hasCodeFences: content.includes('```'),
+                hasBrackets: content.includes('[{'),
+                hasPythonTag: content.includes('<|python_tag|>'),
+            });
+        }
+
         return calls;
     }
 
@@ -868,6 +878,12 @@ export class OllamaProvider extends BaseLlmProvider {
         const lower = name.toLowerCase();
         const argKeys = Object.keys(args);
 
+        // Skip fuzzy matching for very short names — too likely to false-positive
+        if (lower.length < 3) {
+            log.warn(`Rejecting fuzzy match for very short tool name "${name}"`);
+            return undefined;
+        }
+
         // If args contain "command", it's almost certainly run_command
         if (argKeys.includes('command')) {
             const cmdTool = tools.find(t => t.name === 'run_command');
@@ -878,9 +894,11 @@ export class OllamaProvider extends BaseLlmProvider {
         }
 
         // Check if hallucinated name is a substring of any real tool name
+        // Require minimum length of 4 to avoid false positives (e.g. "gh" matching everything)
         for (const tool of tools) {
             const toolLower = tool.name.toLowerCase();
-            if (toolLower.includes(lower) || lower.includes(toolLower)) {
+            const minLen = Math.min(toolLower.length, lower.length);
+            if (minLen >= 4 && (toolLower.includes(lower) || lower.includes(toolLower))) {
                 log.info(`Fuzzy-matched hallucinated tool "${name}" → ${tool.name} (substring match)`);
                 return tool.name;
             }
