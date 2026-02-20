@@ -332,11 +332,16 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
         let iteration = 0;
         let lastToolCallKey = '';
+        let lastToolNames = '';
         let repeatCount = 0;
+        let sameToolNameCount = 0;
         let nudgeCount = 0;
+        let midChainNudgeCount = 0;
         let toolsEverCalled = false;
         const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
+        const MAX_SAME_TOOL = 4; // Break if same tool name called 5 times (even with different args)
         const MAX_NUDGES = 2; // Don't nudge more than twice — model isn't going to start using tools
+        const MAX_MID_CHAIN_NUDGES = 2; // Allow nudging mid-chain when model hallucinates results
 
         try {
 
@@ -439,6 +444,21 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     repeatCount = 0;
                 }
 
+                // Also detect same tool name called repeatedly with different args
+                // (e.g., model keeps re-calling save_memory with slightly different content)
+                const toolNames = result.toolCalls.map(tc => tc.name).join('|');
+                if (toolNames === lastToolNames) {
+                    sameToolNameCount++;
+                    if (sameToolNameCount >= MAX_SAME_TOOL) {
+                        log.warn(`Breaking tool loop: same tool name repeated ${sameToolNameCount + 1} times with varying args`, { tools: toolNames });
+                        messages.push({ role: 'assistant', content: result.content || '' });
+                        break;
+                    }
+                } else {
+                    lastToolNames = toolNames;
+                    sameToolNameCount = 0;
+                }
+
                 // Add assistant message with tool call indication
                 messages.push({ role: 'assistant', content: result.content || '' });
 
@@ -504,10 +524,40 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
             // No tool calls — check if the model stopped prematurely
             const responseText = (result.content || '').trim();
+
+            // Detect hallucinated tool results: if the model generated tool output
+            // markers in its text, it's imitating the tool result format instead of making
+            // actual tool calls. Strip the hallucination and nudge it to call tools properly.
+            const hasHallucinatedResult = responseText.includes('[Tool Result]')
+                || responseText.includes('«tool_output»')
+                || responseText.includes('«/tool_output»');
+            if (toolsEverCalled && hasHallucinatedResult && midChainNudgeCount < MAX_MID_CHAIN_NUDGES) {
+                midChainNudgeCount++;
+                log.warn(`Detected hallucinated tool result in model output (mid-chain nudge ${midChainNudgeCount}/${MAX_MID_CHAIN_NUDGES})`, {
+                    preview: responseText.slice(0, 300),
+                });
+                // Strip the hallucinated content — don't add it to messages
+                // Instead, nudge the model to make a real tool call
+                messages.push({
+                    role: 'user',
+                    content: 'STOP. You just wrote fake tool results instead of calling a tool. '
+                        + 'You must NOT write tool output tags or results yourself — only the system provides those. '
+                        + 'Call the next tool now by outputting ONLY the JSON array: '
+                        + '[{"name": "tool_name", "arguments": {...}}]',
+                });
+                continue;
+            }
+
             messages.push({ role: 'assistant', content: responseText });
 
             // Skip nudging if we've already nudged too many times or tools are disabled
-            if (nudgeCount >= MAX_NUDGES || toolsDisabled || toolsEverCalled) {
+            if (nudgeCount >= MAX_NUDGES || toolsDisabled) {
+                break;
+            }
+
+            // After tools have been called, only allow mid-chain nudges (handled above).
+            // Standard nudges are for initial engagement only.
+            if (toolsEverCalled) {
                 break;
             }
 

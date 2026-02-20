@@ -360,8 +360,10 @@ export class OllamaProvider extends BaseLlmProvider {
         // Conversation messages
         for (const m of params.messages) {
             if (m.role === 'tool' && useTextBasedTools) {
-                // Remap tool results to user messages for models without native tools API
-                messages.push({ role: 'user', content: `[Tool Result]: ${m.content}` });
+                // Remap tool results to user messages for models without native tools API.
+                // Use a distinct delimiter that the model is unlikely to generate on its own.
+                // The «» brackets are rare in training data and help prevent hallucination.
+                messages.push({ role: 'user', content: `«tool_output»\n${m.content}\n«/tool_output»` });
             } else {
                 messages.push({ role: m.role, content: m.content });
             }

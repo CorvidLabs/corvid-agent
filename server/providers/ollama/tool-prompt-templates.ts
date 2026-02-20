@@ -168,7 +168,9 @@ function getFamilySpecificPrompt(family: ModelFamily): string | null {
 - Do not wrap tool calls in markdown code blocks or add any surrounding text.
 - Output EITHER a tool call OR a text response, never both in the same message.
 - CRITICAL: Use tool names EXACTLY as listed above. Do NOT add prefixes — e.g., use "list_files" not "corvid_list_files". Only corvid_* tools already have that prefix.
-- When chaining multiple operations, process each tool result and immediately proceed to the next step.
+- Tool results will be provided inside «tool_output»...«/tool_output» tags. Wait for these before proceeding.
+- NEVER generate fake tool results yourself. NEVER write «tool_output» tags. Only the system writes those.
+- When chaining multiple operations, call ONE tool at a time and wait for its result before calling the next.
 - Provide your final answer as plain text only after all tool operations are complete.`;
 
         case 'mistral':
