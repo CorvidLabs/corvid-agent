@@ -106,6 +106,9 @@ export interface McpToolContext {
     reputationAttestation?: ReputationAttestation;
     /** Reputation verifier for scanning remote agent attestations. */
     reputationVerifier?: ReputationVerifier;
+    /** Pre-resolved tool permissions (agent base + skill bundle tools + project bundle tools).
+     *  When set, used instead of reading agent.mcpToolPermissions directly. */
+    resolvedToolPermissions?: string[] | null;
 }
 
 function textResult(text: string): CallToolResult {

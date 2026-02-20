@@ -753,6 +753,13 @@ export interface AgentSkillAssignment {
     sortOrder: number;
 }
 
+export interface ProjectSkillAssignment {
+    projectId: string;
+    bundleId: string;
+    sortOrder: number;
+    createdAt: string;
+}
+
 // MARK: - A2A Protocol (Agent-to-Agent Agent Card)
 
 export interface A2AAgentProvider {

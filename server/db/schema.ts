@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 50;
+const SCHEMA_VERSION = 51;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -981,6 +981,27 @@ const MIGRATIONS: Record<number, string[]> = {
     ],
     50: [
         `ALTER TABLE owner_question_dispatches ADD COLUMN answered_at TEXT DEFAULT NULL`,
+    ],
+    51: [
+        // Project-level skill assignments — shared skills for all agents in a project
+        `CREATE TABLE IF NOT EXISTS project_skills (
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            bundle_id  TEXT NOT NULL REFERENCES skill_bundles(id) ON DELETE CASCADE,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (project_id, bundle_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_project_skills_project ON project_skills(project_id)`,
+
+        // New preset skill bundles: Coder, GitHub Ops, Full Stack, Memory Manager
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-coder', 'Coder', 'Read, write, and edit code with command execution', '["read_file","write_file","edit_file","run_command","list_files","search_files"]', 'You are an expert coder. Read files to understand context before making changes. Use edit_file for targeted modifications and write_file only for new files. Always verify changes by reading the result. Run commands to test and validate your work.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-github-ops', 'GitHub Ops', 'GitHub PR and issue management', '["corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_github_repo_info"]', 'You specialize in GitHub operations. Review PRs thoroughly by reading diffs before commenting. When creating issues or PRs, write clear titles and descriptions. Check existing issues before creating duplicates.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-full-stack', 'Full Stack', 'Code, GitHub, tasks, and web search combined', '["read_file","write_file","edit_file","run_command","list_files","search_files","corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_create_work_task","corvid_web_search"]', 'You are a full-stack developer agent. You can read and edit code, run commands, manage GitHub PRs and issues, and create work tasks. Approach problems methodically: understand the codebase first, make targeted changes, test your work, then create PRs or report findings.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-memory-manager', 'Memory Manager', 'Knowledge and memory management with research', '["corvid_save_memory","corvid_recall_memory","corvid_web_search","corvid_deep_research"]', 'You manage knowledge and memory. Save important findings, decisions, and context using structured keys. Recall relevant memories before starting new work. Use web search and deep research to fill knowledge gaps.', 1)`,
     ],
 };
 
