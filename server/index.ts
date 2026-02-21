@@ -411,6 +411,15 @@ const server = Bun.serve<WsData>({
         if (url.pathname === '/ws') {
             // Check upgrade-level auth (header or query param)
             const preAuthenticated = checkWsAuth(req, url, authConfig);
+
+            // If API_KEY is set and auth failed, reject the upgrade with 401
+            if (authConfig.apiKey && !preAuthenticated) {
+                return new Response(JSON.stringify({ error: 'Authentication required' }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+                });
+            }
+
             // Extract wallet address if provided (from chat client)
             const walletAddress = url.searchParams.get('wallet') || undefined;
             if (walletAddress) {

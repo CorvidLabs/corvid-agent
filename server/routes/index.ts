@@ -44,8 +44,16 @@ import { loadAlgoChatConfig } from '../algochat/config';
 import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
-import { checkHttpAuth, buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
-import { RateLimiter, loadRateLimitConfig, checkRateLimit } from '../middleware/rate-limit';
+import { buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
+import { RateLimiter, loadRateLimitConfig } from '../middleware/rate-limit';
+import {
+    authGuard,
+    roleGuard,
+    rateLimitGuard,
+    applyGuards,
+    createRequestContext,
+    requiresAdminRole,
+} from '../middleware/guards';
 import type { SandboxManager } from '../sandbox/manager';
 import type { MarketplaceService } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
@@ -139,18 +147,24 @@ export async function handleRequest(
         return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // Rate limiting — check before auth or route dispatch
-    const rateLimited = checkRateLimit(req, url, rateLimiter);
-    if (rateLimited) {
-        applyCors(rateLimited, req, config);
-        return rateLimited;
+    // Build request context and apply declarative guard chain
+    const context = createRequestContext(url.searchParams.get('wallet') || undefined);
+
+    // Guard chain: rate limit → auth → (optional role guard for admin paths)
+    const guards = [
+        rateLimitGuard(rateLimiter),
+        authGuard(config),
+    ];
+
+    // Apply admin role guard for sensitive endpoints
+    if (requiresAdminRole(url.pathname)) {
+        guards.push(roleGuard('admin'));
     }
 
-    // Authentication — check all routes (public paths are exempted inside checkHttpAuth)
-    const authDenied = checkHttpAuth(req, url, config);
-    if (authDenied) {
-        applyCors(authDenied, req, config);
-        return authDenied;
+    const denied = applyGuards(req, url, context, ...guards);
+    if (denied) {
+        applyCors(denied, req, config);
+        return denied;
     }
 
     try {
