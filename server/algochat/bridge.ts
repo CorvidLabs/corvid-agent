@@ -40,6 +40,7 @@ import { formatApprovalForChain, parseApprovalResponse } from './approval-format
 // import { getBalance, purchaseCredits, maybeGrantFirstTimeCredits, canStartSession, getCreditConfig } from '../db/credits';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 // Composed services
 import { ResponseFormatter } from './response-formatter';
@@ -1030,6 +1031,18 @@ export class AlgoChatBridge {
         confirmedRound: number,
         amount?: number,
     ): Promise<void> {
+        // Extract traceId from on-chain message metadata if present
+        let incomingTraceId: string | undefined;
+        let messageBody = content;
+        const traceMatch = content.match(/^\[trace:([a-f0-9]{32})\]\n/);
+        if (traceMatch) {
+            incomingTraceId = traceMatch[1];
+            messageBody = content.slice(traceMatch[0].length);
+        }
+
+        const ctx = createEventContext('algochat', incomingTraceId);
+        return runWithEventContext(ctx, async () => {
+        const content = messageBody; // shadow outer content with trace-stripped body
         log.info(`Message from ${participant}`, { content: content.slice(0, 100), amount });
 
         // Parse device name envelope (multi-device PSK chat)
@@ -1230,6 +1243,7 @@ export class AlgoChatBridge {
         }
 
         updateConversationRound(this.db, conversation.id, confirmedRound);
+        }); // runWithEventContext
     }
 }
 

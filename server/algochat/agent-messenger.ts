@@ -19,8 +19,8 @@ import type { WorkCommandRouter } from './work-command-router';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
-import { generateTraceId } from '../observability/tracing';
-import { runWithTraceId, getTraceId } from '../observability/trace-context';
+import { getTraceId } from '../observability/trace-context';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { agentMessagesTotal } from '../observability/metrics';
 import { recordAudit } from '../db/audit';
 
@@ -131,8 +131,9 @@ export class AgentMessenger {
         const paymentMicro = request.paymentMicro ?? DEFAULT_PAYMENT_MICRO;
         const threadId = request.threadId ?? crypto.randomUUID();
 
-        // Generate or inherit trace ID for this invocation chain
-        const traceId = getTraceId() ?? generateTraceId();
+        // Generate or inherit trace context for this invocation chain
+        const eventCtx = createEventContext('agent');
+        const traceId = eventCtx.traceId;
 
         // Guards
         if (fromAgentId === toAgentId) {
@@ -230,7 +231,7 @@ export class AgentMessenger {
         this.subscribeForAgentResponse(agentMessage.id, session.id, fromAgentId, toAgentId);
 
         // Start the session process within trace context (pass depth for invoke chain limiting)
-        runWithTraceId(traceId, () => {
+        runWithEventContext(eventCtx, () => {
             this.processManager.startProcess(session, prompt, { depth: request.depth });
         });
 
@@ -316,6 +317,13 @@ export class AgentMessenger {
     ): Promise<string | null> {
         if (!this.service) return null;
 
+        // Include traceId in on-chain message payload for cross-agent correlation.
+        // Prepend as a metadata header that the receiving bridge can extract.
+        const currentTraceId = getTraceId();
+        const sendContent = currentTraceId
+            ? `[trace:${currentTraceId}]\n${content}`
+            : content;
+
         // Check daily ALGO spending limit before sending
         if (paymentMicro > 0) {
             try {
@@ -366,7 +374,7 @@ export class AgentMessenger {
                 fromAccount.account,
                 toEntry.walletAddress,
                 toPubKey,
-                content,
+                sendContent,
                 paymentMicro,
             );
 
@@ -388,14 +396,14 @@ export class AgentMessenger {
             });
 
             const { condenseMessage } = await import('./condenser');
-            const { content: sendContent } = await condenseMessage(content, 800, messageId);
+            const { content: condensedContent } = await condenseMessage(sendContent, 800, messageId);
 
             const sendOptions = paymentMicro > 0 ? { amount: paymentMicro } : undefined;
             const result = await this.service.algorandService.sendMessage(
                 fromAccount.account,
                 toEntry.walletAddress,
                 toPubKey,
-                sendContent,
+                condensedContent,
                 sendOptions,
             );
 

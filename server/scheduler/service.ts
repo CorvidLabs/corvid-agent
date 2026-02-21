@@ -37,6 +37,7 @@ import { launchCouncil } from '../routes/councils';
 import { getNextCronDate } from './cron-parser';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('Scheduler');
 
@@ -246,6 +247,8 @@ export class SchedulerService {
     }
 
     private async executeSchedule(schedule: AgentSchedule): Promise<void> {
+        const ctx = createEventContext('scheduler');
+        return runWithEventContext(ctx, async () => {
         const agent = getAgent(this.db, schedule.agentId);
         if (!agent) {
             log.warn('Schedule agent not found', { scheduleId: schedule.id, agentId: schedule.agentId });
@@ -317,6 +320,7 @@ export class SchedulerService {
             // Execute immediately
             this.runAction(execution.id, schedule, action);
         }
+        }); // runWithEventContext
     }
 
     private needsApproval(schedule: AgentSchedule, action: ScheduleAction): boolean {
