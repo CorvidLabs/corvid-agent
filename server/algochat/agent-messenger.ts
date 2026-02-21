@@ -1,11 +1,9 @@
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
-import type { AlgoChatService } from './service';
-import type { AgentWalletService } from './agent-wallet';
-import type { AgentDirectory } from './agent-directory';
 import type { ProcessManager } from '../process/manager';
 import type { AgentMessage } from '../../shared/types';
 import type { ClaudeStreamEvent } from '../process/types';
+import type { OnChainTransactor } from './on-chain-transactor';
 import { extractContentText } from '../process/types';
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
@@ -16,10 +14,8 @@ import {
     getThreadMessages,
 } from '../db/agent-messages';
 import type { WorkCommandRouter } from './work-command-router';
-import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
-import { getTraceId } from '../observability/trace-context';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { agentMessagesTotal } from '../observability/metrics';
 import { recordAudit } from '../db/audit';
@@ -47,9 +43,7 @@ export interface AgentInvokeResult {
 type MessageUpdateCallback = (message: AgentMessage) => void;
 export class AgentMessenger {
     readonly db: Database;
-    private service: AlgoChatService | null;
-    private agentWalletService: AgentWalletService;
-    private agentDirectory: AgentDirectory;
+    private transactor: OnChainTransactor | null;
     private processManager: ProcessManager;
     private workCommandRouter: WorkCommandRouter | null = null;
     private messageUpdateListeners = new Set<MessageUpdateCallback>();
@@ -57,15 +51,11 @@ export class AgentMessenger {
     constructor(
         db: Database,
         _config: AlgoChatConfig,
-        service: AlgoChatService | null,
-        agentWalletService: AgentWalletService,
-        agentDirectory: AgentDirectory,
+        transactor: OnChainTransactor | null,
         processManager: ProcessManager,
     ) {
         this.db = db;
-        this.service = service;
-        this.agentWalletService = agentWalletService;
-        this.agentDirectory = agentDirectory;
+        this.transactor = transactor;
         this.processManager = processManager;
     }
 
@@ -188,10 +178,25 @@ export class AgentMessenger {
             traceId,
         );
 
-        // Send on-chain payment from Agent A → Agent B
+        // Send on-chain payment from Agent A → Agent B via OnChainTransactor
         let txid: string | null = null;
         try {
-            txid = await this.sendOnChainMessage(fromAgentId, toAgentId, content, paymentMicro, agentMessage.id);
+            if (this.transactor) {
+                const result = await this.transactor.sendMessage({
+                    fromAgentId,
+                    toAgentId,
+                    content,
+                    paymentMicro,
+                    messageId: agentMessage.id,
+                });
+                if (result.blockedByLimit && result.limitError) {
+                    updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
+                        response: `Spending limit: ${result.limitError}`,
+                    });
+                    this.emitMessageUpdate(agentMessage.id);
+                }
+                txid = result.txid;
+            }
         } catch (err) {
             log.warn('On-chain send failed, proceeding without txid', {
                 error: err instanceof Error ? err.message : String(err),
@@ -264,8 +269,19 @@ export class AgentMessenger {
                 return;
             }
 
-            // Send the response back on-chain from B → A
-            this.sendOnChainMessage(toAgentId, fromAgentId, response, 0, messageId, sessionId)
+            // Send the response back on-chain from B → A via OnChainTransactor
+            const sendResponse = this.transactor
+                ? this.transactor.sendMessage({
+                    fromAgentId: toAgentId,
+                    toAgentId: fromAgentId,
+                    content: response,
+                    paymentMicro: 0,
+                    messageId,
+                    sessionId,
+                }).then((r) => r.txid)
+                : Promise.resolve(null);
+
+            sendResponse
                 .then((responseTxid) => {
                     updateAgentMessageStatus(this.db, messageId, 'completed', {
                         response,
@@ -305,120 +321,6 @@ export class AgentMessenger {
         };
 
         this.processManager.subscribe(sessionId, callback);
-    }
-
-    private async sendOnChainMessage(
-        fromAgentId: string,
-        toAgentId: string,
-        content: string,
-        paymentMicro: number,
-        messageId?: string,
-        sessionId?: string,
-    ): Promise<string | null> {
-        if (!this.service) return null;
-
-        // Include traceId in on-chain message payload for cross-agent correlation.
-        // Prepend as a metadata header that the receiving bridge can extract.
-        const currentTraceId = getTraceId();
-        const sendContent = currentTraceId
-            ? `[trace:${currentTraceId}]\n${content}`
-            : content;
-
-        // Check daily ALGO spending limit before sending
-        if (paymentMicro > 0) {
-            try {
-                checkAlgoLimit(this.db, paymentMicro);
-            } catch (err) {
-                log.warn(`On-chain send blocked by spending limit`, {
-                    fromAgentId,
-                    toAgentId,
-                    paymentMicro,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-                if (messageId) {
-                    updateAgentMessageStatus(this.db, messageId, 'failed', {
-                        response: `Spending limit: ${err instanceof Error ? err.message : String(err)}`,
-                    });
-                    this.emitMessageUpdate(messageId);
-                }
-                return null;
-            }
-        }
-
-        const fromAccount = await this.agentWalletService.getAgentChatAccount(fromAgentId);
-        if (!fromAccount) {
-            log.debug(`No wallet for agent ${fromAgentId}, skipping on-chain send`);
-            return null;
-        }
-
-        const toEntry = await this.agentDirectory.resolve(toAgentId);
-        if (!toEntry?.walletAddress) {
-            log.debug(`No wallet address for agent ${toAgentId}, skipping on-chain send`);
-            return null;
-        }
-
-        // Discover the target's public key for encryption
-        let toPubKey: Uint8Array;
-        try {
-            toPubKey = await this.service.algorandService.discoverPublicKey(toEntry.walletAddress);
-        } catch {
-            log.debug(`Could not discover public key for ${toEntry.walletAddress}`);
-            return null;
-        }
-
-        // Use group transactions for large messages; fall back to condense on failure
-        try {
-            const { sendGroupMessage } = await import('./group-sender');
-            const result = await sendGroupMessage(
-                this.service,
-                fromAccount.account,
-                toEntry.walletAddress,
-                toPubKey,
-                sendContent,
-                paymentMicro,
-            );
-
-            log.info(`On-chain message sent`, {
-                from: fromAccount.address,
-                to: toEntry.walletAddress,
-                txid: result.primaryTxid,
-                txids: result.txids.length,
-                paymentMicro,
-            });
-
-            if (paymentMicro > 0) recordAlgoSpend(this.db, paymentMicro);
-            const fee = result.fee ?? paymentMicro;
-            if (fee > 0 && sessionId) updateSessionAlgoSpent(this.db, sessionId, fee);
-            return result.primaryTxid;
-        } catch (groupErr) {
-            log.warn('Group send failed, falling back to condense+send', {
-                error: groupErr instanceof Error ? groupErr.message : String(groupErr),
-            });
-
-            const { condenseMessage } = await import('./condenser');
-            const { content: condensedContent } = await condenseMessage(sendContent, 800, messageId);
-
-            const sendOptions = paymentMicro > 0 ? { amount: paymentMicro } : undefined;
-            const result = await this.service.algorandService.sendMessage(
-                fromAccount.account,
-                toEntry.walletAddress,
-                toPubKey,
-                condensedContent,
-                sendOptions,
-            );
-
-            log.info(`On-chain message sent (condensed fallback)`, {
-                from: fromAccount.address,
-                to: toEntry.walletAddress,
-                txid: result.txid,
-                paymentMicro,
-            });
-
-            if (paymentMicro > 0) recordAlgoSpend(this.db, paymentMicro);
-            const fallbackFee = (result as unknown as { fee?: number }).fee ?? paymentMicro;
-            if (fallbackFee > 0 && sessionId) updateSessionAlgoSpent(this.db, sessionId, fallbackFee);
-            return result.txid;
-        }
     }
 
     /**
@@ -496,45 +398,11 @@ export class AgentMessenger {
 
     /**
      * Send an on-chain message from an agent to itself (for memory/audit storage).
-     * Bypasses the self-invoke guard since this is not a conversation.
+     * Delegates to OnChainTransactor.
      */
     async sendOnChainToSelf(agentId: string, content: string): Promise<string | null> {
-        if (!this.service) return null;
-
-        const account = await this.agentWalletService.getAgentChatAccount(agentId);
-        if (!account) {
-            log.debug(`No wallet for agent ${agentId}, skipping on-chain self-send`);
-            return null;
-        }
-
-        // For self-sends we already have the encryption keys — no need to discover
-        // via the indexer (which may lag behind or be unavailable).
-        const pubKey = account.account.encryptionKeys.publicKey;
-
-        // Use group transactions for large messages; fall back to condense
-        try {
-            const { sendGroupMessage } = await import('./group-sender');
-            const result = await sendGroupMessage(
-                this.service,
-                account.account,
-                account.address,
-                pubKey,
-                content,
-            );
-            log.info('On-chain self-send (memory)', { agentId, txid: result.primaryTxid, txids: result.txids.length });
-            return result.primaryTxid;
-        } catch {
-            const { condenseMessage } = await import('./condenser');
-            const { content: sendContent } = await condenseMessage(content, 800);
-            const result = await this.service.algorandService.sendMessage(
-                account.account,
-                account.address,
-                pubKey,
-                sendContent,
-            );
-            log.info('On-chain self-send (memory, condensed fallback)', { agentId, txid: result.txid });
-            return result.txid;
-        }
+        if (!this.transactor) return null;
+        return this.transactor.sendToSelf(agentId, content);
     }
 
     /**
@@ -546,28 +414,8 @@ export class AgentMessenger {
         toAddress: string,
         content: string,
     ): Promise<string | null> {
-        if (!this.service) return null;
-
-        try {
-            const fromAccount = await this.agentWalletService.getAgentChatAccount(fromAgentId);
-            if (!fromAccount) return null;
-
-            const toPubKey = await this.service.algorandService.discoverPublicKey(toAddress);
-
-            const { condenseMessage } = await import('./condenser');
-            const { content: sendContent } = await condenseMessage(content, 800);
-
-            const result = await this.service.algorandService.sendMessage(
-                fromAccount.account,
-                toAddress,
-                toPubKey,
-                sendContent,
-            );
-
-            return result.txid;
-        } catch {
-            return null;
-        }
+        if (!this.transactor) return null;
+        return this.transactor.sendNotificationToAddress(fromAgentId, toAddress, content);
     }
 
     /** Best-effort on-chain message send. Returns txid or null. Never throws. */
@@ -577,11 +425,8 @@ export class AgentMessenger {
         content: string,
         messageId?: string,
     ): Promise<string | null> {
-        try {
-            return await this.sendOnChainMessage(fromAgentId, toAgentId, content, 0, messageId);
-        } catch {
-            return null;
-        }
+        if (!this.transactor) return null;
+        return this.transactor.sendBestEffort(fromAgentId, toAgentId, content, messageId);
     }
 
     private getDefaultProjectId(): string {

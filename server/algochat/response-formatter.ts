@@ -1,27 +1,25 @@
 /**
- * ResponseFormatter — Handles on-chain and PSK response sending,
- * ALGO spending tracking, and event emission for AlgoChat messages.
+ * ResponseFormatter — Handles response sending routing (PSK, on-chain),
+ * event emission, and message persistence for AlgoChat messages.
  *
- * Extracted from bridge.ts to isolate message serialization, delivery,
- * and event persistence concerns.
+ * On-chain transaction construction and submission is delegated to
+ * OnChainTransactor; this class handles PSK routing, sender account
+ * selection, event persistence, and dead-letter logging.
  */
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
 import type { AgentWalletService } from './agent-wallet';
 import type { PSKManager } from './psk';
+import type { OnChainTransactor } from './on-chain-transactor';
 import {
     getConversationByParticipant,
 } from '../db/sessions';
-import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
-import { updateSessionAlgoSpent } from '../db/sessions';
+import { checkAlgoLimit } from '../db/spending';
 import { saveAlgoChatMessage } from '../db/algochat-messages';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('ResponseFormatter');
-
-/** TTL for cached public keys. */
-const PUBLIC_KEY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Callback signature for AlgoChat feed events (UI, WS, etc.).
@@ -33,28 +31,22 @@ export type AlgoChatEventCallback = (
     fee?: number,
 ) => void;
 
-interface CachedPublicKey {
-    key: Uint8Array;
-    cachedAt: number;
-}
-
 /**
  * Manages response serialization, on-chain delivery, and event emission.
  *
  * Responsibilities:
- * - Sending messages on-chain (group txns, single txn fallback, PSK)
+ * - Routing responses to PSK contacts or on-chain via OnChainTransactor
  * - Splitting oversized PSK payloads into sequential chunks
- * - Tracking ALGO spending and per-session costs
  * - Persisting messages to DB and emitting feed events
- * - Caching recipient public keys
+ * - Selecting sender account (per-agent wallet or main account)
  */
 export class ResponseFormatter {
     private db: Database;
     private service: AlgoChatService;
     private agentWalletService: AgentWalletService | null = null;
+    private transactor: OnChainTransactor | null = null;
     private pskManagerLookup: ((address: string) => PSKManager | null) | null = null;
     private eventCallbacks: Set<AlgoChatEventCallback> = new Set();
-    private publicKeyCache: Map<string, CachedPublicKey> = new Map();
 
     constructor(
         db: Database,
@@ -68,6 +60,11 @@ export class ResponseFormatter {
     /** Inject the optional agent wallet service for per-agent sending. */
     setAgentWalletService(service: AgentWalletService): void {
         this.agentWalletService = service;
+    }
+
+    /** Inject the OnChainTransactor for on-chain message delivery. */
+    setOnChainTransactor(transactor: OnChainTransactor): void {
+        this.transactor = transactor;
     }
 
     /** Inject a PSK manager lookup function for multi-contact PSK routing. */
@@ -90,9 +87,7 @@ export class ResponseFormatter {
      *
      * Routing order:
      * 1. PSK contacts → PSKManager (chunked if needed)
-     * 2. Per-agent wallet → group transaction
-     * 3. Main account → group transaction
-     * 4. Fallback → single transaction (truncated)
+     * 2. Per-agent wallet or main account → OnChainTransactor
      */
     async sendResponse(participant: string, content: string): Promise<void> {
         // Check daily ALGO spending limit (estimate min fee of 1000 microAlgos per txn)
@@ -135,50 +130,39 @@ export class ResponseFormatter {
                 return;
             }
 
-            // Try to use per-agent wallet if available
+            // Resolve sender account: per-agent wallet or main account
             let senderAccount = this.service.chatAccount;
-            if (this.agentWalletService) {
-                const conversation = getConversationByParticipant(this.db, participant);
-                if (conversation?.agentId) {
-                    const agentAccount = await this.agentWalletService.getAgentChatAccount(conversation.agentId);
-                    if (agentAccount) {
-                        senderAccount = agentAccount.account;
-                        log.debug(`Using agent wallet ${agentAccount.address} for response`);
-                    }
+            const conversation = getConversationByParticipant(this.db, participant);
+            if (this.agentWalletService && conversation?.agentId) {
+                const agentAccount = await this.agentWalletService.getAgentChatAccount(conversation.agentId);
+                if (agentAccount) {
+                    senderAccount = agentAccount.account;
+                    log.debug(`Using agent wallet ${agentAccount.address} for response`);
                 }
             }
 
-            const pubKey = await this.getPublicKey(participant);
-
-            // Use group transactions for all recipients. External AlgoChat
-            // clients that support [GRP:] reassembly will show the full message;
-            // for short messages that fit in a single txn, sendGroupMessage
-            // automatically falls back to a standard single send.
-            try {
-                const { sendGroupMessage } = await import('./group-sender');
-                const groupResult = await sendGroupMessage(
-                    this.service,
+            // Delegate on-chain send to OnChainTransactor
+            if (this.transactor) {
+                const sessionId = conversation?.sessionId ?? undefined;
+                const result = await this.transactor.sendToAddress(
                     senderAccount,
                     participant,
-                    pubKey,
                     content,
+                    sessionId,
                 );
 
-                log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: groupResult.fee, txids: groupResult.txids.length });
-                if (groupResult.fee) {
-                    recordAlgoSpend(this.db, groupResult.fee);
-                    const conv = getConversationByParticipant(this.db, participant);
-                    if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, groupResult.fee);
+                if (result) {
+                    log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee: result.fee });
+                    this.emitEvent(participant, content, 'outbound', result.fee);
+                } else {
+                    log.warn('On-chain response send returned null (spending limit or service unavailable)', { participant });
                 }
-                this.emitEvent(participant, content, 'outbound', groupResult.fee);
                 return;
-            } catch (groupErr) {
-                log.warn('Group send failed, falling back to single txn', {
-                    error: groupErr instanceof Error ? groupErr.message : String(groupErr),
-                });
             }
 
-            // Fallback: single transaction (truncates if needed)
+            // Fallback: direct send if no transactor available (should not normally happen)
+            log.warn('No OnChainTransactor available, attempting direct send');
+            const pubKey = await this.service.algorandService.discoverPublicKey(participant);
             let sendContent = content;
             const encoded = new TextEncoder().encode(content);
             if (encoded.byteLength > 850) {
@@ -194,11 +178,6 @@ export class ResponseFormatter {
 
             const fee = (result as unknown as { fee?: number }).fee;
             log.info(`Sent response to ${participant}`, { content: content.slice(0, 100), fee });
-            if (fee) {
-                recordAlgoSpend(this.db, fee);
-                const conv = getConversationByParticipant(this.db, participant);
-                if (conv?.sessionId) updateSessionAlgoSpent(this.db, conv.sessionId, fee);
-            }
             this.emitEvent(participant, content, 'outbound', fee);
         } catch (err) {
             // Dead-letter logging: capture full context for failed message sends
@@ -286,20 +265,5 @@ export class ResponseFormatter {
         }
 
         return chunks;
-    }
-
-    /**
-     * Get (or cache) a recipient's public key for on-chain encryption.
-     * Keys are cached for 1 hour.
-     */
-    async getPublicKey(address: string): Promise<Uint8Array> {
-        const cached = this.publicKeyCache.get(address);
-        if (cached && (Date.now() - cached.cachedAt) < PUBLIC_KEY_CACHE_TTL_MS) {
-            return cached.key;
-        }
-
-        const pubKey = await this.service.algorandService.discoverPublicKey(address);
-        this.publicKeyCache.set(address, { key: pubKey, cachedAt: Date.now() });
-        return pubKey;
     }
 }

@@ -6,8 +6,6 @@ import { createProject } from '../db/projects';
 import { getAgentMessage, getThreadMessages } from '../db/agent-messages';
 import { AgentMessenger } from '../algochat/agent-messenger';
 import type { ProcessManager } from '../process/manager';
-import type { AgentWalletService } from '../algochat/agent-wallet';
-import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AlgoChatConfig } from '../algochat/config';
 import type { WorkTaskService } from '../work/service';
 import { WorkCommandRouter } from '../algochat/work-command-router';
@@ -49,24 +47,6 @@ function createMockProcessManager() {
     } as unknown as ProcessManager;
 }
 
-function createMockWalletService() {
-    return {
-        getAgentChatAccount: mock(() => Promise.resolve(null)),
-        ensureWallet: mock(() => Promise.resolve()),
-        fundAgent: mock(() => Promise.resolve()),
-        getBalance: mock(() => Promise.resolve(0)),
-    } as unknown as AgentWalletService;
-}
-
-function createMockDirectory() {
-    return {
-        resolve: mock(() => Promise.resolve(null)),
-        findAgentByAddress: mock(() => null),
-        listAvailable: mock(() => Promise.resolve([])),
-        clearCache: mock(() => {}),
-    } as unknown as AgentDirectory;
-}
-
 /** Helper: wire a mock WorkTaskService into the messenger via a WorkCommandRouter. */
 function wireWorkTaskService(m: AgentMessenger, d: Database, wts: WorkTaskService): void {
     const router = new WorkCommandRouter(d);
@@ -79,8 +59,6 @@ function wireWorkTaskService(m: AgentMessenger, d: Database, wts: WorkTaskServic
 let db: Database;
 let messenger: AgentMessenger;
 let mockProcessManager: ProcessManager;
-let mockWalletService: AgentWalletService;
-let mockDirectory: AgentDirectory;
 let projectId: string;
 let agentA: Agent;
 let agentB: Agent;
@@ -101,15 +79,11 @@ beforeEach(() => {
     agentB = createAgent(db, { name: 'Agent B' });
 
     mockProcessManager = createMockProcessManager();
-    mockWalletService = createMockWalletService();
-    mockDirectory = createMockDirectory();
 
     messenger = new AgentMessenger(
         db,
         mockConfig,
-        null, // AlgoChatService is null for tests
-        mockWalletService,
-        mockDirectory,
+        null, // OnChainTransactor is null for tests (no chain operations)
         mockProcessManager,
     );
 });
@@ -365,13 +339,13 @@ describe('invoke() with [WORK] prefix', () => {
 // ─── sendOnChainBestEffort() ─────────────────────────────────────────────────
 
 describe('sendOnChainBestEffort()', () => {
-    test('returns null when AlgoChatService is null', async () => {
+    test('returns null when OnChainTransactor is null', async () => {
         const txid = await messenger.sendOnChainBestEffort(agentA.id, agentB.id, 'hello');
         expect(txid).toBeNull();
     });
 
     test('never throws even when internal call would fail', async () => {
-        // service is null, so sendOnChainMessage returns null — should not throw
+        // transactor is null, so delegation returns null — should not throw
         const txid = await messenger.sendOnChainBestEffort(agentA.id, agentB.id, 'test');
         expect(txid).toBeNull();
     });
@@ -380,7 +354,7 @@ describe('sendOnChainBestEffort()', () => {
 // ─── sendOnChainToSelf() ─────────────────────────────────────────────────────
 
 describe('sendOnChainToSelf()', () => {
-    test('returns null when AlgoChatService is null', async () => {
+    test('returns null when OnChainTransactor is null', async () => {
         const txid = await messenger.sendOnChainToSelf(agentA.id, 'memory content');
         expect(txid).toBeNull();
     });
@@ -389,7 +363,7 @@ describe('sendOnChainToSelf()', () => {
 // ─── sendNotificationToAddress() ─────────────────────────────────────────────
 
 describe('sendNotificationToAddress()', () => {
-    test('returns null when AlgoChatService is null', async () => {
+    test('returns null when OnChainTransactor is null', async () => {
         const txid = await messenger.sendNotificationToAddress(agentA.id, 'SOME_ADDRESS', 'notify');
         expect(txid).toBeNull();
     });

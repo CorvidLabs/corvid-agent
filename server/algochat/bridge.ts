@@ -30,6 +30,7 @@ import { PSKManager } from './psk';
 import type { AgentWalletService } from './agent-wallet';
 import type { AgentDirectory } from './agent-directory';
 import type { AgentMessenger } from './agent-messenger';
+import type { OnChainTransactor } from './on-chain-transactor';
 import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { OwnerQuestionManager } from '../process/owner-question-manager';
@@ -183,6 +184,11 @@ export class AlgoChatBridge implements ChannelAdapter {
         const router = new WorkCommandRouter(this.db);
         router.setWorkTaskService(service);
         this.commandHandler.setWorkCommandRouter(router);
+    }
+
+    /** Inject the OnChainTransactor for on-chain response delivery. */
+    setOnChainTransactor(transactor: OnChainTransactor): void {
+        this.responseFormatter.setOnChainTransactor(transactor);
     }
 
     /** Inject the agent messenger for council and inter-agent messaging. */
