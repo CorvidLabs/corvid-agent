@@ -22,6 +22,8 @@
         <string>info</string>
         <key>NODE_ENV</key>
         <string>production</string>
+        <key>PATH</key>
+        <string>__PATH__</string>
     </dict>
 
     <key>RunAtLoad</key>

@@ -38,11 +38,15 @@ install_launchd() {
     mkdir -p "$log_dir"
     mkdir -p "$HOME/Library/LaunchAgents"
 
+    # Build a PATH that includes user tool directories (needed for claude CLI, gh, etc.)
+    local user_path="$HOME/.local/bin:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
     # Generate plist with correct paths
     sed \
         -e "s|__BUN_PATH__|$bun_path|g" \
         -e "s|__WORKING_DIR__|$PROJECT_DIR|g" \
         -e "s|__LOG_DIR__|$log_dir|g" \
+        -e "s|__PATH__|$user_path|g" \
         "$plist_src" > "$plist_dst"
 
     # Install log rotation config (newsyslog picks this up automatically)
