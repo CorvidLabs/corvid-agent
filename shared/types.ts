@@ -155,7 +155,9 @@ export type MessageErrorCode =
     | 'CHAIN_ERROR'           // On-chain transaction failed
     | 'EMPTY_RESPONSE'        // Agent session produced no response
     | 'RESPONSE_SEND_FAILED'  // On-chain response delivery failed
-    | 'WORK_TASK_ERROR';      // Work task creation failed
+    | 'WORK_TASK_ERROR'       // Work task creation failed
+    | 'CIRCUIT_OPEN'          // Circuit breaker open for target agent
+    | 'RATE_LIMITED';         // Per-agent rate limit exceeded
 
 /** Current message protocol version for forward compatibility. */
 export const MESSAGE_PROTOCOL_VERSION = 1;
