@@ -3,19 +3,19 @@ module: voice
 version: 1
 status: active
 files:
-  - server/voice/tts.ts
   - server/voice/stt.ts
+  - server/voice/tts.ts
   - server/voice/types.ts
 db_tables:
   - voice_cache
 depends_on: []
 ---
 
-# Voice (TTS / STT)
+# Voice Services
 
 ## Purpose
 
-Text-to-speech synthesis via OpenAI TTS API and speech-to-text transcription via OpenAI Whisper API. TTS results are cached in a SQLite table using SHA-256 content hashing with LRU eviction. Both services require `OPENAI_API_KEY`.
+Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI APIs. STT uses the Whisper API (`whisper-1`) for transcription. TTS uses the Speech API (`tts-1`) for synthesis. TTS results are cached in a SQLite table using SHA-256 content hashing with LRU eviction. Both services require `OPENAI_API_KEY`.
 
 ## Public API
 
@@ -23,9 +23,9 @@ Text-to-speech synthesis via OpenAI TTS API and speech-to-text transcription via
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `synthesize` | `(options: TTSOptions)` | `Promise<TTSResult>` | Calls OpenAI TTS API to convert text to MP3 audio |
+| `transcribe` | `(options: STTOptions)` | `Promise<STTResult>` | Transcribe audio to text via OpenAI Whisper |
+| `synthesize` | `(options: TTSOptions)` | `Promise<TTSResult>` | Convert text to speech via OpenAI TTS API |
 | `synthesizeWithCache` | `(db: Database, text: string, voice: VoicePreset)` | `Promise<TTSResult>` | Cache-aware TTS: checks `voice_cache` table first, synthesizes and caches on miss |
-| `transcribe` | `(options: STTOptions)` | `Promise<STTResult>` | Calls OpenAI Whisper API to convert audio to text |
 
 ### Exported Types
 
@@ -38,53 +38,66 @@ Text-to-speech synthesis via OpenAI TTS API and speech-to-text transcription via
 
 ## Invariants
 
-1. **OPENAI_API_KEY required**: Both `synthesize` and `transcribe` throw if `OPENAI_API_KEY` is not set
-2. **TTS 4096 char limit**: `synthesize` throws if `options.text.length > 4096`
-3. **TTS empty text rejected**: `synthesize` throws if text is empty or whitespace-only
-4. **SHA-256 cache key**: `synthesizeWithCache` hashes text with `Bun.CryptoHasher('sha256')` and looks up by `(text_hash, voice_preset)` pair
-5. **LRU eviction at 10,000 entries**: After inserting a new cache entry, if `voice_cache` exceeds 10,000 rows, the oldest entries (by `created_at ASC`) are deleted
-6. **STT 25 MB limit**: `transcribe` throws if `options.audio.length > 25 * 1024 * 1024`
-7. **STT format support**: Supports `ogg`, `mp3`, `wav`, `webm` formats with corresponding MIME types. Defaults to `ogg`
-8. **TTS output format**: Always returns MP3 (`response_format: 'mp3'`)
-9. **TTS default model**: Uses `tts-1` model by default, configurable via `options.model`
+1. **OPENAI_API_KEY required**: Both `transcribe` and `synthesize` throw immediately if `OPENAI_API_KEY` is not set in the environment
+2. **STT audio size limit**: Audio buffers larger than 25 MB (OpenAI Whisper limit) are rejected with a descriptive error before any API call
+3. **TTS text length limit**: Text longer than 4096 characters is rejected by `synthesize`
+4. **TTS empty text rejection**: Empty or whitespace-only text is rejected by `synthesize`
+5. **Audio format mapping**: STT supports `ogg`, `mp3`, `wav`, `webm` formats with correct MIME type mapping. Unknown formats fall back to `audio/ogg`
+6. **Default STT format**: If no format is specified, defaults to `ogg`
+7. **TTS model default**: If no model is specified, defaults to `tts-1`
+8. **TTS speed default**: If no speed is specified, defaults to `1.0`
+9. **TTS output format**: Always outputs MP3 (`response_format: 'mp3'`)
+10. **Duration estimation**: TTS duration is estimated from audio byte size assuming 128kbps MP3: `durationMs = (bytes / 16000) * 1000`
+11. **SHA-256 cache key**: TTS cache uses SHA-256 hash of the text (via `Bun.CryptoHasher('sha256')`) plus the voice preset as the lookup key
+12. **LRU eviction at 10,000 entries**: When the `voice_cache` table exceeds 10,000 entries, the oldest entries (by `created_at` ASC) are deleted to bring it back to the limit
+13. **Cache returns copy**: Cached audio is wrapped in a new `Buffer.from()` to prevent mutation of cached data
+14. **API error handling**: Both STT and TTS log the full API error server-side but throw a generic error message that does not expose API details
 
 ## Behavioral Examples
 
-### Scenario: TTS cache hit
+### Scenario: Transcribe a voice note
 
-- **Given** text "Hello world" with voice "alloy" was previously synthesized
+- **Given** `OPENAI_API_KEY` is set and a 2 MB OGG audio buffer
+- **When** `transcribe({ audio, format: 'ogg' })` is called
+- **Then** a multipart form is sent to `https://api.openai.com/v1/audio/transcriptions` with model `whisper-1`
+- **And** the returned `{ text }` is the transcription result
+
+### Scenario: Synthesize speech with cache miss
+
+- **Given** `OPENAI_API_KEY` is set and no cached entry for the text/voice combination
 - **When** `synthesizeWithCache(db, "Hello world", "alloy")` is called
-- **Then** the cached audio is returned without calling OpenAI API
+- **Then** `synthesize` is called, the MP3 audio is returned
+- **And** the result is stored in `voice_cache` with the SHA-256 hash of the text
 
-### Scenario: TTS cache miss
+### Scenario: Synthesize speech with cache hit
 
-- **Given** text "New text" has never been synthesized
-- **When** `synthesizeWithCache(db, "New text", "alloy")` is called
-- **Then** OpenAI TTS API is called, the result is stored in `voice_cache`, and the audio is returned
+- **Given** a cached entry exists for text hash + voice preset
+- **When** `synthesizeWithCache(db, "Hello world", "alloy")` is called
+- **Then** the cached audio is returned without making an API call
 
 ### Scenario: Cache eviction
 
-- **Given** the `voice_cache` table has 10,001 entries after a new insert
-- **When** eviction runs
-- **Then** the oldest entry (by `created_at`) is deleted, bringing the count to 10,000
+- **Given** `voice_cache` contains 10,005 entries
+- **When** a new entry is cached via `synthesizeWithCache`
+- **Then** the 6 oldest entries are deleted (bringing count to 10,000)
 
-### Scenario: Voice transcription
+### Scenario: Oversized audio rejected
 
-- **Given** a valid OGG audio buffer under 25 MB
-- **When** `transcribe({ audio, format: 'ogg' })` is called
-- **Then** OpenAI Whisper API is called and the transcribed text is returned
+- **Given** a 30 MB audio buffer
+- **When** `transcribe({ audio })` is called
+- **Then** an error is thrown: `"Audio file too large (30 MB). Maximum is 25 MB."`
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| No `OPENAI_API_KEY` (TTS) | Throws `"OPENAI_API_KEY is required for text-to-speech"` |
-| No `OPENAI_API_KEY` (STT) | Throws `"OPENAI_API_KEY is required for speech-to-text"` |
-| TTS text > 4096 chars | Throws `"TTS text exceeds maximum length of 4096 characters"` |
-| TTS empty text | Throws `"TTS text must not be empty"` |
-| STT audio > 25 MB | Throws `"Audio file too large (X MB). Maximum is 25 MB."` |
-| OpenAI TTS API error | Throws `"Text-to-speech failed (status N)"` |
-| OpenAI Whisper API error | Throws `"Speech-to-text failed (status N)"` |
+| `OPENAI_API_KEY` not set (STT) | Throws `"OPENAI_API_KEY is required for speech-to-text"` |
+| `OPENAI_API_KEY` not set (TTS) | Throws `"OPENAI_API_KEY is required for text-to-speech"` |
+| Audio too large (>25 MB) | Throws with size in MB and 25 MB limit |
+| TTS text too long (>4096 chars) | Throws `"TTS text exceeds maximum length of 4096 characters"` |
+| TTS text empty/whitespace | Throws `"TTS text must not be empty"` |
+| Whisper API returns non-OK | Logs full error, throws `"Speech-to-text failed (status {code})"` |
+| TTS API returns non-OK | Logs full error, throws `"Text-to-speech failed (status {code})"` |
 
 ## Dependencies
 
@@ -98,7 +111,7 @@ Text-to-speech synthesis via OpenAI TTS API and speech-to-text transcription via
 
 | Module | What is used |
 |--------|-------------|
-| `server/telegram/bridge.ts` | `transcribe` (STT for voice notes), `synthesizeWithCache` (TTS for voice responses) |
+| `server/telegram/bridge.ts` | `transcribe` for voice note STT, `synthesizeWithCache` for voice responses |
 
 ## Database Tables
 
@@ -108,17 +121,17 @@ Text-to-speech synthesis via OpenAI TTS API and speech-to-text transcription via
 |--------|------|-------------|-------------|
 | id | TEXT | PRIMARY KEY | UUID |
 | text_hash | TEXT | NOT NULL | SHA-256 hex hash of the input text |
-| voice_preset | TEXT | NOT NULL | Voice preset used for synthesis |
+| voice_preset | TEXT | NOT NULL | Voice name (e.g. `alloy`, `nova`) |
 | audio_data | BLOB | NOT NULL | Cached MP3 audio bytes |
-| format | TEXT | NOT NULL | Audio format (always 'mp3') |
-| duration_ms | INTEGER | NOT NULL | Estimated audio duration |
-| created_at | TEXT | DEFAULT datetime('now') | Creation timestamp (used for LRU eviction) |
+| format | TEXT | NOT NULL | Audio format (always `mp3`) |
+| duration_ms | INTEGER | NOT NULL | Estimated duration in milliseconds |
+| created_at | TEXT | DEFAULT datetime('now') | Cache entry creation time (used for LRU eviction) |
 
 ## Configuration
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `OPENAI_API_KEY` | (required) | OpenAI API key for TTS and STT services |
+| `OPENAI_API_KEY` | (required) | OpenAI API key for Whisper and TTS endpoints |
 
 ## Change Log
 

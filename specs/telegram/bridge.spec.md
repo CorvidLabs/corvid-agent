@@ -5,8 +5,12 @@ status: active
 files:
   - server/telegram/bridge.ts
   - server/telegram/types.ts
-db_tables: []
+db_tables:
+  - sessions
+  - session_messages
 depends_on:
+  - specs/process/process-manager.spec.md
+  - specs/db/sessions.spec.md
   - specs/voice/voice.spec.md
 ---
 
@@ -14,7 +18,7 @@ depends_on:
 
 ## Purpose
 
-Bidirectional Telegram bridge that routes Telegram messages to agent sessions and sends responses back. Supports voice messages via STT (Whisper), voice responses via TTS, per-user sessions, user authorization, rate limiting, and message chunking for Telegram's 4096-character limit.
+Bidirectional Telegram bot bridge that routes Telegram messages to agent sessions and sends responses back. Supports text messages, voice notes (via OpenAI Whisper STT), voice responses (via OpenAI TTS), slash commands (`/start`, `/status`, `/new`), per-user rate limiting, and user authorization. Uses long-polling against the Telegram Bot API — no webhook server required.
 
 ## Public API
 
@@ -22,7 +26,7 @@ Bidirectional Telegram bridge that routes Telegram messages to agent sessions an
 
 | Class | Description |
 |-------|-------------|
-| `TelegramBridge` | Long-polling Telegram bot that routes messages to agent sessions |
+| `TelegramBridge` | Manages Telegram Bot API polling, message routing, and session lifecycle |
 
 #### TelegramBridge Constructor
 
@@ -36,17 +40,17 @@ Bidirectional Telegram bridge that routes Telegram messages to agent sessions an
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `start` | `()` | `void` | Begin long-polling for Telegram updates |
-| `stop` | `()` | `void` | Stop polling and clear timers |
-| `sendText` | `(chatId: number, text: string, replyTo?: number)` | `Promise<void>` | Send a text message, chunking at 4096 chars |
+| `start` | `()` | `void` | Begin long-polling loop; idempotent (no-op if already running) |
+| `stop` | `()` | `void` | Stop polling and clear the poll timer |
+| `sendText` | `(chatId: number, text: string, replyTo?: number)` | `Promise<void>` | Send a text message; auto-chunks at 4096 characters |
 
-### Exported Types
+### Exported Types (from types.ts)
 
 | Type | Description |
 |------|-------------|
 | `TelegramBridgeConfig` | `{ botToken: string; chatId: string; allowedUserIds: string[] }` |
 | `TelegramUpdate` | Telegram update object with optional `message` and `callback_query` |
-| `TelegramMessage` | Message with `from`, `chat`, `text`, `voice` fields |
+| `TelegramMessage` | Message with `from`, `chat`, optional `text`, optional `voice` |
 | `TelegramUser` | `{ id: number; is_bot: boolean; first_name: string; username?: string }` |
 | `TelegramChat` | `{ id: number; type: string }` |
 | `TelegramVoice` | `{ file_id: string; file_unique_id: string; duration: number; mime_type?: string; file_size?: number }` |
@@ -55,36 +59,53 @@ Bidirectional Telegram bridge that routes Telegram messages to agent sessions an
 
 ## Invariants
 
-1. **Long-polling with 30s timeout**: `getUpdates` uses `timeout: 30` for Telegram long-polling. Next poll is scheduled 500ms after the previous completes
-2. **User auth via allowedUserIds**: If `config.allowedUserIds` is non-empty, only users whose Telegram ID appears in the list may interact. Others receive "Unauthorized."
-3. **Per-user rate limit 10/60s**: Each user is limited to 10 messages per 60-second window. Exceeding the limit returns a rate-limit message
-4. **Voice STT via Whisper (10 MB limit)**: Voice messages are downloaded, transcribed via `transcribe()`, and the transcription is echoed back before routing to the agent. Files over 10 MB are rejected
-5. **4096-character chunking**: Outbound messages are split into 4096-character chunks to respect Telegram's message size limit
-6. **Per-user sessions**: Each Telegram user maps to one active agent session. Sessions are reused across messages and cleared with `/new`
-7. **Response debounce 1500ms**: Agent responses are buffered and flushed after 1500ms of inactivity (or on session result), preventing message spam during streaming
-8. **Voice responses when enabled**: If the agent has `voiceEnabled` and `OPENAI_API_KEY` is set, responses are sent as Telegram voice notes (via `synthesizeWithCache`) in addition to text
-9. **Bot commands**: `/start` sends welcome, `/status` shows current session, `/new` clears session
-10. **Session lifecycle**: If a session is stopped/errored, it is discarded and a new one is created on the next message. If `sendMessage` fails (process not running), the session is restarted
+1. **Long-polling loop**: Uses `getUpdates` with a 30-second timeout. After processing all updates in a batch, the next poll starts after a 500ms delay. The loop stops when `running` is set to false
+2. **Offset tracking**: After processing each update, the offset is set to `update_id + 1` to prevent reprocessing
+3. **User authorization**: If `config.allowedUserIds` is non-empty, only those user IDs can interact. Unauthorized users receive `"Unauthorized."` reply
+4. **Per-user rate limiting**: Each user is limited to 10 messages per 60-second sliding window. Rate-limited users receive an explicit message
+5. **Voice note transcription**: Voice messages are downloaded via `getFile` + file download, then transcribed using `transcribe()` from `server/voice/stt.ts`. The transcription is echoed back to the user with a microphone emoji before being routed to the agent
+6. **Voice file size cap**: Voice messages larger than 10 MB are rejected with an error message before download
+7. **Session-per-user mapping**: Each Telegram user ID maps to at most one active session. The mapping is stored in-memory (`userSessions` Map)
+8. **Session reuse**: If a user's existing session is still active (not stopped/error), new messages are sent to it. If the session is stopped/error, a new session is created
+9. **Session restart on send failure**: If `processManager.sendMessage` returns false (process not running), the session is restarted with `startProcess`
+10. **Response debouncing**: Session events are buffered for 1500ms before being sent to Telegram, to coalesce streamed output into a single message
+11. **Voice responses**: If the agent has `voiceEnabled` and `OPENAI_API_KEY` is set, responses are sent as voice notes via `synthesizeWithCache`, with text sent alongside for accessibility. Falls back to text-only on voice synthesis failure
+12. **Message chunking**: Telegram has a 4096-character limit per message. Long responses are split into chunks at that boundary
+13. **Agent selection**: When creating a new session, the bridge uses the first agent from `listAgents`. If the agent has a `defaultProjectId`, that project is used; otherwise the first project from `listProjects`
+14. **Slash commands**: `/start` sends a welcome message, `/status` reports the current session ID, `/new` clears the user's session mapping
+15. **Idempotent start**: Calling `start()` when already running is a no-op
 
 ## Behavioral Examples
 
-### Scenario: New user sends first message
+### Scenario: First message from authorized user
 
-- **Given** a Telegram user with no active session
-- **When** the user sends "Hello"
-- **Then** a new agent session is created, the message is sent as the initial prompt, and the bridge subscribes for responses
+- **Given** a running Telegram bridge with an agent and project configured
+- **When** user 12345 (in `allowedUserIds`) sends "Hello"
+- **Then** a new session is created with source `telegram`, the process is started with the message, and a subscription is registered to forward responses back to the Telegram chat
 
-### Scenario: Voice message transcription
+### Scenario: Voice note transcription
 
-- **Given** a Telegram user sends a voice note (3 MB OGG)
-- **When** the bridge processes the message
-- **Then** the voice file is downloaded, transcribed via Whisper, the transcription is echoed back, and the text is routed to the agent session
+- **Given** a running Telegram bridge
+- **When** user sends a voice note (OGG, 2 MB)
+- **Then** the file is downloaded via `getFile` API, transcribed via Whisper, the transcription is echoed back as `🎤 _text_`, and the transcribed text is routed to the agent
+
+### Scenario: Voice note too large
+
+- **Given** a running Telegram bridge
+- **When** user sends a voice note with `file_size` > 10 MB
+- **Then** the bridge replies `"Voice message too large (max 10 MB)."` and does not attempt download
 
 ### Scenario: Rate limit exceeded
 
-- **Given** a Telegram user has sent 10 messages in the last 60 seconds
-- **When** the user sends an 11th message
-- **Then** the bridge replies "Rate limit exceeded. Please wait before sending more messages."
+- **Given** user 12345 has sent 10 messages in the last 60 seconds
+- **When** the 11th message arrives
+- **Then** the bridge replies with a rate limit message and does not route to the agent
+
+### Scenario: Session expired, new one created
+
+- **Given** user 12345 has an existing session that is in `stopped` status
+- **When** user sends a new message
+- **Then** the old session mapping is cleared and a new session is created
 
 ### Scenario: Unauthorized user
 
@@ -102,13 +123,16 @@ Bidirectional Telegram bridge that routes Telegram messages to agent sessions an
 
 | Condition | Behavior |
 |-----------|----------|
-| Unauthorized user | Replies "Unauthorized." |
-| Rate limit exceeded | Replies "Rate limit exceeded. Please wait before sending more messages." |
-| Voice file > 10 MB | Replies "Voice message too large (max 10 MB)." |
-| STT transcription fails | Replies "Failed to transcribe voice message. Is OPENAI_API_KEY set?" |
-| No agents configured | Replies "No agents configured. Create an agent first." |
-| No projects configured | Replies "No projects configured." |
-| Telegram API error | Throws `"Telegram API error ({method}): status {N}"` (logged, not sent to user) |
+| Unauthorized user | Replies `"Unauthorized."` |
+| Rate limit exceeded | Replies with rate limit message |
+| Voice file too large (>10 MB) | Replies `"Voice message too large (max 10 MB)."` |
+| STT transcription fails | Replies `"Failed to transcribe voice message. Is OPENAI_API_KEY set?"` |
+| No agents configured | Replies `"No agents configured. Create an agent first."` |
+| No projects configured | Replies `"No projects configured."` |
+| Session expired and send fails | Replies `"Session expired. Send another message to start a new one."` |
+| Telegram API call fails | Logs error, throws with `"Telegram API error ({method}): status {code}"` |
+| Poll error | Logs error, continues polling on next cycle |
+| Voice synthesis fails | Falls back to text message |
 
 ## Dependencies
 
@@ -116,28 +140,28 @@ Bidirectional Telegram bridge that routes Telegram messages to agent sessions an
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `ProcessManager` (startProcess, sendMessage, subscribe) |
-| `server/voice/stt.ts` | `transcribe` |
-| `server/voice/tts.ts` | `synthesizeWithCache` |
+| `server/process/manager.ts` | `ProcessManager` — startProcess, sendMessage, subscribe |
 | `server/db/agents.ts` | `getAgent`, `listAgents` |
 | `server/db/sessions.ts` | `createSession`, `getSession` |
 | `server/db/projects.ts` | `listProjects` |
+| `server/voice/stt.ts` | `transcribe` for voice note transcription |
+| `server/voice/tts.ts` | `synthesizeWithCache` for voice responses |
 | `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
-| `server/index.ts` | `TelegramBridge` (initialized when `TELEGRAM_BOT_TOKEN` is set) |
+| `server/index.ts` | Lifecycle: construction, `start()`, `stop()` |
 
 ## Configuration
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | (required) | Telegram Bot API token |
-| `TELEGRAM_CHAT_ID` | (required) | Target chat ID |
-| `TELEGRAM_ALLOWED_USERS` | `""` | Comma-separated Telegram user IDs allowed to interact |
-| `OPENAI_API_KEY` | (optional) | Required for voice notes (STT/TTS) |
+| `TELEGRAM_CHAT_ID` | (required) | Default chat ID for the bridge |
+| `TELEGRAM_ALLOWED_USERS` | `""` | Comma-separated list of allowed Telegram user IDs; empty = allow all |
+| `OPENAI_API_KEY` | (optional) | Required for STT transcription and TTS voice responses |
 
 ## Change Log
 

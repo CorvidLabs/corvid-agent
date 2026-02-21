@@ -12,7 +12,7 @@ depends_on: []
 
 ## Purpose
 
-Per-IP HTTP rate limiting using a sliding-window algorithm. Maintains separate read and mutation request buckets per IP address, returns 429 responses with `Retry-After` headers when limits are exceeded, and periodically sweeps stale entries to bound memory usage.
+Sliding-window per-IP HTTP rate limiter. Separates traffic into two buckets — read (GET/HEAD/OPTIONS) and mutation (POST/PUT/DELETE) — each with independent limits. Returns 429 with Retry-After header when a client exceeds the configured threshold within the 1-minute window. Runs in-memory with periodic sweeping to prevent unbounded growth.
 
 ## Public API
 
@@ -20,8 +20,8 @@ Per-IP HTTP rate limiting using a sliding-window algorithm. Maintains separate r
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `loadRateLimitConfig` | `()` | `RateLimitConfig` | Reads `RATE_LIMIT_GET` and `RATE_LIMIT_MUTATION` from env |
-| `checkRateLimit` | `(req: Request, url: URL, limiter: RateLimiter)` | `Response \| null` | Returns null if allowed, or a 429 Response |
+| `loadRateLimitConfig` | `()` | `RateLimitConfig` | Reads `RATE_LIMIT_GET` and `RATE_LIMIT_MUTATION` from env; falls back to defaults |
+| `checkRateLimit` | `(req: Request, url: URL, limiter: RateLimiter)` | `Response \| null` | Top-level check — exempts specific paths, extracts client IP, delegates to `RateLimiter.check` |
 
 ### Exported Types
 
@@ -33,60 +33,76 @@ Per-IP HTTP rate limiting using a sliding-window algorithm. Maintains separate r
 
 | Class | Description |
 |-------|-------------|
-| `RateLimiter` | Per-IP sliding-window rate limiter with separate read/mutation buckets |
+| `RateLimiter` | Per-IP sliding-window rate limiter with two independent buckets per IP |
+
+#### RateLimiter Constructor
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `config` | `RateLimitConfig` | Rate limit thresholds and window size |
 
 #### RateLimiter Methods
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `check` | `(ip: string, method: string)` | `Response \| null` | Check if request is allowed; returns 429 if rate-limited |
-| `stop` | `()` | `void` | Stop the periodic sweep timer |
-| `reset` | `()` | `void` | Clear all tracked clients (for testing) |
+| `check` | `(ip: string, method: string)` | `Response \| null` | Returns null if allowed, or a 429 Response if rate-limited |
+| `stop` | `()` | `void` | Stops the periodic sweep timer |
+| `reset` | `()` | `void` | Clears all tracked clients (for testing) |
 
 ## Invariants
 
-1. **Separate read/mutation buckets**: GET/HEAD/OPTIONS requests count against the `read` bucket; POST/PUT/DELETE count against the `mutation` bucket. Each bucket is independently rate-limited per IP
-2. **Sliding window (1 minute)**: The window is fixed at 60,000ms. Expired timestamps are pruned on each `check()` call
-3. **Exempt paths**: `/api/health` and `/webhooks/github` bypass rate limiting entirely
-4. **WebSocket exempt**: Requests to `/ws` bypass rate limiting
-5. **5-minute sweep timer**: A periodic sweep runs every 5 minutes to remove IP entries with no activity within the window. The timer is `unref`'d so it does not keep the process alive
-6. **429 with Retry-After**: When a limit is exceeded, a JSON response with status 429 is returned, including a `Retry-After` header (in seconds, minimum 1)
-7. **IP from X-Forwarded-For**: Client IP is extracted from `X-Forwarded-For` (first IP), then `X-Real-IP`, falling back to `'unknown'`
-8. **Default limits**: Read defaults to 600/min, mutation defaults to 60/min. Invalid or non-positive env values fall back to 240 (read) and 60 (mutation)
+1. **Two independent buckets**: Each IP has a separate `read` bucket (GET/HEAD/OPTIONS) and `mutation` bucket (POST/PUT/DELETE). Exhausting one does not affect the other
+2. **Sliding window**: Timestamps older than `windowMs` (60 seconds) are pruned on every `check` call. The window slides forward continuously — it is not a fixed-interval reset
+3. **Retry-After accuracy**: The 429 response includes a `Retry-After` header (seconds) computed from the oldest timestamp still in the window. Minimum value is 1 second
+4. **Exempt paths**: `/api/health` and `/webhooks/github` bypass rate limiting entirely (monitoring probes and webhook callbacks must never be throttled)
+5. **WebSocket upgrade exempt**: Requests to `/ws` are not rate-limited (they are one-time upgrades, not repeated HTTP requests)
+6. **IP extraction order**: Client IP is resolved from `X-Forwarded-For` (first entry) → `X-Real-IP` → `'unknown'`
+7. **Periodic sweep**: A background timer runs every 5 minutes and removes IP entries with no timestamps in the current window, bounding memory to O(active IPs)
+8. **Sweep timer unref**: The sweep interval is `unref`'d so it does not prevent process exit
+9. **Config validation**: Parsed env values that are non-positive or non-finite fall back to defaults (240 for GET, 60 for mutation)
+10. **Default limits**: Read defaults to 600/min, mutation defaults to 60/min
 
 ## Behavioral Examples
 
 ### Scenario: Normal request within limits
 
-- **Given** a RateLimiter with default config (600 GET/min)
-- **When** IP `1.2.3.4` sends a GET request
-- **Then** `check` returns null (allowed) and records the timestamp
+- **Given** a RateLimiter with `maxMutation = 60`
+- **When** a POST request from IP `1.2.3.4` is checked for the first time
+- **Then** `check` returns null (allowed), the timestamp is recorded
 
-### Scenario: Rate limit exceeded
+### Scenario: Mutation limit exceeded
 
-- **Given** a RateLimiter with `maxMutation=2`
-- **When** IP `1.2.3.4` sends 3 POST requests within 1 minute
-- **Then** the 3rd request returns a 429 Response with `Retry-After` header
+- **Given** IP `1.2.3.4` has made 60 POST requests within the last 60 seconds
+- **When** the 61st POST request is checked
+- **Then** `check` returns a 429 Response with `Retry-After` header and JSON body `{ "error": "Too many requests", "retryAfter": N }`
 
-### Scenario: Exempt path bypasses limit
+### Scenario: Read limit does not affect mutations
 
-- **Given** a fully exhausted rate limit for IP `1.2.3.4`
-- **When** a GET to `/api/health` arrives from that IP
-- **Then** `checkRateLimit` returns null (allowed)
+- **Given** IP `1.2.3.4` has exhausted the GET limit (600 requests)
+- **When** a POST request from the same IP is checked
+- **Then** `check` returns null because the mutation bucket is independent
 
-### Scenario: Sweep clears stale entries
+### Scenario: Health endpoint always passes
 
-- **Given** IP `1.2.3.4` last sent a request 2 minutes ago
-- **When** the 5-minute sweep runs
-- **Then** the entry for `1.2.3.4` is removed from the client map
+- **Given** IP `1.2.3.4` has exceeded all rate limits
+- **When** a GET request to `/api/health` is checked via `checkRateLimit`
+- **Then** `checkRateLimit` returns null (exempt path)
+
+### Scenario: Sweep removes stale entries
+
+- **Given** IP `1.2.3.4` made requests 6 minutes ago but none since
+- **When** the sweep timer fires
+- **Then** the IP entry is removed from the client map
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| Rate limit exceeded | 429 response with JSON `{ error, retryAfter }` and `Retry-After` header |
-| Invalid `RATE_LIMIT_GET` env var | Falls back to 240 |
-| Invalid `RATE_LIMIT_MUTATION` env var | Falls back to 60 |
+| Rate limit exceeded (read) | 429 response with JSON body and `Retry-After` header |
+| Rate limit exceeded (mutation) | 429 response with JSON body and `Retry-After` header |
+| `RATE_LIMIT_GET` set to non-numeric or <= 0 | Falls back to 240 |
+| `RATE_LIMIT_MUTATION` set to non-numeric or <= 0 | Falls back to 60 |
+| No `X-Forwarded-For` or `X-Real-IP` header | IP resolves to `'unknown'` — all such requests share one bucket |
 
 ## Dependencies
 
@@ -100,7 +116,7 @@ Per-IP HTTP rate limiting using a sliding-window algorithm. Maintains separate r
 
 | Module | What is used |
 |--------|-------------|
-| `server/index.ts` | `loadRateLimitConfig`, `RateLimiter`, `checkRateLimit` |
+| `server/routes/index.ts` | `RateLimiter`, `loadRateLimitConfig`, `checkRateLimit` — instantiated at module level, called before auth/routing |
 
 ## Configuration
 
