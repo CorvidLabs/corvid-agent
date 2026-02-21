@@ -233,19 +233,7 @@ export class MentionPollingService {
                 }
             }
 
-            // Ensure ALL new mention IDs are recorded in processedIds, not just
-            // the ones that were successfully processed. Mentions eliminated by
-            // dedup (multiple IDs for the same issue) or skipped by processMention()
-            // (rate limit, existing session, etc.) must still be marked as seen.
-            // Otherwise lastSeenId advances past them and they're permanently lost.
-            const alreadyTracked = new Set(config.processedIds);
-            const missingIds = newMentions.map(m => m.id).filter(id => !alreadyTracked.has(id));
-            if (missingIds.length > 0) {
-                config.processedIds = [...config.processedIds, ...missingIds];
-                updateProcessedIds(this.db, config.id, config.processedIds);
-            }
-
-            // Also update lastSeenId to the newest for backward compat
+            // Update lastSeenId for backward compat (processedIds is the real filter)
             const newestId = mentions[0].id; // mentions are sorted newest-first
             updatePollState(this.db, config.id, newestId);
 
@@ -718,16 +706,15 @@ export class MentionPollingService {
         // Resolve the actual owner/repo from the mention URL
         const fullRepo = this.resolveFullRepo(config.repo, mention.htmlUrl);
 
-        // Guard: skip if there's a currently running/idle session for the same issue.
-        // Only block on active sessions — completed sessions should NOT prevent new
-        // mentions from triggering, since follow-up comments are legitimate new work.
+        // Guard: skip only if there's a currently *running* session for the same issue.
+        // Idle sessions have finished — follow-up comments are legitimate new work.
         // Dedup of the *same* comment is handled by processedIds, not this guard.
         const sessionPrefix = `Poll: ${fullRepo} #${mention.number}:`;
         const existing = this.db.query(
-            `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle')`
+            `SELECT id FROM sessions WHERE name LIKE ? AND status = 'running'`
         ).get(sessionPrefix + '%') as { id: string } | null;
         if (existing) {
-            log.debug('Active session already exists for issue', { number: mention.number, existingId: existing.id });
+            log.debug('Running session already exists for issue', { number: mention.number, existingId: existing.id });
             return false;
         }
 
