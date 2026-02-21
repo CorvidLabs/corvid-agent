@@ -7,6 +7,8 @@ import { getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
 import { WorkTaskService } from '../work/service';
 import type { ProcessManager } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
+import type { AstParserService } from '../ast/service';
+import type { AstSymbol, ProjectSymbolIndex, FileSymbolIndex } from '../ast/types';
 
 /**
  * Tests for WorkTaskService.
@@ -25,6 +27,134 @@ let mockProcessManager: ProcessManager;
 let spawnCalls: Array<{ cmd: string[]; cwd?: string }>;
 let spawnResults: Array<{ exitCode: number; stdout: string; stderr: string }>;
 let subscribeCallbacks: Map<string, Set<(sid: string, event: ClaudeStreamEvent) => void>>;
+
+/**
+ * Create a mock AstParserService with configurable symbol data.
+ */
+function createMockAstParserService(opts?: {
+    files?: Map<string, FileSymbolIndex>;
+}): AstParserService {
+    const files = opts?.files ?? new Map<string, FileSymbolIndex>();
+    const projectIndexes = new Map<string, ProjectSymbolIndex>();
+
+    return {
+        init: mock(async () => {}),
+        parseFile: mock(async () => null),
+        parseSource: mock(async () => []),
+        indexProject: mock(async (projectDir: string) => {
+            const index: ProjectSymbolIndex = {
+                projectDir,
+                files,
+                lastFullIndexAt: Date.now(),
+            };
+            projectIndexes.set(projectDir, index);
+            return index;
+        }),
+        getProjectIndex: mock((projectDir: string) => {
+            return projectIndexes.get(projectDir) ?? null;
+        }),
+        searchSymbols: mock((projectDir: string, query: string, options?: { kinds?: string[]; limit?: number }) => {
+            const index = projectIndexes.get(projectDir);
+            if (!index) return [];
+            const lowerQuery = query.toLowerCase();
+            const results: AstSymbol[] = [];
+            const limit = options?.limit ?? 100;
+
+            for (const fileIndex of index.files.values()) {
+                for (const symbol of fileIndex.symbols) {
+                    if (results.length >= limit) return results;
+                    if (symbol.name.toLowerCase().includes(lowerQuery)) {
+                        results.push(symbol);
+                    }
+                    if (symbol.children) {
+                        for (const child of symbol.children) {
+                            if (results.length >= limit) return results;
+                            if (child.name.toLowerCase().includes(lowerQuery)) {
+                                results.push(child);
+                            }
+                        }
+                    }
+                }
+            }
+            return results;
+        }),
+        invalidateFile: mock(() => {}),
+        clearProjectIndex: mock(() => {}),
+    } as unknown as AstParserService;
+}
+
+/**
+ * Build sample file symbol indexes for testing.
+ */
+function buildSampleSymbolIndex(projectDir: string): Map<string, FileSymbolIndex> {
+    const files = new Map<string, FileSymbolIndex>();
+
+    files.set(`${projectDir}/server/work/service.ts`, {
+        filePath: `${projectDir}/server/work/service.ts`,
+        mtimeMs: 1000,
+        symbols: [
+            {
+                name: 'WorkTaskService',
+                kind: 'class',
+                startLine: 30,
+                endLine: 200,
+                isExported: true,
+                children: [
+                    { name: 'create', kind: 'method', startLine: 68, endLine: 150, isExported: false },
+                    { name: 'cancelTask', kind: 'method', startLine: 155, endLine: 175, isExported: false },
+                    { name: 'buildWorkPrompt', kind: 'method', startLine: 180, endLine: 200, isExported: false },
+                ],
+            },
+        ],
+    });
+
+    files.set(`${projectDir}/server/ast/service.ts`, {
+        filePath: `${projectDir}/server/ast/service.ts`,
+        mtimeMs: 1000,
+        symbols: [
+            {
+                name: 'AstParserService',
+                kind: 'class',
+                startLine: 25,
+                endLine: 250,
+                isExported: true,
+                children: [
+                    { name: 'indexProject', kind: 'method', startLine: 103, endLine: 163, isExported: false },
+                    { name: 'searchSymbols', kind: 'method', startLine: 175, endLine: 204, isExported: false },
+                ],
+            },
+        ],
+    });
+
+    files.set(`${projectDir}/server/ast/types.ts`, {
+        filePath: `${projectDir}/server/ast/types.ts`,
+        mtimeMs: 1000,
+        symbols: [
+            { name: 'AstSymbolKind', kind: 'type_alias', startLine: 1, endLine: 10, isExported: true },
+            { name: 'AstSymbol', kind: 'interface', startLine: 12, endLine: 23, isExported: true },
+            { name: 'FileSymbolIndex', kind: 'interface', startLine: 25, endLine: 29, isExported: true },
+        ],
+    });
+
+    files.set(`${projectDir}/src/utils/helpers.ts`, {
+        filePath: `${projectDir}/src/utils/helpers.ts`,
+        mtimeMs: 1000,
+        symbols: [
+            { name: 'formatOutput', kind: 'function', startLine: 5, endLine: 15, isExported: true },
+            { name: 'parseInput', kind: 'function', startLine: 17, endLine: 30, isExported: true },
+        ],
+    });
+
+    files.set(`${projectDir}/server/__tests__/work-task-service.test.ts`, {
+        filePath: `${projectDir}/server/__tests__/work-task-service.test.ts`,
+        mtimeMs: 1000,
+        symbols: [
+            { name: 'createMockProcessManager', kind: 'function', startLine: 60, endLine: 85, isExported: false },
+        ],
+    });
+
+    return files;
+}
 
 /**
  * Build a mock Bun.spawn result that mimics the real API.
@@ -1012,5 +1142,315 @@ describe('Git worktree creation failure', () => {
 
         expect(task.status).toBe('failed');
         expect(task.error).toContain('Failed to create worktree');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 9. AST symbol context integration
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('generateRepoMap with AstParserService', () => {
+    test('returns properly formatted repo map with line ranges when AstParserService is provided', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        // Create service with AST parser
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2); // worktree add + install
+
+        const task = await astService.create({
+            agentId: agent.id,
+            description: 'Test repo map generation',
+            projectId: project.id,
+        });
+
+        // The task should be running — the prompt was built with a repo map
+        expect(task.status).toBe('running');
+
+        // Verify indexProject was called
+        expect((mockAst.indexProject as ReturnType<typeof mock>).mock.calls.length).toBe(1);
+
+        // Verify startProcess was called and the prompt contains repo map sections
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        expect(startCalls.length).toBeGreaterThanOrEqual(1);
+        const prompt = startCalls[0][1] as string;
+        expect(prompt).toContain('Repository Map');
+        expect(prompt).toContain('line ranges');
+        // Verify line ranges are included in the format [start-end]
+        expect(prompt).toMatch(/\[\d+-\d+\]/);
+    });
+
+    test('returns null when AstParserService is null', async () => {
+        // Default service has no AST parser
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Test without AST',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('running');
+
+        // Verify the prompt does NOT contain a repo map section
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+        expect(prompt).not.toContain('Repository Map');
+    });
+
+    test('repo map groups files by directory', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        await astService.create({
+            agentId: agent.id,
+            description: 'Test directory grouping',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        // Should have directory headers
+        expect(prompt).toContain('server/work/');
+        expect(prompt).toContain('server/ast/');
+    });
+
+    test('repo map prioritizes src/ and server/ over test files', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        await astService.create({
+            agentId: agent.id,
+            description: 'Test priority ordering',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        // src/ and server/ should appear before __tests__
+        const srcIndex = prompt.indexOf('src/');
+        const serverIndex = prompt.indexOf('server/work/');
+        const testsIndex = prompt.indexOf('__tests__');
+
+        // If test files are excluded by having no exported symbols, that's fine too
+        if (testsIndex >= 0) {
+            expect(srcIndex).toBeLessThan(testsIndex);
+            expect(serverIndex).toBeLessThan(testsIndex);
+        }
+    });
+
+    test('repo map includes class method line ranges', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        await astService.create({
+            agentId: agent.id,
+            description: 'Test method line ranges',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        // Should include class with method line ranges
+        expect(prompt).toContain('WorkTaskService');
+        expect(prompt).toContain('create');
+    });
+});
+
+describe('extractRelevantSymbols', () => {
+    test('finds symbols matching task description keywords', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        // Description mentions "WorkTask" and "AstParser" — should find matching symbols
+        await astService.create({
+            agentId: agent.id,
+            description: 'Integrate AstParserService into WorkTaskService for symbol indexing',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        // Should have a relevant symbols section
+        expect(prompt).toContain('Relevant Symbols');
+        expect(prompt).toContain('corvid_code_symbols');
+        expect(prompt).toContain('corvid_find_references');
+    });
+
+    test('returns null when no symbols match task keywords', async () => {
+        const projectDir = '/tmp/test-project';
+        // Create an index with symbols that won't match
+        const files = new Map<string, FileSymbolIndex>();
+        files.set(`${projectDir}/src/main.ts`, {
+            filePath: `${projectDir}/src/main.ts`,
+            mtimeMs: 1000,
+            symbols: [
+                { name: 'bootstrap', kind: 'function', startLine: 1, endLine: 10, isExported: true },
+            ],
+        });
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        // Description with no matching keywords
+        await astService.create({
+            agentId: agent.id,
+            description: 'Fix the zygomorphic transmogrification pipeline',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        // Should NOT have a relevant symbols section since no matches
+        expect(prompt).not.toContain('Relevant Symbols');
+    });
+
+    test('returns null when AstParserService is null', async () => {
+        // Default service (no AST parser) should not include relevant symbols
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        await service.create({
+            agentId: agent.id,
+            description: 'WorkTaskService AstParser integration',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+        expect(prompt).not.toContain('Relevant Symbols');
+    });
+});
+
+describe('buildWorkPrompt with repo map and relevant symbols', () => {
+    test('includes repo map section when repo map is provided', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        await astService.create({
+            agentId: agent.id,
+            description: 'Test prompt includes repo map',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        expect(prompt).toContain('## Repository Map');
+        expect(prompt).toContain('## Task');
+        expect(prompt).toContain('## Instructions');
+        expect(prompt).toContain('Test prompt includes repo map');
+    });
+
+    test('includes both repo map and relevant symbols when both are available', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        await astService.create({
+            agentId: agent.id,
+            description: 'Enhance WorkTaskService with AstParserService integration',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        expect(prompt).toContain('## Repository Map');
+        expect(prompt).toContain('## Relevant Symbols');
+        // Relevant Symbols should come after Repository Map
+        const repoMapIdx = prompt.indexOf('## Repository Map');
+        const relevantSymbolsIdx = prompt.indexOf('## Relevant Symbols');
+        expect(relevantSymbolsIdx).toBeGreaterThan(repoMapIdx);
+    });
+
+    test('prompt includes tool guidance when relevant symbols are present', async () => {
+        const projectDir = '/tmp/test-project';
+        const files = buildSampleSymbolIndex(projectDir);
+        const mockAst = createMockAstParserService({ files });
+
+        const astService = new WorkTaskService(db, mockProcessManager, mockAst);
+        const { agent, project } = createTestAgentAndProject({ projectWorkingDir: projectDir });
+
+        queueSuccessfulSpawns(2);
+
+        await astService.create({
+            agentId: agent.id,
+            description: 'Integrate AstParserService symbol search into work tasks',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        expect(prompt).toContain('corvid_code_symbols');
+        expect(prompt).toContain('corvid_find_references');
+    });
+
+    test('prompt excludes both sections when no AST parser is available', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        await service.create({
+            agentId: agent.id,
+            description: 'Simple task without AST',
+            projectId: project.id,
+        });
+
+        const startCalls = (mockProcessManager.startProcess as ReturnType<typeof mock>).mock.calls;
+        const prompt = startCalls[0][1] as string;
+
+        expect(prompt).not.toContain('## Repository Map');
+        expect(prompt).not.toContain('## Relevant Symbols');
+        // Should still have the basic structure
+        expect(prompt).toContain('## Task');
+        expect(prompt).toContain('## Instructions');
     });
 });
