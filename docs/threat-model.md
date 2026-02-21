@@ -76,6 +76,24 @@ corvid-agent is an agent orchestration platform that manages AI agent sessions, 
 - **Mitigations**: Per-tenant session limits, credit-based usage caps, container resource limits
 - **Residual Risk**: SQLite write contention under high load
 
+### AS-11: Mention Polling
+- **Threat**: GitHub API token exposure, rate limit exhaustion, spoofed mentions triggering unwanted agent actions
+- **Current**: GH_TOKEN stored in env var, per-config poll intervals with deduplication, allowed-user filtering
+- **Mitigations**: Configurable `allowedUsers` filter, processed-ID tracking prevents replay, per-config rate limiting
+- **Residual Risk**: Token with broad repo access could be abused if leaked; no per-repo token scoping
+
+### AS-12: Cloud Model Routing
+- **Threat**: Credential forwarding to remote Ollama instances, model impersonation
+- **Current**: `-cloud` suffix routes requests to configured remote host with auth proxy
+- **Mitigations**: Remote host configured via env var (not user-controlled), auth token scoped to Ollama API
+- **Residual Risk**: Plaintext credential forwarding if remote host is non-TLS; no certificate pinning
+
+### AS-13: Marketplace Federation
+- **Threat**: Trust boundary violation with external agent services, malicious listing injection
+- **Current**: Federation sync with remote instances, listing validation
+- **Mitigations**: Credit-based access control, reputation scoring, admin-only federation registration
+- **Residual Risk**: Federated instances could serve malicious agent cards or manipulate listing metadata
+
 ## STRIDE Analysis
 
 | Threat | Category | Severity | Mitigation Status |
@@ -87,6 +105,9 @@ corvid-agent is an agent orchestration platform that manages AI agent sessions, 
 | Cross-tenant queries | Information Disclosure | High | Row-level filtering |
 | Resource exhaustion | Denial of Service | Medium | Rate limits, container limits |
 | Plugin privilege escalation | Elevation of Privilege | High | Capability model, admin-only loading |
+| Mention polling token leak | Information Disclosure | High | Env var storage, allowed-user filter |
+| Cloud model credential forwarding | Information Disclosure | Medium | Env-configured host, auth proxy |
+| Federated listing injection | Tampering | Medium | Admin-only registration, reputation checks |
 
 ## Recommendations for v1.0
 

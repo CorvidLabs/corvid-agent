@@ -10,10 +10,17 @@ All notable changes to this project will be documented in this file.
 - Expanded model family detection — qwen3, qwen3moe, deepseek2, command-r, nemotron, hermes, firefunction added to `inferFromName`
 - Cloud model test suite — 32 tests covering `parseModelSizeB`, `isCloudModel`, `hostForModel` routing, and size gating
 - Model capability name inference for 12 families (up from 5)
+- AST code navigation tools: `corvid_code_symbols` and `corvid_find_references` for cross-file symbol analysis (#183)
+- AST-powered work task repo maps for smarter context in agent sessions (#184)
+- WebSocket authentication improvements (#184)
+- `spec:check` and PR review job added to CI pipeline (#185)
+- SDD-driven reliability improvements for Ollama and Claude providers (#186)
+- Testable tool parser with structured extraction and retry logic for Ollama (#183, #186)
 
 ### Fixed
 - save_memory tool returning confusing "on-chain send failed" messages that caused model retry loops (#181)
 - Model family detection ordering — specific families like qwen3moe matched before generic qwen
+- Ollama tool call reliability — smarter context management and retry logic (#186)
 
 ### Changed
 - confidence-review.html updated to reflect v0.8.0→v0.9.0 state (95/100 score)
@@ -54,7 +61,7 @@ Major release with 1757 server tests, 47 database migrations, and full-stack age
 - **No breaking changes**: All new DB columns have DEFAULT values; all features opt-in via env vars
 - **No new npm dependencies**: Discord gateway uses raw WebSocket; TTS/STT are direct API calls
 
-## [0.8.0] - 2025-12-15
+## [0.7.0] - 2025-12-15
 
 - Graph-based workflow orchestration with suspend/resume
 - OpenTelemetry tracing, Prometheus metrics, and immutable audit logging
