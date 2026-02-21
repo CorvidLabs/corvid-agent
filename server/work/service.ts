@@ -676,7 +676,7 @@ Important: You MUST create a PR when finished. The PR URL will be captured to re
             // Collect file entries with relative paths
             const fileEntries: Array<{ relPath: string; fileIndex: FileSymbolIndex }> = [];
             for (const [filePath, fileIndex] of index.files.entries()) {
-                const relPath = relative(projectDir, filePath);
+                const relPath = relative(projectDir, filePath).replaceAll('\\', '/');
                 const exported = fileIndex.symbols.filter(
                     (s: AstSymbol) => s.isExported && RELEVANT_KINDS.has(s.kind),
                 );
@@ -815,10 +815,11 @@ Important: You MUST create a PR when finished. The PR URL will be captured to re
         const symbolToFile = new Map<string, string>();
         for (const [filePath, fileIndex] of index.files.entries()) {
             for (const sym of fileIndex.symbols) {
-                symbolToFile.set(`${sym.name}:${sym.startLine}`, relative(projectDir, filePath));
+                const relFile = relative(projectDir, filePath).replaceAll('\\', '/');
+                symbolToFile.set(`${sym.name}:${sym.startLine}`, relFile);
                 if (sym.children) {
                     for (const child of sym.children) {
-                        symbolToFile.set(`${child.name}:${child.startLine}`, relative(projectDir, filePath));
+                        symbolToFile.set(`${child.name}:${child.startLine}`, relFile);
                     }
                 }
             }
