@@ -269,6 +269,28 @@ export function updateConversationAgent(db: Database, id: string, agentId: strin
 }
 
 /**
+ * List sessions triggered by a polling config using the session name pattern.
+ * Sessions are named `Poll: {owner/repo} #N: title`.
+ * For org-level configs (no '/'), matches `Poll: {org}/% #%` to capture all repos under the org.
+ * Also matches legacy short-name format `Poll: {shortName} #%` for backwards compatibility.
+ */
+export function listPollingActivity(db: Database, repo: string, limit = 25): Session[] {
+    if (repo.includes('/')) {
+        const shortName = repo.split('/')[1];
+        // Match new full-repo format OR legacy short-name format
+        const rows = db.query(
+            `SELECT * FROM sessions WHERE source = 'agent' AND (name LIKE ? OR name LIKE ?) ORDER BY created_at DESC LIMIT ?`
+        ).all(`Poll: ${repo} #%`, `Poll: ${shortName} #%`, limit) as SessionRow[];
+        return rows.map(rowToSession);
+    }
+    // Org-level: match `Poll: OrgName/anyrepo #N` for all repos under the org
+    const rows = db.query(
+        `SELECT * FROM sessions WHERE source = 'agent' AND name LIKE ? ORDER BY created_at DESC LIMIT ?`
+    ).all(`Poll: ${repo}/% #%`, limit) as SessionRow[];
+    return rows.map(rowToSession);
+}
+
+/**
  * Look up the participant wallet address for a session (via algochat_conversations).
  */
 export function getParticipantForSession(db: Database, sessionId: string): string | null {

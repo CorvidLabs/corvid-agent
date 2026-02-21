@@ -67,18 +67,17 @@ describe('Fallback chains', () => {
         const cloud = DEFAULT_FALLBACK_CHAINS['cloud'];
         expect(cloud).toBeDefined();
         expect(cloud.chain.length).toBeGreaterThan(0);
-        expect(cloud.chain[0].model).toBe('minimax-m2.5:cloud');
+        expect(cloud.chain[0].model).toBe('qwen3.5:cloud');
         // All entries should be ollama provider
         for (const entry of cloud.chain) {
             expect(entry.provider).toBe('ollama');
         }
     });
 
-    it('cloud chain includes local fallback', () => {
+    it('cloud chain has multiple cloud models', () => {
         const models = DEFAULT_FALLBACK_CHAINS['cloud'].chain.map((e) => e.model);
-        // Should have at least one non-cloud model as fallback
-        const hasLocalFallback = models.some((m) => !m.endsWith(':cloud'));
-        expect(hasLocalFallback).toBe(true);
+        const cloudCount = models.filter((m) => m.endsWith(':cloud')).length;
+        expect(cloudCount).toBeGreaterThanOrEqual(3);
     });
 });
 
@@ -87,11 +86,13 @@ describe('Fallback chains', () => {
 describe('Ollama cloud models', () => {
     it('cloud models are in MODEL_PRICING', () => {
         const cloudModels = getOllamaCloudModels();
-        expect(cloudModels.length).toBe(3);
+        expect(cloudModels.length).toBeGreaterThanOrEqual(5);
         const names = cloudModels.map((m) => m.model);
         expect(names).toContain('minimax-m2.5:cloud');
         expect(names).toContain('glm-5:cloud');
         expect(names).toContain('kimi-k2.5:cloud');
+        expect(names).toContain('qwen3.5:cloud');
+        expect(names).toContain('deepseek-v3.2:cloud');
     });
 
     it('cloud models are marked with isCloud=true', () => {

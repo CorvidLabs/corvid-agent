@@ -28,6 +28,7 @@ export interface CreateMentionPollingInput {
 }
 
 export interface UpdateMentionPollingInput {
+    agentId?: string;
     mentionUsername?: string;
     projectId?: string;
     intervalSeconds?: number;
@@ -41,4 +42,19 @@ export interface MentionPollingStats {
     activeConfigs: number;
     totalConfigs: number;
     totalTriggers: number;
+}
+
+export interface PollingActivity {
+    id: string;
+    name: string;
+    status: string;
+    repo: string | null;
+    number: number | null;
+    title: string | null;
+    sender: string | null;
+    url: string | null;
+    isPR: boolean;
+    triggerType: 'mention' | 'assignment' | 'review' | null;
+    createdAt: string;
+    updatedAt: string;
 }

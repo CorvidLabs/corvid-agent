@@ -37,6 +37,9 @@ const MAX_CONCURRENT_POLLS = 3;
 /** Rate limit: minimum gap between triggers for the same config. */
 const MIN_TRIGGER_GAP_MS = 60_000;
 
+/** Max sessions spawned per config per poll cycle — prevents stampede. */
+const MAX_TRIGGERS_PER_CYCLE = 5;
+
 /**
  * A parsed mention from a GitHub API response.
  */
@@ -207,8 +210,17 @@ export class MentionPollingService {
 
             // Process each deduplicated mention and persist IDs immediately
             // to narrow the race window with concurrent poll cycles.
+            // Cap at MAX_TRIGGERS_PER_CYCLE to prevent stampede.
+            let triggeredThisCycle = 0;
             for (const mention of dedupedMentions) {
-                await this.processMention(config, mention);
+                if (triggeredThisCycle >= MAX_TRIGGERS_PER_CYCLE) {
+                    log.info('Hit per-cycle trigger cap, deferring remaining mentions', {
+                        configId: config.id, deferred: dedupedMentions.length - triggeredThisCycle,
+                    });
+                    break;
+                }
+                const triggered = await this.processMention(config, mention);
+                if (triggered) triggeredThisCycle++;
                 // Collect ALL mention IDs for this issue number (comment-X, issue-N, assigned-N)
                 // so duplicates from other search paths don't reappear.
                 const relatedIds = newMentions.filter(m => m.number === mention.number).map(m => m.id);
@@ -272,6 +284,14 @@ export class MentionPollingService {
         // Search for issues/PRs assigned to the user
         const assignedIssues = await this.searchAssignedIssues(config.repo, config.mentionUsername, sinceDate);
         mentions.push(...assignedIssues);
+
+        // Search for reviews on PRs authored by the user
+        if (this.shouldPollEventType(config, 'pull_request_review_comment')) {
+            const prReviewMentions = await this.searchAuthoredPRReviews(
+                config.repo, config.mentionUsername, sinceDate
+            );
+            mentions.push(...prReviewMentions);
+        }
 
         // Sort by creation time descending (newest first)
         mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -495,6 +515,166 @@ export class MentionPollingService {
         }
     }
 
+    /**
+     * Search for open PRs authored by the user and fetch new reviews/review comments on each.
+     */
+    private async searchAuthoredPRReviews(
+        repo: string,
+        username: string,
+        since: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const sinceDate = since.split('T')[0];
+            const query = `${this.repoQualifier(repo)} is:pr is:open author:${username} updated:>=${sinceDate}`;
+            const result = await this.runGh([
+                'api', 'search/issues',
+                '-X', 'GET',
+                '-f', `q=${query}`,
+                '-f', 'sort=updated',
+                '-f', 'order=desc',
+                '-f', 'per_page=10',
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
+            const mentions: DetectedMention[] = [];
+
+            for (const item of items) {
+                const prNumber = item.number as number;
+                const prTitle = (item.title as string) ?? '';
+                const prHtmlUrl = (item.html_url as string) ?? '';
+                const fullRepo = this.resolveFullRepo(repo, prHtmlUrl);
+
+                const [reviews, reviewComments] = await Promise.all([
+                    this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+                    this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+                ]);
+
+                mentions.push(...reviews, ...reviewComments);
+            }
+
+            return mentions;
+        } catch (err) {
+            log.error('Error searching authored PR reviews', { repo, error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
+    /**
+     * Fetch review submissions (approve/changes_requested/comment) on a specific PR.
+     */
+    private async fetchPRReviews(
+        repo: string,
+        prNumber: number,
+        username: string,
+        since: string,
+        prTitle: string,
+        prHtmlUrl: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const result = await this.runGh([
+                'api',
+                `repos/${repo}/pulls/${prNumber}/reviews`,
+                '-X', 'GET',
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const reviews = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+            const sinceTime = new Date(since).getTime();
+            const mentions: DetectedMention[] = [];
+
+            for (const review of reviews) {
+                const reviewer = ((review.user as Record<string, unknown>)?.login as string) ?? '';
+                const state = (review.state as string) ?? '';
+                const body = (review.body as string) ?? '';
+                const submittedAt = (review.submitted_at as string) ?? '';
+
+                // Skip self-reviews
+                if (reviewer.toLowerCase() === username.toLowerCase()) continue;
+
+                // Skip reviews before the since window
+                if (submittedAt && new Date(submittedAt).getTime() < sinceTime) continue;
+
+                // Skip dismissed reviews
+                if (state === 'DISMISSED') continue;
+
+                // Skip empty COMMENTED reviews (phantom top-level for inline comments)
+                if (state === 'COMMENTED' && !body.trim()) continue;
+
+                mentions.push({
+                    id: `review-${review.id}`,
+                    type: 'pull_request_review_comment',
+                    body: body || `[${state} review with no body]`,
+                    sender: reviewer,
+                    number: prNumber,
+                    title: prTitle,
+                    htmlUrl: (review.html_url as string) ?? prHtmlUrl,
+                    createdAt: submittedAt,
+                    isPullRequest: true,
+                });
+            }
+
+            return mentions;
+        } catch (err) {
+            log.debug('Error fetching PR reviews', { repo, prNumber, error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
+    /**
+     * Fetch inline code review comments on a specific PR.
+     */
+    private async fetchPRReviewComments(
+        repo: string,
+        prNumber: number,
+        username: string,
+        since: string,
+        prTitle: string,
+        prHtmlUrl: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const result = await this.runGh([
+                'api',
+                `repos/${repo}/pulls/${prNumber}/comments`,
+                '-X', 'GET',
+                '-f', `since=${since}`,
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+            const mentions: DetectedMention[] = [];
+
+            for (const comment of comments) {
+                const commenter = ((comment.user as Record<string, unknown>)?.login as string) ?? '';
+                const body = (comment.body as string) ?? '';
+
+                // Skip self-comments
+                if (commenter.toLowerCase() === username.toLowerCase()) continue;
+
+                mentions.push({
+                    id: `reviewcomment-${comment.id}`,
+                    type: 'pull_request_review_comment',
+                    body,
+                    sender: commenter,
+                    number: prNumber,
+                    title: prTitle,
+                    htmlUrl: (comment.html_url as string) ?? prHtmlUrl,
+                    createdAt: (comment.created_at as string) ?? '',
+                    isPullRequest: true,
+                });
+            }
+
+            return mentions;
+        } catch (err) {
+            log.debug('Error fetching PR review comments', { repo, prNumber, error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
     // ─── Trigger Logic ──────────────────────────────────────────────────────
 
     /**
@@ -519,10 +699,9 @@ export class MentionPollingService {
 
         // Resolve the actual owner/repo from the mention URL
         const fullRepo = this.resolveFullRepo(config.repo, mention.htmlUrl);
-        const repoShortName = fullRepo.includes('/') ? fullRepo.split('/')[1] : fullRepo;
 
         // Guard: skip if there's already a running or recently completed session for this issue
-        const sessionPrefix = `Poll: ${repoShortName} #${mention.number}:`;
+        const sessionPrefix = `Poll: ${fullRepo} #${mention.number}:`;
         const existing = this.db.query(
             `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle', 'completed') AND created_at > datetime('now', '-1 hour')`
         ).get(sessionPrefix + '%') as { id: string } | null;
@@ -542,7 +721,7 @@ export class MentionPollingService {
             const session = createSession(this.db, {
                 projectId: config.projectId,
                 agentId: config.agentId,
-                name: `Poll: ${repoShortName} #${mention.number}: ${mention.title.slice(0, 40)}`,
+                name: `Poll: ${fullRepo} #${mention.number}: ${mention.title.slice(0, 40)}`,
                 initialPrompt: prompt,
                 source: 'agent',
             });
@@ -614,6 +793,13 @@ export class MentionPollingService {
         // Resolve the actual owner/repo from the mention URL when config.repo is an org/user name.
         // e.g. htmlUrl "https://github.com/CorvidLabs/site/pull/22#..." → "CorvidLabs/site"
         const repo = this.resolveFullRepo(config.repo, mention.htmlUrl);
+
+        // ── Review feedback prompt (PRs authored by the agent) ────────────────
+        const isReviewFeedback = mention.id.startsWith('review-') || mention.id.startsWith('reviewcomment-');
+        if (isReviewFeedback) {
+            return this.buildReviewFeedbackPrompt(repo, mention);
+        }
+
         const contextType = mention.isPullRequest ? 'PR' : 'Issue';
         const isAssignment = mention.type === 'assignment';
         // corvid_create_work_task only works for the platform's own repo
@@ -703,6 +889,69 @@ export class MentionPollingService {
             `  \`gh issue view ${mention.number} --repo ${repo} --comments\``,
             `  If a substantive reply already exists (not just the original post), do NOT post a duplicate.`,
             `- Do NOT assume you have already replied. You have not. This is a fresh session created specifically for this ${isAssignment ? 'assignment' : 'mention'}.`,
+            `- Be concise, helpful, and professional.`,
+        ].join('\n');
+
+        return context + instructions;
+    }
+
+    /**
+     * Build a prompt for review feedback on a PR authored by the agent.
+     * Unlike mention prompts, this checks out the existing PR branch and pushes fixes.
+     */
+    private buildReviewFeedbackPrompt(repo: string, mention: DetectedMention): string {
+        const repoName = repo.split('/')[1];
+        const workDir = `/tmp/${repoName}-pr-${mention.number}`;
+        const replyCmd = `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
+
+        const context = [
+            `## GitHub PR Review Feedback — detected via polling`,
+            ``,
+            `**Repository:** ${repo}`,
+            `**PR:** #${mention.number} "${mention.title}"`,
+            `**Review by:** @${mention.sender}`,
+            `**URL:** ${mention.htmlUrl}`,
+            ``,
+            `### Triggering Review/Comment`,
+            '```',
+            mention.body,
+            '```',
+        ].join('\n');
+
+        const instructions = [
+            ``,
+            `## Instructions`,
+            ``,
+            `A reviewer left feedback on your PR #${mention.number}. This PR was authored by you.`,
+            `You MUST address the feedback and reply — do not skip this step.`,
+            ``,
+            `Steps:`,
+            `1. Clone the repo and check out the PR branch:`,
+            `   \`gh repo clone ${repo} ${workDir} && cd ${workDir} && gh pr checkout ${mention.number}\``,
+            `2. Read ALL review comments on this PR to understand the full feedback:`,
+            `   \`gh pr view ${mention.number} --repo ${repo} --comments\``,
+            `   \`gh api repos/${repo}/pulls/${mention.number}/reviews\``,
+            `   \`gh api repos/${repo}/pulls/${mention.number}/comments\``,
+            `3. Check recent commits to see if feedback has already been addressed:`,
+            `   \`git log --oneline -5\``,
+            `   If the feedback is already addressed by a recent commit, skip to step 6.`,
+            `4. If changes are requested, make the fixes on the EXISTING branch:`,
+            `   - Edit the relevant files`,
+            `   - Commit: \`git add -A && git commit -m "address review feedback"\``,
+            `   - Push to the existing branch: \`git push\``,
+            `   Do NOT create a new PR — push to the existing branch.`,
+            `5. If the review is an approval with no action items, skip to step 6.`,
+            `6. Post a reply comment using: \`${replyCmd}\``,
+            `   - If you made changes, summarize what you fixed.`,
+            `   - If it was an approval, reply with a brief thank-you.`,
+            `   - If feedback was already addressed, note that and point to the relevant commit.`,
+            ``,
+            `Rules:`,
+            `- You MUST run the \`gh\` command above to post a comment. This is mandatory — the reviewer will not see your response otherwise.`,
+            `- Before posting, check if you already replied by running:`,
+            `  \`gh pr view ${mention.number} --repo ${repo} --comments\``,
+            `  If a substantive reply already exists, do NOT post a duplicate.`,
+            `- Do NOT create a new PR. Push fixes to the existing branch.`,
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 
