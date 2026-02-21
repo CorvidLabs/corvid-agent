@@ -220,12 +220,14 @@ export class MentionPollingService {
                     break;
                 }
                 const triggered = await this.processMention(config, mention);
-                if (triggered) triggeredThisCycle++;
-                // Collect ALL mention IDs for this issue number (comment-X, issue-N, assigned-N)
-                // so duplicates from other search paths don't reappear.
-                const relatedIds = newMentions.filter(m => m.number === mention.number).map(m => m.id);
-                config.processedIds = [...config.processedIds, ...relatedIds];
-                updateProcessedIds(this.db, config.id, config.processedIds);
+                if (triggered) {
+                    triggeredThisCycle++;
+                    // Collect ALL mention IDs for this issue number (comment-X, issue-N, assigned-N)
+                    // so duplicates from other search paths don't reappear.
+                    const relatedIds = newMentions.filter(m => m.number === mention.number).map(m => m.id);
+                    config.processedIds = [...config.processedIds, ...relatedIds];
+                    updateProcessedIds(this.db, config.id, config.processedIds);
+                }
             }
 
             // Also update lastSeenId to the newest for backward compat
