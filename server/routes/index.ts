@@ -24,6 +24,7 @@ import { handlePersonaRoutes } from './personas';
 import { handleSkillBundleRoutes } from './skill-bundles';
 import { handleMcpServerRoutes } from './mcp-servers';
 import { handleExamRoutes } from './exam';
+import { handleSlackRoutes } from './slack';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -145,6 +146,16 @@ export async function handleRequest(
         const corsHeaders = buildCorsHeaders(req, config);
         corsHeaders['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
         return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    // Slack webhook — validated by signing secret, no API key auth
+    if (url.pathname === '/slack/events' && req.method === 'POST') {
+        const slackResponse = handleSlackRoutes(req, url, db, processManager);
+        if (slackResponse) {
+            const resolved = slackResponse instanceof Promise ? await slackResponse : slackResponse;
+            applyCors(resolved, req, config);
+            return resolved;
+        }
     }
 
     // Build request context and apply declarative guard chain

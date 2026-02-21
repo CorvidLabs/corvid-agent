@@ -198,12 +198,13 @@ export class NotificationService {
                     break;
                 }
                 case 'slack': {
-                    const webhookUrl = (config.webhookUrl as string) || process.env.SLACK_WEBHOOK_URL;
-                    if (!webhookUrl) {
-                        result = { success: false, error: 'No Slack webhook URL configured' };
+                    const token = (config.botToken as string) || process.env.SLACK_BOT_TOKEN;
+                    const channel = config.channel as string;
+                    if (!token || !channel) {
+                        result = { success: false, error: 'Slack botToken and channel required' };
                         break;
                     }
-                    result = await sendSlack(webhookUrl, payload);
+                    result = await sendSlack(token, channel, payload);
                     break;
                 }
                 default:

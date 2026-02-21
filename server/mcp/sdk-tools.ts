@@ -272,13 +272,13 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         tool(
             'corvid_configure_notifications',
             'Manage notification channels for this agent. Channels control where corvid_notify_owner sends messages. ' +
-            'Supported channel types: discord (webhook), telegram (bot), github (issues), algochat (on-chain). ' +
+            'Supported channel types: discord (webhook), telegram (bot), github (issues), algochat (on-chain), slack (bot). ' +
             'WebSocket is always active. Use action="list" to view, "set" to configure, "enable"/"disable" to toggle, "remove" to delete.',
             {
                 action: z.enum(['list', 'set', 'enable', 'disable', 'remove']).describe('What to do'),
-                channel_type: z.string().optional().describe('Channel type: discord, telegram, github, or algochat'),
+                channel_type: z.string().optional().describe('Channel type: discord, telegram, github, algochat, or slack'),
                 config: z.record(z.string(), z.unknown()).optional().describe(
-                    'Channel configuration. Discord: {webhookUrl}. Telegram: {botToken, chatId}. GitHub: {repo, labels?}. AlgoChat: {toAddress}.',
+                    'Channel configuration. Discord: {webhookUrl}. Telegram: {botToken, chatId}. GitHub: {repo, labels?}. AlgoChat: {toAddress}. Slack: {botToken, channel}.',
                 ),
             },
             async (args) => handleConfigureNotifications(ctx, args),
