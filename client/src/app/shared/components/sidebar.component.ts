@@ -44,92 +44,102 @@ import { filter, Subscription } from 'rxjs';
                         <span class="sidebar__abbr">D</span>
                     </a>
                 </li>
+
+                <li class="sidebar__section"><span class="sidebar__section-label">Core</span></li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/agents"
-                        routerLinkActive="sidebar__link--active"
-                        title="Agents">
+                    <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
                         <span class="sidebar__label">Agents</span>
                         <span class="sidebar__abbr">A</span>
                     </a>
                 </li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/sessions"
-                        routerLinkActive="sidebar__link--active"
-                        title="Conversations">
+                    <a class="sidebar__link" routerLink="/projects" routerLinkActive="sidebar__link--active" title="Projects">
+                        <span class="sidebar__label">Projects</span>
+                        <span class="sidebar__abbr">P</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/models" routerLinkActive="sidebar__link--active" title="Models">
+                        <span class="sidebar__label">Models</span>
+                        <span class="sidebar__abbr">M</span>
+                    </a>
+                </li>
+
+                <li class="sidebar__section"><span class="sidebar__section-label">Sessions</span></li>
+                <li>
+                    <a class="sidebar__link" routerLink="/sessions" routerLinkActive="sidebar__link--active" title="Conversations">
                         <span class="sidebar__label">Conversations</span>
                         <span class="sidebar__abbr">Ch</span>
                     </a>
                 </li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/councils"
-                        routerLinkActive="sidebar__link--active"
-                        title="Councils">
+                    <a class="sidebar__link" routerLink="/work-tasks" routerLinkActive="sidebar__link--active" title="Work Tasks">
+                        <span class="sidebar__label">Work Tasks</span>
+                        <span class="sidebar__abbr">Wt</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/councils" routerLinkActive="sidebar__link--active" title="Councils">
                         <span class="sidebar__label">Councils</span>
                         <span class="sidebar__abbr">Co</span>
                     </a>
                 </li>
+
+                <li class="sidebar__section"><span class="sidebar__section-label">Automation</span></li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/schedules"
-                        routerLinkActive="sidebar__link--active"
-                        title="Schedules">
+                    <a class="sidebar__link" routerLink="/schedules" routerLinkActive="sidebar__link--active" title="Schedules">
                         <span class="sidebar__label">Schedules</span>
                         <span class="sidebar__abbr">Sc</span>
                     </a>
                 </li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/workflows"
-                        routerLinkActive="sidebar__link--active"
-                        title="Workflows">
+                    <a class="sidebar__link" routerLink="/workflows" routerLinkActive="sidebar__link--active" title="Workflows">
                         <span class="sidebar__label">Workflows</span>
                         <span class="sidebar__abbr">Wf</span>
                     </a>
                 </li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/webhooks"
-                        routerLinkActive="sidebar__link--active"
-                        title="Webhooks">
+                    <a class="sidebar__link" routerLink="/webhooks" routerLinkActive="sidebar__link--active" title="Webhooks">
                         <span class="sidebar__label">Webhooks</span>
                         <span class="sidebar__abbr">Wh</span>
                     </a>
                 </li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/mention-polling"
-                        routerLinkActive="sidebar__link--active"
-                        title="Mention Polling">
+                    <a class="sidebar__link" routerLink="/mention-polling" routerLinkActive="sidebar__link--active" title="Mention Polling">
                         <span class="sidebar__label">Polling</span>
                         <span class="sidebar__abbr">Mp</span>
                     </a>
                 </li>
+
+                <li class="sidebar__section"><span class="sidebar__section-label">Monitoring</span></li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/feed"
-                        routerLinkActive="sidebar__link--active"
-                        title="Feed">
+                    <a class="sidebar__link" routerLink="/feed" routerLinkActive="sidebar__link--active" title="Feed">
                         <span class="sidebar__label">Feed</span>
                         <span class="sidebar__abbr">F</span>
                     </a>
                 </li>
                 <li>
-                    <a
-                        class="sidebar__link"
-                        routerLink="/settings"
-                        routerLinkActive="sidebar__link--active"
-                        title="Settings">
+                    <a class="sidebar__link" routerLink="/analytics" routerLinkActive="sidebar__link--active" title="Analytics">
+                        <span class="sidebar__label">Analytics</span>
+                        <span class="sidebar__abbr">An</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/logs" routerLinkActive="sidebar__link--active" title="Logs">
+                        <span class="sidebar__label">Logs</span>
+                        <span class="sidebar__abbr">L</span>
+                    </a>
+                </li>
+
+                <li class="sidebar__section"><span class="sidebar__section-label">Config</span></li>
+                <li>
+                    <a class="sidebar__link" routerLink="/wallets" routerLinkActive="sidebar__link--active" title="Wallets">
+                        <span class="sidebar__label">Wallets</span>
+                        <span class="sidebar__abbr">W</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/settings" routerLinkActive="sidebar__link--active" title="Settings">
                         <span class="sidebar__label">Settings</span>
                         <span class="sidebar__abbr">S</span>
                     </a>
@@ -194,6 +204,25 @@ import { filter, Subscription } from 'rxjs';
             list-style: none;
         }
 
+        /* ── Section headers ── */
+        .sidebar__section {
+            list-style: none;
+            padding: 0.5rem 1.5rem 0.2rem;
+            margin-top: 0.4rem;
+            border-top: 1px solid var(--border);
+        }
+        .sidebar__section:first-of-type {
+            margin-top: 0;
+            border-top: none;
+        }
+        .sidebar__section-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-tertiary);
+            font-weight: 600;
+        }
+
         /* ── Abbreviation labels (hidden by default) ── */
         .sidebar__abbr {
             display: none;
@@ -234,6 +263,12 @@ import { filter, Subscription } from 'rxjs';
         }
         .sidebar--collapsed .sidebar__link--active {
             border-left-width: 2px;
+        }
+        .sidebar--collapsed .sidebar__section {
+            padding: 0.3rem 0;
+        }
+        .sidebar--collapsed .sidebar__section-label {
+            display: none;
         }
 
         /* ── Mobile (<768px): slide-out overlay ── */
@@ -276,6 +311,12 @@ import { filter, Subscription } from 'rxjs';
                 padding: 0.75rem 1.5rem;
                 text-align: left;
                 border-left-width: 3px;
+            }
+            .sidebar--collapsed .sidebar__section {
+                padding: 0.5rem 1.5rem 0.2rem;
+            }
+            .sidebar--collapsed .sidebar__section-label {
+                display: inline;
             }
             .sidebar__collapse-btn {
                 display: none;

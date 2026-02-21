@@ -36,6 +36,8 @@ Provides the main navigation sidebar for the web client. The `SidebarComponent` 
 3. **Mobile overlay**: Below 768px viewport width, the sidebar renders as a slide-out overlay with backdrop, ignoring collapsed state
 4. **Escape key closes sidebar**: Pressing Escape closes the sidebar overlay when open
 5. **Route lazy loading**: All routes use `loadComponent` with dynamic imports for code splitting
+6. **All top-level routes have sidebar entries**: Every routable feature must have a link in the sidebar. Missing nav entries make features unreachable
+7. **Grouped navigation sections**: Links are organized into labeled groups: Dashboard (standalone), Core (Agents, Projects, Models), Sessions (Conversations, Work Tasks, Councils), Automation (Schedules, Workflows, Webhooks, Polling), Monitoring (Feed, Analytics, Logs), Config (Wallets, Settings). Groups are separated by visual dividers with section labels
 
 ## Behavioral Examples
 
@@ -79,3 +81,4 @@ Provides the main navigation sidebar for the web client. The `SidebarComponent` 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-02-20 | corvid-agent | Added invariants #6 and #7: all routes must have sidebar entries, grouped into sections |
