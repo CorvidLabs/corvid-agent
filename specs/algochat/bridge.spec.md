@@ -55,7 +55,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | `setAgentDirectory` | `(directory: AgentDirectory)` | `void` | Late-inject agent directory |
 | `setApprovalManager` | `(manager: ApprovalManager)` | `void` | Late-inject approval manager for forwarding approvals to chat |
 | `setOwnerQuestionManager` | `(manager: OwnerQuestionManager)` | `void` | Late-inject owner question manager |
-| `setWorkTaskService` | `(service: WorkTaskService)` | `void` | Late-inject work task service |
+| `setWorkTaskService` | `(service: WorkTaskService)` | `void` | Late-inject work task service (wraps in a `WorkCommandRouter` for the command handler) |
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Late-inject agent messenger |
 | `sendApprovalRequest` | `(participant: string, request: ApprovalRequestWire)` | `Promise<void>` | Send a tool approval request to a participant via on-chain message |
 | `start` | `()` | `void` | Start all PSK managers, sync polling, and discovery polling |
@@ -145,6 +145,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | `server/algochat/command-handler.ts` | `CommandHandler` |
 | `server/algochat/subscription-manager.ts` | `SubscriptionManager` |
 | `server/algochat/discovery-service.ts` | `DiscoveryService` |
+| `server/algochat/work-command-router.ts` | `WorkCommandRouter` for [WORK] command routing |
 | `server/algochat/group-sender.ts` | `parseGroupPrefix`, `reassembleGroupMessage` |
 | `server/algochat/approval-format.ts` | `formatApprovalForChain`, `parseApprovalResponse` |
 

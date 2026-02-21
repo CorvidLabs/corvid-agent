@@ -15,7 +15,7 @@ import {
     getAgentMessage,
     getThreadMessages,
 } from '../db/agent-messages';
-import type { WorkTaskService } from '../work/service';
+import type { WorkCommandRouter } from './work-command-router';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
@@ -51,7 +51,7 @@ export class AgentMessenger {
     private agentWalletService: AgentWalletService;
     private agentDirectory: AgentDirectory;
     private processManager: ProcessManager;
-    private workTaskService: WorkTaskService | null = null;
+    private workCommandRouter: WorkCommandRouter | null = null;
     private messageUpdateListeners = new Set<MessageUpdateCallback>();
 
     constructor(
@@ -69,8 +69,8 @@ export class AgentMessenger {
         this.processManager = processManager;
     }
 
-    setWorkTaskService(service: WorkTaskService): void {
-        this.workTaskService = service;
+    setWorkCommandRouter(router: WorkCommandRouter): void {
+        this.workCommandRouter = router;
     }
 
     /** Register a callback for agent message status changes (for WS broadcast). */
@@ -145,58 +145,18 @@ export class AgentMessenger {
         const toAgent = getAgent(this.db, toAgentId);
         if (!toAgent) throw new Error(`Target agent ${toAgentId} not found`);
 
-        // Route [WORK] prefix through WorkTaskService
-        if (content.startsWith('[WORK]') && this.workTaskService) {
-            const description = content.slice('[WORK]'.length).trim();
-            if (!description) {
-                throw new Error('[WORK] prefix requires a task description');
-            }
-
-            const agentMessage = createAgentMessage(this.db, {
+        // Route [WORK] prefix through WorkCommandRouter
+        if (content.startsWith('[WORK]') && this.workCommandRouter?.hasService) {
+            return this.workCommandRouter.handleAgentWorkRequest({
                 fromAgentId,
+                fromAgentName: fromAgent.name,
                 toAgentId,
                 content,
                 paymentMicro,
                 threadId,
+                projectId,
+                emitMessageUpdate: (messageId) => this.emitMessageUpdate(messageId),
             });
-
-            try {
-                const task = await this.workTaskService.create({
-                    agentId: toAgentId,
-                    description,
-                    projectId,
-                    source: 'agent',
-                    sourceId: agentMessage.id,
-                    requesterInfo: { fromAgentId, fromAgentName: fromAgent.name },
-                });
-
-                updateAgentMessageStatus(this.db, agentMessage.id, 'processing', { sessionId: task.sessionId ?? undefined });
-                this.emitMessageUpdate(agentMessage.id);
-
-                this.workTaskService.onComplete(task.id, (completed) => {
-                    if (completed.status === 'completed' && completed.prUrl) {
-                        updateAgentMessageStatus(this.db, agentMessage.id, 'completed', {
-                            response: `PR created: ${completed.prUrl}`,
-                        });
-                    } else {
-                        updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
-                            response: completed.error ?? 'Work task failed',
-                        });
-                    }
-                    this.emitMessageUpdate(agentMessage.id);
-                });
-
-                return {
-                    message: getAgentMessage(this.db, agentMessage.id) ?? agentMessage,
-                    sessionId: task.sessionId,
-                };
-            } catch (err) {
-                updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
-                    response: `Work task error: ${err instanceof Error ? err.message : String(err)}`,
-                });
-                this.emitMessageUpdate(agentMessage.id);
-                throw err;
-            }
         }
 
         // Create the agent_messages row

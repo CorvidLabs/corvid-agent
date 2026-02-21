@@ -10,6 +10,7 @@ import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AlgoChatConfig } from '../algochat/config';
 import type { WorkTaskService } from '../work/service';
+import { WorkCommandRouter } from '../algochat/work-command-router';
 import type { ClaudeStreamEvent } from '../process/types';
 import type { Agent, AgentMessage } from '../../shared/types';
 
@@ -64,6 +65,13 @@ function createMockDirectory() {
         listAvailable: mock(() => Promise.resolve([])),
         clearCache: mock(() => {}),
     } as unknown as AgentDirectory;
+}
+
+/** Helper: wire a mock WorkTaskService into the messenger via a WorkCommandRouter. */
+function wireWorkTaskService(m: AgentMessenger, d: Database, wts: WorkTaskService): void {
+    const router = new WorkCommandRouter(d);
+    router.setWorkTaskService(wts);
+    m.setWorkCommandRouter(router);
 }
 
 // ─── Test state ──────────────────────────────────────────────────────────────
@@ -286,7 +294,7 @@ describe('invoke() with [WORK] prefix', () => {
             onComplete: mockOnComplete,
         } as unknown as WorkTaskService;
 
-        messenger.setWorkTaskService(mockWorkTaskService);
+        wireWorkTaskService(messenger, db, mockWorkTaskService);
 
         const result = await messenger.invoke({
             fromAgentId: agentA.id,
@@ -309,7 +317,7 @@ describe('invoke() with [WORK] prefix', () => {
             onComplete: mock(() => {}),
         } as unknown as WorkTaskService;
 
-        messenger.setWorkTaskService(mockWorkTaskService);
+        wireWorkTaskService(messenger, db, mockWorkTaskService);
 
         await expect(
             messenger.invoke({
@@ -341,7 +349,7 @@ describe('invoke() with [WORK] prefix', () => {
             onComplete: mock(() => {}),
         } as unknown as WorkTaskService;
 
-        messenger.setWorkTaskService(mockWorkTaskService);
+        wireWorkTaskService(messenger, db, mockWorkTaskService);
 
         await expect(
             messenger.invoke({
@@ -615,9 +623,9 @@ describe('invokeAndWait()', () => {
     });
 });
 
-// ─── setWorkTaskService() ────────────────────────────────────────────────────
+// ─── setWorkCommandRouter() ──────────────────────────────────────────────────
 
-describe('setWorkTaskService()', () => {
+describe('setWorkCommandRouter()', () => {
     test('enables [WORK] prefix routing after being set', async () => {
         const mockWorkCreate = mock(() =>
             Promise.resolve({
@@ -642,7 +650,7 @@ describe('setWorkTaskService()', () => {
         expect(mockWorkCreate).not.toHaveBeenCalled();
 
         // After setting
-        messenger.setWorkTaskService(mockWorkTaskService);
+        wireWorkTaskService(messenger, db, mockWorkTaskService);
         await messenger.invoke({
             fromAgentId: agentA.id,
             toAgentId: agentB.id,

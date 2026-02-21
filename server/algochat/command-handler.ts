@@ -11,7 +11,7 @@ import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { ProcessManager } from '../process/manager';
 import type { AgentMessenger } from './agent-messenger';
-import type { WorkTaskService } from '../work/service';
+import type { WorkCommandRouter } from './work-command-router';
 import type { ResponseFormatter } from './response-formatter';
 import {
     listConversations,
@@ -60,7 +60,7 @@ export class CommandHandler {
     private processManager: ProcessManager;
     private responseFormatter: ResponseFormatter;
     private context: CommandHandlerContext;
-    private workTaskService: WorkTaskService | null = null;
+    private workCommandRouter: WorkCommandRouter | null = null;
     private agentMessengerRef: AgentMessenger | null = null;
     private schedulerServiceRef: SchedulerService | null = null;
 
@@ -78,9 +78,9 @@ export class CommandHandler {
         this.context = context;
     }
 
-    /** Inject the optional work task service. */
-    setWorkTaskService(service: WorkTaskService): void {
-        this.workTaskService = service;
+    /** Inject the optional work command router. */
+    setWorkCommandRouter(router: WorkCommandRouter): void {
+        this.workCommandRouter = router;
     }
 
     /** Inject the optional agent messenger reference (for councils). */
@@ -301,41 +301,17 @@ export class CommandHandler {
             }
 
             case '/work': {
-                const description = parts.slice(1).join(' ');
-                if (!description) {
-                    respond('Usage: /work <task description>');
-                    return true;
-                }
-
-                if (!this.workTaskService) {
+                if (!this.workCommandRouter) {
                     respond('Work task service not available');
                     return true;
                 }
-
-                const agentId = this.context.findAgentForNewConversation();
-                if (!agentId) {
-                    respond('No agent available for work tasks');
-                    return true;
-                }
-
-                this.workTaskService.create({
-                    agentId,
+                const description = parts.slice(1).join(' ');
+                this.workCommandRouter.handleSlashCommand(
+                    participant,
                     description,
-                    source: 'algochat',
-                    requesterInfo: { participant },
-                }).then((task) => {
-                    respond(`Work task started: ${task.id}\nBranch: ${task.branchName ?? 'creating...'}\nStatus: ${task.status}`);
-
-                    this.workTaskService?.onComplete(task.id, (completed) => {
-                        if (completed.status === 'completed' && completed.prUrl) {
-                            respond(`Work task completed!\nPR: ${completed.prUrl}`);
-                        } else {
-                            respond(`Work task failed: ${completed.error ?? 'Unknown error'}`);
-                        }
-                    });
-                }).catch((err) => {
-                    respond(`Work task error: ${err instanceof Error ? err.message : String(err)}`);
-                });
+                    respond,
+                    () => this.context.findAgentForNewConversation(),
+                );
                 return true;
             }
 
