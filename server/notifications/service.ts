@@ -15,6 +15,7 @@ import { sendGitHub } from './channels/github';
 import { sendAlgoChat } from './channels/algochat';
 import { sendWhatsApp } from './channels/whatsapp';
 import { sendSignal } from './channels/signal';
+import { sendSlack } from './channels/slack';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('NotificationService');
@@ -194,6 +195,15 @@ export class NotificationService {
                         break;
                     }
                     result = await sendSignal(signalApiUrl, senderNumber, recipientNumber, payload);
+                    break;
+                }
+                case 'slack': {
+                    const webhookUrl = (config.webhookUrl as string) || process.env.SLACK_WEBHOOK_URL;
+                    if (!webhookUrl) {
+                        result = { success: false, error: 'No Slack webhook URL configured' };
+                        break;
+                    }
+                    result = await sendSlack(webhookUrl, payload);
                     break;
                 }
                 default:

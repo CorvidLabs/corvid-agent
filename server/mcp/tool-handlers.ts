@@ -1205,7 +1205,7 @@ export async function handleDeepResearch(
 
 // ─── Notification configuration handler ──────────────────────────────────
 
-const VALID_CHANNEL_TYPES = ['discord', 'telegram', 'github', 'algochat'];
+const VALID_CHANNEL_TYPES = ['discord', 'telegram', 'github', 'algochat', 'slack'];
 
 export async function handleConfigureNotifications(
     ctx: McpToolContext,

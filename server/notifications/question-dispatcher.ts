@@ -7,6 +7,7 @@ import { sendTelegramQuestion } from './channels/telegram-question';
 import { sendAlgoChatQuestion } from './channels/algochat-question';
 import { sendWhatsAppQuestion } from './channels/whatsapp-question';
 import { sendSignalQuestion } from './channels/signal-question';
+import { sendSlackQuestion } from './channels/slack-question';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('QuestionDispatcher');
@@ -148,6 +149,20 @@ export class QuestionDispatcher {
                     signalApiUrl,
                     senderNumber,
                     recipientNumber,
+                    question.id,
+                    question.question,
+                    question.options,
+                    question.context,
+                    question.agentId,
+                );
+            }
+            case 'slack': {
+                const slackBotToken = (config.botToken as string) || process.env.SLACK_BOT_TOKEN;
+                const slackChannelId = (config.channelId as string) || process.env.SLACK_CHANNEL_ID;
+                if (!slackBotToken || !slackChannelId) return { success: false, error: 'Slack botToken and channelId required' };
+                return sendSlackQuestion(
+                    slackBotToken,
+                    slackChannelId,
                     question.id,
                     question.question,
                     question.options,

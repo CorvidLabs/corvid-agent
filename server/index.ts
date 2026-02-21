@@ -55,6 +55,7 @@ import { MemoryManager } from './memory/index';
 import { AutonomousLoopService } from './improvement/service';
 import { TelegramBridge } from './telegram/bridge';
 import { DiscordBridge } from './discord/bridge';
+import { SlackBridge } from './slack/bridge';
 import { TenantService } from './tenant/context';
 import { BillingService } from './billing/service';
 import { UsageMeter } from './billing/meter';
@@ -233,6 +234,21 @@ if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
     });
     discordBridge.start();
     log.info('Discord bridge initialized');
+}
+
+// Initialize bidirectional Slack bridge (opt-in via env vars)
+let slackBridge: SlackBridge | null = null;
+if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET) {
+    slackBridge = new SlackBridge(db, processManager, {
+        botToken: process.env.SLACK_BOT_TOKEN,
+        signingSecret: process.env.SLACK_SIGNING_SECRET,
+        channelId: process.env.SLACK_CHANNEL_ID ?? '',
+        allowedUserIds: process.env.SLACK_ALLOWED_USER_IDS
+            ? process.env.SLACK_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
+            : [],
+    });
+    slackBridge.start();
+    log.info('Slack bridge initialized');
 }
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
@@ -513,6 +529,21 @@ const server = Bun.serve<WsData>({
                 );
             }
 
+            // Slack Events API webhook endpoint (no auth guard — Slack verifies via signing secret)
+            if (url.pathname === '/api/slack/events' && req.method === 'POST') {
+                if (!slackBridge) {
+                    return instrumentResponse(
+                        new Response(JSON.stringify({ error: 'Slack bridge not configured' }), {
+                            status: 503,
+                            headers: { 'Content-Type': 'application/json' },
+                        }),
+                        '/api/slack/events',
+                    );
+                }
+                const slackResponse = await slackBridge.handleEventRequest(req);
+                return instrumentResponse(slackResponse, '/api/slack/events');
+            }
+
             // Ollama model management routes
             const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
                 const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
@@ -739,6 +770,7 @@ function gracefulShutdown(): void {
     if (sandboxManager) sandboxManager.shutdown();
     telegramBridge?.stop();
     discordBridge?.stop();
+    slackBridge?.stop();
     processManager.shutdown();
     algochatBridge?.stop();
     closeDb();
