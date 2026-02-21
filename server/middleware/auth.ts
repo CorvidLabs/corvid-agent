@@ -11,7 +11,7 @@
  */
 
 import { createLogger } from '../lib/logger';
-import { existsSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, openSync, writeSync, closeSync, constants as fsConstants } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
@@ -60,22 +60,43 @@ function generateApiKey(): string {
 /**
  * Persist a generated API key to the .env file.
  * Appends to .env if it exists, creates it otherwise.
+ *
+ * Uses atomic file operations to avoid TOCTOU race conditions:
+ * - Reads the file first, catching ENOENT if it doesn't exist.
+ * - Opens the file with O_WRONLY | O_CREAT | O_APPEND to atomically
+ *   create-or-append in a single syscall.
  */
 function persistApiKeyToEnv(key: string): boolean {
     try {
         const envPath = join(process.cwd(), '.env');
         const line = `API_KEY=${key}\n`;
 
-        if (existsSync(envPath)) {
-            const content = readFileSync(envPath, 'utf8');
-            // Don't overwrite an existing API_KEY
-            if (content.includes('API_KEY=')) {
-                return false;
-            }
-            appendFileSync(envPath, line);
-        } else {
-            writeFileSync(envPath, line);
+        // Try to read existing content; treat ENOENT as empty file
+        let content = '';
+        try {
+            content = readFileSync(envPath, 'utf8');
+        } catch (readErr: unknown) {
+            if ((readErr as NodeJS.ErrnoException).code !== 'ENOENT') throw readErr;
+            // File doesn't exist yet — content stays empty
         }
+
+        // Don't overwrite an existing API_KEY
+        if (content.includes('API_KEY=')) {
+            return false;
+        }
+
+        // O_WRONLY | O_CREAT | O_APPEND atomically creates-or-appends
+        const fd = openSync(
+            envPath,
+            fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_APPEND,
+            0o600,
+        );
+        try {
+            writeSync(fd, line);
+        } finally {
+            closeSync(fd);
+        }
+
         return true;
     } catch (err) {
         log.warn('Failed to persist API key to .env', {
