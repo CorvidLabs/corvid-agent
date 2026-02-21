@@ -30,6 +30,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('Workflow');
 
@@ -101,6 +102,8 @@ export class WorkflowService {
         workflowId: string,
         input: Record<string, unknown> = {},
     ): Promise<WorkflowRun> {
+        const ctx = createEventContext('workflow');
+        return runWithEventContext(ctx, async () => {
         const workflow = getWorkflow(this.db, workflowId);
         if (!workflow) throw new Error(`Workflow not found: ${workflowId}`);
         if (workflow.status !== 'active') {
@@ -137,6 +140,7 @@ export class WorkflowService {
         await this.advanceRun(run.id);
 
         return getWorkflowRun(this.db, run.id)!;
+        }); // runWithEventContext
     }
 
     /** Pause a running workflow. */

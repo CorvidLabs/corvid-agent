@@ -25,6 +25,7 @@ import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { buildSafeGhEnv } from '../lib/env';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('MentionPoller');
 
@@ -166,6 +167,8 @@ export class MentionPollingService {
         if (this.activePolls.has(config.id)) return;
         this.activePolls.add(config.id);
 
+        const ctx = createEventContext('polling');
+        return runWithEventContext(ctx, async () => {
         try {
             log.debug('Polling config', { id: config.id, repo: config.repo, username: config.mentionUsername, lastPollAt: config.lastPollAt, lastSeenId: config.lastSeenId, processedIds: config.processedIds.length });
 
@@ -245,6 +248,7 @@ export class MentionPollingService {
         } finally {
             this.activePolls.delete(config.id);
         }
+        }); // runWithEventContext
     }
 
     // ─── GitHub API (via gh CLI) ────────────────────────────────────────────

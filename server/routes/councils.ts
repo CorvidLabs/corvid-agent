@@ -26,6 +26,7 @@ import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('CouncilRoutes');
 
@@ -226,6 +227,8 @@ export function launchCouncil(
     prompt: string,
     agentMessenger: AgentMessenger | null,
 ): LaunchCouncilResult {
+    const ctx = createEventContext('council');
+    return runWithEventContext(ctx, () => {
     const council = getCouncil(db, councilId);
     if (!council) throw new Error('Council not found');
 
@@ -267,6 +270,7 @@ export function launchCouncil(
     watchSessionsForAutoAdvance(db, processManager, launchId, sessionIds, 'member', agentMessenger);
 
     return { launchId, sessionIds };
+    }); // runWithEventContext
 }
 
 async function handleLaunch(

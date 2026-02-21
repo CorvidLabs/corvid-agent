@@ -18,6 +18,7 @@ export {
     activeSessions,
 } from './metrics';
 export { traceContext, getTraceId, runWithTraceId } from './trace-context';
+export { type EventContext, type EventSource, createEventContext, runWithEventContext } from './event-context';
 
 import { initTracing } from './tracing';
 import { createLogger } from '../lib/logger';

@@ -22,6 +22,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('Webhook');
 
@@ -162,6 +163,8 @@ export class WebhookService {
         event: string,
         payload: GitHubWebhookPayload,
     ): Promise<{ processed: number; skipped: number; details: string[] }> {
+        const ctx = createEventContext('webhook');
+        return runWithEventContext(ctx, async () => {
         const repo = payload.repository.full_name;
         const action = payload.action;
         const sender = payload.sender.login;
@@ -247,6 +250,7 @@ export class WebhookService {
         }
 
         return { processed, skipped, details };
+        }); // runWithEventContext
     }
 
     // ─── Internal ────────────────────────────────────────────────────────────
