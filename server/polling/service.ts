@@ -700,10 +700,13 @@ export class MentionPollingService {
         // Resolve the actual owner/repo from the mention URL
         const fullRepo = this.resolveFullRepo(config.repo, mention.htmlUrl);
 
-        // Guard: skip if there's already a running or recently completed session for this issue
+        // Guard: skip if there's a currently running/idle session for the same issue.
+        // Only block on active sessions — completed sessions should NOT prevent new
+        // mentions from triggering, since follow-up comments are legitimate new work.
+        // Dedup of the *same* comment is handled by processedIds, not this guard.
         const sessionPrefix = `Poll: ${fullRepo} #${mention.number}:`;
         const existing = this.db.query(
-            `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle', 'completed') AND created_at > datetime('now', '-1 hour')`
+            `SELECT id FROM sessions WHERE name LIKE ? AND status IN ('running', 'idle')`
         ).get(sessionPrefix + '%') as { id: string } | null;
         if (existing) {
             log.debug('Active session already exists for issue', { number: mention.number, existingId: existing.id });

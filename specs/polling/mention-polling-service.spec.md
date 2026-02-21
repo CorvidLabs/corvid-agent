@@ -39,7 +39,7 @@ Polls GitHub for @mentions, PR reviews, issue assignments, and review comments w
 1. **Self-mentions are never processed**: Comments/reviews authored by the `mentionUsername` itself are skipped to prevent infinite loops
 2. **processedIds set prevents duplicate triggers**: Each processed mention ID is persisted immediately; the set is capped at 200 entries (oldest trimmed on overflow)
 3. **Issue-number dedup**: Multiple mentions for the same issue/PR number (e.g. `comment-123`, `issue-8`, `assigned-8` all for #8) collapse to one session. The first (newest) is kept
-4. **Session guard**: No concurrent sessions for the same issue within 1 hour — a `name LIKE` query checks for existing running/idle/completed sessions created in the last hour
+4. **Session guard**: No concurrent sessions for the same issue — a `name LIKE` query checks for existing running/idle sessions. Completed sessions do NOT block new mentions (follow-up comments are legitimate new work; dedup of the same comment is handled by processedIds)
 5. **Rate limiting**: 60s minimum gap between triggers for the same mention ID (keyed by `configId:mentionId`)
 6. **allowedUsers filter applies to all mention types**: Including review authors, comment authors, and issue creators
 7. **Review feedback prompt uses checkout-and-push**: Mentions with `review-` or `reviewcomment-` prefix ID use the review feedback prompt which checks out the existing PR branch and pushes fixes, rather than creating a new PR
@@ -88,7 +88,7 @@ Polls GitHub for @mentions, PR reviews, issue assignments, and review comments w
 
 - **Given** a high-traffic repo generating many mention-triggered sessions over weeks
 - **When** sessions accumulate (some completed, some errored, some with open PRs from work tasks)
-- **Then** the system relies on existing guards (1-hour session guard, one active work task per project) to bound concurrent work. There is no automatic PR cleanup — stale PRs on poorly maintained repos remain open until manually closed or the project owner acts. This is by design: the agent should not unilaterally close PRs that may still be reviewed
+- **Then** the system relies on existing guards (active-session guard, processedIds dedup, one active work task per project) to bound concurrent work. There is no automatic PR cleanup — stale PRs on poorly maintained repos remain open until manually closed or the project owner acts. This is by design: the agent should not unilaterally close PRs that may still be reviewed
 
 ## Throttling Gaps and Known Limits
 
@@ -160,3 +160,4 @@ The service uses 5 search paths to detect actionable events:
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-02-20 | corvid-agent | Add MAX_TRIGGERS_PER_CYCLE (5), stampede scenario, throttling gaps table, PR accumulation notes |
+| 2026-02-20 | claude | Session guard now only blocks on running/idle sessions, not completed. Follow-up comments on the same issue trigger new sessions correctly |
