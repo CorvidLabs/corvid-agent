@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",

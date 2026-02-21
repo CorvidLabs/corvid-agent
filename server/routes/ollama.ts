@@ -221,6 +221,72 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
 
     // Curated list of recommended models for agent work
     const recommendedModels = [
+        // ── Cloud models (remote, no local GPU needed) ──
+        {
+            name: 'qwen3.5:cloud',
+            description: 'Qwen 3.5 397B — frontier reasoning, tool calling, thinking',
+            category: 'cloud',
+            parameterSize: '397B',
+            capabilities: ['tools', 'chat', 'cloud', 'thinking'],
+            pullCommand: 'qwen3.5:cloud',
+        },
+        {
+            name: 'deepseek-v3.2:cloud',
+            description: 'DeepSeek V3.2 — strong reasoning with tool use and thinking',
+            category: 'cloud',
+            parameterSize: '671B',
+            capabilities: ['tools', 'chat', 'cloud', 'thinking'],
+            pullCommand: 'deepseek-v3.2:cloud',
+        },
+        {
+            name: 'qwen3-coder-next:cloud',
+            description: 'Qwen 3 Coder Next — top-tier code generation and tool use',
+            category: 'cloud',
+            parameterSize: '235B',
+            capabilities: ['tools', 'chat', 'cloud', 'code', 'thinking'],
+            pullCommand: 'qwen3-coder-next:cloud',
+        },
+        {
+            name: 'devstral-small-2:cloud',
+            description: 'Devstral Small 2 24B — fast cloud coding assistant',
+            category: 'cloud',
+            parameterSize: '24B',
+            capabilities: ['tools', 'chat', 'cloud', 'code'],
+            pullCommand: 'devstral-small-2:cloud',
+        },
+        {
+            name: 'nemotron-3-nano:cloud',
+            description: 'Nemotron 3 Nano 30B — NVIDIA cloud model with tool support',
+            category: 'cloud',
+            parameterSize: '30B',
+            capabilities: ['tools', 'chat', 'cloud'],
+            pullCommand: 'nemotron-3-nano:cloud',
+        },
+        {
+            name: 'minimax-m2.5:cloud',
+            description: 'MiniMax M2.5 — massive 1M context, strong reasoning',
+            category: 'cloud',
+            parameterSize: '456B',
+            capabilities: ['tools', 'chat', 'cloud', 'thinking'],
+            pullCommand: 'minimax-m2.5:cloud',
+        },
+        {
+            name: 'glm-5:cloud',
+            description: 'GLM-5 — Zhipu cloud model with thinking and tool use',
+            category: 'cloud',
+            parameterSize: '?',
+            capabilities: ['tools', 'chat', 'cloud', 'thinking'],
+            pullCommand: 'glm-5:cloud',
+        },
+        {
+            name: 'kimi-k2.5:cloud',
+            description: 'Kimi K2.5 — Moonshot cloud model with tool calling',
+            category: 'cloud',
+            parameterSize: '?',
+            capabilities: ['tools', 'chat', 'cloud', 'thinking'],
+            pullCommand: 'kimi-k2.5:cloud',
+        },
+        // ── Local recommended models ──
         {
             name: 'qwen3:8b',
             description: 'Qwen 3 8B — excellent tool calling, strong reasoning',
@@ -230,9 +296,17 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
             pullCommand: 'qwen3:8b',
         },
         {
+            name: 'qwen3:32b',
+            description: 'Qwen 3 32B — best local model for complex agent tasks',
+            category: 'recommended',
+            parameterSize: '32B',
+            capabilities: ['tools', 'chat', 'thinking'],
+            pullCommand: 'qwen3:32b',
+        },
+        {
             name: 'qwen3:4b',
             description: 'Qwen 3 4B — lightweight with good tool support',
-            category: 'recommended',
+            category: 'small',
             parameterSize: '4B',
             capabilities: ['tools', 'chat'],
             pullCommand: 'qwen3:4b',
@@ -277,6 +351,7 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
             capabilities: ['tools', 'chat', 'rag'],
             pullCommand: 'command-r:35b',
         },
+        // ── Coding models ──
         {
             name: 'qwen2.5-coder:7b',
             description: 'Qwen 2.5 Coder 7B — specialized for code generation',
@@ -293,6 +368,7 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
             capabilities: ['tools', 'chat', 'code'],
             pullCommand: 'deepseek-coder-v2:16b',
         },
+        // ── Vision models ──
         {
             name: 'llava:7b',
             description: 'LLaVA 7B — vision model for image understanding',
@@ -301,6 +377,7 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
             capabilities: ['vision', 'chat'],
             pullCommand: 'llava:7b',
         },
+        // ── Small/efficient models ──
         {
             name: 'phi3:mini',
             description: 'Microsoft Phi-3 Mini — tiny but capable (3.8B)',
@@ -356,7 +433,7 @@ async function handleLibrarySearch(url: URL): Promise<Response> {
 
     return json({
         models: results,
-        categories: ['all', 'recommended', 'coding', 'small', 'large', 'vision'],
+        categories: ['all', 'cloud', 'recommended', 'coding', 'small', 'large', 'vision'],
         total: results.length,
     });
 }

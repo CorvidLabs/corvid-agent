@@ -173,6 +173,9 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                                 </div>
                                 <div class="schedule-card__actions">
                                     @if (schedule.status === 'active') {
+                                        <button class="action-btn action-btn--run" (click)="triggerNow(schedule); $event.stopPropagation()" [disabled]="triggering() === schedule.id">
+                                            {{ triggering() === schedule.id ? 'Running...' : 'Run Now' }}
+                                        </button>
                                         <button class="action-btn" (click)="toggleStatus(schedule, 'paused'); $event.stopPropagation()">Pause</button>
                                     } @else if (schedule.status === 'paused') {
                                         <button class="action-btn action-btn--resume" (click)="toggleStatus(schedule, 'active'); $event.stopPropagation()">Resume</button>
@@ -322,6 +325,7 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
         .schedule-status[data-status="paused"]{color:var(--accent-amber);background:var(--accent-amber-dim);border-color:var(--accent-amber)}
         .schedule-status[data-status="failed"]{color:var(--accent-red);background:var(--accent-red-dim);border-color:var(--accent-red)}
         .action-btn{padding:.3rem .6rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.65rem;cursor:pointer;font-family:inherit}
+        .action-btn--run{border-color:var(--accent-cyan);color:var(--accent-cyan)} .action-btn--run:disabled{opacity:.5;cursor:not-allowed}
         .action-btn--resume{border-color:var(--accent-green);color:var(--accent-green)}
         .action-btn--danger{border-color:var(--accent-red);color:var(--accent-red)}
         .schedule-desc{margin:0 0 .5rem;font-size:.75rem;color:var(--text-secondary)}
@@ -368,6 +372,7 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     readonly creating = signal(false);
     readonly formScheduleType = signal<'cron' | 'interval'>('cron');
 
+    readonly triggering = signal<string | null>(null);
     readonly expandedScheduleId = signal<string | null>(null);
     readonly expandedExecId = signal<string | null>(null);
     readonly scheduleExecs = signal<ScheduleExecution[]>([]);
@@ -467,6 +472,18 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
             this.notifications.error('Failed to create schedule');
         } finally {
             this.creating.set(false);
+        }
+    }
+
+    async triggerNow(schedule: AgentSchedule): Promise<void> {
+        this.triggering.set(schedule.id);
+        try {
+            await this.scheduleService.triggerNow(schedule.id);
+            this.notifications.success(`Schedule "${schedule.name}" triggered`);
+        } catch {
+            this.notifications.error('Failed to trigger schedule');
+        } finally {
+            this.triggering.set(null);
         }
     }
 

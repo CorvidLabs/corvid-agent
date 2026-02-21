@@ -199,6 +199,7 @@ const improvementLoopService = new AutonomousLoopService(
 );
 schedulerService.setImprovementLoopService(improvementLoopService);
 schedulerService.setReputationServices(reputationScorer, reputationAttestation);
+schedulerService.setNotificationService(notificationService);
 
 // Initialize multi-tenant (opt-in via MULTI_TENANT=true)
 const multiTenant = process.env.MULTI_TENANT === 'true';

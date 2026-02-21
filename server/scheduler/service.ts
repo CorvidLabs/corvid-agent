@@ -12,6 +12,7 @@ import type { AutonomousLoopService } from '../improvement/service';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { ReputationAttestation } from '../reputation/attestation';
+import type { NotificationService } from '../notifications/service';
 import { summarizeOldMemories } from '../memory/summarizer';
 import type {
     AgentSchedule,
@@ -90,6 +91,7 @@ export class SchedulerService {
     private improvementLoopService: AutonomousLoopService | null = null;
     private reputationScorer: ReputationScorer | null = null;
     private reputationAttestation: ReputationAttestation | null = null;
+    private notificationService: NotificationService | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private runningExecutions = new Set<string>();
     private eventCallbacks = new Set<ScheduleEventCallback>();
@@ -121,6 +123,11 @@ export class SchedulerService {
     setReputationServices(scorer: ReputationScorer, attestation: ReputationAttestation): void {
         this.reputationScorer = scorer;
         this.reputationAttestation = attestation;
+    }
+
+    /** Set notification service (for approval request notifications). */
+    setNotificationService(service: NotificationService): void {
+        this.notificationService = service;
     }
 
     /** Start the scheduler polling loop. */
@@ -178,6 +185,14 @@ export class SchedulerService {
     onEvent(callback: ScheduleEventCallback): () => void {
         this.eventCallbacks.add(callback);
         return () => this.eventCallbacks.delete(callback);
+    }
+
+    /** Manually trigger a schedule to run now (ignoring cron/interval timing). */
+    async triggerNow(scheduleId: string): Promise<void> {
+        const schedule = getSchedule(this.db, scheduleId);
+        if (!schedule) throw new Error('Schedule not found');
+        if (schedule.status !== 'active') throw new Error('Schedule is not active');
+        await this.executeSchedule(schedule);
     }
 
     /** Resolve an approval request for a schedule execution. */
@@ -311,6 +326,21 @@ export class SchedulerService {
                     },
                 });
                 if (updated) this.emit({ type: 'schedule_execution_update', data: updated });
+
+                // Push approval notification to all configured channels
+                if (this.notificationService) {
+                    const desc = action.description ?? `${action.type} on ${action.repos?.join(', ') ?? 'N/A'}`;
+                    this.notificationService.notify({
+                        agentId: schedule.agentId,
+                        title: `Approval needed: ${schedule.name}`,
+                        message: `Schedule "${schedule.name}" wants to run ${action.type}:\n${desc}\n\nApprove in the dashboard.`,
+                        level: 'warning',
+                    }).catch(err => log.warn('Approval notification failed', {
+                        scheduleId: schedule.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    }));
+                }
+
                 continue;
             }
 

@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-02-21
+
+### Added
+- **Schedule approval notifications** — when a schedule execution needs owner approval, notifications are sent via all configured channels (Telegram, Discord, AlgoChat, etc.) instead of only showing in the dashboard
+- **Proactive schedule prompts** — all custom/suggest schedules now use `corvid_notify_owner`, `corvid_web_search`, `corvid_deep_research`, and `corvid_create_work_task` where appropriate
+- **Dynamic community engagement** — Weekend Community schedule searches for trending repos instead of starring a hardcoded list
+- **Rotating self-improvement focus** — corvid-agent self-improvement rotates by day-of-month: test coverage (1st-7th), type safety (8th-14th), error handling (15th-21st), performance (22nd-31st)
+- **Issue-first project improvement** — CorvidLabs project self-improvement checks open issues first before looking for generic improvements
+
+### Changed
+- All schedules now run on CorvidAgent (Claude Opus) — removed Qwen Coder agent dependency
+- Self-improvement schedules bumped to 2x/week (Mon+Thu for projects, Tue+Fri for corvid-agent)
+- Removed PR Comment Response and Morning PR Review schedules (covered by mention polling + Stale PR Follow-Up)
+- Weekly Improvement Suggestions refocused on public API correctness for ts-algochat and swift-algochat
+
 ## [0.9.0] - 2026-02-20
 
 ### Added
