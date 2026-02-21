@@ -17,13 +17,32 @@ import {
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
 import type { AstParserService } from '../ast/service';
-import type { AstSymbol } from '../ast/types';
+import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
 const log = createLogger('WorkTaskService');
 
 const PR_URL_REGEX = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/;
 
 const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10);
+
+/** Max lines in the repo map to keep it lightweight. */
+const REPO_MAP_MAX_LINES = 200;
+
+/** Directories prioritized in repo map ordering (appear first). */
+const PRIORITY_DIRS = ['src/', 'server/', 'lib/', 'packages/'];
+
+/** Stop words excluded from keyword extraction for symbol search. */
+const STOP_WORDS = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'is', 'it', 'be', 'as', 'was', 'were',
+    'are', 'been', 'has', 'have', 'had', 'do', 'does', 'did', 'will',
+    'would', 'could', 'should', 'may', 'might', 'shall', 'can', 'not',
+    'this', 'that', 'these', 'those', 'if', 'then', 'else', 'when',
+    'up', 'out', 'so', 'no', 'we', 'us', 'our', 'my', 'me', 'i',
+    'add', 'fix', 'update', 'change', 'make', 'use', 'create', 'new',
+    'need', 'want', 'get', 'set', 'all', 'each', 'any', 'into',
+    'also', 'about', 'more', 'some', 'only', 'just', 'than', 'such',
+]);
 
 type CompletionCallback = (task: WorkTask) => void;
 
@@ -195,8 +214,11 @@ export class WorkTaskService {
         // Generate repo map for structural awareness (best-effort)
         const repoMap = await this.generateRepoMap(worktreeDir);
 
+        // Extract relevant symbols based on task description keywords
+        const relevantSymbols = this.extractRelevantSymbols(worktreeDir, input.description);
+
         // Build work prompt
-        const prompt = this.buildWorkPrompt(branchName, input.description, repoMap ?? undefined);
+        const prompt = this.buildWorkPrompt(branchName, input.description, repoMap ?? undefined, relevantSymbols ?? undefined);
 
         // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
@@ -609,16 +631,20 @@ Important: You MUST ensure all validation passes and output the PR URL.`;
         }
     }
 
-    private buildWorkPrompt(branchName: string, description: string, repoMap?: string): string {
+    private buildWorkPrompt(branchName: string, description: string, repoMap?: string, relevantSymbols?: string): string {
         const repoMapSection = repoMap
-            ? `\n## Repository Map\nTop-level exported symbols per file:\n\`\`\`\n${repoMap}\`\`\`\n`
+            ? `\n## Repository Map\nTop-level exported symbols per file (with line ranges):\n\`\`\`\n${repoMap}\`\`\`\n`
+            : '';
+
+        const relevantSymbolsSection = relevantSymbols
+            ? `\n## Relevant Symbols\nSymbols matching keywords from the task description — likely starting points:\n\`\`\`\n${relevantSymbols}\n\`\`\`\nUse \`corvid_code_symbols\` and \`corvid_find_references\` tools for deeper exploration of these symbols.\n`
             : '';
 
         return `You are working on a task. A git branch "${branchName}" has been created and checked out.
 
 ## Task
 ${description}
-${repoMapSection}
+${repoMapSection}${relevantSymbolsSection}
 ## Instructions
 1. Explore the codebase as needed to understand the context.
 2. Implement the changes on this branch.
@@ -635,7 +661,9 @@ Important: You MUST create a PR when finished. The PR URL will be captured to re
     }
 
     /**
-     * Generate a lightweight repo map showing exported symbols per file.
+     * Generate a lightweight repo map showing exported symbols per file,
+     * grouped by directory, with line ranges for each symbol.
+     * Prioritizes source directories over test files and truncates at REPO_MAP_MAX_LINES.
      * Returns null if AST service is unavailable or indexing fails.
      */
     private async generateRepoMap(projectDir: string): Promise<string | null> {
@@ -643,34 +671,88 @@ Important: You MUST create a PR when finished. The PR URL will be captured to re
 
         try {
             const index = await this.astParserService.indexProject(projectDir);
-            const lines: string[] = [];
             const RELEVANT_KINDS = new Set(['function', 'class', 'interface', 'type_alias', 'enum', 'variable']);
 
-            // Sort files for deterministic output
-            const sortedFiles = [...index.files.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-
-            for (const [filePath, fileIndex] of sortedFiles) {
-                const relPath = relative(projectDir, filePath);
+            // Collect file entries with relative paths
+            const fileEntries: Array<{ relPath: string; fileIndex: FileSymbolIndex }> = [];
+            for (const [filePath, fileIndex] of index.files.entries()) {
+                const relPath = relative(projectDir, filePath).replaceAll('\\', '/');
                 const exported = fileIndex.symbols.filter(
                     (s: AstSymbol) => s.isExported && RELEVANT_KINDS.has(s.kind),
                 );
                 if (exported.length === 0) continue;
+                fileEntries.push({ relPath, fileIndex });
+            }
 
-                const symbolList = exported.map((s: AstSymbol) => {
-                    const kindLabel = s.kind === 'type_alias' ? 'type' : s.kind;
-                    const children = s.children?.filter((c: AstSymbol) => RELEVANT_KINDS.has(c.kind));
-                    if (children && children.length > 0) {
-                        const methodNames = children.map((c: AstSymbol) => c.name).join(', ');
-                        return `${kindLabel} ${s.name} { ${methodNames} }`;
-                    }
-                    return `${kindLabel} ${s.name}`;
-                });
+            if (fileEntries.length === 0) return null;
 
-                lines.push(`${relPath}: ${symbolList.join(', ')}`);
+            // Sort: prioritize source directories, deprioritize test files
+            fileEntries.sort((a, b) => {
+                const aScore = this.filePathPriority(a.relPath);
+                const bScore = this.filePathPriority(b.relPath);
+                if (aScore !== bScore) return aScore - bScore;
+                return a.relPath.localeCompare(b.relPath);
+            });
+
+            // Group files by directory
+            const dirGroups = new Map<string, typeof fileEntries>();
+            for (const entry of fileEntries) {
+                const dir = entry.relPath.includes('/')
+                    ? entry.relPath.slice(0, entry.relPath.lastIndexOf('/'))
+                    : '.';
+                let group = dirGroups.get(dir);
+                if (!group) {
+                    group = [];
+                    dirGroups.set(dir, group);
+                }
+                group.push(entry);
+            }
+
+            const lines: string[] = [];
+            let lineCount = 0;
+
+            for (const [dir, entries] of dirGroups) {
+                if (lineCount >= REPO_MAP_MAX_LINES) break;
+
+                // Add directory header
+                lines.push(`\n${dir}/`);
+                lineCount++;
+
+                for (const { relPath, fileIndex } of entries) {
+                    if (lineCount >= REPO_MAP_MAX_LINES) break;
+
+                    const exported = fileIndex.symbols.filter(
+                        (s: AstSymbol) => s.isExported && RELEVANT_KINDS.has(s.kind),
+                    );
+
+                    const symbolList = exported.map((s: AstSymbol) => {
+                        const kindLabel = s.kind === 'type_alias' ? 'type' : s.kind;
+                        const lineRange = `[${s.startLine}-${s.endLine}]`;
+                        const children = s.children?.filter((c: AstSymbol) => RELEVANT_KINDS.has(c.kind));
+                        if (children && children.length > 0) {
+                            const methods = children.map((c: AstSymbol) =>
+                                `${c.name} [${c.startLine}-${c.endLine}]`,
+                            ).join(', ');
+                            return `${kindLabel} ${s.name} ${lineRange} { ${methods} }`;
+                        }
+                        return `${kindLabel} ${s.name} ${lineRange}`;
+                    });
+
+                    const fileName = relPath.includes('/')
+                        ? relPath.slice(relPath.lastIndexOf('/') + 1)
+                        : relPath;
+                    lines.push(`  ${fileName}: ${symbolList.join(', ')}`);
+                    lineCount++;
+                }
             }
 
             if (lines.length === 0) return null;
-            return lines.join('\n') + '\n';
+
+            let result = lines.join('\n') + '\n';
+            if (lineCount >= REPO_MAP_MAX_LINES) {
+                result += `\n  ... truncated (${fileEntries.length} files total)\n`;
+            }
+            return result;
         } catch (err) {
             log.warn('Failed to generate repo map', {
                 projectDir,
@@ -678,5 +760,121 @@ Important: You MUST create a PR when finished. The PR URL will be captured to re
             });
             return null;
         }
+    }
+
+    /**
+     * Priority score for file path ordering in the repo map.
+     * Lower score = higher priority. Source dirs come first, test files last.
+     */
+    private filePathPriority(relPath: string): number {
+        // Test files get lowest priority
+        if (relPath.includes('__tests__') || relPath.includes('.test.') || relPath.includes('.spec.')) {
+            return 3;
+        }
+        // Priority source directories
+        for (const dir of PRIORITY_DIRS) {
+            if (relPath.startsWith(dir)) return 1;
+        }
+        return 2;
+    }
+
+    /**
+     * Extract symbols from the project index that are relevant to the task description.
+     * Tokenizes the description into keywords and searches for matching symbols.
+     * Returns a formatted section showing relevant files/symbols, or null if none found.
+     */
+    private extractRelevantSymbols(projectDir: string, description: string): string | null {
+        if (!this.astParserService) return null;
+
+        const keywords = this.tokenizeDescription(description);
+        if (keywords.length === 0) return null;
+
+        const seen = new Set<string>();
+        const results: AstSymbol[] = [];
+
+        for (const keyword of keywords) {
+            if (results.length >= 20) break;
+            const matches = this.astParserService.searchSymbols(projectDir, keyword, { limit: 10 });
+            for (const match of matches) {
+                const key = `${match.name}:${match.startLine}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    results.push(match);
+                }
+                if (results.length >= 20) break;
+            }
+        }
+
+        if (results.length === 0) return null;
+
+        // Group results by file for readability
+        const index = this.astParserService.getProjectIndex(projectDir);
+        if (!index) return null;
+
+        // Build a reverse lookup: symbol → file path
+        const symbolToFile = new Map<string, string>();
+        for (const [filePath, fileIndex] of index.files.entries()) {
+            for (const sym of fileIndex.symbols) {
+                const relFile = relative(projectDir, filePath).replaceAll('\\', '/');
+                symbolToFile.set(`${sym.name}:${sym.startLine}`, relFile);
+                if (sym.children) {
+                    for (const child of sym.children) {
+                        symbolToFile.set(`${child.name}:${child.startLine}`, relFile);
+                    }
+                }
+            }
+        }
+
+        const fileGroups = new Map<string, AstSymbol[]>();
+        for (const sym of results) {
+            const file = symbolToFile.get(`${sym.name}:${sym.startLine}`) ?? 'unknown';
+            let group = fileGroups.get(file);
+            if (!group) {
+                group = [];
+                fileGroups.set(file, group);
+            }
+            group.push(sym);
+        }
+
+        const lines: string[] = [];
+        for (const [file, symbols] of fileGroups) {
+            const symDescs = symbols.map((s) => {
+                const kindLabel = s.kind === 'type_alias' ? 'type' : s.kind;
+                return `${kindLabel} ${s.name} [${s.startLine}-${s.endLine}]`;
+            });
+            lines.push(`${file}: ${symDescs.join(', ')}`);
+        }
+
+        return lines.join('\n');
+    }
+
+    /**
+     * Tokenize a task description into meaningful keywords for symbol search.
+     * Splits on word boundaries, filters stop words, and extracts camelCase/PascalCase parts.
+     */
+    private tokenizeDescription(description: string): string[] {
+        // Split camelCase and PascalCase into parts, then also keep the full token
+        const tokens = new Set<string>();
+
+        // Split on non-alphanumeric boundaries
+        const rawTokens = description.split(/[^a-zA-Z0-9]+/).filter(t => t.length > 0);
+
+        for (const token of rawTokens) {
+            const lower = token.toLowerCase();
+            if (lower.length < 3 || STOP_WORDS.has(lower)) continue;
+
+            tokens.add(lower);
+
+            // Split camelCase: 'buildWorkPrompt' → ['build', 'Work', 'Prompt']
+            const camelParts = token.split(/(?=[A-Z])/).filter(p => p.length >= 3);
+            for (const part of camelParts) {
+                const partLower = part.toLowerCase();
+                if (!STOP_WORDS.has(partLower)) {
+                    tokens.add(partLower);
+                }
+            }
+        }
+
+        return [...tokens];
     }
 }
