@@ -24,6 +24,7 @@ import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { getModelPricing } from '../providers/cost-table';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
@@ -733,11 +734,28 @@ async function runDiscussionRounds(
 ): Promise<void> {
     const discussionStartTime = Date.now();
 
-    // Scale timeouts based on agent count — serialized Ollama agents queue behind each other
+    // Determine if any agent uses local Ollama — Ollama serializes inference internally,
+    // so even though sessions start in parallel, they queue behind each other.
+    // Cloud providers (Anthropic, OpenAI, Ollama cloud) run truly in parallel.
     const agentCount = council.agentIds.length;
-    const perRoundTimeout = Math.max(MIN_ROUND_TIMEOUT_MS, agentCount * PER_AGENT_ROUND_BUDGET_MS);
+    const hasLocalOllama = council.agentIds.some((agentId) => {
+        const agent = getAgent(db, agentId);
+        if (!agent?.model) return false;
+        if (agent.provider === 'ollama') {
+            const pricing = getModelPricing(agent.model);
+            return !pricing?.isCloud; // local Ollama (not cloud-proxied)
+        }
+        return false;
+    });
+
+    // If any agent uses local Ollama, scale timeout by agent count (serialized queue).
+    // Otherwise, agents run truly in parallel — single-agent budget is enough.
+    const perRoundTimeout = hasLocalOllama
+        ? Math.max(MIN_ROUND_TIMEOUT_MS, agentCount * PER_AGENT_ROUND_BUDGET_MS)
+        : Math.max(MIN_ROUND_TIMEOUT_MS, PER_AGENT_ROUND_BUDGET_MS);
     const totalTimeout = Math.min(totalRounds * perRoundTimeout, MAX_DISCUSSION_TOTAL_MS);
-    log.info(`Discussion timeouts: ${Math.round(perRoundTimeout / 60000)}m/round, ${Math.round(totalTimeout / 60000)}m total (${agentCount} agents, ${totalRounds} rounds)`);
+    const mode = hasLocalOllama ? `${agentCount} agents, Ollama serialized` : `${agentCount} agents parallel`;
+    log.info(`Discussion timeouts: ${Math.round(perRoundTimeout / 60000)}m/round, ${Math.round(totalTimeout / 60000)}m total (${mode}, ${totalRounds} rounds)`);
 
     for (let round = 1; round <= totalRounds; round++) {
         // Check overall discussion timeout
@@ -759,8 +777,8 @@ async function runDiscussionRounds(
         // Map agentId → sessionId for agents that successfully started
         const agentSessionMap = new Map<string, string>();
 
-        for (let i = 0; i < council.agentIds.length; i++) {
-            const agentId = council.agentIds[i];
+        // Spawn all discusser sessions in parallel (no stagger delay)
+        for (const agentId of council.agentIds) {
             const agent = getAgent(db, agentId);
             const agentName = agent?.name ?? agentId.slice(0, 8);
             const prompt = buildDiscussionPrompt(originalPrompt, memberResponses, priorDiscussion, round);
@@ -783,18 +801,26 @@ async function runDiscussionRounds(
                 const errMsg = err instanceof Error ? err.message : String(err);
                 emitLog(db, launchId, 'error', `Failed to start discusser for ${agentName}`, errMsg);
             }
-
-            // Stagger process spawns to avoid overwhelming the API
-            if (i < council.agentIds.length - 1) {
-                await new Promise((r) => setTimeout(r, 500));
-            }
         }
 
-        // Wait for all successfully started discusser sessions to finish
+        // Wait for all successfully started discusser sessions in parallel
+        // Using Promise.allSettled-style resilience: timeout doesn't block completion
         if (discusserSessionIds.length === 0) {
             emitLog(db, launchId, 'warn', `No discusser sessions started for round ${round}/${totalRounds}`);
         } else {
-            await waitForSessions(processManager, discusserSessionIds, perRoundTimeout);
+            const waitResult = await waitForSessions(processManager, discusserSessionIds, perRoundTimeout);
+            if (waitResult.timedOut.length > 0) {
+                // Log which agents timed out and stop their stuck sessions
+                for (const timedOutSessionId of waitResult.timedOut) {
+                    const timedOutAgentId = [...agentSessionMap.entries()].find(([, sid]) => sid === timedOutSessionId)?.[0];
+                    const timedOutAgent = timedOutAgentId ? getAgent(db, timedOutAgentId) : null;
+                    const timedOutName = timedOutAgent?.name ?? timedOutAgentId?.slice(0, 8) ?? 'unknown';
+                    emitLog(db, launchId, 'warn', `Discusser ${timedOutName} timed out in round ${round}`, timedOutSessionId);
+                    try { processManager.stopProcess(timedOutSessionId); } catch { /* already stopped */ }
+                }
+                emitLog(db, launchId, 'info',
+                    `Round ${round} completed: ${waitResult.completed.length} responded, ${waitResult.timedOut.length} timed out`);
+            }
         }
 
         // Extract responses and store as discussion messages
@@ -907,15 +933,26 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
     return parts.join('\n\n---\n\n');
 }
 
-// Per-agent budget per round — accounts for serialized Ollama queue (one-at-a-time inference)
+// Per-agent timeout budget. For cloud providers agents run truly in parallel, so a single
+// budget is sufficient. For local Ollama (serialized inference), the budget is multiplied
+// by agent count to account for queueing.
 const PER_AGENT_ROUND_BUDGET_MS = 10 * 60 * 1000; // 10 minutes per agent per round
-const MIN_ROUND_TIMEOUT_MS = 20 * 60 * 1000; // minimum 20 minutes per round
+const MIN_ROUND_TIMEOUT_MS = 10 * 60 * 1000; // minimum 10 minutes per round
 const MAX_DISCUSSION_TOTAL_MS = 3 * 60 * 60 * 1000; // hard cap at 3 hours
 
-function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number): Promise<void> {
-    return new Promise<void>((resolve) => {
+/** Result of waiting for a set of sessions — indicates which completed and which timed out. */
+export interface WaitForSessionsResult {
+    /** Session IDs that completed (exited or stopped) before the timeout. */
+    completed: string[];
+    /** Session IDs still running when the timeout fired. */
+    timedOut: string[];
+}
+
+export function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number): Promise<WaitForSessionsResult> {
+    return new Promise<WaitForSessionsResult>((resolve) => {
         let settled = false;
         const pending = new Set(sessionIds);
+        const completed: string[] = [];
         const callbacks = new Map<string, EventCallback>();
 
         const finish = (): void => {
@@ -926,7 +963,13 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[], t
                 processManager.unsubscribe(sid, cb);
             }
             callbacks.clear();
-            resolve();
+            resolve({ completed, timedOut: Array.from(pending) });
+        };
+
+        const markCompleted = (sessionId: string): void => {
+            if (pending.delete(sessionId)) {
+                completed.push(sessionId);
+            }
         };
 
         const checkDone = (): void => {
@@ -937,8 +980,8 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[], t
         const effectiveTimeout = timeoutMs ?? MIN_ROUND_TIMEOUT_MS;
         const timer = setTimeout(() => {
             if (!settled) {
-                const timedOut = Array.from(pending);
-                log.warn(`waitForSessions timed out (${Math.round(effectiveTimeout / 60000)}m) with ${timedOut.length} sessions still pending: ${timedOut.join(', ')}`);
+                const timedOutIds = Array.from(pending);
+                log.warn(`waitForSessions timed out (${Math.round(effectiveTimeout / 60000)}m) with ${timedOutIds.length} sessions still pending: ${timedOutIds.join(', ')}`);
                 finish();
             }
         }, effectiveTimeout);
@@ -949,7 +992,7 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[], t
             const callback: EventCallback = (sid, event) => {
                 if (sid !== sessionId) return;
                 if (event.type === 'session_exited' || event.type === 'session_stopped') {
-                    pending.delete(sessionId);
+                    markCompleted(sessionId);
                     checkDone();
                 }
             };
@@ -958,7 +1001,7 @@ function waitForSessions(processManager: ProcessManager, sessionIds: string[], t
 
             // If the process already exited before we subscribed, handle it now
             if (!processManager.isRunning(sessionId)) {
-                pending.delete(sessionId);
+                markCompleted(sessionId);
             }
         }
 
