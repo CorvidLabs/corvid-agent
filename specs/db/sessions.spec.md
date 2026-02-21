@@ -44,6 +44,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateConversationRound` | `(db: Database, id: string, lastRound: number)` | `void` | Update the last-seen Algorand round |
 | `updateConversationSession` | `(db: Database, id: string, sessionId: string)` | `void` | Link a conversation to a session |
 | `updateConversationAgent` | `(db: Database, id: string, agentId: string, sessionId: string)` | `void` | Update both agent and session for a conversation |
+| `listPollingActivity` | `(db: Database, repo: string, limit?: number)` | `Session[]` | List sessions related to a repo for polling activity display. Default limit 25 |
 | `getParticipantForSession` | `(db: Database, sessionId: string)` | `string \| null` | Reverse lookup: get wallet address for a session via conversations |
 
 ## Invariants
@@ -119,7 +120,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | TEXT | PRIMARY KEY | UUID |
-| project_id | TEXT | NOT NULL, FK projects(id) | Owning project |
+| project_id | TEXT | FK projects(id), nullable | Owning project |
 | agent_id | TEXT | FK agents(id), nullable | Assigned agent |
 | name | TEXT | DEFAULT '' | Display name |
 | status | TEXT | DEFAULT 'idle' | idle/running/stopped/error/paused |

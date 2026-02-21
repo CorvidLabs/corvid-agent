@@ -63,6 +63,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handlePublishAttestation` | `(ctx, {})` | `Promise<CallToolResult>` | Compute and publish on-chain reputation attestation |
 | `handleVerifyAgentReputation` | `(ctx, { agent_url })` | `Promise<CallToolResult>` | Verify a remote agent's reputation attestation |
 | `handleInvokeRemoteAgent` | `(ctx, { agent_url, message })` | `Promise<CallToolResult>` | Invoke a remote agent via A2A protocol |
+| `handleCodeSymbols` | `(ctx, { project_id?, path?, query? })` | `Promise<CallToolResult>` | Search code symbols (functions, classes, types) in a project using AST parsing |
+| `handleFindReferences` | `(ctx, { project_id?, symbol, path? })` | `Promise<CallToolResult>` | Find references to a symbol across project files using AST parsing |
 
 ## Invariants
 
