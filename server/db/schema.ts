@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 51;
+const SCHEMA_VERSION = 52;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1002,6 +1002,12 @@ const MIGRATIONS: Record<number, string[]> = {
             ('preset-full-stack', 'Full Stack', 'Code, GitHub, tasks, and web search combined', '["read_file","write_file","edit_file","run_command","list_files","search_files","corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_create_work_task","corvid_web_search"]', 'You are a full-stack developer agent. You can read and edit code, run commands, manage GitHub PRs and issues, and create work tasks. Approach problems methodically: understand the codebase first, make targeted changes, test your work, then create PRs or report findings.', 1)`,
         `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
             ('preset-memory-manager', 'Memory Manager', 'Knowledge and memory management with research', '["corvid_save_memory","corvid_recall_memory","corvid_web_search","corvid_deep_research"]', 'You manage knowledge and memory. Save important findings, decisions, and context using structured keys. Recall relevant memories before starting new work. Use web search and deep research to fill knowledge gaps.', 1)`,
+    ],
+    52: [
+        // Fire-and-forget messaging and message versioning
+        `ALTER TABLE agent_messages ADD COLUMN fire_and_forget INTEGER DEFAULT 0`,
+        `ALTER TABLE agent_messages ADD COLUMN message_version INTEGER DEFAULT 1`,
+        `ALTER TABLE agent_messages ADD COLUMN error_code TEXT DEFAULT NULL`,
     ],
 };
 

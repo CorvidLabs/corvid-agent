@@ -11,6 +11,7 @@ import type { WorkTaskService } from '../work/service';
 import { WorkCommandRouter } from '../algochat/work-command-router';
 import type { ClaudeStreamEvent } from '../process/types';
 import type { Agent, AgentMessage } from '../../shared/types';
+import { MESSAGE_PROTOCOL_VERSION } from '../../shared/types';
 
 // ─── Mock objects ────────────────────────────────────────────────────────────
 
@@ -632,6 +633,167 @@ describe('setWorkCommandRouter()', () => {
             projectId,
         });
         expect(mockWorkCreate).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ─── Fire-and-forget messaging ────────────────────────────────────────────────
+
+describe('invoke() with fireAndForget', () => {
+    test('returns immediately without creating a session', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Fire and forget message',
+            projectId,
+            fireAndForget: true,
+        });
+
+        expect(result.message).toBeDefined();
+        expect(result.sessionId).toBeNull();
+        expect(mockProcessManager.startProcess).not.toHaveBeenCalled();
+    });
+
+    test('does not subscribe to session events', async () => {
+        await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'No subscription expected',
+            projectId,
+            fireAndForget: true,
+        });
+
+        // subscribe should only be called by subscribeForAgentResponse, which is
+        // skipped for fire-and-forget messages
+        expect(mockProcessManager.subscribe).not.toHaveBeenCalled();
+    });
+
+    test('marks message as completed after delivery', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Completed on send',
+            projectId,
+            fireAndForget: true,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.status).toBe('completed');
+        expect(dbMessage!.completedAt).not.toBeNull();
+    });
+
+    test('persists fireAndForget flag in DB', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Persisted flag test',
+            projectId,
+            fireAndForget: true,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.fireAndForget).toBe(true);
+    });
+
+    test('normal invoke sets fireAndForget to false', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Normal message',
+            projectId,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.fireAndForget).toBe(false);
+    });
+
+    test('emits message updates for fire-and-forget messages', async () => {
+        const updates: AgentMessage[] = [];
+        messenger.onMessageUpdate((msg) => {
+            updates.push(msg);
+        });
+
+        await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Update emit test',
+            projectId,
+            fireAndForget: true,
+        });
+
+        // Should emit at least for 'sent' and 'completed' status transitions
+        expect(updates.length).toBeGreaterThanOrEqual(2);
+        // Last update should be completed
+        const lastUpdate = updates[updates.length - 1];
+        expect(lastUpdate.status).toBe('completed');
+    });
+
+    test('still applies guard checks for fire-and-forget', async () => {
+        await expect(
+            messenger.invoke({
+                fromAgentId: agentA.id,
+                toAgentId: agentA.id,
+                content: 'self invoke',
+                fireAndForget: true,
+            }),
+        ).rejects.toThrow('An agent cannot invoke itself');
+    });
+});
+
+// ─── Message versioning ──────────────────────────────────────────────────────
+
+describe('message versioning', () => {
+    test('new messages have the current protocol version', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Version test',
+            projectId,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.messageVersion).toBe(MESSAGE_PROTOCOL_VERSION);
+    });
+
+    test('fire-and-forget messages also have the current protocol version', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'F&F version test',
+            projectId,
+            fireAndForget: true,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.messageVersion).toBe(MESSAGE_PROTOCOL_VERSION);
+    });
+});
+
+// ─── Structured error codes ──────────────────────────────────────────────────
+
+describe('structured error codes', () => {
+    test('errorCode is null for successful messages', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'Success message',
+            projectId,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.errorCode).toBeNull();
+    });
+
+    test('errorCode is null for fire-and-forget completed messages', async () => {
+        const result = await messenger.invoke({
+            fromAgentId: agentA.id,
+            toAgentId: agentB.id,
+            content: 'F&F success',
+            projectId,
+            fireAndForget: true,
+        });
+
+        const dbMessage = getAgentMessage(db, result.message.id);
+        expect(dbMessage!.errorCode).toBeNull();
     });
 });
 

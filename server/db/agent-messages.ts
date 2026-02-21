@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
-import type { AgentMessage, AgentMessageStatus } from '../../shared/types';
+import type { AgentMessage, AgentMessageStatus, MessageErrorCode } from '../../shared/types';
+import { MESSAGE_PROTOCOL_VERSION } from '../../shared/types';
 
 interface AgentMessageRow {
     id: string;
@@ -15,6 +16,9 @@ interface AgentMessageRow {
     thread_id: string | null;
     provider: string;
     model: string;
+    fire_and_forget: number;
+    message_version: number;
+    error_code: string | null;
     created_at: string;
     completed_at: string | null;
 }
@@ -34,6 +38,9 @@ function rowToAgentMessage(row: AgentMessageRow): AgentMessage {
         threadId: row.thread_id,
         provider: row.provider || undefined,
         model: row.model || undefined,
+        fireAndForget: row.fire_and_forget === 1,
+        messageVersion: row.message_version ?? MESSAGE_PROTOCOL_VERSION,
+        errorCode: (row.error_code as MessageErrorCode) ?? null,
         createdAt: row.created_at,
         completedAt: row.completed_at,
     };
@@ -49,13 +56,25 @@ export function createAgentMessage(
         threadId?: string;
         provider?: string;
         model?: string;
+        fireAndForget?: boolean;
     },
 ): AgentMessage {
     const id = crypto.randomUUID();
     db.query(
-        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id, provider, model)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, params.fromAgentId, params.toAgentId, params.content, params.paymentMicro ?? 0, params.threadId ?? null, params.provider ?? '', params.model ?? '');
+        `INSERT INTO agent_messages (id, from_agent_id, to_agent_id, content, payment_micro, thread_id, provider, model, fire_and_forget, message_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+        id,
+        params.fromAgentId,
+        params.toAgentId,
+        params.content,
+        params.paymentMicro ?? 0,
+        params.threadId ?? null,
+        params.provider ?? '',
+        params.model ?? '',
+        params.fireAndForget ? 1 : 0,
+        MESSAGE_PROTOCOL_VERSION,
+    );
 
     return getAgentMessage(db, id) as AgentMessage;
 }
@@ -74,6 +93,7 @@ export function updateAgentMessageStatus(
         sessionId?: string;
         response?: string;
         responseTxid?: string;
+        errorCode?: MessageErrorCode;
     },
 ): void {
     const fields: string[] = ['status = ?'];
@@ -94,6 +114,10 @@ export function updateAgentMessageStatus(
     if (extra?.responseTxid !== undefined) {
         fields.push('response_txid = ?');
         values.push(extra.responseTxid);
+    }
+    if (extra?.errorCode !== undefined) {
+        fields.push('error_code = ?');
+        values.push(extra.errorCode);
     }
     if (status === 'completed' || status === 'failed') {
         fields.push("completed_at = datetime('now')");
