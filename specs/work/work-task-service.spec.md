@@ -50,7 +50,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 3. **Worktree cleanup**: Every terminal state (completed, failed, cancelled) must clean up the worktree directory. The git branch is preserved for PR review
 4. **Validation iteration limit**: Failed validation triggers a new iteration up to `WORK_MAX_ITERATIONS` (default 3). After that, the task is marked failed
 5. **Branch naming convention**: `agent/<agent-slug>/<task-slug>-<timestamp-base36>-<random-6char>`
-6. **PR URL extraction**: A task is only marked `completed` if the session output contains a GitHub PR URL matching `https://github.com/[^\\s]+/pull/\\d+`. Otherwise it fails
+6. **PR URL extraction with fallback**: After validation passes, the service first checks session output for a GitHub PR URL matching `https://github.com/[^\\s]+/pull/\\d+`. If none is found, it falls back to service-level PR creation via `createPrFallback()` which pushes the branch and runs `gh pr create`. The task only fails if both extraction and fallback fail
 7. **Status state machine**: `pending` -> `branching` -> `running` -> `validating` -> (`completed` | `failed`) or (`running` for next iteration). No backward transitions
 8. **Dependency installation**: `bun install --frozen-lockfile --ignore-scripts` is run in the worktree before execution and before each validation. Falls back to non-frozen if frozen fails. `--ignore-scripts` prevents postinstall hooks from bypassing protected-file checks
 9. **Session linkage**: Each running iteration creates a new session with `workDir` pointing to the worktree
@@ -85,11 +85,20 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 - **Then** status becomes `failed` with the validation output in the error field
 - **And** worktree is cleaned up
 
-### Scenario: No PR URL in output
+### Scenario: No PR URL in output — fallback PR creation
 
 - **Given** a running work task where validation passes
 - **When** the session output does not contain a GitHub PR URL
-- **Then** status becomes `failed` with error "Session completed but no PR URL was found in output"
+- **Then** the service pushes the branch and runs `gh pr create` as a fallback
+- **When** the fallback succeeds and returns a PR URL
+- **Then** status becomes `completed` with `prUrl` set, worktree is cleaned up
+
+### Scenario: No PR URL and fallback fails
+
+- **Given** a running work task where validation passes
+- **When** the session output does not contain a GitHub PR URL
+- **And** the fallback `gh pr create` also fails
+- **Then** status becomes `failed` with error "Session completed but no PR URL was found in output and service-level PR creation failed"
 
 ### Scenario: Cancel a running task
 
@@ -168,3 +177,4 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-02-20 | corvid-agent | Updated invariant #6 and behavioral example: PR creation now falls back to service-level `createPrFallback()` (fixes #182) |
