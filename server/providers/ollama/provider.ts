@@ -124,6 +124,27 @@ export class OllamaProvider extends BaseLlmProvider {
         return process.env.OLLAMA_HOST || 'http://localhost:11434';
     }
 
+    /**
+     * Get the host for a specific model. Cloud models (suffix "-cloud") require
+     * the local Ollama instance because cloud proxying uses locally-stored auth.
+     * If OLLAMA_HOST points to a non-local address, cloud models fall back to localhost.
+     */
+    private hostForModel(model: string): string {
+        if (model.includes('-cloud')) {
+            const configuredHost = this.host;
+            // If host is already localhost, use it directly
+            if (configuredHost.includes('localhost') || configuredHost.includes('127.0.0.1')) {
+                return configuredHost;
+            }
+            // Cloud models need local Ollama for auth proxy — override to localhost
+            const url = new URL(configuredHost);
+            const localHost = `${url.protocol}//localhost:${url.port || '11434'}`;
+            log.info(`Cloud model "${model}" — redirecting from ${configuredHost} to ${localHost}`);
+            return localHost;
+        }
+        return this.host;
+    }
+
     getInfo(): LlmProviderInfo {
         return {
             type: this.type,
@@ -153,8 +174,32 @@ export class OllamaProvider extends BaseLlmProvider {
             }
 
             const data = (await response.json()) as OllamaTagsResponse;
-            this.cachedModels = data.models.map((m) => m.name);
-            this.cachedTags = data.models;
+            let allModels = data.models;
+
+            // If host is non-local, also check localhost for cloud models
+            // (cloud models only appear on the local Ollama instance)
+            if (!this.host.includes('localhost') && !this.host.includes('127.0.0.1')) {
+                try {
+                    const url = new URL(this.host);
+                    const localHost = `${url.protocol}//localhost:${url.port || '11434'}`;
+                    const localResponse = await fetch(`${localHost}/api/tags`, {
+                        signal: AbortSignal.timeout(3_000),
+                    });
+                    if (localResponse.ok) {
+                        const localData = (await localResponse.json()) as OllamaTagsResponse;
+                        const cloudModels = localData.models.filter(m => m.name.includes('-cloud'));
+                        if (cloudModels.length > 0) {
+                            allModels = [...allModels, ...cloudModels];
+                            log.info(`Found ${cloudModels.length} cloud model(s) on localhost`);
+                        }
+                    }
+                } catch {
+                    // localhost not available — no cloud models
+                }
+            }
+
+            this.cachedModels = allModels.map((m) => m.name);
+            this.cachedTags = allModels;
             this.cacheTimestamp = now;
             log.info(`Refreshed Ollama models: ${this.cachedModels.length} available`);
             return this.cachedModels;
@@ -472,16 +517,20 @@ export class OllamaProvider extends BaseLlmProvider {
             ? AbortSignal.any([params.signal, timeoutSignal])
             : timeoutSignal;
 
-        log.info(`Ollama request: model=${params.model} tools=${useTextBasedTools ? 'text-based' : (body.tools ? 'native' : 'none')} msgs=${messages.length}`);
-        const response = await fetch(`${this.host}/api/chat`, {
+        const effectiveHost = this.hostForModel(params.model);
+        const requestUrl = `${effectiveHost}/api/chat`;
+        const requestBody = JSON.stringify(body);
+        log.info(`Ollama request: model=${params.model} tools=${useTextBasedTools ? 'text-based' : (body.tools ? 'native' : 'none')} msgs=${messages.length} url=${requestUrl} bodyLen=${requestBody.length}`);
+        const response = await fetch(requestUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: requestBody,
             signal: combinedSignal,
         });
 
         if (!response.ok) {
             const text = await response.text();
+            log.error(`Ollama API ${response.status} for model=${params.model}: ${text.slice(0, 200)}`);
             throw new Error(`Ollama API error (${response.status}): ${text}`);
         }
 

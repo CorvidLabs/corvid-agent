@@ -34,23 +34,25 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
     'high-capability': {
         chain: [
             { provider: 'anthropic', model: 'claude-opus-4-6' },
-            { provider: 'openai', model: 'gpt-4o' },
-            { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
+            { provider: 'openai', model: 'gpt-4.1' },
+            { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+            { provider: 'openai', model: 'o3' },
             { provider: 'ollama', model: 'qwen3:32b' },
         ],
     },
     'balanced': {
         chain: [
-            { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
-            { provider: 'openai', model: 'gpt-4o' },
+            { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+            { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
-            { provider: 'openai', model: 'gpt-4o-mini' },
+            { provider: 'openai', model: 'gpt-4.1-mini' },
             { provider: 'ollama', model: 'llama3.3' },
         ],
     },
     'cost-optimized': {
         chain: [
             { provider: 'ollama', model: 'llama3.3' },
+            { provider: 'openai', model: 'gpt-4.1-nano' },
             { provider: 'openai', model: 'gpt-4o-mini' },
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
         ],
@@ -65,10 +67,11 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
     },
     'cloud': {
         chain: [
+            { provider: 'ollama', model: 'qwen3.5:cloud' },
             { provider: 'ollama', model: 'minimax-m2.5:cloud' },
+            { provider: 'ollama', model: 'deepseek-v3.2:cloud' },
+            { provider: 'ollama', model: 'qwen3-coder-next:cloud' },
             { provider: 'ollama', model: 'glm-5:cloud' },
-            { provider: 'ollama', model: 'kimi-k2.5:cloud' },
-            { provider: 'ollama', model: 'qwen3:32b' },
         ],
     },
 };

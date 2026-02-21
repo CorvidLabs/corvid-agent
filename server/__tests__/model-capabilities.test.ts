@@ -56,6 +56,30 @@ describe('Tool support detection via inferFromName', () => {
         expect(caps.supportsTools).toBe(false);
         expect(caps.family).toBe('unknown');
     });
+
+    it('detects qwen3moe as tool-capable', async () => {
+        const caps = await detector.getCapabilities('qwen3moe:latest');
+        expect(caps.supportsTools).toBe(true);
+        expect(caps.family).toBe('qwen3moe');
+    });
+
+    it('detects deepseek-v3 as tool-capable (deepseek2 family)', async () => {
+        const caps = await detector.getCapabilities('deepseek-v3.1:671b');
+        expect(caps.supportsTools).toBe(true);
+        expect(caps.family).toBe('deepseek2');
+    });
+
+    it('detects command-r as tool-capable', async () => {
+        const caps = await detector.getCapabilities('command-r:35b');
+        expect(caps.supportsTools).toBe(true);
+        expect(caps.family).toBe('command-r');
+    });
+
+    it('detects nemotron as tool-capable', async () => {
+        const caps = await detector.getCapabilities('nemotron:8b');
+        expect(caps.supportsTools).toBe(true);
+        expect(caps.family).toBe('nemotron');
+    });
 });
 
 // ── Embedding model exclusion ──────────────────────────────────────────────

@@ -6,11 +6,12 @@ export class AnthropicProvider extends BaseLlmProvider {
     readonly executionMode: ExecutionMode = 'managed';
 
     private static readonly MODELS = [
-        'claude-sonnet-4-20250514',
-        'claude-opus-4-20250514',
-        'claude-haiku-3-5-20241022',
+        'claude-opus-4-6',
+        'claude-sonnet-4-6',
+        'claude-sonnet-4-5-20250929',
+        'claude-haiku-4-5-20251001',
     ];
-    private static readonly DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+    private static readonly DEFAULT_MODEL = 'claude-sonnet-4-6';
 
     getInfo(): LlmProviderInfo {
         return {

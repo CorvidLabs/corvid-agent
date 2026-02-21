@@ -3,7 +3,7 @@
 # Run: chmod +x setup.sh && ./setup.sh
 set -euo pipefail
 
-SETUP_VERSION="1.0.0"
+SETUP_VERSION="1.1.0"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Defaults
@@ -125,6 +125,14 @@ sed_inplace() {
     else
         sed -i "$@"
     fi
+}
+
+is_container() {
+    # Check common container indicators
+    [[ -f /.dockerenv ]] ||
+    grep -qsm1 'docker\|containerd' /proc/1/cgroup 2>/dev/null ||
+    [[ -n "${CONTAINER:-}" ]] ||
+    [[ -n "${DOCKER_CONTAINER:-}" ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -320,6 +328,19 @@ setup_env() {
             info "GH_TOKEN set"
         fi
     fi
+
+    # Container-friendly localnet overrides
+    if [[ "$CHOSEN_NETWORK" == "localnet" ]] && is_container; then
+        detail "Container detected — setting LOCALNET_* overrides for host.docker.internal"
+        {
+            echo ""
+            echo "# Container localnet overrides (auto-set by setup.sh)"
+            echo "LOCALNET_ALGOD_URL=http://host.docker.internal:4001"
+            echo "LOCALNET_KMD_URL=http://host.docker.internal:4002"
+            echo "LOCALNET_INDEXER_URL=http://host.docker.internal:8980"
+        } >> "$env_file"
+        info "LOCALNET_* env vars set to host.docker.internal"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -456,6 +477,30 @@ setup_localnet() {
     step "Setting up AlgoKit localnet (required for on-chain agent features)"
     detail "Localnet provides the Algorand blockchain that powers AlgoChat messaging,"
     detail "agent wallet auto-funding, and on-chain memory storage."
+
+    # Container mode — can't run Docker-in-Docker easily
+    if is_container; then
+        warn "Running inside a container — cannot start AlgoKit localnet here."
+        detail "AlgoKit localnet must run on the host machine."
+        printf "\n"
+        detail "Ensure AlgoKit localnet is running on the host:"
+        detail "  algokit localnet start"
+        printf "\n"
+        detail "LOCALNET_* env vars should point to host.docker.internal"
+        detail "(auto-configured if you ran the env setup step)."
+
+        # Quick check if host localnet is reachable via the override URL
+        local check_url="${LOCALNET_ALGOD_URL:-http://host.docker.internal:4001}"
+        local algod_token
+        algod_token=$(printf 'a%.0s' {1..64})
+        if curl -sf "${check_url}/v2/status" -H "X-Algo-API-Token: ${algod_token}" >/dev/null 2>&1; then
+            info "Host localnet is reachable at ${check_url}"
+        else
+            warn "Host localnet not reachable at ${check_url}"
+            detail "Start localnet on the host: algokit localnet start"
+        fi
+        return
+    fi
 
     # Check Docker
     if ! has_cmd docker; then
@@ -599,16 +644,29 @@ print_summary() {
     if [[ "$CHOSEN_NETWORK" == "localnet" ]]; then
         local algod_token
         algod_token=$(printf 'a%.0s' {1..64})
+        local algod_check_url="http://localhost:4001"
+        if [[ -n "${LOCALNET_ALGOD_URL:-}" ]]; then
+            algod_check_url="$LOCALNET_ALGOD_URL"
+        elif is_container; then
+            algod_check_url="http://host.docker.internal:4001"
+        fi
         printf "  %-12s" "Localnet:"
-        if curl -sf "http://localhost:4001/v2/status" -H "X-Algo-API-Token: ${algod_token}" >/dev/null 2>&1; then
+        if curl -sf "${algod_check_url}/v2/status" -H "X-Algo-API-Token: ${algod_token}" >/dev/null 2>&1; then
             printf "${GREEN}running${RESET}\n"
+            if is_container; then
+                detail "via ${algod_check_url} (container mode)"
+            fi
             printf "  %-12s" "AlgoChat:"
             printf "${GREEN}ready (on-chain messaging enabled)${RESET}\n"
         else
             printf "${RED}not running${RESET}\n"
             printf "  %-12s" "AlgoChat:"
             printf "${RED}unavailable — start localnet first${RESET}\n"
-            detail "Run: algokit localnet start"
+            if is_container; then
+                detail "Run on host: algokit localnet start"
+            else
+                detail "Run: algokit localnet start"
+            fi
         fi
     else
         printf "  %-12s" "Network:"

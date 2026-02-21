@@ -23,6 +23,7 @@ import { handlePluginRoutes } from './plugins';
 import { handlePersonaRoutes } from './personas';
 import { handleSkillBundleRoutes } from './skill-bundles';
 import { handleMcpServerRoutes } from './mcp-servers';
+import { handleExamRoutes } from './exam';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -480,6 +481,10 @@ async function handleRoutes(
     if (url.pathname === '/api/memories/backfill' && req.method === 'POST') {
         return handleMemoryBackfill(db, agentMessenger ?? null);
     }
+
+    // Model exam routes
+    const examResponse = await handleExamRoutes(req, url, db, processManager);
+    if (examResponse) return examResponse;
 
     // Self-test route
     if (url.pathname === '/api/selftest/run' && req.method === 'POST') {

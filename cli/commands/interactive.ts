@@ -3,17 +3,17 @@ import { loadConfig } from '../config';
 import { pickAgent, fetchAgent } from './pick-agent';
 import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
-import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, Spinner } from '../render';
+import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, flushStreamBuffer, Spinner } from '../render';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
 
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 const MAX_HISTORY_CHARS = 12_000; // Trim oldest turns when history exceeds this
 
 interface InteractiveOptions {
     agent?: string;
 }
 
-interface Turn {
+export interface Turn {
     role: 'user' | 'assistant';
     content: string;
 }
@@ -36,7 +36,7 @@ async function resolveProjectFromCwd(client: CorvidClient): Promise<string | und
  * Build a prompt that includes conversation history so one-shot providers
  * (Ollama direct mode) maintain context across turns.
  */
-function buildPromptWithHistory(history: Turn[], currentMessage: string): string {
+export function buildPromptWithHistory(history: Turn[], currentMessage: string): string {
     if (history.length === 0) return currentMessage;
 
     // Trim oldest turns if history is too long
@@ -114,6 +114,7 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
 
     const completeTurn = () => {
         if (!responding) return;
+        flushStreamBuffer();
         if (headerPrinted) {
             renderAgentSuffix();
             headerPrinted = false;
@@ -222,7 +223,7 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
     promptUser();
 }
 
-function handleMessage(
+export function handleMessage(
     msg: ServerMessage,
     agentId: string,
     getHasStreamContent: () => boolean,

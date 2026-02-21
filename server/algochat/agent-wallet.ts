@@ -267,10 +267,10 @@ export class AgentWalletService {
     private async fundFromDispenser(address: string, microAlgos: number): Promise<void> {
         const algosdk = (await import('algosdk')).default;
         const kmdToken = 'a'.repeat(64);
-        const kmdServer = 'http://localhost';
-        const kmdPort = 4002;
+        const kmdUrl = process.env.LOCALNET_KMD_URL ?? 'http://localhost:4002';
+        const parsed = new URL(kmdUrl);
 
-        const kmd = new algosdk.Kmd(kmdToken, kmdServer, kmdPort);
+        const kmd = new algosdk.Kmd(kmdToken, `${parsed.protocol}//${parsed.hostname}`, parseInt(parsed.port || '4002'));
         const wallets = await kmd.listWallets();
         const defaultWallet = wallets.wallets.find(
             (w: { name: string }) => w.name === 'unencrypted-default-wallet',

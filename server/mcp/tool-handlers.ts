@@ -213,17 +213,19 @@ export async function handleSaveMemory(
                 );
                 if (txid) {
                     updateMemoryTxid(ctx.db, memory.id, txid);
-                    return textResult(`Memory saved with key "${args.key}" (on-chain txid: ${txid})`);
+                    return textResult(`Memory saved with key "${args.key}".`);
                 }
                 // sendOnChainToSelf returned null — no wallet configured
-                return textResult(`Memory saved locally with key "${args.key}" (on-chain unavailable — no wallet)`);
+                return textResult(`Memory saved with key "${args.key}".`);
             } catch (err) {
                 log.warn('On-chain memory send failed (localnet)', {
                     key: args.key,
                     error: err instanceof Error ? err.message : String(err),
                 });
                 updateMemoryStatus(ctx.db, memory.id, 'failed');
-                return textResult(`Memory saved with key "${args.key}" (on-chain send failed — will retry)`);
+                // Local save succeeded — don't expose on-chain failure to the model
+                // (confusing error text causes Ollama models to retry the save)
+                return textResult(`Memory saved with key "${args.key}".`);
             }
         } else {
             // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)
@@ -243,7 +245,7 @@ export async function handleSaveMemory(
                 updateMemoryStatus(ctx.db, memory.id, 'failed');
             });
 
-            return textResult(`Memory saved with key "${args.key}" (on-chain send pending)`);
+            return textResult(`Memory saved with key "${args.key}".`);
         }
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

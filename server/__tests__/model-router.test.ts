@@ -83,9 +83,9 @@ describe('Cost Table', () => {
     });
 
     test('estimateCost calculates correctly', () => {
-        // claude-opus-4-6: $15/M input, $75/M output
+        // claude-opus-4-6: $5/M input, $25/M output
         const cost = estimateCost('claude-opus-4-6', 1_000_000, 1_000_000);
-        expect(cost).toBe(90); // $15 input + $75 output
+        expect(cost).toBe(30); // $5 input + $25 output
     });
 
     test('estimateCost returns 0 for unknown model', () => {

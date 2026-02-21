@@ -500,6 +500,16 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 for (const toolCall of result.toolCalls) {
                     if (aborted) return;
 
+                    // Emit structured tool_use event so CLI/dashboard can display it
+                    onEvent({
+                        type: 'content_block_start',
+                        content_block: {
+                            type: 'tool_use',
+                            name: toolCall.name,
+                            input: toolCall.arguments,
+                        },
+                    } as ClaudeStreamEvent);
+
                     const toolDef = toolMap.get(toolCall.name);
                     if (!toolDef) {
                         const errorText = `Unknown tool: ${toolCall.name}`;

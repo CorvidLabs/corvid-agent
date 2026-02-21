@@ -6,6 +6,7 @@ import type {
     CreateMentionPollingInput,
     UpdateMentionPollingInput,
     MentionPollingStats,
+    PollingActivity,
 } from '../models/mention-polling.model';
 import type { ServerWsMessage } from '../models/ws-message.model';
 import { firstValueFrom } from 'rxjs';
@@ -18,6 +19,7 @@ export class MentionPollingService {
     readonly configs = signal<MentionPollingConfig[]>([]);
     readonly stats = signal<MentionPollingStats | null>(null);
     readonly loading = signal(false);
+    readonly activity = signal<Map<string, PollingActivity[]>>(new Map());
 
     private unsubscribeWs: (() => void) | null = null;
 
@@ -89,6 +91,21 @@ export class MentionPollingService {
             this.stats.set(stats);
         } catch {
             // Stats endpoint may not exist yet
+        }
+    }
+
+    async loadActivity(configId: string): Promise<void> {
+        try {
+            const result = await firstValueFrom(
+                this.api.get<{ sessions: PollingActivity[] }>(`/mention-polling/${configId}/activity`),
+            );
+            this.activity.update(map => {
+                const next = new Map(map);
+                next.set(configId, result.sessions);
+                return next;
+            });
+        } catch {
+            // Activity endpoint may not exist yet
         }
     }
 }

@@ -1,11 +1,12 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MentionPollingService } from '../../core/services/mention-polling.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { MentionPollingConfig, MentionPollingStatus } from '../../core/models/mention-polling.model';
+import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from '../../core/models/mention-polling.model';
 
 @Component({
     selector: 'app-mention-polling-list',
@@ -164,6 +165,7 @@ import type { MentionPollingConfig, MentionPollingStatus } from '../../core/mode
                                     <span class="expand-indicator">{{ expandedId() === config.id ? '\u25B2' : '\u25BC' }}</span>
                                 </div>
                                 <div class="config-card__actions">
+                                    <button class="action-btn action-btn--edit" (click)="startEdit(config); $event.stopPropagation()">Edit</button>
                                     @if (config.status === 'active') {
                                         <button class="action-btn" (click)="toggleStatus(config, 'paused'); $event.stopPropagation()">Pause</button>
                                     } @else {
@@ -207,40 +209,97 @@ import type { MentionPollingConfig, MentionPollingStatus } from '../../core/mode
 
                             @if (expandedId() === config.id) {
                                 <div class="config-detail" (click)="$event.stopPropagation()">
-                                    <div class="detail-grid">
-                                        <div class="detail-item">
-                                            <span class="detail-label">Config ID</span>
-                                            <span class="detail-value mono">{{ config.id }}</span>
-                                        </div>
-                                        <div class="detail-item">
-                                            <span class="detail-label">Agent</span>
-                                            <span class="detail-value">{{ getAgentName(config.agentId) }}</span>
-                                            <span class="detail-value mono" style="font-size:.6rem;color:var(--text-tertiary)">{{ config.agentId }}</span>
-                                        </div>
-                                        <div class="detail-item">
-                                            <span class="detail-label">Project</span>
-                                            <span class="detail-value">{{ getProjectName(config.projectId) }}</span>
-                                            <span class="detail-value mono" style="font-size:.6rem;color:var(--text-tertiary)">{{ config.projectId }}</span>
-                                        </div>
-                                        <div class="detail-item">
-                                            <span class="detail-label">Last Seen ID</span>
-                                            <span class="detail-value mono">{{ config.lastSeenId ?? 'None' }}</span>
-                                        </div>
-                                        @if (config.allowedUsers.length > 0) {
-                                            <div class="detail-item span-2">
-                                                <span class="detail-label">Allowed Users</span>
-                                                <span class="detail-value">{{ config.allowedUsers.join(', ') }}</span>
+                                    @if (editingId() === config.id) {
+                                        <!-- Edit Form -->
+                                        <div class="edit-form">
+                                            <div class="form-grid">
+                                                <div class="form-field">
+                                                    <label>Agent</label>
+                                                    <select class="form-select" [ngModel]="editAgentId()" (ngModelChange)="editAgentId.set($event)">
+                                                        @for (agent of agentService.agents(); track agent.id) {
+                                                            <option [value]="agent.id">{{ agent.name }}</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Mention Username</label>
+                                                    <input [value]="editMentionUsername()" (input)="editMentionUsername.set(inputValue($event))" class="form-input mono" />
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Poll Interval (seconds)</label>
+                                                    <input type="number" [value]="editInterval()" (input)="editInterval.set(+inputValue($event) || 60)" class="form-input" min="30" max="3600" />
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Project</label>
+                                                    <select class="form-select" [ngModel]="editProjectId()" (ngModelChange)="editProjectId.set($event)">
+                                                        <option value="">None</option>
+                                                        @for (project of projectService.projects(); track project.id) {
+                                                            <option [value]="project.id">{{ project.name }}</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Listen for</label>
+                                                    <div class="checkbox-group">
+                                                        <label class="checkbox-label">
+                                                            <input type="checkbox" [checked]="editFilterIssueComment()" (change)="editFilterIssueComment.set(!editFilterIssueComment())" />
+                                                            Issue comments
+                                                        </label>
+                                                        <label class="checkbox-label">
+                                                            <input type="checkbox" [checked]="editFilterIssues()" (change)="editFilterIssues.set(!editFilterIssues())" />
+                                                            New issues
+                                                        </label>
+                                                        <label class="checkbox-label">
+                                                            <input type="checkbox" [checked]="editFilterPrComment()" (change)="editFilterPrComment.set(!editFilterPrComment())" />
+                                                            PR review comments
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="form-field">
+                                                    <label>Only from these users (optional)</label>
+                                                    <input [value]="editAllowedUsers()" (input)="editAllowedUsers.set(inputValue($event))" class="form-input" placeholder="user1, user2" />
+                                                </div>
                                             </div>
+                                            <div class="form-buttons edit-buttons">
+                                                <button class="save-btn" [disabled]="saving()" (click)="saveEdit(config)">
+                                                    {{ saving() ? 'Saving...' : 'Save Changes' }}
+                                                </button>
+                                                <button class="action-btn" (click)="cancelEdit()">Cancel</button>
+                                            </div>
+                                        </div>
+                                    } @else {
+                                        <!-- Activity Feed -->
+                                        @if (getActivity(config.id).length > 0) {
+                                            <div class="activity-summary-bar">
+                                                <span class="activity-summary">{{ activitySummary(getActivity(config.id)) }}</span>
+                                                @if (config.allowedUsers.length > 0) {
+                                                    <span class="activity-filter-note">only from {{ config.allowedUsers.join(', ') }}</span>
+                                                }
+                                            </div>
+                                            <div class="activity-list">
+                                                @for (item of sortedActivity(getActivity(config.id)); track item.id) {
+                                                    <div class="activity-item activity-item--clickable" (click)="openSession(item.id)">
+                                                        <span class="activity-status-dot" [attr.data-status]="item.status"></span>
+                                                        <span class="activity-type-label" [attr.data-type]="item.isPR ? 'pr' : 'issue'">{{ item.isPR ? 'PR' : 'Issue' }}</span>
+                                                        <span class="activity-number">{{ item.number ? '#' + item.number : '' }}</span>
+                                                        <span class="activity-title">{{ item.title || parseTitle(item.name) }}</span>
+                                                        @if (item.sender) {
+                                                            <span class="activity-sender">&#64;{{ item.sender }}</span>
+                                                        }
+                                                        @if (item.triggerType) {
+                                                            <span class="activity-trigger" [attr.data-trigger]="item.triggerType">{{ item.triggerType }}</span>
+                                                        }
+                                                        @if (showRepoColumn(config)) {
+                                                            <span class="activity-repo">{{ shortRepo(item.repo) }}</span>
+                                                        }
+                                                        <span class="activity-time">{{ item.createdAt | relativeTime }}</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        } @else {
+                                            <p class="activity-empty">No triggered sessions yet. Waiting for &#64;{{ config.mentionUsername }} mentions...</p>
                                         }
-                                        <div class="detail-item">
-                                            <span class="detail-label">Created</span>
-                                            <span class="detail-value">{{ config.createdAt | relativeTime }}</span>
-                                        </div>
-                                        <div class="detail-item">
-                                            <span class="detail-label">Updated</span>
-                                            <span class="detail-value">{{ config.updatedAt | relativeTime }}</span>
-                                        </div>
-                                    </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -319,10 +378,35 @@ import type { MentionPollingConfig, MentionPollingStatus } from '../../core/mode
         .event-tag--all{color:var(--accent-cyan);border-color:var(--accent-cyan)}
 
         .config-detail{margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem}
-        .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
-        .detail-item{display:flex;flex-direction:column;gap:.1rem}
-        .detail-label{font-size:.55rem;color:var(--text-tertiary);text-transform:uppercase}
-        .detail-value{font-size:.7rem;color:var(--text-secondary);word-break:break-all}
+
+        .action-btn--edit{border-color:var(--accent-cyan);color:var(--accent-cyan)}
+        .edit-form{display:flex;flex-direction:column;gap:.75rem}
+        .edit-buttons{display:flex;gap:.5rem;align-items:center}
+
+        .activity-summary-bar{display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem}
+        .activity-summary{font-size:.7rem;color:var(--text-secondary);font-weight:600}
+        .activity-filter-note{font-size:.6rem;color:var(--text-tertiary)}
+        .activity-list{display:flex;flex-direction:column;gap:.35rem;max-height:300px;overflow-y:auto}
+        .activity-item{display:flex;align-items:center;gap:.5rem;padding:.3rem .4rem;border-radius:var(--radius-sm);background:var(--bg-raised)}
+        .activity-item--clickable{cursor:pointer;transition:background .15s,border-color .15s}
+        .activity-item--clickable:hover{background:var(--bg-hover);outline:1px solid var(--accent-cyan)}
+        .activity-status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+        .activity-status-dot[data-status="running"],.activity-status-dot[data-status="idle"]{background:var(--accent-green);box-shadow:0 0 4px var(--accent-green)}
+        .activity-status-dot[data-status="completed"]{background:var(--text-tertiary)}
+        .activity-status-dot[data-status="stopped"]{background:var(--accent-amber)}
+        .activity-status-dot[data-status="error"]{background:var(--accent-red)}
+        .activity-type-label{font-size:.55rem;font-weight:700;text-transform:uppercase;padding:1px 5px;border-radius:var(--radius-sm);border:1px solid;flex-shrink:0}
+        .activity-type-label[data-type="pr"]{color:var(--accent-cyan);border-color:var(--accent-cyan);background:var(--accent-cyan-dim)}
+        .activity-type-label[data-type="issue"]{color:var(--accent-amber);border-color:var(--accent-amber);background:var(--accent-amber-dim)}
+        .activity-number{font-size:.7rem;font-weight:700;color:var(--text-primary);font-family:monospace;min-width:2rem;flex-shrink:0}
+        .activity-title{font-size:.7rem;color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .activity-sender{font-size:.6rem;color:var(--accent-cyan);font-family:monospace;flex-shrink:0}
+        .activity-trigger{font-size:.5rem;text-transform:uppercase;padding:1px 4px;border-radius:var(--radius-sm);background:var(--bg-surface);color:var(--text-tertiary);border:1px solid var(--border);flex-shrink:0}
+        .activity-trigger[data-trigger="review"]{color:var(--accent-purple, var(--text-secondary));border-color:var(--accent-purple, var(--border))}
+        .activity-trigger[data-trigger="assignment"]{color:var(--accent-green);border-color:var(--accent-green)}
+        .activity-repo{font-size:.6rem;color:var(--text-tertiary);font-family:monospace;flex-shrink:0}
+        .activity-time{font-size:.6rem;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0}
+        .activity-empty{font-size:.7rem;color:var(--text-tertiary);margin:0}
 
         @media(max-width:768px){.form-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.config-meta{flex-direction:column;gap:.5rem}.detail-grid{grid-template-columns:1fr}.stats-banner{flex-wrap:wrap;gap:.75rem}}
     `,
@@ -332,12 +416,25 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
     protected readonly agentService = inject(AgentService);
     protected readonly projectService = inject(ProjectService);
     private readonly notifications = inject(NotificationService);
+    private readonly router = inject(Router);
 
     readonly activeFilter = signal<'all' | 'active' | 'paused'>('all');
     readonly showCreateForm = signal(false);
     readonly showAdvanced = signal(false);
     readonly creating = signal(false);
     readonly expandedId = signal<string | null>(null);
+    readonly editingId = signal<string | null>(null);
+    readonly saving = signal(false);
+
+    // Edit form signals
+    readonly editAgentId = signal('');
+    readonly editMentionUsername = signal('');
+    readonly editInterval = signal(60);
+    readonly editProjectId = signal('');
+    readonly editFilterIssueComment = signal(true);
+    readonly editFilterIssues = signal(false);
+    readonly editFilterPrComment = signal(true);
+    readonly editAllowedUsers = signal('');
 
     // Form fields — all signals for reliable OnPush rendering
     readonly formAgentId = signal('');
@@ -391,7 +488,59 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
     }
 
     toggleExpand(id: string): void {
-        this.expandedId.set(this.expandedId() === id ? null : id);
+        const isExpanding = this.expandedId() !== id;
+        this.expandedId.set(isExpanding ? id : null);
+        if (isExpanding) {
+            this.pollingService.loadActivity(id);
+        }
+    }
+
+    getActivity(configId: string): PollingActivity[] {
+        return this.pollingService.activity().get(configId) ?? [];
+    }
+
+    activitySummary(activities: PollingActivity[]): string {
+        const total = activities.length;
+        const prs = activities.filter(a => a.isPR).length;
+        const issues = total - prs;
+        const inProgress = activities.filter(a => a.status === 'running' || a.status === 'idle').length;
+        const parts: string[] = [`${total} trigger${total !== 1 ? 's' : ''}`];
+        const typeParts: string[] = [];
+        if (prs > 0) typeParts.push(`${prs} PR${prs !== 1 ? 's' : ''}`);
+        if (issues > 0) typeParts.push(`${issues} issue${issues !== 1 ? 's' : ''}`);
+        if (typeParts.length > 0) parts.push(typeParts.join(', '));
+        if (inProgress > 0) parts.push(`${inProgress} in progress`);
+        return parts.join(' \u2014 ');
+    }
+
+    sortedActivity(activities: PollingActivity[]): PollingActivity[] {
+        return [...activities].sort((a, b) => {
+            const aRunning = a.status === 'running' || a.status === 'idle' ? 0 : 1;
+            const bRunning = b.status === 'running' || b.status === 'idle' ? 0 : 1;
+            if (aRunning !== bRunning) return aRunning - bRunning;
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+    }
+
+    openSession(sessionId: string): void {
+        this.router.navigate(['/sessions', sessionId]);
+    }
+
+    parseTitle(name: string): string {
+        const match = name.match(/#\d+:\s*(.*)/);
+        return match ? match[1] : name;
+    }
+
+    /** Show repo column when config watches an org (no slash = org-level). */
+    showRepoColumn(config: MentionPollingConfig): boolean {
+        return !config.repo.includes('/');
+    }
+
+    /** Extract short repo name from full owner/repo. */
+    shortRepo(repo: string | null): string {
+        if (!repo) return '';
+        const idx = repo.indexOf('/');
+        return idx >= 0 ? repo.substring(idx + 1) : repo;
     }
 
     async create(): Promise<void> {
@@ -451,6 +600,55 @@ export class MentionPollingListComponent implements OnInit, OnDestroy {
             this.pollingService.loadStats();
         } catch {
             this.notifications.error('Failed to delete config');
+        }
+    }
+
+    startEdit(config: MentionPollingConfig): void {
+        this.expandedId.set(config.id);
+        this.editingId.set(config.id);
+        this.editAgentId.set(config.agentId);
+        this.editMentionUsername.set(config.mentionUsername);
+        this.editInterval.set(config.intervalSeconds);
+        this.editProjectId.set(config.projectId || '');
+        this.editFilterIssueComment.set(config.eventFilter.length === 0 || config.eventFilter.includes('issue_comment'));
+        this.editFilterIssues.set(config.eventFilter.includes('issues'));
+        this.editFilterPrComment.set(config.eventFilter.length === 0 || config.eventFilter.includes('pull_request_review_comment'));
+        this.editAllowedUsers.set(config.allowedUsers.join(', '));
+    }
+
+    cancelEdit(): void {
+        this.editingId.set(null);
+    }
+
+    async saveEdit(config: MentionPollingConfig): Promise<void> {
+        this.saving.set(true);
+        try {
+            const eventFilter: MentionPollingConfig['eventFilter'] = [];
+            if (this.editFilterIssueComment()) eventFilter.push('issue_comment');
+            if (this.editFilterIssues()) eventFilter.push('issues');
+            if (this.editFilterPrComment()) eventFilter.push('pull_request_review_comment');
+
+            const allowedUsers = this.editAllowedUsers()
+                .split(',')
+                .map((u) => u.trim())
+                .filter(Boolean);
+
+            await this.pollingService.updateConfig(config.id, {
+                agentId: this.editAgentId(),
+                mentionUsername: this.editMentionUsername(),
+                intervalSeconds: this.editInterval(),
+                projectId: this.editProjectId() || undefined,
+                eventFilter,
+                allowedUsers,
+            });
+
+            this.notifications.success('Config updated');
+            this.editingId.set(null);
+            this.pollingService.loadStats();
+        } catch {
+            this.notifications.error('Failed to update config');
+        } finally {
+            this.saving.set(false);
         }
     }
 

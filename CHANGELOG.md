@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-02-20
+
+### Added
+- Ollama cloud model support — `-cloud` suffix routing, local proxy for auth, merged local+remote model listings
+- Model exam system — 18 test cases across 6 categories (coding, context, tools, algochat, council, instruction) with per-category scoring
+- Expanded model family detection — qwen3, qwen3moe, deepseek2, command-r, nemotron, hermes, firefunction added to `inferFromName`
+- Cloud model test suite — 32 tests covering `parseModelSizeB`, `isCloudModel`, `hostForModel` routing, and size gating
+- Model capability name inference for 12 families (up from 5)
+
+### Fixed
+- save_memory tool returning confusing "on-chain send failed" messages that caused model retry loops (#181)
+- Model family detection ordering — specific families like qwen3moe matched before generic qwen
+
+### Changed
+- confidence-review.html updated to reflect v0.8.0→v0.9.0 state (95/100 score)
+
 ## [0.8.0] - 2026-02-17
 
 Major release with 1757 server tests, 47 database migrations, and full-stack agent orchestration across five development phases.

@@ -188,21 +188,111 @@ export function printPrompt(): void {
 
 let _atLineStart = true;
 let _currentCol = 0;
+let _toolCallBuffer = '';
 
 export function resetStreamState(): void {
     _atLineStart = true;
     _currentCol = 0;
+    _toolCallBuffer = '';
+}
+
+/**
+ * Flush any buffered text that was being held for tool call detection.
+ * Call this when the response stream is complete.
+ */
+export function flushStreamBuffer(): void {
+    if (_toolCallBuffer) {
+        const cleaned = deduplicateContent(stripLeakedToolCalls(_toolCallBuffer));
+        _toolCallBuffer = '';
+        if (cleaned) renderChunkDirect(cleaned);
+    }
 }
 
 const BORDER_PREFIX_WIDTH = 2; // "│ " is 2 visible columns
 
+/**
+ * Check if `text` could be the start of a tool call JSON array `[{"name":`.
+ * Returns true for partial prefixes like `[`, `[{`, `[{"n`, etc.
+ */
+function couldBeToolCallStart(text: string): boolean {
+    if (!text.startsWith('[')) return false;
+    const stripped = text.replace(/\s/g, '');
+    const expected = '[{"name":';
+    if (stripped.length >= expected.length) {
+        return stripped.startsWith(expected);
+    }
+    return expected.startsWith(stripped);
+}
+
 export function renderStreamChunk(chunk: string): void {
-    const cleaned = deduplicateContent(stripLeakedToolCalls(chunk));
-    if (!cleaned) return;
+    _toolCallBuffer += chunk;
+    drainToolCallBuffer();
+}
+
+function drainToolCallBuffer(): void {
+    while (_toolCallBuffer.length > 0) {
+        const bracketIdx = _toolCallBuffer.indexOf('[');
+
+        if (bracketIdx === -1) {
+            // No brackets — emit everything
+            const cleaned = deduplicateContent(stripLeakedToolCalls(_toolCallBuffer));
+            _toolCallBuffer = '';
+            if (cleaned) renderChunkDirect(cleaned);
+            return;
+        }
+
+        // Emit text before the bracket
+        if (bracketIdx > 0) {
+            renderChunkDirect(_toolCallBuffer.slice(0, bracketIdx));
+            _toolCallBuffer = _toolCallBuffer.slice(bracketIdx);
+        }
+
+        const tail = _toolCallBuffer;
+
+        // Confirmed tool call start — find matching ]
+        if (/^\[\s*\{\s*"name"\s*:/.test(tail)) {
+            let depth = 0;
+            let endIdx = -1;
+            for (let j = 0; j < tail.length; j++) {
+                if (tail[j] === '[') depth++;
+                if (tail[j] === ']') {
+                    depth--;
+                    if (depth === 0) { endIdx = j; break; }
+                }
+            }
+
+            if (endIdx === -1) {
+                // Incomplete — wait for more data (safety cap at 5KB)
+                if (_toolCallBuffer.length > 5000) {
+                    renderChunkDirect(_toolCallBuffer);
+                    _toolCallBuffer = '';
+                }
+                return;
+            }
+
+            // Complete tool call — strip it, continue with remaining text
+            _toolCallBuffer = _toolCallBuffer.slice(endIdx + 1);
+            continue;
+        }
+
+        // Might still become a tool call — need more data
+        if (tail.length < 15 && couldBeToolCallStart(tail)) {
+            return;
+        }
+
+        // Not a tool call — emit the [ and continue
+        renderChunkDirect('[');
+        _toolCallBuffer = _toolCallBuffer.slice(1);
+    }
+}
+
+/** Render cleaned text directly to stdout with border prefix and line wrapping. */
+function renderChunkDirect(text: string): void {
+    if (!text) return;
 
     const contentWidth = (process.stdout.columns || 80) - BORDER_PREFIX_WIDTH;
     let output = '';
-    for (const ch of cleaned) {
+    for (const ch of text) {
         if (_atLineStart) {
             output += `${c.cyan('│')} `;
             _atLineStart = false;

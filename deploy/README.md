@@ -25,6 +25,43 @@ cd deploy
 docker compose up -d
 ```
 
+### Running Inside Containers (with Algorand localnet)
+
+When corvid-agent runs inside Docker, `localhost` resolves to the container — not the host where AlgoKit localnet is running. You need to tell the container how to reach the host's localnet services.
+
+**Docker Desktop (macOS / Windows)** — `host.docker.internal` works automatically:
+
+```bash
+# In your .env or docker-compose override:
+LOCALNET_ALGOD_URL=http://host.docker.internal:4001
+LOCALNET_KMD_URL=http://host.docker.internal:4002
+LOCALNET_INDEXER_URL=http://host.docker.internal:8980
+```
+
+**Linux Docker** — add the host gateway mapping (already included in `docker-compose.yml`):
+
+```yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
+
+Then set the same `LOCALNET_*` env vars as above.
+
+**Steps:**
+
+1. Start AlgoKit localnet on the **host** machine:
+   ```bash
+   algokit localnet start
+   ```
+2. Set the `LOCALNET_*` env vars in your `.env` (or pass them via `docker-compose.yml`).
+3. Start the container:
+   ```bash
+   cd deploy && docker compose up -d
+   ```
+4. The health check (`/api/health`) confirms connectivity.
+
+> **Tip:** Running `./setup.sh` inside a container auto-detects the environment and sets the `LOCALNET_*` overrides for you. It also warns that AlgoKit localnet must run on the host (Docker-in-Docker is not supported by the setup script).
+
 ### Daemon (bare metal)
 
 ```bash

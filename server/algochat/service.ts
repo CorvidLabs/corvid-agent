@@ -42,14 +42,14 @@ async function fundFromLocalNetDispenser(
     algodClient: unknown,
     address: string,
 ): Promise<void> {
-    // LocalNet KMD defaults
+    // LocalNet KMD defaults (overridable for container deployments)
     const kmdToken = 'a'.repeat(64);
-    const kmdServer = 'http://localhost';
-    const kmdPort = 4002;
+    const kmdUrl = process.env.LOCALNET_KMD_URL ?? 'http://localhost:4002';
+    const parsed = new URL(kmdUrl);
 
     const algosdk = (await import('algosdk')).default;
 
-    const kmd = new algosdk.Kmd(kmdToken, kmdServer, kmdPort);
+    const kmd = new algosdk.Kmd(kmdToken, `${parsed.protocol}//${parsed.hostname}`, parseInt(parsed.port || '4002'));
 
     // Get the default wallet (unencrypted-default-wallet)
     const wallets = await kmd.listWallets();
@@ -98,7 +98,8 @@ async function fundFromLocalNetDispenser(
 /** Check if LocalNet is reachable by hitting the algod health endpoint. */
 async function isLocalNetAvailable(): Promise<boolean> {
     try {
-        const response = await fetch('http://localhost:4001/v2/status', {
+        const algodUrl = process.env.LOCALNET_ALGOD_URL ?? 'http://localhost:4001';
+        const response = await fetch(`${algodUrl}/v2/status`, {
             headers: { 'X-Algo-API-Token': 'a'.repeat(64) },
             signal: AbortSignal.timeout(2000),
         });
@@ -123,6 +124,15 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
         switch (config.network) {
             case 'localnet':
                 networkPreset = algochat.localnet();
+                // Allow env overrides for container deployments where localhost != host
+                if (process.env.LOCALNET_ALGOD_URL) {
+                    networkPreset.algodUrl = process.env.LOCALNET_ALGOD_URL;
+                    log.info(`Using LOCALNET_ALGOD_URL override: ${networkPreset.algodUrl}`);
+                }
+                if (process.env.LOCALNET_INDEXER_URL) {
+                    networkPreset.indexerUrl = process.env.LOCALNET_INDEXER_URL;
+                    log.info(`Using LOCALNET_INDEXER_URL override: ${networkPreset.indexerUrl}`);
+                }
                 break;
             case 'testnet':
                 networkPreset = algochat.testnet();
