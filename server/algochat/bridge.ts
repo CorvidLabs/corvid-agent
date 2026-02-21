@@ -34,6 +34,7 @@ import type { ApprovalManager } from '../process/approval-manager';
 import type { ApprovalRequestWire } from '../process/approval-types';
 import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import type { WorkTaskService } from '../work/service';
+import { WorkCommandRouter } from './work-command-router';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 // Credit functions — will be used when guest access is enabled
 // import { getBalance, purchaseCredits, maybeGrantFirstTimeCredits, canStartSession, getCreditConfig } from '../db/credits';
@@ -169,9 +170,11 @@ export class AlgoChatBridge {
         this.ownerQuestionManager = manager;
     }
 
-    /** Inject the work task service for /work command support. */
+    /** Inject the work task service for /work command support. Wraps it in a WorkCommandRouter. */
     setWorkTaskService(service: WorkTaskService): void {
-        this.commandHandler.setWorkTaskService(service);
+        const router = new WorkCommandRouter(this.db);
+        router.setWorkTaskService(service);
+        this.commandHandler.setWorkCommandRouter(router);
     }
 
     /** Inject the agent messenger for council and inter-agent messaging. */

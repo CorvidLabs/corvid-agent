@@ -9,6 +9,7 @@ import { AlgoChatBridge } from './algochat/bridge';
 import { AgentWalletService } from './algochat/agent-wallet';
 import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
+import { WorkCommandRouter } from './algochat/work-command-router';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
 import { SchedulerService } from './scheduler/service';
@@ -299,7 +300,9 @@ async function initAlgoChat(): Promise<void> {
     algochatBridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
     algochatBridge.setWorkTaskService(workTaskService);
     agentMessenger = new AgentMessenger(db, agentNetworkConfig, agentService, agentWalletService, agentDirectory, processManager);
-    agentMessenger.setWorkTaskService(workTaskService);
+    const workCommandRouter = new WorkCommandRouter(db);
+    workCommandRouter.setWorkTaskService(workTaskService);
+    agentMessenger.setWorkCommandRouter(workCommandRouter);
     algochatBridge.setAgentMessenger(agentMessenger);
 
     // Register MCP services so agent sessions get corvid_* tools
