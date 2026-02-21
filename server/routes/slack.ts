@@ -23,8 +23,10 @@ async function verifySlackSignature(
     if (!timestamp || !slackSignature) return false;
 
     // Reject requests older than 5 minutes
+    const parsedTimestamp = parseInt(timestamp, 10);
+    if (!Number.isFinite(parsedTimestamp)) return false;
     const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - parseInt(timestamp, 10)) > 300) return false;
+    if (Math.abs(now - parsedTimestamp) > 300) return false;
 
     const sigBasestring = `v0:${timestamp}:${body}`;
     const hmac = crypto.createHmac('sha256', signingSecret);
@@ -87,13 +89,18 @@ async function handleSlackEvents(
         const payloadStr = params.get('payload');
         if (!payloadStr) return json({ error: 'Missing payload' }, 400);
 
-        const payload = JSON.parse(payloadStr) as {
+        let payload: {
             type: string;
             actions?: Array<{ action_id: string; value: string }>;
             channel?: { id: string };
             message?: { ts: string; thread_ts?: string };
             user?: { id: string };
         };
+        try {
+            payload = JSON.parse(payloadStr) as typeof payload;
+        } catch {
+            return json({ error: 'Invalid payload' }, 400);
+        }
 
         if (payload.type === 'block_actions' && payload.actions) {
             for (const action of payload.actions) {
@@ -180,8 +187,10 @@ async function handleSlackEvents(
             const dispatch = dispatches.find((d) => {
                 if (d.channelType !== 'slack' || !d.externalRef) return false;
                 // externalRef format: "channel:ts"
-                const [, ts] = d.externalRef.split(':');
-                return ts === event.thread_ts;
+                const parts = d.externalRef.split(':');
+                if (parts.length !== 2) return false;
+                const [channel, ts] = parts;
+                return channel === event.channel && ts === event.thread_ts;
             });
 
             if (dispatch) {
