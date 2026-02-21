@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [0.9.0] - 2026-02-20
 
 ### Added
-- Ollama cloud model support — `-cloud` suffix routing, local proxy for auth, merged local+remote model listings
+- **Rich polling activity feed** — activity endpoint parses session `initialPrompt` to return structured fields (repo, number, title, sender, url, isPR, triggerType); UI shows status dots, PR/Issue labels, @sender, trigger type badges, and summary bar
+- **Stampede throttling** — `MAX_TRIGGERS_PER_CYCLE` (5) caps sessions spawned per config per poll cycle, preventing runaway session creation when many mentions arrive at once
+- **Model library refresh** — added Claude Sonnet 4.6, GPT-4.1/Mini/Nano, o3, o4-mini, Qwen 3 32B (local), and 5 new Ollama cloud models (Qwen 3.5, DeepSeek V3.2, Qwen 3 Coder Next, Devstral Small 2, Nemotron 3 Nano)
+- Ollama cloud model support — `:cloud` suffix routing, local proxy for auth, merged local+remote model listings
 - Model exam system — 18 test cases across 6 categories (coding, context, tools, algochat, council, instruction) with per-category scoring
 - Expanded model family detection — qwen3, qwen3moe, deepseek2, command-r, nemotron, hermes, firefunction added to `inferFromName`
 - Cloud model test suite — 32 tests covering `parseModelSizeB`, `isCloudModel`, `hostForModel` routing, and size gating
@@ -13,17 +16,26 @@ All notable changes to this project will be documented in this file.
 - AST code navigation tools: `corvid_code_symbols` and `corvid_find_references` for cross-file symbol analysis (#183)
 - AST-powered work task repo maps for smarter context in agent sessions (#184)
 - WebSocket authentication improvements (#184)
-- `spec:check` and PR review job added to CI pipeline (#185)
-- SDD-driven reliability improvements for Ollama and Claude providers (#186)
-- Testable tool parser with structured extraction and retry logic for Ollama (#183, #186)
+- Module specification system with `bun run spec:check` CI enforcement (#185)
+- Ollama reliability improvements — testable tool parser, retry logic, context-aware truncation, smarter nudges, fuzzy repeat detection (#186)
+- Claude Code subscription auth support (no API key required)
 
 ### Fixed
+- Opus 4.6 pricing corrected to $5/$25 (was legacy $15/$75 from Opus 4/4.1 era)
+- Haiku 4.5 pricing corrected to $1/$5 (was $0.80/$4 from Haiku 3.5)
+- Anthropic provider model IDs updated to current versions (claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5-20251001)
 - save_memory tool returning confusing "on-chain send failed" messages that caused model retry loops (#181)
 - Model family detection ordering — specific families like qwen3moe matched before generic qwen
+- GitHub mention dedup race condition (#174)
+- Ollama slot weight leak on session kill (#173)
+- Failed on-chain sends marked as failed, not completed (#171)
+- Project bundle tool merging for explicitly scoped agents (#176)
+- Ollama multi-tool chain hallucination in text-based tool calling (#180)
 - Ollama tool call reliability — smarter context management and retry logic (#186)
 
 ### Changed
-- confidence-review.html updated to reflect v0.8.0→v0.9.0 state (95/100 score)
+- Fallback chains updated — GPT-4.1 replaces GPT-4o in high-capability/balanced, GPT-4.1 Nano added to cost-optimized, cloud chain expanded
+- Default Anthropic model changed from claude-sonnet-4 to claude-sonnet-4-6
 
 ## [0.8.0] - 2026-02-17
 
