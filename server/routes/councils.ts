@@ -24,6 +24,7 @@ import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { getModelPricing } from '../providers/cost-table';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
@@ -733,11 +734,28 @@ async function runDiscussionRounds(
 ): Promise<void> {
     const discussionStartTime = Date.now();
 
-    // Agents run in parallel — per-round timeout is the max single-agent budget (not cumulative)
+    // Determine if any agent uses local Ollama — Ollama serializes inference internally,
+    // so even though sessions start in parallel, they queue behind each other.
+    // Cloud providers (Anthropic, OpenAI, Ollama cloud) run truly in parallel.
     const agentCount = council.agentIds.length;
-    const perRoundTimeout = Math.max(MIN_ROUND_TIMEOUT_MS, PER_AGENT_ROUND_BUDGET_MS);
+    const hasLocalOllama = council.agentIds.some((agentId) => {
+        const agent = getAgent(db, agentId);
+        if (!agent?.model) return false;
+        if (agent.provider === 'ollama') {
+            const pricing = getModelPricing(agent.model);
+            return !pricing?.isCloud; // local Ollama (not cloud-proxied)
+        }
+        return false;
+    });
+
+    // If any agent uses local Ollama, scale timeout by agent count (serialized queue).
+    // Otherwise, agents run truly in parallel — single-agent budget is enough.
+    const perRoundTimeout = hasLocalOllama
+        ? Math.max(MIN_ROUND_TIMEOUT_MS, agentCount * PER_AGENT_ROUND_BUDGET_MS)
+        : Math.max(MIN_ROUND_TIMEOUT_MS, PER_AGENT_ROUND_BUDGET_MS);
     const totalTimeout = Math.min(totalRounds * perRoundTimeout, MAX_DISCUSSION_TOTAL_MS);
-    log.info(`Discussion timeouts: ${Math.round(perRoundTimeout / 60000)}m/round, ${Math.round(totalTimeout / 60000)}m total (${agentCount} agents parallel, ${totalRounds} rounds)`);
+    const mode = hasLocalOllama ? `${agentCount} agents, Ollama serialized` : `${agentCount} agents parallel`;
+    log.info(`Discussion timeouts: ${Math.round(perRoundTimeout / 60000)}m/round, ${Math.round(totalTimeout / 60000)}m total (${mode}, ${totalRounds} rounds)`);
 
     for (let round = 1; round <= totalRounds; round++) {
         // Check overall discussion timeout
@@ -915,10 +933,11 @@ function formatDiscussionMessages(messages: CouncilDiscussionMessage[]): string 
     return parts.join('\n\n---\n\n');
 }
 
-// Per-agent timeout budget — agents run in parallel, so this is a per-round wall-clock cap,
-// not a serialized queue budget. Slow agents are stopped when the timeout fires.
+// Per-agent timeout budget. For cloud providers agents run truly in parallel, so a single
+// budget is sufficient. For local Ollama (serialized inference), the budget is multiplied
+// by agent count to account for queueing.
 const PER_AGENT_ROUND_BUDGET_MS = 10 * 60 * 1000; // 10 minutes per agent per round
-const MIN_ROUND_TIMEOUT_MS = 10 * 60 * 1000; // minimum 10 minutes per round (parallel)
+const MIN_ROUND_TIMEOUT_MS = 10 * 60 * 1000; // minimum 10 minutes per round
 const MAX_DISCUSSION_TOTAL_MS = 3 * 60 * 60 * 1000; // hard cap at 3 hours
 
 /** Result of waiting for a set of sessions — indicates which completed and which timed out. */
