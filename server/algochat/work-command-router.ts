@@ -165,6 +165,7 @@ export class WorkCommandRouter {
                 } else {
                     updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
                         response: completed.error ?? 'Work task failed',
+                        errorCode: 'WORK_TASK_ERROR',
                     });
                 }
                 emitMessageUpdate(agentMessage.id);
@@ -177,6 +178,7 @@ export class WorkCommandRouter {
         } catch (err) {
             updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
                 response: `Work task error: ${err instanceof Error ? err.message : String(err)}`,
+                errorCode: 'WORK_TASK_ERROR',
             });
             emitMessageUpdate(agentMessage.id);
             throw err;

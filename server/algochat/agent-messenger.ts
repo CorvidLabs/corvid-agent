@@ -33,6 +33,12 @@ export interface AgentInvokeRequest {
     threadId?: string;
     /** Invocation depth for preventing infinite agent-to-agent chains. */
     depth?: number;
+    /**
+     * When true, return immediately after message dispatch without waiting
+     * for a response. The message is still tracked for delivery confirmation
+     * but no session is created for the receiving agent to respond.
+     */
+    fireAndForget?: boolean;
 }
 
 export interface AgentInvokeResult {
@@ -120,6 +126,7 @@ export class AgentMessenger {
         const { fromAgentId, toAgentId, content, projectId } = request;
         const paymentMicro = request.paymentMicro ?? DEFAULT_PAYMENT_MICRO;
         const threadId = request.threadId ?? crypto.randomUUID();
+        const fireAndForget = request.fireAndForget ?? false;
 
         // Generate or inherit trace context for this invocation chain
         const eventCtx = createEventContext('agent');
@@ -157,6 +164,7 @@ export class AgentMessenger {
             content,
             paymentMicro,
             threadId,
+            fireAndForget,
         });
 
         log.info(`Agent invoke: ${fromAgent.name} → ${toAgent.name}`, {
@@ -164,6 +172,7 @@ export class AgentMessenger {
             threadId,
             traceId,
             paymentMicro,
+            fireAndForget,
         });
 
         // Record audit and metrics for agent message send
@@ -174,7 +183,7 @@ export class AgentMessenger {
             fromAgent.name,
             'agent_message',
             agentMessage.id,
-            `${fromAgent.name} → ${toAgent.name}: ${content.slice(0, 200)}`,
+            `${fromAgent.name} → ${toAgent.name}${fireAndForget ? ' [F&F]' : ''}: ${content.slice(0, 200)}`,
             traceId,
         );
 
@@ -192,8 +201,12 @@ export class AgentMessenger {
                 if (result.blockedByLimit && result.limitError) {
                     updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
                         response: `Spending limit: ${result.limitError}`,
+                        errorCode: 'SPENDING_LIMIT',
                     });
                     this.emitMessageUpdate(agentMessage.id);
+                    // Return early for fire-and-forget; throw for sync
+                    const failedMessage = getAgentMessage(this.db, agentMessage.id);
+                    return { message: failedMessage ?? agentMessage, sessionId: null };
                 }
                 txid = result.txid;
             }
@@ -205,6 +218,23 @@ export class AgentMessenger {
 
         updateAgentMessageStatus(this.db, agentMessage.id, 'sent', { txid: txid ?? undefined });
         this.emitMessageUpdate(agentMessage.id);
+
+        // Fire-and-forget: mark as completed after delivery, don't create a session
+        if (fireAndForget) {
+            updateAgentMessageStatus(this.db, agentMessage.id, 'completed');
+            this.emitMessageUpdate(agentMessage.id);
+
+            log.info(`Fire-and-forget message delivered`, {
+                messageId: agentMessage.id,
+                txid,
+            });
+
+            const updatedMessage = getAgentMessage(this.db, agentMessage.id);
+            return {
+                message: updatedMessage ?? agentMessage,
+                sessionId: null,
+            };
+        }
 
         // Create a session for Agent B to process the message
         const resolvedProjectId = projectId ?? toAgent.defaultProjectId ?? this.getDefaultProjectId();
@@ -264,7 +294,9 @@ export class AgentMessenger {
 
             const response = (responseBuffer.trim() || lastTurnResponse.trim());
             if (!response) {
-                updateAgentMessageStatus(this.db, messageId, 'failed');
+                updateAgentMessageStatus(this.db, messageId, 'failed', {
+                    errorCode: 'EMPTY_RESPONSE',
+                });
                 this.emitMessageUpdate(messageId);
                 return;
             }
@@ -292,7 +324,10 @@ export class AgentMessenger {
                 })
                 .catch((err) => {
                     // Mark failed — response was generated but on-chain send didn't succeed
-                    updateAgentMessageStatus(this.db, messageId, 'failed', { response });
+                    updateAgentMessageStatus(this.db, messageId, 'failed', {
+                        response,
+                        errorCode: 'RESPONSE_SEND_FAILED',
+                    });
                     this.emitMessageUpdate(messageId);
                     log.warn('On-chain response send failed', {
                         messageId,
