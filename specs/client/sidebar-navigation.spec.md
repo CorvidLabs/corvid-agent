@@ -15,6 +15,20 @@ depends_on: []
 
 Defines the sidebar navigation links that provide access to all top-level pages in the dashboard. The sidebar is the sole navigation mechanism — if a route exists in `app.routes.ts` but has no sidebar link, users cannot reach it through the UI.
 
+## Public API
+
+### Exported Classes
+
+| Class | Description |
+|-------|-------------|
+| `SidebarComponent` | Angular component that renders the sidebar navigation with collapsible links to all top-level routes |
+
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `routes` | `Routes` | Angular route configuration array defining all application routes (from `app.routes.ts`) |
+
 ## Invariants
 
 1. **Every top-level route MUST have a sidebar link** unless it is explicitly listed in the "Routes WITHOUT Sidebar Links" section below. When a new route is added to `app.routes.ts`, a corresponding `<li>` entry MUST be added to the sidebar template, or it must be added to the exclusion list with justification.
@@ -84,6 +98,21 @@ These routes are accessed via in-page navigation and do NOT need sidebar entries
 | Route exists without sidebar link (and not excluded) | Spec violation — user cannot navigate to the page |
 | Sidebar link exists without route | Angular shows blank page — link must be removed or route added |
 | Duplicate abbreviation | Collapsed sidebar becomes ambiguous — abbreviations must be unique |
+
+## Dependencies
+
+### Consumes
+
+| Module | What is used |
+|--------|-------------|
+| `@angular/core` | `Component`, `ChangeDetectionStrategy`, `model`, `signal`, lifecycle hooks |
+| `@angular/router` | `Router`, `RouterLink`, `RouterLinkActive`, `NavigationEnd` |
+
+### Consumed By
+
+| Module | What is used |
+|--------|-------------|
+| `client/src/app/app.component.ts` | `SidebarComponent` (rendered in app shell) |
 
 ## Change Log
 
