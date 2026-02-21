@@ -48,6 +48,9 @@ import { CommandHandler } from './command-handler';
 import { SubscriptionManager } from './subscription-manager';
 import { DiscoveryService } from './discovery-service';
 
+// Channel adapter interface
+import type { ChannelAdapter, SessionMessage, ChannelStatus } from '../channels/types';
+
 // Re-export types from extracted modules so callers don't need to change imports
 export type { AlgoChatEventCallback } from './response-formatter';
 export type { LocalChatSendFn, LocalChatEvent, LocalChatEventFn } from './subscription-manager';
@@ -63,7 +66,8 @@ const log = createLogger('AlgoChatBridge');
  * Public API surface is preserved for backward compatibility — callers
  * (server/index.ts, ws/handler.ts, routes/index.ts) require no changes.
  */
-export class AlgoChatBridge {
+export class AlgoChatBridge implements ChannelAdapter {
+    readonly channelType = 'algochat' as const;
     readonly db: Database;
     private processManager: ProcessManager;
     private config: AlgoChatConfig;
@@ -94,6 +98,9 @@ export class AlgoChatBridge {
 
     // Local chat state (kept here as it bridges WS handler → subscription manager)
     private localAgentSessions: Map<string, string> = new Map();
+
+    // ChannelAdapter inbound message handlers
+    private messageHandlers: Set<(msg: SessionMessage) => void> = new Set();
 
     // On-chain message dedup
     private processedTxids: Set<string> = new Set();
@@ -244,8 +251,8 @@ export class AlgoChatBridge {
         this.responseFormatter.offEvent(callback);
     }
 
-    /** Get the current AlgoChat status. */
-    async getStatus(): Promise<AlgoChatStatus> {
+    /** Get the current AlgoChat status (also satisfies ChannelAdapter.getStatus). */
+    async getStatus(): Promise<AlgoChatStatus & ChannelStatus> {
         const conversations = listConversations(this.db);
         let balance = 0;
         try {
@@ -253,13 +260,34 @@ export class AlgoChatBridge {
             balance = Number(info.amount ?? 0);
         } catch { /* ignore — balance stays 0 */ }
         return {
+            // ChannelStatus fields
+            channelType: this.channelType,
             enabled: true,
+            connected: true,
+            details: {
+                address: this.service.chatAccount.address,
+                network: this.config.network,
+                syncInterval: this.config.syncInterval,
+                activeConversations: conversations.length,
+                balance,
+            },
+            // Legacy AlgoChatStatus fields (preserved for backward compatibility)
             address: this.service.chatAccount.address,
             network: this.config.network,
             syncInterval: this.config.syncInterval,
             activeConversations: conversations.length,
             balance,
         };
+    }
+
+    /** Send an outbound message to a participant (ChannelAdapter). */
+    async sendMessage(participant: string, content: string): Promise<void> {
+        await this.responseFormatter.sendResponse(participant, content);
+    }
+
+    /** Register a handler for inbound messages (ChannelAdapter). */
+    onMessage(handler: (msg: SessionMessage) => void): void {
+        this.messageHandlers.add(handler);
     }
 
     // ── Legacy single-contact PSK API (backward compat) ──────────────
@@ -1137,6 +1165,26 @@ export class AlgoChatBridge {
 
         // Emit feed event only for external (non-agent) messages
         this.responseFormatter.emitEvent(participant, messageContent, 'inbound', amount);
+
+        // Notify ChannelAdapter message handlers
+        if (this.messageHandlers.size > 0) {
+            const sessionMessage: SessionMessage = {
+                id: crypto.randomUUID(),
+                channelType: this.channelType,
+                participant,
+                content: messageContent,
+                direction: 'inbound',
+                timestamp: new Date(),
+                metadata: amount != null ? { amount } : undefined,
+            };
+            for (const handler of this.messageHandlers) {
+                try {
+                    handler(sessionMessage);
+                } catch (err) {
+                    log.error('Message handler threw', { error: err instanceof Error ? err.message : String(err) });
+                }
+            }
+        }
 
         // Check for commands first (owners always have access)
         if (this.commandHandler.handleCommand(participant, messageContent)) return;
