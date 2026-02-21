@@ -184,6 +184,27 @@ export function deleteAgent(db: Database, id: string): boolean {
         // agent_messages (from/to agent, no explicit FK but logically linked)
         db.query('DELETE FROM agent_messages WHERE from_agent_id = ? OR to_agent_id = ?').run(id, id);
 
+        // owner_questions (no cascade)
+        db.query('DELETE FROM owner_questions WHERE agent_id = ?').run(id);
+
+        // notification_channels + owner_notifications (no cascade on agent_id)
+        db.query('DELETE FROM notification_channels WHERE agent_id = ?').run(id);
+        db.query('DELETE FROM owner_notifications WHERE agent_id = ?').run(id);
+
+        // sandbox_configs (no cascade)
+        db.query('DELETE FROM sandbox_configs WHERE agent_id = ?').run(id);
+
+        // marketplace_listings (no cascade)
+        db.query('DELETE FROM marketplace_listings WHERE agent_id = ?').run(id);
+
+        // reputation tables (no cascade)
+        db.query('DELETE FROM reputation_attestations WHERE agent_id = ?').run(id);
+        db.query('DELETE FROM reputation_events WHERE agent_id = ?').run(id);
+        db.query('DELETE FROM agent_reputation WHERE agent_id = ?').run(id);
+
+        // health_snapshots (no cascade)
+        db.query('DELETE FROM health_snapshots WHERE agent_id = ?').run(id);
+
         // Nullify optional FKs rather than delete entire records
         db.query('UPDATE councils SET chairman_agent_id = NULL WHERE chairman_agent_id = ?').run(id);
         db.query('UPDATE algochat_conversations SET agent_id = NULL WHERE agent_id = ?').run(id);
@@ -196,8 +217,10 @@ export function deleteAgent(db: Database, id: string): boolean {
         db.query('DELETE FROM sessions WHERE agent_id = ?').run(id);
 
         // The following have ON DELETE CASCADE and will auto-delete:
-        //   agent_memories, council_members, council_discussion_messages
-        // But we delete the agent itself which triggers those cascades
+        //   agent_memories, council_members, council_discussion_messages,
+        //   agent_schedules, schedule_executions, webhook_registrations,
+        //   mention_polling_configs, workflows, workflow_runs,
+        //   agent_personas, agent_skills, mcp_server_configs
 
         // Finally delete the agent
         db.query('DELETE FROM agents WHERE id = ?').run(id);

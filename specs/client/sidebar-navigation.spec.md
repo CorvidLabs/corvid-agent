@@ -37,7 +37,14 @@ Provides the main navigation sidebar for the web client. The `SidebarComponent` 
 4. **Escape key closes sidebar**: Pressing Escape closes the sidebar overlay when open
 5. **Route lazy loading**: All routes use `loadComponent` with dynamic imports for code splitting
 6. **All top-level routes have sidebar entries**: Every routable feature must have a link in the sidebar. Missing nav entries make features unreachable
-7. **Grouped navigation sections**: Links are organized into labeled groups: Dashboard (standalone), Core (Agents, Projects, Models), Sessions (Conversations, Work Tasks, Councils), Automation (Schedules, Workflows, Webhooks, Polling), Monitoring (Feed, Analytics, Logs), Config (Wallets, Settings). Groups are separated by visual dividers with section labels
+7. **Grouped navigation sections**: Links are organized into labeled groups separated by visual dividers with section labels. The **complete** set of 17 sidebar entries is:
+   - **Dashboard** (standalone)
+   - **Core**: Agents, Projects, Models
+   - **Sessions**: Conversations, Work Tasks, Councils
+   - **Automation**: Schedules, Workflows, Webhooks, Polling
+   - **Monitoring**: Feed, Analytics, Logs
+   - **Config**: Wallets, Settings
+8. **Client rebuild required**: After any change to sidebar or route files, `bun run build:client` must be run. The server serves static files from `client/dist/` — a stale build will silently show the old sidebar
 
 ## Behavioral Examples
 
@@ -82,3 +89,4 @@ Provides the main navigation sidebar for the web client. The `SidebarComponent` 
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-02-20 | corvid-agent | Added invariants #6 and #7: all routes must have sidebar entries, grouped into sections |
+| 2026-02-21 | corvid-agent | Added invariant #8 (client rebuild required); enumerated all 17 sidebar entries in invariant #7 to prevent regression |
