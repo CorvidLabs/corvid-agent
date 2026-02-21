@@ -3,13 +3,17 @@
  *
  * Security model:
  * - If API_KEY is set, all non-OPTIONS routes require `Authorization: Bearer <key>`.
- * - If BIND_HOST !== 127.0.0.1 and no API_KEY is set, the server refuses to start.
- * - WebSocket connections authenticate via `?key=<key>` query param or the
- *   first message `{ type: "auth", key: "<key>" }`.
+ * - If BIND_HOST !== 127.0.0.1 and no API_KEY is set, a random key is generated
+ *   on first run and persisted to .env (admin bootstrap).
+ * - WebSocket connections authenticate via `?key=<key>` query param. When API_KEY
+ *   is set, unauthenticated upgrade requests are rejected with 401.
  * - Health endpoint (/api/health) is always public (monitoring probes need it).
  */
 
 import { createLogger } from '../lib/logger';
+import { readFileSync, openSync, writeSync, closeSync, constants as fsConstants } from 'node:fs';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 const log = createLogger('Auth');
 
@@ -47,16 +51,93 @@ export function loadAuthConfig(): AuthConfig {
 }
 
 /**
+ * Generate a cryptographically random API key.
+ */
+function generateApiKey(): string {
+    return randomBytes(32).toString('base64url');
+}
+
+/**
+ * Persist a generated API key to the .env file.
+ * Appends to .env if it exists, creates it otherwise.
+ *
+ * Uses atomic file operations to avoid TOCTOU race conditions:
+ * - Reads the file first, catching ENOENT if it doesn't exist.
+ * - Opens the file with O_WRONLY | O_CREAT | O_APPEND to atomically
+ *   create-or-append in a single syscall.
+ */
+function persistApiKeyToEnv(key: string): boolean {
+    try {
+        const envPath = join(process.cwd(), '.env');
+        const line = `API_KEY=${key}\n`;
+
+        // Try to read existing content; treat ENOENT as empty file
+        let content = '';
+        try {
+            content = readFileSync(envPath, 'utf8');
+        } catch (readErr: unknown) {
+            if ((readErr as NodeJS.ErrnoException).code !== 'ENOENT') throw readErr;
+            // File doesn't exist yet — content stays empty
+        }
+
+        // Don't overwrite an existing API_KEY
+        if (content.includes('API_KEY=')) {
+            return false;
+        }
+
+        // O_WRONLY | O_CREAT | O_APPEND atomically creates-or-appends
+        const fd = openSync(
+            envPath,
+            fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_APPEND,
+            0o600,
+        );
+        try {
+            writeSync(fd, line);
+        } finally {
+            closeSync(fd);
+        }
+
+        return true;
+    } catch (err) {
+        log.warn('Failed to persist API key to .env', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        return false;
+    }
+}
+
+/**
  * Validate that the deployment is safe to start.
- * Refuses to proceed if bound to a non-localhost address without API_KEY.
+ *
+ * When BIND_HOST is non-localhost and no API_KEY is set, instead of refusing
+ * to start, generates a random API key on first run, prints it to stdout,
+ * and persists it to .env (admin bootstrap).
  */
 export function validateStartupSecurity(config: AuthConfig): void {
     const isLocalhost = config.bindHost === '127.0.0.1' || config.bindHost === 'localhost' || config.bindHost === '::1';
 
     if (!isLocalhost && !config.apiKey) {
-        log.error('SECURITY: BIND_HOST is not localhost but no API_KEY is set');
-        log.error('Set API_KEY in your .env to secure the server, or bind to 127.0.0.1');
-        process.exit(1);
+        // First-run admin bootstrap: generate and persist a key
+        const generatedKey = generateApiKey();
+        const persisted = persistApiKeyToEnv(generatedKey);
+
+        if (persisted) {
+            // Update config in-place so the rest of the server uses the new key
+            config.apiKey = generatedKey;
+            process.env.API_KEY = generatedKey;
+
+            log.info('==========================================================');
+            log.info('FIRST-RUN BOOTSTRAP: Generated API key for remote access');
+            log.info(`API_KEY=${generatedKey}`);
+            log.info('This key has been persisted to .env');
+            log.info('Use this key in the Authorization header: Bearer <key>');
+            log.info('==========================================================');
+        } else {
+            // .env already has an API_KEY line or write failed — fall back to refusing
+            log.error('SECURITY: BIND_HOST is not localhost but no API_KEY is set');
+            log.error('Set API_KEY in your .env to secure the server, or bind to 127.0.0.1');
+            process.exit(1);
+        }
     }
 
     if (config.apiKey) {
