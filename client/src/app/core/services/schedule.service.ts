@@ -123,6 +123,10 @@ export class ScheduleService {
         return execution;
     }
 
+    async triggerNow(scheduleId: string): Promise<void> {
+        await firstValueFrom(this.api.post(`/schedules/${scheduleId}/trigger`, {}));
+    }
+
     async getGithubStatus(): Promise<{ configured: boolean }> {
         return firstValueFrom(this.api.get<{ configured: boolean }>('/github/status'));
     }

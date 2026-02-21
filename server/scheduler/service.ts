@@ -187,6 +187,14 @@ export class SchedulerService {
         return () => this.eventCallbacks.delete(callback);
     }
 
+    /** Manually trigger a schedule to run now (ignoring cron/interval timing). */
+    async triggerNow(scheduleId: string): Promise<void> {
+        const schedule = getSchedule(this.db, scheduleId);
+        if (!schedule) throw new Error('Schedule not found');
+        if (schedule.status !== 'active') throw new Error('Schedule is not active');
+        await this.executeSchedule(schedule);
+    }
+
     /** Resolve an approval request for a schedule execution. */
     resolveApproval(executionId: string, approved: boolean): ScheduleExecution | null {
         const execution = resolveScheduleApproval(this.db, executionId, approved);

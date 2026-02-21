@@ -77,6 +77,13 @@ export function handleScheduleRoutes(
         return json(execution);
     }
 
+    // Trigger schedule now
+    const triggerMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/trigger$/);
+    if (triggerMatch && req.method === 'POST') {
+        if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
+        return handleTriggerNow(triggerMatch[1], schedulerService);
+    }
+
     // Approve/deny execution
     const approvalMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/resolve$/);
     if (approvalMatch && req.method === 'POST') {
@@ -181,6 +188,18 @@ async function handleResolveApproval(
         if (!execution) return json({ error: 'Execution not found or not awaiting approval' }, 404);
         return json(execution);
     } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleTriggerNow(scheduleId: string, schedulerService: SchedulerService): Promise<Response> {
+    try {
+        await schedulerService.triggerNow(scheduleId);
+        return json({ ok: true });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('not found')) return json({ error: message }, 404);
+        if (message.includes('not active')) return json({ error: message }, 400);
         return handleRouteError(err);
     }
 }
