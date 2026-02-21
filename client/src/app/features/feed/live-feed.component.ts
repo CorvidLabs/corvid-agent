@@ -552,21 +552,9 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                     colorIndex: this.colorIndexForAgent(fromName),
                 });
 
-                if (m.status === 'processing') {
-                    newEntries.push({
-                        id: this.nextId++,
-                        timestamp: new Date(),
-                        direction: 'agent-processing',
-                        participant: `${toName}`,
-                        participantLabel: `${fromName} \u2192 ${toName}`,
-                        content: m.content,
-                        agentName: toName,
-                        fee: null,
-                        threadId: m.threadId ?? null,
-                        colorIndex: this.colorIndexForAgent(toName),
-                        messageId: m.id,
-                    });
-                }
+                // Skip stale "processing" entries from history — they are zombie
+                // statuses from sessions that finished without updating the message.
+                // Real-time processing indicators are handled by the WebSocket handler.
 
                 if (m.status === 'completed' && m.response) {
                     newEntries.push({
