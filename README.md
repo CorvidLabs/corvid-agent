@@ -125,9 +125,25 @@ OPENAI_API_KEY=sk-...
 - Blocking `corvid_ask_owner` for two-way agent-to-owner questions
 - First-response-wins across all configured channels
 
+### Cloud Model Routing
+- Ollama cloud model support with `-cloud` suffix routing to remote instances
+- Local proxy handles authentication forwarding for remote Ollama hosts
+- Merged local + remote model listings in the dashboard
+
+### Model Exam System
+- 18 test cases across 6 categories: coding, context, tools, algochat, council, instruction
+- Per-category scoring with aggregate scorecard for evaluating model capabilities
+- Integrated into the dashboard and API at `/api/exam`
+
+### Mention Polling
+- GitHub `@mention` polling for automated issue and PR responses
+- Configurable per-agent poll intervals with deduplication
+- Filters by event type (issue comments, issues, PR review comments)
+
 ### AST Code Understanding
 - Tree-sitter parser for TypeScript, JavaScript, Python, Go, Rust, and more
 - Extracts functions, classes, imports, and call graphs for smarter work tasks
+- `corvid_code_symbols` and `corvid_find_references` tools for agent use
 
 ### Observability
 - OpenTelemetry tracing with OTLP HTTP export
@@ -159,6 +175,9 @@ OPENAI_API_KEY=sk-...
 |  | Workflow |  | A2A      |  | Marketplace |  | Sandbox       |  |
 |  | Engine   |  | Protocol |  | + Plugins   |  | (containers)  |  |
 |  +----------+  +----------+  +-------------+  +---------------+  |
+|  | Mention  |  | Exam     |  | Improvement |  | Notifications |  |
+|  | Polling  |  | System   |  | Pipeline    |  | (multi-chan)  |  |
+|  +----------+  +----------+  +-------------+  +---------------+  |
 |  | Reputation |  | Tenants |  | Observability (OTEL)          |  |
 |  | + Trust    |  | + Billing|  | Tracing + Metrics + Audit    |  |
 |  +------------+  +---------+  +-------------------------------+  |
@@ -179,30 +198,39 @@ OPENAI_API_KEY=sk-...
 
 ```
 server/          Bun HTTP + WebSocket server
+  a2a/           Google A2A protocol inbound task handling and agent card
   algochat/      On-chain messaging (bridge, wallet, directory, messenger)
   ast/           Tree-sitter AST parser for code understanding
   billing/       Usage metering and billing
   db/            SQLite schema (47 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
+  docs/          OpenAPI generator, MCP tool docs, route registry
+  exam/          Model exam system with 18 test cases across 6 categories
   github/        GitHub API operations (PRs, issues, reviews)
+  improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 34 corvid_* tool handlers
+  mcp/           MCP tool server and 36 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
+  notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
   observability/ OpenTelemetry tracing, Prometheus metrics
   plugins/       Plugin SDK and dynamic tool registration
+  polling/       GitHub mention polling for @mention-driven automation
   process/       Agent lifecycle (SDK + Ollama, approval, event bus, persona/skill injection)
   providers/     Multi-model cost-aware routing
+  public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (26 route modules)
+  routes/        REST API routes (28 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
+  selftest/      Self-test and validation utilities
   telegram/      Bidirectional Telegram bridge (long-polling, voice)
   tenant/        Multi-tenant isolation and access control
   voice/         TTS (OpenAI) and STT (Whisper) with caching
   webhooks/      GitHub webhook and mention polling
   work/          Work task service (worktree, branch, validate, PR)
+  workflow/      Graph-based DAG workflow orchestration engine
   ws/            WebSocket handlers with pub/sub
 client/          Angular 21 SPA (standalone components, signals)
 shared/          TypeScript types shared between server and client
@@ -212,7 +240,7 @@ e2e/             Playwright end-to-end tests (8 spec files)
 
 ---
 
-## MCP Tools (34)
+## MCP Tools (36)
 
 Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
 
@@ -227,6 +255,7 @@ Extensible tool system via [Model Context Protocol](https://github.com/modelcont
 | **Credits** | `corvid_check_credits`, `corvid_grant_credits`, `corvid_credit_config` |
 | **Owner Comms** | `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications` |
 | **Reputation** | `corvid_check_reputation`, `corvid_check_health_trends`, `corvid_publish_attestation`, `corvid_verify_agent_reputation` |
+| **Code** | `corvid_code_symbols` (AST symbols), `corvid_find_references` (cross-file refs) |
 | **Session** | `corvid_extend_timeout` |
 
 Tools are permission-scoped per agent via skill bundles and agent-level allowlists. Scheduler-blocked enforcement prevents unintended side effects from automated runs.
@@ -235,7 +264,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~55 REST endpoints and a WebSocket interface across 26 route modules:
+~55 REST endpoints and a WebSocket interface across 28 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
@@ -249,11 +278,21 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Work Tasks | `/api/work-tasks` | Self-improvement task tracking |
 | Marketplace | `/api/marketplace` | Agent service listings, reviews, federation |
 | Webhooks | `/api/webhooks`, `POST /webhooks/github` | GitHub event-driven automation |
+| Mention Polling | `/api/mention-polling` | GitHub @mention polling configuration |
 | Reputation | `/api/reputation` | Trust scores, events, attestations |
 | Billing | `/api/billing` | Subscriptions, usage metering, invoices |
 | Sandbox | `/api/sandbox` | Container policies and allocation |
 | Analytics | `/api/analytics` | Cost, token, and session statistics |
 | Audit | `/api/audit` | Immutable audit log queries |
+| Exam | `/api/exam` | Model examination and capability scoring |
+| MCP API | `/api/mcp` | Model Context Protocol endpoints |
+| MCP Servers | `/api/mcp-servers` | External MCP server configuration |
+| Ollama | `/api/ollama` | Ollama provider management and model pulls |
+| Plugins | `/api/plugins` | Plugin registry and capability management |
+| Allowlist | `/api/allowlist` | Address allowlist management |
+| Auth Flow | `/api/auth` | Device authorization for CLI login |
+| Settings | `/api/settings` | Application settings and operational mode |
+| System Logs | `/api/system-logs` | System log queries and credit history |
 | Health | `GET /api/health` | Health check (public, no auth) |
 | A2A | `/.well-known/agent-card.json` | Google A2A protocol Agent Card |
 | WebSocket | `WS /ws` | Real-time streaming and event subscriptions |
