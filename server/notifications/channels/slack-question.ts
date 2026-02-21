@@ -1,11 +1,11 @@
 import type { ChannelSendResult } from '../types';
 import { createLogger } from '../../lib/logger';
 
-const log = createLogger('QuestionSlack');
+const log = createLogger('SlackQuestion');
 
 export async function sendSlackQuestion(
     botToken: string,
-    channelId: string,
+    channel: string,
     questionId: string,
     question: string,
     options: string[] | null,
@@ -14,87 +14,66 @@ export async function sendSlackQuestion(
 ): Promise<ChannelSendResult> {
     try {
         const shortId = questionId.slice(0, 8);
-        const blocks: Array<Record<string, unknown>> = [];
+        const contextBlock = context ? `\n\n_Context: ${context}_` : '';
 
-        // Header
-        blocks.push({
-            type: 'header',
-            text: { type: 'plain_text', text: 'Agent Question', emoji: true },
-        });
-
-        // Question text
-        blocks.push({
-            type: 'section',
-            text: { type: 'mrkdwn', text: question },
-        });
-
-        // Context if provided
-        if (context) {
-            blocks.push({
-                type: 'context',
-                elements: [{ type: 'mrkdwn', text: `_Context: ${context}_` }],
-            });
-        }
-
-        // Options as numbered list
-        if (options?.length) {
-            const optionsText = options.map((opt, i) => `${i + 1}. ${opt}`).join('\n');
-            blocks.push({
+        const blocks: Array<Record<string, unknown>> = [
+            {
                 type: 'section',
-                text: { type: 'mrkdwn', text: `*Options:*\n${optionsText}` },
-            });
+                text: {
+                    type: 'mrkdwn',
+                    text: `❓ *Agent Question*\n\n${question}${contextBlock}`,
+                },
+            },
+        ];
 
-            // Interactive buttons for options
-            const actionElements = options.map((opt, i) => ({
+        if (options && options.length > 0) {
+            const elements = options.map((opt, idx) => ({
                 type: 'button',
-                text: { type: 'plain_text', text: `${i + 1}. ${opt.slice(0, 30)}`, emoji: true },
-                action_id: `q_${shortId}_${i}`,
-                value: `q:${shortId}:${i}`,
+                text: { type: 'plain_text', text: opt.slice(0, 75), emoji: true },
+                action_id: `q:${shortId}:${idx}`,
+                value: String(idx),
             }));
 
+            // Slack limits actions blocks to 25 elements, but keep it reasonable
             blocks.push({
                 type: 'actions',
-                elements: actionElements.slice(0, 5), // Slack limits to 5 buttons per block
+                elements: elements.slice(0, 25),
             });
         }
 
-        // Footer
         blocks.push({
             type: 'context',
-            elements: [{
-                type: 'mrkdwn',
-                text: `Agent: ${agentId.slice(0, 8)}... | Q: ${shortId}`,
-            }],
+            elements: [
+                {
+                    type: 'mrkdwn',
+                    text: `Agent: \`${agentId.slice(0, 8)}...\` | Reply in thread for freeform answer`,
+                },
+            ],
         });
-
-        const body = {
-            channel: channelId,
-            text: `Agent Question: ${question}`, // Fallback text
-            blocks,
-        };
 
         const response = await fetch('https://slack.com/api/chat.postMessage', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${botToken}`,
                 'Content-Type': 'application/json',
+                Authorization: `Bearer ${botToken}`,
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+                channel,
+                blocks,
+                unfurl_links: false,
+            }),
             signal: AbortSignal.timeout(10_000),
         });
 
-        const data = await response.json() as {
-            ok: boolean;
-            ts?: string;
-            error?: string;
-        };
+        const data = await response.json() as { ok: boolean; ts?: string; error?: string };
 
         if (!data.ok) {
-            log.warn('Slack API error', { error: data.error });
+            log.warn('Slack question dispatch error', { error: data.error });
             return { success: false, error: data.error ?? 'Slack API error' };
         }
 
-        return { success: true, externalRef: data.ts ?? '' };
+        // Store channel:ts as external ref for response polling
+        return { success: true, externalRef: `${channel}:${data.ts ?? ''}` };
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.warn('Slack question send error', { error: message });

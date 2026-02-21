@@ -157,12 +157,12 @@ export class QuestionDispatcher {
                 );
             }
             case 'slack': {
-                const slackBotToken = (config.botToken as string) || process.env.SLACK_BOT_TOKEN;
-                const slackChannelId = (config.channelId as string) || process.env.SLACK_CHANNEL_ID;
-                if (!slackBotToken || !slackChannelId) return { success: false, error: 'Slack botToken and channelId required' };
+                const token = (config.botToken as string) || process.env.SLACK_BOT_TOKEN;
+                const channel = config.channel as string;
+                if (!token || !channel) return { success: false, error: 'Slack botToken and channel required' };
                 return sendSlackQuestion(
-                    slackBotToken,
-                    slackChannelId,
+                    token,
+                    channel,
                     question.id,
                     question.question,
                     question.options,

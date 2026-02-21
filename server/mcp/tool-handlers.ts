@@ -1222,7 +1222,7 @@ export async function handleConfigureNotifications(
                 if (channels.length === 0) {
                     return textResult(
                         'No notification channels configured.\n\n' +
-                        'Available channel types: discord, telegram, github, algochat\n' +
+                        'Available channel types: discord, telegram, github, algochat, slack\n' +
                         'Use action="set" with channel_type and config to add one.',
                     );
                 }

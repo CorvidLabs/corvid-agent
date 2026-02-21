@@ -5,6 +5,7 @@
  * - sendWebSocket (websocket.ts)
  * - sendGitHub (github.ts)
  * - sendAlgoChat (algochat.ts)
+ * - sendSlack (slack.ts)
  *
  * These tests validate each channel in isolation without hitting real external APIs.
  */
@@ -14,6 +15,7 @@ import { sendDiscord } from '../notifications/channels/discord';
 import { sendTelegram } from '../notifications/channels/telegram';
 import { sendWebSocket } from '../notifications/channels/websocket';
 import { sendAlgoChat } from '../notifications/channels/algochat';
+import { sendSlack } from '../notifications/channels/slack';
 import type { NotificationPayload } from '../notifications/types';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 
@@ -348,5 +350,36 @@ describe('sendAlgoChat', () => {
         const result = await sendAlgoChat(messenger, 'ADDR', TEST_PAYLOAD);
         expect(result.success).toBe(false);
         expect(result.error).toBe('string-error');
+    });
+});
+
+// ─── Slack ────────────────────────────────────────────────────────────────
+
+describe('sendSlack', () => {
+    test('returns success: false with error for invalid bot token', async () => {
+        const result = await sendSlack('xoxb-invalid-token', '#test', TEST_PAYLOAD);
+        expect(result.success).toBe(false);
+        expect(result.error).toBeTruthy();
+        expect(typeof result.error).toBe('string');
+    });
+
+    test('returns success: false for unreachable API', async () => {
+        const result = await sendSlack('xoxb-fake', '#test', TEST_PAYLOAD);
+        expect(result.success).toBe(false);
+        expect(result.error).toBeTruthy();
+    });
+
+    test('handles payload with null title gracefully', async () => {
+        const payloadNoTitle: NotificationPayload = { ...TEST_PAYLOAD, title: null };
+        const result = await sendSlack('xoxb-fake', '#test', payloadNoTitle);
+        expect(result.success).toBe(false);
+        expect(result.error).toBeTruthy();
+    });
+
+    test('handles payload with null sessionId gracefully', async () => {
+        const payloadNoSession: NotificationPayload = { ...TEST_PAYLOAD, sessionId: null };
+        const result = await sendSlack('xoxb-fake', '#test', payloadNoSession);
+        expect(result.success).toBe(false);
+        expect(result.error).toBeTruthy();
     });
 });
