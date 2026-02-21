@@ -213,6 +213,10 @@ export function deleteAgent(db: Database, id: string): boolean {
         db.query(`DELETE FROM session_messages WHERE session_id IN
             (SELECT id FROM sessions WHERE agent_id = ?)`).run(id);
 
+        // algochat_conversations.session_id FK -> sessions (NO ACTION, blocks session deletion)
+        db.query(`UPDATE algochat_conversations SET session_id = NULL WHERE session_id IN
+            (SELECT id FROM sessions WHERE agent_id = ?)`).run(id);
+
         // sessions (optional FK but still blocks deletion)
         db.query('DELETE FROM sessions WHERE agent_id = ?').run(id);
 
