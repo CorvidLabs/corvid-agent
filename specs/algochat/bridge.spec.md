@@ -154,7 +154,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 |--------|-------------|
 | `server/index.ts` | Lifecycle: construction, `start()`, `stop()`, service wiring |
 | `server/ws/handler.ts` | `onEvent`, `offEvent` for WebSocket event forwarding |
-| `server/routes/algochat.ts` | All PSK contact methods, `getStatus`, `handleLocalMessage` |
+| `server/routes/index.ts` | All PSK contact methods, `getStatus`, `handleLocalMessage` (inline AlgoChat routes) |
 
 ## Change Log
 

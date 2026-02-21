@@ -18,7 +18,7 @@ depends_on:
 
 Central orchestration hub for agent session lifecycles. Manages starting, stopping, resuming, and monitoring Claude agent processes. Integrates every subsystem: persona/skill prompt injection, MCP tool resolution, credit deduction, provider routing (SDK vs direct, Claude vs Ollama), approval workflows, timeout management, auto-restart for AlgoChat sessions, and API outage recovery.
 
-This is the most complex module in the system (1253 lines). It is the single point through which all agent sessions are created and managed.
+This is the most complex module in the system (1258 lines). It is the single point through which all agent sessions are created and managed.
 
 ## Public API
 
