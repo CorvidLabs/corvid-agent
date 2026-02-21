@@ -254,6 +254,18 @@ export const activeSessions = new Gauge(
     'Number of currently active sessions',
 );
 
+export const circuitBreakerTransitions = new Counter(
+    'circuit_breaker_transitions_total',
+    'Circuit breaker state transitions for agent messaging',
+    ['from_state', 'to_state', 'agent_id'],
+);
+
+export const agentRateLimitRejections = new Counter(
+    'agent_rate_limit_rejections_total',
+    'Agent messaging rejections by circuit breaker or rate limiter',
+    ['reason', 'agent_id'],
+);
+
 // ─── Registry ────────────────────────────────────────────────────────────
 
 const allMetrics = [
@@ -264,6 +276,8 @@ const allMetrics = [
     agentMessagesTotal,
     creditsConsumedTotal,
     activeSessions,
+    circuitBreakerTransitions,
+    agentRateLimitRejections,
 ];
 
 /**

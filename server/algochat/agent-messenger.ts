@@ -19,6 +19,7 @@ import { createLogger } from '../lib/logger';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { agentMessagesTotal } from '../observability/metrics';
 import { recordAudit } from '../db/audit';
+import { MessagingGuard, type MessagingGuardConfig } from './messaging-guard';
 
 const log = createLogger('AgentMessenger');
 
@@ -53,16 +54,19 @@ export class AgentMessenger {
     private processManager: ProcessManager;
     private workCommandRouter: WorkCommandRouter | null = null;
     private messageUpdateListeners = new Set<MessageUpdateCallback>();
+    readonly guard: MessagingGuard;
 
     constructor(
         db: Database,
         _config: AlgoChatConfig,
         transactor: OnChainTransactor | null,
         processManager: ProcessManager,
+        guardConfig?: Partial<MessagingGuardConfig>,
     ) {
         this.db = db;
         this.transactor = transactor;
         this.processManager = processManager;
+        this.guard = new MessagingGuard(guardConfig);
     }
 
     setWorkCommandRouter(router: WorkCommandRouter): void {
@@ -157,6 +161,41 @@ export class AgentMessenger {
             });
         }
 
+        // Circuit breaker + per-agent rate limit check
+        const guardResult = this.guard.check(fromAgentId, toAgentId);
+        if (!guardResult.allowed) {
+            const errorCode = guardResult.reason === 'CIRCUIT_OPEN' ? 'CIRCUIT_OPEN' as const : 'RATE_LIMITED' as const;
+            const errorMsg = guardResult.reason === 'CIRCUIT_OPEN'
+                ? `Circuit breaker open for agent ${toAgent.name} — calls temporarily blocked`
+                : `Rate limit exceeded: ${fromAgent.name} is sending too many messages (retry after ${Math.ceil((guardResult.retryAfterMs ?? 0) / 1000)}s)`;
+
+            // Create the message row in failed state so it's visible in history
+            const failedMessage = createAgentMessage(this.db, {
+                fromAgentId,
+                toAgentId,
+                content,
+                paymentMicro,
+                threadId,
+                fireAndForget,
+            });
+            updateAgentMessageStatus(this.db, failedMessage.id, 'failed', {
+                response: errorMsg,
+                errorCode,
+            });
+            this.emitMessageUpdate(failedMessage.id);
+            agentMessagesTotal.inc({ direction: 'outbound', status: 'rejected' });
+
+            log.warn(`Messaging guard rejected: ${guardResult.reason}`, {
+                fromAgentId,
+                toAgentId,
+                errorCode,
+                retryAfterMs: guardResult.retryAfterMs,
+            });
+
+            const updated = getAgentMessage(this.db, failedMessage.id);
+            return { message: updated ?? failedMessage, sessionId: null };
+        }
+
         // Create the agent_messages row
         const agentMessage = createAgentMessage(this.db, {
             fromAgentId,
@@ -204,7 +243,7 @@ export class AgentMessenger {
                         errorCode: 'SPENDING_LIMIT',
                     });
                     this.emitMessageUpdate(agentMessage.id);
-                    // Return early for fire-and-forget; throw for sync
+                    this.guard.recordFailure(toAgentId);
                     const failedMessage = getAgentMessage(this.db, agentMessage.id);
                     return { message: failedMessage ?? agentMessage, sessionId: null };
                 }
@@ -223,6 +262,7 @@ export class AgentMessenger {
         if (fireAndForget) {
             updateAgentMessageStatus(this.db, agentMessage.id, 'completed');
             this.emitMessageUpdate(agentMessage.id);
+            this.guard.recordSuccess(toAgentId);
 
             log.info(`Fire-and-forget message delivered`, {
                 messageId: agentMessage.id,
@@ -298,6 +338,7 @@ export class AgentMessenger {
                     errorCode: 'EMPTY_RESPONSE',
                 });
                 this.emitMessageUpdate(messageId);
+                this.guard.recordFailure(toAgentId);
                 return;
             }
 
@@ -320,6 +361,7 @@ export class AgentMessenger {
                         responseTxid: responseTxid ?? undefined,
                     });
                     this.emitMessageUpdate(messageId);
+                    this.guard.recordSuccess(toAgentId);
                     log.info(`Agent message completed`, { messageId, responseTxid });
                 })
                 .catch((err) => {
@@ -329,6 +371,7 @@ export class AgentMessenger {
                         errorCode: 'RESPONSE_SEND_FAILED',
                     });
                     this.emitMessageUpdate(messageId);
+                    this.guard.recordFailure(toAgentId);
                     log.warn('On-chain response send failed', {
                         messageId,
                         error: err instanceof Error ? err.message : String(err),

@@ -127,15 +127,16 @@ export class CircuitBreaker {
 
         try {
             const result = await fn();
-            this.onSuccess();
+            this.recordSuccess();
             return result;
         } catch (err) {
-            this.onFailure();
+            this.recordFailure();
             throw err;
         }
     }
 
-    private onSuccess(): void {
+    /** Record a successful operation (used by execute() or externally). */
+    recordSuccess(): void {
         if (this.state === 'HALF_OPEN') {
             this.successCount++;
             if (this.successCount >= this.successThreshold) {
@@ -149,7 +150,8 @@ export class CircuitBreaker {
         }
     }
 
-    private onFailure(): void {
+    /** Record a failed operation (used by execute() or externally). */
+    recordFailure(): void {
         this.failureCount++;
         this.lastFailureTime = Date.now();
 
