@@ -356,30 +356,74 @@ describe('sendAlgoChat', () => {
 // ─── Slack ────────────────────────────────────────────────────────────────
 
 describe('sendSlack', () => {
+    // Save/restore globalThis.fetch to avoid hitting the real Slack API
+    const originalFetch = globalThis.fetch;
+    function restoreFetch() {
+        globalThis.fetch = originalFetch;
+    }
+
+    test('returns success with externalRef when Slack API returns ok', async () => {
+        globalThis.fetch = mock(() =>
+            Promise.resolve(new Response(JSON.stringify({ ok: true, ts: '1234567890.123456' }), { status: 200 })),
+        ) as unknown as typeof fetch;
+        try {
+            const result = await sendSlack('xoxb-valid-token', '#test', TEST_PAYLOAD);
+            expect(result.success).toBe(true);
+            expect(result.externalRef).toBe('1234567890.123456');
+        } finally {
+            restoreFetch();
+        }
+    });
+
     test('returns success: false with error for invalid bot token', async () => {
-        const result = await sendSlack('xoxb-invalid-token', '#test', TEST_PAYLOAD);
-        expect(result.success).toBe(false);
-        expect(result.error).toBeTruthy();
-        expect(typeof result.error).toBe('string');
+        globalThis.fetch = mock(() =>
+            Promise.resolve(new Response(JSON.stringify({ ok: false, error: 'invalid_auth' }), { status: 200 })),
+        ) as unknown as typeof fetch;
+        try {
+            const result = await sendSlack('xoxb-invalid-token', '#test', TEST_PAYLOAD);
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('invalid_auth');
+        } finally {
+            restoreFetch();
+        }
     });
 
     test('returns success: false for unreachable API', async () => {
-        const result = await sendSlack('xoxb-fake', '#test', TEST_PAYLOAD);
-        expect(result.success).toBe(false);
-        expect(result.error).toBeTruthy();
+        globalThis.fetch = mock(() =>
+            Promise.reject(new Error('Network unreachable')),
+        ) as unknown as typeof fetch;
+        try {
+            const result = await sendSlack('xoxb-fake', '#test', TEST_PAYLOAD);
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Network unreachable');
+        } finally {
+            restoreFetch();
+        }
     });
 
     test('handles payload with null title gracefully', async () => {
-        const payloadNoTitle: NotificationPayload = { ...TEST_PAYLOAD, title: null };
-        const result = await sendSlack('xoxb-fake', '#test', payloadNoTitle);
-        expect(result.success).toBe(false);
-        expect(result.error).toBeTruthy();
+        globalThis.fetch = mock(() =>
+            Promise.resolve(new Response(JSON.stringify({ ok: true, ts: '111.222' }), { status: 200 })),
+        ) as unknown as typeof fetch;
+        try {
+            const payloadNoTitle: NotificationPayload = { ...TEST_PAYLOAD, title: null };
+            const result = await sendSlack('xoxb-fake', '#test', payloadNoTitle);
+            expect(result.success).toBe(true);
+        } finally {
+            restoreFetch();
+        }
     });
 
     test('handles payload with null sessionId gracefully', async () => {
-        const payloadNoSession: NotificationPayload = { ...TEST_PAYLOAD, sessionId: null };
-        const result = await sendSlack('xoxb-fake', '#test', payloadNoSession);
-        expect(result.success).toBe(false);
-        expect(result.error).toBeTruthy();
+        globalThis.fetch = mock(() =>
+            Promise.resolve(new Response(JSON.stringify({ ok: true, ts: '333.444' }), { status: 200 })),
+        ) as unknown as typeof fetch;
+        try {
+            const payloadNoSession: NotificationPayload = { ...TEST_PAYLOAD, sessionId: null };
+            const result = await sendSlack('xoxb-fake', '#test', payloadNoSession);
+            expect(result.success).toBe(true);
+        } finally {
+            restoreFetch();
+        }
     });
 });
