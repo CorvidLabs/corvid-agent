@@ -1,7 +1,7 @@
 ---
 module: discord-bridge
 version: 1
-status: draft
+status: active
 files:
   - server/discord/bridge.ts
   - server/discord/types.ts
@@ -47,24 +47,24 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Type | Description |
 |------|-------------|
-| `DiscordBridgeConfig` | `{ botToken, channelId, allowedUserIds: string[] }` |
-| `DiscordGatewayPayload` | `{ op, d, s, t }` — standard gateway payload |
-| `DiscordHelloData` | `{ heartbeat_interval }` |
-| `DiscordReadyData` | `{ session_id, resume_gateway_url }` |
-| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp }` |
-| `DiscordAuthor` | `{ id, username, bot? }` |
+| `DiscordBridgeConfig` | `{ botToken: string; channelId: string; allowedUserIds: string[] }` |
+| `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
+| `DiscordHelloData` | `{ heartbeat_interval: number }` |
+| `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
+| `DiscordMessageData` | `{ id: string; channel_id: string; author: DiscordAuthor; content: string; timestamp: string }` |
+| `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
 | `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
 | `GatewayIntent` | Bit flags: `GUILD_MESSAGES` (1<<9), `MESSAGE_CONTENT` (1<<15) |
 
 ## Invariants
 
 1. **Hardcoded gateway URL**: Always connects to `wss://gateway.discord.gg/?v=10&encoding=json`. The `resume_gateway_url` from the READY event is intentionally not stored or used to prevent SSRF attacks
-2. **Fixed heartbeat interval**: Uses a constant 41.25-second heartbeat interval regardless of the server-provided value. The server value is validated (10s–120s range) but not used, to prevent resource exhaustion from malicious gateway payloads
+2. **Fixed heartbeat interval**: Uses a constant 41.25-second heartbeat interval regardless of the server-provided value. The server value is validated (10s-120s range) but not used, to prevent resource exhaustion from malicious gateway payloads
 3. **Heartbeat ACK tracking**: If a heartbeat is not acknowledged before the next one is due, the connection is closed with code 4000 and reconnection is triggered
 4. **Initial heartbeat jitter**: The first heartbeat after HELLO is sent after a random delay between 0 and the heartbeat interval, per Discord documentation
 5. **Sequence tracking**: The `s` field from every dispatch is tracked and sent back in heartbeats and resume payloads
 6. **Session resume**: On reconnection, if a `sessionId` exists, a RESUME is sent instead of IDENTIFY. On INVALID_SESSION with `resumable=false`, the session ID is cleared and IDENTIFY is used
-7. **INVALID_SESSION delay**: After receiving INVALID_SESSION, the bridge waits 1–5 seconds (random) before re-identifying, per Discord documentation
+7. **INVALID_SESSION delay**: After receiving INVALID_SESSION, the bridge waits 1-5 seconds (random) before re-identifying, per Discord documentation
 8. **Reconnection backoff**: Exponential backoff with `delay = min(1000 * 2^attempt, 60000)`. Maximum 10 reconnect attempts before giving up and setting `running = false`
 9. **Channel filter**: Only messages from the configured `channelId` are processed. Messages from other channels are silently ignored
 10. **Bot message ignore**: Messages from bot accounts (`author.bot === true`) are silently ignored to prevent loops
@@ -103,13 +103,25 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 - **Then** the heartbeat timer is cleared
 - **And** after exponential backoff delay, the bridge reconnects and sends RESUME
 - **When** INVALID_SESSION (non-resumable) is received
-- **Then** the session ID is cleared and a new IDENTIFY is sent after a 1–5 second delay
+- **Then** the session ID is cleared and a new IDENTIFY is sent after a 1-5 second delay
 
 ### Scenario: Max reconnect attempts exhausted
 
 - **Given** a Discord bridge that has failed to reconnect 10 times
 - **When** the 10th reconnect attempt fails
 - **Then** `running` is set to false and no more reconnect attempts are made
+
+### Scenario: Heartbeat timeout
+
+- **Given** a heartbeat was sent but not acknowledged
+- **When** the next heartbeat interval fires
+- **Then** the WebSocket is closed with code 4000 and reconnect is triggered
+
+### Scenario: Long response chunked
+
+- **Given** an agent produces a 3500-character response
+- **When** the response is flushed
+- **Then** two Discord messages are sent: one with 2000 characters and one with 1500 characters
 
 ## Error Cases
 
@@ -126,7 +138,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Discord REST API send fails | Logs error with status and truncated response body |
 | Heartbeat not acknowledged | Closes connection with code 4000, triggers reconnect |
 | Max reconnect attempts reached | Stops bridge (`running = false`), logs error |
-| Heartbeat interval out of 10s–120s range | Logs warning, uses default 41.25s |
+| Heartbeat interval out of 10s-120s range | Logs warning, uses default 41.25s |
 
 ## Dependencies
 
@@ -138,6 +150,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `server/db/agents.ts` | `listAgents` |
 | `server/db/sessions.ts` | `createSession`, `getSession` |
 | `server/db/projects.ts` | `listProjects` |
+| `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
 

@@ -43,22 +43,23 @@ export function loadRateLimitConfig(): RateLimitConfig {
 // Sliding-window tracker
 // ---------------------------------------------------------------------------
 
-/** Timestamps of recent requests for a single IP+bucket. */
+/** Timestamps of recent requests for a single key+bucket. */
 interface BucketEntry {
     /** Sorted array of request timestamps (ms). */
     timestamps: number[];
 }
 
 /**
- * Per-IP rate limiter using a sliding-window algorithm.
+ * Per-key rate limiter using a sliding-window algorithm.
  *
- * Maintains two buckets per IP: "read" (GET/HEAD/OPTIONS) and "mutation"
- * (POST/PUT/DELETE). Each bucket independently tracks request timestamps
- * within the configured window.
+ * Keys can be wallet addresses (preferred trust boundary) or IP addresses
+ * (fallback). Maintains two buckets per key: "read" (GET/HEAD/OPTIONS)
+ * and "mutation" (POST/PUT/DELETE). Each bucket independently tracks
+ * request timestamps within the configured window.
  */
 export class RateLimiter {
-    private readonly config: RateLimitConfig;
-    /** Map<ip, { read: BucketEntry, mutation: BucketEntry }> */
+    readonly config: RateLimitConfig;
+    /** Map<key, { read: BucketEntry, mutation: BucketEntry }> */
     private readonly clients: Map<string, { read: BucketEntry; mutation: BucketEntry }> = new Map();
     /** Periodic sweep interval handle. */
     private sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -75,23 +76,24 @@ export class RateLimiter {
     }
 
     /**
-     * Check whether a request from the given IP should be allowed.
+     * Check whether a request from the given key should be allowed.
+     * The key is typically a wallet address or IP address.
      *
      * @returns null if allowed, or a Response (429) if rate-limited.
      */
-    check(ip: string, method: string): Response | null {
+    check(key: string, method: string): Response | null {
         const now = Date.now();
         const isRead = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
         const bucketKey = isRead ? 'read' : 'mutation';
         const limit = isRead ? this.config.maxGet : this.config.maxMutation;
 
-        let entry = this.clients.get(ip);
+        let entry = this.clients.get(key);
         if (!entry) {
             entry = {
                 read: { timestamps: [] },
                 mutation: { timestamps: [] },
             };
-            this.clients.set(ip, entry);
+            this.clients.set(key, entry);
         }
 
         const bucket = entry[bucketKey];
@@ -111,7 +113,7 @@ export class RateLimiter {
             const retryAfterSec = Math.ceil((oldestInWindow + this.config.windowMs - now) / 1000);
             const retryAfter = Math.max(retryAfterSec, 1);
 
-            log.warn('Rate limit exceeded', { ip, method, bucket: bucketKey, limit, retryAfter });
+            log.warn('Rate limit exceeded', { key, method, bucket: bucketKey, limit, retryAfter });
 
             return new Response(
                 JSON.stringify({
@@ -138,11 +140,11 @@ export class RateLimiter {
         const windowStart = now - this.config.windowMs;
         let swept = 0;
 
-        for (const [ip, entry] of this.clients) {
+        for (const [key, entry] of this.clients) {
             const readActive = entry.read.timestamps.some((t) => t > windowStart);
             const mutationActive = entry.mutation.timestamps.some((t) => t > windowStart);
             if (!readActive && !mutationActive) {
-                this.clients.delete(ip);
+                this.clients.delete(key);
                 swept++;
             }
         }
@@ -177,7 +179,7 @@ const EXEMPT_PATHS = new Set(['/api/health', '/webhooks/github']);
  * Extract the client IP from a Request.
  * Checks X-Forwarded-For first (reverse proxy), then X-Real-IP, falls back to 'unknown'.
  */
-function getClientIp(req: Request): string {
+export function getClientIp(req: Request): string {
     const forwarded = req.headers.get('x-forwarded-for');
     if (forwarded) {
         // X-Forwarded-For can contain multiple IPs; the first is the client
@@ -194,15 +196,22 @@ function getClientIp(req: Request): string {
 /**
  * Rate-limit check for an incoming HTTP request.
  *
+ * When a wallet address is available (from auth context or query param),
+ * it is used as the rate limit key instead of IP — the trust boundary
+ * is wallet address, not IP.
+ *
+ * @param walletAddress - Optional wallet address to use as the rate limit key.
  * @returns null if the request is allowed, or a 429 Response if rate-limited.
  */
-export function checkRateLimit(req: Request, url: URL, limiter: RateLimiter): Response | null {
+export function checkRateLimit(req: Request, url: URL, limiter: RateLimiter, walletAddress?: string): Response | null {
     // Exempt specific paths
     if (EXEMPT_PATHS.has(url.pathname)) return null;
 
     // Don't rate-limit WebSocket upgrades
     if (url.pathname === '/ws') return null;
 
-    const ip = getClientIp(req);
-    return limiter.check(ip, req.method);
+    // Prefer wallet address as the rate limit key (trust boundary),
+    // fall back to IP when no wallet is available
+    const key = walletAddress || getClientIp(req);
+    return limiter.check(key, req.method);
 }

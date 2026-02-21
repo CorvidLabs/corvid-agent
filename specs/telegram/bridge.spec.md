@@ -1,7 +1,7 @@
 ---
 module: telegram-bridge
 version: 1
-status: draft
+status: active
 files:
   - server/telegram/bridge.ts
   - server/telegram/types.ts
@@ -11,6 +11,7 @@ db_tables:
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/db/sessions.spec.md
+  - specs/voice/voice.spec.md
 ---
 
 # Telegram Bridge
@@ -47,14 +48,14 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 
 | Type | Description |
 |------|-------------|
-| `TelegramBridgeConfig` | `{ botToken, chatId, allowedUserIds: string[] }` |
+| `TelegramBridgeConfig` | `{ botToken: string; chatId: string; allowedUserIds: string[] }` |
 | `TelegramUpdate` | Telegram update object with optional `message` and `callback_query` |
 | `TelegramMessage` | Message with `from`, `chat`, optional `text`, optional `voice` |
-| `TelegramUser` | `{ id, is_bot, first_name, username? }` |
-| `TelegramChat` | `{ id, type }` |
-| `TelegramVoice` | `{ file_id, file_unique_id, duration, mime_type?, file_size? }` |
-| `TelegramCallbackQuery` | `{ id, from, message?, data? }` |
-| `TelegramFile` | `{ file_id, file_unique_id, file_size?, file_path? }` |
+| `TelegramUser` | `{ id: number; is_bot: boolean; first_name: string; username?: string }` |
+| `TelegramChat` | `{ id: number; type: string }` |
+| `TelegramVoice` | `{ file_id: string; file_unique_id: string; duration: number; mime_type?: string; file_size?: number }` |
+| `TelegramCallbackQuery` | Callback query from inline keyboard |
+| `TelegramFile` | `{ file_id: string; file_unique_id: string; file_size?: number; file_path?: string }` |
 
 ## Invariants
 
@@ -106,6 +107,18 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 - **When** user sends a new message
 - **Then** the old session mapping is cleared and a new session is created
 
+### Scenario: Unauthorized user
+
+- **Given** `allowedUserIds` is `["123", "456"]`
+- **When** user with Telegram ID 789 sends a message
+- **Then** the bridge replies "Unauthorized."
+
+### Scenario: Long response chunked
+
+- **Given** an agent produces a 5000-character response
+- **When** the response is flushed
+- **Then** two messages are sent: one with 4096 characters and one with 904 characters
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -133,6 +146,7 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 | `server/db/projects.ts` | `listProjects` |
 | `server/voice/stt.ts` | `transcribe` for voice note transcription |
 | `server/voice/tts.ts` | `synthesizeWithCache` for voice responses |
+| `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
 
@@ -147,7 +161,7 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 | `TELEGRAM_BOT_TOKEN` | (required) | Telegram Bot API token |
 | `TELEGRAM_CHAT_ID` | (required) | Default chat ID for the bridge |
 | `TELEGRAM_ALLOWED_USERS` | `""` | Comma-separated list of allowed Telegram user IDs; empty = allow all |
-| `OPENAI_API_KEY` | (none) | Required for STT transcription and TTS voice responses |
+| `OPENAI_API_KEY` | (optional) | Required for STT transcription and TTS voice responses |
 
 ## Change Log
 

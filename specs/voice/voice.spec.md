@@ -1,7 +1,7 @@
 ---
 module: voice
 version: 1
-status: draft
+status: active
 files:
   - server/voice/stt.ts
   - server/voice/tts.ts
@@ -15,7 +15,7 @@ depends_on: []
 
 ## Purpose
 
-Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI APIs. STT uses the Whisper API (`whisper-1`) for transcription. TTS uses the Speech API (`tts-1`) for synthesis. TTS results are cached in SQLite to avoid redundant API calls for repeated text.
+Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI APIs. STT uses the Whisper API (`whisper-1`) for transcription. TTS uses the Speech API (`tts-1`) for synthesis. TTS results are cached in a SQLite table using SHA-256 content hashing with LRU eviction. Both services require `OPENAI_API_KEY`.
 
 ## Public API
 
@@ -25,15 +25,15 @@ Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI
 |----------|-----------|---------|-------------|
 | `transcribe` | `(options: STTOptions)` | `Promise<STTResult>` | Transcribe audio to text via OpenAI Whisper |
 | `synthesize` | `(options: TTSOptions)` | `Promise<TTSResult>` | Convert text to speech via OpenAI TTS API |
-| `synthesizeWithCache` | `(db: Database, text: string, voice: VoicePreset)` | `Promise<TTSResult>` | Synthesize with SQLite cache lookup/store |
+| `synthesizeWithCache` | `(db: Database, text: string, voice: VoicePreset)` | `Promise<TTSResult>` | Cache-aware TTS: checks `voice_cache` table first, synthesizes and caches on miss |
 
 ### Exported Types
 
 | Type | Description |
 |------|-------------|
-| `TTSOptions` | `{ text, voice: VoicePreset, model?, speed? }` |
-| `TTSResult` | `{ audio: Buffer, format: 'mp3', durationMs: number }` |
-| `STTOptions` | `{ audio: Buffer, format?: 'ogg' \| 'mp3' \| 'wav' \| 'webm', language?: string }` |
+| `TTSOptions` | `{ text: string; voice: VoicePreset; model?: string; speed?: number }` |
+| `TTSResult` | `{ audio: Buffer; format: 'mp3'; durationMs: number }` |
+| `STTOptions` | `{ audio: Buffer; format?: 'ogg' \| 'mp3' \| 'wav' \| 'webm'; language?: string }` |
 | `STTResult` | `{ text: string }` |
 
 ## Invariants
@@ -48,8 +48,8 @@ Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI
 8. **TTS speed default**: If no speed is specified, defaults to `1.0`
 9. **TTS output format**: Always outputs MP3 (`response_format: 'mp3'`)
 10. **Duration estimation**: TTS duration is estimated from audio byte size assuming 128kbps MP3: `durationMs = (bytes / 16000) * 1000`
-11. **Cache keying**: TTS cache uses SHA-256 hash of the text plus the voice preset as the lookup key
-12. **Cache eviction**: When the `voice_cache` table exceeds 10,000 entries, the oldest entries (by `created_at`) are deleted to bring it back to the limit
+11. **SHA-256 cache key**: TTS cache uses SHA-256 hash of the text (via `Bun.CryptoHasher('sha256')`) plus the voice preset as the lookup key
+12. **LRU eviction at 10,000 entries**: When the `voice_cache` table exceeds 10,000 entries, the oldest entries (by `created_at` ASC) are deleted to bring it back to the limit
 13. **Cache returns copy**: Cached audio is wrapped in a new `Buffer.from()` to prevent mutation of cached data
 14. **API error handling**: Both STT and TTS log the full API error server-side but throw a generic error message that does not expose API details
 
@@ -105,7 +105,7 @@ Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI
 
 | Module | What is used |
 |--------|-------------|
-| `server/lib/logger.ts` | `createLogger` for STT/TTS logging |
+| `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
 
@@ -125,7 +125,7 @@ Provides speech-to-text (STT) and text-to-speech (TTS) capabilities using OpenAI
 | audio_data | BLOB | NOT NULL | Cached MP3 audio bytes |
 | format | TEXT | NOT NULL | Audio format (always `mp3`) |
 | duration_ms | INTEGER | NOT NULL | Estimated duration in milliseconds |
-| created_at | TEXT | DEFAULT datetime('now') | Cache entry creation time |
+| created_at | TEXT | DEFAULT datetime('now') | Cache entry creation time (used for LRU eviction) |
 
 ## Configuration
 

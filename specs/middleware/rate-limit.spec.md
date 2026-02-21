@@ -1,7 +1,7 @@
 ---
 module: rate-limit
 version: 1
-status: draft
+status: active
 files:
   - server/middleware/rate-limit.ts
 db_tables: []
@@ -16,18 +16,18 @@ Sliding-window per-IP HTTP rate limiter. Separates traffic into two buckets — 
 
 ## Public API
 
-### Exported Types
-
-| Type | Description |
-|------|-------------|
-| `RateLimitConfig` | Configuration: `maxGet`, `maxMutation`, `windowMs` |
-
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `loadRateLimitConfig` | `()` | `RateLimitConfig` | Reads `RATE_LIMIT_GET` and `RATE_LIMIT_MUTATION` from env; falls back to defaults |
 | `checkRateLimit` | `(req: Request, url: URL, limiter: RateLimiter)` | `Response \| null` | Top-level check — exempts specific paths, extracts client IP, delegates to `RateLimiter.check` |
+
+### Exported Types
+
+| Type | Description |
+|------|-------------|
+| `RateLimitConfig` | `{ maxGet: number; maxMutation: number; windowMs: number }` |
 
 ### Exported Classes
 
@@ -60,6 +60,7 @@ Sliding-window per-IP HTTP rate limiter. Separates traffic into two buckets — 
 7. **Periodic sweep**: A background timer runs every 5 minutes and removes IP entries with no timestamps in the current window, bounding memory to O(active IPs)
 8. **Sweep timer unref**: The sweep interval is `unref`'d so it does not prevent process exit
 9. **Config validation**: Parsed env values that are non-positive or non-finite fall back to defaults (240 for GET, 60 for mutation)
+10. **Default limits**: Read defaults to 600/min, mutation defaults to 60/min
 
 ## Behavioral Examples
 
@@ -99,8 +100,8 @@ Sliding-window per-IP HTTP rate limiter. Separates traffic into two buckets — 
 |-----------|----------|
 | Rate limit exceeded (read) | 429 response with JSON body and `Retry-After` header |
 | Rate limit exceeded (mutation) | 429 response with JSON body and `Retry-After` header |
-| `RATE_LIMIT_GET` set to non-numeric or ≤ 0 | Falls back to 240 |
-| `RATE_LIMIT_MUTATION` set to non-numeric or ≤ 0 | Falls back to 60 |
+| `RATE_LIMIT_GET` set to non-numeric or <= 0 | Falls back to 240 |
+| `RATE_LIMIT_MUTATION` set to non-numeric or <= 0 | Falls back to 60 |
 | No `X-Forwarded-For` or `X-Real-IP` header | IP resolves to `'unknown'` — all such requests share one bucket |
 
 ## Dependencies
@@ -109,7 +110,7 @@ Sliding-window per-IP HTTP rate limiter. Separates traffic into two buckets — 
 
 | Module | What is used |
 |--------|-------------|
-| `server/lib/logger.ts` | `createLogger` for rate-limit logging |
+| `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
 

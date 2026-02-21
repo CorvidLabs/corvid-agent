@@ -1,7 +1,7 @@
 ---
 module: ws-handler
 version: 1
-status: draft
+status: active
 files:
   - server/ws/handler.ts
   - shared/ws-protocol.ts
@@ -23,7 +23,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 
 | Type | Description |
 |------|-------------|
-| `WsData` | Per-connection data attached to each WebSocket: `subscriptions` map, optional `walletAddress`, `authenticated` flag |
+| `WsData` | Per-connection data: `{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }` |
 
 ### Exported Functions
 
@@ -32,7 +32,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `createWebSocketHandler` | `(processManager, getBridge, authConfig, getMessenger?, getWorkTaskService?, getSchedulerService?, getOwnerQuestionManager?)` | `{ open, message, close }` | Factory returning Bun WebSocket handler callbacks |
 | `broadcastAlgoChatMessage` | `(server, participant, content, direction)` | `void` | Publish an AlgoChat message to all WebSocket clients subscribed to the `algochat` topic |
 
-## Client → Server Messages (ClientMessage)
+## Client -> Server Messages (ClientMessage)
 
 | Type | Fields | Description |
 |------|--------|-------------|
@@ -48,7 +48,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `schedule_approval` | `executionId: string, approved: boolean` | Approve or deny a scheduled execution |
 | `question_response` | `questionId: string, answer: string, selectedOption?: number` | Answer an owner question |
 
-## Server → Client Messages (ServerMessage)
+## Server -> Client Messages (ServerMessage)
 
 | Type | Key Fields | Description |
 |------|------------|-------------|
@@ -80,6 +80,30 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 11. **Message validation**: Incoming messages are validated via `isClientMessage` from `shared/ws-protocol.ts`. Invalid JSON or unknown message types are rejected with an error
 
 ## Behavioral Examples
+
+### Scenario: Pre-authenticated WebSocket connection
+
+- **Given** a WebSocket upgrade with `?key=<valid-key>` (authenticated at upgrade)
+- **When** the connection opens
+- **Then** `ws.data.authenticated` is true, and the client is subscribed to all 5 broadcast topics
+
+### Scenario: First-message authentication
+
+- **Given** an unauthenticated WebSocket connection
+- **When** the client sends `{ "type": "auth", "key": "<valid-key>" }`
+- **Then** `ws.data.authenticated` is set to true, broadcast topics are subscribed
+
+### Scenario: Invalid auth key closes connection
+
+- **Given** an unauthenticated WebSocket connection
+- **When** the client sends `{ "type": "auth", "key": "wrong" }`
+- **Then** an error message is sent and the connection is closed with code 4001
+
+### Scenario: Message before auth is rejected
+
+- **Given** an unauthenticated WebSocket connection
+- **When** the client sends `{ "type": "subscribe", "sessionId": "..." }`
+- **Then** the server responds with an error: "Authentication required"
 
 ### Scenario: Client subscribes to a session
 
