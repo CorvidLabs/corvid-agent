@@ -9,6 +9,7 @@ import { AlgoChatBridge } from './algochat/bridge';
 import { AgentWalletService } from './algochat/agent-wallet';
 import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
+import { OnChainTransactor } from './algochat/on-chain-transactor';
 import { WorkCommandRouter } from './algochat/work-command-router';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
@@ -316,7 +317,12 @@ async function initAlgoChat(): Promise<void> {
     algochatBridge.setApprovalManager(processManager.approvalManager);
     algochatBridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
     algochatBridge.setWorkTaskService(workTaskService);
-    agentMessenger = new AgentMessenger(db, agentNetworkConfig, agentService, agentWalletService, agentDirectory, processManager);
+
+    // Create OnChainTransactor — handles all Algorand transaction operations
+    const onChainTransactor = new OnChainTransactor(db, agentService, agentWalletService, agentDirectory);
+    algochatBridge.setOnChainTransactor(onChainTransactor);
+
+    agentMessenger = new AgentMessenger(db, agentNetworkConfig, onChainTransactor, processManager);
     const workCommandRouter = new WorkCommandRouter(db);
     workCommandRouter.setWorkTaskService(workTaskService);
     agentMessenger.setWorkCommandRouter(workCommandRouter);
