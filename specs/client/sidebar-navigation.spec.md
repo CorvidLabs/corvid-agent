@@ -13,7 +13,7 @@ depends_on: []
 
 ## Purpose
 
-Defines the sidebar navigation links that provide access to all top-level pages in the dashboard. The sidebar is the sole navigation mechanism — if a route exists in `app.routes.ts` but has no sidebar link, users cannot reach it through the UI.
+Provides the main navigation sidebar for the web client. The `SidebarComponent` renders navigation links to all top-level routes, supports responsive mobile overlay mode, and persists a collapsed/expanded state in localStorage. The `routes` array defines all lazy-loaded Angular routes for the application.
 
 ## Public API
 
@@ -21,83 +21,42 @@ Defines the sidebar navigation links that provide access to all top-level pages 
 
 | Class | Description |
 |-------|-------------|
-| `SidebarComponent` | Angular component that renders the sidebar navigation with collapsible links to all top-level routes |
+| `SidebarComponent` | Angular component rendering the main navigation sidebar with responsive collapse and mobile overlay |
 
-### Exported Constants
+### Exported Variables
 
-| Constant | Type | Description |
+| Variable | Type | Description |
 |----------|------|-------------|
-| `routes` | `Routes` | Angular route configuration array defining all application routes (from `app.routes.ts`) |
+| `routes` | `Routes` | Angular route configuration array defining all application routes with lazy-loaded components |
 
 ## Invariants
 
-1. **Every top-level route MUST have a sidebar link** unless it is explicitly listed in the "Routes WITHOUT Sidebar Links" section below. When a new route is added to `app.routes.ts`, a corresponding `<li>` entry MUST be added to the sidebar template, or it must be added to the exclusion list with justification.
-2. **Link order is fixed.** Links are grouped into logical sections separated by dividers. The order below must be maintained.
-3. **Each link needs both label and abbreviation.** Every sidebar link has a `sidebar__label` (full text) and `sidebar__abbr` (1-2 char abbreviation shown when collapsed).
-4. **routerLinkActive must be set.** Every link uses `routerLinkActive="sidebar__link--active"` for visual highlighting.
-5. **Never remove a sidebar link without reading this spec first.** If you are editing the sidebar, check this table and ensure every listed link remains present.
-
-## Sidebar Links (Authoritative List)
-
-The sidebar MUST contain exactly these links in this order:
-
-| # | Label | Route | Abbreviation | Section |
-|---|-------|-------|-------------|---------|
-| 1 | Dashboard | `/dashboard` | D | Core |
-| 2 | Agents | `/agents` | A | Core |
-| 3 | Models | `/models` | M | Core |
-| 4 | Conversations | `/sessions` | Ch | Core |
-| 5 | Councils | `/councils` | Co | Core |
-| 6 | Projects | `/projects` | P | Core |
-| | --- divider --- | | | |
-| 7 | Schedules | `/schedules` | Sc | Automation |
-| 8 | Workflows | `/workflows` | Wf | Automation |
-| 9 | Work Tasks | `/work-tasks` | Wt | Automation |
-| | --- divider --- | | | |
-| 10 | Webhooks | `/webhooks` | Wh | Integrations |
-| 11 | Polling | `/mention-polling` | Mp | Integrations |
-| | --- divider --- | | | |
-| 12 | Feed | `/feed` | F | Monitoring |
-| 13 | Wallets | `/wallets` | W | Monitoring |
-| 14 | Analytics | `/analytics` | An | Monitoring |
-| 15 | Logs | `/logs` | L | Monitoring |
-| 16 | Settings | `/settings` | S | System |
-
-## Routes WITHOUT Sidebar Links
-
-These routes are accessed via in-page navigation and do NOT need sidebar entries:
-
-**Sub-routes (detail/edit/create pages):**
-- `projects/new`, `projects/:id`, `projects/:id/edit`
-- `agents/new`, `agents/:id`, `agents/:id/edit`
-- `councils/new`, `councils/:id`, `councils/:id/edit`
-- `council-launches/:id`
-- `sessions/new`, `sessions/:id`
-
-**Merged pages (functionality lives inside another page):**
-- `allowlist` — allowlist management is built into the Wallets page (`/wallets`). The standalone `/allowlist` route still exists for direct URL access but does not need a sidebar link.
+1. **Sidebar closes on navigation**: Route changes (NavigationEnd events) automatically close the mobile sidebar overlay
+2. **Collapsed state persistence**: The collapsed/expanded state is persisted in `localStorage` under key `sidebar_collapsed`
+3. **Mobile overlay**: Below 768px viewport width, the sidebar renders as a slide-out overlay with backdrop, ignoring collapsed state
+4. **Escape key closes sidebar**: Pressing Escape closes the sidebar overlay when open
+5. **Route lazy loading**: All routes use `loadComponent` with dynamic imports for code splitting
 
 ## Behavioral Examples
 
-### Scenario: New top-level route added
+### Scenario: Toggle sidebar collapse on desktop
 
-- **Given** a developer adds `{ path: 'notifications', loadComponent: ... }` to `app.routes.ts`
-- **When** they check this spec
-- **Then** they MUST also add a sidebar link for `/notifications` with label, abbreviation, and correct position — OR add it to the exclusion list with justification
+- **Given** the sidebar is expanded on desktop
+- **When** the collapse button is clicked
+- **Then** the sidebar width shrinks to 48px, labels are replaced with abbreviations, and `localStorage` stores `sidebar_collapsed = 'true'`
 
-### Scenario: Sidebar link removed by mistake
+### Scenario: Mobile sidebar open and navigate
 
-- **Given** the sidebar is missing a link for an existing route (e.g. `/models`)
-- **When** `spec:check` or manual review catches it
-- **Then** the link must be restored — removing sidebar links without removing the corresponding route is a spec violation
+- **Given** the sidebar is open on a mobile viewport
+- **When** a navigation link is clicked
+- **Then** the route changes and the sidebar closes automatically
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| Route exists without sidebar link (and not excluded) | Spec violation — user cannot navigate to the page |
-| Sidebar link exists without route | Angular shows blank page — link must be removed or route added |
-| Duplicate abbreviation | Collapsed sidebar becomes ambiguous — abbreviations must be unique |
+| `localStorage` unavailable | Collapsed state defaults to `false` (expanded) |
+| Route not matched | Angular default behavior (no component loaded) |
 
 ## Dependencies
 
@@ -105,17 +64,18 @@ These routes are accessed via in-page navigation and do NOT need sidebar entries
 
 | Module | What is used |
 |--------|-------------|
-| `@angular/core` | `Component`, `ChangeDetectionStrategy`, `model`, `signal`, lifecycle hooks |
-| `@angular/router` | `Router`, `RouterLink`, `RouterLinkActive`, `NavigationEnd` |
+| `@angular/core` | `Component`, `ChangeDetectionStrategy`, `model`, `signal`, `inject`, `viewChild` |
+| `@angular/router` | `Router`, `RouterLink`, `RouterLinkActive`, `NavigationEnd`, `Routes` |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
-| `client/src/app/app.component.ts` | `SidebarComponent` (rendered in app shell) |
+| `client/src/app/app.ts` | `SidebarComponent` used in the root App template |
+| `client/src/app/app.config.ts` | `routes` imported for Angular router configuration |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-02-20 | corvid-agent | Initial spec — 16 sidebar links, allowlist excluded (merged into Wallets) |
+| 2026-02-20 | corvid-agent | Initial spec |
