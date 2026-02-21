@@ -35,7 +35,7 @@ export interface Agent {
 }
 
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'stopped' | 'error';
-export type SessionSource = 'web' | 'algochat' | 'agent' | 'telegram' | 'discord';
+export type SessionSource = 'web' | 'algochat' | 'agent' | 'telegram' | 'discord' | 'slack';
 
 export interface Session {
     id: string;
@@ -691,7 +691,7 @@ export interface WorkflowNodeRun {
 
 // MARK: - Notifications (Multi-Channel)
 
-export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat' | 'whatsapp' | 'signal';
+export type NotificationChannelType = 'websocket' | 'discord' | 'telegram' | 'github' | 'algochat' | 'whatsapp' | 'signal' | 'slack';
 
 // MARK: - Voice
 
