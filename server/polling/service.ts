@@ -233,6 +233,18 @@ export class MentionPollingService {
                 }
             }
 
+            // Ensure ALL new mention IDs are recorded in processedIds, not just
+            // the ones that were successfully processed. Mentions eliminated by
+            // dedup (multiple IDs for the same issue) or skipped by processMention()
+            // (rate limit, existing session, etc.) must still be marked as seen.
+            // Otherwise lastSeenId advances past them and they're permanently lost.
+            const alreadyTracked = new Set(config.processedIds);
+            const missingIds = newMentions.map(m => m.id).filter(id => !alreadyTracked.has(id));
+            if (missingIds.length > 0) {
+                config.processedIds = [...config.processedIds, ...missingIds];
+                updateProcessedIds(this.db, config.id, config.processedIds);
+            }
+
             // Also update lastSeenId to the newest for backward compat
             const newestId = mentions[0].id; // mentions are sorted newest-first
             updatePollState(this.db, config.id, newestId);
