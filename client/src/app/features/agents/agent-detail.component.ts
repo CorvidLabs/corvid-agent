@@ -6,11 +6,15 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { WorkTaskService } from '../../core/services/work-task.service';
+import { PersonaService } from '../../core/services/persona.service';
+import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
 import type { WorkTask } from '../../core/models/work-task.model';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { AgentPersona } from '../../core/models/persona.model';
+import type { AgentSkillAssignment } from '../../core/models/skill-bundle.model';
 
 @Component({
     selector: 'app-agent-detail',
@@ -70,6 +74,39 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
                         <p>{{ a.allowedTools }}</p>
                     </div>
                 }
+
+                <div class="detail__section">
+                    <h3>Persona</h3>
+                    @if (persona(); as p) {
+                        <div class="persona-info">
+                            <dl>
+                                <dt>Archetype</dt>
+                                <dd>{{ p.archetype }}</dd>
+                                <dt>Traits</dt>
+                                <dd>{{ p.traits.join(', ') || 'None' }}</dd>
+                            </dl>
+                            @if (p.voiceGuidelines) {
+                                <p class="persona-info__text"><strong>Voice:</strong> {{ p.voiceGuidelines }}</p>
+                            }
+                        </div>
+                        <button class="btn btn--secondary btn--sm" routerLink="/personas">Edit Persona</button>
+                    } @else {
+                        <p class="detail__empty">No persona configured. <a routerLink="/personas">Configure one</a></p>
+                    }
+                </div>
+
+                <div class="detail__section">
+                    <h3>Skill Bundles</h3>
+                    @if (agentBundles().length === 0) {
+                        <p class="detail__empty">No skill bundles assigned. <a routerLink="/skill-bundles">Manage bundles</a></p>
+                    } @else {
+                        <div class="skills-list">
+                            @for (ab of agentBundles(); track ab.bundleId) {
+                                <span class="skill-tag">{{ getBundleName(ab.bundleId) }}</span>
+                            }
+                        </div>
+                    }
+                </div>
 
                 <div class="detail__section">
                     <h3>Messages</h3>
@@ -266,6 +303,17 @@ import type { ServerWsMessage } from '../../core/models/ws-message.model';
         .work-task-row__error { margin: 0.25rem 0; font-size: 0.8rem; color: var(--accent-red); }
         .work-task-row__session { font-size: 0.75rem; color: var(--accent-cyan); text-decoration: none; }
         .work-task-row__session:hover { text-decoration: underline; }
+        .persona-info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin-bottom: 0.5rem; }
+        .persona-info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
+        .persona-info dd { margin: 0; color: var(--text-primary); }
+        .persona-info__text { font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0; }
+        .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .skill-tag {
+            font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm);
+            background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
+        }
+        .detail__empty a { color: var(--accent-cyan); text-decoration: none; }
+        .detail__empty a:hover { text-decoration: underline; }
     `,
 })
 export class AgentDetailComponent implements OnInit, OnDestroy {
@@ -275,8 +323,12 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     private readonly projectService = inject(ProjectService);
     private readonly wsService = inject(WebSocketService);
     private readonly workTaskService = inject(WorkTaskService);
+    private readonly personaService = inject(PersonaService);
+    private readonly skillBundleService = inject(SkillBundleService);
 
     protected readonly agent = signal<Agent | null>(null);
+    protected readonly persona = signal<AgentPersona | null>(null);
+    protected readonly agentBundles = signal<AgentSkillAssignment[]>([]);
     protected readonly defaultProjectName = signal<string | null>(null);
     protected readonly walletBalance = signal(0);
     protected readonly messages = signal<AgentMessage[]>([]);
@@ -310,6 +362,19 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             const balanceInfo = await this.agentService.getBalance(id);
             this.walletBalance.set(balanceInfo.balance);
         }
+
+        // Load persona
+        this.personaService.loadPersona(id).then((p) => this.persona.set(p)).catch(() => {
+            this.persona.set(null);
+        });
+
+        // Load skill bundle assignments
+        this.skillBundleService.getAgentBundles(id).then((ab) => this.agentBundles.set(ab)).catch(() => {
+            this.agentBundles.set([]);
+        });
+
+        // Load all bundles for name lookups
+        this.skillBundleService.loadBundles().catch(() => {});
 
         // Load messages — on failure, leave messages empty rather than silently failing
         this.agentService.getMessages(id).then((msgs) => this.messages.set(msgs)).catch(() => {
@@ -380,6 +445,10 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
 
     protected getAgentName(agentId: string): string {
         return this.agentNameCache[agentId] ?? agentId.slice(0, 8);
+    }
+
+    protected getBundleName(bundleId: string): string {
+        return this.skillBundleService.bundles().find((b) => b.id === bundleId)?.name ?? bundleId.slice(0, 8);
     }
 
     async onCreateWork(): Promise<void> {

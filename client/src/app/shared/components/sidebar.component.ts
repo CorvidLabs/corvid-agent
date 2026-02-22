@@ -64,6 +64,18 @@ import { filter, Subscription } from 'rxjs';
                         <span class="sidebar__abbr">M</span>
                     </a>
                 </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/personas" routerLinkActive="sidebar__link--active" title="Personas">
+                        <span class="sidebar__label">Personas</span>
+                        <span class="sidebar__abbr">Ps</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/skill-bundles" routerLinkActive="sidebar__link--active" title="Skill Bundles">
+                        <span class="sidebar__label">Skill Bundles</span>
+                        <span class="sidebar__abbr">Sk</span>
+                    </a>
+                </li>
 
                 <li class="sidebar__section"><span class="sidebar__section-label">Sessions</span></li>
                 <li>
@@ -111,6 +123,14 @@ import { filter, Subscription } from 'rxjs';
                     </a>
                 </li>
 
+                <li class="sidebar__section"><span class="sidebar__section-label">Integrations</span></li>
+                <li>
+                    <a class="sidebar__link" routerLink="/mcp-servers" routerLinkActive="sidebar__link--active" title="MCP Servers">
+                        <span class="sidebar__label">MCP Servers</span>
+                        <span class="sidebar__abbr">Mc</span>
+                    </a>
+                </li>
+
                 <li class="sidebar__section"><span class="sidebar__section-label">Monitoring</span></li>
                 <li>
                     <a class="sidebar__link" routerLink="/feed" routerLinkActive="sidebar__link--active" title="Feed">
@@ -128,6 +148,20 @@ import { filter, Subscription } from 'rxjs';
                     <a class="sidebar__link" routerLink="/logs" routerLinkActive="sidebar__link--active" title="Logs">
                         <span class="sidebar__label">Logs</span>
                         <span class="sidebar__abbr">L</span>
+                    </a>
+                </li>
+
+                <li class="sidebar__section"><span class="sidebar__section-label">Community</span></li>
+                <li>
+                    <a class="sidebar__link" routerLink="/reputation" routerLinkActive="sidebar__link--active" title="Reputation">
+                        <span class="sidebar__label">Reputation</span>
+                        <span class="sidebar__abbr">R</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/marketplace" routerLinkActive="sidebar__link--active" title="Marketplace">
+                        <span class="sidebar__label">Marketplace</span>
+                        <span class="sidebar__abbr">Mk</span>
                     </a>
                 </li>
 
