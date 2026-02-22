@@ -1,9 +1,69 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { McpServerService } from '../../core/services/mcp-server.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
-import type { McpServerConfig } from '../../core/models/mcp-server.model';
+import type { McpServerConfig, CreateMcpServerConfigInput } from '../../core/models/mcp-server.model';
+
+interface OfficialMcpServer {
+    name: string;
+    description: string;
+    command: string;
+    args: string[];
+    envVars: Record<string, string>;
+    envHints: string[];
+}
+
+const OFFICIAL_SERVERS: OfficialMcpServer[] = [
+    {
+        name: 'GitHub',
+        description: 'GitHub API — repos, issues, PRs, search',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-github'],
+        envVars: { GITHUB_PERSONAL_ACCESS_TOKEN: '' },
+        envHints: ['GITHUB_PERSONAL_ACCESS_TOKEN'],
+    },
+    {
+        name: 'Filesystem',
+        description: 'Local filesystem — read, write, search files',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+        envVars: {},
+        envHints: [],
+    },
+    {
+        name: 'Brave Search',
+        description: 'Web search via Brave Search API',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-brave-search'],
+        envVars: { BRAVE_API_KEY: '' },
+        envHints: ['BRAVE_API_KEY'],
+    },
+    {
+        name: 'Fetch',
+        description: 'Fetch web pages and extract content',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-fetch'],
+        envVars: {},
+        envHints: [],
+    },
+    {
+        name: 'Memory',
+        description: 'Knowledge graph-based persistent memory',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-memory'],
+        envVars: {},
+        envHints: [],
+    },
+    {
+        name: 'PostgreSQL',
+        description: 'Query PostgreSQL databases',
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-postgres'],
+        envVars: { POSTGRES_CONNECTION_STRING: '' },
+        envHints: ['POSTGRES_CONNECTION_STRING'],
+    },
+];
 
 @Component({
     selector: 'app-mcp-server-list',
@@ -78,13 +138,61 @@ import type { McpServerConfig } from '../../core/models/mcp-server.model';
                 </div>
             }
 
+            <!-- Official Defaults -->
+            @if (!showCreateForm()) {
+                <div class="section">
+                    <div class="section__header" (click)="showOfficialDefaults.set(!showOfficialDefaults())">
+                        <h3>Official MCP Servers</h3>
+                        <span class="section__toggle">{{ showOfficialDefaults() ? 'Hide' : 'Show' }}</span>
+                    </div>
+                    @if (showOfficialDefaults()) {
+                        <div class="official-grid">
+                            @for (official of officialServers; track official.name) {
+                                <div class="official-card" [class.official-card--installed]="isInstalled(official.name)">
+                                    <div class="official-card__top">
+                                        <span class="official-card__name">{{ official.name }}</span>
+                                        @if (isInstalled(official.name)) {
+                                            <span class="installed-badge">Installed</span>
+                                        }
+                                    </div>
+                                    <p class="official-card__desc">{{ official.description }}</p>
+                                    <code class="official-card__cmd">{{ official.command }} {{ official.args.join(' ') }}</code>
+                                    @if (!isInstalled(official.name)) {
+                                        @if (official.envHints.length > 0) {
+                                            <div class="official-card__env">
+                                                @for (hint of official.envHints; track hint) {
+                                                    <input
+                                                        class="env-input"
+                                                        [placeholder]="hint"
+                                                        (input)="setOfficialEnv(official.name, hint, $any($event.target).value)" />
+                                                }
+                                            </div>
+                                        }
+                                        <button
+                                            class="btn btn--primary btn--sm"
+                                            [disabled]="installingOfficial() === official.name"
+                                            (click)="onInstallOfficial(official)">
+                                            {{ installingOfficial() === official.name ? 'Installing...' : 'Install' }}
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Configured Servers -->
             @if (mcpService.loading()) {
                 <p class="loading">Loading servers...</p>
             } @else if (mcpService.servers().length === 0) {
-                <p class="empty">No MCP servers configured.</p>
+                <p class="empty">No custom MCP servers configured.</p>
             } @else {
-                <div class="server-list">
-                    @for (server of mcpService.servers(); track server.id) {
+                @if (globalServers().length > 0) {
+                    <div class="section">
+                        <h3 class="section__title">Global Servers</h3>
+                        <div class="server-list">
+                            @for (server of globalServers(); track server.id) {
                         <div
                             class="server-card"
                             [class.server-card--expanded]="expandedId() === server.id">
@@ -173,7 +281,106 @@ import type { McpServerConfig } from '../../core/models/mcp-server.model';
                             }
                         </div>
                     }
-                </div>
+                        </div>
+                    </div>
+                }
+                @if (agentServers().length > 0) {
+                    <div class="section">
+                        <h3 class="section__title">Agent-Specific Servers</h3>
+                        <div class="server-list">
+                            @for (server of agentServers(); track server.id) {
+                                <div
+                                    class="server-card"
+                                    [class.server-card--expanded]="expandedId() === server.id">
+                                    <div class="server-card__header" (click)="toggleExpand(server.id)">
+                                        <div class="server-card__title">
+                                            <span class="server-card__name">{{ server.name }}</span>
+                                            <span class="server-card__agent-tag">{{ getAgentName(server.agentId!) }}</span>
+                                            <span
+                                                class="server-card__status"
+                                                [attr.data-enabled]="server.enabled">
+                                                {{ server.enabled ? 'Enabled' : 'Disabled' }}
+                                            </span>
+                                        </div>
+                                        <span class="server-card__command">{{ server.command }}</span>
+                                    </div>
+
+                                    @if (expandedId() === server.id) {
+                                        <div class="server-card__details">
+                                            @if (editingId() === server.id) {
+                                                <div class="form-grid">
+                                                    <div class="form-field">
+                                                        <label>Name</label>
+                                                        <input [(ngModel)]="editName" class="form-input" />
+                                                    </div>
+                                                    <div class="form-field">
+                                                        <label>Command</label>
+                                                        <input [(ngModel)]="editCommand" class="form-input mono" />
+                                                    </div>
+                                                    <div class="form-field span-2">
+                                                        <label>Arguments (one per line)</label>
+                                                        <textarea [(ngModel)]="editArgs" class="form-textarea mono" rows="3"></textarea>
+                                                    </div>
+                                                    <div class="form-field span-2">
+                                                        <label>Env Vars (KEY=VALUE per line)</label>
+                                                        <textarea [(ngModel)]="editEnvVars" class="form-textarea mono" rows="3"></textarea>
+                                                    </div>
+                                                    <div class="form-field">
+                                                        <label>Working Directory</label>
+                                                        <input [(ngModel)]="editCwd" class="form-input mono" />
+                                                    </div>
+                                                    <div class="form-field">
+                                                        <label>Enabled</label>
+                                                        <label class="toggle">
+                                                            <input type="checkbox" [(ngModel)]="editEnabled" />
+                                                            <span>{{ editEnabled ? 'Yes' : 'No' }}</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="form-actions">
+                                                    <button class="btn btn--primary" (click)="onSaveEdit(server.id)">Save</button>
+                                                    <button class="btn btn--secondary" (click)="editingId.set(null)">Cancel</button>
+                                                </div>
+                                            } @else {
+                                                <dl class="server-detail-list">
+                                                    <dt>Command</dt>
+                                                    <dd><code>{{ server.command }} {{ server.args.join(' ') }}</code></dd>
+                                                    @if (server.cwd) {
+                                                        <dt>CWD</dt>
+                                                        <dd><code>{{ server.cwd }}</code></dd>
+                                                    }
+                                                    <dt>Agent</dt>
+                                                    <dd>{{ getAgentName(server.agentId!) }}</dd>
+                                                    @if (Object.keys(server.envVars).length > 0) {
+                                                        <dt>Env Vars</dt>
+                                                        <dd>{{ Object.keys(server.envVars).length }} configured</dd>
+                                                    }
+                                                </dl>
+
+                                                @if (testResult()) {
+                                                    <div class="test-result" [attr.data-success]="testResult()!.success">
+                                                        {{ testResult()!.message }}
+                                                    </div>
+                                                }
+
+                                                <div class="form-actions">
+                                                    <button class="btn btn--secondary" (click)="startEdit(server)">Edit</button>
+                                                    <button
+                                                        class="btn btn--secondary"
+                                                        [disabled]="testing()"
+                                                        (click)="onTest(server.id)">
+                                                        {{ testing() ? 'Testing...' : 'Test Connection' }}
+                                                    </button>
+                                                    <button class="btn btn--danger" (click)="onDelete(server.id)">Delete</button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
             }
         </div>
     `,
@@ -187,6 +394,30 @@ import type { McpServerConfig } from '../../core/models/mcp-server.model';
             color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
         }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .section { margin-bottom: 1.5rem; }
+        .section__header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.75rem; }
+        .section__header h3 { margin: 0; color: var(--text-primary); }
+        .section__toggle { font-size: 0.7rem; color: var(--accent-cyan); text-transform: uppercase; }
+        .section__title { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.9rem; }
+
+        .official-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+        .official-card {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+            padding: 0.75rem; transition: border-color 0.15s;
+        }
+        .official-card:hover { border-color: var(--border-bright); }
+        .official-card--installed { opacity: 0.6; }
+        .official-card__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
+        .official-card__name { font-weight: 700; color: var(--text-primary); font-size: 0.85rem; }
+        .installed-badge { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-green); border: 1px solid var(--accent-green); font-weight: 600; text-transform: uppercase; }
+        .official-card__desc { margin: 0 0 0.35rem; font-size: 0.7rem; color: var(--text-secondary); }
+        .official-card__cmd { display: block; font-size: 0.65rem; color: var(--text-tertiary); margin-bottom: 0.5rem; word-break: break-all; }
+        .official-card__env { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
+        .env-input { padding: 0.35rem 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.75rem; font-family: monospace; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box; }
+        .env-input:focus { border-color: var(--accent-cyan); outline: none; }
+        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+
+        .server-card__agent-tag { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); font-weight: 600; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
             padding: 1.5rem; margin-bottom: 1.5rem;
@@ -261,8 +492,20 @@ export class McpServerListComponent implements OnInit {
     protected readonly editingId = signal<string | null>(null);
     protected readonly testResult = signal<{ success: boolean; message: string } | null>(null);
     protected readonly testing = signal(false);
+    protected readonly showOfficialDefaults = signal(true);
+    protected readonly installingOfficial = signal<string | null>(null);
 
+    protected readonly officialServers = OFFICIAL_SERVERS;
     protected readonly Object = Object;
+
+    protected readonly globalServers = computed(() =>
+        this.mcpService.servers().filter((s) => !s.agentId),
+    );
+    protected readonly agentServers = computed(() =>
+        this.mcpService.servers().filter((s) => !!s.agentId),
+    );
+
+    private officialEnvValues: Record<string, Record<string, string>> = {};
 
     protected formName = '';
     protected formCommand = '';
@@ -392,6 +635,44 @@ export class McpServerListComponent implements OnInit {
             this.notify.success('Server deleted');
         } catch {
             this.notify.error('Failed to delete server');
+        }
+    }
+
+    protected isInstalled(officialName: string): boolean {
+        return this.mcpService.servers().some(
+            (s) => s.name.toLowerCase() === officialName.toLowerCase(),
+        );
+    }
+
+    protected setOfficialEnv(serverName: string, key: string, value: string): void {
+        if (!this.officialEnvValues[serverName]) {
+            this.officialEnvValues[serverName] = {};
+        }
+        this.officialEnvValues[serverName][key] = value;
+    }
+
+    protected async onInstallOfficial(official: OfficialMcpServer): Promise<void> {
+        this.installingOfficial.set(official.name);
+        try {
+            const envVars: Record<string, string> = { ...official.envVars };
+            const overrides = this.officialEnvValues[official.name];
+            if (overrides) {
+                for (const [k, v] of Object.entries(overrides)) {
+                    if (v) envVars[k] = v;
+                }
+            }
+            await this.mcpService.createServer({
+                name: official.name,
+                command: official.command,
+                args: official.args,
+                envVars,
+                enabled: true,
+            });
+            this.notify.success(`${official.name} MCP server installed`);
+        } catch {
+            this.notify.error(`Failed to install ${official.name}`);
+        } finally {
+            this.installingOfficial.set(null);
         }
     }
 }

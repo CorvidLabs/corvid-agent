@@ -81,7 +81,7 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                             @if (formScheduleType() === 'cron') {
                                 <label>Cron Expression</label>
                                 <input [(ngModel)]="formCron" class="form-input mono" placeholder="0 9 * * 1-5" />
-                                <span class="form-hint">min hour dom mon dow (e.g. weekdays at 9am)</span>
+                                <span class="form-hint" [class.form-hint--active]="cronPreview()">{{ cronPreview() || 'min hour dom mon dow (e.g. 0 9 * * 1-5 = weekdays at 9am)' }}</span>
                             } @else {
                                 <label>Interval (minutes)</label>
                                 <input type="number" [(ngModel)]="formIntervalMin" class="form-input" min="1" placeholder="60" />
@@ -188,8 +188,12 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                             }
                             <div class="schedule-meta">
                                 <div class="meta-item">
+                                    <span class="meta-label">Agent</span>
+                                    <span class="meta-value">{{ getAgentName(schedule.agentId) }}</span>
+                                </div>
+                                <div class="meta-item">
                                     <span class="meta-label">Timing</span>
-                                    <span class="meta-value mono">{{ schedule.cronExpression || (schedule.intervalMs ? 'Every ' + (schedule.intervalMs / 60000) + 'min' : 'N/A') }}</span>
+                                    <span class="meta-value mono">{{ cronToHuman(schedule.cronExpression) || (schedule.intervalMs ? 'Every ' + (schedule.intervalMs / 60000) + 'min' : 'N/A') }}</span>
                                 </div>
                                 <div class="meta-item">
                                     <span class="meta-label">Executions</span>
@@ -302,7 +306,7 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
         .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem} .span-2{grid-column:span 2}
         .form-field{display:flex;flex-direction:column;gap:.25rem} .form-field label{font-size:.65rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
         .form-input,.form-select{padding:.45rem;background:var(--bg-input);border:1px solid var(--border-bright);border-radius:var(--radius);color:var(--text-primary);font-size:.8rem;font-family:inherit}
-        .form-input:focus,.form-select:focus{border-color:var(--accent-cyan);outline:none} .form-hint{font-size:.6rem;color:var(--text-tertiary)} .mono{font-family:monospace}
+        .form-input:focus,.form-select:focus{border-color:var(--accent-cyan);outline:none} .form-hint{font-size:.6rem;color:var(--text-tertiary);transition:color .15s} .form-hint--active{color:var(--accent-cyan)} .mono{font-family:monospace}
         .schedule-type-toggle{display:flex;gap:.35rem}
         .type-btn,.filter-btn{padding:.35rem .65rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit}
         .type-btn--active,.filter-btn--active{border-color:var(--accent-cyan);color:var(--accent-cyan);background:var(--accent-cyan-dim)}
@@ -412,6 +416,10 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         this.scheduleService.schedules().filter((s) => s.status === 'paused').length,
     );
 
+    readonly cronPreview = computed(() => this.cronToHuman(this.formCron));
+
+    private agentNameMap: Record<string, string> = {};
+
     readonly filteredSchedules = computed(() => {
         const filter = this.activeFilter();
         const all = this.scheduleService.schedules();
@@ -419,15 +427,63 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         return all.filter((s) => s.status === filter);
     });
 
-    ngOnInit(): void {
+    async ngOnInit(): Promise<void> {
         this.scheduleService.loadSchedules();
         this.scheduleService.loadExecutions();
         this.scheduleService.startListening();
-        this.agentService.loadAgents();
+        await this.agentService.loadAgents();
+        for (const a of this.agentService.agents()) {
+            this.agentNameMap[a.id] = a.name;
+        }
     }
 
     ngOnDestroy(): void {
         this.scheduleService.stopListening();
+    }
+
+    protected getAgentName(agentId: string): string {
+        return this.agentNameMap[agentId] ?? agentId.slice(0, 8);
+    }
+
+    protected cronToHuman(expr: string | null | undefined): string {
+        if (!expr) return '';
+        const parts = expr.trim().split(/\s+/);
+        if (parts.length !== 5) return expr;
+        const [min, hour, dom, mon, dow] = parts;
+
+        const dowNames: Record<string, string> = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat', '7': 'Sun' };
+        const monNames: Record<string, string> = { '1': 'Jan', '2': 'Feb', '3': 'Mar', '4': 'Apr', '5': 'May', '6': 'Jun', '7': 'Jul', '8': 'Aug', '9': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
+
+        const formatTime = (h: string, m: string): string => {
+            if (h === '*' && m === '*') return 'every minute';
+            if (h === '*') return `every hour at :${m.padStart(2, '0')}`;
+            if (m === '*') return `every minute of hour ${h}`;
+            const hr = parseInt(h, 10);
+            const ampm = hr >= 12 ? 'PM' : 'AM';
+            const h12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+            return `${h12}:${m.padStart(2, '0')} ${ampm}`;
+        };
+
+        const formatDow = (d: string): string => {
+            if (d === '*') return '';
+            if (d.includes('-')) {
+                const [a, b] = d.split('-');
+                return `${dowNames[a] ?? a}–${dowNames[b] ?? b}`;
+            }
+            if (d.includes(',')) return d.split(',').map((v) => dowNames[v] ?? v).join(', ');
+            return dowNames[d] ?? d;
+        };
+
+        const time = formatTime(hour, min);
+        const dayOfWeek = formatDow(dow);
+        const dayOfMonth = dom !== '*' ? `day ${dom}` : '';
+        const month = mon !== '*' ? (monNames[mon] ?? `month ${mon}`) : '';
+
+        const pieces = [time];
+        if (dayOfWeek) pieces.push(dayOfWeek);
+        if (dayOfMonth) pieces.push(dayOfMonth);
+        if (month) pieces.push(`in ${month}`);
+        return pieces.join(', ');
     }
 
     addAction(): void {

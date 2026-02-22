@@ -47,6 +47,11 @@ import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.m
                         @if (personaService.loading()) {
                             <p class="loading">Loading persona...</p>
                         } @else {
+                            @if (!personaService.persona()) {
+                                <div class="no-persona-banner">
+                                    <p>No persona configured — create one below</p>
+                                </div>
+                            }
                             <div class="form-grid">
                                 <div class="form-field">
                                     <label>Archetype</label>
@@ -118,6 +123,11 @@ import type { AgentPersona, PersonaArchetype } from '../../core/models/persona.m
         .page__header { margin-bottom: 1.5rem; }
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .no-persona-banner {
+            background: var(--bg-raised); border: 1px dashed var(--border-bright); border-radius: var(--radius);
+            padding: 0.75rem 1rem; margin-bottom: 1rem;
+        }
+        .no-persona-banner p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; }
         .agent-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
         .agent-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -189,15 +199,17 @@ export class PersonaManagerComponent implements OnInit {
 
     async ngOnInit(): Promise<void> {
         await this.agentService.loadAgents();
-        // Check persona status for all agents
+        // Check persona status for all agents in parallel without touching shared signals
+        const agents = this.agentService.agents();
+        const results = await Promise.all(
+            agents.map(async (agent) => {
+                const exists = await this.personaService.checkPersonaExists(agent.id);
+                return [agent.id, exists ? 'configured' : 'none'] as const;
+            }),
+        );
         const statusMap: Record<string, string> = {};
-        for (const agent of this.agentService.agents()) {
-            try {
-                const persona = await this.personaService.loadPersona(agent.id);
-                statusMap[agent.id] = persona ? 'configured' : 'none';
-            } catch {
-                statusMap[agent.id] = 'none';
-            }
+        for (const [id, status] of results) {
+            statusMap[id] = status;
         }
         this.personaStatusMap.set(statusMap);
     }

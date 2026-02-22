@@ -26,6 +26,18 @@ export class PersonaService {
         }
     }
 
+    /** Check if a persona exists for an agent without touching shared signals. */
+    async checkPersonaExists(agentId: string): Promise<boolean> {
+        try {
+            await firstValueFrom(
+                this.api.get<AgentPersona>(`/agents/${agentId}/persona`),
+            );
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async savePersona(agentId: string, data: UpsertPersonaInput): Promise<AgentPersona> {
         const persona = await firstValueFrom(
             this.api.put<AgentPersona>(`/agents/${agentId}/persona`, data),
