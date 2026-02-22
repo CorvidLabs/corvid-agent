@@ -11,7 +11,7 @@ test.describe('Personas', () => {
     });
 
     test('select agent and verify persona form appears', async ({ page, api }) => {
-        const agent = await api.seedAgent('Persona Form Agent');
+        await api.seedAgent('Persona Form Agent');
         await page.goto('/personas');
         await page.waitForLoadState('networkidle');
 
@@ -24,7 +24,7 @@ test.describe('Personas', () => {
     });
 
     test('fill and save persona, verify success notification', async ({ page, api }) => {
-        const agent = await api.seedAgent('Persona Save Agent');
+        await api.seedAgent('Persona Save Agent');
         await page.goto('/personas');
         await page.waitForLoadState('networkidle');
 

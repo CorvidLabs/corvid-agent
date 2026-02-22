@@ -46,7 +46,7 @@ test.describe('Marketplace', () => {
 
     test('leave review and verify it appears', async ({ page, api }) => {
         const agent = await api.seedAgent('Review Agent');
-        const listing = await api.seedMarketplaceListing(agent.id, { name: 'Review Target Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Review Target Listing' });
 
         await page.goto('/marketplace');
         await page.waitForLoadState('networkidle');
