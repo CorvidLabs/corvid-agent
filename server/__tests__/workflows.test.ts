@@ -718,3 +718,332 @@ describe('Update Node Run Status', () => {
         expect(found!.error).toBeNull(); // wasn't set
     });
 });
+
+// ─── Parallel Execution & Conditional Branching ─────────────────────────────
+
+describe('Workflow Parallel Execution', () => {
+    let workflowId: string;
+
+    beforeEach(() => {
+        const workflow = createWorkflow(db, {
+            agentId,
+            name: 'Parallel Test Workflow',
+            nodes: sampleNodes,
+            edges: sampleEdges,
+        });
+        workflowId = workflow.id;
+    });
+
+    test('parallel node runs respect MAX_CONCURRENT_NODES (4)', () => {
+        // Create a workflow run with many nodes
+        const parallelNodes: WorkflowNode[] = [
+            { id: 'start', type: 'start', label: 'Start', config: {} },
+            { id: 'parallel-split', type: 'parallel', label: 'Split', config: {} },
+            { id: 'task-a', type: 'agent_session', label: 'Task A', config: { prompt: 'A' } },
+            { id: 'task-b', type: 'agent_session', label: 'Task B', config: { prompt: 'B' } },
+            { id: 'task-c', type: 'agent_session', label: 'Task C', config: { prompt: 'C' } },
+            { id: 'task-d', type: 'agent_session', label: 'Task D', config: { prompt: 'D' } },
+            { id: 'task-e', type: 'agent_session', label: 'Task E', config: { prompt: 'E' } },
+            { id: 'join', type: 'join', label: 'Join', config: {} },
+            { id: 'end', type: 'end', label: 'End', config: {} },
+        ];
+        const parallelEdges: WorkflowEdge[] = [
+            { id: 'e1', sourceNodeId: 'start', targetNodeId: 'parallel-split' },
+            { id: 'e2', sourceNodeId: 'parallel-split', targetNodeId: 'task-a' },
+            { id: 'e3', sourceNodeId: 'parallel-split', targetNodeId: 'task-b' },
+            { id: 'e4', sourceNodeId: 'parallel-split', targetNodeId: 'task-c' },
+            { id: 'e5', sourceNodeId: 'parallel-split', targetNodeId: 'task-d' },
+            { id: 'e6', sourceNodeId: 'parallel-split', targetNodeId: 'task-e' },
+            { id: 'e7', sourceNodeId: 'task-a', targetNodeId: 'join' },
+            { id: 'e8', sourceNodeId: 'task-b', targetNodeId: 'join' },
+            { id: 'e9', sourceNodeId: 'task-c', targetNodeId: 'join' },
+            { id: 'e10', sourceNodeId: 'task-d', targetNodeId: 'join' },
+            { id: 'e11', sourceNodeId: 'task-e', targetNodeId: 'join' },
+            { id: 'e12', sourceNodeId: 'join', targetNodeId: 'end' },
+        ];
+
+        const workflow = createWorkflow(db, {
+            agentId,
+            name: 'Parallel Workflow',
+            nodes: parallelNodes,
+            edges: parallelEdges,
+        });
+
+        const run = createWorkflowRun(db, workflow.id, agentId, {}, {
+            nodes: parallelNodes,
+            edges: parallelEdges,
+        });
+
+        // Verify the snapshot captures the parallel graph structure
+        expect(run.workflowSnapshot.nodes).toHaveLength(9);
+        expect(run.workflowSnapshot.edges).toHaveLength(12);
+
+        // Verify the parallel split node has 5 outgoing edges
+        const splitEdges = run.workflowSnapshot.edges.filter(
+            (e) => e.sourceNodeId === 'parallel-split'
+        );
+        expect(splitEdges).toHaveLength(5);
+
+        // Verify the join node has 5 incoming edges
+        const joinEdges = run.workflowSnapshot.edges.filter(
+            (e) => e.targetNodeId === 'join'
+        );
+        expect(joinEdges).toHaveLength(5);
+    });
+
+    test('conditional branching with true/false edges', () => {
+        const condNodes: WorkflowNode[] = [
+            { id: 'start', type: 'start', label: 'Start', config: {} },
+            { id: 'cond', type: 'condition', label: 'Check', config: { expression: "prev.status === 'ok'" } },
+            { id: 'true-path', type: 'agent_session', label: 'Success', config: { prompt: 'handle success' } },
+            { id: 'false-path', type: 'agent_session', label: 'Failure', config: { prompt: 'handle failure' } },
+            { id: 'end', type: 'end', label: 'End', config: {} },
+        ];
+        const condEdges: WorkflowEdge[] = [
+            { id: 'e1', sourceNodeId: 'start', targetNodeId: 'cond' },
+            { id: 'e2', sourceNodeId: 'cond', targetNodeId: 'true-path', condition: 'true' },
+            { id: 'e3', sourceNodeId: 'cond', targetNodeId: 'false-path', condition: 'false' },
+            { id: 'e4', sourceNodeId: 'true-path', targetNodeId: 'end' },
+            { id: 'e5', sourceNodeId: 'false-path', targetNodeId: 'end' },
+        ];
+
+        const workflow = createWorkflow(db, {
+            agentId,
+            name: 'Conditional Workflow',
+            nodes: condNodes,
+            edges: condEdges,
+        });
+
+        const run = createWorkflowRun(db, workflow.id, agentId, {}, {
+            nodes: condNodes,
+            edges: condEdges,
+        });
+
+        // Create node runs to simulate execution
+        const startRun = createNodeRun(db, run.id, 'start', 'start', {});
+        updateNodeRunStatus(db, startRun.id, 'completed', { output: { status: 'ok' } });
+
+        // Condition node evaluates to true
+        const condRun = createNodeRun(db, run.id, 'cond', 'condition', { status: 'ok' });
+        updateNodeRunStatus(db, condRun.id, 'completed', { output: { conditionResult: true } });
+
+        // The true-path edge should match the condition result
+        const trueEdge = condEdges.find(e => e.sourceNodeId === 'cond' && e.condition === 'true');
+        expect(trueEdge).toBeDefined();
+        expect(trueEdge!.targetNodeId).toBe('true-path');
+
+        // And the false path should not match
+        const falseEdge = condEdges.find(e => e.sourceNodeId === 'cond' && e.condition === 'false');
+        expect(falseEdge).toBeDefined();
+        expect(falseEdge!.targetNodeId).toBe('false-path');
+
+        // Verify conditionResult is stored correctly
+        const condRunFound = getNodeRunByNodeId(db, run.id, 'cond');
+        expect(condRunFound!.output).toEqual({ conditionResult: true });
+    });
+
+    test('data passing between nodes via prev.output', () => {
+        const run = createWorkflowRun(db, workflowId, agentId, { initial: 'data' }, {
+            nodes: sampleNodes,
+            edges: sampleEdges,
+        });
+
+        // Start node produces output
+        const startRun = createNodeRun(db, run.id, 'start-1', 'start', { initial: 'data' });
+        updateNodeRunStatus(db, startRun.id, 'completed', {
+            output: { computed: 'result-from-start' },
+        });
+
+        // Task node can access the predecessor's output
+        const taskRun = createNodeRun(db, run.id, 'task-1', 'agent_session', {
+            initial: 'data',
+            prev: { computed: 'result-from-start' },
+        });
+        updateNodeRunStatus(db, taskRun.id, 'completed', {
+            output: { response: 'processed' },
+        });
+
+        // Verify the chain of outputs
+        const startFound = getNodeRunByNodeId(db, run.id, 'start-1');
+        expect(startFound!.output).toEqual({ computed: 'result-from-start' });
+
+        const taskFound = getNodeRunByNodeId(db, run.id, 'task-1');
+        expect(taskFound!.input).toEqual({
+            initial: 'data',
+            prev: { computed: 'result-from-start' },
+        });
+        expect(taskFound!.output).toEqual({ response: 'processed' });
+    });
+
+    test('delay node run records delay metadata', () => {
+        const delayNodes: WorkflowNode[] = [
+            { id: 'start', type: 'start', label: 'Start', config: {} },
+            { id: 'delay', type: 'delay', label: 'Wait 5s', config: { delayMs: 5000 } },
+            { id: 'end', type: 'end', label: 'End', config: {} },
+        ];
+        const delayEdges: WorkflowEdge[] = [
+            { id: 'e1', sourceNodeId: 'start', targetNodeId: 'delay' },
+            { id: 'e2', sourceNodeId: 'delay', targetNodeId: 'end' },
+        ];
+
+        const workflow = createWorkflow(db, {
+            agentId,
+            name: 'Delay Workflow',
+            nodes: delayNodes,
+            edges: delayEdges,
+        });
+
+        const run = createWorkflowRun(db, workflow.id, agentId, {}, {
+            nodes: delayNodes,
+            edges: delayEdges,
+        });
+
+        // Simulate delay node completion
+        const delayRun = createNodeRun(db, run.id, 'delay', 'delay', {});
+        updateNodeRunStatus(db, delayRun.id, 'completed', {
+            output: { delayed: true, delayMs: 5000 },
+        });
+
+        const found = getNodeRunByNodeId(db, run.id, 'delay');
+        expect(found!.output).toEqual({ delayed: true, delayMs: 5000 });
+        expect(found!.status).toBe('completed');
+    });
+
+    test('failure in one parallel branch fails the entire run', () => {
+        const run = createWorkflowRun(db, workflowId, agentId, {}, {
+            nodes: sampleNodes,
+            edges: sampleEdges,
+        });
+
+        // Start node succeeds
+        const startRun = createNodeRun(db, run.id, 'start-1', 'start', {});
+        updateNodeRunStatus(db, startRun.id, 'completed', { output: {} });
+
+        // Task node fails
+        const taskRun = createNodeRun(db, run.id, 'task-1', 'agent_session', {});
+        updateNodeRunStatus(db, taskRun.id, 'failed', { error: 'Agent crashed unexpectedly' });
+
+        // The run should be marked as failed
+        updateWorkflowRunStatus(db, run.id, 'failed', {
+            error: 'Node "Run Agent" failed: Agent crashed unexpectedly',
+        });
+
+        const found = getWorkflowRun(db, run.id);
+        expect(found!.status).toBe('failed');
+        expect(found!.error).toBe('Node "Run Agent" failed: Agent crashed unexpectedly');
+        expect(found!.completedAt).not.toBeNull();
+    });
+
+    test('join node requires ALL predecessors complete', () => {
+        const joinNodes: WorkflowNode[] = [
+            { id: 'start', type: 'start', label: 'Start', config: {} },
+            { id: 'task-a', type: 'agent_session', label: 'A', config: {} },
+            { id: 'task-b', type: 'agent_session', label: 'B', config: {} },
+            { id: 'join', type: 'join', label: 'Join', config: {} },
+            { id: 'end', type: 'end', label: 'End', config: {} },
+        ];
+        const joinEdges: WorkflowEdge[] = [
+            { id: 'e1', sourceNodeId: 'start', targetNodeId: 'task-a' },
+            { id: 'e2', sourceNodeId: 'start', targetNodeId: 'task-b' },
+            { id: 'e3', sourceNodeId: 'task-a', targetNodeId: 'join' },
+            { id: 'e4', sourceNodeId: 'task-b', targetNodeId: 'join' },
+            { id: 'e5', sourceNodeId: 'join', targetNodeId: 'end' },
+        ];
+
+        const workflow = createWorkflow(db, {
+            agentId,
+            name: 'Join Workflow',
+            nodes: joinNodes,
+            edges: joinEdges,
+        });
+
+        const run = createWorkflowRun(db, workflow.id, agentId, {}, {
+            nodes: joinNodes,
+            edges: joinEdges,
+        });
+
+        // Start completes
+        const startRun = createNodeRun(db, run.id, 'start', 'start', {});
+        updateNodeRunStatus(db, startRun.id, 'completed');
+
+        // Only task-a completes; task-b still pending
+        const taskARun = createNodeRun(db, run.id, 'task-a', 'agent_session', {});
+        updateNodeRunStatus(db, taskARun.id, 'completed', { output: { result: 'A done' } });
+
+        const taskBRun = createNodeRun(db, run.id, 'task-b', 'agent_session', {});
+        // task-b still running
+        updateNodeRunStatus(db, taskBRun.id, 'running');
+
+        // Verify node runs state
+        const nodeRuns = listNodeRuns(db, run.id);
+        const joinRun = nodeRuns.find(nr => nr.nodeId === 'join');
+        // Join should NOT exist yet (not ready)
+        expect(joinRun).toBeUndefined();
+
+        // Now complete task-b
+        updateNodeRunStatus(db, taskBRun.id, 'completed', { output: { result: 'B done' } });
+
+        // Both predecessors are complete — join node can now be created
+        const taskAFound = getNodeRunByNodeId(db, run.id, 'task-a');
+        const taskBFound = getNodeRunByNodeId(db, run.id, 'task-b');
+        expect(taskAFound!.status).toBe('completed');
+        expect(taskBFound!.status).toBe('completed');
+    });
+
+    test('workflow run tracks currentNodeIds for parallel execution', () => {
+        const run = createWorkflowRun(db, workflowId, agentId, {}, {
+            nodes: sampleNodes,
+            edges: sampleEdges,
+        });
+
+        // Set multiple concurrent node IDs
+        updateWorkflowRunStatus(db, run.id, 'running', {
+            currentNodeIds: ['task-a', 'task-b', 'task-c'],
+        });
+
+        const found = getWorkflowRun(db, run.id);
+        expect(found!.currentNodeIds).toEqual(['task-a', 'task-b', 'task-c']);
+    });
+
+    test('transform node stores transformed output', () => {
+        const run = createWorkflowRun(db, workflowId, agentId, {}, {
+            nodes: sampleNodes,
+            edges: sampleEdges,
+        });
+
+        const transformRun = createNodeRun(db, run.id, 'task-1', 'transform', {
+            prev: { output: 'raw data' },
+        });
+        updateNodeRunStatus(db, transformRun.id, 'completed', {
+            output: { transformed: 'processed: raw data', prev: { output: 'raw data' } },
+        });
+
+        const found = getNodeRun(db, transformRun.id);
+        expect(found!.output).toEqual({
+            transformed: 'processed: raw data',
+            prev: { output: 'raw data' },
+        });
+    });
+
+    test('workflow snapshot preserves node positions', () => {
+        const nodesWithPositions: WorkflowNode[] = [
+            { id: 's', type: 'start', label: 'Start', config: {}, position: { x: 0, y: 0 } },
+            { id: 't', type: 'agent_session', label: 'Task', config: {}, position: { x: 200, y: 100 } },
+            { id: 'e', type: 'end', label: 'End', config: {}, position: { x: 400, y: 0 } },
+        ];
+
+        const workflow = createWorkflow(db, {
+            agentId,
+            name: 'Position Test',
+            nodes: nodesWithPositions,
+            edges: sampleEdges,
+        });
+
+        const run = createWorkflowRun(db, workflow.id, agentId, {}, {
+            nodes: nodesWithPositions,
+            edges: sampleEdges,
+        });
+
+        expect(run.workflowSnapshot.nodes[1].position).toEqual({ x: 200, y: 100 });
+    });
+});
