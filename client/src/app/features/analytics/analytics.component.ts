@@ -144,6 +144,27 @@ interface SessionStats {
                     </div>
                 }
 
+                <!-- Sessions Per Day -->
+                @if (spending()) {
+                    <div class="analytics__section">
+                        <h3>Sessions Per Day (Last {{ spendingDays() }} Days)</h3>
+                        <div class="ascii-chart">
+                            @for (bar of sessionBars(); track bar.date) {
+                                <div class="chart-row" [title]="bar.date + ': ' + bar.value + ' sessions'">
+                                    <span class="chart-row__label">{{ bar.dateShort }}</span>
+                                    <div class="chart-row__bar-wrapper">
+                                        <div class="chart-row__bar chart-row__bar--sessions" [style.width.%]="bar.pct"></div>
+                                    </div>
+                                    <span class="chart-row__value chart-row__value--sessions">{{ bar.value }}</span>
+                                </div>
+                            }
+                            @if (sessionBars().length === 0) {
+                                <p class="empty-state">No session data for this period</p>
+                            }
+                        </div>
+                    </div>
+                }
+
                 <!-- Agent Breakdown -->
                 @if (sessionStats()) {
                     <div class="analytics__section">
@@ -336,6 +357,10 @@ interface SessionStats {
             color: var(--accent-green);
             text-align: right;
         }
+        .chart-row__bar--sessions {
+            background: linear-gradient(90deg, var(--accent-magenta-dim, rgba(255, 0, 170, 0.15)), var(--accent-magenta));
+        }
+        .chart-row__value--sessions { color: var(--accent-magenta); }
 
         /* Agent table */
         .agent-table { display: flex; flex-direction: column; }
@@ -422,6 +447,29 @@ export class AnalyticsComponent implements OnInit {
         return entries.map((e) => ({
             date: e.date,
             dateShort: e.date.slice(5), // MM-DD
+            value: e.value,
+            pct: (e.value / max) * 100,
+        }));
+    });
+
+    readonly sessionBars = computed(() => {
+        const data = this.spending();
+        if (!data) return [];
+
+        const dateMap = new Map<string, number>();
+        for (const d of data.sessionCosts) {
+            dateMap.set(d.date, (dateMap.get(d.date) ?? 0) + d.session_count);
+        }
+
+        const entries = Array.from(dateMap.entries())
+            .map(([date, value]) => ({ date, value }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        const max = Math.max(...entries.map((e) => e.value), 1);
+
+        return entries.map((e) => ({
+            date: e.date,
+            dateShort: e.date.slice(5),
             value: e.value,
             pct: (e.value / max) * 100,
         }));

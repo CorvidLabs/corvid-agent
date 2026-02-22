@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-02-21
+
+### Added
+- **Reputation auto-compute** — GET /api/reputation/scores now auto-computes stale scores (5-minute threshold) instead of returning only cached data; POST /api/reputation/scores force-recomputes all agents
+- **Reputation UI rework** — replaced table layout with responsive card grid featuring SVG score rings, 5 color-coded component bars with weight percentages, trust badges, and a "Compute All" button replacing per-agent Refresh
+- **Reputation event labels** — detail panel event timeline shows human-readable labels (e.g., "Task Completed") with type-specific coloring instead of raw event type strings
+- **Marketplace trust badges** — listing cards now show the publishing agent's trust level badge sourced from reputation scores
+- **Marketplace star ratings** — replaced text ratings with visual filled/empty star display
+- **Marketplace detail panel** — two-column layout with info section and stats section (rating stars, uses, price, review count)
+- **Federated listings section** — marketplace loads and displays federated listings from remote instances with "External" badge and dashed border
+- **Module specs** — added specs for reputation scorer, marketplace service, and marketplace federation
+
+### Changed
+- Reputation scorer exposes `computeAllIfStale()` and `computeAll()` methods for bulk operations
+- Marketplace component injects ReputationService for cross-feature trust badge display
+
 ## [0.10.0] - 2026-02-21
 
 ### Added

@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { DecimalPipe } from '@angular/common';
 import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { WebSocketService } from '../../core/services/websocket.service';
@@ -7,6 +8,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 import { SessionOutputComponent } from './session-output.component';
 import { SessionInputComponent } from './session-input.component';
 import { ApprovalDialogComponent, type ApprovalDecision } from './approval-dialog.component';
+import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Session, SessionMessage } from '../../core/models/session.model';
 import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '../../core/models/ws-message.model';
 import { NotificationService } from '../../core/services/notification.service';
@@ -14,7 +16,7 @@ import { NotificationService } from '../../core/services/notification.service';
 @Component({
     selector: 'app-session-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent],
+    imports: [StatusBadgeComponent, SessionOutputComponent, SessionInputComponent, ApprovalDialogComponent, DecimalPipe, RelativeTimePipe],
     template: `
         @if (session(); as s) {
             <div class="session-view">
@@ -24,12 +26,20 @@ import { NotificationService } from '../../core/services/notification.service';
                         <app-status-badge [status]="s.status" />
                     </div>
                     <div class="session-view__meta">
-                        <span>Turns: {{ s.totalTurns }}</span>
+                        <span class="meta-item"><span class="meta-label">Agent</span> {{ agentName() }}</span>
+                        <span class="meta-item"><span class="meta-label">Turns</span> {{ s.totalTurns }}</span>
+                        <span class="meta-item"><span class="meta-label">Cost</span> {{ '$' + (s.totalCostUsd | number:'1.2-4') }}</span>
+                        <span class="meta-item"><span class="meta-label">Source</span> {{ s.source }}</span>
+                        <span class="meta-item">{{ s.updatedAt | relativeTime }}</span>
                     </div>
                     <div class="session-view__actions">
-                        <button class="btn btn--secondary" (click)="onCopyLog()">
-                            {{ logCopied() ? 'Copied!' : 'Copy Log' }}
-                        </button>
+                        <div class="export-group">
+                            <button class="btn btn--secondary" (click)="onCopyLog()">
+                                {{ logCopied() ? 'Copied!' : 'Copy Log' }}
+                            </button>
+                            <button class="btn btn--secondary" (click)="onExportJson()">JSON</button>
+                            <button class="btn btn--secondary" (click)="onExportMarkdown()">MD</button>
+                        </div>
                         @if (s.status === 'running') {
                             <button class="btn btn--danger" (click)="onStop()">Stop</button>
                         } @else {
@@ -95,8 +105,11 @@ import { NotificationService } from '../../core/services/notification.service';
         }
         .session-view__info { display: flex; align-items: center; gap: 0.75rem; }
         .session-view__info h2 { margin: 0; font-size: 1rem; color: var(--text-primary); }
-        .session-view__meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary); margin-left: auto; }
-        .session-view__actions { display: flex; gap: 0.5rem; }
+        .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
+        .meta-item { white-space: nowrap; }
+        .meta-label { color: var(--text-tertiary); text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.05em; margin-right: 0.2rem; }
+        .session-view__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .export-group { display: flex; gap: 0.25rem; }
         .btn {
             padding: 0.375rem 0.75rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;
             cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
@@ -283,6 +296,62 @@ export class SessionViewComponent implements OnInit, OnDestroy {
             this.logCopied.set(true);
             setTimeout(() => this.logCopied.set(false), 2000);
         });
+    }
+
+    protected onExportJson(): void {
+        const s = this.session();
+        if (!s) return;
+        const data = {
+            session: s,
+            messages: this.messages(),
+            exportedAt: new Date().toISOString(),
+        };
+        this.downloadFile(
+            `session-${s.id.slice(0, 8)}.json`,
+            JSON.stringify(data, null, 2),
+            'application/json',
+        );
+    }
+
+    protected onExportMarkdown(): void {
+        const s = this.session();
+        if (!s) return;
+        const lines: string[] = [
+            `# Session: ${s.name || s.id.slice(0, 8)}`,
+            '',
+            `- **Status:** ${s.status}`,
+            `- **Agent:** ${this.agentName()}`,
+            `- **Turns:** ${s.totalTurns}`,
+            `- **Cost:** $${s.totalCostUsd.toFixed(4)}`,
+            `- **Source:** ${s.source}`,
+            `- **Created:** ${s.createdAt}`,
+            '',
+            '---',
+            '',
+        ];
+        for (const msg of this.messages()) {
+            const time = this.formatTime(msg.timestamp);
+            const role = msg.role === 'assistant' ? this.agentName() : msg.role;
+            lines.push(`### ${role} (${time})${msg.costUsd > 0 ? ` — $${msg.costUsd.toFixed(4)}` : ''}`);
+            lines.push('');
+            lines.push(msg.content);
+            lines.push('');
+        }
+        this.downloadFile(
+            `session-${s.id.slice(0, 8)}.md`,
+            lines.join('\n'),
+            'text/markdown',
+        );
+    }
+
+    private downloadFile(filename: string, content: string, mimeType: string): void {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     private formatTime(timestamp: string): string {

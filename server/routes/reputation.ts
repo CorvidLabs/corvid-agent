@@ -24,9 +24,14 @@ export function handleReputationRoutes(
 
     // ─── Scores ──────────────────────────────────────────────────────────────
 
-    // All scores
+    // All scores (auto-computes stale)
     if (path === '/api/reputation/scores' && method === 'GET') {
-        return json(scorer.getAllScores());
+        return json(scorer.computeAllIfStale());
+    }
+
+    // Force-recompute all scores
+    if (path === '/api/reputation/scores' && method === 'POST') {
+        return json(scorer.computeAll());
     }
 
     // Compute/get score for agent

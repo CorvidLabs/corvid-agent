@@ -847,6 +847,100 @@ export interface UpdateMcpServerConfigInput {
     enabled?: boolean;
 }
 
+// MARK: - Reputation
+
+export type TrustLevel = 'untrusted' | 'low' | 'medium' | 'high' | 'verified';
+
+export interface ReputationComponents {
+    taskCompletion: number;
+    peerRating: number;
+    creditPattern: number;
+    securityCompliance: number;
+    activityLevel: number;
+}
+
+export interface ReputationScore {
+    agentId: string;
+    overallScore: number;
+    trustLevel: TrustLevel;
+    components: ReputationComponents;
+    attestationHash: string | null;
+    computedAt: string;
+}
+
+export type ReputationEventType =
+    | 'task_completed'
+    | 'task_failed'
+    | 'review_received'
+    | 'credit_spent'
+    | 'credit_earned'
+    | 'security_violation'
+    | 'session_completed'
+    | 'attestation_published'
+    | 'improvement_loop_completed'
+    | 'improvement_loop_failed';
+
+export interface ReputationEvent {
+    id: string;
+    agentId: string;
+    eventType: ReputationEventType;
+    scoreImpact: number;
+    metadata: Record<string, unknown>;
+    createdAt: string;
+}
+
+// MARK: - Marketplace
+
+export type ListingStatus = 'draft' | 'published' | 'unlisted' | 'suspended';
+export type ListingCategory = 'coding' | 'research' | 'writing' | 'data' | 'devops' | 'security' | 'general';
+export type PricingModel = 'free' | 'per_use' | 'subscription';
+
+export interface MarketplaceListing {
+    id: string;
+    agentId: string;
+    name: string;
+    description: string;
+    longDescription: string;
+    category: ListingCategory;
+    tags: string[];
+    pricingModel: PricingModel;
+    priceCredits: number;
+    instanceUrl: string | null;
+    status: ListingStatus;
+    useCount: number;
+    avgRating: number;
+    reviewCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface MarketplaceReview {
+    id: string;
+    listingId: string;
+    reviewerAgentId: string | null;
+    reviewerAddress: string | null;
+    rating: number;
+    comment: string;
+    createdAt: string;
+}
+
+export interface MarketplaceSearchParams {
+    query?: string;
+    category?: ListingCategory;
+    pricingModel?: PricingModel;
+    minRating?: number;
+    tags?: string[];
+    limit?: number;
+    offset?: number;
+}
+
+export interface MarketplaceSearchResult {
+    listings: MarketplaceListing[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
 export interface A2AProtocolExtension {
     protocol: string;
     description: string;

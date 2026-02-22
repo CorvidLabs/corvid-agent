@@ -6,6 +6,10 @@ interface ApiHelpers {
     seedProject(name?: string): Promise<{ id: string; name: string }>;
     seedAgent(name?: string): Promise<{ id: string; name: string }>;
     seedCouncil(agentIds: string[], name?: string, chairmanAgentId?: string): Promise<{ id: string; name: string; agentIds: string[]; chairmanAgentId: string | null }>;
+    seedPersona(agentId: string, data?: Record<string, unknown>): Promise<Record<string, unknown>>;
+    seedSkillBundle(data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
+    seedMarketplaceListing(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
+    seedMcpServer(data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
     getHealth(): Promise<{ status: string; algochat: boolean }>;
     launchCouncil(councilId: string, projectId: string, prompt: string): Promise<{ launchId: string; sessionIds: string[] }>;
     getLaunch(launchId: string): Promise<{ stage: string; synthesis: string | null; sessionIds: string[]; prompt: string }>;
@@ -73,6 +77,85 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 if (!res.ok) {
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedCouncil failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedPersona(agentId: string, data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/agents/${agentId}/persona`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        archetype: 'professional',
+                        traits: ['helpful', 'concise'],
+                        voiceGuidelines: 'Be direct and clear.',
+                        background: 'E2E test persona',
+                        exampleMessages: ['Sure, I can help with that.'],
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedPersona failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedSkillBundle(data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/skill-bundles`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: 'E2E Test Bundle',
+                        description: 'Bundle for e2e testing',
+                        tools: ['Read', 'Write'],
+                        promptAdditions: 'Test prompt addition',
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedSkillBundle failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedMarketplaceListing(agentId: string, data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/marketplace/listings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId,
+                        name: 'E2E Test Listing',
+                        description: 'Test marketplace listing',
+                        category: 'general',
+                        pricingModel: 'free',
+                        tags: ['test'],
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedMarketplaceListing failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedMcpServer(data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/mcp-servers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: 'E2E Test MCP Server',
+                        command: 'echo',
+                        args: ['hello'],
+                        enabled: true,
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedMcpServer failed: ${res.status} ${res.statusText} — ${body}`);
                 }
                 return res.json();
             },

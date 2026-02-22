@@ -1,17 +1,42 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { WorkTaskService } from '../../core/services/work-task.service';
+import { AgentService } from '../../core/services/agent.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { WorkTask } from '../../core/models/work-task.model';
 
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, RelativeTimePipe],
     template: `
         <div class="tasks">
             <div class="tasks__header">
                 <h2>Work Tasks</h2>
+                <button class="create-btn" (click)="showCreateForm.set(!showCreateForm())">
+                    {{ showCreateForm() ? 'Cancel' : '+ New Task' }}
+                </button>
+            </div>
+
+            @if (showCreateForm()) {
+                <div class="create-form">
+                    <div class="create-form__row">
+                        <select class="form-select" [(ngModel)]="createAgentId">
+                            <option value="" disabled>Select agent...</option>
+                            @for (agent of agentService.agents(); track agent.id) {
+                                <option [value]="agent.id">{{ agent.name }}</option>
+                            }
+                        </select>
+                        <textarea class="form-textarea" [(ngModel)]="createDescription" placeholder="Describe the task..." rows="2"></textarea>
+                        <button class="btn btn--primary" [disabled]="!createAgentId || !createDescription || creating()" (click)="onCreateTask()">
+                            {{ creating() ? 'Creating...' : 'Create' }}
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <div class="tasks__filter-row">
                 <div class="tasks__filters">
                     <button
                         class="filter-btn"
@@ -48,9 +73,17 @@ import type { WorkTask } from '../../core/models/work-task.model';
                         <div class="task-card" [attr.data-status]="task.status">
                             <div class="task-card__header">
                                 <span class="task-status" [attr.data-status]="task.status">{{ task.status }}</span>
+                                <span class="task-agent">{{ getAgentName(task.agentId) }}</span>
                                 <span class="task-time">{{ task.createdAt | relativeTime }}</span>
                             </div>
                             <p class="task-desc">{{ task.description }}</p>
+                            @if (task.status === 'running' || task.status === 'branching' || task.status === 'validating') {
+                                <div class="task-progress">
+                                    <div class="task-progress__bar">
+                                        <div class="task-progress__fill" [attr.data-status]="task.status"></div>
+                                    </div>
+                                </div>
+                            }
                             <div class="task-meta">
                                 @if (task.branchName) {
                                     <span class="task-branch">{{ task.branchName }}</span>
@@ -71,6 +104,11 @@ import type { WorkTask } from '../../core/models/work-task.model';
                             @if (task.summary) {
                                 <div class="task-summary">{{ task.summary }}</div>
                             }
+                            @if (task.status === 'running' || task.status === 'branching' || task.status === 'validating') {
+                                <div class="task-actions">
+                                    <button class="action-btn action-btn--cancel" (click)="onCancel(task.id)">Cancel</button>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -85,10 +123,37 @@ import type { WorkTask } from '../../core/models/work-task.model';
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 0.75rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
         .tasks__header h2 { margin: 0; color: var(--text-primary); }
+        .create-btn {
+            padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600;
+            cursor: pointer; border: 1px solid var(--accent-cyan); background: var(--accent-cyan-dim);
+            color: var(--accent-cyan); font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .create-form { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; }
+        .create-form__row { display: flex; gap: 0.5rem; align-items: flex-start; }
+        .form-select, .form-textarea { padding: 0.5rem; border: 1px solid var(--border-bright); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); }
+        .form-select { min-width: 150px; }
+        .form-textarea { flex: 1; resize: vertical; min-height: 2.5em; line-height: 1.5; }
+        .form-select:focus, .form-textarea:focus { border-color: var(--accent-cyan); outline: none; }
+        .btn { padding: 0.5rem 1rem; border-radius: var(--radius); font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn--primary { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+        .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tasks__filter-row { margin-bottom: 1rem; }
         .loading { color: var(--text-secondary); }
+        .task-agent { font-size: 0.65rem; color: var(--accent-cyan); font-weight: 600; }
+        .task-progress { margin: 0.35rem 0; }
+        .task-progress__bar { height: 4px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; }
+        .task-progress__fill { height: 100%; border-radius: 2px; animation: progress-pulse 1.5s ease-in-out infinite; }
+        .task-progress__fill[data-status="branching"] { width: 30%; background: var(--accent-cyan); }
+        .task-progress__fill[data-status="running"] { width: 60%; background: var(--accent-cyan); }
+        .task-progress__fill[data-status="validating"] { width: 85%; background: var(--accent-green); }
+        @keyframes progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .task-actions { margin-top: 0.5rem; }
+        .action-btn { padding: 0.25rem 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
+        .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .action-btn--cancel:hover { background: var(--accent-red-dim); }
 
         .tasks__filters {
             display: flex;
@@ -245,7 +310,16 @@ import type { WorkTask } from '../../core/models/work-task.model';
 })
 export class WorkTaskListComponent implements OnInit, OnDestroy {
     protected readonly taskService = inject(WorkTaskService);
+    protected readonly agentService = inject(AgentService);
+    private readonly notify = inject(NotificationService);
+
     readonly activeFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
+    readonly showCreateForm = signal(false);
+    readonly creating = signal(false);
+    protected createAgentId = '';
+    protected createDescription = '';
+
+    private agentNameCache: Record<string, string> = {};
 
     readonly allTasks = computed(() => this.taskService.tasks());
 
@@ -272,9 +346,15 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
         }
     });
 
-    ngOnInit(): void {
-        this.taskService.loadTasks();
+    async ngOnInit(): Promise<void> {
+        await Promise.all([
+            this.taskService.loadTasks(),
+            this.agentService.loadAgents(),
+        ]);
         this.taskService.startListening();
+        for (const a of this.agentService.agents()) {
+            this.agentNameCache[a.id] = a.name;
+        }
     }
 
     ngOnDestroy(): void {
@@ -283,5 +363,37 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     protected setFilter(filter: 'all' | 'active' | 'completed' | 'failed'): void {
         this.activeFilter.set(filter);
+    }
+
+    protected getAgentName(agentId: string): string {
+        return this.agentNameCache[agentId] ?? agentId.slice(0, 8);
+    }
+
+    protected async onCreateTask(): Promise<void> {
+        if (!this.createAgentId || !this.createDescription) return;
+        this.creating.set(true);
+        try {
+            await this.taskService.createTask({
+                agentId: this.createAgentId,
+                description: this.createDescription,
+            });
+            this.notify.success('Work task created');
+            this.createAgentId = '';
+            this.createDescription = '';
+            this.showCreateForm.set(false);
+        } catch (e) {
+            this.notify.error('Failed to create work task', String(e));
+        } finally {
+            this.creating.set(false);
+        }
+    }
+
+    protected async onCancel(taskId: string): Promise<void> {
+        try {
+            await this.taskService.cancelTask(taskId);
+            this.notify.success('Work task cancelled');
+        } catch (e) {
+            this.notify.error('Failed to cancel task', String(e));
+        }
     }
 }

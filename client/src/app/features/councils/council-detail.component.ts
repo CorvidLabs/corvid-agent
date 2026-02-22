@@ -82,11 +82,19 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                     } @else {
                         <div class="launches-list">
                             @for (launch of launches(); track launch.id) {
-                                <a class="launch-row" [routerLink]="['/council-launches', launch.id]">
-                                    <span class="launch-row__prompt">{{ launch.prompt.length > 80 ? launch.prompt.slice(0, 80) + '...' : launch.prompt }}</span>
-                                    <span class="launch-row__stage" [attr.data-stage]="launch.stage">{{ launch.stage }}</span>
-                                    <span class="launch-row__sessions">{{ launch.sessionIds.length }} sessions</span>
-                                    <span class="launch-row__time">{{ launch.createdAt | relativeTime }}</span>
+                                <a class="launch-card" [routerLink]="['/council-launches', launch.id]">
+                                    <div class="launch-card__header">
+                                        <span class="launch-card__stage" [attr.data-stage]="launch.stage">{{ launch.stage }}</span>
+                                        <span class="launch-card__meta">{{ launch.sessionIds.length }} sessions · round {{ launch.currentDiscussionRound }}/{{ launch.totalDiscussionRounds }}</span>
+                                        <span class="launch-card__time">{{ launch.createdAt | relativeTime }}</span>
+                                    </div>
+                                    <p class="launch-card__prompt">{{ launch.prompt }}</p>
+                                    @if (launch.synthesis) {
+                                        <div class="launch-card__synthesis">
+                                            <span class="synthesis-label">Synthesis</span>
+                                            <p class="synthesis-text">{{ launch.synthesis.length > 200 ? launch.synthesis.slice(0, 200) + '...' : launch.synthesis }}</p>
+                                        </div>
+                                    }
                                 </a>
                             }
                         </div>
@@ -137,26 +145,32 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
         .detail__launches { margin-top: 2rem; }
         .detail__launches h3 { margin: 0 0 0.75rem; color: var(--text-primary); }
         .detail__empty { color: var(--text-secondary); font-size: 0.85rem; }
-        .launches-list { display: flex; flex-direction: column; gap: 0.5rem; }
-        .launch-row {
-            display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem;
-            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+        .launches-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .launch-card {
+            display: block; padding: 0.75rem;
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
             text-decoration: none; color: inherit; transition: border-color 0.2s;
         }
-        .launch-row:hover { border-color: var(--accent-cyan); }
-        .launch-row__prompt { flex: 1; font-size: 0.85rem; color: var(--text-primary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .launch-row__stage {
-            font-size: 0.7rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
+        .launch-card:hover { border-color: var(--accent-cyan); }
+        .launch-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+        .launch-card__stage {
+            font-size: 0.65rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid;
-            background: var(--bg-raised); color: var(--text-secondary);
         }
-        .launch-row__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .launch-row__stage[data-stage="discussing"] { color: #a78bfa; border-color: #a78bfa; }
-        .launch-row__stage[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
-        .launch-row__stage[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
-        .launch-row__stage[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
-        .launch-row__sessions { font-size: 0.75rem; color: var(--text-tertiary); white-space: nowrap; }
-        .launch-row__time { font-size: 0.75rem; color: var(--text-tertiary); white-space: nowrap; }
+        .launch-card__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .launch-card__stage[data-stage="discussing"] { color: #a78bfa; border-color: #a78bfa; }
+        .launch-card__stage[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
+        .launch-card__stage[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
+        .launch-card__stage[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
+        .launch-card__meta { font-size: 0.7rem; color: var(--text-tertiary); }
+        .launch-card__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }
+        .launch-card__prompt { margin: 0 0 0.35rem; font-size: 0.8rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .launch-card__synthesis {
+            padding: 0.5rem; background: var(--bg-raised); border: 1px solid var(--border);
+            border-radius: var(--radius); margin-top: 0.35rem;
+        }
+        .synthesis-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-green); font-weight: 600; }
+        .synthesis-text { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
     `,
 })
 export class CouncilDetailComponent implements OnInit {

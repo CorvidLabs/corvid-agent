@@ -55,6 +55,17 @@ interface FeedEntry {
                         thread:{{ activeThreadFilter()!.slice(0, 6) }} ✕
                     </button>
                 }
+                <button class="btn btn--secondary" (click)="onExportFeed()">Export</button>
+            </div>
+
+            <div class="feed__direction-filters">
+                @for (dir of directionFilters; track dir.value) {
+                    <button
+                        class="dir-chip"
+                        [class.dir-chip--active]="directionFilter() === dir.value"
+                        (click)="setDirectionFilter(dir.value)"
+                    >{{ dir.label }}</button>
+                }
             </div>
 
             @if (isFiltered()) {
@@ -152,6 +163,14 @@ interface FeedEntry {
         }
         .feed__page-info { font-size: 0.75rem; color: var(--text-secondary); }
         .feed__page-controls { display: flex; gap: 0.5rem; }
+        .feed__direction-filters { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; flex-shrink: 0; }
+        .dir-chip {
+            padding: 0.25rem 0.55rem; background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: 20px; color: var(--text-tertiary); font-size: 0.65rem; font-family: inherit;
+            cursor: pointer; text-transform: uppercase; transition: all 0.15s;
+        }
+        .dir-chip:hover { border-color: var(--border-bright); color: var(--text-secondary); }
+        .dir-chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
         .feed__empty { color: var(--text-secondary); text-align: center; margin-top: 4rem; }
         .feed__hint { font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.6; }
         .feed__list {
@@ -234,7 +253,22 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     private readonly api = inject(ApiService);
     private readonly feedList = viewChild<ElementRef<HTMLElement>>('feedList');
 
-    protected readonly entries = signal<FeedEntry[]>([]);
+    protected readonly rawEntries = signal<FeedEntry[]>([]);
+    protected readonly directionFilter = signal<string>('all');
+    protected readonly directionFilters = [
+        { value: 'all', label: 'All' },
+        { value: 'inbound', label: 'In' },
+        { value: 'outbound', label: 'Out' },
+        { value: 'agent-send', label: 'Send' },
+        { value: 'agent-reply', label: 'Reply' },
+        { value: 'status', label: 'Status' },
+    ];
+    protected readonly entries = computed(() => {
+        const dir = this.directionFilter();
+        const all = this.rawEntries();
+        if (dir === 'all') return all;
+        return all.filter((e) => e.direction === dir);
+    });
     protected readonly expandedIds = signal<Set<number>>(new Set());
     protected readonly autoScroll = signal(true);
     protected readonly searchTerm = signal('');
@@ -459,8 +493,26 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
         this.autoScroll.update((v) => !v);
     }
 
+    protected setDirectionFilter(dir: string): void {
+        this.directionFilter.set(dir);
+    }
+
+    protected onExportFeed(): void {
+        const lines = this.entries().map((e) => {
+            const time = e.timestamp.toISOString();
+            return `[${time}] [${e.direction.toUpperCase()}] ${e.participantLabel}: ${e.content}`;
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `feed-export-${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
     protected onClear(): void {
-        this.entries.set([]);
+        this.rawEntries.set([]);
         this.expandedIds.set(new Set());
         this.seenMessageKeys.clear();
         this.searchTerm.set('');
@@ -630,7 +682,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
                 entry.id = this.nextId++;
             }
 
-            this.entries.set(newEntries);
+            this.rawEntries.set(newEntries);
         } catch {
             // History unavailable — rely on real-time WebSocket only
         }
@@ -642,7 +694,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
             timestamp: timestamp ?? new Date(),
             ...partial,
         };
-        this.entries.update((list) => [...list, entry]);
+        this.rawEntries.update((list) => [...list, entry]);
 
         if (this.autoScroll()) {
             requestAnimationFrame(() => {
@@ -662,7 +714,7 @@ export class LiveFeedComponent implements OnInit, OnDestroy {
     }
 
     private removeEntriesByMessageId(messageId: string): void {
-        this.entries.update((list) => list.filter((e) => e.messageId !== messageId));
+        this.rawEntries.update((list) => list.filter((e) => e.messageId !== messageId));
     }
 
     /** Find which agent handles conversations with an external participant. */
