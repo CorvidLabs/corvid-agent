@@ -2,10 +2,12 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { MarketplaceService } from '../../core/services/marketplace.service';
+import { ReputationService } from '../../core/services/reputation.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../../core/models/marketplace.model';
+import type { TrustLevel } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-marketplace',
@@ -99,6 +101,10 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
 
             @if (marketplaceService.loading()) {
                 <p class="loading">Loading listings...</p>
+            } @else if (loadError()) {
+                <div class="error-banner">
+                    <p>Marketplace service unavailable (503). The service may not be initialized yet.</p>
+                </div>
             } @else if (marketplaceService.listings().length === 0) {
                 <p class="empty">No listings found.</p>
             } @else {
@@ -110,11 +116,21 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
                             (click)="selectListing(listing)">
                             <div class="listing-card__header">
                                 <span class="listing-card__name">{{ listing.name }}</span>
-                                <span class="listing-card__category">{{ listing.category }}</span>
+                                <div class="listing-card__badges">
+                                    @if (agentTrustLevels()[listing.agentId]; as trust) {
+                                        <span class="trust-badge" [attr.data-level]="trust">{{ trust }}</span>
+                                    }
+                                    <span class="listing-card__category">{{ listing.category }}</span>
+                                </div>
                             </div>
                             <p class="listing-card__desc">{{ listing.description }}</p>
                             <div class="listing-card__meta">
-                                <span class="listing-card__rating">{{ listing.avgRating | number:'1.1-1' }} ({{ listing.reviewCount }})</span>
+                                <span class="listing-card__stars" [title]="listing.avgRating + ' / 5'">
+                                    @for (star of [1, 2, 3, 4, 5]; track star) {
+                                        <span class="star" [class.star--filled]="star <= Math.round(listing.avgRating)">&#9733;</span>
+                                    }
+                                    <span class="listing-card__review-count">({{ listing.reviewCount }})</span>
+                                </span>
                                 <span class="listing-card__price">{{ listing.pricingModel === 'free' ? 'Free' : listing.priceCredits + ' credits' }}</span>
                                 <span class="listing-card__uses">{{ listing.useCount }} uses</span>
                             </div>
@@ -130,16 +146,78 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
                 </div>
             }
 
+            <!-- Federated listings -->
+            @if (federatedListings().length > 0) {
+                <h3 class="section-title">Federated Listings</h3>
+                <div class="listing-grid">
+                    @for (listing of federatedListings(); track listing.id) {
+                        <div
+                            class="listing-card listing-card--federated"
+                            [class.listing-card--selected]="selectedId() === listing.id"
+                            (click)="selectListing(listing)">
+                            <div class="listing-card__header">
+                                <span class="listing-card__name">{{ listing.name }}</span>
+                                <div class="listing-card__badges">
+                                    <span class="external-badge">External</span>
+                                    <span class="listing-card__category">{{ listing.category }}</span>
+                                </div>
+                            </div>
+                            <p class="listing-card__desc">{{ listing.description }}</p>
+                            <div class="listing-card__meta">
+                                <span class="listing-card__stars" [title]="listing.avgRating + ' / 5'">
+                                    @for (star of [1, 2, 3, 4, 5]; track star) {
+                                        <span class="star" [class.star--filled]="star <= Math.round(listing.avgRating)">&#9733;</span>
+                                    }
+                                    <span class="listing-card__review-count">({{ listing.reviewCount }})</span>
+                                </span>
+                                <span class="listing-card__price">{{ listing.pricingModel === 'free' ? 'Free' : listing.priceCredits + ' credits' }}</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
             @if (selectedId()) {
                 <div class="detail-panel">
                     @if (selectedListing(); as listing) {
-                        <div class="detail-panel__header">
-                            <h3>{{ listing.name }}</h3>
-                            <button class="btn btn--danger btn--sm" (click)="onDelete(listing.id)">Delete</button>
+                        <div class="detail-columns">
+                            <div class="detail-info">
+                                <div class="detail-panel__header">
+                                    <h3>{{ listing.name }}</h3>
+                                    <button class="btn btn--danger btn--sm" (click)="onDelete(listing.id)">Delete</button>
+                                </div>
+                                <p>{{ listing.description }}</p>
+                                <div class="detail-agent">
+                                    <span>Agent: {{ getAgentName(listing.agentId) }}</span>
+                                    @if (agentTrustLevels()[listing.agentId]; as trust) {
+                                        <span class="trust-badge" [attr.data-level]="trust">{{ trust }}</span>
+                                    }
+                                </div>
+                                <p class="detail-time">Listed {{ listing.createdAt | relativeTime }}</p>
+                            </div>
+                            <div class="detail-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Rating</span>
+                                    <span class="stat-value stat-value--rating">
+                                        @for (star of [1, 2, 3, 4, 5]; track star) {
+                                            <span class="star star--lg" [class.star--filled]="star <= Math.round(listing.avgRating)">&#9733;</span>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Uses</span>
+                                    <span class="stat-value">{{ listing.useCount }}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Price</span>
+                                    <span class="stat-value stat-value--price">{{ listing.pricingModel === 'free' ? 'Free' : listing.priceCredits + ' credits' }}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Reviews</span>
+                                    <span class="stat-value">{{ listing.reviewCount }}</span>
+                                </div>
+                            </div>
                         </div>
-                        <p>{{ listing.description }}</p>
-                        <p class="detail-panel__agent">Agent: {{ getAgentName(listing.agentId) }}</p>
-                        <p class="detail-panel__time">Listed {{ listing.createdAt | relativeTime }}</p>
 
                         <h4>Reviews</h4>
                         @if (reviews().length === 0) {
@@ -148,7 +226,11 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
                             @for (review of reviews(); track review.id) {
                                 <div class="review-row">
                                     <div class="review-row__header">
-                                        <span class="review-row__rating">{{ review.rating }}/5</span>
+                                        <span class="review-row__stars">
+                                            @for (star of [1, 2, 3, 4, 5]; track star) {
+                                                <span class="star" [class.star--filled]="star <= review.rating">&#9733;</span>
+                                            }
+                                        </span>
                                         <span class="review-row__time">{{ review.createdAt | relativeTime }}</span>
                                     </div>
                                     <p class="review-row__comment">{{ review.comment }}</p>
@@ -198,6 +280,11 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
             font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
         }
         .loading, .empty { color: var(--text-secondary); font-size: 0.85rem; }
+        .error-banner {
+            background: var(--accent-red-dim); border: 1px solid var(--accent-red); border-radius: var(--radius);
+            padding: 0.75rem 1rem; margin-bottom: 1rem;
+        }
+        .error-banner p { margin: 0; color: var(--accent-red); font-size: 0.85rem; }
         .create-form {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
             padding: 1.5rem; margin-bottom: 1.5rem;
@@ -214,6 +301,8 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
         .form-textarea { resize: vertical; min-height: 3em; line-height: 1.5; }
         .span-2 { grid-column: span 2; }
         .form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+        /* Listing grid */
         .listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
         .listing-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -221,33 +310,68 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
         }
         .listing-card:hover { border-color: var(--accent-cyan); }
         .listing-card--selected { border-color: var(--accent-cyan); background: var(--bg-raised); }
-        .listing-card__header { display: flex; justify-content: space-between; align-items: center; }
+        .listing-card--federated { border-style: dashed; }
+        .listing-card__header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
         .listing-card__name { font-weight: 600; color: var(--text-primary); }
+        .listing-card__badges { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
         .listing-card__category {
             font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
             text-transform: uppercase; color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
         }
         .listing-card__desc { margin: 0.5rem 0; font-size: 0.8rem; color: var(--text-secondary); }
-        .listing-card__meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary); }
-        .listing-card__rating { color: var(--accent-yellow, #ffc107); }
+        .listing-card__meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary); align-items: center; }
+        .listing-card__stars { display: inline-flex; align-items: center; gap: 0.1rem; }
+        .listing-card__review-count { font-size: 0.7rem; color: var(--text-secondary); margin-left: 0.2rem; }
         .listing-card__price { color: var(--accent-green); }
         .listing-card__tags { display: flex; gap: 0.25rem; margin-top: 0.5rem; flex-wrap: wrap; }
         .tag {
             font-size: 0.65rem; padding: 1px 6px; border-radius: var(--radius-sm);
             background: var(--bg-raised); color: var(--text-secondary); border: 1px solid var(--border);
         }
+
+        /* Stars */
+        .star { color: var(--border); font-size: 0.85rem; line-height: 1; }
+        .star--filled { color: var(--accent-yellow, #ffc107); }
+        .star--lg { font-size: 1.1rem; }
+
+        /* Trust badge */
+        .trust-badge {
+            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            text-transform: uppercase; background: var(--bg-raised); border: 1px solid var(--border);
+        }
+        .trust-badge[data-level="verified"], .trust-badge[data-level="high"] { color: var(--accent-green); border-color: var(--accent-green); }
+        .trust-badge[data-level="medium"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .trust-badge[data-level="low"] { color: var(--accent-yellow, #ffc107); border-color: var(--accent-yellow, #ffc107); }
+        .trust-badge[data-level="untrusted"] { color: var(--accent-red); border-color: var(--accent-red); }
+        .external-badge {
+            font-size: 0.6rem; padding: 1px 5px; border-radius: var(--radius-sm); font-weight: 600;
+            text-transform: uppercase; color: var(--accent-orange, #ff9100); border: 1px solid var(--accent-orange, #ff9100);
+            background: var(--bg-raised);
+        }
+
+        /* Section title */
+        .section-title { margin: 2rem 0 1rem; color: var(--text-primary); font-size: 1rem; }
+
+        /* Detail panel */
         .detail-panel {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
             padding: 1.5rem; margin-top: 1.5rem;
         }
+        .detail-columns { display: grid; grid-template-columns: 1fr auto; gap: 2rem; }
         .detail-panel__header { display: flex; justify-content: space-between; align-items: center; }
         .detail-panel__header h3 { margin: 0; color: var(--text-primary); }
         .detail-panel h4 { margin: 1.5rem 0 0.75rem; color: var(--text-primary); }
-        .detail-panel__agent { font-size: 0.8rem; color: var(--text-secondary); }
-        .detail-panel__time { font-size: 0.75rem; color: var(--text-secondary); }
+        .detail-agent { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0; }
+        .detail-time { font-size: 0.75rem; color: var(--text-secondary); }
+        .detail-stats { display: flex; flex-direction: column; gap: 0.75rem; min-width: 140px; }
+        .stat-item { display: flex; flex-direction: column; gap: 0.15rem; }
+        .stat-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+        .stat-value { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+        .stat-value--rating { display: flex; align-items: center; gap: 0.1rem; }
+        .stat-value--price { color: var(--accent-green); }
         .review-row { border-bottom: 1px solid var(--border); padding: 0.5rem 0; }
-        .review-row__header { display: flex; justify-content: space-between; }
-        .review-row__rating { font-weight: 600; color: var(--accent-yellow, #ffc107); }
+        .review-row__header { display: flex; justify-content: space-between; align-items: center; }
+        .review-row__stars { display: inline-flex; gap: 0.1rem; }
         .review-row__time { font-size: 0.75rem; color: var(--text-secondary); }
         .review-row__comment { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--text-primary); }
         .review-form { margin-top: 1rem; }
@@ -268,19 +392,33 @@ import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../
             .span-2 { grid-column: span 1; }
             .listing-grid { grid-template-columns: 1fr; }
             .search-bar { flex-wrap: wrap; }
+            .detail-columns { grid-template-columns: 1fr; }
         }
     `,
 })
 export class MarketplaceComponent implements OnInit {
     protected readonly marketplaceService = inject(MarketplaceService);
     protected readonly agentService = inject(AgentService);
+    private readonly reputationService = inject(ReputationService);
     private readonly notify = inject(NotificationService);
 
     protected readonly showCreateForm = signal(false);
     protected readonly creating = signal(false);
+    protected readonly loadError = signal(false);
     protected readonly selectedId = signal<string | null>(null);
     protected readonly selectedListing = signal<MarketplaceListing | null>(null);
     protected readonly reviews = signal<MarketplaceReview[]>([]);
+    protected readonly federatedListings = signal<MarketplaceListing[]>([]);
+
+    protected readonly agentTrustLevels = computed(() => {
+        const map: Record<string, TrustLevel> = {};
+        for (const score of this.reputationService.scores()) {
+            map[score.agentId] = score.trustLevel;
+        }
+        return map;
+    });
+
+    protected readonly Math = Math;
 
     protected searchQuery = '';
     protected categoryFilter = '';
@@ -300,7 +438,24 @@ export class MarketplaceComponent implements OnInit {
         for (const a of this.agentService.agents()) {
             this.agentNameCache[a.id] = a.name;
         }
-        await this.marketplaceService.getListings();
+        try {
+            await this.marketplaceService.getListings();
+        } catch {
+            this.loadError.set(true);
+        }
+        // Load reputation scores for trust badges
+        try {
+            await this.reputationService.loadScores();
+        } catch {
+            // Non-critical — trust badges just won't show
+        }
+        // Load federated listings
+        try {
+            const federated = await this.marketplaceService.getFederatedListings();
+            this.federatedListings.set(federated);
+        } catch {
+            // Non-critical — federated section just won't show
+        }
     }
 
     protected getAgentName(agentId: string): string {

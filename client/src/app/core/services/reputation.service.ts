@@ -23,6 +23,18 @@ export class ReputationService {
         }
     }
 
+    async computeAll(): Promise<void> {
+        this.loading.set(true);
+        try {
+            const scores = await firstValueFrom(
+                this.api.post<ReputationScore[]>('/reputation/scores'),
+            );
+            this.scores.set(scores);
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
     async getScore(agentId: string): Promise<ReputationScore> {
         return firstValueFrom(
             this.api.get<ReputationScore>(`/reputation/scores/${agentId}`),

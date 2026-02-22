@@ -230,6 +230,49 @@ export class ReputationScorer {
     }
 
     /**
+     * Compute scores for all agents that are stale or missing.
+     * Staleness threshold: 5 minutes.
+     */
+    computeAllIfStale(): ReputationScore[] {
+        const STALE_MINUTES = 5;
+        const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
+        const results: ReputationScore[] = [];
+
+        for (const agent of agents) {
+            const existing = this.db.query(
+                'SELECT computed_at FROM agent_reputation WHERE agent_id = ?',
+            ).get(agent.id) as { computed_at: string } | null;
+
+            let isStale = true;
+            if (existing?.computed_at) {
+                const computedAt = new Date(existing.computed_at).getTime();
+                const now = Date.now();
+                isStale = (now - computedAt) > STALE_MINUTES * 60 * 1000;
+            }
+
+            if (isStale) {
+                results.push(this.computeScore(agent.id));
+            } else {
+                results.push(this.getCachedScore(agent.id)!);
+            }
+        }
+
+        // Sort by score descending
+        results.sort((a, b) => b.overallScore - a.overallScore);
+        return results;
+    }
+
+    /**
+     * Force-recompute scores for all agents.
+     */
+    computeAll(): ReputationScore[] {
+        const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
+        const results = agents.map((a) => this.computeScore(a.id));
+        results.sort((a, b) => b.overallScore - a.overallScore);
+        return results;
+    }
+
+    /**
      * Get reputation scores for all agents.
      */
     getAllScores(): ReputationScore[] {

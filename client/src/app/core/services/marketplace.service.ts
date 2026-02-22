@@ -66,6 +66,12 @@ export class MarketplaceService {
         );
     }
 
+    async getFederatedListings(): Promise<MarketplaceListing[]> {
+        return firstValueFrom(
+            this.api.get<MarketplaceListing[]>('/marketplace/federated'),
+        );
+    }
+
     async createReview(listingId: string, data: { rating: number; comment: string }): Promise<MarketplaceReview> {
         return firstValueFrom(
             this.api.post<MarketplaceReview>(`/marketplace/listings/${listingId}/reviews`, data),
