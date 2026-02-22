@@ -34,7 +34,9 @@ export class MarketplaceService {
 
     async getListings(agentId?: string): Promise<MarketplaceListing[]> {
         const path = agentId ? `/marketplace/listings?agentId=${agentId}` : '/marketplace/listings';
-        const listings = await firstValueFrom(this.api.get<MarketplaceListing[]>(path));
+        const raw = await firstValueFrom(this.api.get<MarketplaceListing[] | MarketplaceSearchResult>(path));
+        // GET /api/marketplace/listings returns { listings, total, ... } when no agentId
+        const listings = Array.isArray(raw) ? raw : raw.listings;
         this.listings.set(listings);
         return listings;
     }

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { MarketplaceService } from '../../core/services/marketplace.service';
@@ -521,7 +521,7 @@ export class MarketplaceComponent implements OnInit {
         if (!listingId || !this.reviewComment) return;
         try {
             await this.marketplaceService.createReview(listingId, {
-                rating: this.reviewRating,
+                rating: Number(this.reviewRating),
                 comment: this.reviewComment,
             });
             this.reviewComment = '';

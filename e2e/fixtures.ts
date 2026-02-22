@@ -10,6 +10,9 @@ interface ApiHelpers {
     seedSkillBundle(data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
     seedMarketplaceListing(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
     seedMcpServer(data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
+    seedReputationEvent(agentId: string, eventType?: string, scoreImpact?: number): Promise<{ ok: boolean }>;
+    computeScore(agentId: string): Promise<Record<string, unknown>>;
+    computeAllScores(): Promise<Record<string, unknown>>;
     getHealth(): Promise<{ status: string; algochat: boolean }>;
     launchCouncil(councilId: string, projectId: string, prompt: string): Promise<{ launchId: string; sessionIds: string[] }>;
     getLaunch(launchId: string): Promise<{ stage: string; synthesis: string | null; sessionIds: string[]; prompt: string }>;
@@ -138,7 +141,20 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedMarketplaceListing failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const listing = await res.json();
+
+                // Publish the listing so it appears in search results
+                const pubRes = await fetchWithRetry(`${BASE_URL}/api/marketplace/listings/${listing.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'published' }),
+                });
+                if (!pubRes.ok) {
+                    const body = await pubRes.text().catch(() => '');
+                    throw new Error(`publishListing failed: ${pubRes.status} ${pubRes.statusText} — ${body}`);
+                }
+
+                return pubRes.json();
             },
 
             async seedMcpServer(data: Record<string, unknown> = {}) {
@@ -156,6 +172,43 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 if (!res.ok) {
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedMcpServer failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedReputationEvent(agentId: string, eventType = 'task_completed', scoreImpact = 5) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/reputation/events`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agentId, eventType, scoreImpact }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedReputationEvent failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async computeScore(agentId: string) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/reputation/scores/${agentId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`computeScore failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async computeAllScores() {
+                const res = await fetchWithRetry(`${BASE_URL}/api/reputation/scores`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`computeAllScores failed: ${res.status} ${res.statusText} — ${body}`);
                 }
                 return res.json();
             },
