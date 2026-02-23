@@ -50,8 +50,9 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
                                             cx="60" cy="60" r="52"
                                             class="score-ring__fill"
                                             [attr.data-level]="score.trustLevel"
-                                            [style.stroke-dasharray]="ringCircumference"
-                                            [style.stroke-dashoffset]="getRingOffset(score.overallScore)" />
+                                            [attr.stroke-dasharray]="ringCircumference"
+                                            [attr.stroke-dashoffset]="getRingOffset(score.overallScore)"
+                                            transform="rotate(-90 60 60)" />
                                         <text x="60" y="60" class="score-ring__text" dominant-baseline="central" text-anchor="middle">
                                             {{ score.overallScore | number:'1.0-0' }}
                                         </text>
@@ -179,7 +180,6 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
         .score-ring__bg { fill: none; stroke: var(--border); stroke-width: 8; }
         .score-ring__fill {
             fill: none; stroke-width: 8; stroke-linecap: round;
-            transform: rotate(-90deg); transform-origin: 60px 60px;
             transition: stroke-dashoffset 0.5s ease;
         }
         .score-ring__fill[data-level="verified"], .score-ring__fill[data-level="high"] { stroke: var(--accent-green); }
