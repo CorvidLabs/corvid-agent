@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CorvidAgent — Autonomous AI Agent Orchestration on Algorand</title>
+  <meta name="description" content="Autonomous AI agent orchestration with on-chain identity, multi-agent councils, graph workflows, and self-improving code — powered by Algorand and Claude Agent SDK.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="CorvidAgent — Autonomous AI Agent Orchestration">
+  <meta property="og:description" content="Autonomous AI agent orchestration with on-chain identity, multi-agent councils, graph workflows, and self-improving code — powered by Algorand.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/">
+
+  <!-- Favicon (crow emoji as SVG data URL) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════════ NAV ═══════════════════ -->
+  <nav class="nav">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="architecture.html" class="nav__link">API</a>
+        <a href="algochat.html" class="nav__link">AlgoChat</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero__badge">v0.11.0</div>
+      <h1 class="hero__title">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </h1>
+      <p class="hero__tagline">
+        Autonomous AI agent orchestration with on-chain identity, graph workflows &amp; self-improving code on
+        <span class="accent-cyan">Algorand</span>
+      </p>
+      <div class="hero__actions">
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="btn btn--cyan">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a href="https://github.com/CorvidLabs/corvid-agent/releases" class="btn btn--magenta">
+          Releases
+        </a>
+      </div>
+    </div>
+    <div class="hero__scanline"></div>
+  </header>
+
+  <!-- ═══════════════════ WHAT IS ═══════════════════ -->
+  <section class="section section--alt" id="about">
+    <div class="container">
+      <h2 class="section__title">What is CorvidAgent?</h2>
+      <div class="explainer">
+        <p class="explainer__text">
+          CorvidAgent is an <span class="accent-cyan">open-source autonomous AI agent platform</span> that combines Claude&rsquo;s reasoning with Algorand&rsquo;s on-chain identity. Deploy self-improving agents that can <span class="accent-magenta">write code</span>, <span class="accent-green">coordinate in councils</span>, execute scheduled tasks, and communicate through encrypted on-chain messaging &mdash; all with a verifiable cryptographic identity.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FEATURES ═══════════════════ -->
+  <section class="section" id="features">
+    <div class="container">
+      <h2 class="section__title">Features</h2>
+      <div class="grid grid--3">
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F9E0;</div>
+          <h3 class="card__title">Agent Orchestration</h3>
+          <p>Multi-agent council system with configurable personas. Agents deliberate, vote, and reach consensus. Supports both Claude and local Ollama models.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F4AC;</div>
+          <h3 class="card__title">AlgoChat Messaging <span class="accent-magenta" style="font-size: 7px; opacity: 0.7;">(optional)</span></h3>
+          <p>On-chain encrypted messaging via Algorand. Agents communicate with cryptographic identity and verifiable message history. Works fully without it &mdash; chat via the web UI + SQLite persistence.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x23F0;</div>
+          <h3 class="card__title">Scheduler</h3>
+          <p>Cron and interval-based autonomous task execution. Agents run on schedule with approval policies (auto, owner, council) and budget limits.</p>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F9CA;</div>
+          <h3 class="card__title">Ollama / Local Models</h3>
+          <p>Run Qwen, LLama, Mistral, and other local models. Weight-based concurrency prevents memory thrashing. Real-time tok/s metrics.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F6E0;</div>
+          <h3 class="card__title">Work Tasks</h3>
+          <p>Spawn autonomous agent sessions on dedicated branches. Agents implement changes, run validation, and open PRs.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F4F1;</div>
+          <h3 class="card__title">Dashboard &amp; Mobile</h3>
+          <p>Angular UI with analytics, system logs, work tasks, settings, and QR-based mobile connect. Dark cyberpunk aesthetic.</p>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F310;</div>
+          <h3 class="card__title">Graph Workflows</h3>
+          <p>Define multi-step workflows as DAGs. Condition nodes, parallel fork/join, delays, and suspend/resume across sessions.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F91D;</div>
+          <h3 class="card__title">A2A Protocol</h3>
+          <p>Agent-to-Agent interoperability via Google A2A. Agents publish Agent Cards and discover remote agent capabilities.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F50D;</div>
+          <h3 class="card__title">Observability</h3>
+          <p>OpenTelemetry tracing, Prometheus metrics, and immutable audit logging. Full trace context across agent sessions.</p>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F4E2;</div>
+          <h3 class="card__title">Multi-Channel Comms</h3>
+          <p>Notifications and two-way questions via Discord, Telegram, GitHub Issues, and AlgoChat. Per-agent config with delivery tracking.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F333;</div>
+          <h3 class="card__title">AST Parser</h3>
+          <p>Tree-sitter AST analysis for smarter code understanding. Language-aware symbol extraction across work tasks.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x1F4AC;</div>
+          <h3 class="card__title">Owner Communication</h3>
+          <p>Two-way agent-to-owner questions with blocking polls. Responses via GitHub checkboxes, Telegram keyboards, or AlgoChat.</p>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F4E8;</div>
+          <h3 class="card__title">Slack Integration</h3>
+          <p>Bidirectional Slack bridge for channel-based agent interaction. Notifications, question routing, and response buttons.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F3AD;</div>
+          <h3 class="card__title">Personas &amp; Skills</h3>
+          <p>Give agents distinct personalities with archetypes and traits. Equip them with composable skill bundles for specialized capabilities.</p>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">&#x2B50;</div>
+          <h3 class="card__title">Reputation &amp; Trust</h3>
+          <p>Auto-computed reputation scores with SVG score rings. Trust badges, component-weighted scoring, and on-chain attestations.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ TECH STACK ═══════════════════ -->
+  <section class="section section--alt" id="stack">
+    <div class="container">
+      <h2 class="section__title">Tech Stack</h2>
+      <div class="grid grid--6">
+        <div class="chip chip--cyan">Bun</div>
+        <div class="chip chip--magenta">Angular</div>
+        <div class="chip chip--green">SQLite</div>
+        <div class="chip chip--cyan">Algorand</div>
+        <div class="chip chip--magenta">Claude SDK</div>
+        <div class="chip chip--green">Ollama</div>
+        <div class="chip chip--cyan">OpenTelemetry</div>
+        <div class="chip chip--magenta">MCP</div>
+        <div class="chip chip--green">A2A Protocol</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ QUICK START ═══════════════════ -->
+  <section class="section" id="quickstart">
+    <div class="container">
+      <h2 class="section__title">Quick Start</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">terminal</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-comment"># Clone &amp; install</span>
+<span class="t-prompt">$</span> git clone https://github.com/CorvidLabs/corvid-agent.git
+<span class="t-prompt">$</span> cd corvid-agent
+<span class="t-prompt">$</span> bun install
+
+<span class="t-comment"># Configure</span>
+<span class="t-prompt">$</span> cp .env.example .env
+<span class="t-prompt">$</span> <span class="t-comment"># Add your ANTHROPIC_API_KEY and ALGO_MNEMONIC</span>
+
+<span class="t-comment"># Run</span>
+<span class="t-prompt">$</span> bun dev          <span class="t-comment"># API server on :3000</span>
+<span class="t-prompt">$</span> bun dev:client   <span class="t-comment"># Angular UI on :4200</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ ARCHITECTURE ═══════════════════ -->
+  <section class="section section--alt" id="architecture">
+    <div class="container">
+      <h2 class="section__title">Architecture</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">project structure</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-dir">corvid-agent/</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">server/</span>          <span class="t-comment"># Bun HTTP + WebSocket server</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>     <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>   <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>   <span class="t-comment"># Cron/interval task engine</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># 36 MCP tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">observability/</span> <span class="t-comment"># OpenTelemetry + audit</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">client/</span>          <span class="t-comment"># Angular 21 UI</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">src/app/</span>     <span class="t-comment"># Components &amp; services</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">shared/</span>          <span class="t-comment"># Shared types &amp; WS protocol</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">deploy/</span>          <span class="t-comment"># Docker, systemd, Caddy, nginx</span>
+<span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">e2e/</span>             <span class="t-comment"># Playwright + Bun tests</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECURITY ═══════════════════ -->
+  <section class="section" id="security">
+    <div class="container">
+      <h2 class="section__title">Security &amp; Trust</h2>
+      <div class="grid grid--3">
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Wallet Auth</h3>
+          <p>Every agent and user authenticates via Algorand wallet. No passwords, no cookies &mdash; just cryptographic keys.</p>
+        </div>
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Encrypted Memory</h3>
+          <p>Agent memories are encrypted and stored on-chain. Only the owning agent can decrypt and recall its own notes.</p>
+        </div>
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">Credit System</h3>
+          <p>ALGO-backed credits prevent abuse. Each conversation turn consumes credits purchased with native tokens.</p>
+        </div>
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Audit Logging</h3>
+          <p>Immutable, insert-only audit log with trace IDs. Full forensic trail of every agent action for compliance.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
+  <section class="section section--alt" id="how-it-works">
+    <div class="container">
+      <h2 class="section__title">How it Works</h2>
+      <div class="flow-steps">
+        <div class="flow-steps__item">
+          <div class="flow-steps__number accent-cyan">01</div>
+          <div class="flow-steps__content">
+            <h3 class="flow-steps__title">Deploy</h3>
+            <p>Clone the repo, add your API key, and run <code class="accent-cyan">bun dev</code>. Your agent boots with a unique Algorand wallet identity.</p>
+          </div>
+        </div>
+        <div class="flow-steps__connector"></div>
+        <div class="flow-steps__item">
+          <div class="flow-steps__number accent-magenta">02</div>
+          <div class="flow-steps__content">
+            <h3 class="flow-steps__title">Configure</h3>
+            <p>Set up schedules, workflows, and council personas via the Dashboard UI or REST API. Define what your agent does autonomously.</p>
+          </div>
+        </div>
+        <div class="flow-steps__connector"></div>
+        <div class="flow-steps__item">
+          <div class="flow-steps__number accent-green">03</div>
+          <div class="flow-steps__content">
+            <h3 class="flow-steps__title">Orchestrate</h3>
+            <p>Agents execute work tasks on branches, deliberate in councils, communicate on-chain, and self-improve &mdash; with full audit trails.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="index.html">Home</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="architecture.html">API</a>
+        <a href="algochat.html">AlgoChat</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" target="_blank" rel="noopener">Chat</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API &amp; Architecture — CorvidAgent</title>
+  <meta name="description" content="REST API reference, WebSocket protocol, database schema, and system architecture for the CorvidAgent framework.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="API &amp; Architecture — CorvidAgent">
+  <meta property="og:description" content="REST API, WebSocket protocol, and system architecture reference.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/architecture.html">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/architecture.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════════ NAV ═══════════════════ -->
+  <nav class="nav">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="architecture.html" class="nav__link nav__link--active">API</a>
+        <a href="algochat.html" class="nav__link">AlgoChat</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <header class="page-hero">
+    <div class="container">
+      <h1 class="page-hero__title">API &amp; <span class="accent-magenta">Architecture</span></h1>
+      <p class="page-hero__tagline">REST endpoints, WebSocket protocol, MCP tools, and system design.</p>
+    </div>
+    <div class="hero__scanline"></div>
+  </header>
+
+  <!-- ═══════════════════ OVERVIEW ═══════════════════ -->
+  <section class="section" id="overview">
+    <div class="container">
+      <h2 class="section__title">System Overview</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">architecture</span>
+        </div>
+        <div class="arch-diagram">
+          <!-- Top row: Angular UI → Bun Server → LLM Providers -->
+          <div class="arch-row">
+            <div class="arch-box arch-box--cyan">
+              <div class="arch-box__label accent-cyan">Angular UI</div>
+              <div class="arch-box__sub">Port 4200</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--magenta">
+              <div class="arch-box__label accent-magenta">Bun Server</div>
+              <div class="arch-box__sub">Port 3000</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">LLM Providers</div>
+              <div class="arch-box__sub">Claude + Ollama</div>
+            </div>
+          </div>
+
+          <!-- Connector: vertical line from Bun Server down -->
+          <div class="arch-arrow--down"></div>
+
+          <!-- Branching connectors -->
+          <div class="arch-connector">
+            <div class="arch-connector__line"></div>
+            <div class="arch-connector__junction">
+              <div class="arch-connector__vert"></div>
+            </div>
+            <div class="arch-connector__line"></div>
+            <div class="arch-connector__junction">
+              <div class="arch-connector__vert"></div>
+            </div>
+            <div class="arch-connector__line"></div>
+          </div>
+
+          <!-- Bottom row: SQLite, Scheduler, AlgoChat -->
+          <div class="arch-row">
+            <div class="arch-box arch-box--cyan">
+              <div class="arch-box__label accent-cyan">SQLite DB</div>
+              <div class="arch-box__sub">Persistence</div>
+            </div>
+            <div class="arch-box arch-box--magenta">
+              <div class="arch-box__label accent-magenta">Scheduler</div>
+              <div class="arch-box__sub">Cron / Interval</div>
+            </div>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">AlgoChat</div>
+              <div class="arch-box__sub">(optional)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ PROJECT STRUCTURE ═══════════════════ -->
+  <section class="section section--alt" id="structure">
+    <div class="container">
+      <h2 class="section__title">Project Structure</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">tree</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-dir">corvid-agent/</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">server/</span>              <span class="t-comment"># Bun HTTP + WebSocket server</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">algochat/</span>        <span class="t-comment"># On-chain messaging layer</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">db/</span>              <span class="t-comment"># SQLite schema &amp; queries</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">lib/</span>             <span class="t-comment"># Logger, crypto, validation</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>             <span class="t-comment"># MCP tool server &amp; coding tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">middleware/</span>       <span class="t-comment"># Auth, CORS, rate limiting</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>         <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>       <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">routes/</span>          <span class="t-comment"># REST API endpoints (28 modules)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>       <span class="t-comment"># Cron/interval execution engine</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">slack/</span>           <span class="t-comment"># Bidirectional Slack bridge</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">telegram/</span>        <span class="t-comment"># Telegram bridge (voice, STT)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">discord/</span>         <span class="t-comment"># Discord bridge (raw WebSocket)</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">work/</span>            <span class="t-comment"># Git worktree &amp; work tasks</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">ws/</span>              <span class="t-comment"># WebSocket handler</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-file">index.ts</span>         <span class="t-comment"># Entry point</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">client/</span>              <span class="t-comment"># Angular 21 SPA</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">shared/</span>              <span class="t-comment"># Shared types &amp; WS protocol</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">deploy/</span>              <span class="t-comment"># Docker, systemd, nginx, Caddy</span>
+<span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">e2e/</span>                 <span class="t-comment"># Playwright tests</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ REST API ═══════════════════ -->
+  <section class="section" id="rest-api">
+    <div class="container">
+      <h2 class="section__title">REST API</h2>
+      <p class="section__subtitle">All endpoints prefixed with <code class="accent-cyan">/api</code>. Auth via <code>Authorization: Bearer &lt;API_KEY&gt;</code> when remote.</p>
+
+      <!-- Agents -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Agents</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents</code>
+            <span class="api-desc">List all agents</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/agents</code>
+            <span class="api-desc">Create agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id</code>
+            <span class="api-desc">Get agent by ID</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/agents/:id</code>
+            <span class="api-desc">Update agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/agents/:id</code>
+            <span class="api-desc">Delete agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id/balance</code>
+            <span class="api-desc">Check wallet balance</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/agents/:id/fund</code>
+            <span class="api-desc">Fund agent wallet</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/agents/:id/invoke</code>
+            <span class="api-desc">Send message to agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id/messages</code>
+            <span class="api-desc">Agent-to-agent message history</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sessions -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Sessions</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/sessions</code>
+            <span class="api-desc">List sessions (?projectId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/sessions</code>
+            <span class="api-desc">Create &amp; start session</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/sessions/:id</code>
+            <span class="api-desc">Get session details</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/sessions/:id</code>
+            <span class="api-desc">Update session</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/sessions/:id</code>
+            <span class="api-desc">Delete session</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/sessions/:id/messages</code>
+            <span class="api-desc">Get message history</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/sessions/:id/stop</code>
+            <span class="api-desc">Stop running session</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/sessions/:id/resume</code>
+            <span class="api-desc">Resume paused session</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projects -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Projects</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/projects</code>
+            <span class="api-desc">List projects</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/projects</code>
+            <span class="api-desc">Create project</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/projects/:id</code>
+            <span class="api-desc">Get project</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/projects/:id</code>
+            <span class="api-desc">Update project</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/projects/:id</code>
+            <span class="api-desc">Delete project</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Councils -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Councils</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/councils</code>
+            <span class="api-desc">List councils</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/councils</code>
+            <span class="api-desc">Create council</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/councils/:id</code>
+            <span class="api-desc">Get council</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/councils/:id</code>
+            <span class="api-desc">Update council</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/councils/:id</code>
+            <span class="api-desc">Delete council</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/councils/:id/launch</code>
+            <span class="api-desc">Launch deliberation</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/councils/:id/launches</code>
+            <span class="api-desc">List launches for council</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Council Launches -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Council Launches</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches</code>
+            <span class="api-desc">List launches (?councilId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches/:id</code>
+            <span class="api-desc">Get launch details</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches/:id/logs</code>
+            <span class="api-desc">Get launch logs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/council-launches/:id/discussion-messages</code>
+            <span class="api-desc">Get discussion messages</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/abort</code>
+            <span class="api-desc">Abort launch</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/review</code>
+            <span class="api-desc">Start review stage</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/synthesize</code>
+            <span class="api-desc">Start synthesis stage</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/council-launches/:id/chat</code>
+            <span class="api-desc">Follow-up chat on completed council</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedules -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Schedules</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedules</code>
+            <span class="api-desc">List schedules (?agentId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedules</code>
+            <span class="api-desc">Create schedule (cron or interval)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedules/:id</code>
+            <span class="api-desc">Get schedule details</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/schedules/:id</code>
+            <span class="api-desc">Update schedule</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/schedules/:id</code>
+            <span class="api-desc">Delete schedule</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedules/:id/executions</code>
+            <span class="api-desc">List executions for schedule</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedule-executions</code>
+            <span class="api-desc">List all executions</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedule-executions/:id/resolve</code>
+            <span class="api-desc">Approve or deny execution</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/scheduler/health</code>
+            <span class="api-desc">Scheduler health &amp; stats</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Work Tasks -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Work Tasks</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/work-tasks</code>
+            <span class="api-desc">List tasks (?agentId filter)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/work-tasks</code>
+            <span class="api-desc">Create work task</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/work-tasks/:id</code>
+            <span class="api-desc">Get task status</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/work-tasks/:id/cancel</code>
+            <span class="api-desc">Cancel running task</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wallets -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Wallets</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/wallets/summary</code>
+            <span class="api-desc">External wallet summary (?search)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/wallets/:address/messages</code>
+            <span class="api-desc">Messages for wallet (?limit, ?offset)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Allowlist -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Allowlist</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/allowlist</code>
+            <span class="api-desc">List allowlisted addresses</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/allowlist</code>
+            <span class="api-desc">Add address to allowlist</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/allowlist/:address</code>
+            <span class="api-desc">Update allowlist entry</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/allowlist/:address</code>
+            <span class="api-desc">Remove from allowlist</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- System -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">System</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/health</code>
+            <span class="api-desc">Server health check</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/browse-dirs</code>
+            <span class="api-desc">Browse filesystem directories</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/operational-mode</code>
+            <span class="api-desc">Get operational mode</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/operational-mode</code>
+            <span class="api-desc">Set operational mode</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/escalation-queue</code>
+            <span class="api-desc">List pending approvals</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/escalation-queue/:id/resolve</code>
+            <span class="api-desc">Resolve escalation</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/feed/history</code>
+            <span class="api-desc">Activity feed history</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/backup</code>
+            <span class="api-desc">Create database backup</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/selftest/run</code>
+            <span class="api-desc">Run self-tests (unit/e2e/all)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AlgoChat -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">AlgoChat</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/algochat/status</code>
+            <span class="api-desc">Connection status</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/algochat/network</code>
+            <span class="api-desc">Switch network (testnet/mainnet)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/algochat/conversations</code>
+            <span class="api-desc">List conversations</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slack -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Slack</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/slack/status</code>
+            <span class="api-desc">Slack bridge connection status</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/slack/events</code>
+            <span class="api-desc">Slack event webhook receiver</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP API -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">MCP API</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp/send-message</code>
+            <span class="api-desc">Send message via MCP</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp/save-memory</code>
+            <span class="api-desc">Save memory via MCP</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp/recall-memory</code>
+            <span class="api-desc">Recall memory via MCP</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mcp/list-agents</code>
+            <span class="api-desc">List agents via MCP</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ WEBSOCKET ═══════════════════ -->
+  <section class="section section--alt" id="websocket">
+    <div class="container">
+      <h2 class="section__title">WebSocket Protocol</h2>
+      <p class="section__subtitle">Connect to <code class="accent-cyan">ws://localhost:3000</code>. All messages are JSON.</p>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">Client &rarr; Server</h3>
+          <div class="terminal terminal--compact">
+            <pre class="terminal__body"><code><span class="t-comment">// Subscribe to session events</span>
+{ "type": "<span class="accent-cyan">subscribe</span>",
+  "sessionId": "..." }
+
+<span class="t-comment">// Unsubscribe from session</span>
+{ "type": "<span class="accent-cyan">unsubscribe</span>",
+  "sessionId": "..." }
+
+<span class="t-comment">// Send message to session</span>
+{ "type": "<span class="accent-cyan">send_message</span>",
+  "sessionId": "...",
+  "content": "..." }
+
+<span class="t-comment">// Quick chat with agent</span>
+{ "type": "<span class="accent-cyan">chat_send</span>",
+  "agentId": "...",
+  "content": "..." }
+
+<span class="t-comment">// Approve/deny tool use</span>
+{ "type": "<span class="accent-cyan">approval_response</span>",
+  "requestId": "...",
+  "behavior": "allow" }
+
+<span class="t-comment">// Agent-to-agent invoke</span>
+{ "type": "<span class="accent-cyan">agent_invoke</span>",
+  "fromAgentId": "...",
+  "toAgentId": "...",
+  "content": "..." }
+
+<span class="t-comment">// Reward agent (ALGO)</span>
+{ "type": "<span class="accent-cyan">agent_reward</span>",
+  "agentId": "...",
+  "microAlgos": 1000000 }
+
+<span class="t-comment">// Create work task</span>
+{ "type": "<span class="accent-cyan">create_work_task</span>",
+  "agentId": "...",
+  "description": "..." }</code></pre>
+          </div>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">Server &rarr; Client</h3>
+          <div class="terminal terminal--compact">
+            <pre class="terminal__body"><code><span class="t-comment">// Session stream events</span>
+{ "type": "<span class="accent-magenta">session_event</span>",
+  "sessionId": "...",
+  "event": { ... } }
+
+<span class="t-comment">// Session status changes</span>
+{ "type": "<span class="accent-magenta">session_status</span>",
+  "sessionId": "...",
+  "status": "running" }
+
+<span class="t-comment">// AlgoChat messages</span>
+{ "type": "<span class="accent-magenta">algochat_message</span>",
+  "participant": "...",
+  "direction": "inbound" }
+
+<span class="t-comment">// Approval requests</span>
+{ "type": "<span class="accent-magenta">approval_request</span>",
+  "request": { "id": "...",
+    "toolName": "..." } }
+
+<span class="t-comment">// Chat stream / tool / thinking</span>
+{ "type": "<span class="accent-magenta">chat_stream</span>",
+  "agentId": "...",
+  "chunk": "...", "done": false }
+{ "type": "<span class="accent-magenta">chat_tool_use</span>" }
+{ "type": "<span class="accent-magenta">chat_thinking</span>" }
+
+<span class="t-comment">// Work task &amp; council updates</span>
+{ "type": "<span class="accent-magenta">work_task_update</span>" }
+{ "type": "<span class="accent-magenta">council_stage_change</span>" }
+{ "type": "<span class="accent-magenta">council_log</span>" }
+{ "type": "<span class="accent-magenta">council_discussion_message</span>" }
+
+<span class="t-comment">// Balance &amp; errors</span>
+{ "type": "<span class="accent-magenta">agent_balance</span>" }
+{ "type": "<span class="accent-magenta">error</span>",
+  "message": "..." }</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ MCP TOOLS ═══════════════════ -->
+  <section class="section" id="mcp-tools">
+    <div class="container">
+      <h2 class="section__title">MCP Tools</h2>
+      <p class="section__subtitle">Tools available to agents via the <a href="https://modelcontextprotocol.io" class="accent-green">Model Context Protocol</a>. 36 tools across 11 categories.</p>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">corvid_send_message</h3>
+          <p>Send a message to another agent and wait for response. Supports threaded conversations.</p>
+          <div class="card__params">
+            <span class="param">to_agent</span> <span class="param">message</span> <span class="param param--opt">thread</span>
+          </div>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">corvid_save_memory</h3>
+          <p>Save an encrypted private note. Persists across sessions with optional on-chain audit.</p>
+          <div class="card__params">
+            <span class="param">key</span> <span class="param">content</span>
+          </div>
+        </div>
+
+        <div class="card card--green">
+          <h3 class="card__title">corvid_recall_memory</h3>
+          <p>Recall previously saved memories. Exact key lookup or keyword search.</p>
+          <div class="card__params">
+            <span class="param param--opt">key</span> <span class="param param--opt">query</span>
+          </div>
+        </div>
+
+        <div class="card card--cyan">
+          <h3 class="card__title">corvid_list_agents</h3>
+          <p>Discover available agents. Returns names, IDs, and wallet addresses.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">corvid_extend_timeout</h3>
+          <p>Request more time for the current session. Max 120 minutes per call.</p>
+          <div class="card__params">
+            <span class="param">minutes</span>
+          </div>
+        </div>
+
+        <div class="card card--green">
+          <h3 class="card__title">corvid_check_credits</h3>
+          <p>Check credit balance for a wallet address. Credits are consumed per turn.</p>
+          <div class="card__params">
+            <span class="param">wallet_address</span>
+          </div>
+        </div>
+
+        <div class="card card--cyan">
+          <h3 class="card__title">corvid_create_work_task</h3>
+          <p>Spawn a new agent on a dedicated branch. Implements changes, validates, and opens a PR.</p>
+          <div class="card__params">
+            <span class="param">description</span> <span class="param param--opt">project_id</span>
+          </div>
+        </div>
+
+        <div class="card card--cyan">
+          <h3 class="card__title">corvid_notify_owner</h3>
+          <p>Send a notification to the agent owner via configured channels (Discord, Telegram, GitHub, AlgoChat).</p>
+          <div class="card__params">
+            <span class="param">message</span> <span class="param param--opt">channels</span> <span class="param param--opt">priority</span>
+          </div>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">corvid_ask_owner</h3>
+          <p>Ask the owner a question and wait for a response. Dispatches to all configured channels with response polling.</p>
+          <div class="card__params">
+            <span class="param">question</span> <span class="param param--opt">options</span> <span class="param param--opt">timeout</span>
+          </div>
+        </div>
+
+        <div class="card card--green">
+          <h3 class="card__title">corvid_configure_notifications</h3>
+          <p>View or update notification channel configuration for an agent. Supports Discord, Telegram, GitHub, and AlgoChat.</p>
+          <div class="card__params">
+            <span class="param param--opt">channels</span> <span class="param param--opt">action</span>
+          </div>
+        </div>
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Privileged Tools</h3>
+          <p>Require explicit grant in <code>mcp_tool_permissions</code>:</p>
+          <div class="schema-list" style="margin-top: 8px;">
+            <div class="schema-item"><code>corvid_grant_credits</code> <span class="t-comment">&mdash; Grant free credits to a wallet (max 1M per call)</span></div>
+            <div class="schema-item"><code>corvid_credit_config</code> <span class="t-comment">&mdash; View or update credit system configuration</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SESSION LIFECYCLE ═══════════════════ -->
+  <section class="section section--alt" id="lifecycle">
+    <div class="container">
+      <h2 class="section__title">Session Lifecycle</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">lifecycle</span>
+        </div>
+        <div class="arch-diagram" style="padding: 20px 12px;">
+          <!-- Main flow: Created → Running → Paused → Resumed -->
+          <div class="arch-row">
+            <div class="arch-box arch-box--cyan">
+              <div class="arch-box__label accent-cyan">Created</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Running</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--magenta">
+              <div class="arch-box__label accent-magenta">Paused</div>
+            </div>
+            <span class="arch-arrow"></span>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Resumed</div>
+            </div>
+          </div>
+
+          <!-- Branches down -->
+          <div style="display: flex; justify-content: space-around; width: 100%; padding: 0 40px;">
+            <div style="text-align: center; flex: 1;">
+              <div class="arch-arrow--down"></div>
+              <div style="font-size: 7px; color: var(--text-tertiary); padding: 2px 0;">context reset</div>
+              <div style="font-size: 7px; color: var(--text-tertiary); padding: 0 0 4px;">(every 8 turns)</div>
+              <div class="arch-arrow--down arch-arrow--down-tip"></div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div class="arch-arrow--down"></div>
+              <div style="padding: 16px 0 4px;"></div>
+              <div class="arch-arrow--down arch-arrow--down-tip"></div>
+            </div>
+          </div>
+
+          <div class="arch-row" style="gap: 40px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="arch-box arch-box--cyan">
+                <div class="arch-box__label accent-cyan">Timeout</div>
+              </div>
+              <span class="arch-arrow"></span>
+              <div class="arch-box arch-box--magenta">
+                <div class="arch-box__label accent-magenta">Stopped</div>
+              </div>
+            </div>
+            <div class="arch-box arch-box--green">
+              <div class="arch-box__label accent-green">Running</div>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div style="margin-top: 20px; text-align: center;">
+            <div style="font-size: 8px; color: var(--text-tertiary); line-height: 2.2;">Auto-resume backoff: 5m &rarr; 15m &rarr; 45m &rarr; 60m cap</div>
+            <div style="font-size: 8px; color: var(--text-tertiary); line-height: 2.2;">Default timeout: 30 minutes (configurable)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid--3" style="margin-top: 40px;">
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Sources</h3>
+          <p>Sessions can originate from: <code>web</code> (UI), <code>algochat</code> (on-chain), or <code>agent</code> (inter-agent).</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">Context Reset</h3>
+          <p>After 8 turns, the SDK process is killed and restarted to prevent context window bloat.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">Protected Files</h3>
+          <p>Agents cannot modify critical files like <code>package.json</code>, <code>schema.ts</code>, or <code>.env</code> even in full-auto mode.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ DATABASE ═══════════════════ -->
+  <section class="section" id="database">
+    <div class="container">
+      <h2 class="section__title">Database Schema</h2>
+      <p class="section__subtitle">SQLite via <code class="accent-cyan">bun:sqlite</code>. Schema version 47. Auto-migrates on startup.</p>
+
+      <div class="grid grid--3">
+        <div class="card card--cyan">
+          <h3 class="card__title">Core</h3>
+          <div class="schema-list">
+            <div class="schema-item"><code>projects</code> <span class="t-comment">&mdash; workingDir, env_vars</span></div>
+            <div class="schema-item"><code>agents</code> <span class="t-comment">&mdash; name, model, wallet</span></div>
+            <div class="schema-item"><code>sessions</code> <span class="t-comment">&mdash; status, cost, source</span></div>
+            <div class="schema-item"><code>session_messages</code> <span class="t-comment">&mdash; role, content</span></div>
+            <div class="schema-item"><code>daily_spending</code> <span class="t-comment">&mdash; date, total</span></div>
+            <div class="schema-item"><code>escalation_queue</code> <span class="t-comment">&mdash; pending approvals</span></div>
+          </div>
+        </div>
+        <div class="card card--magenta">
+          <h3 class="card__title">Messaging</h3>
+          <div class="schema-list">
+            <div class="schema-item"><code>algochat_conversations</code></div>
+            <div class="schema-item"><code>algochat_messages</code> <span class="t-comment">&mdash; content, txid</span></div>
+            <div class="schema-item"><code>algochat_psk_state_v2</code> <span class="t-comment">&mdash; PSK handshake</span></div>
+            <div class="schema-item"><code>algochat_allowlist</code> <span class="t-comment">&mdash; address, label</span></div>
+            <div class="schema-item"><code>agent_messages</code> <span class="t-comment">&mdash; from, to, txid</span></div>
+            <div class="schema-item"><code>agent_memories</code> <span class="t-comment">&mdash; encrypted</span></div>
+          </div>
+        </div>
+        <div class="card card--green">
+          <h3 class="card__title">Advanced</h3>
+          <div class="schema-list">
+            <div class="schema-item"><code>councils</code> <span class="t-comment">&mdash; members, rounds</span></div>
+            <div class="schema-item"><code>council_members</code></div>
+            <div class="schema-item"><code>council_launches</code> <span class="t-comment">&mdash; stage</span></div>
+            <div class="schema-item"><code>council_launch_logs</code></div>
+            <div class="schema-item"><code>council_discussion_messages</code></div>
+            <div class="schema-item"><code>schedules</code> <span class="t-comment">&mdash; cron, interval, actions</span></div>
+            <div class="schema-item"><code>schedule_executions</code> <span class="t-comment">&mdash; status, result</span></div>
+            <div class="schema-item"><code>credit_ledger</code> <span class="t-comment">&mdash; wallet, balance</span></div>
+            <div class="schema-item"><code>credit_transactions</code></div>
+            <div class="schema-item"><code>credit_config</code></div>
+            <div class="schema-item"><code>work_tasks</code> <span class="t-comment">&mdash; status, branch</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ NEXT ═══════════════════ -->
+  <section class="section section--alt" id="next">
+    <div class="container">
+      <h2 class="section__title">Related Docs</h2>
+      <div class="grid grid--3">
+        <a href="getting-started.html" class="card card--outline card--link">
+          <h3 class="card__title accent-cyan">Getting Started &rarr;</h3>
+          <p>Installation, configuration, and first steps.</p>
+        </a>
+        <a href="algochat.html" class="card card--outline card--link">
+          <h3 class="card__title accent-magenta">AlgoChat Explainer &rarr;</h3>
+          <p>On-chain messaging, PSK encryption, and commands.</p>
+        </a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="card card--outline card--link">
+          <h3 class="card__title accent-green">Source Code &rarr;</h3>
+          <p>Browse the full repository on GitHub.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="index.html">Home</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="architecture.html">API</a>
+        <a href="algochat.html">AlgoChat</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" target="_blank" rel="noopener">Chat</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>

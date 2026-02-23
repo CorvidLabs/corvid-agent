@@ -2,20 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.11.0] - 2026-02-21
+## [0.11.0] - 2026-02-23
 
 ### Added
-- **Reputation auto-compute** — GET /api/reputation/scores now auto-computes stale scores (5-minute threshold) instead of returning only cached data; POST /api/reputation/scores force-recomputes all agents
-- **Reputation UI rework** — replaced table layout with responsive card grid featuring SVG score rings, 5 color-coded component bars with weight percentages, trust badges, and a "Compute All" button replacing per-agent Refresh
-- **Reputation event labels** — detail panel event timeline shows human-readable labels (e.g., "Task Completed") with type-specific coloring instead of raw event type strings
-- **Marketplace trust badges** — listing cards now show the publishing agent's trust level badge sourced from reputation scores
-- **Marketplace star ratings** — replaced text ratings with visual filled/empty star display
-- **Marketplace detail panel** — two-column layout with info section and stats section (rating stars, uses, price, review count)
-- **Federated listings section** — marketplace loads and displays federated listings from remote instances with "External" badge and dashed border
-- **Module specs** — added specs for reputation scorer, marketplace service, and marketplace federation
+- **Slack integration** — bidirectional Slack bridge for channel-based agent interaction, notification delivery, and question routing (#143, #212)
+- **ChannelAdapter interface** — unified adapter pattern for messaging bridges; AlgoChatBridge refactored to conform (#142, #209)
+- **Koa-style middleware pipeline** for agent messaging — composable request processing (#151, #217)
+- **OnChainTransactor extraction** — separated on-chain transaction handling from AgentMessenger for cleaner separation of concerns (#152, #219)
+- **Fire-and-forget async messaging** — non-blocking message delivery mode for AgentMessenger (#153, #220)
+- **Circuit breaker + per-agent rate limiting** — protects against overwhelming individual agents and the system (#154, #221)
+- **Parallel council responses** — agents respond concurrently during council discussion rounds, improving throughput (#216)
+- **AST symbol context in work tasks** — work task sessions now receive richer code context through AST analysis (#141, #211)
+- **UI audit (phases 1–9)** — complete dashboard and component rework: agent list/detail tabs, session state display, council panels, settings sections, analytics charts, work tasks, schedules, system logs, feed, and personas — all with consistent styling
+- **Client pages for personas, skill bundles, reputation, marketplace, and MCP servers** — full Angular services and E2E test coverage
+- **Reputation auto-compute** — stale scores auto-recompute on read (5-minute threshold); SVG score rings, trust badges, color-coded component bars with weight percentages
+- **Marketplace enhancements** — detail panels with star ratings, trust badges from reputation, federated listings from remote instances
+- **100% testable API E2E coverage** — 348 tests across 30 Playwright spec files covering 198/202 endpoints
+- **Module specs** for reputation scorer, marketplace service, and marketplace federation
+
+### Fixed
+- Persona manager UX — replaced vertical card list with horizontal chip picker; detail form now immediately visible without scrolling
+- Suppressed expected 404 toasts on persona endpoints (unconfigured personas are normal)
+- Reputation score ring SVG arcs — switched from CSS style bindings to SVG attribute bindings for cross-browser rendering
+- Mention polling no longer blocks on idle sessions (#214) or permanently skips deduped mentions (#213)
+- LaunchAgent PATH for claude CLI discoverability (#218)
+- Replaced `Math.random()` with `crypto.randomBytes()` in E2E fixtures
+- Removed unused variables flagged by code scanning
+- Copilot review feedback (two rounds): marketplace query param alignment, system-log server-side filtering, `cronToHuman()` NaN handling, federation SSRF mitigation with DNS rebinding/IP validation, `Promise.allSettled` for resilient persona checks
 
 ### Changed
-- Reputation scorer exposes `computeAllIfStale()` and `computeAll()` methods for bulk operations
+- E2E fixtures consolidated with `gotoWithRetry` extraction and `api.seedWorkflow()` helper
+- Reputation scorer exposes `computeAllIfStale()` and `computeAll()` for bulk operations
 - Marketplace component injects ReputationService for cross-feature trust badge display
 
 ## [0.10.0] - 2026-02-21
