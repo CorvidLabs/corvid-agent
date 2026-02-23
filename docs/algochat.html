@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlgoChat — CorvidAgent</title>
+  <meta name="description" content="How AlgoChat works: on-chain messaging via Algorand, PSK encryption, slash commands, and agent-to-agent communication for CorvidAgent.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="AlgoChat — CorvidAgent">
+  <meta property="og:description" content="On-chain messaging via Algorand with PSK encryption and slash commands.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/algochat.html">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/algochat.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════════ NAV ═══════════════════ -->
+  <nav class="nav">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="architecture.html" class="nav__link">API</a>
+        <a href="algochat.html" class="nav__link nav__link--active">AlgoChat</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <header class="page-hero">
+    <div class="container">
+      <h1 class="page-hero__title"><span class="accent-green">Algo</span>Chat</h1>
+      <p class="page-hero__tagline">On-chain messaging between agents and humans, powered by Algorand.</p>
+    </div>
+    <div class="hero__scanline"></div>
+  </header>
+
+  <!-- ═══════════════════ OPTIONAL CALLOUT ═══════════════════ -->
+  <section class="section" id="optional">
+    <div class="container">
+      <div class="callout callout--cyan">
+        <h3 class="callout__title accent-cyan">AlgoChat is Optional</h3>
+        <p>CorvidAgent works fully without AlgoChat. Without an <code class="accent-cyan">ALGOCHAT_MNEMONIC</code>, the on-chain bridge stays disabled. All features &mdash; sessions, councils, work tasks, the web UI &mdash; work via HTTP/WebSocket + SQLite. AlgoChat adds on-chain identity, encrypted remote messaging, and wallet-based authentication.</p>
+      </div>
+
+      <div class="callout callout--green">
+        <h3 class="callout__title accent-green">Localnet: Zero-Cost Development</h3>
+        <p>Agents default to <code class="accent-green">AGENT_NETWORK=localnet</code>. Localnet auto-generates test wallets and funds them with 10 ALGO &mdash; zero real crypto needed. Test the full AlgoChat flow (PSK encryption, slash commands, agent-to-agent messaging) without spending a single ALGO. The server and agents can even run on different networks (e.g., mainnet for the server, localnet for agents).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ WHAT IS ALGOCHAT ═══════════════════ -->
+  <section class="section section--alt" id="what">
+    <div class="container">
+      <h2 class="section__title">What is AlgoChat?</h2>
+      <div class="grid grid--3">
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F4E1;</div>
+          <h3 class="card__title">On-Chain Messages</h3>
+          <p>Messages are Algorand transactions. Every message has a verifiable sender, timestamp, and on-chain receipt. No centralized servers.</p>
+        </div>
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F510;</div>
+          <h3 class="card__title">PSK Encryption</h3>
+          <p>Pre-shared key encryption for private conversations. Messages are encrypted before broadcast and only readable by intended recipients.</p>
+        </div>
+        <div class="card card--green">
+          <div class="card__icon">&#x1F916;</div>
+          <h3 class="card__title">Agent Identity</h3>
+          <p>Every agent has an Algorand wallet. Their public key is their identity. Messages are cryptographically signed and verifiable.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
+  <section class="section" id="how">
+    <div class="container">
+      <h2 class="section__title">How It Works</h2>
+
+      <div class="terminal" style="margin-bottom: 40px;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">message flow</span>
+        </div>
+        <div class="flow-diagram">
+          <!-- Column headers -->
+          <div class="flow-header">
+            <span class="flow-header__col accent-cyan">Human</span>
+            <span class="flow-header__col accent-magenta">AlgoChat Bridge</span>
+            <span class="flow-header__col accent-green">Agent</span>
+          </div>
+
+          <!-- Step 1: Human → Bridge -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--right" style="position: relative;">
+                <span class="flow-step__label">Algorand Txn (hex)</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+          </div>
+
+          <!-- Step 2: Bridge → Agent -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--right" style="position: relative;">
+                <span class="flow-step__label">Parse &amp; decrypt</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+          </div>
+
+          <!-- Step 3: Agent → Bridge -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--left" style="position: relative;">
+                <span class="flow-step__label">Agent response</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+          </div>
+
+          <!-- Step 4: Bridge → Human -->
+          <div class="flow-step">
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer">
+              <div class="flow-step__arrow flow-step__arrow--left" style="position: relative;">
+                <span class="flow-step__label">Algorand Txn (PSK)</span>
+              </div>
+            </div>
+            <div class="flow-step__dot"></div>
+            <div class="flow-step__spacer"></div>
+            <div class="flow-step__dot"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid--2">
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">1. Discovery</h3>
+          <p>The <code>DiscoveryService</code> polls the Algorand indexer for new transactions sent to the agent&rsquo;s wallet. It tracks the last round per conversation to avoid reprocessing.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">2. Parsing</h3>
+          <p>Incoming transactions are decoded from hex. If PSK encryption is configured, messages are decrypted using the pre-shared key with counter-mode replay protection.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">3. Routing</h3>
+          <p>Messages are routed to either the <code>CommandHandler</code> (for <code>/slash</code> commands) or to an agent session. Conversation history (last 10 exchanges, 8K char limit) is injected as context.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">4. Response</h3>
+          <p>The <code>ResponseFormatter</code> delivers responses on-chain. Long messages are chunked into 800-byte segments with inter-chunk delays. ALGO spending is tracked with daily limits.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ ARCHITECTURE ═══════════════════ -->
+  <section class="section section--alt" id="components">
+    <div class="container">
+      <h2 class="section__title">Components</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">algochat architecture</span>
+        </div>
+        <pre class="terminal__body"><code><span class="t-dir">server/algochat/</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">bridge.ts</span>              <span class="t-comment"># Orchestrates all services</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">config.ts</span>              <span class="t-comment"># Env vars &amp; network config</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">agent-messenger.ts</span>     <span class="t-comment"># Agent-to-agent routing</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">agent-wallet.ts</span>        <span class="t-comment"># Wallet creation &amp; funding</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">agent-directory.ts</span>     <span class="t-comment"># Agent metadata lookup</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">command-handler.ts</span>     <span class="t-comment"># Slash command parsing</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">response-formatter.ts</span>  <span class="t-comment"># On-chain message delivery</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">discovery-service.ts</span>   <span class="t-comment"># Indexer polling</span>
+<span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-file">subscription-manager.ts</span><span class="t-comment"># Session management</span>
+<span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-file">psk.ts</span>                 <span class="t-comment"># Pre-shared key encryption</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ PSK ENCRYPTION ═══════════════════ -->
+  <section class="section" id="encryption">
+    <div class="container">
+      <h2 class="section__title">PSK Encryption</h2>
+
+      <div class="grid grid--2">
+        <div class="card card--magenta">
+          <h3 class="card__title">How PSK Works</h3>
+          <p>Pre-Shared Key (PSK) encryption provides private messaging over Algorand&rsquo;s public ledger. Both parties share a secret key out-of-band, then encrypt all messages before broadcasting.</p>
+          <div class="terminal terminal--compact" style="margin-top: 16px;">
+            <pre class="terminal__body"><code><span class="t-comment"># PSK URI format</span>
+algochat-psk://v1?addr=<span class="accent-magenta">ALGO_ADDR</span>&amp;psk=<span class="accent-cyan">BASE64URL_KEY</span></code></pre>
+          </div>
+        </div>
+        <div class="card card--green">
+          <h3 class="card__title">Security Features</h3>
+          <div class="feature-list">
+            <div class="feature-item">
+              <span class="accent-green">&#x2713;</span> Counter-mode replay protection
+            </div>
+            <div class="feature-item">
+              <span class="accent-green">&#x2713;</span> 800-byte chunk limit with delays
+            </div>
+            <div class="feature-item">
+              <span class="accent-green">&#x2713;</span> Public key caching (1-hour TTL)
+            </div>
+            <div class="feature-item">
+              <span class="accent-green">&#x2713;</span> Message persistence to SQLite
+            </div>
+            <div class="feature-item">
+              <span class="accent-green">&#x2713;</span> Daily ALGO spending limits
+            </div>
+            <div class="feature-item">
+              <span class="accent-green">&#x2713;</span> Mainnet requires owner addresses
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SLASH COMMANDS ═══════════════════ -->
+  <section class="section section--alt" id="commands">
+    <div class="container">
+      <h2 class="section__title">Slash Commands</h2>
+      <p class="section__subtitle">Send these commands via AlgoChat to control your agent remotely. Requires <code class="accent-magenta">ALGOCHAT_OWNER_ADDRESSES</code> authorization.</p>
+
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Session Control</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <code class="api-path accent-cyan">/status</code>
+            <span class="api-desc">Check agent status and active sessions</span>
+          </div>
+          <div class="api-row">
+            <code class="api-path accent-cyan">/stop</code>
+            <span class="api-desc">Stop the currently running session</span>
+          </div>
+          <div class="api-row">
+            <code class="api-path accent-cyan">/mode &lt;mode&gt;</code>
+            <span class="api-desc">Set permission mode (default, plan, auto-edit, full-auto)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Agent Management</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <code class="api-path accent-magenta">/agent &lt;name&gt;</code>
+            <span class="api-desc">Switch to a different agent</span>
+          </div>
+          <div class="api-row">
+            <code class="api-path accent-magenta">/approve</code>
+            <span class="api-desc">Approve a pending tool-use request</span>
+          </div>
+          <div class="api-row">
+            <code class="api-path accent-magenta">/deny</code>
+            <span class="api-desc">Deny a pending tool-use request</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Advanced</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <code class="api-path accent-green">/work &lt;desc&gt;</code>
+            <span class="api-desc">Create a work task (branch + PR)</span>
+          </div>
+          <div class="api-row">
+            <code class="api-path accent-green">/council &lt;prompt&gt;</code>
+            <span class="api-desc">Launch a multi-agent council deliberation</span>
+          </div>
+          <div class="api-row">
+            <code class="api-path accent-green">/balance</code>
+            <span class="api-desc">Check agent wallet &amp; credit balance</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ AGENT MESSAGING ═══════════════════ -->
+  <section class="section" id="agent-messaging">
+    <div class="container">
+      <h2 class="section__title">Agent-to-Agent Messaging</h2>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">How It Works</h3>
+          <p>Agents communicate with each other using the <code>corvid_send_message</code> MCP tool. Messages are routed through the <code>AgentMessenger</code> service which handles thread tracking, deduplication, and optional ALGO payments.</p>
+          <div class="terminal terminal--compact" style="margin-top: 16px;">
+            <pre class="terminal__body"><code><span class="t-comment">// Agent calls MCP tool</span>
+corvid_send_message({
+  to_agent: "<span class="accent-cyan">researcher</span>",
+  message: "Analyze this data...",
+  thread: "<span class="accent-magenta">abc123</span>"  <span class="t-comment">// optional</span>
+})</code></pre>
+          </div>
+        </div>
+        <div class="card card--magenta">
+          <h3 class="card__title">Safety Limits</h3>
+          <div class="feature-list">
+            <div class="feature-item">
+              <span class="accent-magenta">&#x25CF;</span> Max depth: 3 (prevents circular chains)
+            </div>
+            <div class="feature-item">
+              <span class="accent-magenta">&#x25CF;</span> Dedup window: 30 seconds
+            </div>
+            <div class="feature-item">
+              <span class="accent-magenta">&#x25CF;</span> Thread history: last 10 exchanges
+            </div>
+            <div class="feature-item">
+              <span class="accent-magenta">&#x25CF;</span> Context limit: 8,000 characters
+            </div>
+            <div class="feature-item">
+              <span class="accent-magenta">&#x25CF;</span> Optional ALGO payment per message
+            </div>
+            <div class="feature-item">
+              <span class="accent-magenta">&#x25CF;</span> All messages persisted to SQLite
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CONFIGURATION ═══════════════════ -->
+  <section class="section section--alt" id="config">
+    <div class="container">
+      <h2 class="section__title">Configuration</h2>
+
+      <div class="grid grid--2">
+        <div class="card card--green">
+          <h3 class="card__title">Required <span style="font-size: 7px; opacity: 0.7;">(only if using AlgoChat)</span></h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key accent-green">ALGOCHAT_MNEMONIC</span>
+              <span class="config-val">25-word Algorand mnemonic</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-green">ALGORAND_NETWORK</span>
+              <span class="config-val">testnet (default) or mainnet</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-green">ALGOCHAT_OWNER_ADDRESSES</span>
+              <span class="config-val">comma-separated authorized wallets</span>
+            </div>
+          </div>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Optional</h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key accent-cyan">ALGOCHAT_SYNC_INTERVAL</span>
+              <span class="config-val">30000 ms (default)</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">ALGOCHAT_PSK_URI</span>
+              <span class="config-val">PSK contact URI</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">AGENT_NETWORK</span>
+              <span class="config-val">localnet (default) for funding</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">DAILY_ALGO_LIMIT_MICRO</span>
+              <span class="config-val">10000000 (10 ALGO)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ NEXT ═══════════════════ -->
+  <section class="section" id="next">
+    <div class="container">
+      <h2 class="section__title">Related Docs</h2>
+      <div class="grid grid--3">
+        <a href="getting-started.html" class="card card--outline card--link">
+          <h3 class="card__title accent-cyan">Getting Started &rarr;</h3>
+          <p>Installation, configuration, and first steps.</p>
+        </a>
+        <a href="architecture.html" class="card card--outline card--link">
+          <h3 class="card__title accent-magenta">API &amp; Architecture &rarr;</h3>
+          <p>REST endpoints, WebSocket protocol, and system design.</p>
+        </a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="card card--outline card--link">
+          <h3 class="card__title accent-green">Source Code &rarr;</h3>
+          <p>Browse the full repository on GitHub.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="index.html">Home</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="architecture.html">API</a>
+        <a href="algochat.html">AlgoChat</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" target="_blank" rel="noopener">Chat</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>

@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.9.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.11.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-1757%20passing-brightgreen" alt="1757 Tests Passing">
+  <img src="https://img.shields.io/badge/tests-1757%20unit%20%7C%20348%20E2E-brightgreen" alt="1757 Unit | 348 E2E Tests">
 </p>
 
 # corvid-agent
@@ -48,6 +48,11 @@ TELEGRAM_ALLOWED_USER_IDS=111222333   # comma-separated, empty = allow all
 DISCORD_BOT_TOKEN=your-bot-token
 DISCORD_CHANNEL_ID=channel-id
 
+# Slack — talk to agents from Slack channels
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_CHANNEL_ID=C0123456789
+SLACK_SIGNING_SECRET=your-signing-secret
+
 # Voice — TTS/STT for Telegram voice notes and audio responses
 OPENAI_API_KEY=sk-...
 ```
@@ -74,6 +79,12 @@ OPENAI_API_KEY=sk-...
 - Auto-reconnect with exponential backoff, heartbeat, and session resume
 - Per-user sessions with `/status` and `/new` commands
 - Messages over 2000 characters automatically chunked
+
+### Slack Integration
+- Talk to agents from Slack channels with bidirectional message bridge
+- Notification delivery for schedule approvals, work task results, and agent questions
+- Question routing: `corvid_ask_owner` questions appear in Slack with response buttons
+- Implements the ChannelAdapter interface for consistent bridge behavior
 
 ### Character/Persona System
 - Give each agent a distinct personality with archetype, traits, background, and voice guidelines
@@ -225,6 +236,7 @@ server/          Bun HTTP + WebSocket server
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
+  slack/         Bidirectional Slack bridge (channel adapter, notifications, questions)
   telegram/      Bidirectional Telegram bridge (long-polling, voice)
   tenant/        Multi-tenant isolation and access control
   voice/         TTS (OpenAI) and STT (Whisper) with caching
@@ -235,7 +247,7 @@ server/          Bun HTTP + WebSocket server
 client/          Angular 21 SPA (standalone components, signals)
 shared/          TypeScript types shared between server and client
 deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm
-e2e/             Playwright end-to-end tests (8 spec files)
+e2e/             Playwright end-to-end tests (30 spec files, 348 tests)
 ```
 
 ---
@@ -304,10 +316,12 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ```bash
 bun test              # 1757 server tests (~30s)
 cd client && npx vitest run   # Angular component tests (~2s)
-bun run test:e2e      # Playwright e2e spec files
+bun run test:e2e      # 30 Playwright spec files, 348 tests
 ```
 
-**1757+ tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Telegram bridge, tenant isolation, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**1757+ unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+
+**348 E2E tests** across 30 Playwright spec files covering 198/202 testable API endpoints and all 34 Angular UI routes.
 
 ---
 
@@ -374,6 +388,9 @@ The `deploy/` directory includes production configurations:
 | `TELEGRAM_ALLOWED_USER_IDS` | Comma-separated authorized Telegram user IDs | — |
 | `DISCORD_BOT_TOKEN` | Discord bot token (enables bridge) | — |
 | `DISCORD_CHANNEL_ID` | Discord channel ID to listen in | — |
+| `SLACK_BOT_TOKEN` | Slack bot token (enables bridge + notifications) | — |
+| `SLACK_CHANNEL_ID` | Slack channel ID for the bridge | — |
+| `SLACK_SIGNING_SECRET` | Slack signing secret for event verification | — |
 | `OPENAI_API_KEY` | OpenAI key for voice TTS/STT | — |
 | `BRAVE_API_KEY` | Brave Search API key | — |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
