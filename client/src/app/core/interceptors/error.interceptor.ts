@@ -12,6 +12,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
     return next(req).pipe(
         catchError((error: HttpErrorResponse) => {
+            // Suppress expected 404s (e.g. persona not configured yet)
+            if (error.status === 404 && req.url.includes('/persona')) {
+                return throwError(() => error);
+            }
+
             const message = resolveMessage(error);
             const detail = resolveDetail(req.method, req.url, error);
 
