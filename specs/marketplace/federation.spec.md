@@ -43,7 +43,7 @@ Enables cross-instance marketplace discovery by syncing published listings from 
 ## Invariants
 
 1. Federation URLs must use `http:` or `https:` protocol.
-2. Private/loopback addresses are rejected (localhost, 127.0.0.1, ::1, 0.0.0.0, 10.x, 192.168.x, 172.16-31.x, 169.254.x, *.local) to prevent SSRF.
+2. Private/loopback addresses are rejected (localhost, 127.0.0.1, ::1, 0.0.0.0, 10.x, 192.168.x, 172.16-31.x, 169.254.x, *.local) to prevent SSRF. Additionally, hostnames are DNS-resolved at request time and the resolved IP is validated against RFC 1918/link-local/loopback ranges to defend against DNS rebinding and cloud metadata attacks (e.g. `169.254.169.254`). Redirects are followed only to URLs that also pass these checks. Instance registration is restricted to admin users.
 3. URLs are normalized by stripping trailing slashes before storage.
 4. `syncInstance()` performs a full replace: deletes all existing listings for that `instance_url`, then inserts fresh ones.
 5. Federated listing IDs are prefixed `fed-{url}-{originalId}` to avoid collision with local listings.

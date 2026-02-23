@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
@@ -113,43 +113,49 @@ interface CouncilCard {
 export class CouncilListComponent implements OnInit {
     protected readonly councilService = inject(CouncilService);
     private readonly agentService = inject(AgentService);
-    protected readonly cards = signal<CouncilCard[]>([]);
+
+    private readonly lastLaunches = signal<Record<string, CouncilLaunch | null>>({});
+
+    protected readonly cards = computed<CouncilCard[]>(() => {
+        const councils = this.councilService.councils();
+        const agents = this.agentService.agents();
+        const launches = this.lastLaunches();
+
+        const agentMap: Record<string, string> = {};
+        for (const a of agents) {
+            agentMap[a.id] = a.name;
+        }
+
+        return councils.map((council) => ({
+            council,
+            memberNames: council.agentIds.map((id) => agentMap[id] ?? id.slice(0, 8)),
+            chairmanName: council.chairmanAgentId ? (agentMap[council.chairmanAgentId] ?? null) : null,
+            lastLaunch: launches[council.id] ?? null,
+        }));
+    });
 
     async ngOnInit(): Promise<void> {
         await Promise.all([
             this.councilService.loadCouncils(),
             this.agentService.loadAgents(),
         ]);
-        await this.buildCards();
+        this.loadLastLaunches();
     }
 
-    private async buildCards(): Promise<void> {
-        const agents = this.agentService.agents();
-        const agentMap: Record<string, string> = {};
-        for (const a of agents) {
-            agentMap[a.id] = a.name;
-        }
-
+    private async loadLastLaunches(): Promise<void> {
         const councils = this.councilService.councils();
         const launchResults = await Promise.all(
             councils.map((c) =>
                 this.councilService.getCouncilLaunches(c.id).catch(() => [] as CouncilLaunch[]),
             ),
         );
-
-        const cards: CouncilCard[] = councils.map((council, i) => {
-            const launches = launchResults[i];
-            const sorted = [...launches].sort(
+        const map: Record<string, CouncilLaunch | null> = {};
+        councils.forEach((council, i) => {
+            const sorted = [...launchResults[i]].sort(
                 (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
             );
-            return {
-                council,
-                memberNames: council.agentIds.map((id) => agentMap[id] ?? id.slice(0, 8)),
-                chairmanName: council.chairmanAgentId ? (agentMap[council.chairmanAgentId] ?? null) : null,
-                lastLaunch: sorted[0] ?? null,
-            };
+            map[council.id] = sorted[0] ?? null;
         });
-
-        this.cards.set(cards);
+        this.lastLaunches.set(map);
     }
 }

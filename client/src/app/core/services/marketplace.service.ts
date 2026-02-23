@@ -17,9 +17,9 @@ export class MarketplaceService {
 
     async search(params: MarketplaceSearchParams): Promise<MarketplaceSearchResult> {
         const query = new URLSearchParams();
-        if (params.query) query.set('query', params.query);
+        if (params.query) query.set('q', params.query);
         if (params.category) query.set('category', params.category);
-        if (params.pricingModel) query.set('pricingModel', params.pricingModel);
+        if (params.pricingModel) query.set('pricing', params.pricingModel);
         if (params.minRating != null) query.set('minRating', String(params.minRating));
         if (params.tags?.length) query.set('tags', params.tags.join(','));
         if (params.limit != null) query.set('limit', String(params.limit));

@@ -459,6 +459,8 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
             if (h === '*') return `every hour at :${m.padStart(2, '0')}`;
             if (m === '*') return `every minute of hour ${h}`;
             const hr = parseInt(h, 10);
+            const mn = parseInt(m, 10);
+            if (!Number.isFinite(hr) || !Number.isFinite(mn)) return `${h} ${m}`;
             const ampm = hr >= 12 ? 'PM' : 'AM';
             const h12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
             return `${h12}:${m.padStart(2, '0')} ${ampm}`;
