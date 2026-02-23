@@ -39,8 +39,8 @@ test.describe('Personas', () => {
         // Click on the agent card
         await page.locator(`text=Persona Form Agent`).first().click();
 
-        // Wait for the persona form to appear
-        await expect(page.locator('h3:text("Persona for Persona Form Agent")')).toBeVisible();
+        // Wait for the persona detail panel to appear (agent name as heading)
+        await expect(page.locator('.detail-header h3')).toBeVisible();
         await expect(page.locator('select')).toBeVisible(); // archetype dropdown
     });
 
@@ -49,7 +49,7 @@ test.describe('Personas', () => {
         await gotoPersonas(page, 'Persona Save Agent');
 
         await page.locator(`text=Persona Save Agent`).first().click();
-        await page.waitForSelector('h3:text("Persona for Persona Save Agent")');
+        await page.waitForSelector('.detail-header h3');
 
         // Fill form
         await page.locator('select').first().selectOption('technical');
@@ -70,7 +70,7 @@ test.describe('Personas', () => {
 
         // Agent should show "Configured" badge
         await page.locator(`text=Persona Persist Agent`).first().click();
-        await page.waitForSelector('h3:text("Persona for Persona Persist Agent")');
+        await page.waitForSelector('.detail-header h3');
 
         // The archetype should be pre-filled
         const archetype = page.locator('select').first();
@@ -96,12 +96,10 @@ test.describe('Personas', () => {
 
         await gotoPersonas(page, 'Badge Agent');
 
-        const card = page.locator(`.agent-card:has-text("Badge Agent")`).first();
-        if (await card.count() > 0) {
-            const badge = card.locator('.agent-card__badge');
-            if (await badge.count() > 0) {
-                await expect(badge).toContainText('Configured');
-            }
+        // With the chip picker layout, configured agents show a checkmark via data-status="configured"
+        const chip = page.locator(`.agent-chip:has-text("Badge Agent")`).first();
+        if (await chip.count() > 0) {
+            await expect(chip).toHaveAttribute('data-status', 'configured');
         }
     });
 
