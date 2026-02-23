@@ -7,7 +7,7 @@
  * - Channel dispatcher payload formatting
  */
 
-import { test, expect, beforeEach, describe, mock } from 'bun:test';
+import { test, expect, beforeEach, describe, mock, spyOn } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createAgent } from '../db/agents';
@@ -444,8 +444,15 @@ describe('channel dispatchers', () => {
     });
 
     test('sendTelegram returns error for bad token', async () => {
-        const result = await sendTelegram('bad-token', 'bad-chat', payload);
-        expect(result.success).toBe(false);
-        expect(result.error).toBeTruthy();
+        const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+            new Response(JSON.stringify({ ok: false, description: 'Unauthorized' }), { status: 401 }),
+        );
+        try {
+            const result = await sendTelegram('bad-token', 'bad-chat', payload);
+            expect(result.success).toBe(false);
+            expect(result.error).toBeTruthy();
+        } finally {
+            fetchSpy.mockRestore();
+        }
     });
 });

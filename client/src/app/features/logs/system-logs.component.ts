@@ -1,5 +1,6 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { firstValueFrom } from 'rxjs';
@@ -28,7 +29,7 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe],
+    imports: [RouterLink, RelativeTimePipe, FormsModule],
     template: `
         <div class="logs">
             <h2>System Logs</h2>
@@ -48,15 +49,40 @@ interface CreditTransaction {
             </div>
 
             @if (activeTab() === 'logs') {
-                <!-- Log type filters -->
+                <!-- Search & Controls -->
+                <div class="log-toolbar">
+                    <input
+                        class="log-search"
+                        placeholder="Search logs..."
+                        [(ngModel)]="searchQuery"
+                        (input)="onSearch()" />
+                    <button class="btn btn--secondary btn--sm" [class.btn--active]="autoRefresh()" (click)="toggleAutoRefresh()">
+                        Auto-refresh: {{ autoRefresh() ? 'ON' : 'OFF' }}
+                    </button>
+                    <button class="btn btn--secondary btn--sm" (click)="onExportLogs()">Export</button>
+                </div>
+
+                <!-- Log type + level filters -->
                 <div class="log-filters">
-                    @for (type of logTypes; track type) {
-                        <button
-                            class="filter-chip"
-                            [class.filter-chip--active]="logTypeFilter() === type"
-                            (click)="setLogType(type)"
-                        >{{ type }}</button>
-                    }
+                    <div class="filter-group">
+                        @for (type of logTypes; track type) {
+                            <button
+                                class="filter-chip"
+                                [class.filter-chip--active]="logTypeFilter() === type"
+                                (click)="setLogType(type)"
+                            >{{ type }}</button>
+                        }
+                    </div>
+                    <div class="filter-group">
+                        @for (level of logLevels; track level) {
+                            <button
+                                class="filter-chip filter-chip--level"
+                                [class.filter-chip--active]="logLevelFilter() === level"
+                                [attr.data-level]="level"
+                                (click)="setLogLevel(level)"
+                            >{{ level }}</button>
+                        }
+                    </div>
                 </div>
 
                 @if (loadingLogs()) {
@@ -147,12 +173,25 @@ interface CreditTransaction {
         .tab-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
         .tab-btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: var(--accent-cyan-dim); }
 
+        /* Toolbar */
+        .log-toolbar {
+            display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
+        }
+        .log-search {
+            flex: 1; padding: 0.4rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            font-size: 0.8rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary); box-sizing: border-box;
+        }
+        .log-search:focus { border-color: var(--accent-cyan); outline: none; }
+        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+        .btn--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
         /* Log filters */
         .log-filters {
             display: flex;
-            gap: 0.35rem;
+            gap: 0.75rem;
             margin-bottom: 1rem;
         }
+        .filter-group { display: flex; gap: 0.35rem; }
         .filter-chip {
             padding: 0.25rem 0.55rem;
             background: var(--bg-surface);
@@ -296,23 +335,34 @@ interface CreditTransaction {
         .load-more:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
     `,
 })
-export class SystemLogsComponent implements OnInit {
+export class SystemLogsComponent implements OnInit, OnDestroy {
     private readonly api = inject(ApiService);
 
     readonly activeTab = signal<'logs' | 'credits'>('logs');
     readonly logTypeFilter = signal('all');
+    readonly logLevelFilter = signal('all');
     readonly loadingLogs = signal(true);
     readonly loadingCredits = signal(true);
     readonly logs = signal<LogEntry[]>([]);
     readonly creditTxns = signal<CreditTransaction[]>([]);
+    readonly autoRefresh = signal(false);
 
+    protected searchQuery = '';
     private logOffset = 0;
     private creditOffset = 0;
+    private refreshTimer: ReturnType<typeof setInterval> | null = null;
+    private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
     readonly logTypes = ['all', 'council', 'escalation', 'work-task'];
+    readonly logLevels = ['all', 'error', 'warn', 'info', 'stage'];
 
     ngOnInit(): void {
         this.loadLogs();
+    }
+
+    ngOnDestroy(): void {
+        if (this.refreshTimer) clearInterval(this.refreshTimer);
+        if (this.searchDebounce) clearTimeout(this.searchDebounce);
     }
 
     protected switchTab(tab: 'logs' | 'credits'): void {
@@ -329,6 +379,50 @@ export class SystemLogsComponent implements OnInit {
         this.loadLogs();
     }
 
+    protected setLogLevel(level: string): void {
+        this.logLevelFilter.set(level);
+        this.logOffset = 0;
+        this.logs.set([]);
+        this.loadLogs();
+    }
+
+    protected onSearch(): void {
+        if (this.searchDebounce) clearTimeout(this.searchDebounce);
+        this.searchDebounce = setTimeout(() => {
+            this.logOffset = 0;
+            this.logs.set([]);
+            this.loadLogs();
+        }, 300);
+    }
+
+    protected toggleAutoRefresh(): void {
+        this.autoRefresh.update((v) => !v);
+        if (this.autoRefresh()) {
+            this.refreshTimer = setInterval(() => {
+                this.logOffset = 0;
+                this.loadLogs();
+            }, 10000);
+        } else {
+            if (this.refreshTimer) {
+                clearInterval(this.refreshTimer);
+                this.refreshTimer = null;
+            }
+        }
+    }
+
+    protected onExportLogs(): void {
+        const lines = this.logs().map((log) =>
+            `[${log.timestamp}] [${log.level.toUpperCase()}] [${log.type}] ${log.message}${log.detail ? '\n  ' + log.detail : ''}`,
+        );
+        const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `system-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
     protected loadMoreLogs(): void {
         this.logOffset += 100;
         this.loadLogs(true);
@@ -343,8 +437,12 @@ export class SystemLogsComponent implements OnInit {
         this.loadingLogs.set(true);
         try {
             const type = this.logTypeFilter();
+            const level = this.logLevelFilter();
+            let url = `/system-logs?type=${type}&limit=100&offset=${this.logOffset}`;
+            if (level !== 'all') url += `&level=${level}`;
+            if (this.searchQuery) url += `&search=${encodeURIComponent(this.searchQuery)}`;
             const result = await firstValueFrom(
-                this.api.get<{ logs: LogEntry[] }>(`/system-logs?type=${type}&limit=100&offset=${this.logOffset}`),
+                this.api.get<{ logs: LogEntry[] }>(url),
             );
             if (append) {
                 this.logs.update((current) => [...current, ...result.logs]);

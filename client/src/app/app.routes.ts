@@ -147,4 +147,29 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/settings/settings.component').then((m) => m.SettingsComponent),
     },
+    {
+        path: 'personas',
+        loadComponent: () =>
+            import('./features/personas/persona-manager.component').then((m) => m.PersonaManagerComponent),
+    },
+    {
+        path: 'skill-bundles',
+        loadComponent: () =>
+            import('./features/skill-bundles/skill-bundle-list.component').then((m) => m.SkillBundleListComponent),
+    },
+    {
+        path: 'reputation',
+        loadComponent: () =>
+            import('./features/reputation/reputation.component').then((m) => m.ReputationComponent),
+    },
+    {
+        path: 'marketplace',
+        loadComponent: () =>
+            import('./features/marketplace/marketplace.component').then((m) => m.MarketplaceComponent),
+    },
+    {
+        path: 'mcp-servers',
+        loadComponent: () =>
+            import('./features/mcp-servers/mcp-server-list.component').then((m) => m.McpServerListComponent),
+    },
 ];

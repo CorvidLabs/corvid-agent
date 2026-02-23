@@ -263,9 +263,10 @@ Every request passes through these stages in order:
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| GET | `/api/reputation/scores` | reputation.ts | Get all reputation scores |
+| GET | `/api/reputation/scores` | reputation.ts | Get all scores (auto-computes stale, 5-min threshold) |
+| POST | `/api/reputation/scores` | reputation.ts | Force recompute all agent scores |
 | GET | `/api/reputation/scores/:agentId` | reputation.ts | Get/compute score for agent |
-| POST | `/api/reputation/scores/:agentId` | reputation.ts | Force recompute score |
+| POST | `/api/reputation/scores/:agentId` | reputation.ts | Force recompute score for agent |
 | POST | `/api/reputation/events` | reputation.ts | Record reputation event |
 | GET | `/api/reputation/events/:agentId` | reputation.ts | Get events for agent |
 | GET | `/api/reputation/attestation/:agentId` | reputation.ts | Get attestation for agent |
@@ -481,3 +482,4 @@ Every request passes through these stages in order:
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-02-21 | corvid-agent | Add POST /api/reputation/scores for bulk recompute; update GET /scores description to reflect auto-compute behavior |

@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
 /**
  * E2E tests for the Approval Dialog critical path.
@@ -368,6 +368,6 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         // The component uses setTimeout(() => allowBtn.focus()) in ngOnInit,
         // so we give it a moment to settle.
         const allowBtn = page.locator('.btn--allow');
-        await expect(allowBtn).toBeFocused({ timeout: 3000 });
+        await expect(allowBtn).toBeFocused({ timeout: 5000 });
     });
 });

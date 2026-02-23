@@ -1,5 +1,5 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, signal, ElementRef } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed, ElementRef } from '@angular/core';
+import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -34,7 +34,7 @@ interface PSKContact {
 @Component({
     selector: 'app-settings',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe],
+    imports: [FormsModule, DecimalPipe, TitleCasePipe],
     template: `
         <div class="settings">
             <h2>Settings</h2>
@@ -44,197 +44,272 @@ interface PSKContact {
             } @else {
                 <!-- System Info -->
                 <div class="settings__section">
-                    <h3>System Info</h3>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span class="info-label">Schema Version</span>
-                            <span class="info-value">{{ settings()?.system?.schemaVersion }}</span>
+                    <h3 class="section-toggle" (click)="toggleSection('system')">
+                        <span class="section-chevron">{{ collapsedSections().has('system') ? '\u25B6' : '\u25BC' }}</span>
+                        System Info
+                    </h3>
+                    @if (!collapsedSections().has('system')) {
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Schema Version</span>
+                                <span class="info-value">{{ settings()?.system?.schemaVersion }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Agents</span>
+                                <span class="info-value">{{ settings()?.system?.agentCount }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Projects</span>
+                                <span class="info-value">{{ settings()?.system?.projectCount }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Sessions</span>
+                                <span class="info-value">{{ settings()?.system?.sessionCount }}</span>
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">Agents</span>
-                            <span class="info-value">{{ settings()?.system?.agentCount }}</span>
+                    }
+                </div>
+
+                <!-- System Health -->
+                <div class="settings__section">
+                    <h3 class="section-toggle" (click)="toggleSection('health')">
+                        <span class="section-chevron">{{ collapsedSections().has('health') ? '\u25B6' : '\u25BC' }}</span>
+                        System Health
+                    </h3>
+                    @if (!collapsedSections().has('health')) {
+                        <div class="health-grid">
+                            <div class="health-item">
+                                <span class="health-dot" [attr.data-status]="algochatStatus() ? 'ok' : 'off'"></span>
+                                <span class="health-name">AlgoChat</span>
+                                <span class="health-status">{{ algochatStatus()?.enabled ? 'Connected' : 'Disconnected' }}</span>
+                            </div>
+                            <div class="health-item">
+                                <span class="health-dot" [attr.data-status]="operationalMode() === 'normal' ? 'ok' : operationalMode() === 'paused' ? 'off' : 'warn'"></span>
+                                <span class="health-name">Operations</span>
+                                <span class="health-status">{{ operationalMode() | titlecase }}</span>
+                            </div>
+                            <div class="health-item">
+                                <span class="health-dot" [attr.data-status]="(settings()?.system?.sessionCount ?? 0) > 0 ? 'ok' : 'off'"></span>
+                                <span class="health-name">Sessions</span>
+                                <span class="health-status">{{ settings()?.system?.sessionCount }} total</span>
+                            </div>
+                            <div class="health-item">
+                                <span class="health-dot" [attr.data-status]="pskContacts().length > 0 ? 'ok' : 'off'"></span>
+                                <span class="health-name">Mobile Contacts</span>
+                                <span class="health-status">{{ pskContacts().length }} configured</span>
+                            </div>
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">Projects</span>
-                            <span class="info-value">{{ settings()?.system?.projectCount }}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Sessions</span>
-                            <span class="info-value">{{ settings()?.system?.sessionCount }}</span>
-                        </div>
-                    </div>
+                    }
                 </div>
 
                 <!-- AlgoChat Status -->
                 <div class="settings__section">
-                    <h3>AlgoChat</h3>
-                    @if (algochatStatus(); as status) {
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <span class="info-label">Status</span>
-                                <span class="info-value" [class.info-value--active]="status.enabled" [class.info-value--inactive]="!status.enabled">
-                                    {{ status.enabled ? 'Connected' : 'Disconnected' }}
-                                </span>
-                            </div>
-                            @if (status.address && status.address !== 'local') {
+                    <h3 class="section-toggle" (click)="toggleSection('algochat')">
+                        <span class="section-chevron">{{ collapsedSections().has('algochat') ? '\u25B6' : '\u25BC' }}</span>
+                        AlgoChat
+                    </h3>
+                    @if (!collapsedSections().has('algochat')) {
+                        @if (algochatStatus(); as status) {
+                            <div class="info-grid">
                                 <div class="info-item">
-                                    <span class="info-label">Address</span>
-                                    <code class="info-code">{{ status.address }}</code>
+                                    <span class="info-label">Status</span>
+                                    <span class="info-value" [class.info-value--active]="status.enabled" [class.info-value--inactive]="!status.enabled">
+                                        {{ status.enabled ? 'Connected' : 'Disconnected' }}
+                                    </span>
                                 </div>
-                            }
-                            <div class="info-item">
-                                <span class="info-label">Network</span>
-                                <span class="info-value network-badge" [attr.data-network]="status.network">{{ status.network }}</span>
+                                @if (status.address && status.address !== 'local') {
+                                    <div class="info-item">
+                                        <span class="info-label">Address</span>
+                                        <code class="info-code">{{ status.address }}</code>
+                                    </div>
+                                }
+                                <div class="info-item">
+                                    <span class="info-label">Network</span>
+                                    <span class="info-value network-badge" [attr.data-network]="status.network">{{ status.network }}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Server Balance</span>
+                                    <span class="info-value" [class.algo-balance--low]="status.balance < 1000000">
+                                        {{ status.balance / 1000000 | number:'1.2-4' }} ALGO
+                                    </span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Active Chats</span>
+                                    <span class="info-value">{{ status.activeConversations }}</span>
+                                </div>
                             </div>
-                            <div class="info-item">
-                                <span class="info-label">Server Balance</span>
-                                <span class="info-value" [class.algo-balance--low]="status.balance < 1000000">
-                                    {{ status.balance / 1000000 | number:'1.2-4' }} ALGO
-                                </span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Active Chats</span>
-                                <span class="info-value">{{ status.activeConversations }}</span>
-                            </div>
-                        </div>
-                    } @else {
-                        <p class="muted">AlgoChat not configured</p>
+                        } @else {
+                            <p class="muted">AlgoChat not configured</p>
+                        }
                     }
                 </div>
 
                 <!-- Connect Mobile — Multi-Contact PSK -->
                 <div class="settings__section">
-                    <h3>Connect Mobile</h3>
-                    <p class="connect-desc">
-                        Share your agent with friends. Each contact gets their own encrypted PSK channel.
-                    </p>
+                    <h3 class="section-toggle" (click)="toggleSection('mobile')">
+                        <span class="section-chevron">{{ collapsedSections().has('mobile') ? '\u25B6' : '\u25BC' }}</span>
+                        Connect Mobile
+                        @if (pskContacts().length > 0) {
+                            <span class="section-badge">{{ pskContacts().length }}</span>
+                        }
+                    </h3>
+                    @if (!collapsedSections().has('mobile')) {
+                        <p class="connect-desc">
+                            Share your agent with friends. Each contact gets their own encrypted PSK channel.
+                        </p>
 
-                    <!-- Contact list -->
-                    @if (pskContacts().length > 0) {
-                        <div class="contact-list">
-                            @for (contact of pskContacts(); track contact.id) {
-                                <div class="contact-card">
-                                    <div class="contact-header">
-                                        @if (editingContactId() === contact.id) {
-                                            <input
-                                                class="contact-nickname-input"
-                                                [value]="editingNickname()"
-                                                (input)="editingNickname.set(asInputValue($event))"
-                                                (keydown.enter)="saveNickname(contact.id)"
-                                                (keydown.escape)="cancelEditNickname()"
-                                            />
-                                            <button class="icon-btn" (click)="saveNickname(contact.id)" title="Save">&#10003;</button>
-                                            <button class="icon-btn" (click)="cancelEditNickname()" title="Cancel">&#10005;</button>
-                                        } @else {
-                                            <span class="contact-nickname" (dblclick)="startEditNickname(contact)">{{ contact.nickname }}</span>
-                                            <button class="icon-btn" (click)="startEditNickname(contact)" title="Rename">&#9998;</button>
-                                        }
-                                        <span class="contact-status" [class.contact-status--active]="contact.mobileAddress"
-                                              [class.contact-status--waiting]="!contact.mobileAddress">
-                                            {{ contact.mobileAddress ? 'Connected' : 'Waiting' }}
-                                        </span>
-                                    </div>
-                                    @if (contact.mobileAddress) {
-                                        <code class="contact-address">{{ contact.mobileAddress }}</code>
-                                    }
-                                    <div class="contact-actions">
-                                        <button class="save-btn save-btn--sm" (click)="toggleQR(contact)">
-                                            {{ expandedContactId() === contact.id ? 'Hide QR' : 'Show QR' }}
-                                        </button>
-                                        <button class="save-btn save-btn--sm" (click)="copyContactUri(contact)">Copy URI</button>
-                                        <button class="cancel-btn cancel-btn--sm" (click)="cancelContact(contact)">Delete</button>
-                                    </div>
-                                    @if (expandedContactId() === contact.id && contact.uri) {
-                                        <div class="qr-container">
-                                            <canvas class="qr-canvas"></canvas>
+                        <!-- Contact list -->
+                        @if (pskContacts().length > 0) {
+                            <div class="contact-list">
+                                @for (contact of pskContacts(); track contact.id) {
+                                    <div class="contact-card">
+                                        <div class="contact-header">
+                                            @if (editingContactId() === contact.id) {
+                                                <input
+                                                    class="contact-nickname-input"
+                                                    [value]="editingNickname()"
+                                                    (input)="editingNickname.set(asInputValue($event))"
+                                                    (keydown.enter)="saveNickname(contact.id)"
+                                                    (keydown.escape)="cancelEditNickname()"
+                                                />
+                                                <button class="icon-btn" (click)="saveNickname(contact.id)" title="Save">&#10003;</button>
+                                                <button class="icon-btn" (click)="cancelEditNickname()" title="Cancel">&#10005;</button>
+                                            } @else {
+                                                <span class="contact-nickname" (dblclick)="startEditNickname(contact)">{{ contact.nickname }}</span>
+                                                <button class="icon-btn" (click)="startEditNickname(contact)" title="Rename">&#9998;</button>
+                                            }
+                                            <span class="contact-status" [class.contact-status--active]="contact.mobileAddress"
+                                                  [class.contact-status--waiting]="!contact.mobileAddress">
+                                                {{ contact.mobileAddress ? 'Connected' : 'Waiting' }}
+                                            </span>
                                         </div>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    } @else {
-                        <p class="muted">No contacts yet. Add one to get started.</p>
-                    }
-
-                    <!-- Add contact -->
-                    <div class="add-contact">
-                        @if (addingContact()) {
-                            <div class="add-contact-form">
-                                <input
-                                    class="contact-nickname-input"
-                                    placeholder="Nickname (e.g. Alice)"
-                                    [value]="newContactNickname()"
-                                    (input)="newContactNickname.set(asInputValue($event))"
-                                    (keydown.enter)="createContact()"
-                                    (keydown.escape)="addingContact.set(false)"
-                                />
-                                <button class="save-btn save-btn--sm" [disabled]="creatingContact()" (click)="createContact()">
-                                    {{ creatingContact() ? 'Creating...' : 'Create' }}
-                                </button>
-                                <button class="icon-btn" (click)="addingContact.set(false)">&#10005;</button>
+                                        @if (contact.mobileAddress) {
+                                            <code class="contact-address">{{ contact.mobileAddress }}</code>
+                                        }
+                                        <div class="contact-actions">
+                                            <button class="save-btn save-btn--sm" (click)="toggleQR(contact)">
+                                                {{ expandedContactId() === contact.id ? 'Hide QR' : 'Show QR' }}
+                                            </button>
+                                            <button class="save-btn save-btn--sm" (click)="copyContactUri(contact)">Copy URI</button>
+                                            <button class="cancel-btn cancel-btn--sm" (click)="cancelContact(contact)">Delete</button>
+                                        </div>
+                                        @if (expandedContactId() === contact.id && contact.uri) {
+                                            <div class="qr-container">
+                                                <canvas class="qr-canvas"></canvas>
+                                            </div>
+                                        }
+                                    </div>
+                                }
                             </div>
                         } @else {
-                            <button class="save-btn" (click)="addingContact.set(true)">+ Add Contact</button>
+                            <p class="muted">No contacts yet. Add one to get started.</p>
                         }
-                    </div>
+
+                        <!-- Add contact -->
+                        <div class="add-contact">
+                            @if (addingContact()) {
+                                <div class="add-contact-form">
+                                    <input
+                                        class="contact-nickname-input"
+                                        placeholder="Nickname (e.g. Alice)"
+                                        [value]="newContactNickname()"
+                                        (input)="newContactNickname.set(asInputValue($event))"
+                                        (keydown.enter)="createContact()"
+                                        (keydown.escape)="addingContact.set(false)"
+                                    />
+                                    <button class="save-btn save-btn--sm" [disabled]="creatingContact()" (click)="createContact()">
+                                        {{ creatingContact() ? 'Creating...' : 'Create' }}
+                                    </button>
+                                    <button class="icon-btn" (click)="addingContact.set(false)">&#10005;</button>
+                                </div>
+                            } @else {
+                                <button class="save-btn" (click)="addingContact.set(true)">+ Add Contact</button>
+                            }
+                        </div>
+                    }
                 </div>
 
                 <!-- Operational Mode -->
                 <div class="settings__section">
-                    <h3>Operational Mode</h3>
-                    <div class="mode-selector">
-                        @for (mode of modes; track mode) {
-                            <button
-                                class="mode-btn"
-                                [class.mode-btn--active]="operationalMode() === mode"
-                                (click)="setMode(mode)"
-                            >{{ mode }}</button>
-                        }
-                    </div>
-                    <p class="mode-desc">
-                        @switch (operationalMode()) {
-                            @case ('normal') { Agents execute tools immediately without approval. }
-                            @case ('queued') { Tool calls are queued for manual approval before execution. }
-                            @case ('paused') { All sessions are paused. No tool execution. }
-                        }
-                    </p>
+                    <h3 class="section-toggle" (click)="toggleSection('mode')">
+                        <span class="section-chevron">{{ collapsedSections().has('mode') ? '\u25B6' : '\u25BC' }}</span>
+                        Operational Mode
+                        <span class="section-badge section-badge--mode" [attr.data-mode]="operationalMode()">{{ operationalMode() }}</span>
+                    </h3>
+                    @if (!collapsedSections().has('mode')) {
+                        <div class="mode-selector">
+                            @for (mode of modes; track mode) {
+                                <button
+                                    class="mode-btn"
+                                    [class.mode-btn--active]="operationalMode() === mode"
+                                    (click)="setMode(mode)"
+                                >{{ mode }}</button>
+                            }
+                        </div>
+                        <p class="mode-desc">
+                            @switch (operationalMode()) {
+                                @case ('normal') { Agents execute tools immediately without approval. }
+                                @case ('queued') { Tool calls are queued for manual approval before execution. }
+                                @case ('paused') { All sessions are paused. No tool execution. }
+                            }
+                        </p>
+                    }
                 </div>
 
                 <!-- Credit Configuration -->
                 <div class="settings__section">
-                    <h3>Credit Configuration</h3>
-                    <div class="credit-grid">
-                        @for (field of creditFields; track field.key) {
-                            <div class="credit-field">
-                                <label class="credit-label" [for]="'credit_' + field.key">{{ field.label }}</label>
-                                <input
-                                    class="credit-input"
-                                    type="number"
-                                    [id]="'credit_' + field.key"
-                                    [ngModel]="getCreditValue(field.key)"
-                                    (ngModelChange)="setCreditValue(field.key, $event)"
-                                />
-                                <span class="credit-desc">{{ field.description }}</span>
-                            </div>
+                    <h3 class="section-toggle" (click)="toggleSection('credits')">
+                        <span class="section-chevron">{{ collapsedSections().has('credits') ? '\u25B6' : '\u25BC' }}</span>
+                        Credit Configuration
+                        @if (isDirty()) {
+                            <span class="dirty-badge">Unsaved changes</span>
                         }
-                    </div>
-                    <button
-                        class="save-btn"
-                        [disabled]="saving()"
-                        (click)="saveCreditConfig()"
-                    >{{ saving() ? 'Saving...' : 'Save Credit Config' }}</button>
+                    </h3>
+                    @if (!collapsedSections().has('credits')) {
+                        <div class="credit-grid">
+                            @for (field of creditFields; track field.key) {
+                                <div class="credit-field">
+                                    <label class="credit-label" [for]="'credit_' + field.key">{{ field.label }}</label>
+                                    <input
+                                        class="credit-input"
+                                        [class.credit-input--dirty]="isCreditDirty(field.key)"
+                                        type="number"
+                                        [id]="'credit_' + field.key"
+                                        [ngModel]="getCreditValue(field.key)"
+                                        (ngModelChange)="setCreditValue(field.key, $event)"
+                                    />
+                                    <span class="credit-desc">{{ field.description }}</span>
+                                </div>
+                            }
+                        </div>
+                        <div class="credit-actions">
+                            <button
+                                class="save-btn"
+                                [disabled]="saving() || !isDirty()"
+                                (click)="saveCreditConfig()"
+                            >{{ saving() ? 'Saving...' : 'Save Credit Config' }}</button>
+                            @if (isDirty()) {
+                                <button class="cancel-btn cancel-btn--sm" (click)="resetCreditChanges()">Discard Changes</button>
+                            }
+                        </div>
+                    }
                 </div>
 
                 <!-- Database Backup -->
                 <div class="settings__section">
-                    <h3>Database</h3>
-                    <button
-                        class="backup-btn"
-                        [disabled]="backingUp()"
-                        (click)="runBackup()"
-                    >{{ backingUp() ? 'Backing up...' : 'Create Backup' }}</button>
-                    @if (backupResult()) {
-                        <p class="backup-result">{{ backupResult() }}</p>
+                    <h3 class="section-toggle" (click)="toggleSection('database')">
+                        <span class="section-chevron">{{ collapsedSections().has('database') ? '\u25B6' : '\u25BC' }}</span>
+                        Database
+                    </h3>
+                    @if (!collapsedSections().has('database')) {
+                        <button
+                            class="backup-btn"
+                            [disabled]="backingUp()"
+                            (click)="runBackup()"
+                        >{{ backingUp() ? 'Backing up...' : 'Create Backup' }}</button>
+                        @if (backupResult()) {
+                            <p class="backup-result">{{ backupResult() }}</p>
+                        }
                     }
                 </div>
             }
@@ -245,6 +320,41 @@ interface PSKContact {
         .settings h2 { margin: 0 0 1.5rem; color: var(--text-primary); }
         .settings h3 { margin: 0 0 0.75rem; color: var(--text-primary); font-size: 0.85rem; }
         .loading, .muted { color: var(--text-secondary); font-size: 0.8rem; }
+
+        /* Collapsible sections */
+        .section-toggle {
+            cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
+            user-select: none; transition: color 0.15s;
+        }
+        .section-toggle:hover { color: var(--accent-cyan); }
+        .section-chevron { font-size: 0.55rem; color: var(--text-tertiary); width: 0.75rem; }
+        .section-badge {
+            font-size: 0.55rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-sm);
+            background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .section-badge--mode[data-mode="normal"] { color: var(--accent-green); border-color: var(--accent-green); background: var(--accent-green-dim); }
+        .section-badge--mode[data-mode="queued"] { color: var(--accent-amber); border-color: var(--accent-amber); background: var(--accent-amber-dim); }
+        .section-badge--mode[data-mode="paused"] { color: var(--accent-red); border-color: var(--accent-red); background: var(--accent-red-dim); }
+        .dirty-badge {
+            font-size: 0.55rem; font-weight: 600; padding: 1px 6px; border-radius: var(--radius-sm);
+            background: var(--accent-amber-dim); color: var(--accent-amber); border: 1px solid var(--accent-amber);
+            margin-left: auto;
+        }
+
+        /* Health grid */
+        .health-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+        .health-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.5rem; background: var(--bg-raised); border-radius: var(--radius); }
+        .health-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .health-dot[data-status="ok"] { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+        .health-dot[data-status="warn"] { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber); }
+        .health-dot[data-status="off"] { background: var(--text-tertiary); }
+        .health-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); min-width: 120px; }
+        .health-status { font-size: 0.7rem; color: var(--text-secondary); }
+
+        /* Credit dirty input */
+        .credit-input--dirty { border-color: var(--accent-amber) !important; }
+        .credit-actions { display: flex; gap: 0.5rem; align-items: center; }
 
         .settings__section {
             background: var(--bg-surface);
@@ -522,8 +632,13 @@ export class SettingsComponent implements OnInit {
     readonly editingContactId = signal<string | null>(null);
     readonly editingNickname = signal('');
 
+    // Collapsible sections
+    readonly collapsedSections = signal<Set<string>>(new Set());
+
     // Mutable copy for credit config editing
     private creditValues: Record<string, string> = {};
+    readonly dirtyKeys = signal<Set<string>>(new Set());
+    readonly isDirty = computed(() => this.dirtyKeys().size > 0);
 
     readonly modes = ['normal', 'queued', 'paused'];
 
@@ -545,12 +660,37 @@ export class SettingsComponent implements OnInit {
         return (event.target as HTMLInputElement).value;
     }
 
+    toggleSection(section: string): void {
+        this.collapsedSections.update((set) => {
+            const next = new Set(set);
+            if (next.has(section)) next.delete(section);
+            else next.add(section);
+            return next;
+        });
+    }
+
     getCreditValue(key: string): string {
         return this.creditValues[key] ?? this.settings()?.creditConfig?.[key] ?? '';
     }
 
     setCreditValue(key: string, value: string): void {
         this.creditValues[key] = value;
+        const original = this.settings()?.creditConfig?.[key] ?? '';
+        this.dirtyKeys.update((set) => {
+            const next = new Set(set);
+            if (value === original) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    }
+
+    isCreditDirty(key: string): boolean {
+        return this.dirtyKeys().has(key);
+    }
+
+    resetCreditChanges(): void {
+        this.creditValues = {};
+        this.dirtyKeys.set(new Set());
     }
 
     async setMode(mode: string): Promise<void> {
@@ -564,15 +704,13 @@ export class SettingsComponent implements OnInit {
     }
 
     async saveCreditConfig(): Promise<void> {
-        if (Object.keys(this.creditValues).length === 0) {
-            this.notifications.error('No changes to save');
-            return;
-        }
+        if (!this.isDirty()) return;
         this.saving.set(true);
         try {
             await firstValueFrom(this.api.put<{ ok: boolean }>('/settings/credits', this.creditValues));
             this.notifications.success('Credit configuration saved');
             this.creditValues = {};
+            this.dirtyKeys.set(new Set());
         } catch {
             this.notifications.error('Failed to save credit configuration');
         } finally {

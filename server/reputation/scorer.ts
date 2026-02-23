@@ -230,6 +230,59 @@ export class ReputationScorer {
     }
 
     /**
+     * Compute scores for all agents that are stale or missing.
+     * Staleness threshold: 5 minutes.
+     */
+    computeAllIfStale(): ReputationScore[] {
+        const STALE_MINUTES = 5;
+        const now = Date.now();
+        const threshold = STALE_MINUTES * 60 * 1000;
+
+        // Batch-fetch all agents and their cached computed_at timestamps in two queries
+        const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
+        const cachedRows = this.db.query(
+            'SELECT agent_id, computed_at FROM agent_reputation',
+        ).all() as { agent_id: string; computed_at: string }[];
+
+        const computedAtMap = new Map<string, string>();
+        for (const row of cachedRows) {
+            computedAtMap.set(row.agent_id, row.computed_at);
+        }
+
+        const results: ReputationScore[] = [];
+
+        for (const agent of agents) {
+            const cachedTime = computedAtMap.get(agent.id);
+            let isStale = true;
+            if (cachedTime) {
+                const computedAt = new Date(cachedTime).getTime();
+                // Treat invalid/NaN dates as stale
+                isStale = !Number.isFinite(computedAt) || (now - computedAt) > threshold;
+            }
+
+            if (isStale) {
+                results.push(this.computeScore(agent.id));
+            } else {
+                results.push(this.getCachedScore(agent.id)!);
+            }
+        }
+
+        // Sort by score descending
+        results.sort((a, b) => b.overallScore - a.overallScore);
+        return results;
+    }
+
+    /**
+     * Force-recompute scores for all agents.
+     */
+    computeAll(): ReputationScore[] {
+        const agents = this.db.query('SELECT id FROM agents').all() as { id: string }[];
+        const results = agents.map((a) => this.computeScore(a.id));
+        results.sort((a, b) => b.overallScore - a.overallScore);
+        return results;
+    }
+
+    /**
      * Get reputation scores for all agents.
      */
     getAllScores(): ReputationScore[] {

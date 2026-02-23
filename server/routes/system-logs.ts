@@ -12,7 +12,9 @@ export function handleSystemLogRoutes(req: Request, url: URL, db: Database): Res
         const limit = safeNumParam(url.searchParams.get('limit'), 100);
         const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const type = url.searchParams.get('type') ?? 'all';
-        return handleLogs(db, limit, offset, type);
+        const level = url.searchParams.get('level') ?? undefined;
+        const search = url.searchParams.get('search') ?? undefined;
+        return handleLogs(db, limit, offset, type, level, search);
     }
 
     // GET /api/system-logs/credit-transactions — credit ledger
@@ -34,7 +36,7 @@ interface LogEntry {
     timestamp: string;
 }
 
-function handleLogs(db: Database, limit: number, offset: number, type: string): Response {
+function handleLogs(db: Database, limit: number, offset: number, type: string, level?: string, search?: string): Response {
     const clampedLimit = Math.min(Math.max(limit, 1), 500);
     const logs: LogEntry[] = [];
 
@@ -122,10 +124,24 @@ function handleLogs(db: Database, limit: number, offset: number, type: string): 
     // Sort all logs by timestamp descending
     logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    // Apply limit after merging
-    const paged = logs.slice(0, clampedLimit);
+    // Apply level and search filters
+    let filtered = logs;
+    if (level && level !== 'all') {
+        filtered = filtered.filter((log) => log.level === level);
+    }
+    if (search) {
+        const lowerSearch = search.toLowerCase();
+        filtered = filtered.filter(
+            (log) =>
+                log.message.toLowerCase().includes(lowerSearch) ||
+                (log.detail && log.detail.toLowerCase().includes(lowerSearch)),
+        );
+    }
 
-    return json({ logs: paged, total: logs.length });
+    // Apply limit after merging
+    const paged = filtered.slice(0, clampedLimit);
+
+    return json({ logs: paged, total: filtered.length });
 }
 
 function handleCreditTransactions(db: Database, limit: number, offset: number): Response {
