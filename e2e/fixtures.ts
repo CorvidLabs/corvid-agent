@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -116,7 +117,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: `E2E Test Bundle ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        name: `E2E Test Bundle ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         description: 'Bundle for e2e testing',
                         tools: ['Read', 'Write'],
                         promptAdditions: 'Test prompt addition',
@@ -228,7 +229,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        name: `E2E Schedule ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        name: `E2E Schedule ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         intervalMs: 3600000,
                         actions: [{ type: 'review_prs', repos: ['test/repo'] }],
                         approvalPolicy: 'auto',
@@ -248,7 +249,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        name: `E2E Workflow ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        name: `E2E Workflow ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         nodes: [
                             { id: 'start', type: 'start', label: 'Start' },
                             { id: 'agent', type: 'agent_session', label: 'Agent Session', config: { prompt: 'test' } },
@@ -289,7 +290,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     body: JSON.stringify({
                         agentId,
                         repo: `e2e-org/repo-${Date.now()}`,
-                        mentionUsername: `e2e-bot-${Math.random().toString(36).slice(2, 6)}`,
+                        mentionUsername: `e2e-bot-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         events: ['issue_comment', 'pull_request_review_comment'],
                         projectId,
                         ...data,
@@ -309,7 +310,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     body: JSON.stringify({
                         agentId,
                         repo: `e2e-org/poll-${Date.now()}`,
-                        mentionUsername: `e2e-poll-${Math.random().toString(36).slice(2, 6)}`,
+                        mentionUsername: `e2e-poll-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         intervalSeconds: 300,
                         eventFilter: ['issue_comment', 'pull_request_review_comment'],
                         ...data,
@@ -329,7 +330,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     body: JSON.stringify({
                         projectId,
                         agentId,
-                        name: `E2E Session ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        name: `E2E Session ${Date.now()}-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         ...data,
                     }),
                 });
