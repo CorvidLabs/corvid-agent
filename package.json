@@ -48,7 +48,7 @@
     "algosdk": "^3.5.2",
     "croner": "^10.0.1",
     "tree-sitter-wasms": "^0.1.12",
-    "web-tree-sitter": "^0.25.3",
+    "web-tree-sitter": "^0.26.5",
     "zod": "^4.3.6"
   },
   "patchedDependencies": {
