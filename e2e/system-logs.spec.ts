@@ -78,10 +78,6 @@ test.describe('System Logs', () => {
     test('log type and level filters', async ({ page }) => {
         await gotoWithRetry(page, '/logs');
 
-        // Type filter chips (all, council, escalation, work-task)
-        const typeChips = page.locator('.filter-chip').filter({ hasNot: page.locator('.filter-chip--level') });
-        const levelChips = page.locator('.filter-chip--level');
-
         // At least some filter chips should exist
         const totalChips = page.locator('.filter-chip');
         expect(await totalChips.count()).toBeGreaterThanOrEqual(4);
