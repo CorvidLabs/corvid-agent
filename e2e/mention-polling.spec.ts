@@ -93,6 +93,7 @@ test.describe('Mention Polling', () => {
 
     test('API CRUD', async ({ api }) => {
         const agent = await api.seedAgent('MP CRUD Agent');
+        const project = await api.seedProject('MP CRUD Project');
 
         // Create
         const createRes = await fetch(`${BASE_URL}/api/mention-polling`, {
@@ -100,6 +101,7 @@ test.describe('Mention Polling', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 agentId: agent.id,
+                projectId: project.id,
                 repo: `crud-org/poll-${Date.now()}`,
                 mentionUsername: 'crud-poller',
                 intervalSeconds: 120,

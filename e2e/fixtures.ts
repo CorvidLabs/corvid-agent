@@ -304,11 +304,25 @@ export const test = base.extend<{ api: ApiHelpers }>({
             },
 
             async seedMentionPolling(agentId: string, data: Record<string, unknown> = {}) {
+                // Mention polling requires a projectId
+                let projectId = data.projectId as string | undefined;
+                if (!projectId) {
+                    const projRes = await fetchWithRetry(`${BASE_URL}/api/projects`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: `MP Project ${Date.now()}`, workingDir: '/tmp' }),
+                    });
+                    if (projRes.ok) {
+                        const proj = await projRes.json();
+                        projectId = proj.id;
+                    }
+                }
                 const res = await fetchWithRetry(`${BASE_URL}/api/mention-polling`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
+                        projectId,
                         repo: `e2e-org/poll-${Date.now()}`,
                         mentionUsername: `e2e-poll-${randomBytes(3).toString('hex').slice(0, 4)}`,
                         intervalSeconds: 300,
