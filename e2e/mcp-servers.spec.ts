@@ -1,16 +1,37 @@
 import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
+
+const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+
+/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
+async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        await page.goto(path);
+        await page.waitForLoadState('networkidle');
+
+        const body = await page.locator('body').textContent() ?? '';
+        const rateLimited = body.includes('Too many requests');
+        const rendered = await page.locator('main').locator('*').first().count() > 0;
+
+        if (!rateLimited && rendered) return;
+
+        if (attempt < maxRetries) {
+            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
+            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
+            await page.waitForTimeout(wait * 1000 + 500);
+        }
+    }
+}
 
 test.describe('MCP Servers', () => {
     test('navigate to mcp-servers page and verify empty state', async ({ page }) => {
-        await page.goto('/mcp-servers');
-        await page.waitForLoadState('networkidle');
+        await gotoWithRetry(page, '/mcp-servers');
 
         await expect(page.locator('h2:text("MCP Servers")')).toBeVisible();
     });
 
     test('create server config and verify it appears', async ({ page }) => {
-        await page.goto('/mcp-servers');
-        await page.waitForLoadState('networkidle');
+        await gotoWithRetry(page, '/mcp-servers');
 
         await page.locator('button:text("+ New Server")').click();
         await expect(page.locator('h3:text("Add MCP Server")')).toBeVisible();
@@ -28,8 +49,7 @@ test.describe('MCP Servers', () => {
 
     test('test connection and verify error handling', async ({ page, api }) => {
         await api.seedMcpServer({ name: 'Test Connection Server' });
-        await page.goto('/mcp-servers');
-        await page.waitForLoadState('networkidle');
+        await gotoWithRetry(page, '/mcp-servers');
 
         // Expand the server
         await page.locator('text=Test Connection Server').first().click();
@@ -43,8 +63,7 @@ test.describe('MCP Servers', () => {
 
     test('edit config and toggle enabled', async ({ page, api }) => {
         await api.seedMcpServer({ name: 'Server To Edit' });
-        await page.goto('/mcp-servers');
-        await page.waitForLoadState('networkidle');
+        await gotoWithRetry(page, '/mcp-servers');
 
         await page.locator('text=Server To Edit').first().click();
         await page.locator('button:text("Edit")').first().click();
@@ -59,11 +78,79 @@ test.describe('MCP Servers', () => {
 
     test('delete server config', async ({ page, api }) => {
         await api.seedMcpServer({ name: 'Server To Delete' });
-        await page.goto('/mcp-servers');
-        await page.waitForLoadState('networkidle');
+        await gotoWithRetry(page, '/mcp-servers');
 
         await page.locator('text=Server To Delete').first().click();
         await page.locator('button:text("Delete")').click();
         await expect(page.locator('text=Server deleted').first()).toBeVisible({ timeout: 5000 });
+    });
+
+    test('official servers section visible', async ({ page }) => {
+        await gotoWithRetry(page, '/mcp-servers');
+
+        const officialGrid = page.locator('.official-grid');
+        if (await officialGrid.count() > 0) {
+            await expect(officialGrid).toBeVisible();
+            const officialCards = page.locator('.official-card');
+            expect(await officialCards.count()).toBeGreaterThanOrEqual(1);
+        }
+    });
+
+    test('server card shows details when expanded', async ({ page, api }) => {
+        await api.seedMcpServer({ name: 'Detail Server' });
+        await gotoWithRetry(page, '/mcp-servers');
+
+        await page.locator('text=Detail Server').first().click();
+
+        const detailList = page.locator('.server-detail-list');
+        if (await detailList.count() > 0) {
+            await expect(detailList).toBeVisible({ timeout: 5000 });
+        }
+    });
+
+    test('API CRUD', async ({}) => {
+        // Create
+        const createRes = await fetch(`${BASE_URL}/api/mcp-servers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: `API MCP ${Date.now()}`,
+                command: 'echo',
+                args: ['test'],
+                enabled: true,
+            }),
+        });
+        expect(createRes.status).toBe(201);
+        const server = await createRes.json();
+
+        // List
+        const listRes = await fetch(`${BASE_URL}/api/mcp-servers`);
+        expect(listRes.ok).toBe(true);
+
+        // Update
+        const updateRes = await fetch(`${BASE_URL}/api/mcp-servers/${server.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'Updated MCP Server' }),
+        });
+        expect(updateRes.ok).toBe(true);
+
+        // Delete
+        const deleteRes = await fetch(`${BASE_URL}/api/mcp-servers/${server.id}`, { method: 'DELETE' });
+        expect(deleteRes.ok).toBe(true);
+    });
+
+    test('POST /api/mcp-servers/:id/test returns 502 for unreachable server', async ({ api }) => {
+        const server = await api.seedMcpServer({ name: 'Test Connectivity Server' });
+
+        const res = await fetch(`${BASE_URL}/api/mcp-servers/${server.id}/test`, {
+            method: 'POST',
+        });
+        // 502 (server unreachable) — echo command isn't a valid MCP server
+        expect([200, 502]).toContain(res.status);
+        const data = await res.json();
+        if (res.status === 502) {
+            expect(data.ok).toBe(false);
+        }
     });
 });

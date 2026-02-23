@@ -15,7 +15,7 @@ async function gotoDashboard(page: Page, maxRetries = 3): Promise<void> {
 
         if (attempt < maxRetries) {
             const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.max(Number(match?.[1] ?? 5), 3);
+            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
             await page.waitForTimeout(wait * 1000 + 500);
         }
     }
@@ -28,7 +28,8 @@ test.describe('Dashboard', () => {
 
         await gotoDashboard(page);
 
-        // Should have at least 3 metric cards
+        // Should have at least 3 metric cards (wait for Angular to fetch and render data)
+        await expect(page.locator('.metric-card').first()).toBeVisible({ timeout: 10000 });
         const cards = page.locator('.metric-card');
         expect(await cards.count()).toBeGreaterThanOrEqual(3);
     });
@@ -95,5 +96,108 @@ test.describe('Dashboard', () => {
                 || classes?.includes('network-badge--mainnet');
             expect(hasNetworkClass).toBe(true);
         }
+    });
+
+    test('agent activity grid renders with agent cards', async ({ page, api }) => {
+        await api.seedAgent('Grid Agent Alpha');
+        await api.seedAgent('Grid Agent Beta');
+
+        await gotoDashboard(page);
+
+        const grid = page.locator('.agent-grid');
+        await expect(grid).toBeVisible({ timeout: 10000 });
+
+        const cards = grid.locator('.agent-card');
+        expect(await cards.count()).toBeGreaterThanOrEqual(2);
+
+        // Each card should have name and model
+        const firstCard = cards.first();
+        await expect(firstCard.locator('.agent-card__name')).toBeVisible();
+        await expect(firstCard.locator('.agent-card__model')).toBeVisible();
+    });
+
+    test('agent card shows status badge with data-status', async ({ page, api }) => {
+        await api.seedAgent('Status Badge Agent');
+
+        await gotoDashboard(page);
+
+        const card = page.locator('.agent-card').first();
+        await expect(card).toBeVisible({ timeout: 10000 });
+
+        const status = card.locator('.agent-card__status');
+        await expect(status).toBeVisible();
+        const dataStatus = await status.getAttribute('data-status');
+        expect(['busy', 'idle']).toContain(dataStatus);
+    });
+
+    test('agent card action buttons visible', async ({ page, api }) => {
+        await api.seedAgent('Action Btn Agent');
+
+        await gotoDashboard(page);
+
+        const card = page.locator('.agent-card').first();
+        await expect(card).toBeVisible({ timeout: 10000 });
+
+        const actions = card.locator('.agent-card__actions');
+        await expect(actions).toBeVisible();
+
+        const buttons = actions.locator('.agent-card__btn');
+        expect(await buttons.count()).toBeGreaterThanOrEqual(1);
+    });
+
+    test('recent activity feed renders', async ({ page, api }) => {
+        const project = await api.seedProject('Feed Project');
+        const agent = await api.seedAgent('Feed Agent');
+        // Create a session to generate activity
+        await api.seedSession(project.id, agent.id);
+
+        await gotoDashboard(page);
+
+        // Activity feed section should exist
+        const feedSection = page.locator('.section--feed');
+        await expect(feedSection).toBeVisible({ timeout: 10000 });
+
+        // Either has activity items or shows empty state
+        const hasItems = await page.locator('.activity-item').count() > 0;
+        const hasEmpty = await page.locator('.empty').count() > 0;
+        expect(hasItems || hasEmpty).toBe(true);
+
+        if (hasItems) {
+            const item = page.locator('.activity-item').first();
+            await expect(item.locator('.activity-item__icon')).toBeVisible();
+            await expect(item.locator('.activity-item__label')).toBeVisible();
+            await expect(item.locator('.activity-item__time')).toBeVisible();
+        }
+    });
+
+    test('quick actions section with buttons', async ({ page, api }) => {
+        await api.seedAgent('Quick Action Agent');
+
+        await gotoDashboard(page);
+
+        const actionsSection = page.locator('.section--actions');
+        await expect(actionsSection).toBeVisible({ timeout: 10000 });
+
+        const actionBtns = actionsSection.locator('.action-btn');
+        expect(await actionBtns.count()).toBeGreaterThanOrEqual(3);
+    });
+
+    test('system status section shows indicators', async ({ page }) => {
+        await gotoDashboard(page);
+
+        const statusSection = page.locator('.section--status');
+        await expect(statusSection).toBeVisible({ timeout: 10000 });
+
+        const statusRows = statusSection.locator('.status-row');
+        expect(await statusRows.count()).toBeGreaterThanOrEqual(2);
+
+        // Each row should have label, indicator, and value
+        const firstRow = statusRows.first();
+        await expect(firstRow.locator('.status-row__label')).toBeVisible();
+        await expect(firstRow.locator('.status-row__indicator')).toBeVisible();
+
+        // Indicator should have data-ok attribute
+        const dataOk = await firstRow.locator('.status-row__indicator').getAttribute('data-ok');
+        expect(['true', 'false']).toContain(dataOk);
     });
 });

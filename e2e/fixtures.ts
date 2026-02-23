@@ -1,6 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
 interface ApiHelpers {
     seedProject(name?: string): Promise<{ id: string; name: string }>;
@@ -11,6 +11,13 @@ interface ApiHelpers {
     seedMarketplaceListing(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
     seedMcpServer(data?: Record<string, unknown>): Promise<{ id: string; name: string }>;
     seedReputationEvent(agentId: string, eventType?: string, scoreImpact?: number): Promise<{ ok: boolean }>;
+    seedWorkTask(agentId: string, description?: string, projectId?: string): Promise<{ id: string; status: string }>;
+    seedSchedule(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; name: string; status: string }>;
+    seedWorkflow(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; name: string; status: string; nodes: unknown[]; edges: unknown[] }>;
+    seedWebhook(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; repo: string; status: string; mentionUsername: string }>;
+    seedMentionPolling(agentId: string, data?: Record<string, unknown>): Promise<{ id: string; repo: string; status: string; mentionUsername: string }>;
+    seedSession(projectId: string, agentId?: string, data?: Record<string, unknown>): Promise<{ id: string; name: string; status: string }>;
+    getSettings(): Promise<{ creditConfig: Record<string, string>; system: { schemaVersion: number; agentCount: number } }>;
     computeScore(agentId: string): Promise<Record<string, unknown>>;
     computeAllScores(): Promise<Record<string, unknown>>;
     getHealth(): Promise<{ status: string; algochat: boolean }>;
@@ -109,7 +116,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: 'E2E Test Bundle',
+                        name: `E2E Test Bundle ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                         description: 'Bundle for e2e testing',
                         tools: ['Read', 'Write'],
                         promptAdditions: 'Test prompt addition',
@@ -185,6 +192,161 @@ export const test = base.extend<{ api: ApiHelpers }>({
                 if (!res.ok) {
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedReputationEvent failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedWorkTask(agentId: string, description = 'E2E work task', projectId?: string) {
+                // Work tasks require a projectId; create one if not provided
+                let pid = projectId;
+                if (!pid) {
+                    const projRes = await fetchWithRetry(`${BASE_URL}/api/projects`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: `WT Project ${Date.now()}`, workingDir: '/tmp' }),
+                    });
+                    if (projRes.ok) {
+                        const proj = await projRes.json();
+                        pid = proj.id;
+                    }
+                }
+                const res = await fetchWithRetry(`${BASE_URL}/api/work-tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agentId, description, projectId: pid }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedWorkTask failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedSchedule(agentId: string, data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId,
+                        name: `E2E Schedule ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        intervalMs: 3600000,
+                        actions: [{ type: 'review_prs', repos: ['test/repo'] }],
+                        approvalPolicy: 'auto',
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedSchedule failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedWorkflow(agentId: string, data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/workflows`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId,
+                        name: `E2E Workflow ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        nodes: [
+                            { id: 'start', type: 'start', label: 'Start' },
+                            { id: 'agent', type: 'agent_session', label: 'Agent Session', config: { prompt: 'test' } },
+                            { id: 'end', type: 'end', label: 'End' },
+                        ],
+                        edges: [
+                            { id: 'e1', sourceNodeId: 'start', targetNodeId: 'agent' },
+                            { id: 'e2', sourceNodeId: 'agent', targetNodeId: 'end' },
+                        ],
+                        maxConcurrency: 1,
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedWorkflow failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedWebhook(agentId: string, data: Record<string, unknown> = {}) {
+                // Webhook registrations require a projectId
+                let projectId = data.projectId as string | undefined;
+                if (!projectId) {
+                    const projRes = await fetchWithRetry(`${BASE_URL}/api/projects`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: `WH Project ${Date.now()}`, workingDir: '/tmp' }),
+                    });
+                    if (projRes.ok) {
+                        const proj = await projRes.json();
+                        projectId = proj.id;
+                    }
+                }
+                const res = await fetchWithRetry(`${BASE_URL}/api/webhooks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId,
+                        repo: `e2e-org/repo-${Date.now()}`,
+                        mentionUsername: `e2e-bot-${Math.random().toString(36).slice(2, 6)}`,
+                        events: ['issue_comment', 'pull_request_review_comment'],
+                        projectId,
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedWebhook failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedMentionPolling(agentId: string, data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/mention-polling`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId,
+                        repo: `e2e-org/poll-${Date.now()}`,
+                        mentionUsername: `e2e-poll-${Math.random().toString(36).slice(2, 6)}`,
+                        intervalSeconds: 300,
+                        eventFilter: ['issue_comment', 'pull_request_review_comment'],
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedMentionPolling failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async seedSession(projectId: string, agentId?: string, data: Record<string, unknown> = {}) {
+                const res = await fetchWithRetry(`${BASE_URL}/api/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        projectId,
+                        agentId,
+                        name: `E2E Session ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                        ...data,
+                    }),
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`seedSession failed: ${res.status} ${res.statusText} — ${body}`);
+                }
+                return res.json();
+            },
+
+            async getSettings() {
+                const res = await fetchWithRetry(`${BASE_URL}/api/settings`, {
+                    method: 'GET',
+                });
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    throw new Error(`getSettings failed: ${res.status} ${res.statusText} — ${body}`);
                 }
                 return res.json();
             },
