@@ -1,36 +1,15 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Mention Polling', () => {
     test('page loads with heading', async ({ page }) => {
-        await gotoWithRetry(page, '/mention-polling');
+        await gotoWithRetry(page, '/mention-polling', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator('h2')).toContainText('GitHub Mention Polling');
     });
 
     test('stats banner shows service stats', async ({ page }) => {
-        await gotoWithRetry(page, '/mention-polling');
+        await gotoWithRetry(page, '/mention-polling', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const banner = page.locator('.stats-banner');
         await expect(banner).toBeVisible({ timeout: 10000 });
@@ -43,7 +22,7 @@ test.describe('Mention Polling', () => {
         const agent = await api.seedAgent('MP List Agent');
         const config = await api.seedMentionPolling(agent.id);
 
-        await gotoWithRetry(page, '/mention-polling');
+        await gotoWithRetry(page, '/mention-polling', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator(`text=${config.repo}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -51,7 +30,7 @@ test.describe('Mention Polling', () => {
         const agent = await api.seedAgent('MP Status Agent');
         await api.seedMentionPolling(agent.id);
 
-        await gotoWithRetry(page, '/mention-polling');
+        await gotoWithRetry(page, '/mention-polling', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const card = page.locator('.config-card').first();
         await expect(card).toBeVisible({ timeout: 10000 });
@@ -65,7 +44,7 @@ test.describe('Mention Polling', () => {
         const agent = await api.seedAgent('MP Filter Agent');
         await api.seedMentionPolling(agent.id);
 
-        await gotoWithRetry(page, '/mention-polling');
+        await gotoWithRetry(page, '/mention-polling', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const filterBtns = page.locator('.filter-btn');
         expect(await filterBtns.count()).toBeGreaterThanOrEqual(2);
@@ -79,7 +58,7 @@ test.describe('Mention Polling', () => {
 
     test('new config form toggle', async ({ page, api }) => {
         await api.seedAgent('MP Form Agent');
-        await gotoWithRetry(page, '/mention-polling');
+        await gotoWithRetry(page, '/mention-polling', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const newBtn = page.locator('button:text("New Config")');
         await expect(newBtn).toBeVisible({ timeout: 10000 });

@@ -1,31 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h1:text("Workflows")').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Workflows', () => {
     test('page loads with heading', async ({ page }) => {
-        await gotoWithRetry(page, '/workflows');
+        await gotoWithRetry(page, '/workflows', { isRendered: async (p) => (await p.locator('h1:text("Workflows")').count()) > 0 });
         await expect(page.locator('h1:text("Workflows")')).toBeVisible();
     });
 
@@ -33,7 +12,7 @@ test.describe('Workflows', () => {
         const agent = await api.seedAgent('Workflow Agent');
         const workflow = await api.seedWorkflow(agent.id);
 
-        await gotoWithRetry(page, '/workflows');
+        await gotoWithRetry(page, '/workflows', { isRendered: async (p) => (await p.locator('h1:text("Workflows")').count()) > 0 });
         await expect(page.locator(`text=${workflow.name}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -41,7 +20,7 @@ test.describe('Workflows', () => {
         const agent = await api.seedAgent('NodeChip Agent');
         const workflow = await api.seedWorkflow(agent.id);
 
-        await gotoWithRetry(page, '/workflows');
+        await gotoWithRetry(page, '/workflows', { isRendered: async (p) => (await p.locator('h1:text("Workflows")').count()) > 0 });
         await expect(page.locator(`text=${workflow.name}`).first()).toBeVisible({ timeout: 10000 });
 
         // Click to expand
@@ -65,7 +44,7 @@ test.describe('Workflows', () => {
         });
         expect(res.ok).toBe(true);
 
-        await gotoWithRetry(page, '/workflows');
+        await gotoWithRetry(page, '/workflows', { isRendered: async (p) => (await p.locator('h1:text("Workflows")').count()) > 0 });
         await expect(page.locator(`text=${newName}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -95,7 +74,7 @@ test.describe('Workflows', () => {
         const agent = await api.seedAgent('Delete Agent');
         const workflow = await api.seedWorkflow(agent.id);
 
-        await gotoWithRetry(page, '/workflows');
+        await gotoWithRetry(page, '/workflows', { isRendered: async (p) => (await p.locator('h1:text("Workflows")').count()) > 0 });
         await expect(page.locator(`text=${workflow.name}`).first()).toBeVisible({ timeout: 10000 });
 
         // Expand the card
@@ -186,7 +165,7 @@ test.describe('Workflows', () => {
         const agent = await api.seedAgent('StatusBadge Agent');
         await api.seedWorkflow(agent.id);
 
-        await gotoWithRetry(page, '/workflows');
+        await gotoWithRetry(page, '/workflows', { isRendered: async (p) => (await p.locator('h1:text("Workflows")').count()) > 0 });
 
         const card = page.locator('.workflow-card').first();
         await expect(card).toBeVisible({ timeout: 10000 });

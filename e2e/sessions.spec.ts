@@ -1,33 +1,12 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
-
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
 
 test.describe('Sessions', () => {
     test('session list renders', async ({ page, api }) => {
         await api.seedProject('Session Project');
 
-        await gotoWithRetry(page, '/sessions');
+        await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Session list page should load without errors
         await expect(page.locator('h2')).toBeVisible();
@@ -50,7 +29,7 @@ test.describe('Sessions', () => {
         });
         const session = await res.json();
 
-        await gotoWithRetry(page, `/sessions/${session.id}`);
+        await gotoWithRetry(page, `/sessions/${session.id}`, { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Should show the session view
         await expect(page.locator('.session-view')).toBeVisible({ timeout: 10000 });
@@ -73,7 +52,7 @@ test.describe('Sessions', () => {
         });
         expect(res.ok).toBe(true);
 
-        await gotoWithRetry(page, '/sessions');
+        await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Verify session table structure
         await expect(page.locator('.session-table')).toBeVisible({ timeout: 10000 });
@@ -88,7 +67,7 @@ test.describe('Sessions', () => {
         const uniqueName = `SearchMe ${Date.now()}`;
         await api.seedSession(project.id, agent.id, { name: uniqueName });
 
-        await gotoWithRetry(page, '/sessions');
+        await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const searchInput = page.locator('.search-input');
         if (await searchInput.count() > 0) {
@@ -104,7 +83,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('Filter Tab Agent');
         await api.seedSession(project.id, agent.id);
 
-        await gotoWithRetry(page, '/sessions');
+        await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const filterTabs = page.locator('.filter-tab');
         if (await filterTabs.count() > 0) {
@@ -123,7 +102,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('Badge Agent');
         await api.seedSession(project.id, agent.id);
 
-        await gotoWithRetry(page, '/sessions');
+        await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         await expect(page.locator('.session-table')).toBeVisible({ timeout: 10000 });
 
@@ -138,7 +117,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('Meta Agent');
         const session = await api.seedSession(project.id, agent.id, { name: 'MetaView Session' });
 
-        await gotoWithRetry(page, `/sessions/${session.id}`);
+        await gotoWithRetry(page, `/sessions/${session.id}`, { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         await expect(page.locator('.session-view')).toBeVisible({ timeout: 10000 });
     });
@@ -198,7 +177,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('Source Filter Agent');
         await api.seedSession(project.id, agent.id);
 
-        await gotoWithRetry(page, '/sessions');
+        await gotoWithRetry(page, '/sessions', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const sourceSelect = page.locator('.source-select');
         if (await sourceSelect.count() > 0) {

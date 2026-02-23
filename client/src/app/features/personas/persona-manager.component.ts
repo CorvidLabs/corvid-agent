@@ -226,16 +226,18 @@ export class PersonaManagerComponent implements OnInit {
         await this.agentService.loadAgents();
         // Check persona status for all agents in parallel without touching shared signals
         const agents = this.agentService.agents();
-        const results = await Promise.all(
-            agents.map(async (agent) => {
-                const exists = await this.personaService.checkPersonaExists(agent.id);
-                return [agent.id, exists ? 'configured' : 'none'] as const;
-            }),
+        const results = await Promise.allSettled(
+            agents.map((agent) => this.personaService.checkPersonaExists(agent.id)),
         );
         const statusMap: Record<string, string> = {};
-        for (const [id, status] of results) {
-            statusMap[id] = status;
-        }
+        results.forEach((result, index) => {
+            const agentId = agents[index].id;
+            if (result.status === 'fulfilled') {
+                statusMap[agentId] = result.value ? 'configured' : 'none';
+            } else {
+                statusMap[agentId] = 'none';
+            }
+        });
         this.personaStatusMap.set(statusMap);
     }
 

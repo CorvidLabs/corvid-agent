@@ -1,31 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Webhooks', () => {
     test('page loads with heading', async ({ page }) => {
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator('h2')).toContainText('GitHub Webhooks');
     });
 
@@ -33,7 +12,7 @@ test.describe('Webhooks', () => {
         const agent = await api.seedAgent('Webhook Agent');
         const webhook = await api.seedWebhook(agent.id);
 
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator(`text=${webhook.repo}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -41,7 +20,7 @@ test.describe('Webhooks', () => {
         const agent = await api.seedAgent('WH Status Agent');
         await api.seedWebhook(agent.id);
 
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const card = page.locator('.reg-card').first();
         await expect(card).toBeVisible({ timeout: 10000 });
@@ -55,7 +34,7 @@ test.describe('Webhooks', () => {
         const agent = await api.seedAgent('WH Filter Agent');
         await api.seedWebhook(agent.id);
 
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const filterBtns = page.locator('.filter-btn');
         expect(await filterBtns.count()).toBeGreaterThanOrEqual(2);
@@ -73,7 +52,7 @@ test.describe('Webhooks', () => {
         const agent = await api.seedAgent('WH Expand Agent');
         const webhook = await api.seedWebhook(agent.id);
 
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator(`text=${webhook.repo}`).first()).toBeVisible({ timeout: 10000 });
 
         // Click to expand
@@ -89,7 +68,7 @@ test.describe('Webhooks', () => {
 
     test('new webhook form toggle', async ({ page, api }) => {
         await api.seedAgent('WH Form Agent');
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Click "+ New Webhook" button
         const newBtn = page.locator('button:text("New Webhook")');
@@ -107,7 +86,7 @@ test.describe('Webhooks', () => {
         const agent = await api.seedAgent('WH Delete Agent');
         const webhook = await api.seedWebhook(agent.id);
 
-        await gotoWithRetry(page, '/webhooks');
+        await gotoWithRetry(page, '/webhooks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator(`text=${webhook.repo}`).first()).toBeVisible({ timeout: 10000 });
 
         // Expand the card

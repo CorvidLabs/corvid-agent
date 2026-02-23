@@ -1,31 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('System Logs', () => {
     test('page loads with tabs', async ({ page }) => {
-        await gotoWithRetry(page, '/logs');
+        await gotoWithRetry(page, '/logs', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         await expect(page.locator('h2')).toContainText('System Logs');
 
@@ -38,7 +17,7 @@ test.describe('System Logs', () => {
     });
 
     test('event logs tab shows list or empty', async ({ page }) => {
-        await gotoWithRetry(page, '/logs');
+        await gotoWithRetry(page, '/logs', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const hasList = await page.locator('.log-list').count() > 0;
         const hasEmpty = await page.locator('.empty').count() > 0;
@@ -53,7 +32,7 @@ test.describe('System Logs', () => {
     });
 
     test('credit transactions tab', async ({ page }) => {
-        await gotoWithRetry(page, '/logs');
+        await gotoWithRetry(page, '/logs', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Click Credit Transactions tab
         const creditTab = page.locator('.tab-btn:text("Credit Transactions")');
@@ -76,7 +55,7 @@ test.describe('System Logs', () => {
     });
 
     test('log type and level filters', async ({ page }) => {
-        await gotoWithRetry(page, '/logs');
+        await gotoWithRetry(page, '/logs', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // At least some filter chips should exist
         const totalChips = page.locator('.filter-chip');
@@ -109,7 +88,7 @@ test.describe('System Logs', () => {
     });
 
     test('search and toolbar controls', async ({ page }) => {
-        await gotoWithRetry(page, '/logs');
+        await gotoWithRetry(page, '/logs', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Search input with placeholder
         const search = page.locator('.log-search');

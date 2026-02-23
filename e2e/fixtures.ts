@@ -1,7 +1,40 @@
 import { test as base, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+
+/**
+ * Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load.
+ * Pass an optional `isRendered` callback to customise the content check;
+ * by default it waits for any element inside `<main>`.
+ */
+export async function gotoWithRetry(
+    page: Page,
+    path: string,
+    opts: { maxRetries?: number; isRendered?: (page: Page) => Promise<boolean> } = {},
+): Promise<void> {
+    const maxRetries = opts.maxRetries ?? 3;
+    const isRendered = opts.isRendered ?? (async (p: Page) =>
+        (await p.locator('main').locator('*').first().count()) > 0);
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        await page.goto(path);
+        await page.waitForLoadState('networkidle');
+
+        const body = await page.locator('body').textContent() ?? '';
+        const rateLimited = body.includes('Too many requests');
+        const rendered = await isRendered(page);
+
+        if (!rateLimited && rendered) return;
+
+        if (attempt < maxRetries) {
+            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
+            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
+            await page.waitForTimeout(wait * 1000 + 500);
+        }
+    }
+}
 
 interface ApiHelpers {
     seedProject(name?: string): Promise<{ id: string; name: string }>;

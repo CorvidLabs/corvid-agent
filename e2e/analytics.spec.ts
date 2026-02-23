@@ -1,32 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0
-            || await page.locator('.stat-card').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Analytics', () => {
     test('page loads with stat cards', async ({ page }) => {
-        await gotoWithRetry(page, '/analytics');
+        await gotoWithRetry(page, '/analytics', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.stat-card').count()) > 0 });
 
         await expect(page.locator('h2')).toContainText('Analytics');
 
@@ -35,7 +13,7 @@ test.describe('Analytics', () => {
     });
 
     test('stat cards show correct labels', async ({ page }) => {
-        await gotoWithRetry(page, '/analytics');
+        await gotoWithRetry(page, '/analytics', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.stat-card').count()) > 0 });
 
         const labels = await page.locator('.stat-card__label').allTextContents();
         const joined = labels.join(' ');
@@ -47,7 +25,7 @@ test.describe('Analytics', () => {
     });
 
     test('stat card values displayed', async ({ page }) => {
-        await gotoWithRetry(page, '/analytics');
+        await gotoWithRetry(page, '/analytics', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.stat-card').count()) > 0 });
 
         const values = page.locator('.stat-card__value');
         expect(await values.count()).toBeGreaterThanOrEqual(5);
@@ -57,7 +35,7 @@ test.describe('Analytics', () => {
     });
 
     test('chart buttons toggle views', async ({ page }) => {
-        await gotoWithRetry(page, '/analytics');
+        await gotoWithRetry(page, '/analytics', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.stat-card').count()) > 0 });
 
         const chartBtns = page.locator('.chart-btn');
         expect(await chartBtns.count()).toBe(4);
@@ -89,7 +67,7 @@ test.describe('Analytics', () => {
             }),
         });
 
-        await gotoWithRetry(page, '/analytics');
+        await gotoWithRetry(page, '/analytics', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.stat-card').count()) > 0 });
 
         const table = page.locator('.agent-table');
         if (await table.count() > 0) {

@@ -32,11 +32,18 @@ export class MarketplaceService {
         return result;
     }
 
-    async getListings(agentId?: string): Promise<MarketplaceListing[]> {
-        const path = agentId ? `/marketplace/listings?agentId=${agentId}` : '/marketplace/listings';
-        const raw = await firstValueFrom(this.api.get<MarketplaceListing[] | MarketplaceSearchResult>(path));
-        // GET /api/marketplace/listings returns { listings, total, ... } when no agentId
-        const listings = Array.isArray(raw) ? raw : raw.listings;
+    async getListings(): Promise<MarketplaceListing[]> {
+        const result = await firstValueFrom(
+            this.api.get<MarketplaceSearchResult>('/marketplace/listings'),
+        );
+        this.listings.set(result.listings);
+        return result.listings;
+    }
+
+    async getListingsByAgent(agentId: string): Promise<MarketplaceListing[]> {
+        const listings = await firstValueFrom(
+            this.api.get<MarketplaceListing[]>(`/marketplace/listings?agentId=${encodeURIComponent(agentId)}`),
+        );
         this.listings.set(listings);
         return listings;
     }

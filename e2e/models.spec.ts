@@ -1,32 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0
-            || await page.locator('.page__header').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Models', () => {
     test('page loads with heading and status banner', async ({ page }) => {
-        await gotoWithRetry(page, '/models');
+        await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         await expect(page.locator('h2')).toContainText('Models');
         const statusBanner = page.locator('.status-banner');
@@ -34,14 +12,14 @@ test.describe('Models', () => {
     });
 
     test('status banner shows Ollama connection state', async ({ page }) => {
-        await gotoWithRetry(page, '/models');
+        await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         const statusDot = page.locator('.status-dot');
         await expect(statusDot).toBeVisible({ timeout: 10000 });
     });
 
     test('tabs switch between installed and library', async ({ page }) => {
-        await gotoWithRetry(page, '/models');
+        await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         const tabs = page.locator('.tab');
         expect(await tabs.count()).toBe(2);
@@ -56,7 +34,7 @@ test.describe('Models', () => {
     });
 
     test('library tab shows search and category filters', async ({ page }) => {
-        await gotoWithRetry(page, '/models');
+        await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         // Switch to Library tab
         await page.locator('.tab:text("Library")').click();
@@ -73,7 +51,7 @@ test.describe('Models', () => {
     });
 
     test('library search filters models', async ({ page }) => {
-        await gotoWithRetry(page, '/models');
+        await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         await page.locator('.tab:text("Library")').click();
 
@@ -92,7 +70,7 @@ test.describe('Models', () => {
     });
 
     test('manual pull form exists', async ({ page }) => {
-        await gotoWithRetry(page, '/models');
+        await gotoWithRetry(page, '/models', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.page__header').count()) > 0 });
 
         const manualPull = page.locator('.manual-pull');
         if (await manualPull.count() > 0) {

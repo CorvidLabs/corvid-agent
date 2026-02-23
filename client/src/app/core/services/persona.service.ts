@@ -26,7 +26,13 @@ export class PersonaService {
         }
     }
 
-    /** Check if a persona exists for an agent without touching shared signals. */
+    /**
+     * Check if a persona exists for an agent without touching shared signals.
+     *
+     * Use this instead of `loadPersona()` when checking multiple agents in parallel,
+     * since `loadPersona()` mutates `this.persona` and `this.loading` signals which
+     * would cause race conditions with concurrent calls.
+     */
     async checkPersonaExists(agentId: string): Promise<boolean> {
         try {
             await firstValueFrom(

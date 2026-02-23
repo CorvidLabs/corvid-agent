@@ -1,31 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Work Tasks', () => {
     test('page loads with heading and filters', async ({ page }) => {
-        await gotoWithRetry(page, '/work-tasks');
+        await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         await expect(page.locator('h2')).toContainText('Work Tasks');
 
@@ -38,7 +17,7 @@ test.describe('Work Tasks', () => {
         const desc = `E2E task ${Date.now()}`;
         await api.seedWorkTask(agent.id, desc);
 
-        await gotoWithRetry(page, '/work-tasks');
+        await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator(`text=${desc}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -46,7 +25,7 @@ test.describe('Work Tasks', () => {
         const agent = await api.seedAgent('Filter Agent');
         await api.seedWorkTask(agent.id, `Filter task ${Date.now()}`);
 
-        await gotoWithRetry(page, '/work-tasks');
+        await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Click "All" filter — should be active by default
         const allBtn = page.locator('.filter-btn').first();
@@ -77,7 +56,7 @@ test.describe('Work Tasks', () => {
         const agent = await api.seedAgent('Badge Agent');
         await api.seedWorkTask(agent.id, `Badge task ${Date.now()}`);
 
-        await gotoWithRetry(page, '/work-tasks');
+        await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const card = page.locator('.task-card').first();
         if (await card.count() > 0) {
@@ -88,7 +67,7 @@ test.describe('Work Tasks', () => {
 
     test('new task form toggle', async ({ page, api }) => {
         await api.seedAgent('Form Agent');
-        await gotoWithRetry(page, '/work-tasks');
+        await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Click "+ New Task" button
         const newBtn = page.locator('button:text("New Task")');
@@ -126,7 +105,7 @@ test.describe('Work Tasks', () => {
         const desc = `Detail task ${Date.now()}`;
         await api.seedWorkTask(agent.id, desc);
 
-        await gotoWithRetry(page, '/work-tasks');
+        await gotoWithRetry(page, '/work-tasks', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Find the specific task card containing our description
         const card = page.locator(`.task-card:has-text("${desc}")`).first();

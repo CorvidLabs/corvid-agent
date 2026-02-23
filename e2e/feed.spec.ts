@@ -1,31 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Feed', () => {
     test('page loads with heading and list or empty', async ({ page }) => {
-        await gotoWithRetry(page, '/feed');
+        await gotoWithRetry(page, '/feed', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         await expect(page.locator('h2')).toContainText('Feed');
 
@@ -35,7 +14,7 @@ test.describe('Feed', () => {
     });
 
     test('direction filter chips', async ({ page }) => {
-        await gotoWithRetry(page, '/feed');
+        await gotoWithRetry(page, '/feed', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const chips = page.locator('.dir-chip');
         expect(await chips.count()).toBe(6);
@@ -51,7 +30,7 @@ test.describe('Feed', () => {
     });
 
     test('search input accepts text', async ({ page }) => {
-        await gotoWithRetry(page, '/feed');
+        await gotoWithRetry(page, '/feed', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         const search = page.locator('.feed__search');
         await expect(search).toBeVisible();
@@ -73,7 +52,7 @@ test.describe('Feed', () => {
     });
 
     test('pagination controls', async ({ page }) => {
-        await gotoWithRetry(page, '/feed');
+        await gotoWithRetry(page, '/feed', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Enter search text to trigger pagination rendering
         const search = page.locator('.feed__search');
@@ -88,7 +67,7 @@ test.describe('Feed', () => {
     });
 
     test('auto-scroll, export, clear buttons', async ({ page }) => {
-        await gotoWithRetry(page, '/feed');
+        await gotoWithRetry(page, '/feed', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
         // Auto-scroll button
         const autoScroll = page.locator('button:text("Auto-scroll")');

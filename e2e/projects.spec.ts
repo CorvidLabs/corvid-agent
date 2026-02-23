@@ -1,32 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0
-            || await page.locator('.list').count() > 0;
-
-        if (!rateLimited && rendered) return;
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Projects', () => {
     test('page loads with heading', async ({ page }) => {
-        await gotoWithRetry(page, '/projects');
+        await gotoWithRetry(page, '/projects', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
         await expect(page.locator('h2')).toBeVisible();
         const heading = await page.locator('h2').textContent();
         expect(heading).toContain('Projects');
@@ -34,7 +12,7 @@ test.describe('Projects', () => {
 
     test('create project via form', async ({ page }) => {
         const projectName = `PW Project ${Date.now()}`;
-        await gotoWithRetry(page, '/projects/new');
+        await gotoWithRetry(page, '/projects/new', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
 
         await page.locator('#name').fill(projectName);
         await page.locator('#workingDir').fill('/tmp');
@@ -45,13 +23,13 @@ test.describe('Projects', () => {
         await expect(page.locator('h2')).toContainText(projectName);
 
         // Verify in list
-        await gotoWithRetry(page, '/projects');
+        await gotoWithRetry(page, '/projects', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
         await expect(page.locator(`text=${projectName}`).first()).toBeVisible({ timeout: 10000 });
     });
 
     test('project detail shows info', async ({ page, api }) => {
         const project = await api.seedProject('Detail Project');
-        await gotoWithRetry(page, `/projects/${project.id}`);
+        await gotoWithRetry(page, `/projects/${project.id}`, { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
 
         await expect(page.locator('h2')).toContainText('Detail Project');
         await expect(page.locator('dt:text("Working Directory")')).toBeVisible();
@@ -63,7 +41,7 @@ test.describe('Projects', () => {
         const project = await api.seedProject('Edit Me Project');
         const newName = `Edited Project ${Date.now()}`;
 
-        await gotoWithRetry(page, `/projects/${project.id}`);
+        await gotoWithRetry(page, `/projects/${project.id}`, { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
         await page.locator('a:text("Edit"), button:text("Edit")').first().click();
         await page.waitForURL(/\/projects\/.*\/edit/);
 
@@ -78,7 +56,7 @@ test.describe('Projects', () => {
 
     test('delete project removes from list', async ({ page, api }) => {
         const project = await api.seedProject('Delete Me Project');
-        await gotoWithRetry(page, `/projects/${project.id}`);
+        await gotoWithRetry(page, `/projects/${project.id}`, { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
 
         await page.locator('button:text("Delete")').first().click();
 
@@ -127,7 +105,7 @@ test.describe('Projects', () => {
         await api.seedProject('Structure A');
         await api.seedProject('Structure B');
 
-        await gotoWithRetry(page, '/projects');
+        await gotoWithRetry(page, '/projects', { isRendered: async (p) => (await p.locator('h2').count()) > 0 || (await p.locator('.list').count()) > 0 });
 
         const items = page.locator('.list__item');
         expect(await items.count()).toBeGreaterThanOrEqual(2);

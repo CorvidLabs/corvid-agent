@@ -1,38 +1,10 @@
-import { test, expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import { test, expect, gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-/** Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load. */
-async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<void> {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
-
-        const body = await page.locator('body').textContent() ?? '';
-        const rateLimited = body.includes('Too many requests');
-
-        if (!rateLimited) {
-            // Wait for loading to finish and sections to appear
-            try {
-                await page.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 });
-                return;
-            } catch {
-                // Sections not yet visible, retry
-            }
-        }
-
-        if (attempt < maxRetries) {
-            const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
-            const wait = Math.min(Math.max(Number(match?.[1] ?? 5), 3), 10);
-            await page.waitForTimeout(wait * 1000 + 500);
-        }
-    }
-}
-
 test.describe('Settings', () => {
     test('page loads with all sections', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         await expect(page.locator('h2')).toContainText('Settings');
         // Wait for loading to finish and sections to render
@@ -49,7 +21,7 @@ test.describe('Settings', () => {
     });
 
     test('system info shows stats', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         await expect(page.locator('.info-grid').first()).toBeVisible({ timeout: 10000 });
 
@@ -62,7 +34,7 @@ test.describe('Settings', () => {
     });
 
     test('health grid with status dots', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         await expect(page.locator('.health-grid').first()).toBeVisible({ timeout: 10000 });
 
@@ -75,7 +47,7 @@ test.describe('Settings', () => {
     });
 
     test('credit config editable', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         await expect(page.locator('.credit-grid').first()).toBeVisible({ timeout: 10000 });
 
@@ -94,7 +66,7 @@ test.describe('Settings', () => {
     });
 
     test('database backup button exists', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         const backupBtn = page.locator('.backup-btn');
         await expect(backupBtn).toBeVisible({ timeout: 10000 });
@@ -103,7 +75,7 @@ test.describe('Settings', () => {
     });
 
     test('operational mode buttons', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         await expect(page.locator('.mode-selector').first()).toBeVisible({ timeout: 10000 });
 
@@ -119,7 +91,7 @@ test.describe('Settings', () => {
     });
 
     test('section toggle collapses and expands', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         // Scope to the System Info section specifically
         const section = page.locator('.settings__section').filter({ has: page.locator('.section-toggle:has-text("System Info")') }).first();
@@ -176,7 +148,7 @@ test.describe('Settings', () => {
     });
 
     test('mode badge shows current mode', async ({ page }) => {
-        await gotoWithRetry(page, '/settings');
+        await gotoWithRetry(page, '/settings', { isRendered: async (p) => { try { await p.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 }); return true; } catch { return false; } } });
 
         const badge = page.locator('.section-badge--mode');
         await expect(badge).toBeVisible({ timeout: 10000 });
