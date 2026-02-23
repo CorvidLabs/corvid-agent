@@ -11,10 +11,16 @@ async function gotoWithRetry(page: Page, path: string, maxRetries = 3): Promise<
 
         const body = await page.locator('body').textContent() ?? '';
         const rateLimited = body.includes('Too many requests');
-        const rendered = await page.locator('h2').count() > 0
-            || await page.locator('.settings__section').count() > 0;
 
-        if (!rateLimited && rendered) return;
+        if (!rateLimited) {
+            // Wait for loading to finish and sections to appear
+            try {
+                await page.locator('.settings__section').first().waitFor({ state: 'visible', timeout: 5000 });
+                return;
+            } catch {
+                // Sections not yet visible, retry
+            }
+        }
 
         if (attempt < maxRetries) {
             const match = body.match(/"retryAfter"\s*:\s*(\d+)/);
@@ -29,7 +35,9 @@ test.describe('Settings', () => {
         await gotoWithRetry(page, '/settings');
 
         await expect(page.locator('h2')).toContainText('Settings');
+        // Wait for loading to finish and sections to render
         const sections = page.locator('.settings__section');
+        await expect(sections.first()).toBeVisible({ timeout: 10000 });
         expect(await sections.count()).toBeGreaterThanOrEqual(3);
 
         // Verify key section toggles exist
