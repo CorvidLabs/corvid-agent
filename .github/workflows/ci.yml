@@ -12,6 +12,7 @@ jobs:
   build:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -65,6 +66,7 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: build
     # E2E tests require a running server and may need Claude API for some tests.
     # Tests that need external services are skipped gracefully in CI.
