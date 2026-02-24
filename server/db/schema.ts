@@ -1011,7 +1011,13 @@ const MIGRATIONS: Record<number, string[]> = {
     ],
 };
 
+/** Allowlist pattern for valid SQL identifiers (table/column names). */
+const SAFE_SQL_IDENTIFIER = /^[a-z_][a-z0-9_]*$/i;
+
 function hasColumn(db: Database, table: string, column: string): boolean {
+    if (!SAFE_SQL_IDENTIFIER.test(table)) {
+        throw new Error(`hasColumn: invalid table name '${table}'`);
+    }
     const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
     return cols.some((c) => c.name === column);
 }
@@ -1041,9 +1047,9 @@ export function runMigrations(db: Database): void {
         }
 
         if (currentVersion === 0) {
-            db.exec(`INSERT INTO schema_version (version) VALUES (${SCHEMA_VERSION})`);
+            db.query('INSERT INTO schema_version (version) VALUES (?)').run(SCHEMA_VERSION);
         } else {
-            db.exec(`UPDATE schema_version SET version = ${SCHEMA_VERSION}`);
+            db.query('UPDATE schema_version SET version = ?').run(SCHEMA_VERSION);
         }
     })();
 }
