@@ -191,7 +191,7 @@ describe('Sync', () => {
     });
 
     it('syncInstance fetches and caches listings', async () => {
-        globalThis.fetch = async () => {
+        globalThis.fetch = (async () => {
             return new Response(JSON.stringify({
                 listings: [
                     {
@@ -211,7 +211,7 @@ describe('Sync', () => {
                     },
                 ],
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         federation.registerInstance('https://remote.example.com', 'Remote');
         const synced = await federation.syncInstance('https://remote.example.com');
@@ -224,9 +224,9 @@ describe('Sync', () => {
     });
 
     it('syncInstance marks instance unreachable on error', async () => {
-        globalThis.fetch = async () => {
+        globalThis.fetch = (async () => {
             return new Response('Server Error', { status: 500, statusText: 'Internal Server Error' });
-        };
+        }) as typeof fetch;
 
         federation.registerInstance('https://down.example.com', 'Down');
         const synced = await federation.syncInstance('https://down.example.com');
@@ -237,9 +237,9 @@ describe('Sync', () => {
     });
 
     it('syncInstance marks instance unreachable on network error', async () => {
-        globalThis.fetch = async () => {
+        globalThis.fetch = (async () => {
             throw new Error('Network unreachable');
-        };
+        }) as typeof fetch;
 
         federation.registerInstance('https://offline.example.com', 'Offline');
         const synced = await federation.syncInstance('https://offline.example.com');
@@ -258,14 +258,14 @@ describe('Sync', () => {
 
     it('syncInstance replaces old cached listings', async () => {
         let callCount = 0;
-        globalThis.fetch = async () => {
+        globalThis.fetch = (async () => {
             callCount++;
             return new Response(JSON.stringify({
                 listings: callCount === 1
                     ? [{ id: 'old', agentId: 'a1', name: 'Old', description: '', longDescription: '', category: 'general', tags: [], pricingModel: 'free', priceCredits: 0, status: 'published', useCount: 0, avgRating: 0, reviewCount: 0 }]
                     : [{ id: 'new', agentId: 'a2', name: 'New', description: '', longDescription: '', category: 'general', tags: [], pricingModel: 'free', priceCredits: 0, status: 'published', useCount: 0, avgRating: 0, reviewCount: 0 }],
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         federation.registerInstance('https://refresh.example.com', 'Refresh');
         await federation.syncInstance('https://refresh.example.com');
@@ -278,13 +278,13 @@ describe('Sync', () => {
 
     it('syncAll counts successes and failures', async () => {
         let callCount = 0;
-        globalThis.fetch = async () => {
+        globalThis.fetch = (async () => {
             callCount++;
             if (callCount === 1) {
                 return new Response(JSON.stringify({ listings: [] }), { status: 200 });
             }
             return new Response('Error', { status: 500, statusText: 'Error' });
-        };
+        }) as typeof fetch;
 
         federation.registerInstance('https://good.example.com', 'Good');
         federation.registerInstance('https://bad.example.com', 'Bad');

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { ApprovalManager } from '../process/approval-manager';
-import type { ApprovalRequest, ApprovalResponse } from '../process/approval-types';
+import type { ApprovalRequest } from '../process/approval-types';
 
 let db: Database;
 let manager: ApprovalManager;

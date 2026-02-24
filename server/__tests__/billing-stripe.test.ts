@@ -118,7 +118,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createCustomer sends correct request', async () => {
-        globalThis.fetch = async (url: any, init: any) => {
+        globalThis.fetch = (async (url: any, init: any) => {
             expect(String(url)).toContain('/v1/customers');
             expect(init.method).toBe('POST');
             expect(init.headers.Authorization).toBe('Bearer sk_test_123');
@@ -133,7 +133,7 @@ describe('Stripe API functions', () => {
                 name: 'Test User',
                 metadata: {},
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const customer = await createCustomer('test@example.com', 'Test User');
         expect(customer.id).toBe('cus_test');
@@ -141,7 +141,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createCustomer includes metadata', async () => {
-        globalThis.fetch = async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: any, init: any) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('metadata[agentId]')).toBe('agent-1');
 
@@ -151,14 +151,14 @@ describe('Stripe API functions', () => {
                 name: 'Meta',
                 metadata: { agentId: 'agent-1' },
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const customer = await createCustomer('meta@test.com', 'Meta', { agentId: 'agent-1' });
         expect(customer.metadata.agentId).toBe('agent-1');
     });
 
     it('getCustomer sends GET request', async () => {
-        globalThis.fetch = async (url: any, init: any) => {
+        globalThis.fetch = (async (url: any, init: any) => {
             expect(String(url)).toContain('/v1/customers/cus_123');
             expect(init.method).toBe('GET');
 
@@ -168,14 +168,14 @@ describe('Stripe API functions', () => {
                 name: 'Get Test',
                 metadata: {},
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const customer = await getCustomer('cus_123');
         expect(customer.id).toBe('cus_123');
     });
 
     it('createSubscription sends correct params', async () => {
-        globalThis.fetch = async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: any, init: any) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('customer')).toBe('cus_123');
             expect(body.get('items[0][price]')).toBe('price_abc');
@@ -189,7 +189,7 @@ describe('Stripe API functions', () => {
                 cancel_at_period_end: false,
                 items: { data: [{ id: 'si_123', price: { id: 'price_abc' } }] },
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const sub = await createSubscription('cus_123', 'price_abc');
         expect(sub.id).toBe('sub_test');
@@ -197,7 +197,7 @@ describe('Stripe API functions', () => {
     });
 
     it('cancelSubscription at period end sends correct flag', async () => {
-        globalThis.fetch = async (url: any, init: any) => {
+        globalThis.fetch = (async (url: any, init: any) => {
             expect(String(url)).toContain('/v1/subscriptions/sub_123');
             expect(init.method).toBe('POST');
             const body = new URLSearchParams(init.body);
@@ -212,14 +212,14 @@ describe('Stripe API functions', () => {
                 cancel_at_period_end: true,
                 items: { data: [] },
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const sub = await cancelSubscription('sub_123', true);
         expect(sub.cancel_at_period_end).toBe(true);
     });
 
     it('cancelSubscription immediately sends DELETE', async () => {
-        globalThis.fetch = async (url: any, init: any) => {
+        globalThis.fetch = (async (url: any, init: any) => {
             expect(init.method).toBe('DELETE');
             expect(String(url)).toContain('/v1/subscriptions/sub_123');
 
@@ -232,42 +232,42 @@ describe('Stripe API functions', () => {
                 cancel_at_period_end: false,
                 items: { data: [] },
             }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const sub = await cancelSubscription('sub_123', false);
         expect(sub.status).toBe('canceled');
     });
 
     it('createUsageRecord sends quantity and action', async () => {
-        globalThis.fetch = async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: any, init: any) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('quantity')).toBe('100');
             expect(body.get('action')).toBe('set');
 
             return new Response(JSON.stringify({ id: 'usage_123' }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         const result = await createUsageRecord('si_item_1', 100);
         expect(result.id).toBe('usage_123');
     });
 
     it('createUsageRecord includes timestamp when provided', async () => {
-        globalThis.fetch = async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: any, init: any) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('timestamp')).toBe('1700000000');
 
             return new Response(JSON.stringify({ id: 'usage_ts' }), { status: 200 });
-        };
+        }) as typeof fetch;
 
         await createUsageRecord('si_item_1', 50, 1700000000);
     });
 
     it('throws on API error response', async () => {
-        globalThis.fetch = async () => {
+        globalThis.fetch = (async () => {
             return new Response(JSON.stringify({
                 error: { message: 'Invalid API Key', type: 'authentication_error' },
             }), { status: 401 });
-        };
+        }) as typeof fetch;
 
         await expect(getCustomer('cus_bad')).rejects.toThrow('Invalid API Key');
     });
