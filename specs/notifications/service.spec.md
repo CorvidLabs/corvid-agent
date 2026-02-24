@@ -134,7 +134,7 @@ Multi-channel notification service that persists notifications to the database a
 |--------|-------------|
 | `server/index.ts` | Lifecycle: construction, `start()`, `stop()`, `setAgentMessenger()`, `setBroadcast()` |
 | `server/routes/notifications.ts` | `notify()` via API endpoints |
-| `server/mcp/tool-handlers.ts` | `notify()` via MCP tools |
+| `server/mcp/tool-handlers/index.ts` | `notify()` via MCP tools |
 
 ## Database Tables
 

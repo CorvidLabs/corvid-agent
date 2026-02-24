@@ -3,7 +3,8 @@ module: mcp-tool-handlers
 version: 1
 status: active
 files:
-  - server/mcp/tool-handlers.ts
+  - server/mcp/tool-handlers/index.ts
+  - server/mcp/tool-handlers/types.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -152,3 +153,4 @@ Internal constants (not env-configurable):
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-02-24 | corvid-agent | Update files to reflect tool-handlers split into domain modules (PR #233) |
