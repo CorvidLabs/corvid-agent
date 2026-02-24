@@ -174,7 +174,7 @@ Graph-based workflow orchestration engine. Executes workflow graphs by traversin
 |--------|-------------|
 | `server/routes/workflows.ts` | `triggerWorkflow`, `pauseRun`, `resumeRun`, `cancelRun`, `getStats` |
 | `server/process/manager.ts` | Injected as `mcpWorkflowService` for MCP tools |
-| `server/mcp/tool-handlers.ts` | `handleManageWorkflow` uses the service |
+| `server/mcp/tool-handlers/workflow.ts` | `handleManageWorkflow` uses the service |
 
 ## Configuration
 

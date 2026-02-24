@@ -72,7 +72,7 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 
 | Module | What is used |
 |--------|-------------|
-| `server/mcp/tool-handlers.ts` | All 36 `handle*` functions and `McpToolContext` type |
+| `server/mcp/tool-handlers/index.ts` | All 36 `handle*` functions and `McpToolContext` type |
 | `server/db/agents.ts` | `getAgent` (for permission lookup) |
 | `@anthropic-ai/claude-agent-sdk` | `createSdkMcpServer`, `tool` |
 | `zod/v4` | `z` for input schema definitions |
