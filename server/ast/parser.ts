@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { Parser, Language } from 'web-tree-sitter';
 import type { AstLanguage } from './types';
+import { ValidationError } from '../lib/errors';
 
 let initialized = false;
 const languageCache = new Map<AstLanguage, Language>();
@@ -48,7 +49,7 @@ export async function loadLanguage(lang: AstLanguage): Promise<Language> {
  */
 export async function createParserForLanguage(lang: AstLanguage): Promise<Parser> {
     if (!initialized) {
-        throw new Error('Parser not initialized — call initParser() first');
+        throw new ValidationError('Parser not initialized — call initParser() first');
     }
     const language = await loadLanguage(lang);
     const parser = new Parser();

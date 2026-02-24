@@ -1,5 +1,6 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../shared/types';
+import { NotFoundError } from '../lib/errors';
 
 interface AgentRow {
     id: string;
@@ -98,7 +99,7 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
     );
 
     const created = getAgent(db, id);
-    if (!created) throw new Error(`createAgent: INSERT succeeded but SELECT returned null for id=${id}`);
+    if (!created) throw new NotFoundError('Agent', id);
     return created;
 }
 

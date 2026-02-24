@@ -5,6 +5,7 @@ import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, list
 import { encryptMnemonic, decryptMnemonic } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
 import { createLogger } from '../lib/logger';
+import { NotFoundError } from '../lib/errors';
 
 const log = createLogger('AgentWallet');
 
@@ -277,7 +278,7 @@ export class AgentWalletService {
         );
 
         if (!defaultWallet) {
-            throw new Error('LocalNet default wallet not found');
+            throw new NotFoundError('LocalNet default wallet');
         }
 
         const walletHandle = (await kmd.initWalletHandle(defaultWallet.id, '')).wallet_handle_token;
@@ -285,7 +286,7 @@ export class AgentWalletService {
         try {
             const keys = await kmd.listKeys(walletHandle);
             const dispenserAddress = keys.addresses[0];
-            if (!dispenserAddress) throw new Error('No accounts in LocalNet default wallet');
+            if (!dispenserAddress) throw new NotFoundError('LocalNet default wallet accounts');
 
             const keyResponse = await kmd.exportKey(walletHandle, '', dispenserAddress);
             const dispenserAccount = algosdk.mnemonicToSecretKey(

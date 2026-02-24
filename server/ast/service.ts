@@ -4,6 +4,7 @@ import { createLogger } from '../lib/logger';
 import { initParser, createParserForLanguage, languageFromExtension } from './parser';
 import { extractSymbols } from './queries';
 import type { AstLanguage, AstSymbol, AstSymbolKind, FileSymbolIndex, ProjectSymbolIndex } from './types';
+import { ValidationError } from '../lib/errors';
 
 const log = createLogger('AstParser');
 
@@ -41,7 +42,7 @@ export class AstParserService {
      */
     async parseFile(filePath: string): Promise<FileSymbolIndex | null> {
         if (!this.initialized) {
-            throw new Error('AstParserService not initialized — call init() first');
+            throw new ValidationError('AstParserService not initialized — call init() first');
         }
 
         const ext = extname(filePath);
@@ -79,7 +80,7 @@ export class AstParserService {
      */
     async parseSource(source: string, lang: AstLanguage): Promise<AstSymbol[]> {
         if (!this.initialized) {
-            throw new Error('AstParserService not initialized — call init() first');
+            throw new ValidationError('AstParserService not initialized — call init() first');
         }
 
         const parser = await createParserForLanguage(lang);
@@ -102,7 +103,7 @@ export class AstParserService {
      */
     async indexProject(projectDir: string): Promise<ProjectSymbolIndex> {
         if (!this.initialized) {
-            throw new Error('AstParserService not initialized — call init() first');
+            throw new ValidationError('AstParserService not initialized — call init() first');
         }
 
         const existing = this.projectIndexes.get(projectDir);

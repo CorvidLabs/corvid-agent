@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import { ExternalServiceError } from './errors';
 
 const log = createLogger('WebSearch');
 
@@ -66,7 +67,7 @@ export async function braveWebSearch(
     if (!response.ok) {
         const body = await response.text().catch(() => '');
         log.error('Brave search API error', { status: response.status, body: body.slice(0, 200) });
-        throw new Error(`Brave Search API error: ${response.status} ${response.statusText}`);
+        throw new ExternalServiceError("Brave Search", `API error: ${response.status} ${response.statusText}`);
     }
 
     const data = (await response.json()) as BraveSearchResponse;

@@ -6,7 +6,7 @@ import {
     normalizeToolArgs,
     stripJsonToolCallArrays,
 } from '../providers/ollama/tool-parser';
-import type { LlmToolDefinition } from '../providers/types';
+import type { LlmToolDefinition, JsonSchemaProperty } from '../providers/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ function makeTools(...names: string[]): LlmToolDefinition[] {
     }));
 }
 
-function makeToolWithParams(name: string, props: Record<string, unknown>, required: string[] = []): LlmToolDefinition {
+function makeToolWithParams(name: string, props: Record<string, JsonSchemaProperty>, required: string[] = []): LlmToolDefinition {
     return {
         name,
         description: `Tool: ${name}`,

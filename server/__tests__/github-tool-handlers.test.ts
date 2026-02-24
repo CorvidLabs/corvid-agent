@@ -4,18 +4,18 @@ import type { McpToolContext } from '../mcp/tool-handlers';
 // ── Mock the github/operations module before importing handlers ──────────
 // Bun freezes module exports, so we must use mock.module() to intercept.
 
-const mockStarRepo = mock(() => Promise.resolve({ ok: true, message: 'Starred test/repo' }));
-const mockUnstarRepo = mock(() => Promise.resolve({ ok: true, message: 'Unstarred test/repo' }));
-const mockForkRepo = mock(() => Promise.resolve({ ok: true, message: 'Forked test/repo', forkUrl: 'https://github.com/me/repo' }));
-const mockListOpenPrs = mock(() => Promise.resolve({ ok: true, prs: [] as Array<Record<string, unknown>> }));
-const mockCreatePr = mock(() => Promise.resolve({ ok: true, prUrl: 'https://github.com/test/repo/pull/1' }));
-const mockAddPrReview = mock(() => Promise.resolve({ ok: true }));
-const mockCreateIssue = mock(() => Promise.resolve({ ok: true, issueUrl: 'https://github.com/test/repo/issues/1' }));
-const mockListIssues = mock(() => Promise.resolve({ ok: true, issues: [] as Array<Record<string, unknown>> }));
-const mockGetRepoInfo = mock(() => Promise.resolve({ ok: true, info: { name: 'repo', stargazerCount: 42 } }));
-const mockGetPrDiff = mock(() => Promise.resolve({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line' }));
-const mockAddPrComment = mock(() => Promise.resolve({ ok: true }));
-const mockFollowUser = mock(() => Promise.resolve({ ok: true, message: 'Followed testuser' }));
+const mockStarRepo = mock(() => Promise.resolve({ ok: true, message: 'Starred test/repo', error: undefined as string | undefined }));
+const mockUnstarRepo = mock(() => Promise.resolve({ ok: true, message: 'Unstarred test/repo', error: undefined as string | undefined }));
+const mockForkRepo = mock(() => Promise.resolve({ ok: true, message: 'Forked test/repo', forkUrl: 'https://github.com/me/repo', error: undefined as string | undefined }));
+const mockListOpenPrs = mock(() => Promise.resolve({ ok: true, prs: [] as Array<Record<string, unknown>>, error: undefined as string | undefined }));
+const mockCreatePr = mock(() => Promise.resolve({ ok: true, prUrl: 'https://github.com/test/repo/pull/1', error: undefined as string | undefined }));
+const mockAddPrReview = mock(() => Promise.resolve({ ok: true, error: undefined as string | undefined }));
+const mockCreateIssue = mock(() => Promise.resolve({ ok: true, issueUrl: 'https://github.com/test/repo/issues/1', error: undefined as string | undefined }));
+const mockListIssues = mock(() => Promise.resolve({ ok: true, issues: [] as Array<Record<string, unknown>>, error: undefined as string | undefined }));
+const mockGetRepoInfo = mock(() => Promise.resolve({ ok: true, info: { name: 'repo', stargazerCount: 42 }, error: undefined as string | undefined }));
+const mockGetPrDiff = mock(() => Promise.resolve({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line', error: undefined as string | undefined }));
+const mockAddPrComment = mock(() => Promise.resolve({ ok: true, error: undefined as string | undefined }));
+const mockFollowUser = mock(() => Promise.resolve({ ok: true, message: 'Followed testuser', error: undefined as string | undefined }));
 
 mock.module('../github/operations', () => ({
     starRepo: mockStarRepo,

@@ -18,6 +18,7 @@ import {
 } from './container';
 import { getAgentPolicy } from './policy';
 import { createLogger } from '../lib/logger';
+import { ValidationError, ConflictError } from '../lib/errors';
 
 const log = createLogger('SandboxManager');
 
@@ -81,7 +82,7 @@ export class SandboxManager {
         workDir?: string | null,
     ): Promise<string> {
         if (!this.enabled) {
-            throw new Error('Sandboxing is not enabled');
+            throw new ValidationError('Sandboxing is not enabled');
         }
 
         // Find an available (unassigned) container from the pool
@@ -98,7 +99,7 @@ export class SandboxManager {
         if (!entry) {
             // No warm containers available — create one on demand
             if (this.pool.size >= this.poolConfig.maxContainers) {
-                throw new Error('Maximum container limit reached');
+                throw new ConflictError('Maximum container limit reached');
             }
 
             const sandboxId = crypto.randomUUID();

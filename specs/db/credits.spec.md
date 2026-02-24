@@ -130,7 +130,7 @@ This module must be correct -- bugs mean real money lost. All balance mutations 
 | `server/algochat/bridge.ts` | `getBalance`, `purchaseCredits`, `maybeGrantFirstTimeCredits`, `canStartSession`, `deductAgentMessageCredits` |
 | `server/routes/settings.ts` | Credit config read/write via `/api/settings/credits` |
 | `server/routes/system-logs.ts` | Credit transaction history via `/api/system-logs/credit-transactions` |
-| `server/mcp/tool-handlers/index.ts` | `grantCredits`, `updateCreditConfig`, `getBalance` |
+| `server/mcp/tool-handlers/credits.ts` | `grantCredits`, `updateCreditConfig`, `getBalance` |
 
 ## Database Tables
 

@@ -12,6 +12,7 @@ import type { Agent, Session } from '../../shared/types';
 import { listAgents as defaultListAgents } from '../db/agents';
 import { createSession as defaultCreateSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { NotFoundError } from '../lib/errors';
 
 const log = createLogger('A2ATaskHandler');
 
@@ -61,7 +62,7 @@ export function handleTaskSend(
     const agents = listAgentsFn(db);
     const agent = agents.find((a) => a.defaultProjectId);
     if (!agent) {
-        throw new Error('No agent with a default project is available to handle A2A tasks');
+        throw new NotFoundError('Agent with default project');
     }
 
     const projectId = agent.defaultProjectId!;

@@ -117,7 +117,7 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 |--------|-------------|
 | `server/routes/reputation.ts` | All scorer methods |
 | `server/scheduler/service.ts` | `computeScore()` for scheduled attestation |
-| `server/mcp/tool-handlers/index.ts` | `computeScore()`, `getCachedScore()` for MCP tools |
+| `server/mcp/tool-handlers/reputation.ts` | `computeScore()`, `getCachedScore()` for MCP tools |
 | `server/reputation/attestation.ts` | Receives scores for on-chain publishing |
 
 ## Database Tables

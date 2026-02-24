@@ -30,6 +30,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('Workflow');
@@ -105,14 +106,14 @@ export class WorkflowService {
         const ctx = createEventContext('workflow');
         return runWithEventContext(ctx, async () => {
         const workflow = getWorkflow(this.db, workflowId);
-        if (!workflow) throw new Error(`Workflow not found: ${workflowId}`);
+        if (!workflow) throw new NotFoundError('Workflow', workflowId);
         if (workflow.status !== 'active') {
-            throw new Error(`Workflow is not active (status: ${workflow.status}). Activate it first.`);
+            throw new ValidationError(`Workflow is not active (status: ${workflow.status}). Activate it first.`, { workflowId });
         }
 
         // Validate the graph has a start node
         const startNode = workflow.nodes.find((n) => n.type === 'start');
-        if (!startNode) throw new Error('Workflow has no start node');
+        if (!startNode) throw new ValidationError('Workflow has no start node', { workflowId });
 
         // Create the run with a snapshot of the current graph
         const run = createWorkflowRun(
@@ -428,10 +429,10 @@ export class WorkflowService {
 
             case 'webhook_wait':
                 // Mark as waiting — will be completed externally
-                throw new Error('webhook_wait nodes are completed externally via the API');
+                throw new ValidationError('webhook_wait nodes are completed externally via the API');
 
             default:
-                throw new Error(`Unknown node type: ${node.type}`);
+                throw new ValidationError(`Unknown node type: ${node.type}`);
         }
     }
 
@@ -443,17 +444,17 @@ export class WorkflowService {
     ): Promise<Record<string, unknown>> {
         const config = node.config;
         const run = getWorkflowRun(this.db, runId);
-        if (!run) throw new Error('Run not found');
+        if (!run) throw new NotFoundError('WorkflowRun', runId);
 
         const workflow = getWorkflow(this.db, run.workflowId);
         const agentId = config.agentId ?? workflow?.agentId;
-        if (!agentId) throw new Error('No agent ID configured for agent_session node');
+        if (!agentId) throw new ValidationError('No agent ID configured for agent_session node', { runId });
 
         const agent = getAgent(this.db, agentId);
-        if (!agent) throw new Error(`Agent not found: ${agentId}`);
+        if (!agent) throw new NotFoundError('Agent', agentId);
 
         const projectId = config.projectId ?? workflow?.defaultProjectId;
-        if (!projectId) throw new Error('No project ID configured for agent_session node');
+        if (!projectId) throw new ValidationError('No project ID configured for agent_session node', { runId });
 
         // Resolve template variables in the prompt
         const prompt = this.resolveTemplate(config.prompt ?? 'Execute workflow step', input);
@@ -491,12 +492,12 @@ export class WorkflowService {
         input: Record<string, unknown>,
     ): Promise<Record<string, unknown>> {
         if (!this.workTaskService) {
-            throw new Error('Work task service not available');
+            throw new ValidationError('Work task service not available');
         }
 
         const config = node.config;
         const run = getWorkflowRun(this.db, runId);
-        if (!run) throw new Error('Run not found');
+        if (!run) throw new NotFoundError('WorkflowRun', runId);
 
         const workflow = getWorkflow(this.db, run.workflowId);
         const description = this.resolveTemplate(config.description ?? 'Workflow work task', input);
@@ -712,7 +713,7 @@ export class WorkflowService {
 
         while (Date.now() - startTime < maxWaitMs) {
             const session = getSession(this.db, sessionId);
-            if (!session) throw new Error(`Session ${sessionId} not found`);
+            if (!session) throw new NotFoundError('Session', sessionId);
 
             if (session.status === 'stopped' || session.status === 'idle') {
                 // Session completed — gather the last assistant message as output
@@ -723,13 +724,13 @@ export class WorkflowService {
             }
 
             if (session.status === 'error') {
-                throw new Error(`Session ${sessionId} ended with error`);
+                throw new ValidationError(`Session ${sessionId} ended with error`, { sessionId });
             }
 
             await new Promise((resolve) => setTimeout(resolve, pollMs));
         }
 
-        throw new Error(`Session ${sessionId} timed out after ${Math.round(maxWaitMs / 1000)}s`);
+        throw new ValidationError(`Session ${sessionId} timed out after ${Math.round(maxWaitMs / 1000)}s`, { sessionId });
     }
 
     /** Emit an event to all registered callbacks. */

@@ -4,6 +4,8 @@
  * Uses the Stripe REST API directly (no SDK dependency) to keep
  * the dependency footprint minimal.
  */
+import { ExternalServiceError, AuthenticationError } from '../lib/errors';
+
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 
 /**
@@ -35,7 +37,7 @@ async function stripeRequest<T>(
 ): Promise<T> {
     const apiKey = process.env.STRIPE_SECRET_KEY;
     if (!apiKey) {
-        throw new Error('STRIPE_SECRET_KEY is not configured');
+        throw new ExternalServiceError('Stripe', 'STRIPE_SECRET_KEY is not configured');
     }
 
     const url = `${STRIPE_API_BASE}${path}`;
@@ -55,7 +57,7 @@ async function stripeRequest<T>(
 
     if (!response.ok) {
         const err = (data as { error?: { message: string } }).error;
-        throw new Error(`Stripe API error: ${err?.message ?? response.statusText}`);
+        throw new ExternalServiceError('Stripe', err?.message ?? response.statusText);
     }
 
     return data;
@@ -161,7 +163,7 @@ export async function verifyWebhookSignature(
     const sigPart = parts.find((p) => p.startsWith('v1='));
 
     if (!timestampPart || !sigPart) {
-        throw new Error('Invalid webhook signature format');
+        throw new AuthenticationError('Invalid webhook signature format');
     }
 
     const timestamp = timestampPart.slice(2);
@@ -182,13 +184,13 @@ export async function verifyWebhookSignature(
         .join('');
 
     if (!timingSafeCompare(computed, expectedSig)) {
-        throw new Error('Webhook signature verification failed');
+        throw new AuthenticationError('Webhook signature verification failed');
     }
 
     // Check timestamp tolerance (5 minutes)
     const eventTime = parseInt(timestamp, 10) * 1000;
     if (Math.abs(Date.now() - eventTime) > 300_000) {
-        throw new Error('Webhook timestamp too old');
+        throw new AuthenticationError('Webhook timestamp too old');
     }
 
     return JSON.parse(payload);

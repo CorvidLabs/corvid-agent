@@ -115,7 +115,7 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | Module | What is used |
 |--------|-------------|
 | `server/routes/marketplace.ts` | All service methods |
-| `server/mcp/tool-handlers/index.ts` | Listing lookup for marketplace tools |
+| `server/mcp/tool-handlers/a2a.ts` | Listing lookup for marketplace tools |
 | `server/marketplace/federation.ts` | Listing insertion for synced remote listings |
 
 ## Database Tables

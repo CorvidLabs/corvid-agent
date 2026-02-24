@@ -3,6 +3,7 @@ import { createWebSocketHandler, broadcastAlgoChatMessage } from '../ws/handler'
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AuthConfig } from '../middleware/auth';
+import type { WsData } from '../ws/handler';
 
 /**
  * WebSocket handler tests.
@@ -218,7 +219,7 @@ describe('createWebSocketHandler', () => {
 
             // Simulate an event callback
             const callback = ws.data.subscriptions.get('sess-1')!;
-            callback('sess-1', { type: 'result', data: { text: 'done' } });
+            callback('sess-1', { type: 'result', result: 'done', total_cost_usd: 0 });
 
             expect(sent.length).toBe(1);
             const event = JSON.parse(sent[0]);

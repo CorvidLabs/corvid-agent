@@ -138,7 +138,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 |--------|-------------|
 | `server/process/manager.ts` | Injected as `mcpWorkTaskService` for MCP tools |
 | `server/scheduler/service.ts` | `create` (for `work_task` actions) |
-| `server/mcp/tool-handlers/index.ts` | `create`, `getTask`, `listTasks` |
+| `server/mcp/tool-handlers/work.ts` | `create`, `getTask`, `listTasks` |
 | `server/routes/work-tasks.ts` | All public methods |
 
 ## Database Tables

@@ -13,6 +13,7 @@ import type { AgentDirectory } from './agent-directory';
 import { checkAlgoLimit, recordAlgoSpend } from '../db/spending';
 import { updateSessionAlgoSpent } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { NotFoundError } from '../lib/errors';
 import { getTraceId } from '../observability/trace-context';
 
 const log = createLogger('OnChainTransactor');
@@ -310,7 +311,7 @@ export class OnChainTransactor {
             return cached.key;
         }
 
-        if (!this.service) throw new Error('AlgoChatService not available');
+        if (!this.service) throw new NotFoundError('AlgoChatService');
 
         const pubKey = await this.service.algorandService.discoverPublicKey(address);
         this.publicKeyCache.set(address, { key: pubKey, cachedAt: Date.now() });

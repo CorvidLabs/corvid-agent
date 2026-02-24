@@ -1,5 +1,6 @@
 import type { AlgoChatConfig } from './config';
 import { createLogger } from '../lib/logger';
+import { NotFoundError } from '../lib/errors';
 
 const log = createLogger('AlgoChat');
 
@@ -58,7 +59,7 @@ async function fundFromLocalNetDispenser(
     );
 
     if (!defaultWallet) {
-        throw new Error('LocalNet default wallet not found — is AlgoKit LocalNet running?');
+        throw new NotFoundError('LocalNet default wallet');
     }
 
     const walletHandle = (await kmd.initWalletHandle(defaultWallet.id, '')).wallet_handle_token;
@@ -68,7 +69,7 @@ async function fundFromLocalNetDispenser(
         const dispenserAddress = keys.addresses[0];
 
         if (!dispenserAddress) {
-            throw new Error('No accounts in LocalNet default wallet');
+            throw new NotFoundError('LocalNet default wallet accounts');
         }
 
         // Export dispenser's private key to sign the funding transaction

@@ -1,5 +1,6 @@
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import type { McpServerConfig, CreateMcpServerConfigInput, UpdateMcpServerConfigInput } from '../../shared/types';
+import { NotFoundError } from '../lib/errors';
 
 interface McpServerConfigRow {
     id: string;
@@ -81,7 +82,7 @@ export function createMcpServerConfig(db: Database, input: CreateMcpServerConfig
     );
 
     const created = getMcpServerConfig(db, id);
-    if (!created) throw new Error(`createMcpServerConfig: INSERT succeeded but SELECT returned null for id=${id}`);
+    if (!created) throw new NotFoundError('MCP server config', id);
     return created;
 }
 

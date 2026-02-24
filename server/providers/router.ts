@@ -9,6 +9,7 @@ import type { LlmProviderRegistry } from './registry';
 import { MODEL_PRICING, estimateCost } from './cost-table';
 import { FallbackManager, DEFAULT_FALLBACK_CHAINS, type FallbackChain } from './fallback';
 import { createLogger } from '../lib/logger';
+import { ValidationError } from '../lib/errors';
 
 const log = createLogger('ModelRouter');
 
@@ -235,7 +236,7 @@ export class ModelRouter {
                 .sort((a, b) => a.outputPricePerMillion - b.outputPricePerMillion)[0];
 
             if (!fallback) {
-                throw new Error('No models available for routing');
+                throw new ValidationError('No models available for routing');
             }
 
             log.warn('No qualified model found, using fallback', {

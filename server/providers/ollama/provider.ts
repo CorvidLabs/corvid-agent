@@ -15,6 +15,7 @@ import {
     normalizeToolArgs,
 } from './tool-parser';
 import { createLogger } from '../../lib/logger';
+import { ExternalServiceError } from '../../lib/errors';
 
 const log = createLogger('OllamaProvider');
 
@@ -531,11 +532,11 @@ export class OllamaProvider extends BaseLlmProvider {
         if (!response.ok) {
             const text = await response.text();
             log.error(`Ollama API ${response.status} for model=${params.model}: ${text.slice(0, 200)}`);
-            throw new Error(`Ollama API error (${response.status}): ${text}`);
+            throw new ExternalServiceError('Ollama', `API error (${response.status}): ${text}`);
         }
 
         if (!response.body) {
-            throw new Error('Ollama returned no response body');
+            throw new ExternalServiceError('Ollama', 'No response body returned');
         }
 
         // Accumulate streamed response chunks into a single result.
@@ -792,7 +793,7 @@ export class OllamaProvider extends BaseLlmProvider {
             });
 
             if (!response.ok || !response.body) {
-                throw new Error(`Pull request failed: ${response.status}`);
+                throw new ExternalServiceError('Ollama', `Pull request failed: ${response.status}`);
             }
 
             const reader = response.body.getReader();

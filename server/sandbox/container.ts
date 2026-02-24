@@ -7,6 +7,7 @@
 import type { ContainerInfo, ContainerStatus, ResourceLimits, SandboxConfig } from './types';
 import { DEFAULT_RESOURCE_LIMITS } from './types';
 import { createLogger } from '../lib/logger';
+import { AuthorizationError, ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('Container');
 
@@ -77,7 +78,7 @@ export async function createContainer(
         const resolved = resolve(config.workDir);
         // Block paths that escape via traversal or target system directories
         if (resolved !== config.workDir && config.workDir.includes('..')) {
-            throw new Error(`Invalid workDir: path traversal detected in '${config.workDir}'`);
+            throw new AuthorizationError(`Path traversal denied: '${config.workDir}' resolves outside allowed directory`);
         }
         args.push('-v', `${resolved}:/workspace`);
         args.push('-w', '/workspace');
@@ -94,7 +95,7 @@ export async function createContainer(
     const result = await dockerExec(args);
 
     if (result.exitCode !== 0) {
-        throw new Error(`Failed to create container: ${result.stderr}`);
+        throw new ExternalServiceError("Docker", `Failed to create container: ${result.stderr}`);
     }
 
     return result.stdout; // Container ID
@@ -106,7 +107,7 @@ export async function createContainer(
 export async function startContainer(containerId: string): Promise<void> {
     const result = await dockerExec(['start', containerId]);
     if (result.exitCode !== 0) {
-        throw new Error(`Failed to start container ${containerId}: ${result.stderr}`);
+        throw new ExternalServiceError("Docker", `Failed to start container ${containerId}: ${result.stderr}`);
     }
     log.info('Started container', { containerId: containerId.slice(0, 12) });
 }

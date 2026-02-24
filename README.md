@@ -148,8 +148,14 @@ OPENAI_API_KEY=sk-...
 
 ### Mention Polling
 - GitHub `@mention` polling for automated issue and PR responses
-- Configurable per-agent poll intervals with deduplication
+- Configurable per-agent poll intervals with centralized deduplication
 - Filters by event type (issue comments, issues, PR review comments)
+
+### Centralized Deduplication
+- Bounded LRU caches with configurable TTL per namespace
+- Replaces per-module Map/Set patterns to prevent unbounded memory growth
+- Optional SQLite persistence for crash recovery
+- Used across polling, messaging, AlgoChat bridge, and Slack bridge
 
 ### AST Code Understanding
 - Tree-sitter parser for TypeScript, JavaScript, Python, Go, Rust, and more
@@ -219,7 +225,7 @@ server/          Bun HTTP + WebSocket server
   exam/          Model exam system with 18 test cases across 6 categories
   github/        GitHub API operations (PRs, issues, reviews)
   improvement/   Self-improvement pipeline and health metrics
-  lib/           Shared utilities (logger, crypto, validation, web search)
+  lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
   mcp/           MCP tool server and 36 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
@@ -317,11 +323,14 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 bun test              # 1757 server tests (~30s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 30 Playwright spec files, 348 tests
+bun run spec:check    # Validate all module specs in specs/
 ```
 
 **1757+ unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **348 E2E tests** across 30 Playwright spec files covering 198/202 testable API endpoints and all 34 Angular UI routes.
+
+**33 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
@@ -330,7 +339,7 @@ bun run test:e2e      # 30 Playwright spec files, 348 tests
 | Layer | Technology |
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
-| Frontend | [Angular 21](https://angular.dev) — standalone components, signals |
+| Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
 | Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 47 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
