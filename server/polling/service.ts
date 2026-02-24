@@ -446,14 +446,16 @@ export class MentionPollingService {
                 if (sender.toLowerCase() === username.toLowerCase()) continue;
 
                 if (this.containsMention(body, username)) {
+                    const htmlUrl = (item.html_url as string) ?? '';
+                    const itemRepo = this.resolveFullRepo(repo, htmlUrl);
                     mentions.push({
-                        id: `issue-${item.number}`,
+                        id: `issue-${itemRepo}-${item.number}`,
                         type: 'issues',
                         body,
                         sender,
                         number: item.number as number,
                         title: (item.title as string) ?? '',
-                        htmlUrl: (item.html_url as string) ?? '',
+                        htmlUrl,
                         createdAt: (item.created_at as string) ?? '',
                         isPullRequest: false,
                     });
@@ -501,14 +503,16 @@ export class MentionPollingService {
                 // Don't skip self-authored for assignments — if someone assigns
                 // the agent to its own issue, it should still act on it.
 
+                const htmlUrl = (item.html_url as string) ?? '';
+                const itemRepo = this.resolveFullRepo(repo, htmlUrl);
                 mentions.push({
-                    id: `assigned-${item.number}`,
+                    id: `assigned-${itemRepo}-${item.number}`,
                     type: 'assignment',
                     body,
                     sender,
                     number: item.number as number,
                     title: (item.title as string) ?? '',
-                    htmlUrl: (item.html_url as string) ?? '',
+                    htmlUrl,
                     createdAt: (item.created_at as string) ?? '',
                     isPullRequest: isPR,
                 });
