@@ -103,7 +103,7 @@ describe('A2A Task Handler', () => {
         deps = createMockDeps({ listAgents: mock(() => []) });
 
         expect(() => handleTaskSend(deps, { message: 'test' })).toThrow(
-            'No agent with a default project is available to handle A2A tasks',
+            'Agent with default project not found',
         );
     });
 

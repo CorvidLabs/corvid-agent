@@ -102,7 +102,7 @@ describe('braveWebSearch', () => {
         process.env.BRAVE_SEARCH_API_KEY = 'test-key';
         mockFetch(async () => new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' }));
 
-        await expect(braveWebSearch('test')).rejects.toThrow('Brave Search API error: 401');
+        await expect(braveWebSearch('test')).rejects.toThrow('API error: 401 Unauthorized');
     });
 });
 

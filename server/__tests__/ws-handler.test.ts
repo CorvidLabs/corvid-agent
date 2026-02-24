@@ -3,7 +3,6 @@ import { createWebSocketHandler, broadcastAlgoChatMessage } from '../ws/handler'
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AuthConfig } from '../middleware/auth';
-import type { WsData } from '../ws/handler';
 
 /**
  * WebSocket handler tests.

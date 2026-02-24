@@ -651,7 +651,7 @@ describe('Mention Polling Routes', () => {
 
             const body = await getJson(res);
             expect(body.configs).toHaveLength(1);
-            expect(body.configs[0].agentId).toBe(agentId);
+            expect(body.configs![0].agentId).toBe(agentId);
         });
     });
 
