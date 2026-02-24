@@ -10,7 +10,6 @@
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
-import type { AlgoChatNetwork } from '../../shared/types';
 import { PSKManager } from './psk';
 import type { PSKMessage } from './psk';
 import { createLogger } from '../lib/logger';
