@@ -133,7 +133,7 @@ describe('Stripe API functions', () => {
                 name: 'Test User',
                 metadata: {},
             }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const customer = await createCustomer('test@example.com', 'Test User');
         expect(customer.id).toBe('cus_test');
@@ -151,7 +151,7 @@ describe('Stripe API functions', () => {
                 name: 'Meta',
                 metadata: { agentId: 'agent-1' },
             }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const customer = await createCustomer('meta@test.com', 'Meta', { agentId: 'agent-1' });
         expect(customer.metadata.agentId).toBe('agent-1');
@@ -168,7 +168,7 @@ describe('Stripe API functions', () => {
                 name: 'Get Test',
                 metadata: {},
             }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const customer = await getCustomer('cus_123');
         expect(customer.id).toBe('cus_123');
@@ -189,7 +189,7 @@ describe('Stripe API functions', () => {
                 cancel_at_period_end: false,
                 items: { data: [{ id: 'si_123', price: { id: 'price_abc' } }] },
             }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const sub = await createSubscription('cus_123', 'price_abc');
         expect(sub.id).toBe('sub_test');
@@ -212,7 +212,7 @@ describe('Stripe API functions', () => {
                 cancel_at_period_end: true,
                 items: { data: [] },
             }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const sub = await cancelSubscription('sub_123', true);
         expect(sub.cancel_at_period_end).toBe(true);
@@ -232,7 +232,7 @@ describe('Stripe API functions', () => {
                 cancel_at_period_end: false,
                 items: { data: [] },
             }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const sub = await cancelSubscription('sub_123', false);
         expect(sub.status).toBe('canceled');
@@ -245,7 +245,7 @@ describe('Stripe API functions', () => {
             expect(body.get('action')).toBe('set');
 
             return new Response(JSON.stringify({ id: 'usage_123' }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         const result = await createUsageRecord('si_item_1', 100);
         expect(result.id).toBe('usage_123');
@@ -257,7 +257,7 @@ describe('Stripe API functions', () => {
             expect(body.get('timestamp')).toBe('1700000000');
 
             return new Response(JSON.stringify({ id: 'usage_ts' }), { status: 200 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         await createUsageRecord('si_item_1', 50, 1700000000);
     });
@@ -267,7 +267,7 @@ describe('Stripe API functions', () => {
             return new Response(JSON.stringify({
                 error: { message: 'Invalid API Key', type: 'authentication_error' },
             }), { status: 401 });
-        }) as typeof fetch;
+        }) as unknown as typeof fetch;
 
         await expect(getCustomer('cus_bad')).rejects.toThrow('Invalid API Key');
     });
