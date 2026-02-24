@@ -386,9 +386,6 @@ export class MentionPollingService {
                 const body = (comment.body as string) ?? '';
                 const commentUser = (comment.user as Record<string, unknown>)?.login as string ?? '';
 
-                // Skip own comments (prevent infinite loops)
-                if (commentUser.toLowerCase() === username.toLowerCase()) continue;
-
                 // Check for @mention
                 if (this.containsMention(body, username)) {
                     mentions.push({
@@ -441,9 +438,6 @@ export class MentionPollingService {
             for (const item of items) {
                 const body = (item.body as string) ?? '';
                 const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
-
-                // Skip own issues
-                if (sender.toLowerCase() === username.toLowerCase()) continue;
 
                 if (this.containsMention(body, username)) {
                     const htmlUrl = (item.html_url as string) ?? '';
