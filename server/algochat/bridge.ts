@@ -41,6 +41,7 @@ import { formatApprovalForChain, parseApprovalResponse } from './approval-format
 // import { getBalance, purchaseCredits, maybeGrantFirstTimeCredits, canStartSession, getCreditConfig } from '../db/credits';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
+import { DedupService } from '../lib/dedup';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 // Composed services
@@ -57,6 +58,7 @@ export type { AlgoChatEventCallback } from './response-formatter';
 export type { LocalChatSendFn, LocalChatEvent, LocalChatEventFn } from './subscription-manager';
 
 const log = createLogger('AlgoChatBridge');
+const ALGOCHAT_TXID_DEDUP_NS = 'algochat:txids';
 
 /**
  * Central orchestrator for the AlgoChat system.
@@ -103,8 +105,7 @@ export class AlgoChatBridge implements ChannelAdapter {
     // ChannelAdapter inbound message handlers
     private messageHandlers: Set<(msg: SessionMessage) => void> = new Set();
 
-    // On-chain message dedup
-    private processedTxids: Set<string> = new Set();
+    private dedup = DedupService.global();
 
     // Group message reassembly buffer
     private pendingGroupChunks: Map<string, { chunks: unknown[]; firstSeen: number }> = new Map();
@@ -144,6 +145,9 @@ export class AlgoChatBridge implements ChannelAdapter {
 
         // Wire PSK manager lookup into response formatter before setup
         this.responseFormatter.setPskManagerLookup((address) => this.lookupPskManager(address));
+
+        // Register on-chain txid dedup namespace (10 min TTL, bounded at 500 entries)
+        this.dedup.register(ALGOCHAT_TXID_DEDUP_NS, { maxSize: 500, ttlMs: 600_000 });
 
         this.setupMessageHandler();
         this.setupPSKManagers();
@@ -567,11 +571,10 @@ export class AlgoChatBridge implements ChannelAdapter {
                 // Dedup by transaction ID
                 const txid = (msg as unknown as { id?: string }).id;
                 if (txid) {
-                    if (this.processedTxids.has(txid)) {
+                    if (this.dedup.isDuplicate(ALGOCHAT_TXID_DEDUP_NS, txid)) {
                         log.debug('Skipping already-processed txid', { txid });
                         continue;
                     }
-                    this.processedTxids.add(txid);
                 }
 
                 const grp = parseGroupPrefix(msg.content);
@@ -582,12 +585,6 @@ export class AlgoChatBridge implements ChannelAdapter {
                 } else {
                     regularMessages.push(msg);
                 }
-            }
-
-            // Prune old txids to prevent unbounded growth (keep last 500)
-            if (this.processedTxids.size > 500) {
-                const all = [...this.processedTxids];
-                this.processedTxids = new Set(all.slice(all.length - 500));
             }
 
             // Reassemble group messages

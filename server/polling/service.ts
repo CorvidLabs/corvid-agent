@@ -24,10 +24,12 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { DedupService } from '../lib/dedup';
 import { buildSafeGhEnv } from '../lib/env';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('MentionPoller');
+const TRIGGER_DEDUP_NS = 'polling:triggers';
 
 /** How often we check which configs are due (main loop interval). */
 const POLL_LOOP_INTERVAL_MS = 15_000; // 15 seconds
@@ -75,7 +77,7 @@ export class MentionPollingService {
     private processManager: ProcessManager;
     private loopTimer: ReturnType<typeof setInterval> | null = null;
     private activePolls = new Set<string>(); // config IDs currently being polled
-    private recentTriggers = new Map<string, number>(); // configId -> last trigger timestamp
+    private dedup = DedupService.global();
     private eventCallbacks = new Set<PollingEventCallback>();
     private running = false;
 
@@ -86,6 +88,8 @@ export class MentionPollingService {
     ) {
         this.db = db;
         this.processManager = processManager;
+        // Rate limit triggers: 60s TTL matches MIN_TRIGGER_GAP_MS, bounded at 500 entries
+        this.dedup.register(TRIGGER_DEDUP_NS, { maxSize: 500, ttlMs: MIN_TRIGGER_GAP_MS });
     }
 
     /** Subscribe to polling events (for WebSocket broadcast). */
@@ -691,8 +695,7 @@ export class MentionPollingService {
         // Rate limit per mention ID — prevents re-triggering the same mention
         // within 60s, but allows different mentions on the same config concurrently.
         const rateLimitKey = `${config.id}:${mention.id}`;
-        const lastTrigger = this.recentTriggers.get(rateLimitKey);
-        if (lastTrigger && (Date.now() - lastTrigger) < MIN_TRIGGER_GAP_MS) {
+        if (this.dedup.has(TRIGGER_DEDUP_NS, rateLimitKey)) {
             log.debug('Skipping mention due to rate limit', { configId: config.id, mentionId: mention.id });
             return false;
         }
@@ -723,7 +726,7 @@ export class MentionPollingService {
         // changes. This ensures the person who mentioned us always gets a reply.
         const prompt = this.buildPrompt(config, mention);
 
-        this.recentTriggers.set(rateLimitKey, Date.now());
+        this.dedup.markSeen(TRIGGER_DEDUP_NS, rateLimitKey);
 
         try {
             const session = createSession(this.db, {

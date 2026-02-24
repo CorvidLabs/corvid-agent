@@ -22,6 +22,7 @@ import { MemorySyncService } from './db/memory-sync';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
+import { DedupService } from './lib/dedup';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity, timingSafeEqual } from './middleware/auth';
 import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
@@ -74,6 +75,10 @@ const startTime = Date.now();
 
 // Initialize database
 const db = getDb();
+
+// Initialize centralized dedup service (TTL + LRU + optional SQLite persistence)
+const dedupService = DedupService.init(db);
+dedupService.start();
 
 // Initialize observability (OpenTelemetry tracing + metrics) — non-blocking, opt-in.
 // Empty catch is intentional: initObservability() logs warnings internally when
@@ -779,6 +784,7 @@ function gracefulShutdown(): void {
     slackBridge?.stop();
     processManager.shutdown();
     algochatBridge?.stop();
+    dedupService.stop();
     closeDb();
 }
 

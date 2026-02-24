@@ -2,33 +2,18 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import { createLogger } from '../../lib/logger';
+import { DedupService } from '../../lib/dedup';
 
 const log = createLogger('McpToolHandlers');
 
 const MAX_INVOKE_DEPTH = 3;
 
-// Dedup: track recent sends to prevent Claude from calling the tool twice
-// with the same content in the same turn. Key = hash, value = timestamp.
-const recentSends = new Map<string, number>();
-const DEDUP_WINDOW_MS = 30_000; // 30 seconds
+// Dedup namespace for agent-to-agent message sends (30s window, bounded at 500 entries).
+const SEND_DEDUP_NS = 'mcp:send-message';
+DedupService.global().register(SEND_DEDUP_NS, { maxSize: 500, ttlMs: 30_000 });
 
 function sendKey(agentId: string, toAgent: string, message: string): string {
-    // Simple hash: agent pair + first 200 chars of message
     return `${agentId}:${toAgent}:${message.slice(0, 200)}`;
-}
-
-/** Returns true if this key was already sent within the dedup window.
- *  First call with a given key records it and returns false (allow).
- *  Subsequent calls within the window return true (duplicate). */
-function isDuplicateSend(key: string): boolean {
-    const now = Date.now();
-    // Prune expired entries
-    for (const [k, ts] of recentSends) {
-        if (now - ts > DEDUP_WINDOW_MS) recentSends.delete(k);
-    }
-    if (recentSends.has(key)) return true;
-    recentSends.set(key, now);
-    return false;
 }
 
 export async function handleSendMessage(
@@ -61,7 +46,7 @@ export async function handleSendMessage(
 
         // Dedup: reject duplicate sends within the time window
         const key = sendKey(ctx.agentId, match.agentId, args.message);
-        if (isDuplicateSend(key)) {
+        if (DedupService.global().isDuplicate(SEND_DEDUP_NS, key)) {
             log.warn('Duplicate send_message suppressed', {
                 from: ctx.agentId,
                 to: match.agentId,
