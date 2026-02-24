@@ -138,6 +138,13 @@ export const routes: Routes = [
             import('./features/analytics/analytics.component').then((m) => m.AnalyticsComponent),
     },
     {
+        path: 'github-activity',
+        loadComponent: () =>
+            import('./features/github-activity/github-activity.component').then(
+                (m) => m.GitHubActivityComponent,
+            ),
+    },
+    {
         path: 'logs',
         loadComponent: () =>
             import('./features/logs/system-logs.component').then((m) => m.SystemLogsComponent),

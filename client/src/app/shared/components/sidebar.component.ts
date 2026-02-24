@@ -145,6 +145,12 @@ import { filter, Subscription } from 'rxjs';
                     </a>
                 </li>
                 <li>
+                    <a class="sidebar__link" routerLink="/github-activity" routerLinkActive="sidebar__link--active" title="GitHub Activity">
+                        <span class="sidebar__label">GitHub</span>
+                        <span class="sidebar__abbr">Gh</span>
+                    </a>
+                </li>
+                <li>
                     <a class="sidebar__link" routerLink="/logs" routerLinkActive="sidebar__link--active" title="Logs">
                         <span class="sidebar__label">Logs</span>
                         <span class="sidebar__abbr">L</span>

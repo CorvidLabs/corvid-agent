@@ -12,6 +12,7 @@ import { handleSettingsRoutes } from './settings';
 import { handleScheduleRoutes } from './schedules';
 import { handleWebhookRoutes } from './webhooks';
 import { handleMentionPollingRoutes } from './mention-polling';
+import { handleGitHubActivityRoutes } from './github-activity';
 import { handleWorkflowRoutes } from './workflows';
 import { handleSandboxRoutes } from './sandbox';
 import { handleMarketplaceRoutes } from './marketplace';
@@ -269,6 +270,10 @@ async function handleRoutes(
     // Mention polling routes (local-first GitHub @mention detection)
     const pollingResponse = handleMentionPollingRoutes(req, url, db, mentionPollingService ?? null);
     if (pollingResponse) return pollingResponse;
+
+    // GitHub activity routes (repo events, PRs, issues, CI runs)
+    const ghActivityResponse = handleGitHubActivityRoutes(req, url);
+    if (ghActivityResponse) return ghActivityResponse;
 
     // Workflow routes (graph-based orchestration)
     const workflowResponse = handleWorkflowRoutes(req, url, db, workflowService ?? null);
