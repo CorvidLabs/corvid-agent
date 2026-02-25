@@ -1,6 +1,7 @@
 import type { PluginRegistry } from '../plugins/registry';
-import { grantCapability, revokeCapability, isValidCapability } from '../plugins/permissions';
+import { grantCapability, revokeCapability } from '../plugins/permissions';
 import { json, handleRouteError } from '../lib/response';
+import { parseBodyOrThrow, ValidationError, LoadPluginSchema, PluginCapabilityActionSchema } from '../lib/validation';
 import type { Database } from 'bun:sqlite';
 import type { PluginCapability } from '../plugins/types';
 
@@ -55,17 +56,14 @@ export function handlePluginRoutes(
 
 async function handleLoad(req: Request, registry: PluginRegistry): Promise<Response> {
     try {
-        const body = await req.json() as { packageName?: string; autoGrant?: boolean };
-        const packageName = body.packageName?.trim();
-        if (!packageName) {
-            return json({ error: 'packageName is required' }, 400);
-        }
-        const result = await registry.loadPlugin(packageName, body.autoGrant ?? false);
+        const data = await parseBodyOrThrow(req, LoadPluginSchema);
+        const result = await registry.loadPlugin(data.packageName, data.autoGrant);
         if (!result.success) {
             return json({ error: result.error }, 400);
         }
-        return json({ ok: true, message: `Plugin loaded from ${packageName}` });
+        return json({ ok: true, message: `Plugin loaded from ${data.packageName}` });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         return handleRouteError(err);
     }
 }
@@ -80,28 +78,22 @@ async function handleUnload(name: string, registry: PluginRegistry): Promise<Res
 
 async function handleGrant(req: Request, db: Database, pluginName: string): Promise<Response> {
     try {
-        const body = await req.json() as { capability?: string };
-        const cap = body.capability?.trim();
-        if (!cap || !isValidCapability(cap)) {
-            return json({ error: 'Invalid capability. Valid: db:read, network:outbound, fs:project-dir, agent:read, session:read' }, 400);
-        }
-        grantCapability(db, pluginName, cap as PluginCapability);
-        return json({ ok: true, message: `${cap} granted to ${pluginName}` });
+        const data = await parseBodyOrThrow(req, PluginCapabilityActionSchema);
+        grantCapability(db, pluginName, data.capability as PluginCapability);
+        return json({ ok: true, message: `${data.capability} granted to ${pluginName}` });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         return handleRouteError(err);
     }
 }
 
 async function handleRevoke(req: Request, db: Database, pluginName: string): Promise<Response> {
     try {
-        const body = await req.json() as { capability?: string };
-        const cap = body.capability?.trim();
-        if (!cap || !isValidCapability(cap)) {
-            return json({ error: 'Invalid capability' }, 400);
-        }
-        revokeCapability(db, pluginName, cap as PluginCapability);
-        return json({ ok: true, message: `${cap} revoked from ${pluginName}` });
+        const data = await parseBodyOrThrow(req, PluginCapabilityActionSchema);
+        revokeCapability(db, pluginName, data.capability as PluginCapability);
+        return json({ ok: true, message: `${data.capability} revoked from ${pluginName}` });
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         return handleRouteError(err);
     }
 }

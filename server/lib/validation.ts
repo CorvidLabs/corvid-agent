@@ -570,3 +570,97 @@ export const UpdateMcpServerConfigSchema = z.object({
     cwd: z.string().max(500).nullable().optional(),
     enabled: z.boolean().optional(),
 });
+
+// ─── A2A ─────────────────────────────────────────────────────────────────────
+
+export const SendA2ATaskSchema = z.object({
+    params: z.object({
+        message: z.string().min(1, 'message is required'),
+        skill: z.string().optional(),
+        timeoutMs: z.number().int().min(1000).max(600000).optional(),
+    }).optional(),
+    message: z.string().min(1).optional(),
+    skill: z.string().optional(),
+    timeoutMs: z.number().int().min(1000).max(600000).optional(),
+}).refine(
+    (d) => (d.params?.message?.trim()) || (d.message?.trim()),
+    { message: 'message is required (either at top-level or inside params)' },
+);
+
+// ─── Council Chat ──────────────────────────────────────────────────────────
+
+export const CouncilChatSchema = z.object({
+    message: z.string().min(1, 'message is required'),
+});
+
+// ─── Settings ──────────────────────────────────────────────────────────────
+
+const CreditConfigKeySchema = z.enum([
+    'credits_per_algo',
+    'low_credit_threshold',
+    'reserve_per_group_message',
+    'credits_per_turn',
+    'credits_per_agent_message',
+    'free_credits_on_first_message',
+]);
+
+export const UpdateCreditConfigSchema = z.record(
+    CreditConfigKeySchema,
+    z.union([z.string(), z.number()]),
+).refine(
+    (d) => Object.keys(d).length > 0,
+    { message: 'At least one config key is required' },
+);
+
+// ─── Plugins ──────────────────────────────────────────────────────────────
+
+export const LoadPluginSchema = z.object({
+    packageName: z.string().min(1, 'packageName is required'),
+    autoGrant: z.boolean().optional().default(false),
+});
+
+const PluginCapabilitySchema = z.enum([
+    'db:read',
+    'network:outbound',
+    'fs:project-dir',
+    'agent:read',
+    'session:read',
+]);
+
+export const PluginCapabilityActionSchema = z.object({
+    capability: PluginCapabilitySchema,
+});
+
+// ─── Sandbox ──────────────────────────────────────────────────────────────
+
+export const SetSandboxPolicySchema = z.object({
+    cpuLimit: z.number().min(0.1).max(16).optional(),
+    memoryLimitMb: z.number().int().min(64).max(65536).optional(),
+    networkPolicy: z.enum(['none', 'host', 'restricted']).optional(),
+    timeoutSeconds: z.number().int().min(1).max(86400).optional(),
+});
+
+export const AssignSandboxSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    sessionId: z.string().min(1, 'sessionId is required'),
+    workDir: z.string().optional(),
+});
+
+// ─── Auth Flow (Device Authorization) ───────────────────────────────────
+
+export const DeviceTokenSchema = z.object({
+    deviceCode: z.string().min(1, 'deviceCode is required'),
+});
+
+export const DeviceAuthorizeSchema = z.object({
+    userCode: z.string().min(1, 'userCode is required'),
+    tenantId: z.string().min(1, 'tenantId is required'),
+    email: z.string().min(1, 'email is required'),
+    approve: z.boolean({ message: 'approve (boolean) is required' }),
+});
+
+// ─── PSK Contacts ────────────────────────────────────────────────────────
+
+export const PSKContactNicknameSchema = z.object({
+    nickname: z.string().min(1, 'nickname is required'),
+});
