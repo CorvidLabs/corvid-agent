@@ -7,18 +7,9 @@
 
 import { z } from 'zod';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Validation error — throw to get a 400 response. */
-export class ValidationError extends Error {
-    /** User-facing error detail — safe to include in HTTP responses (not Error.message/stack). */
-    readonly detail: string;
-    constructor(message: string) {
-        super(message);
-        this.name = 'ValidationError';
-        this.detail = message;
-    }
-}
+// Re-export ValidationError from the central errors module so existing imports keep working.
+export { ValidationError } from './errors';
+import { ValidationError } from './errors';
 
 /**
  * Parse and validate a JSON request body against a Zod schema.

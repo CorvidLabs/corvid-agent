@@ -20,6 +20,7 @@ import { createEventContext, runWithEventContext } from '../observability/event-
 import { agentMessagesTotal } from '../observability/metrics';
 import { recordAudit } from '../db/audit';
 import { MessagingGuard, type MessagingGuardConfig } from './messaging-guard';
+import { ValidationError, NotFoundError, ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('AgentMessenger');
 
@@ -138,14 +139,14 @@ export class AgentMessenger {
 
         // Guards
         if (fromAgentId === toAgentId) {
-            throw new Error('An agent cannot invoke itself');
+            throw new ValidationError('An agent cannot invoke itself', { fromAgentId, toAgentId });
         }
 
         const fromAgent = getAgent(this.db, fromAgentId);
-        if (!fromAgent) throw new Error(`Source agent ${fromAgentId} not found`);
+        if (!fromAgent) throw new NotFoundError('Agent', fromAgentId);
 
         const toAgent = getAgent(this.db, toAgentId);
-        if (!toAgent) throw new Error(`Target agent ${toAgentId} not found`);
+        if (!toAgent) throw new NotFoundError('Agent', toAgentId);
 
         // Route [WORK] prefix through WorkCommandRouter
         if (content.startsWith('[WORK]') && this.workCommandRouter?.hasService) {
@@ -413,7 +414,7 @@ export class AgentMessenger {
         const result = await this.invoke(request);
         const sessionId = result.sessionId;
         if (!sessionId) {
-            throw new Error('No session created for agent invoke');
+            throw new ExternalServiceError('AgentMessenger', 'No session created for agent invoke');
         }
 
         // Retrieve the threadId from the created message

@@ -25,8 +25,9 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { getModelPricing } from '../providers/cost-table';
-import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
+import { NotFoundError } from '../lib/errors';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('CouncilRoutes');
@@ -231,10 +232,10 @@ export function launchCouncil(
     const ctx = createEventContext('council');
     return runWithEventContext(ctx, () => {
     const council = getCouncil(db, councilId);
-    if (!council) throw new Error('Council not found');
+    if (!council) throw new NotFoundError("Council", councilId);
 
     const project = getProject(db, projectId);
-    if (!project) throw new Error('Project not found');
+    if (!project) throw new NotFoundError("Project", projectId);
 
     const launchId = crypto.randomUUID();
     createCouncilLaunch(db, { id: launchId, councilId, projectId, prompt });
@@ -589,13 +590,10 @@ async function handleCouncilChat(
 
     let body: { message: string };
     try {
-        const raw = await req.json();
-        if (!raw?.message || typeof raw.message !== 'string' || raw.message.trim().length === 0) {
-            return json({ error: 'message is required' }, 400);
-        }
-        body = { message: raw.message.trim() };
-    } catch {
-        return json({ error: 'Invalid JSON body' }, 400);
+        body = await parseBodyOrThrow(req, CouncilChatSchema);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
     }
 
     const council = getCouncil(db, launch.councilId);
