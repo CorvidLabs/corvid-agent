@@ -339,7 +339,7 @@ export function normalizeToolArgs(
     args: Record<string, unknown>,
     toolDef: LlmToolDefinition,
 ): Record<string, unknown> {
-    const schemaProps = (toolDef.parameters as any)?.properties;
+    const schemaProps = toolDef.parameters.properties;
     if (!schemaProps) return args;
 
     const schemaKeys = new Set(Object.keys(schemaProps));
