@@ -133,17 +133,17 @@ async function handleDeviceToken(req: Request): Promise<Response> {
 
     const auth = pendingAuths.get(data.deviceCode);
     if (!auth) {
-        return json({ error: 'Device code expired or invalid' }, 400);
+        return json({ error: 'expired', error_description: 'Device code expired or invalid' }, 400);
     }
 
     if (auth.expiresAt < Date.now()) {
         pendingAuths.delete(data.deviceCode);
-        return json({ error: 'Device code expired' }, 400);
+        return json({ error: 'expired', error_description: 'Device code expired' }, 400);
     }
 
     if (auth.status === 'denied') {
         pendingAuths.delete(data.deviceCode);
-        return json({ error: 'Authorization denied' }, 400);
+        return json({ error: 'denied', error_description: 'Authorization denied' }, 400);
     }
 
     if (auth.status === 'pending') {

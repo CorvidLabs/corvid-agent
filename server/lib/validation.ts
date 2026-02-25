@@ -589,12 +589,6 @@ export const SendA2ATaskSchema = z.object({
     { message: 'message is required (either at top-level or inside params)' },
 );
 
-// ─── Council Chat ──────────────────────────────────────────────────────────
-
-export const CouncilChatSchema = z.object({
-    message: z.string().min(1, 'message is required'),
-});
-
 // ─── Settings ──────────────────────────────────────────────────────────────
 
 const CreditConfigValueSchema = z.union([z.string(), z.number()]);
