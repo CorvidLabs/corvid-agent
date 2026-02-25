@@ -11,5 +11,12 @@ export default defineConfig({
         include: ['src/**/*.spec.ts'],
         reporters: ['default'],
         pool: 'forks',
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'lcov'],
+            reportsDirectory: '../coverage/client',
+            include: ['src/**/*.ts'],
+            exclude: ['src/test-setup.ts', 'src/**/*.spec.ts'],
+        },
     },
 });

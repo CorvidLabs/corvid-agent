@@ -1,0 +1,26 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 60%
+        threshold: 2%
+    patch:
+      default:
+        target: 70%
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+
+flags:
+  server:
+    paths:
+      - server/
+      - cli/
+      - shared/
+    carryforward: true
+  client:
+    paths:
+      - client/src/
+    carryforward: true
