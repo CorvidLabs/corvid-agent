@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { routes, type RouteEntry, type HttpMethod } from './route-registry';
+import { routes, type HttpMethod } from './route-registry';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
