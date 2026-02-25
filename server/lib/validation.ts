@@ -6,10 +6,12 @@
 // Input validation schemas and parsing utilities for HTTP routes
 
 import { z } from 'zod';
-
-// Re-export ValidationError from the central errors module so existing imports keep working.
-export { ValidationError } from './errors';
 import { ValidationError } from './errors';
+
+// Re-export so existing imports from '../lib/validation' continue to work
+export { ValidationError };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
  * Parse and validate a JSON request body against a Zod schema.

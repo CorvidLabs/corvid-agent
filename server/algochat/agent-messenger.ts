@@ -143,10 +143,10 @@ export class AgentMessenger {
         }
 
         const fromAgent = getAgent(this.db, fromAgentId);
-        if (!fromAgent) throw new NotFoundError('Agent', fromAgentId);
+        if (!fromAgent) throw new NotFoundError('Source agent', fromAgentId);
 
         const toAgent = getAgent(this.db, toAgentId);
-        if (!toAgent) throw new NotFoundError('Agent', toAgentId);
+        if (!toAgent) throw new NotFoundError('Target agent', toAgentId);
 
         // Route [WORK] prefix through WorkCommandRouter
         if (content.startsWith('[WORK]') && this.workCommandRouter?.hasService) {
