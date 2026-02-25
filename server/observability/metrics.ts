@@ -266,6 +266,12 @@ export const agentRateLimitRejections = new Counter(
     ['reason', 'agent_id'],
 );
 
+export const endpointRateLimitRejections = new Counter(
+    'endpoint_rate_limit_rejections_total',
+    'Per-endpoint rate limit rejections',
+    ['method', 'path', 'tier'],
+);
+
 // ─── Registry ────────────────────────────────────────────────────────────
 
 const allMetrics = [
@@ -278,6 +284,7 @@ const allMetrics = [
     activeSessions,
     circuitBreakerTransitions,
     agentRateLimitRejections,
+    endpointRateLimitRejections,
 ];
 
 /**

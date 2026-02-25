@@ -13,6 +13,8 @@ import { buildCorsHeaders } from './auth';
 import { checkHttpAuth } from './auth';
 import type { RateLimiter } from './rate-limit';
 import { getClientIp } from './rate-limit';
+import type { EndpointRateLimiter } from './endpoint-rate-limit';
+import { resolveTier } from './endpoint-rate-limit';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('Middleware');
@@ -181,6 +183,35 @@ export function rateLimitMiddleware(limiter: RateLimiter): Middleware {
     };
 }
 
+
+// ---------------------------------------------------------------------------
+// Per-endpoint rate limit middleware
+// ---------------------------------------------------------------------------
+
+export function endpointRateLimitMiddleware(limiter: EndpointRateLimiter): Middleware {
+    return {
+        name: 'endpoint-rate-limit',
+        order: ORDER.RATE_LIMIT + 15,
+        handler: async (ctx: MiddlewareContext, next: NextFn): Promise<void> => {
+            const { url, req, requestContext } = ctx;
+            const key = requestContext.walletAddress || getClientIp(req);
+            const tier = resolveTier(requestContext.authenticated, requestContext.role);
+            const result = limiter.check(key, req.method, url.pathname, tier);
+            requestContext.rateLimitHeaders = result.headers;
+            if (!result.allowed && result.response) {
+                ctx.response = result.response;
+                ctx.aborted = true;
+                return;
+            }
+            await next();
+            if (ctx.response && requestContext.rateLimitHeaders) {
+                for (const [header, value] of Object.entries(requestContext.rateLimitHeaders)) {
+                    ctx.response.headers.set(header, value);
+                }
+            }
+        },
+    };
+}
 // ---------------------------------------------------------------------------
 // Auth middleware
 // ---------------------------------------------------------------------------
