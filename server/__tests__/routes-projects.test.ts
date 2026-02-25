@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleProjectRoutes, handleBrowseDirs, isPathAllowed, getAllowedRoots } from '../routes/projects';
 import { homedir } from 'node:os';
-import { resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
 
 let db: Database;
 
