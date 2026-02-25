@@ -5,7 +5,7 @@
  * across 13 route modules.
  */
 
-import { ValidationError } from './validation';
+import { isAppError, RateLimitError } from './errors';
 import { createLogger } from './logger';
 
 const log = createLogger('Response');
@@ -64,10 +64,17 @@ export function safeNumParam(value: string | null, defaultValue: number): number
 /**
  * Standard route error handler.
  *
- * Returns 400 for ValidationError, 500 (with timestamp) for anything else.
+ * Maps any `AppError` subclass to the correct HTTP status and a consistent
+ * JSON body `{ error, code }`. Falls back to 500 for unknown errors.
  * Use in catch blocks: `catch (err) { return handleRouteError(err); }`
  */
 export function handleRouteError(err: unknown): Response {
-    if (err instanceof ValidationError) return badRequest(err.detail);
+    if (isAppError(err)) {
+        const body: Record<string, unknown> = { error: err.message, code: err.code };
+        if (err instanceof RateLimitError && err.retryAfter !== undefined) {
+            body.retryAfter = err.retryAfter;
+        }
+        return json(body, err.statusCode);
+    }
     return serverError(err);
 }

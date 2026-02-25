@@ -1,3 +1,5 @@
+import { ValidationError } from '../lib/errors';
+
 /**
  * Lightweight cron expression parser.
  *
@@ -75,7 +77,7 @@ export function parseCron(expression: string): ParsedCron {
     const parts = resolved.trim().split(/\s+/);
 
     if (parts.length !== 5) {
-        throw new Error(`Invalid cron expression: expected 5 fields, got ${parts.length}`);
+        throw new ValidationError(`Invalid cron expression: expected 5 fields, got ${parts.length}`);
     }
 
     return {
@@ -143,7 +145,7 @@ export function getNextCronDate(expression: string, from?: Date): Date {
         return date;
     }
 
-    throw new Error(`No matching cron date found within 366 days for: ${expression}`);
+    throw new ValidationError(`No matching cron date found within 366 days for: ${expression}`);
 }
 
 /**

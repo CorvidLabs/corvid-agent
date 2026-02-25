@@ -23,6 +23,7 @@ import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
+import { NotFoundError } from '../lib/errors';
 
 const log = createLogger('Webhook');
 
@@ -356,7 +357,7 @@ export class WebhookService {
     ): Promise<void> {
         const agent = getAgent(this.db, reg.agentId);
         if (!agent) {
-            throw new Error(`Agent ${reg.agentId} not found`);
+            throw new NotFoundError('Agent', reg.agentId);
         }
 
         // Build the prompt with full context

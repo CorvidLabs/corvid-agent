@@ -5,12 +5,13 @@
  * external services and needs fault tolerance.
  */
 
+import { AppError } from './errors';
+
 // ── CircuitOpenError ────────────────────────────────────────────────────
 
-export class CircuitOpenError extends Error {
+export class CircuitOpenError extends AppError {
     constructor(message = 'Circuit breaker is OPEN — call rejected') {
-        super(message);
-        this.name = 'CircuitOpenError';
+        super(message, { code: 'CIRCUIT_OPEN', statusCode: 503 });
     }
 }
 

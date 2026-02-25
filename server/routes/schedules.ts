@@ -197,9 +197,6 @@ async function handleTriggerNow(scheduleId: string, schedulerService: SchedulerS
         await schedulerService.triggerNow(scheduleId);
         return json({ ok: true });
     } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (message.includes('not found')) return json({ error: message }, 404);
-        if (message.includes('not active')) return json({ error: message }, 400);
         return handleRouteError(err);
     }
 }

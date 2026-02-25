@@ -14,6 +14,7 @@ import { checkHttpAuth } from './auth';
 import type { RateLimiter } from './rate-limit';
 import { getClientIp } from './rate-limit';
 import { createLogger } from '../lib/logger';
+import { isAppError, RateLimitError } from '../lib/errors';
 
 const log = createLogger('Middleware');
 
@@ -62,10 +63,21 @@ export function errorHandlerMiddleware(): Middleware {
                 log.error('Unhandled error in pipeline', { error: message, stack, path: ctx.url.pathname });
 
                 if (!ctx.response) {
-                    ctx.response = new Response(
-                        JSON.stringify({ error: 'Internal server error', timestamp: new Date().toISOString() }),
-                        { status: 500, headers: { 'Content-Type': 'application/json' } },
-                    );
+                    if (isAppError(err)) {
+                        const body: Record<string, unknown> = { error: err.message, code: err.code };
+                        if (err instanceof RateLimitError && err.retryAfter !== undefined) {
+                            body.retryAfter = err.retryAfter;
+                        }
+                        ctx.response = new Response(
+                            JSON.stringify(body),
+                            { status: err.statusCode, headers: { 'Content-Type': 'application/json' } },
+                        );
+                    } else {
+                        ctx.response = new Response(
+                            JSON.stringify({ error: 'Internal server error', timestamp: new Date().toISOString() }),
+                            { status: 500, headers: { 'Content-Type': 'application/json' } },
+                        );
+                    }
                 }
             }
         },

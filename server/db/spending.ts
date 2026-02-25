@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
+import { RateLimitError } from '../lib/errors';
 
 const log = createLogger('SpendingTracker');
 
@@ -70,7 +71,7 @@ export function checkAlgoLimit(db: Database, additionalMicro: number): void {
             const currentAlgo = (totals.algoMicro / 1_000_000).toFixed(6);
             const message = `Daily ALGO spending limit reached: ${currentAlgo}/${limitAlgo} ALGO`;
             log.warn(message);
-            throw new Error(message);
+            throw new RateLimitError(message);
         }
     });
     check();
