@@ -324,9 +324,11 @@ export class MentionPollingService {
         since: string,
     ): Promise<DetectedMention[]> {
         try {
-            // Use the GitHub search API for issues/PRs mentioning the user in the repo
-            // This finds issues/PRs where the user is mentioned (including in comments)
-            const query = `${this.repoQualifier(repo)} mentions:${username} updated:>=${since.split('T')[0]}`;
+            // Use `involves:` instead of `mentions:` because GitHub's search index
+            // ignores self-mentions (when a user @mentions themselves in a comment).
+            // `involves:` is a superset covering author, assignee, mentions, and commenter.
+            // The downstream `fetchRecentComments` filters to only comments containing @username.
+            const query = `${this.repoQualifier(repo)} involves:${username} updated:>=${since.split('T')[0]}`;
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
@@ -415,6 +417,7 @@ export class MentionPollingService {
 
     /**
      * Search for newly opened issues that mention the username in their body.
+     * Uses `involves:` instead of `mentions:` to catch self-mentions (see searchIssueMentions).
      */
     private async searchNewIssueMentions(
         repo: string,
@@ -423,7 +426,7 @@ export class MentionPollingService {
     ): Promise<DetectedMention[]> {
         try {
             const sinceDate = since.split('T')[0];
-            const query = `${this.repoQualifier(repo)} mentions:${username} is:issue created:>=${sinceDate}`;
+            const query = `${this.repoQualifier(repo)} involves:${username} is:issue created:>=${sinceDate}`;
             const result = await this.runGh([
                 'api', 'search/issues',
                 '-X', 'GET',
