@@ -28,6 +28,7 @@ import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { handleOllamaRoutes } from './routes/ollama';
+import { handleOpenApiRoutes } from './openapi/index';
 import { listProjects, createProject } from './db/projects';
 import {
     initObservability,
@@ -554,6 +555,10 @@ const server = Bun.serve<WsData>({
                 const slackResponse = await slackBridge.handleEventRequest(req);
                 return instrumentResponse(slackResponse, '/api/slack/events');
             }
+
+            // OpenAPI spec & Swagger UI (public, no auth required)
+            const openApiResponse = handleOpenApiRoutes(req, url);
+            if (openApiResponse) return instrumentResponse(openApiResponse, url.pathname);
 
             // Ollama model management routes
             const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
