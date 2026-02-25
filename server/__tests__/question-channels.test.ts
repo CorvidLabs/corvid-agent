@@ -8,7 +8,7 @@
  * Each channel is tested in isolation with fully mocked external APIs.
  */
 
-import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test';
+import { test, expect, describe, mock, afterEach } from 'bun:test';
 import { sendAlgoChatQuestion } from '../notifications/channels/algochat-question';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 
