@@ -5,6 +5,7 @@
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
   <img src="https://img.shields.io/badge/tests-1757%20unit%20%7C%20348%20E2E-brightgreen" alt="1757 Unit | 348 E2E Tests">
+  <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
 # corvid-agent

@@ -4,6 +4,9 @@ version: 1
 status: active
 files:
   - server/algochat/bridge.ts
+  - server/algochat/psk-contact-manager.ts
+  - server/algochat/psk-discovery-poller.ts
+  - server/algochat/message-router.ts
 db_tables:
   - algochat_conversations
   - algochat_psk_state

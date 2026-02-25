@@ -390,9 +390,6 @@ export class MentionPollingService {
                 const body = (comment.body as string) ?? '';
                 const commentUser = (comment.user as Record<string, unknown>)?.login as string ?? '';
 
-                // Skip own comments (prevent infinite loops)
-                if (commentUser.toLowerCase() === username.toLowerCase()) continue;
-
                 // Check for @mention
                 if (this.containsMention(body, username)) {
                     mentions.push({
@@ -446,18 +443,17 @@ export class MentionPollingService {
                 const body = (item.body as string) ?? '';
                 const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
 
-                // Skip own issues
-                if (sender.toLowerCase() === username.toLowerCase()) continue;
-
                 if (this.containsMention(body, username)) {
+                    const htmlUrl = (item.html_url as string) ?? '';
+                    const itemRepo = this.resolveFullRepo(repo, htmlUrl);
                     mentions.push({
-                        id: `issue-${item.number}`,
+                        id: `issue-${itemRepo}-${item.number}`,
                         type: 'issues',
                         body,
                         sender,
                         number: item.number as number,
                         title: (item.title as string) ?? '',
-                        htmlUrl: (item.html_url as string) ?? '',
+                        htmlUrl,
                         createdAt: (item.created_at as string) ?? '',
                         isPullRequest: false,
                     });
@@ -505,14 +501,16 @@ export class MentionPollingService {
                 // Don't skip self-authored for assignments — if someone assigns
                 // the agent to its own issue, it should still act on it.
 
+                const htmlUrl = (item.html_url as string) ?? '';
+                const itemRepo = this.resolveFullRepo(repo, htmlUrl);
                 mentions.push({
-                    id: `assigned-${item.number}`,
+                    id: `assigned-${itemRepo}-${item.number}`,
                     type: 'assignment',
                     body,
                     sender,
                     number: item.number as number,
                     title: (item.title as string) ?? '',
-                    htmlUrl: (item.html_url as string) ?? '',
+                    htmlUrl,
                     createdAt: (item.created_at as string) ?? '',
                     isPullRequest: isPR,
                 });

@@ -16,6 +16,7 @@ function sendKey(agentId: string, toAgent: string, message: string): string {
     return `${agentId}:${toAgent}:${message.slice(0, 200)}`;
 }
 
+
 export async function handleSendMessage(
     ctx: McpToolContext,
     args: { to_agent: string; message: string; thread?: string },
