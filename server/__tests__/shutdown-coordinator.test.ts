@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ShutdownCoordinator } from '../lib/shutdown-coordinator';
 
 // Helper to create a delay promise
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('ShutdownCoordinator', () => {
     test('starts in idle phase', () => {
