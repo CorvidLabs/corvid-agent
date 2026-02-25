@@ -31,6 +31,9 @@ jobs:
       - name: TypeScript check
         run: bunx tsc --noEmit --skipLibCheck
 
+      - name: Run database migrations
+        run: bun run migrate:up
+
       - name: Unit tests
         run: bun test
 

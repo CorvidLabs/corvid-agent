@@ -21,6 +21,11 @@
     "test:e2e:ui": "npx playwright test --config=playwright.config.js --ui",
     "build:client": "cd client && bun run build",
     "dev:client": "cd client && bun run start",
+    "migrate": "bun server/db/migrate-cli.ts",
+    "migrate:up": "bun server/db/migrate-cli.ts up",
+    "migrate:down": "bun server/db/migrate-cli.ts down",
+    "migrate:status": "bun server/db/migrate-cli.ts status",
+    "migrate:create": "bun server/db/migrate-create.ts",
     "spec:check": "bun scripts/spec-check.ts",
     "lint:sql": "bash scripts/check-sql-injection.sh"
   },

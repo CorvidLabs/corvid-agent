@@ -1,4 +1,4 @@
-import { getDb, closeDb } from './db/connection';
+import { getDb, closeDb, initDb } from './db/connection';
 import { handleRequest } from './routes/index';
 import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
@@ -73,8 +73,13 @@ const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 const CLIENT_DIST = join(import.meta.dir, '..', 'client', 'dist', 'client', 'browser');
 const startTime = Date.now();
 
-// Initialize database
+// Initialize database (legacy migrations run synchronously via getDb)
 const db = getDb();
+
+// Run file-based migrations (v53+) — non-blocking, logs on completion
+initDb().catch((err) => {
+    log.error('File-based migration failed', { error: err instanceof Error ? err.message : String(err) });
+});
 
 // Initialize centralized dedup service (TTL + LRU + optional SQLite persistence)
 const dedupService = DedupService.init(db);
