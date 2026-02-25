@@ -62,6 +62,7 @@ import { SlackBridge } from './slack/bridge';
 import { TenantService } from './tenant/context';
 import { BillingService } from './billing/service';
 import { UsageMeter } from './billing/meter';
+import { getHealthCheck, getLivenessCheck, getReadinessCheck, type HealthCheckDeps } from './health/service';
 
 const log = createLogger('Server');
 
@@ -498,31 +499,55 @@ const server = Bun.serve<WsData>({
 
         // Run request handler within trace context so all logs include trace ID
         return runWithTraceId(traceId, async () => {
-            // Health check endpoint
-            if (url.pathname === '/api/health' && req.method === 'GET') {
-                const shutdownStatus = shutdownCoordinator.getStatus();
-                const health: Record<string, unknown> = {
-                    status: shutdownStatus.phase === 'idle' ? 'ok' : 'shutting_down',
-                    uptime: (Date.now() - startTime) / 1000,
-                    activeSessions: processManager.getActiveSessionIds().length,
-                    algochat: algochatBridge !== null,
-                    timestamp: new Date().toISOString(),
-                    shutdown: {
-                        phase: shutdownStatus.phase,
-                        registeredHandlers: shutdownStatus.handlerCount,
-                    },
+            // Health check endpoints (no auth required)
+            if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname.startsWith('/health'))) {
+                const healthDeps: HealthCheckDeps = {
+                    db,
+                    startTime,
+                    version: (require('../package.json') as { version: string }).version,
+                    getActiveSessions: () => processManager.getActiveSessionIds(),
+                    isAlgoChatConnected: () => algochatBridge !== null,
+                    isShuttingDown: () => shutdownCoordinator.getStatus().phase !== 'idle',
+                    getSchedulerStats: () => schedulerService.getStats(),
+                    getMentionPollingStats: () => mentionPollingService.getStats(),
+                    getWorkflowStats: () => workflowService.getStats(),
                 };
-                health.scheduler = schedulerService.getStats();
-                health.mentionPolling = mentionPollingService.getStats();
-                health.workflows = workflowService.getStats();
-                const httpStatus = shutdownStatus.phase === 'idle' ? 200 : 503;
-                return instrumentResponse(
-                    new Response(JSON.stringify(health), {
-                        status: httpStatus,
-                        headers: { 'Content-Type': 'application/json' },
-                    }),
-                    '/api/health',
-                );
+
+                // Liveness probe: /health/live
+                if (url.pathname === '/health/live') {
+                    return instrumentResponse(
+                        new Response(JSON.stringify(getLivenessCheck()), {
+                            headers: { 'Content-Type': 'application/json' },
+                        }),
+                        '/health/live',
+                    );
+                }
+
+                // Readiness probe: /health/ready
+                if (url.pathname === '/health/ready') {
+                    const readiness = getReadinessCheck(healthDeps);
+                    const httpStatus = readiness.status === 'ready' ? 200 : 503;
+                    return instrumentResponse(
+                        new Response(JSON.stringify(readiness), {
+                            status: httpStatus,
+                            headers: { 'Content-Type': 'application/json' },
+                        }),
+                        '/health/ready',
+                    );
+                }
+
+                // Full health check: /health or /api/health
+                if (url.pathname === '/health' || url.pathname === '/api/health') {
+                    const health = await getHealthCheck(healthDeps);
+                    const httpStatus = health.status === 'unhealthy' ? 503 : 200;
+                    return instrumentResponse(
+                        new Response(JSON.stringify(health), {
+                            status: httpStatus,
+                            headers: { 'Content-Type': 'application/json' },
+                        }),
+                        '/api/health',
+                    );
+                }
             }
 
             // A2A Protocol: Agent Card (public, no auth required)

@@ -27,7 +27,7 @@ services:
       - LOCALNET_INDEXER_URL=${LOCALNET_INDEXER_URL:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "bun", "-e", "const r = await fetch('http://localhost:3000/health/ready'); process.exit(r.ok ? 0 : 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
