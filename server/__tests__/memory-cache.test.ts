@@ -49,8 +49,8 @@ describe('LRUCache', () => {
 
         expect(shortCache.get('ephemeral')).toBe('value');
 
-        // Wait for expiration
-        await new Promise((resolve) => setTimeout(resolve, 60));
+        // Wait well beyond TTL — Windows CI timers can be coarse (~15ms granularity)
+        await new Promise((resolve) => setTimeout(resolve, 150));
 
         expect(shortCache.get('ephemeral')).toBeUndefined();
     });
@@ -99,7 +99,8 @@ describe('LRUCache', () => {
         shortCache.set('old', 'val');
         shortCache.set('old2', 'val2');
 
-        await new Promise((resolve) => setTimeout(resolve, 60));
+        // Wait well beyond TTL — Windows CI timers can be coarse (~15ms granularity)
+        await new Promise((resolve) => setTimeout(resolve, 150));
 
         // Add a new non-expired entry
         shortCache.set('new', 'val3');
