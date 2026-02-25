@@ -75,6 +75,8 @@ interface SessionMeta {
     lastKnownCostUsd: number;
     /** Number of user messages sent to this live process instance. */
     turnCount: number;
+    /** Timestamp of last activity (event received). Used for inactivity-based timeout. */
+    lastActivityAt: number;
 }
 
 interface PausedSessionInfo {
@@ -455,12 +457,14 @@ export class ProcessManager {
 
     private registerProcess(session: Session, process: SdkProcess): void {
         this.processes.set(session.id, process);
+        const now = Date.now();
         this.sessionMeta.set(session.id, {
-            startedAt: Date.now(),
+            startedAt: now,
             source: (session as { source?: string }).source ?? 'web',
             restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
             lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
             turnCount: 0,
+            lastActivityAt: now,
         });
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
@@ -468,7 +472,7 @@ export class ProcessManager {
         // Start stable period timer — resets restart counter after sustained uptime
         this.startStableTimer(session.id);
 
-        // Start per-session timeout — fires exactly at AGENT_TIMEOUT_MS
+        // Start per-session inactivity timeout — resets on each event
         this.startSessionTimeout(session.id);
 
         log.info(`Started process for session ${session.id}`, { pid: process.pid });
@@ -640,12 +644,14 @@ export class ProcessManager {
 
         this.processes.set(session.id, sp);
 
+        const now = Date.now();
         this.sessionMeta.set(session.id, {
-            startedAt: Date.now(),
+            startedAt: now,
             source: (session as { source?: string }).source ?? 'web',
             restartCount: this.sessionMeta.get(session.id)?.restartCount ?? 0,
             lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
             turnCount: 0,
+            lastActivityAt: now,
         });
         const proc = this.processes.get(session.id);
         if (proc) {
@@ -656,7 +662,7 @@ export class ProcessManager {
         // Start stable period timer — resets restart counter after sustained uptime
         this.startStableTimer(session.id);
 
-        // Start per-session timeout — fires exactly at AGENT_TIMEOUT_MS
+        // Start per-session inactivity timeout — resets on each event
         this.startSessionTimeout(session.id);
     }
 
@@ -898,6 +904,15 @@ export class ProcessManager {
     }
 
     private handleEvent(sessionId: string, event: ClaudeStreamEvent): void {
+        // Reset inactivity timeout on every event — the session is still working.
+        // This ensures sessions are only killed when they're stuck (no events for
+        // AGENT_TIMEOUT_MS), not when they're actively making progress.
+        const meta = this.sessionMeta.get(sessionId);
+        if (meta) {
+            meta.lastActivityAt = Date.now();
+            this.startSessionTimeout(sessionId);
+        }
+
         // Persist assistant messages
         if (event.type === 'assistant' && event.message?.content) {
             const text = extractContentText(event.message.content);
@@ -1082,9 +1097,9 @@ export class ProcessManager {
             this.sessionTimeouts.delete(sessionId);
             if (!this.processes.has(sessionId)) return;
             const meta = this.sessionMeta.get(sessionId);
-            const elapsed = meta ? Date.now() - meta.startedAt : timeoutMs;
-            log.warn(`Session ${sessionId} exceeded timeout`, {
-                elapsedMs: elapsed,
+            const inactiveMs = meta ? Date.now() - meta.lastActivityAt : timeoutMs;
+            log.warn(`Session ${sessionId} exceeded inactivity timeout`, {
+                inactiveMs,
                 timeoutMs,
             });
             this.stopProcess(sessionId);
@@ -1112,7 +1127,7 @@ export class ProcessManager {
 
     /**
      * Polling fallback: catches sessions that somehow survive past their
-     * per-session timeout (e.g. timer was lost due to a bug). Runs every 60s
+     * inactivity timeout (e.g. timer was lost due to a bug). Runs every 60s
      * as a safety net — the per-session setTimeout is the primary mechanism.
      */
     private startTimeoutChecker(): void {
@@ -1120,10 +1135,10 @@ export class ProcessManager {
             const now = Date.now();
             for (const [sessionId, meta] of this.sessionMeta) {
                 if (!this.processes.has(sessionId)) continue;
-                const elapsed = now - meta.startedAt;
-                if (elapsed > AGENT_TIMEOUT_MS) {
-                    log.warn(`Session ${sessionId} exceeded timeout (fallback checker)`, {
-                        elapsedMs: elapsed,
+                const inactiveMs = now - meta.lastActivityAt;
+                if (inactiveMs > AGENT_TIMEOUT_MS) {
+                    log.warn(`Session ${sessionId} exceeded inactivity timeout (fallback checker)`, {
+                        inactiveMs,
                         timeoutMs: AGENT_TIMEOUT_MS,
                     });
                     this.stopProcess(sessionId);
