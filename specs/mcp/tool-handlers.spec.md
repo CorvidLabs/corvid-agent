@@ -3,7 +3,22 @@ module: mcp-tool-handlers
 version: 1
 status: active
 files:
-  - server/mcp/tool-handlers.ts
+  - server/mcp/tool-handlers/index.ts
+  - server/mcp/tool-handlers/types.ts
+  - server/mcp/tool-handlers/messaging.ts
+  - server/mcp/tool-handlers/memory.ts
+  - server/mcp/tool-handlers/session.ts
+  - server/mcp/tool-handlers/credits.ts
+  - server/mcp/tool-handlers/work.ts
+  - server/mcp/tool-handlers/scheduling.ts
+  - server/mcp/tool-handlers/workflow.ts
+  - server/mcp/tool-handlers/search.ts
+  - server/mcp/tool-handlers/github.ts
+  - server/mcp/tool-handlers/a2a.ts
+  - server/mcp/tool-handlers/owner.ts
+  - server/mcp/tool-handlers/notifications.ts
+  - server/mcp/tool-handlers/reputation.ts
+  - server/mcp/tool-handlers/ast.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -152,3 +167,4 @@ Internal constants (not env-configurable):
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-02-24 | corvid-agent | Update files list for domain-module refactor (tool-handlers.ts → tool-handlers/*.ts) |
