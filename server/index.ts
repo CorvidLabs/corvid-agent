@@ -23,6 +23,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
 import { DedupService } from './lib/dedup';
+import { ShutdownCoordinator } from './lib/shutdown-coordinator';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity, timingSafeEqual } from './middleware/auth';
 import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
@@ -84,6 +85,10 @@ initDb().catch((err) => {
 // Initialize centralized dedup service (TTL + LRU + optional SQLite persistence)
 const dedupService = DedupService.init(db);
 dedupService.start();
+
+// Initialize shutdown coordinator (30s grace period, configurable via env)
+const SHUTDOWN_GRACE_MS = parseInt(process.env.SHUTDOWN_GRACE_MS ?? '30000', 10);
+const shutdownCoordinator = new ShutdownCoordinator(SHUTDOWN_GRACE_MS);
 
 // Initialize observability (OpenTelemetry tracing + metrics) — non-blocking, opt-in.
 // Empty catch is intentional: initObservability() logs warnings internally when
@@ -230,6 +235,7 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
         allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
     });
     telegramBridge.start();
+    shutdownCoordinator.registerService('TelegramBridge', telegramBridge, 20);
     log.info('Telegram bridge initialized');
 }
 
@@ -244,6 +250,7 @@ if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
             : [],
     });
     discordBridge.start();
+    shutdownCoordinator.registerService('DiscordBridge', discordBridge, 20);
     log.info('Discord bridge initialized');
 }
 
@@ -259,8 +266,27 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET) {
             : [],
     });
     slackBridge.start();
+    shutdownCoordinator.registerService('SlackBridge', slackBridge, 20);
     log.info('Slack bridge initialized');
 }
+
+// Register all services with the shutdown coordinator.
+// Priority convention: 0=pollers/schedulers, 10=processing, 20=bridges, 30=process manager, 40=persistence, 50=database
+shutdownCoordinator.registerService('ResponsePollingService', responsePollingService, 0);
+shutdownCoordinator.registerService('NotificationService', notificationService, 0);
+shutdownCoordinator.registerService('WorkflowService', workflowService, 0);
+shutdownCoordinator.registerService('SchedulerService', schedulerService, 0);
+shutdownCoordinator.registerService('MentionPollingService', mentionPollingService, 0);
+shutdownCoordinator.registerService('SessionLifecycleManager', sessionLifecycle, 0);
+shutdownCoordinator.registerService('UsageMeter', usageMeter, 5);
+shutdownCoordinator.register({ name: 'MarketplaceFederation', priority: 5, handler: () => marketplaceFederation.stopPeriodicSync() });
+shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
+if (sandboxManager) {
+    shutdownCoordinator.register({ name: 'SandboxManager', priority: 15, handler: () => sandboxManager.shutdown(), timeoutMs: 10_000 });
+}
+shutdownCoordinator.register({ name: 'ProcessManager', priority: 30, handler: () => processManager.shutdown(), timeoutMs: 15_000 });
+shutdownCoordinator.registerService('DedupService', dedupService, 40);
+shutdownCoordinator.register({ name: 'Database', priority: 50, handler: () => closeDb() });
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
@@ -354,6 +380,7 @@ async function initAlgoChat(): Promise<void> {
     await agentWalletService.publishAllKeys();
 
     algochatBridge.start();
+    shutdownCoordinator.register({ name: 'AlgoChatBridge', priority: 25, handler: () => algochatBridge?.stop() });
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
@@ -473,18 +500,25 @@ const server = Bun.serve<WsData>({
         return runWithTraceId(traceId, async () => {
             // Health check endpoint
             if (url.pathname === '/api/health' && req.method === 'GET') {
+                const shutdownStatus = shutdownCoordinator.getStatus();
                 const health: Record<string, unknown> = {
-                    status: 'ok',
+                    status: shutdownStatus.phase === 'idle' ? 'ok' : 'shutting_down',
                     uptime: (Date.now() - startTime) / 1000,
                     activeSessions: processManager.getActiveSessionIds().length,
                     algochat: algochatBridge !== null,
                     timestamp: new Date().toISOString(),
+                    shutdown: {
+                        phase: shutdownStatus.phase,
+                        registeredHandlers: shutdownStatus.handlerCount,
+                    },
                 };
                 health.scheduler = schedulerService.getStats();
                 health.mentionPolling = mentionPollingService.getStats();
                 health.workflows = workflowService.getStats();
+                const httpStatus = shutdownStatus.phase === 'idle' ? 200 : 503;
                 return instrumentResponse(
                     new Response(JSON.stringify(health), {
+                        status: httpStatus,
                         headers: { 'Content-Type': 'application/json' },
                     }),
                     '/api/health',
@@ -748,8 +782,7 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (err) => {
     log.error('Uncaught exception, shutting down', { error: err.message, stack: err.stack });
     logShutdownDiagnostics('uncaughtException');
-    gracefulShutdown();
-    process.exit(1);
+    shutdownCoordinator.shutdown().finally(() => process.exit(1));
 });
 
 // Shutdown diagnostics — log enough context to diagnose unexpected kills
@@ -773,37 +806,6 @@ function logShutdownDiagnostics(signal: string): void {
     });
 }
 
-function gracefulShutdown(): void {
-    responsePollingService.stop();
-    notificationService.stop();
-    workflowService.stop();
-    schedulerService.stop();
-    mentionPollingService.stop();
-    memorySyncService.stop();
-    sessionLifecycle.stop();
-    usageMeter.stop();
-    marketplaceFederation.stopPeriodicSync();
-    if (sandboxManager) sandboxManager.shutdown();
-    telegramBridge?.stop();
-    discordBridge?.stop();
-    slackBridge?.stop();
-    processManager.shutdown();
-    algochatBridge?.stop();
-    dedupService.stop();
-    closeDb();
-}
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-    logShutdownDiagnostics('SIGINT');
-    gracefulShutdown();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    logShutdownDiagnostics('SIGTERM');
-    gracefulShutdown();
-    // Exit non-zero so launchd/run.sh know this was NOT an intentional stop.
-    // Only SIGINT (ctrl-C / manual stop) exits 0.
-    process.exit(1);
-});
+// Coordinated graceful shutdown via ShutdownCoordinator.
+// SIGINT (ctrl-C) exits 0; SIGTERM exits 1 so launchd/run.sh know it wasn't intentional.
+shutdownCoordinator.registerSignals(logShutdownDiagnostics, { SIGINT: 0, SIGTERM: 1 });
