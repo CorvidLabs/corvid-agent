@@ -7,6 +7,7 @@
 import type { Database } from 'bun:sqlite';
 import type { FederatedInstance, FederatedListing, MarketplaceListing } from './types';
 import { createLogger } from '../lib/logger';
+import { ValidationError, ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('MarketplaceFederation');
 
@@ -44,10 +45,10 @@ export class MarketplaceFederation {
         try {
             parsed = new URL(url);
         } catch {
-            throw new Error('Invalid URL');
+            throw new ValidationError('Invalid federation URL', { url });
         }
         if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-            throw new Error('Federation URLs must use http or https protocol');
+            throw new ValidationError('Federation URLs must use http or https protocol', { url });
         }
         // Block private/loopback IPs to prevent SSRF
         const hostname = parsed.hostname;
@@ -62,7 +63,7 @@ export class MarketplaceFederation {
             hostname.startsWith('169.254.') ||
             hostname.endsWith('.local')
         ) {
-            throw new Error('Federation URLs must not point to private or loopback addresses');
+            throw new ValidationError('Federation URLs must not point to private or loopback addresses', { url, hostname });
         }
     }
 
@@ -130,7 +131,7 @@ export class MarketplaceFederation {
         try {
             const response = await fetch(`${normalizedUrl}/api/marketplace/listings?status=published`);
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new ExternalServiceError('Federation', `HTTP ${response.status}: ${response.statusText}`, { url: normalizedUrl });
             }
 
             const data = await response.json() as { listings: MarketplaceListing[] };

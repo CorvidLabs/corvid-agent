@@ -96,7 +96,7 @@ describe('SSRF Protection', () => {
     });
 
     it('rejects invalid URLs', () => {
-        expect(() => federation.registerInstance('not-a-url', 'bad')).toThrow('Invalid URL');
+        expect(() => federation.registerInstance('not-a-url', 'bad')).toThrow('Invalid federation URL');
     });
 
     it('allows valid public HTTPS URLs', () => {

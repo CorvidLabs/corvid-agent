@@ -1,4 +1,5 @@
 import { createLogger } from '../lib/logger';
+import { NotFoundError } from '../lib/errors';
 
 const log = createLogger('Condenser');
 
@@ -40,7 +41,7 @@ export async function condenseMessage(
     try {
         const { LlmProviderRegistry } = await import('../providers/registry');
         const provider = LlmProviderRegistry.getInstance().getDefault();
-        if (!provider) throw new Error('No LLM provider available');
+        if (!provider) throw new NotFoundError('LLM provider');
 
         const result = await provider.complete({
             model: provider.getInfo().defaultModel,

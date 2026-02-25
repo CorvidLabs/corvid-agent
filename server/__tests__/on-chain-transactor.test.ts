@@ -217,7 +217,7 @@ describe('sendNotificationToAddress()', () => {
 describe('discoverPublicKey()', () => {
     test('throws when service is null', async () => {
         const transactor = new OnChainTransactor(db, null, mockWalletService, mockDirectory);
-        await expect(transactor.discoverPublicKey('SOME_ADDRESS')).rejects.toThrow('AlgoChatService not available');
+        await expect(transactor.discoverPublicKey('SOME_ADDRESS')).rejects.toThrow('AlgoChatService not found');
     });
 
     test('caches public keys', async () => {

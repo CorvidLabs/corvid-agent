@@ -2,6 +2,7 @@ import type { ChatAccount } from '@corvidlabs/ts-algochat';
 import { encryptMessage, encodeEnvelope, PROTOCOL } from '@corvidlabs/ts-algochat';
 import type { AlgoChatService } from './service';
 import { createLogger } from '../lib/logger';
+import { ValidationError } from '../lib/errors';
 
 const log = createLogger('GroupSender');
 
@@ -37,7 +38,7 @@ const GROUP_PREFIX_MAX_BYTES = 13; // e.g. "[GRP:99/99]"
  */
 export function splitMessage(content: string, maxPayload?: number): string[] {
     if (maxPayload !== undefined && maxPayload <= 0) {
-        throw new Error('maxPayload must be positive');
+        throw new ValidationError('maxPayload must be positive');
     }
     const singleMax = maxPayload ?? (PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE);
     const multiMax = (maxPayload ?? (PROTOCOL.MAX_PAYLOAD_SIZE - PROTOCOL.TAG_SIZE)) - GROUP_PREFIX_MAX_BYTES;

@@ -1,6 +1,14 @@
 export type LlmProviderType = 'anthropic' | 'openai' | 'ollama';
 export type ExecutionMode = 'managed' | 'direct';
 
+export interface JsonSchemaProperty {
+    type: string;
+    description?: string;
+    enum?: string[];
+    items?: JsonSchemaProperty;
+    default?: unknown;
+}
+
 export interface LlmToolDefinition {
     name: string;
     description: string;

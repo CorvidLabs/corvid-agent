@@ -18,6 +18,7 @@ import {
     updateAgentMessageStatus,
     getAgentMessage,
 } from '../db/agent-messages';
+import { ValidationError, NotFoundError } from '../lib/errors';
 
 /** Parameters for handling an agent-to-agent [WORK] request. */
 export interface AgentWorkRequestParams {
@@ -129,11 +130,11 @@ export class WorkCommandRouter {
 
         const description = content.slice('[WORK]'.length).trim();
         if (!description) {
-            throw new Error('[WORK] prefix requires a task description');
+            throw new ValidationError('[WORK] prefix requires a task description');
         }
 
         if (!this.workTaskService) {
-            throw new Error('Work task service not available');
+            throw new NotFoundError('Work task service');
         }
 
         const agentMessage = createAgentMessage(this.db, {

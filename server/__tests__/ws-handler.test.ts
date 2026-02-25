@@ -218,7 +218,7 @@ describe('createWebSocketHandler', () => {
 
             // Simulate an event callback
             const callback = ws.data.subscriptions.get('sess-1')!;
-            callback('sess-1', { type: 'result', data: { text: 'done' } });
+            callback('sess-1', { type: 'result', result: 'done', total_cost_usd: 0 });
 
             expect(sent.length).toBe(1);
             const event = JSON.parse(sent[0]);

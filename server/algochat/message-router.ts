@@ -40,9 +40,14 @@ import { getAgent } from '../db/agents';
 import { formatApprovalForChain, parseApprovalResponse } from './approval-format';
 import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
+import { DedupService } from '../lib/dedup';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 
 const log = createLogger('MessageRouter');
+
+// On-chain txid dedup namespace (10 min TTL, bounded at 500 entries)
+const ALGOCHAT_TXID_DEDUP_NS = 'algochat:txids';
+DedupService.global().register(ALGOCHAT_TXID_DEDUP_NS, { maxSize: 500, ttlMs: 600_000 });
 
 export class MessageRouter {
     readonly channelType = 'algochat' as const;
@@ -70,8 +75,8 @@ export class MessageRouter {
     // ChannelAdapter inbound message handlers
     private messageHandlers: Set<(msg: SessionMessage) => void> = new Set();
 
-    // On-chain message dedup
-    private processedTxids: Set<string> = new Set();
+    // On-chain message dedup (centralized DedupService)
+    private dedup = DedupService.global();
 
     // Group message reassembly buffer
     private pendingGroupChunks: Map<string, { chunks: unknown[]; firstSeen: number }> = new Map();
@@ -138,11 +143,10 @@ export class MessageRouter {
                 // Dedup by transaction ID
                 const txid = (msg as unknown as { id?: string }).id;
                 if (txid) {
-                    if (this.processedTxids.has(txid)) {
+                    if (this.dedup.isDuplicate(ALGOCHAT_TXID_DEDUP_NS, txid)) {
                         log.debug('Skipping already-processed txid', { txid });
                         continue;
                     }
-                    this.processedTxids.add(txid);
                 }
 
                 const grp = parseGroupPrefix(msg.content);
@@ -153,12 +157,6 @@ export class MessageRouter {
                 } else {
                     regularMessages.push(msg);
                 }
-            }
-
-            // Prune old txids to prevent unbounded growth (keep last 500)
-            if (this.processedTxids.size > 500) {
-                const all = [...this.processedTxids];
-                this.processedTxids = new Set(all.slice(all.length - 500));
             }
 
             // Reassemble group messages

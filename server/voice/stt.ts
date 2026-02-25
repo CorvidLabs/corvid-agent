@@ -1,5 +1,6 @@
 import type { STTOptions, STTResult } from './types';
 import { createLogger } from '../lib/logger';
+import { ValidationError, ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('STT');
 
@@ -19,11 +20,11 @@ const FORMAT_MIME: Record<string, string> = {
 export async function transcribe(options: STTOptions): Promise<STTResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is required for speech-to-text');
+        throw new ValidationError('OPENAI_API_KEY is required for speech-to-text');
     }
 
     if (options.audio.length > MAX_AUDIO_SIZE) {
-        throw new Error(`Audio file too large (${Math.round(options.audio.length / 1024 / 1024)} MB). Maximum is 25 MB.`);
+        throw new ValidationError(`Audio file too large (${Math.round(options.audio.length / 1024 / 1024)} MB). Maximum is 25 MB.`);
     }
 
     const format = options.format ?? 'ogg';
@@ -48,7 +49,7 @@ export async function transcribe(options: STTOptions): Promise<STTResult> {
     if (!response.ok) {
         const error = await response.text();
         log.error('OpenAI Whisper API error', { status: response.status, error });
-        throw new Error(`Speech-to-text failed (status ${response.status})`);
+        throw new ExternalServiceError("OpenAI STT", `Speech-to-text failed (status ${response.status})`);
     }
 
     const result = await response.json() as { text: string };

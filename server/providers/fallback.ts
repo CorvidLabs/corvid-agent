@@ -7,6 +7,7 @@
 import type { LlmCompletionParams, LlmCompletionResult, LlmProviderType } from './types';
 import type { LlmProviderRegistry } from './registry';
 import { createLogger } from '../lib/logger';
+import { ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('ProviderFallback');
 
@@ -141,7 +142,7 @@ export class FallbackManager {
             }
         }
 
-        throw new Error(`All providers in fallback chain failed:\n${errors.join('\n')}`);
+        throw new ExternalServiceError('LLM', `All providers in fallback chain failed:\n${errors.join('\n')}`);
     }
 
     /**

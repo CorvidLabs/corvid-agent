@@ -1,5 +1,6 @@
 import type { NotificationPayload, ChannelSendResult } from '../types';
 import { createLogger } from '../../lib/logger';
+import { ValidationError } from '../../lib/errors';
 
 const log = createLogger('NotifyDiscord');
 
@@ -15,14 +16,14 @@ function validateWebhookUrl(url: string): void {
     try {
         parsed = new URL(url);
     } catch {
-        throw new Error('Invalid webhook URL');
+        throw new ValidationError('Invalid webhook URL');
     }
     if (parsed.protocol !== 'https:') {
-        throw new Error('Discord webhook URL must use HTTPS');
+        throw new ValidationError('Discord webhook URL must use HTTPS');
     }
     const hostname = parsed.hostname;
     if (!hostname.endsWith('.discord.com') && hostname !== 'discord.com' && !hostname.endsWith('.discordapp.com') && hostname !== 'discordapp.com') {
-        throw new Error('Discord webhook URL must point to discord.com or discordapp.com');
+        throw new ValidationError('Discord webhook URL must point to discord.com or discordapp.com');
     }
 }
 

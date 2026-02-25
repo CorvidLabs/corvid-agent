@@ -8,6 +8,7 @@ import { listProjects } from '../db/projects';
 import { transcribe } from '../voice/stt';
 import { synthesizeWithCache } from '../voice/tts';
 import { createLogger } from '../lib/logger';
+import { ExternalServiceError, NotFoundError } from '../lib/errors';
 
 const log = createLogger('TelegramBridge');
 
@@ -342,13 +343,13 @@ export class TelegramBridge {
         // Get file path
         const fileInfo = await this.callTelegramApi('getFile', { file_id: fileId }) as { result: TelegramFile };
         const filePath = fileInfo.result.file_path;
-        if (!filePath) throw new Error('File path not available');
+        if (!filePath) throw new NotFoundError('Telegram file path');
 
         // Download file
         const response = await fetch(
             `https://api.telegram.org/file/bot${this.config.botToken}/${filePath}`,
         );
-        if (!response.ok) throw new Error(`Failed to download file: ${response.status}`);
+        if (!response.ok) throw new ExternalServiceError("Telegram", `Failed to download file: ${response.status}`);
 
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer);
@@ -368,7 +369,7 @@ export class TelegramBridge {
             // Log full error internally but don't expose token or full API response
             const error = await response.text();
             log.error('Telegram API error', { method, status: response.status, error });
-            throw new Error(`Telegram API error (${method}): status ${response.status}`);
+            throw new ExternalServiceError("Telegram", `API error (${method}): status ${response.status}`);
         }
 
         return response.json() as Promise<{ result: unknown }>;

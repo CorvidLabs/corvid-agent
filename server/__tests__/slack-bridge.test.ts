@@ -116,7 +116,7 @@ describe('SlackBridge', () => {
         expect((bridge as any).running).toBe(false);
     });
 
-    test('stop clears cleanup timer', () => {
+    test('stop sets running to false', () => {
         const pm = createMockProcessManager();
         const config: SlackBridgeConfig = {
             botToken: 'xoxb-test-token',
@@ -127,10 +127,10 @@ describe('SlackBridge', () => {
         const bridge = new SlackBridge(db, pm, config);
 
         bridge.start();
-        expect((bridge as any).processedEventsCleanupTimer).not.toBeNull();
+        expect((bridge as any).running).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).processedEventsCleanupTimer).toBeNull();
+        expect((bridge as any).running).toBe(false);
     });
 });
 

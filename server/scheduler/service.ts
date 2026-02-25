@@ -37,6 +37,7 @@ import * as github from '../github/operations';
 import { launchCouncil } from '../routes/councils';
 import { getNextCronDate } from './cron-parser';
 import { createLogger } from '../lib/logger';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import { recordAudit } from '../db/audit';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 
@@ -59,7 +60,7 @@ type ScheduleEventCallback = (event: {
 export function validateScheduleFrequency(cronExpression?: string | null, intervalMs?: number | null): void {
     if (intervalMs !== undefined && intervalMs !== null) {
         if (intervalMs < MIN_SCHEDULE_INTERVAL_MS) {
-            throw new Error(`Schedule interval too short: ${intervalMs}ms. Minimum is ${MIN_SCHEDULE_INTERVAL_MS}ms (5 minutes).`);
+            throw new ValidationError(`Schedule interval too short: ${intervalMs}ms. Minimum is ${MIN_SCHEDULE_INTERVAL_MS}ms (5 minutes).`);
         }
     }
 
@@ -70,15 +71,14 @@ export function validateScheduleFrequency(cronExpression?: string | null, interv
             const second = getNextCronDate(cronExpression, first);
             const gapMs = second.getTime() - first.getTime();
             if (gapMs < MIN_SCHEDULE_INTERVAL_MS) {
-                throw new Error(
+                throw new ValidationError(
                     `Cron expression "${cronExpression}" fires every ${Math.round(gapMs / 1000)}s. ` +
                     `Minimum interval is 5 minutes.`
                 );
             }
         } catch (err) {
-            if (err instanceof Error && err.message.includes('Minimum interval')) throw err;
-            if (err instanceof Error && err.message.includes('fires every')) throw err;
-            throw new Error(`Invalid cron expression: ${cronExpression}`);
+            if (err instanceof ValidationError) throw err;
+            throw new ValidationError(`Invalid cron expression: ${cronExpression}`);
         }
     }
 }
@@ -190,8 +190,8 @@ export class SchedulerService {
     /** Manually trigger a schedule to run now (ignoring cron/interval timing). */
     async triggerNow(scheduleId: string): Promise<void> {
         const schedule = getSchedule(this.db, scheduleId);
-        if (!schedule) throw new Error('Schedule not found');
-        if (schedule.status !== 'active') throw new Error('Schedule is not active');
+        if (!schedule) throw new NotFoundError('Schedule', scheduleId);
+        if (schedule.status !== 'active') throw new ValidationError('Schedule is not active', { scheduleId, status: schedule.status });
         await this.executeSchedule(schedule);
     }
 

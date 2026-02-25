@@ -9,6 +9,7 @@
 
 import type { A2AAgentCard } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { ExternalServiceError, ValidationError } from '../lib/errors';
 
 const log = createLogger('A2AClient');
 
@@ -80,14 +81,14 @@ export async function fetchAgentCard(baseUrl: string): Promise<A2AAgentCard> {
     });
 
     if (!response.ok) {
-        throw new Error(`Failed to fetch Agent Card from ${agentCardUrl}: HTTP ${response.status} ${response.statusText}`);
+        throw new ExternalServiceError("A2A", `Failed to fetch Agent Card from ${agentCardUrl}: HTTP ${response.status} ${response.statusText}`);
     }
 
     const card = await response.json() as A2AAgentCard;
 
     // Basic validation
     if (!card.name || !card.version) {
-        throw new Error(`Invalid Agent Card from ${agentCardUrl}: missing required fields (name, version)`);
+        throw new ValidationError(`Invalid Agent Card from ${agentCardUrl}: missing required fields (name, version)`);
     }
 
     // Cache the result

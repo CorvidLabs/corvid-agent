@@ -9,6 +9,7 @@ import { resolve, relative, dirname } from 'path';
 import { mkdir } from 'fs/promises';
 import { isProtectedPath, isProtectedBashCommand } from '../process/protected-paths';
 import type { DirectToolDefinition } from './direct-tools';
+import { AuthorizationError } from '../lib/errors';
 
 export interface CodingToolContext {
     workingDir: string;          // Project working directory (absolute)
@@ -26,11 +27,11 @@ function resolveSafePath(workingDir: string, filePath: string): string {
     const rel = relative(workingDir, abs);
     // relative() returns a path starting with '..' if abs escapes workingDir
     if (rel.startsWith('..') || rel.startsWith(process.platform === 'win32' ? '..\\' : '../')) {
-        throw new Error(`Path traversal denied: "${filePath}" resolves outside the project directory`);
+        throw new AuthorizationError(`Path traversal denied: "${filePath}" resolves outside the project directory`);
     }
     // On Windows, an absolute path on a different drive will produce an absolute relative path
     if (resolve(rel) === rel) {
-        throw new Error(`Path traversal denied: "${filePath}" resolves outside the project directory`);
+        throw new AuthorizationError(`Path traversal denied: "${filePath}" resolves outside the project directory`);
     }
     return abs;
 }

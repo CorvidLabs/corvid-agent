@@ -224,7 +224,7 @@ describe('handleAgentWorkRequest()', () => {
                 threadId: crypto.randomUUID(),
                 emitMessageUpdate: () => {},
             }),
-        ).rejects.toThrow('Work task service not available');
+        ).rejects.toThrow('Work task service not found');
     });
 
     test('creates agent message and work task successfully', async () => {

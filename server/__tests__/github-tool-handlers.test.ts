@@ -4,18 +4,18 @@ import type { McpToolContext } from '../mcp/tool-handlers';
 // ── Mock the github/operations module before importing handlers ──────────
 // Bun freezes module exports, so we must use mock.module() to intercept.
 
-const mockStarRepo = mock(() => Promise.resolve({ ok: true, message: 'Starred test/repo' }));
-const mockUnstarRepo = mock(() => Promise.resolve({ ok: true, message: 'Unstarred test/repo' }));
-const mockForkRepo = mock(() => Promise.resolve({ ok: true, message: 'Forked test/repo', forkUrl: 'https://github.com/me/repo' }));
-const mockListOpenPrs = mock(() => Promise.resolve({ ok: true, prs: [] as Array<Record<string, unknown>> }));
-const mockCreatePr = mock(() => Promise.resolve({ ok: true, prUrl: 'https://github.com/test/repo/pull/1' }));
-const mockAddPrReview = mock(() => Promise.resolve({ ok: true }));
-const mockCreateIssue = mock(() => Promise.resolve({ ok: true, issueUrl: 'https://github.com/test/repo/issues/1' }));
-const mockListIssues = mock(() => Promise.resolve({ ok: true, issues: [] as Array<Record<string, unknown>> }));
-const mockGetRepoInfo = mock(() => Promise.resolve({ ok: true, info: { name: 'repo', stargazerCount: 42 } }));
-const mockGetPrDiff = mock(() => Promise.resolve({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line' }));
-const mockAddPrComment = mock(() => Promise.resolve({ ok: true }));
-const mockFollowUser = mock(() => Promise.resolve({ ok: true, message: 'Followed testuser' }));
+const mockStarRepo = mock(() => Promise.resolve({ ok: true, message: 'Starred test/repo', error: undefined as string | undefined }));
+const mockUnstarRepo = mock(() => Promise.resolve({ ok: true, message: 'Unstarred test/repo', error: undefined as string | undefined }));
+const mockForkRepo = mock(() => Promise.resolve({ ok: true, message: 'Forked test/repo', forkUrl: 'https://github.com/me/repo', error: undefined as string | undefined }));
+const mockListOpenPrs = mock(() => Promise.resolve({ ok: true, prs: [] as Array<Record<string, unknown>>, error: undefined as string | undefined }));
+const mockCreatePr = mock(() => Promise.resolve({ ok: true, prUrl: 'https://github.com/test/repo/pull/1', error: undefined as string | undefined }));
+const mockAddPrReview = mock(() => Promise.resolve({ ok: true, error: undefined as string | undefined }));
+const mockCreateIssue = mock(() => Promise.resolve({ ok: true, issueUrl: 'https://github.com/test/repo/issues/1', error: undefined as string | undefined }));
+const mockListIssues = mock(() => Promise.resolve({ ok: true, issues: [] as Array<Record<string, unknown>>, error: undefined as string | undefined }));
+const mockGetRepoInfo = mock(() => Promise.resolve({ ok: true, info: { name: 'repo', stargazerCount: 42 }, error: undefined as string | undefined }));
+const mockGetPrDiff = mock(() => Promise.resolve({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line', error: undefined as string | undefined }));
+const mockAddPrComment = mock(() => Promise.resolve({ ok: true, error: undefined as string | undefined }));
+const mockFollowUser = mock(() => Promise.resolve({ ok: true, message: 'Followed testuser', error: undefined as string | undefined }));
 
 mock.module('../github/operations', () => ({
     starRepo: mockStarRepo,
@@ -70,18 +70,18 @@ function getText(result: { content: Array<{ type: string; text?: string }> }): s
 
 beforeEach(() => {
     // Reset all mocks and restore default success behaviors
-    mockStarRepo.mockReset().mockResolvedValue({ ok: true, message: 'Starred test/repo' });
-    mockUnstarRepo.mockReset().mockResolvedValue({ ok: true, message: 'Unstarred test/repo' });
-    mockForkRepo.mockReset().mockResolvedValue({ ok: true, message: 'Forked test/repo', forkUrl: 'https://github.com/me/repo' });
-    mockListOpenPrs.mockReset().mockResolvedValue({ ok: true, prs: [] });
-    mockCreatePr.mockReset().mockResolvedValue({ ok: true, prUrl: 'https://github.com/test/repo/pull/1' });
-    mockAddPrReview.mockReset().mockResolvedValue({ ok: true });
-    mockCreateIssue.mockReset().mockResolvedValue({ ok: true, issueUrl: 'https://github.com/test/repo/issues/1' });
-    mockListIssues.mockReset().mockResolvedValue({ ok: true, issues: [] });
-    mockGetRepoInfo.mockReset().mockResolvedValue({ ok: true, info: { name: 'repo', stargazerCount: 42 } });
-    mockGetPrDiff.mockReset().mockResolvedValue({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line' });
-    mockAddPrComment.mockReset().mockResolvedValue({ ok: true });
-    mockFollowUser.mockReset().mockResolvedValue({ ok: true, message: 'Followed testuser' });
+    mockStarRepo.mockReset().mockResolvedValue({ ok: true, message: 'Starred test/repo', error: undefined });
+    mockUnstarRepo.mockReset().mockResolvedValue({ ok: true, message: 'Unstarred test/repo', error: undefined });
+    mockForkRepo.mockReset().mockResolvedValue({ ok: true, message: 'Forked test/repo', forkUrl: 'https://github.com/me/repo', error: undefined });
+    mockListOpenPrs.mockReset().mockResolvedValue({ ok: true, prs: [], error: undefined });
+    mockCreatePr.mockReset().mockResolvedValue({ ok: true, prUrl: 'https://github.com/test/repo/pull/1', error: undefined });
+    mockAddPrReview.mockReset().mockResolvedValue({ ok: true, error: undefined });
+    mockCreateIssue.mockReset().mockResolvedValue({ ok: true, issueUrl: 'https://github.com/test/repo/issues/1', error: undefined });
+    mockListIssues.mockReset().mockResolvedValue({ ok: true, issues: [], error: undefined });
+    mockGetRepoInfo.mockReset().mockResolvedValue({ ok: true, info: { name: 'repo', stargazerCount: 42 }, error: undefined });
+    mockGetPrDiff.mockReset().mockResolvedValue({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line', error: undefined });
+    mockAddPrComment.mockReset().mockResolvedValue({ ok: true, error: undefined });
+    mockFollowUser.mockReset().mockResolvedValue({ ok: true, message: 'Followed testuser', error: undefined });
 });
 
 // ── Star / Unstar ────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ describe('handleGitHubStarRepo', () => {
     });
 
     test('returns error on failure', async () => {
-        mockStarRepo.mockResolvedValue({ ok: false, message: 'GH_TOKEN not configured' });
+        mockStarRepo.mockResolvedValue({ ok: false, message: 'GH_TOKEN not configured', error: undefined });
         const ctx = makeCtx();
         const result = await handleGitHubStarRepo(ctx, { repo: 'bad/repo' });
         expect(result.isError).toBe(true);
@@ -123,7 +123,7 @@ describe('handleGitHubUnstarRepo', () => {
     });
 
     test('returns error on failure', async () => {
-        mockUnstarRepo.mockResolvedValue({ ok: false, message: 'Not found' });
+        mockUnstarRepo.mockResolvedValue({ ok: false, message: 'Not found', error: undefined });
         const ctx = makeCtx();
         const result = await handleGitHubUnstarRepo(ctx, { repo: 'bad/repo' });
         expect(result.isError).toBe(true);
@@ -157,7 +157,7 @@ describe('handleGitHubForkRepo', () => {
     });
 
     test('returns error on failure', async () => {
-        mockForkRepo.mockResolvedValue({ ok: false, message: 'Permission denied', forkUrl: '' });
+        mockForkRepo.mockResolvedValue({ ok: false, message: 'Permission denied', forkUrl: '', error: undefined });
         const ctx = makeCtx();
         const result = await handleGitHubForkRepo(ctx, { repo: 'private/repo' });
         expect(result.isError).toBe(true);
@@ -165,7 +165,7 @@ describe('handleGitHubForkRepo', () => {
     });
 
     test('handles missing fork URL gracefully', async () => {
-        mockForkRepo.mockResolvedValue({ ok: true, message: 'Forked test/repo', forkUrl: '' });
+        mockForkRepo.mockResolvedValue({ ok: true, message: 'Forked test/repo', forkUrl: '', error: undefined });
         const ctx = makeCtx();
         const result = await handleGitHubForkRepo(ctx, { repo: 'test/repo' });
         expect(result.isError).toBeUndefined();
@@ -202,6 +202,7 @@ describe('handleGitHubListPrs', () => {
                     changedFiles: 5,
                 },
             ],
+            error: undefined,
         });
 
         const ctx = makeCtx();
@@ -425,6 +426,7 @@ describe('handleGitHubListIssues', () => {
                     url: 'https://github.com/test/repo/issues/10',
                 },
             ],
+            error: undefined,
         });
 
         const ctx = makeCtx();
@@ -455,6 +457,7 @@ describe('handleGitHubListIssues', () => {
                 number: 1, title: 'Issue', state: 'closed',
                 labels: [], url: 'https://github.com/test/repo/issues/1',
             }],
+            error: undefined,
         });
         const ctx = makeCtx();
         const result = await handleGitHubListIssues(ctx, { repo: 'test/repo', state: 'closed' });
@@ -512,7 +515,7 @@ describe('handleGitHubGetPrDiff', () => {
     });
 
     test('returns message for empty diff', async () => {
-        mockGetPrDiff.mockResolvedValue({ ok: true, diff: '' });
+        mockGetPrDiff.mockResolvedValue({ ok: true, diff: '', error: undefined });
         const ctx = makeCtx();
         const result = await handleGitHubGetPrDiff(ctx, { repo: 'test/repo', pr_number: 42 });
         expect(result.isError).toBeUndefined();
@@ -589,7 +592,7 @@ describe('handleGitHubFollowUser', () => {
     });
 
     test('returns error on failure', async () => {
-        mockFollowUser.mockResolvedValue({ ok: false, message: 'User not found' });
+        mockFollowUser.mockResolvedValue({ ok: false, message: 'User not found', error: undefined });
         const ctx = makeCtx();
         const result = await handleGitHubFollowUser(ctx, { username: 'nobody' });
         expect(result.isError).toBe(true);

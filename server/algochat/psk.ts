@@ -4,10 +4,9 @@ import type { AlgoChatService } from './service';
 import type { PSKState } from '@corvidlabs/ts-algochat';
 import type { AlgoChatNetwork } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { DedupService } from '../lib/dedup';
 
 const log = createLogger('PSK');
-
-const MAX_PROCESSED_TXIDS = 1000;
 
 export interface PSKMessage {
     sender: string;
@@ -60,7 +59,8 @@ export class PSKManager {
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private pollIntervalMs: number = 0;
     private callbacks: Set<PSKMessageCallback> = new Set();
-    private processedTxids: Set<string> = new Set();
+    private dedup = DedupService.global();
+    private dedupNs: string; // per-contact dedup namespace
     /** Cached X25519 encryption public key of the contact, learned from received envelopes. */
     private contactEncryptionKey: Uint8Array | null = null;
     /** Unique contact ID (psk_contacts.id). Used to key multi-contact maps in bridge. */
@@ -77,6 +77,8 @@ export class PSKManager {
         this.service = service;
         this.network = network;
         this.contactId = contactId ?? pskConfig.address;
+        this.dedupNs = `psk:txids:${this.contactId}`;
+        this.dedup.register(this.dedupNs, { maxSize: 1000, ttlMs: 600_000 });
 
         // Try to restore ratchet state from DB, otherwise create fresh.
         // Always use the PSK from pskConfig (authoritative source — psk_contacts
@@ -174,7 +176,7 @@ export class PSKManager {
         this.contact.state = { sendCounter: 0, peerLastCounter: 0, seenCounters: new Set() };
         this.contact.lastRound = 0;
         this.contactEncryptionKey = null;
-        this.processedTxids.clear();
+        this.dedup.clear(this.dedupNs);
         this.saveState();
 
         const pskFp = Array.from(newPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
@@ -278,7 +280,7 @@ export class PSKManager {
                 if (tx.paymentTransaction?.receiver !== myAddress) continue;
 
                 // Deduplication check
-                if (this.processedTxids.has(tx.id)) continue;
+                if (this.dedup.has(this.dedupNs, tx.id)) continue;
 
                 const noteBytes = base64ToBytes(tx.note);
 
@@ -385,13 +387,7 @@ export class PSKManager {
     }
 
     private trackProcessedTxid(txid: string): void {
-        this.processedTxids.add(txid);
-        // Cap the set to prevent unbounded memory growth
-        if (this.processedTxids.size > MAX_PROCESSED_TXIDS) {
-            const iter = this.processedTxids.values();
-            const oldest = iter.next().value;
-            if (oldest) this.processedTxids.delete(oldest);
-        }
+        this.dedup.markSeen(this.dedupNs, txid);
     }
 
     // -- State persistence --

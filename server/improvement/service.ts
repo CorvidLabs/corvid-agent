@@ -20,6 +20,7 @@ import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { NotFoundError, ValidationError, AuthorizationError } from '../lib/errors';
 
 const log = createLogger('ImprovementLoop');
 
@@ -89,11 +90,11 @@ export class AutonomousLoopService {
 
         // 1. Validate agent and project
         const agent = getAgent(this.db, agentId);
-        if (!agent) throw new Error(`Agent not found: ${agentId}`);
+        if (!agent) throw new NotFoundError('Agent', agentId);
 
         const project = getProject(this.db, projectId);
-        if (!project) throw new Error(`Project not found: ${projectId}`);
-        if (!project.workingDir) throw new Error(`Project has no workingDir: ${projectId}`);
+        if (!project) throw new NotFoundError('Project', projectId);
+        if (!project.workingDir) throw new ValidationError('Project has no workingDir', { projectId });
 
         log.info('Starting improvement loop', { agentId, projectId, requestedMax });
 
@@ -145,10 +146,7 @@ export class AutonomousLoopService {
         const maxTasksAllowed = computeMaxTasks(reputation.trustLevel, requestedMax);
         if (maxTasksAllowed === 0) {
             log.warn('Improvement loop blocked — agent is untrusted', { agentId, score: reputation.overallScore });
-            throw new Error(
-                `Agent ${agentId} is untrusted (score: ${reputation.overallScore}). ` +
-                `Improvement loop requires at least "low" trust level.`,
-            );
+            throw new AuthorizationError('Agent is untrusted', { agentId, score: reputation.overallScore });
         }
 
         // 6. Build enriched prompt

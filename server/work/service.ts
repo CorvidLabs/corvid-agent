@@ -16,6 +16,7 @@ import {
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
+import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
@@ -88,22 +89,22 @@ export class WorkTaskService {
         // Validate agent exists
         const agent = getAgent(this.db, input.agentId);
         if (!agent) {
-            throw new Error(`Agent ${input.agentId} not found`);
+            throw new NotFoundError('Agent', input.agentId);
         }
 
         // Resolve projectId
         const projectId = input.projectId ?? agent.defaultProjectId;
         if (!projectId) {
-            throw new Error('No projectId provided and agent has no defaultProjectId');
+            throw new NotFoundError('Project', 'defaultProjectId', { agentId: input.agentId });
         }
 
         // Validate project exists with a workingDir
         const project = getProject(this.db, projectId);
         if (!project) {
-            throw new Error(`Project ${projectId} not found`);
+            throw new NotFoundError('Project', projectId);
         }
         if (!project.workingDir) {
-            throw new Error(`Project ${projectId} has no workingDir`);
+            throw new ValidationError('Project has no workingDir', { projectId });
         }
 
         // Atomic insert — fails if a concurrent active task exists on this project
@@ -116,7 +117,7 @@ export class WorkTaskService {
             requesterInfo: input.requesterInfo,
         });
         if (!task) {
-            throw new Error(`Another task is already active on project ${projectId}`);
+            throw new ConflictError('Another task is already active on project', { projectId });
         }
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId });

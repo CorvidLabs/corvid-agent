@@ -167,4 +167,4 @@ Internal constants (not env-configurable):
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
-| 2026-02-24 | corvid-agent | Update files list for domain-module refactor (tool-handlers.ts → tool-handlers/*.ts) |
+| 2026-02-24 | corvid-agent | Updated files list after refactor into domain-specific modules (#233) |

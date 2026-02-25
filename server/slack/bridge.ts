@@ -10,10 +10,12 @@ import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
 import { createLogger } from '../lib/logger';
+import { DedupService } from '../lib/dedup';
 
 const log = createLogger('SlackBridge');
 
 const MAX_MESSAGE_LENGTH = 4000; // Slack block text limit
+const SLACK_DEDUP_NS = 'slack:events';
 
 /**
  * Bidirectional Slack bridge using Events API (webhook-based).
@@ -33,32 +35,23 @@ export class SlackBridge {
     private readonly RATE_LIMIT_WINDOW_MS = 60_000;
     private readonly RATE_LIMIT_MAX_MESSAGES = 10;
 
-    // Track processed event timestamps to avoid duplicates
-    private processedEvents: Set<string> = new Set();
-    private processedEventsCleanupTimer: ReturnType<typeof setInterval> | null = null;
+    private dedup = DedupService.global();
 
     constructor(db: Database, processManager: ProcessManager, config: SlackBridgeConfig) {
         this.db = db;
         this.processManager = processManager;
         this.config = config;
+        this.dedup.register(SLACK_DEDUP_NS, { maxSize: 1000, ttlMs: 300_000 }); // 5 min TTL
     }
 
     start(): void {
         if (this.running) return;
         this.running = true;
-        // Clean up processed events set periodically to prevent memory growth
-        this.processedEventsCleanupTimer = setInterval(() => {
-            this.processedEvents.clear();
-        }, 300_000); // 5 minutes
         log.info('Slack bridge started', { channelId: this.config.channelId });
     }
 
     stop(): void {
         this.running = false;
-        if (this.processedEventsCleanupTimer) {
-            clearInterval(this.processedEventsCleanupTimer);
-            this.processedEventsCleanupTimer = null;
-        }
         log.info('Slack bridge stopped');
     }
 
@@ -156,8 +149,7 @@ export class SlackBridge {
 
         // Deduplicate events (Slack may retry)
         const eventKey = `${event.channel}:${event.ts}`;
-        if (this.processedEvents.has(eventKey)) return;
-        this.processedEvents.add(eventKey);
+        if (this.dedup.isDuplicate(SLACK_DEDUP_NS, eventKey)) return;
 
         const userId = event.user;
         const text = event.text;

@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import type { VoicePreset } from '../../shared/types';
 import type { TTSOptions, TTSResult } from './types';
 import { createLogger } from '../lib/logger';
+import { ValidationError, ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('TTS');
 
@@ -15,15 +16,15 @@ const MAX_VOICE_CACHE_ENTRIES = 10_000;
 export async function synthesize(options: TTSOptions): Promise<TTSResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is required for text-to-speech');
+        throw new ValidationError('OPENAI_API_KEY is required for text-to-speech');
     }
 
     if (options.text.length > MAX_TTS_TEXT_LENGTH) {
-        throw new Error(`TTS text exceeds maximum length of ${MAX_TTS_TEXT_LENGTH} characters`);
+        throw new ValidationError(`TTS text exceeds maximum length of ${MAX_TTS_TEXT_LENGTH} characters`);
     }
 
     if (!options.text.trim()) {
-        throw new Error('TTS text must not be empty');
+        throw new ValidationError('TTS text must not be empty');
     }
 
     const response = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -44,7 +45,7 @@ export async function synthesize(options: TTSOptions): Promise<TTSResult> {
     if (!response.ok) {
         const error = await response.text();
         log.error('OpenAI TTS API error', { status: response.status, error });
-        throw new Error(`Text-to-speech failed (status ${response.status})`);
+        throw new ExternalServiceError("OpenAI TTS", `Text-to-speech failed (status ${response.status})`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
