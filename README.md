@@ -21,6 +21,13 @@ Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](ht
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
+bash scripts/dev-setup.sh    # guided setup: prerequisites, env, deps, build
+bun run dev
+```
+
+Or manually:
+
+```bash
 bun install
 cp .env.example .env   # add your ANTHROPIC_API_KEY
 bun run build:client
