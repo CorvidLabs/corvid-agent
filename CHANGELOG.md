@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-02-25
+
+### Added
+- **Centralized DedupService** — unified deduplication with TTL expiry, LRU eviction, and SQLite persistence; replaces scattered per-feature dedup logic (#254)
+- **Test coverage reporting** — CI pipeline now generates and uploads coverage reports (#252)
+- **Unit tests for critical untested services** — expanded test coverage for previously untested code paths (#255)
+
+### Fixed
+- **Cross-repo dedup collisions** — mention polling now scopes dedup keys per-repository to prevent false-positive suppression (#232)
+- **SQL injection prevention** — replaced string interpolation with parameterized queries across database layer (#251)
+- **Dockerfile bun version** — pinned to bun:1.3.8 to match lockfile (#229)
+- **CI/Docker workflow timeouts** — added `timeout-minutes` to prevent runaway jobs (#228)
+- **bun.lock regeneration** — resolved lockfile drift from dependabot dependency merges (#230)
+
+### Changed
+- **Tool handler decomposition** — split monolithic `tool-handlers.ts` into domain-specific modules for maintainability (#253)
+- **AlgoChatBridge decomposition** — refactored into focused single-responsibility services (#256)
+
+### Dependencies
+- Bumped `@opentelemetry/auto-instrumentations-node` (#225)
+- Bumped `@anthropic-ai/sdk` from 0.74.0 to 0.78.0 (#227)
+
 ## [0.11.0] - 2026-02-23
 
 ### Added
