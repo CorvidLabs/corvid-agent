@@ -200,6 +200,10 @@ export const LaunchCouncilSchema = z.object({
     prompt: z.string().min(1, 'prompt is required'),
 });
 
+export const CouncilChatSchema = z.object({
+    message: z.string().min(1, 'message is required'),
+});
+
 // ─── Work Tasks ────────────────────────────────────────────────────────────────
 
 export const CreateWorkTaskSchema = z.object({
