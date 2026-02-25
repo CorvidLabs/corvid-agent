@@ -12,7 +12,7 @@
  * 4. Response routing — when NOT to use corvid_send_message
  */
 
-import type { JsonSchemaObject, JsonSchemaProperty } from '../types';
+import type { JsonSchemaObject } from '../types';
 
 export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'unknown';
 

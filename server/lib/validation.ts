@@ -595,19 +595,16 @@ export const CouncilChatSchema = z.object({
 
 // ─── Settings ──────────────────────────────────────────────────────────────
 
-const CreditConfigKeySchema = z.enum([
-    'credits_per_algo',
-    'low_credit_threshold',
-    'reserve_per_group_message',
-    'credits_per_turn',
-    'credits_per_agent_message',
-    'free_credits_on_first_message',
-]);
+const CreditConfigValueSchema = z.union([z.string(), z.number()]);
 
-export const UpdateCreditConfigSchema = z.record(
-    CreditConfigKeySchema,
-    z.union([z.string(), z.number()]),
-).refine(
+export const UpdateCreditConfigSchema = z.object({
+    credits_per_algo: CreditConfigValueSchema.optional(),
+    low_credit_threshold: CreditConfigValueSchema.optional(),
+    reserve_per_group_message: CreditConfigValueSchema.optional(),
+    credits_per_turn: CreditConfigValueSchema.optional(),
+    credits_per_agent_message: CreditConfigValueSchema.optional(),
+    free_credits_on_first_message: CreditConfigValueSchema.optional(),
+}).strict().refine(
     (d) => Object.keys(d).length > 0,
     { message: 'At least one config key is required' },
 );

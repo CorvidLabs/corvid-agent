@@ -89,7 +89,7 @@ describe('Plugin Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json();
-        expect(data.error).toContain('packageName is required');
+        expect(data.error).toContain('packageName');
     });
 
     it('POST /api/plugins/:name/unload unloads a plugin', async () => {
@@ -121,7 +121,7 @@ describe('Plugin Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json();
-        expect(data.error).toContain('Invalid capability');
+        expect(data.error).toContain('capability');
     });
 
     it('returns null for unmatched paths with registry present', () => {

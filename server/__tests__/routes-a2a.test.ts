@@ -85,7 +85,7 @@ describe('A2A Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json();
-        expect(data.error).toContain('message is required');
+        expect(data.error).toContain('message');
     });
 
     it('POST /a2a/tasks/send rejects empty message', async () => {

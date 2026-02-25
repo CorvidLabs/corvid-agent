@@ -67,7 +67,7 @@ describe('Auth Flow Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json();
-        expect(data.error).toBe('expired');
+        expect(data.error).toBe('Device code expired or invalid');
     });
 
     it('POST /api/auth/device/authorize authorizes a device code', async () => {
