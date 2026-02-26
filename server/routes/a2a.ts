@@ -8,7 +8,8 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import { handleTaskSend, handleTaskGet, type A2ATaskDeps } from '../a2a/task-handler';
-import { json, badRequest, notFound } from '../lib/response';
+import { json, notFound, handleRouteError } from '../lib/response';
+import { parseBodyOrThrow, ValidationError, SendA2ATaskSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('A2ARoutes');
@@ -22,24 +23,21 @@ export async function handleA2ARoutes(
     // POST /a2a/tasks/send
     if (url.pathname === '/a2a/tasks/send' && req.method === 'POST') {
         try {
-            const body = await req.json() as { params?: { message?: string; skill?: string; timeoutMs?: number } };
-            const params = body.params ?? body as { message?: string; skill?: string; timeoutMs?: number };
-
-            if (!params.message?.trim()) {
-                return badRequest('message is required');
-            }
+            const data = await parseBodyOrThrow(req, SendA2ATaskSchema);
+            const params = data.params ?? data;
 
             const deps: A2ATaskDeps = { db, processManager };
             const task = handleTaskSend(deps, {
-                message: params.message,
+                message: params.message!,
                 skill: params.skill,
                 timeoutMs: params.timeoutMs,
             });
 
             return json(task);
         } catch (err) {
+            if (err instanceof ValidationError) return json({ error: err.detail }, 400);
             log.error('A2A tasks/send failed', { error: err instanceof Error ? err.message : String(err) });
-            return badRequest('Failed to send A2A task');
+            return handleRouteError(err);
         }
     }
 

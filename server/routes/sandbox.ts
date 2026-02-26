@@ -4,7 +4,8 @@
 import type { Database } from 'bun:sqlite';
 import type { SandboxManager } from '../sandbox/manager';
 import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
-import { json, badRequest, notFound, handleRouteError } from '../lib/response';
+import { json, notFound, handleRouteError } from '../lib/response';
+import { parseBodyOrThrow, ValidationError, SetSandboxPolicySchema, AssignSandboxSchema } from '../lib/validation';
 
 export function handleSandboxRoutes(
     req: Request,
@@ -65,22 +66,11 @@ export function handleSandboxRoutes(
 
 async function handleSetPolicy(req: Request, db: Database, agentId: string): Promise<Response> {
     try {
-        const body = await req.json() as Record<string, unknown>;
-        const limits: Record<string, unknown> = {};
-
-        if (typeof body.cpuLimit === 'number') limits.cpuLimit = body.cpuLimit;
-        if (typeof body.memoryLimitMb === 'number') limits.memoryLimitMb = body.memoryLimitMb;
-        if (typeof body.networkPolicy === 'string') {
-            if (!['none', 'host', 'restricted'].includes(body.networkPolicy)) {
-                return badRequest('networkPolicy must be one of: none, host, restricted');
-            }
-            limits.networkPolicy = body.networkPolicy;
-        }
-        if (typeof body.timeoutSeconds === 'number') limits.timeoutSeconds = body.timeoutSeconds;
-
-        setAgentPolicy(db, agentId, limits as Record<string, number | string>);
+        const data = await parseBodyOrThrow(req, SetSandboxPolicySchema);
+        setAgentPolicy(db, agentId, data as Record<string, number | string>);
         return json(getAgentPolicy(db, agentId));
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         return handleRouteError(err);
     }
 }
@@ -94,20 +84,17 @@ async function handleAssign(
     }
 
     try {
-        const body = await req.json() as { agentId: string; sessionId: string; workDir?: string };
-
-        if (!body.agentId || !body.sessionId) {
-            return badRequest('agentId and sessionId are required');
-        }
+        const data = await parseBodyOrThrow(req, AssignSandboxSchema);
 
         const containerId = await sandboxManager.assignContainer(
-            body.agentId,
-            body.sessionId,
-            body.workDir,
+            data.agentId,
+            data.sessionId,
+            data.workDir,
         );
 
         return json({ containerId }, 201);
     } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         return handleRouteError(err);
     }
 }

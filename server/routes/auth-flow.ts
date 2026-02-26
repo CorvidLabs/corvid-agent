@@ -5,7 +5,8 @@
  * for CLI-to-server authentication.
  */
 import type { Database } from 'bun:sqlite';
-import { json, badRequest } from '../lib/response';
+import { json } from '../lib/response';
+import { parseBodyOrThrow, ValidationError, DeviceTokenSchema, DeviceAuthorizeSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AuthFlow');
@@ -122,28 +123,31 @@ function handleDeviceAuth(_db: Database): Response {
 }
 
 async function handleDeviceToken(req: Request): Promise<Response> {
-    const body = await req.json() as { deviceCode: string };
-    if (!body.deviceCode) {
-        return badRequest('deviceCode is required');
+    let data: { deviceCode: string };
+    try {
+        data = await parseBodyOrThrow(req, DeviceTokenSchema);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
     }
 
-    const auth = pendingAuths.get(body.deviceCode);
+    const auth = pendingAuths.get(data.deviceCode);
     if (!auth) {
         return json({ error: 'expired', error_description: 'Device code expired or invalid' }, 400);
     }
 
     if (auth.expiresAt < Date.now()) {
-        pendingAuths.delete(body.deviceCode);
+        pendingAuths.delete(data.deviceCode);
         return json({ error: 'expired', error_description: 'Device code expired' }, 400);
     }
 
     if (auth.status === 'denied') {
-        pendingAuths.delete(body.deviceCode);
+        pendingAuths.delete(data.deviceCode);
         return json({ error: 'denied', error_description: 'Authorization denied' }, 400);
     }
 
     if (auth.status === 'pending') {
-        return json({ error: 'authorization_pending', error_description: 'Waiting for user authorization' }, 400);
+        return json({ error: 'authorization_pending' }, 400);
     }
 
     if (auth.status === 'authorized' && auth.accessToken) {
@@ -154,7 +158,7 @@ async function handleDeviceToken(req: Request): Promise<Response> {
             tenantName: auth.tenantId ?? 'default',
             email: auth.email ?? '',
         };
-        pendingAuths.delete(body.deviceCode);
+        pendingAuths.delete(data.deviceCode);
         return json(response);
     }
 
@@ -162,21 +166,18 @@ async function handleDeviceToken(req: Request): Promise<Response> {
 }
 
 async function handleDeviceAuthorize(req: Request): Promise<Response> {
-    const body = await req.json() as {
-        userCode: string;
-        tenantId: string;
-        email: string;
-        approve: boolean;
-    };
-
-    if (!body.userCode) {
-        return badRequest('userCode is required');
+    let data: { userCode: string; tenantId: string; email: string; approve: boolean };
+    try {
+        data = await parseBodyOrThrow(req, DeviceAuthorizeSchema);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
     }
 
     // Find the pending auth by user code
     let found: PendingAuth | null = null;
     for (const auth of pendingAuths.values()) {
-        if (auth.userCode === body.userCode && auth.status === 'pending') {
+        if (auth.userCode === data.userCode && auth.status === 'pending') {
             found = auth;
             break;
         }
@@ -186,7 +187,7 @@ async function handleDeviceAuthorize(req: Request): Promise<Response> {
         return json({ error: 'Invalid or expired user code' }, 404);
     }
 
-    if (!body.approve) {
+    if (!data.approve) {
         found.status = 'denied';
         return json({ ok: true, status: 'denied' });
     }
@@ -194,11 +195,11 @@ async function handleDeviceAuthorize(req: Request): Promise<Response> {
     // Generate an access token
     const accessToken = `ca_${crypto.randomUUID().replace(/-/g, '')}`;
     found.status = 'authorized';
-    found.tenantId = body.tenantId;
+    found.tenantId = data.tenantId;
     found.accessToken = accessToken;
-    found.email = body.email;
+    found.email = data.email;
 
-    log.info('Device authorized', { userCode: body.userCode, tenantId: body.tenantId });
+    log.info('Device authorized', { userCode: data.userCode, tenantId: data.tenantId });
 
     return json({ ok: true, status: 'authorized' });
 }

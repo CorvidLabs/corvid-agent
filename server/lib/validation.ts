@@ -6,10 +6,12 @@
 // Input validation schemas and parsing utilities for HTTP routes
 
 import { z } from 'zod';
-
-// Re-export ValidationError from the central errors module so existing imports keep working.
-export { ValidationError } from './errors';
 import { ValidationError } from './errors';
+
+// Re-export so existing imports from '../lib/validation' continue to work
+export { ValidationError };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
  * Parse and validate a JSON request body against a Zod schema.
@@ -569,4 +571,89 @@ export const UpdateMcpServerConfigSchema = z.object({
     envVars: z.record(z.string(), z.string().max(4000)).optional(),
     cwd: z.string().max(500).nullable().optional(),
     enabled: z.boolean().optional(),
+});
+
+// ─── A2A ─────────────────────────────────────────────────────────────────────
+
+export const SendA2ATaskSchema = z.object({
+    params: z.object({
+        message: z.string().min(1, 'message is required'),
+        skill: z.string().optional(),
+        timeoutMs: z.number().int().min(1000).max(600000).optional(),
+    }).optional(),
+    message: z.string().min(1).optional(),
+    skill: z.string().optional(),
+    timeoutMs: z.number().int().min(1000).max(600000).optional(),
+}).refine(
+    (d) => (d.params?.message?.trim()) || (d.message?.trim()),
+    { message: 'message is required (either at top-level or inside params)' },
+);
+
+// ─── Settings ──────────────────────────────────────────────────────────────
+
+const CreditConfigValueSchema = z.union([z.string(), z.number()]);
+
+export const UpdateCreditConfigSchema = z.object({
+    credits_per_algo: CreditConfigValueSchema.optional(),
+    low_credit_threshold: CreditConfigValueSchema.optional(),
+    reserve_per_group_message: CreditConfigValueSchema.optional(),
+    credits_per_turn: CreditConfigValueSchema.optional(),
+    credits_per_agent_message: CreditConfigValueSchema.optional(),
+    free_credits_on_first_message: CreditConfigValueSchema.optional(),
+}).strict().refine(
+    (d) => Object.keys(d).length > 0,
+    { message: 'At least one config key is required' },
+);
+
+// ─── Plugins ──────────────────────────────────────────────────────────────
+
+export const LoadPluginSchema = z.object({
+    packageName: z.string().min(1, 'packageName is required'),
+    autoGrant: z.boolean().optional().default(false),
+});
+
+const PluginCapabilitySchema = z.enum([
+    'db:read',
+    'network:outbound',
+    'fs:project-dir',
+    'agent:read',
+    'session:read',
+]);
+
+export const PluginCapabilityActionSchema = z.object({
+    capability: PluginCapabilitySchema,
+});
+
+// ─── Sandbox ──────────────────────────────────────────────────────────────
+
+export const SetSandboxPolicySchema = z.object({
+    cpuLimit: z.number().min(0.1).max(16).optional(),
+    memoryLimitMb: z.number().int().min(64).max(65536).optional(),
+    networkPolicy: z.enum(['none', 'host', 'restricted']).optional(),
+    timeoutSeconds: z.number().int().min(1).max(86400).optional(),
+});
+
+export const AssignSandboxSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    sessionId: z.string().min(1, 'sessionId is required'),
+    workDir: z.string().optional(),
+});
+
+// ─── Auth Flow (Device Authorization) ───────────────────────────────────
+
+export const DeviceTokenSchema = z.object({
+    deviceCode: z.string().min(1, 'deviceCode is required'),
+});
+
+export const DeviceAuthorizeSchema = z.object({
+    userCode: z.string().min(1, 'userCode is required'),
+    tenantId: z.string().min(1, 'tenantId is required'),
+    email: z.string().min(1, 'email is required'),
+    approve: z.boolean({ message: 'approve (boolean) is required' }),
+});
+
+// ─── PSK Contacts ────────────────────────────────────────────────────────
+
+export const PSKContactNicknameSchema = z.object({
+    nickname: z.string().min(1, 'nickname is required'),
 });

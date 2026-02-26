@@ -581,8 +581,8 @@ export class SubscriptionManager {
             }
 
             // Direct-mode: tool_status events
-            if (event.type === 'tool_status' && (event as any).statusMessage) {
-                const match = (event as any).statusMessage.match(/^\[(\w+)\]\s(.*)$/);
+            if (event.type === 'tool_status' && event.statusMessage) {
+                const match = event.statusMessage.match(/^\[(\w+)\]\s(.*)$/);
                 if (match) {
                     currentEventFn?.({ type: 'tool_use', toolName: match[1], input: match[2] });
                 }
@@ -590,7 +590,7 @@ export class SubscriptionManager {
 
             // Direct-mode: thinking signal
             if (event.type === 'thinking') {
-                currentEventFn?.({ type: 'thinking', active: !!(event as any).thinking });
+                currentEventFn?.({ type: 'thinking', active: !!event.thinking });
             }
 
             if (event.type === 'assistant' && event.message?.content) {

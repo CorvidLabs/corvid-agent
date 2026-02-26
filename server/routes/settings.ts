@@ -5,6 +5,7 @@
 
 import type { Database } from 'bun:sqlite';
 import { json } from '../lib/response';
+import { parseBodyOrThrow, ValidationError, UpdateCreditConfigSchema } from '../lib/validation';
 
 export function handleSettingsRoutes(req: Request, url: URL, db: Database): Response | Promise<Response> | null {
     // GET /api/settings — all settings
@@ -46,35 +47,17 @@ function handleGetSettings(db: Database): Response {
 }
 
 async function handleUpdateCreditConfig(req: Request, db: Database): Promise<Response> {
-    let body: Record<string, string>;
+    let data: Record<string, string | number>;
     try {
-        body = await req.json() as Record<string, string>;
-    } catch {
-        return json({ error: 'Invalid JSON body' }, 400);
+        data = await parseBodyOrThrow(req, UpdateCreditConfigSchema);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
     }
-
-    const allowedKeys = [
-        'credits_per_algo',
-        'low_credit_threshold',
-        'reserve_per_group_message',
-        'credits_per_turn',
-        'credits_per_agent_message',
-        'free_credits_on_first_message',
-    ];
 
     const updates: { key: string; value: string }[] = [];
-    for (const [key, value] of Object.entries(body)) {
-        if (!allowedKeys.includes(key)) {
-            return json({ error: `Unknown config key: ${key}` }, 400);
-        }
-        if (typeof value !== 'string' && typeof value !== 'number') {
-            return json({ error: `Invalid value for ${key}` }, 400);
-        }
+    for (const [key, value] of Object.entries(data)) {
         updates.push({ key, value: String(value) });
-    }
-
-    if (updates.length === 0) {
-        return json({ error: 'No valid config keys provided' }, 400);
     }
 
     const stmt = db.prepare(`INSERT OR REPLACE INTO credit_config (key, value, updated_at) VALUES (?, ?, datetime('now'))`);

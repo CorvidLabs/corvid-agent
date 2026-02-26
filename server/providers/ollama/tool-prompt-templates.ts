@@ -12,6 +12,8 @@
  * 4. Response routing — when NOT to use corvid_send_message
  */
 
+import type { JsonSchemaObject } from '../types';
+
 export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'unknown';
 
 /**
@@ -38,7 +40,7 @@ export function detectModelFamily(modelName: string): ModelFamily {
 interface ToolSchema {
     name: string;
     description: string;
-    parameters: Record<string, unknown>;
+    parameters: JsonSchemaObject;
 }
 
 /**
@@ -80,9 +82,9 @@ const TEXT_BASED_FAMILIES = new Set<ModelFamily>(['qwen3']);
 function formatToolSchemas(toolDefs: ToolSchema[]): string {
     const lines = ['### Tool Schemas', 'Use EXACTLY these parameter names when calling tools:'];
     for (const tool of toolDefs) {
-        const props = (tool.parameters as any)?.properties ?? {};
-        const required = (tool.parameters as any)?.required ?? [];
-        const params = Object.entries(props).map(([name, schema]: [string, any]) => {
+        const props = tool.parameters.properties ?? {};
+        const required = tool.parameters.required ?? [];
+        const params = Object.entries(props).map(([name, schema]) => {
             const req = required.includes(name) ? ' (required)' : '';
             return `  - ${name}: ${schema.type ?? 'string'}${req} — ${schema.description ?? ''}`;
         });

@@ -109,7 +109,7 @@ describe('invoke()', () => {
                 toAgentId: agentB.id,
                 content: 'hello',
             }),
-        ).rejects.toThrow('Agent nonexistent-id not found');
+        ).rejects.toThrow('Source agent nonexistent-id not found');
     });
 
     test('throws when target agent not found', async () => {
@@ -119,7 +119,7 @@ describe('invoke()', () => {
                 toAgentId: 'nonexistent-id',
                 content: 'hello',
             }),
-        ).rejects.toThrow('Agent nonexistent-id not found');
+        ).rejects.toThrow('Target agent nonexistent-id not found');
     });
 
     test('creates agent_messages row in DB', async () => {

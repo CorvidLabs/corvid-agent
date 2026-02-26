@@ -68,7 +68,7 @@ describe('Settings Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json();
-        expect(data.error).toContain('Unknown config key');
+        expect(data.error).toContain('Unrecognized key');
     });
 
     it('PUT /api/settings/credits rejects empty body', async () => {
@@ -77,7 +77,7 @@ describe('Settings Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
         const data = await res!.json();
-        expect(data.error).toContain('No valid config keys');
+        expect(data.error).toContain('At least one config key is required');
     });
 
     it('returns null for unmatched paths', async () => {

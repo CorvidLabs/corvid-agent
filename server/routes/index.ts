@@ -42,7 +42,7 @@ import { backupDatabase } from '../db/backup';
 import { updateMemoryTxid } from '../db/agent-memories';
 import { encryptMemoryContent } from '../lib/crypto';
 import { loadAlgoChatConfig } from '../algochat/config';
-import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema, PSKContactNicknameSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
@@ -430,14 +430,11 @@ async function handleRoutes(
             return json({ error: 'AlgoChat not configured' }, 503);
         }
         try {
-            const body = await req.json() as { nickname?: string };
-            const nickname = body.nickname?.trim();
-            if (!nickname) {
-                return json({ error: 'nickname is required' }, 400);
-            }
-            const result = algochatBridge.createPSKContact(nickname);
+            const data = await parseBodyOrThrow(req, PSKContactNicknameSchema);
+            const result = algochatBridge.createPSKContact(data.nickname);
             return json(result);
         } catch (err) {
+            if (err instanceof ValidationError) return json({ error: err.detail }, 400);
             return handleRouteError(err);
         }
     }
@@ -450,15 +447,12 @@ async function handleRoutes(
         }
         try {
             const id = decodeURIComponent(pskContactPatchMatch[1]);
-            const body = await req.json() as { nickname?: string };
-            const nickname = body.nickname?.trim();
-            if (!nickname) {
-                return json({ error: 'nickname is required' }, 400);
-            }
-            const ok = algochatBridge.renamePSKContact(id, nickname);
+            const data = await parseBodyOrThrow(req, PSKContactNicknameSchema);
+            const ok = algochatBridge.renamePSKContact(id, data.nickname);
             if (!ok) return json({ error: 'Contact not found' }, 404);
             return json({ ok: true });
         } catch (err) {
+            if (err instanceof ValidationError) return json({ error: err.detail }, 400);
             return handleRouteError(err);
         }
     }

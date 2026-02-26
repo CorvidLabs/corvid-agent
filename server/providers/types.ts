@@ -9,10 +9,18 @@ export interface JsonSchemaProperty {
     default?: unknown;
 }
 
+/** JSON Schema object with properties/required (used for tool parameter schemas). */
+export interface JsonSchemaObject {
+    type?: string;
+    properties?: Record<string, JsonSchemaProperty>;
+    required?: string[];
+    [key: string]: unknown;
+}
+
 export interface LlmToolDefinition {
     name: string;
     description: string;
-    parameters: Record<string, unknown>; // JSON Schema
+    parameters: JsonSchemaObject;
 }
 
 export interface LlmToolCall {
