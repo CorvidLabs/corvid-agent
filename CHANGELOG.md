@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.12.0] - 2026-02-25
+## [0.13.0] - 2026-02-25
 
 ### Added
 - **Centralized DedupService** — unified deduplication with TTL expiry, LRU eviction, and SQLite persistence; replaces scattered per-feature dedup logic (#254)
