@@ -360,7 +360,7 @@ const PollingEventFilterSchema = z.enum([
 
 export const CreateMentionPollingSchema = z.object({
     agentId: z.string().min(1, 'agentId is required'),
-    repo: z.string().min(1, 'repo is required (format: owner/name)').regex(/^[^/]+\/[^/]+$/, 'repo must be in owner/name format'),
+    repo: z.string().min(1, 'repo is required').regex(/^[^/]+(?:\/[^/]+)?$/, 'repo must be owner/name or org name'),
     mentionUsername: z.string().min(1, 'mentionUsername is required'),
     projectId: z.string().min(1).optional(),
     intervalSeconds: z.number().int().min(30, 'Minimum polling interval is 30 seconds').max(3600, 'Maximum polling interval is 1 hour').optional(),
