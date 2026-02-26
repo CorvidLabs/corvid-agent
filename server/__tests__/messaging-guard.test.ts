@@ -63,8 +63,8 @@ describe('MessagingGuard', () => {
 
             expect(guard.getCircuitState('target-1')).toBe('OPEN');
 
-            // Wait for reset timeout
-            await new Promise((r) => setTimeout(r, 60));
+            // Wait for reset timeout (extra margin for Windows timer resolution)
+            await new Promise((r) => setTimeout(r, 100));
 
             expect(guard.getCircuitState('target-1')).toBe('HALF_OPEN');
 
@@ -79,8 +79,8 @@ describe('MessagingGuard', () => {
             guard.recordFailure('target-1');
             guard.recordFailure('target-1');
 
-            // Wait for HALF_OPEN
-            await new Promise((r) => setTimeout(r, 60));
+            // Wait for HALF_OPEN (extra margin for Windows timer resolution)
+            await new Promise((r) => setTimeout(r, 100));
             expect(guard.getCircuitState('target-1')).toBe('HALF_OPEN');
 
             // 2 successes needed (our threshold)
@@ -96,8 +96,8 @@ describe('MessagingGuard', () => {
             guard.recordFailure('target-1');
             guard.recordFailure('target-1');
 
-            // Wait for HALF_OPEN
-            await new Promise((r) => setTimeout(r, 60));
+            // Wait for HALF_OPEN (extra margin for Windows timer resolution)
+            await new Promise((r) => setTimeout(r, 100));
             expect(guard.getCircuitState('target-1')).toBe('HALF_OPEN');
 
             // Failure re-opens
