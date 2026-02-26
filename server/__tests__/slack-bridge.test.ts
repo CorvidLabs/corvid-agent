@@ -5,10 +5,48 @@ import { SlackBridge } from '../slack/bridge';
 import type { SlackBridgeConfig } from '../slack/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
+import type { ProcessManager } from '../process/manager';
 
-// ─── Mock ProcessManager ────────────────────────────────────────────────────
+// ─── Testable SlackBridge subclass ──────────────────────────────────────────
+// Exposes protected members for test assertions without `as any` casts.
 
-function createMockProcessManager() {
+class TestableSlackBridge extends SlackBridge {
+    get isRunning(): boolean {
+        return this.running;
+    }
+
+    getUserSession(userId: string): string | undefined {
+        return this.userSessions.get(userId);
+    }
+
+    hasUserSession(userId: string): boolean {
+        return this.userSessions.has(userId);
+    }
+
+    setUserSession(userId: string, sessionId: string): void {
+        this.userSessions.set(userId, sessionId);
+    }
+
+    testCheckRateLimit(userId: string): boolean {
+        return this.checkRateLimit(userId);
+    }
+}
+
+// ─── Typed mock factories ───────────────────────────────────────────────────
+
+/** Subset of ProcessManager methods that SlackBridge actually calls. */
+interface MockProcessManager {
+    getActiveSessionIds: () => string[];
+    startProcess: ReturnType<typeof mock>;
+    sendMessage: ReturnType<typeof mock>;
+    subscribe: ReturnType<typeof mock>;
+    unsubscribe: ReturnType<typeof mock>;
+    isRunning: ReturnType<typeof mock>;
+}
+
+function createMockProcessManager(): MockProcessManager & ProcessManager {
+    // SlackBridge only uses the methods below; cast through unknown to satisfy
+    // the constructor's full ProcessManager type without implementing 50+ unused members.
     return {
         getActiveSessionIds: () => [] as string[],
         startProcess: mock(() => {}),
@@ -16,8 +54,48 @@ function createMockProcessManager() {
         subscribe: mock(() => {}),
         unsubscribe: mock(() => {}),
         isRunning: mock(() => false),
-    } as unknown as import('../process/manager').ProcessManager;
+    } as unknown as MockProcessManager & ProcessManager;
 }
+
+/**
+ * Replace `bridge.sendMessage` with a mock that captures sent messages.
+ * Returns the array of captured message texts.
+ */
+function mockSendMessage(bridge: TestableSlackBridge): string[] {
+    const sentMessages: string[] = [];
+    bridge.sendMessage = mock(async (_ch: string, text: string) => {
+        sentMessages.push(text);
+    });
+    return sentMessages;
+}
+
+/**
+ * Temporarily replace `globalThis.fetch` with a mock that records calls.
+ * Returns a disposable with the captured calls and a restore function.
+ */
+function mockFetch(handler: (url: string, opts: RequestInit) => Response | Promise<Response>) {
+    const calls: { url: string; body: string }[] = [];
+    const originalFetch = globalThis.fetch;
+
+    const mockFn = Object.assign(
+        mock(async (input: string | URL | Request, init?: RequestInit) => {
+            const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+            const opts = init ?? (input instanceof Request ? { body: await input.text() } : {});
+            calls.push({ url, body: (opts.body ?? '') as string });
+            return handler(url, opts as RequestInit);
+        }),
+        // Bun's fetch type includes a static `preconnect` method; stub it for type compat.
+        { preconnect: (_url: string | URL) => {} },
+    );
+    globalThis.fetch = mockFn;
+
+    return {
+        calls,
+        restore: () => { globalThis.fetch = originalFetch; },
+    };
+}
+
+const OK_RESPONSE = () => new Response(JSON.stringify({ ok: true }), { status: 200 });
 
 let db: Database;
 
@@ -77,7 +155,7 @@ describe('SlackBridge', () => {
             channelId: 'C12345',
             allowedUserIds: ['U111'],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         expect(bridge).toBeDefined();
     });
 
@@ -89,13 +167,13 @@ describe('SlackBridge', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
         bridge.start();
-        expect((bridge as any).running).toBe(true);
+        expect(bridge.isRunning).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect(bridge.isRunning).toBe(false);
     });
 
     test('start is idempotent', () => {
@@ -106,14 +184,14 @@ describe('SlackBridge', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
         bridge.start();
         bridge.start(); // second call is no-op
-        expect((bridge as any).running).toBe(true);
+        expect(bridge.isRunning).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect(bridge.isRunning).toBe(false);
     });
 
     test('stop sets running to false', () => {
@@ -124,13 +202,13 @@ describe('SlackBridge', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
         bridge.start();
-        expect((bridge as any).running).toBe(true);
+        expect(bridge.isRunning).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect(bridge.isRunning).toBe(false);
     });
 });
 
@@ -147,7 +225,7 @@ describe('Slack signature verification', () => {
 
     test('accepts valid signature', async () => {
         const pm = createMockProcessManager();
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const body = { type: 'url_verification', challenge: 'test-challenge' };
@@ -164,7 +242,7 @@ describe('Slack signature verification', () => {
 
     test('rejects missing signature headers', async () => {
         const pm = createMockProcessManager();
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const req = new Request('http://localhost/api/slack/events', {
@@ -181,7 +259,7 @@ describe('Slack signature verification', () => {
 
     test('rejects invalid signature', async () => {
         const pm = createMockProcessManager();
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const timestamp = Math.floor(Date.now() / 1000);
@@ -203,7 +281,7 @@ describe('Slack signature verification', () => {
 
     test('rejects replay attacks (timestamp > 5 minutes old)', async () => {
         const pm = createMockProcessManager();
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const oldTimestamp = Math.floor(Date.now() / 1000) - 400; // 6+ minutes ago
@@ -229,7 +307,7 @@ describe('Slack URL verification', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const body = {
@@ -259,7 +337,7 @@ describe('Slack event deduplication', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         // Seed an agent and project so routeToAgent doesn't fail
@@ -307,7 +385,7 @@ describe('Slack bot message filtering', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const body = {
@@ -340,7 +418,7 @@ describe('Slack bot message filtering', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const body = {
@@ -377,7 +455,7 @@ describe('Slack channel filtering', () => {
             channelId: 'C_MY_CHANNEL',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         const body = {
@@ -413,14 +491,10 @@ describe('Slack user authorization', () => {
             channelId: 'C12345',
             allowedUserIds: ['U_ALLOWED_1'],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
-        // Mock sendMessage to capture what was sent
-        const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
-        });
+        const sentMessages = mockSendMessage(bridge);
 
         const body = {
             type: 'event_callback',
@@ -452,7 +526,7 @@ describe('Slack user authorization', () => {
             channelId: 'C12345',
             allowedUserIds: ['U_ALLOWED_1'],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
@@ -487,7 +561,7 @@ describe('Slack user authorization', () => {
             channelId: 'C12345',
             allowedUserIds: [], // empty = allow all
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
@@ -526,16 +600,13 @@ describe('Slack rate limiting', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
-        const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
-        });
+        const sentMessages = mockSendMessage(bridge);
 
         // Send 10 messages (should all be allowed)
         for (let i = 0; i < 10; i++) {
@@ -583,16 +654,16 @@ describe('Slack rate limiting', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
         // Fill user1's rate limit
         for (let i = 0; i < 10; i++) {
-            expect((bridge as any).checkRateLimit('user1')).toBe(true);
+            expect(bridge.testCheckRateLimit('user1')).toBe(true);
         }
-        expect((bridge as any).checkRateLimit('user1')).toBe(false);
+        expect(bridge.testCheckRateLimit('user1')).toBe(false);
 
         // user2 should still have capacity
-        expect((bridge as any).checkRateLimit('user2')).toBe(true);
+        expect(bridge.testCheckRateLimit('user2')).toBe(true);
     });
 });
 
@@ -607,20 +678,14 @@ describe('Slack message chunking', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
-        const fetchCalls: { body: string }[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string, opts: RequestInit) => {
-            fetchCalls.push({ body: opts.body as string });
-            return new Response(JSON.stringify({ ok: true }), { status: 200 });
-        }) as unknown as typeof fetch;
-
+        const fetcher = mockFetch(OK_RESPONSE);
         try {
             await bridge.sendMessage('C12345', 'Hello');
-            expect(fetchCalls).toHaveLength(1);
+            expect(fetcher.calls).toHaveLength(1);
         } finally {
-            globalThis.fetch = originalFetch;
+            fetcher.restore();
         }
     });
 
@@ -632,29 +697,23 @@ describe('Slack message chunking', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
-        const fetchCalls: { body: string }[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string, opts: RequestInit) => {
-            fetchCalls.push({ body: opts.body as string });
-            return new Response(JSON.stringify({ ok: true }), { status: 200 });
-        }) as unknown as typeof fetch;
-
+        const fetcher = mockFetch(OK_RESPONSE);
         try {
             const longText = 'x'.repeat(5000);
             await bridge.sendMessage('C12345', longText);
-            expect(fetchCalls).toHaveLength(2);
+            expect(fetcher.calls).toHaveLength(2);
 
             // First chunk should be 4000 chars
-            const firstBody = JSON.parse(fetchCalls[0].body);
+            const firstBody = JSON.parse(fetcher.calls[0].body);
             expect(firstBody.text).toHaveLength(4000);
 
             // Second chunk should be the remainder
-            const secondBody = JSON.parse(fetchCalls[1].body);
+            const secondBody = JSON.parse(fetcher.calls[1].body);
             expect(secondBody.text).toHaveLength(1000);
         } finally {
-            globalThis.fetch = originalFetch;
+            fetcher.restore();
         }
     });
 
@@ -666,20 +725,14 @@ describe('Slack message chunking', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
-        const fetchCalls: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            fetchCalls.push(1);
-            return new Response(JSON.stringify({ ok: true }), { status: 200 });
-        }) as unknown as typeof fetch;
-
+        const fetcher = mockFetch(OK_RESPONSE);
         try {
             await bridge.sendMessage('C12345', 'x'.repeat(4000));
-            expect(fetchCalls).toHaveLength(1);
+            expect(fetcher.calls).toHaveLength(1);
         } finally {
-            globalThis.fetch = originalFetch;
+            fetcher.restore();
         }
     });
 });
@@ -695,21 +748,16 @@ describe('Slack thread support', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
-        const fetchBodies: Record<string, unknown>[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string, opts: RequestInit) => {
-            fetchBodies.push(JSON.parse(opts.body as string));
-            return new Response(JSON.stringify({ ok: true }), { status: 200 });
-        }) as unknown as typeof fetch;
-
+        const fetcher = mockFetch(OK_RESPONSE);
         try {
             await bridge.sendMessage('C12345', 'threaded reply', '1234567890.000100');
-            expect(fetchBodies).toHaveLength(1);
-            expect(fetchBodies[0].thread_ts).toBe('1234567890.000100');
+            expect(fetcher.calls).toHaveLength(1);
+            const body = JSON.parse(fetcher.calls[0].body);
+            expect(body.thread_ts).toBe('1234567890.000100');
         } finally {
-            globalThis.fetch = originalFetch;
+            fetcher.restore();
         }
     });
 
@@ -721,21 +769,16 @@ describe('Slack thread support', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
 
-        const fetchBodies: Record<string, unknown>[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string, opts: RequestInit) => {
-            fetchBodies.push(JSON.parse(opts.body as string));
-            return new Response(JSON.stringify({ ok: true }), { status: 200 });
-        }) as unknown as typeof fetch;
-
+        const fetcher = mockFetch(OK_RESPONSE);
         try {
             await bridge.sendMessage('C12345', 'no thread');
-            expect(fetchBodies).toHaveLength(1);
-            expect(fetchBodies[0].thread_ts).toBeUndefined();
+            expect(fetcher.calls).toHaveLength(1);
+            const body = JSON.parse(fetcher.calls[0].body);
+            expect(body.thread_ts).toBeUndefined();
         } finally {
-            globalThis.fetch = originalFetch;
+            fetcher.restore();
         }
     });
 });
@@ -752,7 +795,7 @@ describe('Slack app_mention events', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
@@ -791,13 +834,10 @@ describe('Slack slash commands', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
-        const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
-        });
+        const sentMessages = mockSendMessage(bridge);
 
         const body = {
             type: 'event_callback',
@@ -829,16 +869,13 @@ describe('Slack slash commands', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         // Set a session for the user
-        (bridge as any).userSessions.set('U_CMD', 'old-session-id');
+        bridge.setUserSession('U_CMD', 'old-session-id');
 
-        const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
-        });
+        const sentMessages = mockSendMessage(bridge);
 
         const body = {
             type: 'event_callback',
@@ -855,7 +892,7 @@ describe('Slack slash commands', () => {
 
         await new Promise(r => setTimeout(r, 50));
 
-        expect((bridge as any).userSessions.has('U_CMD')).toBe(false);
+        expect(bridge.hasUserSession('U_CMD')).toBe(false);
         expect(sentMessages.some(m => m.includes('cleared'))).toBe(true);
 
         bridge.stop();
@@ -874,14 +911,14 @@ describe('Slack session routing', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
         // Mock sendMessage to avoid actual API calls
-        (bridge as any).sendMessage = mock(async () => {});
+        mockSendMessage(bridge);
 
         const body = {
             type: 'event_callback',
@@ -900,7 +937,7 @@ describe('Slack session routing', () => {
 
         expect(pm.startProcess).toHaveBeenCalledTimes(1);
         // Verify user session was created
-        expect((bridge as any).userSessions.has('U_ROUTE')).toBe(true);
+        expect(bridge.hasUserSession('U_ROUTE')).toBe(true);
 
         bridge.stop();
     });
@@ -914,13 +951,13 @@ describe('Slack session routing', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
-        (bridge as any).sendMessage = mock(async () => {});
+        mockSendMessage(bridge);
 
         // First message — creates session
         const body1 = {
@@ -969,13 +1006,10 @@ describe('Slack session routing', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
-        const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
-        });
+        const sentMessages = mockSendMessage(bridge);
 
         const body = {
             type: 'event_callback',
@@ -1010,7 +1044,7 @@ describe('Slack bridge not running', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         // Note: NOT started
 
         const body = {
@@ -1047,7 +1081,7 @@ describe('Slack invalid request body', () => {
             channelId: 'C12345',
             allowedUserIds: [],
         };
-        const bridge = new SlackBridge(db, pm, config);
+        const bridge = new TestableSlackBridge(db, pm, config);
         bridge.start();
 
         // Build a signed request with the raw invalid body

@@ -25,10 +25,10 @@ export class SlackBridge {
     private db: Database;
     private processManager: ProcessManager;
     private config: SlackBridgeConfig;
-    private running = false;
+    protected running = false;
 
     // Map Slack userId -> active sessionId
-    private userSessions: Map<string, string> = new Map();
+    protected userSessions: Map<string, string> = new Map();
 
     // Per-user rate limiting: userId -> timestamps of recent messages
     private userMessageTimestamps: Map<string, number[]> = new Map();
@@ -199,7 +199,7 @@ export class SlackBridge {
         await this.routeToAgent(channelId, userId, text, event.thread_ts ?? event.ts);
     }
 
-    private checkRateLimit(userId: string): boolean {
+    protected checkRateLimit(userId: string): boolean {
         const now = Date.now();
         const timestamps = this.userMessageTimestamps.get(userId) ?? [];
         const recent = timestamps.filter(t => now - t < this.RATE_LIMIT_WINDOW_MS);
