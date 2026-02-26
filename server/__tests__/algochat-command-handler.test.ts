@@ -81,14 +81,19 @@ function createMockResponseFormatter(): ResponseFormatter & { lastResponse: { pa
     return formatter;
 }
 
-function createMockContext(overrides: Partial<CommandHandlerContext> = {}): CommandHandlerContext {
+interface MockContextOptions {
+    defaultAgentId?: string | null;
+    defaultProjectId?: string;
+    extendResult?: boolean;
+}
+
+function createMockContext(overrides: MockContextOptions = {}): CommandHandlerContext {
     return {
         findAgentForNewConversation: mock(() => overrides.defaultAgentId ?? 'agent-1') as () => string | null,
         getDefaultProjectId: mock(() => overrides.defaultProjectId ?? 'proj-1') as () => string,
         extendSession: mock((_sessionId: string, _minutes: number) =>
             overrides.extendResult ?? true
         ) as (sessionId: string, minutes: number) => boolean,
-        ...overrides,
     };
 }
 
