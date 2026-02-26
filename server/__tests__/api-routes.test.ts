@@ -23,7 +23,7 @@ function fakeReq(method: string, path: string, body?: unknown): { req: Request; 
     return { req: new Request(url.toString(), opts), url };
 }
 
-async function getJson(res: Response | Promise<Response>): Promise<any> {
+async function getJson(res: Response | Promise<Response>): Promise<Record<string, unknown>> {
     const resolved = await res;
     return resolved.json();
 }

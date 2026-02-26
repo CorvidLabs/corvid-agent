@@ -228,7 +228,7 @@ describe('handleGitHubListPrs', () => {
     });
 
     test('returns error on failure', async () => {
-        mockListOpenPrs.mockResolvedValue({ ok: false, prs: [], error: 'Repo not found' } as any);
+        mockListOpenPrs.mockResolvedValue({ ok: false, prs: [], error: 'Repo not found' });
         const ctx = makeCtx();
         const result = await handleGitHubListPrs(ctx, { repo: 'bad/repo' });
         expect(result.isError).toBe(true);
@@ -276,7 +276,7 @@ describe('handleGitHubCreatePr', () => {
     });
 
     test('returns error on failure', async () => {
-        mockCreatePr.mockResolvedValue({ ok: false, error: 'Branch not found' } as any);
+        mockCreatePr.mockResolvedValue({ ok: false, error: 'Branch not found' });
         const ctx = makeCtx();
         const result = await handleGitHubCreatePr(ctx, {
             repo: 'test/repo',
@@ -342,7 +342,7 @@ describe('handleGitHubReviewPr', () => {
     });
 
     test('returns error on failure', async () => {
-        mockAddPrReview.mockResolvedValue({ ok: false, error: 'PR not found' } as any);
+        mockAddPrReview.mockResolvedValue({ ok: false, error: 'PR not found' });
         const ctx = makeCtx();
         const result = await handleGitHubReviewPr(ctx, {
             repo: 'test/repo',
@@ -392,7 +392,7 @@ describe('handleGitHubCreateIssue', () => {
     });
 
     test('returns error on failure', async () => {
-        mockCreateIssue.mockResolvedValue({ ok: false, error: 'Rate limited' } as any);
+        mockCreateIssue.mockResolvedValue({ ok: false, error: 'Rate limited' });
         const ctx = makeCtx();
         const result = await handleGitHubCreateIssue(ctx, {
             repo: 'test/repo',
@@ -465,7 +465,7 @@ describe('handleGitHubListIssues', () => {
     });
 
     test('returns error on failure', async () => {
-        mockListIssues.mockResolvedValue({ ok: false, issues: [], error: 'Not found' } as any);
+        mockListIssues.mockResolvedValue({ ok: false, issues: [], error: 'Not found' });
         const ctx = makeCtx();
         const result = await handleGitHubListIssues(ctx, { repo: 'bad/repo' });
         expect(result.isError).toBe(true);
@@ -486,7 +486,7 @@ describe('handleGitHubRepoInfo', () => {
     });
 
     test('returns error on failure', async () => {
-        mockGetRepoInfo.mockResolvedValue({ ok: false, error: 'Not found' } as any);
+        mockGetRepoInfo.mockResolvedValue({ ok: false, error: 'Not found' });
         const ctx = makeCtx();
         const result = await handleGitHubRepoInfo(ctx, { repo: 'nonexistent/repo' });
         expect(result.isError).toBe(true);
@@ -523,7 +523,7 @@ describe('handleGitHubGetPrDiff', () => {
     });
 
     test('returns error on failure', async () => {
-        mockGetPrDiff.mockResolvedValue({ ok: false, diff: '', error: 'PR not found' } as any);
+        mockGetPrDiff.mockResolvedValue({ ok: false, diff: '', error: 'PR not found' });
         const ctx = makeCtx();
         const result = await handleGitHubGetPrDiff(ctx, { repo: 'test/repo', pr_number: 999 });
         expect(result.isError).toBe(true);
@@ -556,7 +556,7 @@ describe('handleGitHubCommentOnPr', () => {
     });
 
     test('returns error on failure', async () => {
-        mockAddPrComment.mockResolvedValue({ ok: false, error: 'Permission denied' } as any);
+        mockAddPrComment.mockResolvedValue({ ok: false, error: 'Permission denied' });
         const ctx = makeCtx();
         const result = await handleGitHubCommentOnPr(ctx, {
             repo: 'test/repo',

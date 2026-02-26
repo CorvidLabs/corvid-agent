@@ -186,7 +186,7 @@ describe('getBalance', () => {
         // Override accountInformation to throw
         service.algodClient.accountInformation = mock(() => ({
             do: mock(() => Promise.reject(new Error('Network error'))),
-        })) as any;
+        })) as unknown as ReturnType<typeof mock>;
 
         const wallet = new AgentWalletService(db, config, service);
         const balance = await wallet.getBalance('BAD_ADDRESS');
@@ -200,7 +200,7 @@ describe('getBalance', () => {
         // Override accountInformation to return no amount field
         service.algodClient.accountInformation = mock(() => ({
             do: mock(() => Promise.resolve({})),
-        })) as any;
+        })) as unknown as ReturnType<typeof mock>;
 
         const wallet = new AgentWalletService(db, config, service);
         const balance = await wallet.getBalance('EMPTY_ACCOUNT');
@@ -269,7 +269,7 @@ describe('checkAndRefill', () => {
         // Balance of 5 ALGO (5_000_000 microAlgos) is above 1 ALGO threshold
         service.algodClient.accountInformation = mock(() => ({
             do: mock(() => Promise.resolve({ amount: 5_000_000 })),
-        })) as any;
+        })) as unknown as ReturnType<typeof mock>;
 
         const wallet = new AgentWalletService(db, config, service);
 

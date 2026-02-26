@@ -107,7 +107,7 @@ describe('OnChainTransactor with null service', () => {
 
     test('sendToAddress returns null when service is null', async () => {
         const transactor = new OnChainTransactor(db, null, mockWalletService, mockDirectory);
-        const mockAccount = { address: 'MOCK', account: { sk: new Uint8Array(64) } } as any;
+        const mockAccount = { address: 'MOCK', account: { sk: new Uint8Array(64) } } as unknown as import('@corvidlabs/ts-algochat').ChatAccount;
         const result = await transactor.sendToAddress(mockAccount, 'RECIPIENT', 'hello');
         expect(result).toBeNull();
     });

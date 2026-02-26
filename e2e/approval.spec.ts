@@ -2,6 +2,11 @@ import { test, expect } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
+interface TestWindow extends Window {
+    __TEST_WS_INSTANCES: WebSocket[];
+    __TEST_WS_SENT: Record<string, unknown>[];
+}
+
 /**
  * E2E tests for the Approval Dialog critical path.
  *
@@ -68,7 +73,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
     async function installWsHooks(page: import('@playwright/test').Page) {
         await page.addInitScript(() => {
             /* global window */
-            const w = window as any;
+            const w = window as unknown as TestWindow;
             w.__TEST_WS_INSTANCES = [] as WebSocket[];
             w.__TEST_WS_SENT = [] as object[];
 
@@ -82,12 +87,12 @@ test.describe.serial('Approval Dialog Critical Path', () => {
                 const ws = new OrigWS(url, protocols);
                 w.__TEST_WS_INSTANCES.push(ws);
                 return ws;
-            } as any;
+            } as unknown as typeof WebSocket;
             window.WebSocket.prototype = OrigWS.prototype;
             Object.assign(window.WebSocket, OrigWS);
 
             const origSend = OrigWS.prototype.send;
-            OrigWS.prototype.send = function (data: any) {
+            OrigWS.prototype.send = function (data: string | ArrayBufferLike | Blob | ArrayBufferView) {
                 try {
                     const parsed = JSON.parse(data);
                     w.__TEST_WS_SENT.push(parsed);
@@ -117,7 +122,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         const requestId = overrides.id ?? `req-${Date.now()}`;
         await page.evaluate(
             ({ req }) => {
-                const w = window as any;
+                const w = window as unknown as TestWindow;
                 const instances: WebSocket[] = w.__TEST_WS_INSTANCES ?? [];
                 const ws = instances[instances.length - 1];
                 if (!ws) throw new Error('No WebSocket instance captured');
@@ -203,7 +208,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
 
         // Clear previously captured sent messages
         await page.evaluate(() => {
-            (window as any).__TEST_WS_SENT = [];
+            (window as unknown as TestWindow).__TEST_WS_SENT = [];
         });
 
         const requestId = await injectApprovalRequest(page, {
@@ -225,10 +230,10 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         await expect(overlay).not.toBeVisible({ timeout: 5000 });
 
         // Verify the WebSocket sent an approval_response with behavior: 'allow'
-        const sentMessages = await page.evaluate(() => (window as any).__TEST_WS_SENT as object[]);
+        const sentMessages = await page.evaluate(() => (window as unknown as TestWindow).__TEST_WS_SENT);
         const approvalMsg = sentMessages.find(
-            (m: any) => m.type === 'approval_response' && m.requestId === requestId,
-        ) as any;
+            (m: Record<string, unknown>) => m.type === 'approval_response' && m.requestId === requestId,
+        );
 
         expect(approvalMsg).toBeTruthy();
         expect(approvalMsg.type).toBe('approval_response');
@@ -244,7 +249,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
 
         // Clear sent messages
         await page.evaluate(() => {
-            (window as any).__TEST_WS_SENT = [];
+            (window as unknown as TestWindow).__TEST_WS_SENT = [];
         });
 
         const requestId = await injectApprovalRequest(page, {
@@ -266,10 +271,10 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         await expect(overlay).not.toBeVisible({ timeout: 5000 });
 
         // Verify the WebSocket sent an approval_response with behavior: 'deny'
-        const sentMessages = await page.evaluate(() => (window as any).__TEST_WS_SENT as object[]);
+        const sentMessages = await page.evaluate(() => (window as unknown as TestWindow).__TEST_WS_SENT);
         const denyMsg = sentMessages.find(
-            (m: any) => m.type === 'approval_response' && m.requestId === requestId,
-        ) as any;
+            (m: Record<string, unknown>) => m.type === 'approval_response' && m.requestId === requestId,
+        );
 
         expect(denyMsg).toBeTruthy();
         expect(denyMsg.type).toBe('approval_response');
@@ -285,7 +290,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
 
         // Clear sent messages
         await page.evaluate(() => {
-            (window as any).__TEST_WS_SENT = [];
+            (window as unknown as TestWindow).__TEST_WS_SENT = [];
         });
 
         const requestId = await injectApprovalRequest(page, {
@@ -306,10 +311,10 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         await expect(overlay).not.toBeVisible({ timeout: 8000 });
 
         // Verify that a deny response was emitted automatically
-        const sentMessages = await page.evaluate(() => (window as any).__TEST_WS_SENT as object[]);
+        const sentMessages = await page.evaluate(() => (window as unknown as TestWindow).__TEST_WS_SENT);
         const denyMsg = sentMessages.find(
-            (m: any) => m.type === 'approval_response' && m.requestId === requestId,
-        ) as any;
+            (m: Record<string, unknown>) => m.type === 'approval_response' && m.requestId === requestId,
+        );
 
         expect(denyMsg).toBeTruthy();
         expect(denyMsg.behavior).toBe('deny');

@@ -31,7 +31,7 @@ describe('AgentFormComponent', () => {
         loading: signal(false),
         loadAgents: vi.fn(async () => {}),
         getAgent: vi.fn(),
-        createAgent: vi.fn(async (input: any) => ({
+        createAgent: vi.fn(async (input: Record<string, unknown>) => ({
             id: 'a-new',
             ...input,
             createdAt: new Date().toISOString(),

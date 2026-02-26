@@ -118,7 +118,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createCustomer sends correct request', async () => {
-        globalThis.fetch = (async (url: any, init: any) => {
+        globalThis.fetch = (async (url: string | URL | Request, init: RequestInit) => {
             expect(String(url)).toContain('/v1/customers');
             expect(init.method).toBe('POST');
             expect(init.headers.Authorization).toBe('Bearer sk_test_123');
@@ -141,7 +141,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createCustomer includes metadata', async () => {
-        globalThis.fetch = (async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('metadata[agentId]')).toBe('agent-1');
 
@@ -158,7 +158,7 @@ describe('Stripe API functions', () => {
     });
 
     it('getCustomer sends GET request', async () => {
-        globalThis.fetch = (async (url: any, init: any) => {
+        globalThis.fetch = (async (url: string | URL | Request, init: RequestInit) => {
             expect(String(url)).toContain('/v1/customers/cus_123');
             expect(init.method).toBe('GET');
 
@@ -175,7 +175,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createSubscription sends correct params', async () => {
-        globalThis.fetch = (async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('customer')).toBe('cus_123');
             expect(body.get('items[0][price]')).toBe('price_abc');
@@ -197,7 +197,7 @@ describe('Stripe API functions', () => {
     });
 
     it('cancelSubscription at period end sends correct flag', async () => {
-        globalThis.fetch = (async (url: any, init: any) => {
+        globalThis.fetch = (async (url: string | URL | Request, init: RequestInit) => {
             expect(String(url)).toContain('/v1/subscriptions/sub_123');
             expect(init.method).toBe('POST');
             const body = new URLSearchParams(init.body);
@@ -219,7 +219,7 @@ describe('Stripe API functions', () => {
     });
 
     it('cancelSubscription immediately sends DELETE', async () => {
-        globalThis.fetch = (async (url: any, init: any) => {
+        globalThis.fetch = (async (url: string | URL | Request, init: RequestInit) => {
             expect(init.method).toBe('DELETE');
             expect(String(url)).toContain('/v1/subscriptions/sub_123');
 
@@ -239,7 +239,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createUsageRecord sends quantity and action', async () => {
-        globalThis.fetch = (async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('quantity')).toBe('100');
             expect(body.get('action')).toBe('set');
@@ -252,7 +252,7 @@ describe('Stripe API functions', () => {
     });
 
     it('createUsageRecord includes timestamp when provided', async () => {
-        globalThis.fetch = (async (_url: any, init: any) => {
+        globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
             const body = new URLSearchParams(init.body);
             expect(body.get('timestamp')).toBe('1700000000');
 

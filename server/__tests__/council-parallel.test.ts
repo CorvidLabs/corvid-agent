@@ -1,6 +1,7 @@
 import { describe, it, expect, mock } from 'bun:test';
 import { waitForSessions } from '../routes/councils';
 import type { ProcessManager, EventCallback } from '../process/manager';
+import type { ClaudeStreamEvent } from '../process/types';
 
 /**
  * Create a mock ProcessManager that supports subscribe/unsubscribe and
@@ -36,7 +37,7 @@ function createMockPM() {
             const cbs = subscribers.get(sessionId);
             if (cbs) {
                 for (const cb of cbs) {
-                    cb(sessionId, { type: 'session_exited', exitCode: 0, duration: 1000 } as any);
+                    cb(sessionId, { type: 'session_exited', exitCode: 0, duration: 1000 } as ClaudeStreamEvent);
                 }
             }
         },
@@ -46,7 +47,7 @@ function createMockPM() {
             const cbs = subscribers.get(sessionId);
             if (cbs) {
                 for (const cb of cbs) {
-                    cb(sessionId, { type: 'session_stopped' } as any);
+                    cb(sessionId, { type: 'session_stopped' } as ClaudeStreamEvent);
                 }
             }
         },

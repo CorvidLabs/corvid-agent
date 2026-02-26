@@ -73,7 +73,7 @@ function createMockProcessManager() {
         stopProcess: mock(() => {}),
         getProcess: mock(() => null),
         listProcesses: mock(() => []),
-    } as any;
+    } as unknown as import('../process/manager').ProcessManager;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

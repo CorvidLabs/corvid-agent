@@ -49,13 +49,13 @@ describe('TelegramBridge', () => {
         const bridge = new TelegramBridge(db, pm, config);
 
         // Mock the poll method to prevent actual API calls
-        (bridge as any).poll = mock(() => {});
+        (bridge as unknown as { poll: () => void }).poll = mock(() => {});
 
         bridge.start();
-        expect((bridge as any).running).toBe(true);
+        expect((bridge as unknown as { running: boolean }).running).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect((bridge as unknown as { running: boolean }).running).toBe(false);
     });
 
     test('sendText splits long messages', async () => {
@@ -68,7 +68,7 @@ describe('TelegramBridge', () => {
         const bridge = new TelegramBridge(db, pm, config);
 
         const calls: unknown[] = [];
-        (bridge as any).callTelegramApi = mock(async (method: string, body: unknown) => {
+        (bridge as unknown as { callTelegramApi: (...args: unknown[]) => Promise<unknown> }).callTelegramApi = mock(async (method: string, body: unknown) => {
             calls.push({ method, body });
             return { result: {} };
         });
@@ -94,13 +94,13 @@ describe('TelegramBridge', () => {
         const bridge = new TelegramBridge(db, pm, config);
 
         const sentMessages: string[] = [];
-        (bridge as any).callTelegramApi = mock(async (_method: string, body: { text?: string }) => {
+        (bridge as unknown as { callTelegramApi: (...args: unknown[]) => Promise<unknown> }).callTelegramApi = mock(async (_method: string, body: { text?: string }) => {
             if (body.text) sentMessages.push(body.text);
             return { result: {} };
         });
 
         // Simulate message from unauthorized user (ID 999)
-        await (bridge as any).handleMessage({
+        await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             message_id: 1,
             from: { id: 999, is_bot: false, first_name: 'Hacker' },
             chat: { id: 12345, type: 'private' },

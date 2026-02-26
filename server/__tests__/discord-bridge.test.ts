@@ -58,9 +58,9 @@ describe('DiscordBridge', () => {
 
         // Simulate bot message — should not call routeToAgent
         const routeSpy = mock(() => Promise.resolve());
-        (bridge as any).routeToAgent = routeSpy;
+        (bridge as unknown as { routeToAgent: (...args: unknown[]) => Promise<void> }).routeToAgent = routeSpy;
 
-        await (bridge as any).handleMessage({
+        await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             id: '1',
             channel_id: 'test-channel',
             author: { id: 'bot-1', username: 'TestBot', bot: true },
@@ -81,9 +81,9 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         const routeSpy = mock(() => Promise.resolve());
-        (bridge as any).routeToAgent = routeSpy;
+        (bridge as unknown as { routeToAgent: (...args: unknown[]) => Promise<void> }).routeToAgent = routeSpy;
 
-        await (bridge as any).handleMessage({
+        await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             id: '1',
             channel_id: 'other-channel',
             author: { id: 'user-1', username: 'TestUser' },
@@ -135,12 +135,12 @@ describe('DiscordBridge', () => {
         const bridge = new DiscordBridge(db, pm, config);
 
         // Mock connect to prevent actual WebSocket
-        (bridge as any).connect = mock(() => {});
+        (bridge as unknown as { connect: () => void }).connect = mock(() => {});
 
         bridge.start();
-        expect((bridge as any).running).toBe(true);
+        expect((bridge as unknown as { running: boolean }).running).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect((bridge as unknown as { running: boolean }).running).toBe(false);
     });
 });
