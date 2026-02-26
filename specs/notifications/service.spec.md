@@ -5,6 +5,8 @@ status: active
 files:
   - server/notifications/service.ts
   - server/notifications/types.ts
+  - server/notifications/question-dispatcher.ts
+  - server/notifications/response-poller.ts
   - server/notifications/channels/websocket.ts
   - server/notifications/channels/discord.ts
   - server/notifications/channels/telegram.ts
@@ -13,10 +15,17 @@ files:
   - server/notifications/channels/whatsapp.ts
   - server/notifications/channels/signal.ts
   - server/notifications/channels/slack.ts
+  - server/notifications/channels/algochat-question.ts
+  - server/notifications/channels/github-question.ts
+  - server/notifications/channels/telegram-question.ts
+  - server/notifications/channels/whatsapp-question.ts
+  - server/notifications/channels/signal-question.ts
+  - server/notifications/channels/slack-question.ts
 db_tables:
   - owner_notifications
   - notification_deliveries
   - notification_channels
+  - owner_question_dispatches
 depends_on:
   - specs/db/schema.spec.md
 ---
@@ -25,7 +34,7 @@ depends_on:
 
 ## Purpose
 
-Multi-channel notification service that persists notifications to the database and dispatches them to configured channels. Supports 8 channel types, per-agent channel configuration, delivery tracking, and automatic retry of failed deliveries. Ensures notifications are never lost — they are always persisted before dispatch is attempted.
+Multi-channel notification service that persists notifications to the database and dispatches them to configured channels. Supports 8 channel types, per-agent channel configuration, delivery tracking, and automatic retry of failed deliveries. Ensures notifications are never lost — they are always persisted before dispatch is attempted. Also provides a question dispatch system that sends agent questions to configured channels and polls for owner responses (via GitHub issue comments, Telegram callbacks/replies, and AlgoChat bridge routing).
 
 ## Public API
 
@@ -51,6 +60,56 @@ Multi-channel notification service that persists notifications to the database a
 | `setBroadcast` | `(fn: (message: unknown) => void)` | `void` | Set the WebSocket broadcast function |
 | `notify` | `(params: { agentId, sessionId?, title?, message, level })` | `Promise<{ notificationId, channels }>` | Create and dispatch a notification |
 
+### Exported Classes (from question-dispatcher.ts)
+
+| Class | Description |
+|-------|-------------|
+| `QuestionDispatcher` | Dispatches owner questions to configured notification channels and records dispatch tracking |
+
+#### QuestionDispatcher Constructor
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `db` | `Database` | SQLite database handle |
+
+#### QuestionDispatcher Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the messenger for AlgoChat channel dispatch |
+| `dispatch` | `(question: OwnerQuestion)` | `Promise<string[]>` | Dispatch a question to all enabled channels for the agent; returns list of channel types dispatched to |
+
+### Exported Classes (from response-poller.ts)
+
+| Class | Description |
+|-------|-------------|
+| `ResponsePollingService` | Polls external channels (GitHub, Telegram) for responses to dispatched questions and resolves them |
+
+#### ResponsePollingService Constructor
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `db` | `Database` | SQLite database handle |
+| `ownerQuestionManager` | `OwnerQuestionManager` | Manager for resolving pending owner questions |
+
+#### ResponsePollingService Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `start` | `()` | `void` | Start the poll timer (15s interval); idempotent |
+| `stop` | `()` | `void` | Stop the poll timer |
+
+### Exported Functions (from channel question files)
+
+| Function | File | Description |
+|----------|------|-------------|
+| `sendGitHubQuestion` | `channels/github-question.ts` | Creates a GitHub issue with the question and options |
+| `sendTelegramQuestion` | `channels/telegram-question.ts` | Sends a Telegram message with inline keyboard for options |
+| `sendAlgoChatQuestion` | `channels/algochat-question.ts` | Sends the question via AlgoChat with a reply format |
+| `sendWhatsAppQuestion` | `channels/whatsapp-question.ts` | Sends the question via WhatsApp Business API |
+| `sendSignalQuestion` | `channels/signal-question.ts` | Sends the question via Signal REST API |
+| `sendSlackQuestion` | `channels/slack-question.ts` | Sends the question via Slack with interactive blocks |
+
 ### Exported Types (from types.ts)
 
 | Type | Description |
@@ -68,6 +127,11 @@ Multi-channel notification service that persists notifications to the database a
 6. **Retry mechanism**: Failed deliveries are retried every 60 seconds, up to 3 attempts maximum. The retry query joins `notification_deliveries`, `owner_notifications`, and `notification_channels` to reconstruct the full dispatch context
 7. **Idempotent start**: Calling `start()` when the retry timer is already running is a no-op
 8. **Channel-specific configuration**: Each channel type reads config from its `notification_channels.config` JSON, with fallback to environment variables
+9. **Question dispatch tracking**: Each question dispatched to a channel creates an `owner_question_dispatches` record with status `sent`. When a response is received, the dispatch is marked `answered`
+10. **First-responder wins**: When a question is dispatched to multiple channels, the first channel to receive a response resolves the question and all other dispatches for that question are also marked `answered`
+11. **Discord excluded from questions**: Discord (webhook-only) does not support receiving responses, so question dispatch skips Discord channels
+12. **Response polling**: The `ResponsePollingService` polls GitHub (issue comments) and Telegram (getUpdates with callback queries and reply messages) every 15 seconds. AlgoChat responses are handled by bridge inbound routing — no polling needed
+13. **Idempotent response handling**: `markDispatchAnswered` uses an atomic `UPDATE ... WHERE status = 'sent'` guard so only the first poller/handler to see a response actually processes it
 
 ## Behavioral Examples
 
@@ -101,6 +165,30 @@ Multi-channel notification service that persists notifications to the database a
 - **When** a notification is created
 - **Then** the notification is persisted and sent via WebSocket only
 
+### Scenario: Question dispatched to multiple channels
+
+- **Given** agent "A1" has GitHub and Telegram channels configured and enabled
+- **When** `QuestionDispatcher.dispatch(question)` is called
+- **Then** the question is sent to both GitHub (as an issue) and Telegram (as a message with inline keyboard), and `owner_question_dispatches` records are created for each
+
+### Scenario: Question response received via GitHub
+
+- **Given** a question was dispatched to GitHub as issue #42
+- **When** the owner comments on the issue with an answer
+- **Then** `ResponsePollingService` detects the comment, resolves the question via `OwnerQuestionManager`, marks all dispatches as `answered`, and closes the GitHub issue
+
+### Scenario: Question response received via Telegram callback
+
+- **Given** a question was dispatched to Telegram with inline keyboard options
+- **When** the owner taps an option button
+- **Then** `ResponsePollingService` detects the callback query, resolves the question, marks all dispatches as `answered`, and sends a confirmation callback answer
+
+### Scenario: Discord channel skipped for questions
+
+- **Given** agent "A1" has Discord and Slack channels configured
+- **When** a question is dispatched
+- **Then** Discord returns `{ success: false, error: 'Discord does not support question responses' }` and only Slack receives the question
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -116,6 +204,8 @@ Multi-channel notification service that persists notifications to the database a
 | Slack credentials missing | Delivery fails with `"Slack botToken and channel required"` |
 | Unknown channel type | Delivery fails with `"Unknown channel type: {type}"` |
 | Channel dispatch throws | Error caught, delivery updated to `failed`, logged as warning |
+| Discord question dispatch | Returns `{ success: false, error: 'Discord does not support question responses' }` |
+| Question channel dispatch throws | Error caught, logged as warning, channel skipped |
 
 ## Dependencies
 
@@ -123,9 +213,12 @@ Multi-channel notification service that persists notifications to the database a
 
 | Module | What is used |
 |--------|-------------|
-| `server/db/notifications.ts` | `createNotification`, `createDelivery`, `updateDeliveryStatus`, `listChannelsForAgent`, `listFailedDeliveries` |
+| `server/db/notifications.ts` | `createNotification`, `createDelivery`, `updateDeliveryStatus`, `listChannelsForAgent`, `listFailedDeliveries`, `createQuestionDispatch`, `listActiveQuestionDispatches`, `updateQuestionDispatchStatus`, `getQuestionDispatchesByQuestionId`, `markDispatchAnswered` |
 | `server/notifications/channels/*.ts` | `sendWebSocket`, `sendDiscord`, `sendTelegram`, `sendGitHub`, `sendAlgoChat`, `sendWhatsApp`, `sendSignal`, `sendSlack` |
-| `server/algochat/agent-messenger.ts` | `AgentMessenger` for AlgoChat channel |
+| `server/notifications/channels/*-question.ts` | `sendGitHubQuestion`, `sendTelegramQuestion`, `sendAlgoChatQuestion`, `sendWhatsAppQuestion`, `sendSignalQuestion`, `sendSlackQuestion` |
+| `server/algochat/agent-messenger.ts` | `AgentMessenger` for AlgoChat and AlgoChat question channels |
+| `server/process/owner-question-manager.ts` | `OwnerQuestionManager`, `OwnerQuestion` types for question dispatch and resolution |
+| `server/github/operations.ts` | `listIssueComments`, `addIssueComment`, `closeIssue` for GitHub response polling |
 | `server/lib/logger.ts` | `createLogger` |
 
 ### Consumed By
@@ -177,6 +270,18 @@ Multi-channel notification service that persists notifications to the database a
 | updated_at | TEXT | DEFAULT datetime('now') | Last modified |
 | | | UNIQUE(agent_id, channel_type) | One channel per type per agent |
 
+### owner_question_dispatches
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Dispatch ID |
+| question_id | TEXT | NOT NULL | Parent owner question ID |
+| channel_type | TEXT | NOT NULL | Channel type (github, telegram, etc.) |
+| external_ref | TEXT | | External reference (issue URL, message ID, etc.) |
+| status | TEXT | DEFAULT 'sent' | sent, answered, or expired |
+| answered_at | TEXT | | Timestamp when answer was received |
+| created_at | TEXT | DEFAULT datetime('now') | When the dispatch was created |
+
 ## Configuration
 
 | Env Var | Default | Description |
@@ -195,3 +300,4 @@ Multi-channel notification service that persists notifications to the database a
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-21 | corvid-agent | Initial spec |
+| 2026-02-25 | corvid-agent | Add question-dispatcher, response-poller, 6 channel question files, owner_question_dispatches table, and question dispatch flow documentation |

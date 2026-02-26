@@ -2,6 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleMcpApiRoutes } from '../routes/mcp-api';
+import type { McpApiDeps } from '../routes/mcp-api';
+import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { AgentDirectory } from '../algochat/agent-directory';
+import type { AgentWalletService } from '../algochat/agent-wallet';
 
 let db: Database;
 
@@ -13,6 +17,20 @@ function fakeReq(method: string, path: string, body?: unknown): { req: Request; 
         opts.headers = { 'Content-Type': 'application/json' };
     }
     return { req: new Request(url.toString(), opts), url };
+}
+
+/** Create a typed McpApiDeps with stub services. Pass partial overrides for specific methods. */
+function makeMockDeps(overrides?: {
+    agentMessenger?: Partial<AgentMessenger>;
+    agentDirectory?: Partial<AgentDirectory>;
+    agentWalletService?: Partial<AgentWalletService>;
+}): McpApiDeps {
+    return {
+        db,
+        agentMessenger: (overrides?.agentMessenger ?? {}) as unknown as AgentMessenger,
+        agentDirectory: (overrides?.agentDirectory ?? {}) as unknown as AgentDirectory,
+        agentWalletService: (overrides?.agentWalletService ?? {}) as unknown as AgentWalletService,
+    };
 }
 
 beforeAll(() => {
@@ -37,38 +55,23 @@ describe('MCP API Routes', () => {
     });
 
     it('returns null for non-mcp paths with deps provided', () => {
-        const deps = {
-            db,
-            agentMessenger: {} as unknown as import('../algochat/agent-messenger').AgentMessenger,
-            agentDirectory: {} as unknown as import('../algochat/agent-directory').AgentDirectory,
-            agentWalletService: {} as unknown as import('../algochat/agent-wallet').AgentWalletService,
-        };
+        const deps = makeMockDeps();
         const { req, url } = fakeReq('GET', '/api/other');
         const res = handleMcpApiRoutes(req, url, deps);
         expect(res).toBeNull();
     });
 
     it('returns null for unknown /api/mcp/ sub-paths', () => {
-        const deps = {
-            db,
-            agentMessenger: {} as unknown as import('../algochat/agent-messenger').AgentMessenger,
-            agentDirectory: {} as unknown as import('../algochat/agent-directory').AgentDirectory,
-            agentWalletService: {} as unknown as import('../algochat/agent-wallet').AgentWalletService,
-        };
+        const deps = makeMockDeps();
         const { req, url } = fakeReq('GET', '/api/mcp/unknown-endpoint');
         const res = handleMcpApiRoutes(req, url, deps);
         expect(res).toBeNull();
     });
 
     it('GET /api/mcp/list-agents returns 400 without agentId', async () => {
-        const deps = {
-            db,
-            agentMessenger: {} as unknown as import('../algochat/agent-messenger').AgentMessenger,
-            agentDirectory: {
-                getRegisteredAgents: () => [],
-            } as unknown as import('../algochat/agent-directory').AgentDirectory,
-            agentWalletService: {} as unknown as import('../algochat/agent-wallet').AgentWalletService,
-        };
+        const deps = makeMockDeps({
+            agentDirectory: { listAvailable: async () => [] },
+        });
         const { req, url } = fakeReq('GET', '/api/mcp/list-agents');
         const res = await handleMcpApiRoutes(req, url, deps);
         expect(res).not.toBeNull();
@@ -78,14 +81,11 @@ describe('MCP API Routes', () => {
     });
 
     it('POST /api/mcp/send-message with valid deps but missing body fields returns error', async () => {
-        const deps = {
-            db,
+        const deps = makeMockDeps({
             agentMessenger: {
                 sendMessage: async () => ({ content: [{ type: 'text', text: 'ok' }], isError: false }),
-            } as unknown as import('../algochat/agent-messenger').AgentMessenger,
-            agentDirectory: {} as unknown as import('../algochat/agent-directory').AgentDirectory,
-            agentWalletService: {} as unknown as import('../algochat/agent-wallet').AgentWalletService,
-        };
+            } as Partial<AgentMessenger>,
+        });
         const { req, url } = fakeReq('POST', '/api/mcp/send-message', {});
         const res = await handleMcpApiRoutes(req, url, deps);
         expect(res).not.toBeNull();
@@ -94,12 +94,7 @@ describe('MCP API Routes', () => {
     });
 
     it('POST /api/mcp/save-memory with missing fields returns error', async () => {
-        const deps = {
-            db,
-            agentMessenger: {} as unknown as import('../algochat/agent-messenger').AgentMessenger,
-            agentDirectory: {} as unknown as import('../algochat/agent-directory').AgentDirectory,
-            agentWalletService: {} as unknown as import('../algochat/agent-wallet').AgentWalletService,
-        };
+        const deps = makeMockDeps();
         const { req, url } = fakeReq('POST', '/api/mcp/save-memory', {});
         const res = await handleMcpApiRoutes(req, url, deps);
         expect(res).not.toBeNull();
@@ -107,12 +102,7 @@ describe('MCP API Routes', () => {
     });
 
     it('POST /api/mcp/recall-memory with missing fields returns error', async () => {
-        const deps = {
-            db,
-            agentMessenger: {} as unknown as import('../algochat/agent-messenger').AgentMessenger,
-            agentDirectory: {} as unknown as import('../algochat/agent-directory').AgentDirectory,
-            agentWalletService: {} as unknown as import('../algochat/agent-wallet').AgentWalletService,
-        };
+        const deps = makeMockDeps();
         const { req, url } = fakeReq('POST', '/api/mcp/recall-memory', {});
         const res = await handleMcpApiRoutes(req, url, deps);
         expect(res).not.toBeNull();
