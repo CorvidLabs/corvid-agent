@@ -276,7 +276,7 @@ describe('handleGitHubCreatePr', () => {
     });
 
     test('returns error on failure', async () => {
-        mockCreatePr.mockResolvedValue({ ok: false, error: 'Branch not found' });
+        mockCreatePr.mockResolvedValue({ ok: false, prUrl: '', error: 'Branch not found' });
         const ctx = makeCtx();
         const result = await handleGitHubCreatePr(ctx, {
             repo: 'test/repo',
@@ -392,7 +392,7 @@ describe('handleGitHubCreateIssue', () => {
     });
 
     test('returns error on failure', async () => {
-        mockCreateIssue.mockResolvedValue({ ok: false, error: 'Rate limited' });
+        mockCreateIssue.mockResolvedValue({ ok: false, issueUrl: '', error: 'Rate limited' });
         const ctx = makeCtx();
         const result = await handleGitHubCreateIssue(ctx, {
             repo: 'test/repo',
@@ -486,7 +486,7 @@ describe('handleGitHubRepoInfo', () => {
     });
 
     test('returns error on failure', async () => {
-        mockGetRepoInfo.mockResolvedValue({ ok: false, error: 'Not found' });
+        mockGetRepoInfo.mockResolvedValue({ ok: false, info: { name: '', stargazerCount: 0 }, error: 'Not found' });
         const ctx = makeCtx();
         const result = await handleGitHubRepoInfo(ctx, { repo: 'nonexistent/repo' });
         expect(result.isError).toBe(true);

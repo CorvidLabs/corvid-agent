@@ -121,9 +121,10 @@ describe('Stripe API functions', () => {
         globalThis.fetch = (async (url: string | URL | Request, init: RequestInit) => {
             expect(String(url)).toContain('/v1/customers');
             expect(init.method).toBe('POST');
-            expect(init.headers.Authorization).toBe('Bearer sk_test_123');
-            expect(init.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
-            const body = new URLSearchParams(init.body);
+            const headers = init.headers as Record<string, string>;
+            expect(headers.Authorization).toBe('Bearer sk_test_123');
+            expect(headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+            const body = new URLSearchParams(init.body as string);
             expect(body.get('email')).toBe('test@example.com');
             expect(body.get('name')).toBe('Test User');
 
@@ -142,7 +143,7 @@ describe('Stripe API functions', () => {
 
     it('createCustomer includes metadata', async () => {
         globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
-            const body = new URLSearchParams(init.body);
+            const body = new URLSearchParams(init.body as string);
             expect(body.get('metadata[agentId]')).toBe('agent-1');
 
             return new Response(JSON.stringify({
@@ -176,7 +177,7 @@ describe('Stripe API functions', () => {
 
     it('createSubscription sends correct params', async () => {
         globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
-            const body = new URLSearchParams(init.body);
+            const body = new URLSearchParams(init.body as string);
             expect(body.get('customer')).toBe('cus_123');
             expect(body.get('items[0][price]')).toBe('price_abc');
 
@@ -200,7 +201,7 @@ describe('Stripe API functions', () => {
         globalThis.fetch = (async (url: string | URL | Request, init: RequestInit) => {
             expect(String(url)).toContain('/v1/subscriptions/sub_123');
             expect(init.method).toBe('POST');
-            const body = new URLSearchParams(init.body);
+            const body = new URLSearchParams(init.body as string);
             expect(body.get('cancel_at_period_end')).toBe('true');
 
             return new Response(JSON.stringify({
@@ -240,7 +241,7 @@ describe('Stripe API functions', () => {
 
     it('createUsageRecord sends quantity and action', async () => {
         globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
-            const body = new URLSearchParams(init.body);
+            const body = new URLSearchParams(init.body as string);
             expect(body.get('quantity')).toBe('100');
             expect(body.get('action')).toBe('set');
 
@@ -253,7 +254,7 @@ describe('Stripe API functions', () => {
 
     it('createUsageRecord includes timestamp when provided', async () => {
         globalThis.fetch = (async (_url: string | URL | Request, init: RequestInit) => {
-            const body = new URLSearchParams(init.body);
+            const body = new URLSearchParams(init.body as string);
             expect(body.get('timestamp')).toBe('1700000000');
 
             return new Response(JSON.stringify({ id: 'usage_ts' }), { status: 200 });

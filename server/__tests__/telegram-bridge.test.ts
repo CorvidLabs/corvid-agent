@@ -68,8 +68,8 @@ describe('TelegramBridge', () => {
         const bridge = new TelegramBridge(db, pm, config);
 
         const calls: unknown[] = [];
-        (bridge as unknown as { callTelegramApi: (...args: unknown[]) => Promise<unknown> }).callTelegramApi = mock(async (method: string, body: unknown) => {
-            calls.push({ method, body });
+        (bridge as unknown as { callTelegramApi: (...args: unknown[]) => Promise<unknown> }).callTelegramApi = mock(async (...args: unknown[]) => {
+            calls.push({ method: args[0], body: args[1] });
             return { result: {} };
         });
 
@@ -94,7 +94,8 @@ describe('TelegramBridge', () => {
         const bridge = new TelegramBridge(db, pm, config);
 
         const sentMessages: string[] = [];
-        (bridge as unknown as { callTelegramApi: (...args: unknown[]) => Promise<unknown> }).callTelegramApi = mock(async (_method: string, body: { text?: string }) => {
+        (bridge as unknown as { callTelegramApi: (...args: unknown[]) => Promise<unknown> }).callTelegramApi = mock(async (...args: unknown[]) => {
+            const body = args[1] as { text?: string };
             if (body.text) sentMessages.push(body.text);
             return { result: {} };
         });

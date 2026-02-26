@@ -418,8 +418,8 @@ describe('Slack user authorization', () => {
 
         // Mock sendMessage to capture what was sent
         const sentMessages: string[] = [];
-        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {
@@ -533,8 +533,8 @@ describe('Slack rate limiting', () => {
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
         const sentMessages: string[] = [];
-        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         // Send 10 messages (should all be allowed)
@@ -795,8 +795,8 @@ describe('Slack slash commands', () => {
         bridge.start();
 
         const sentMessages: string[] = [];
-        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {
@@ -836,8 +836,8 @@ describe('Slack slash commands', () => {
         (bridge as unknown as { userSessions: Map<string, string> }).userSessions.set('U_CMD', 'old-session-id');
 
         const sentMessages: string[] = [];
-        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {
@@ -973,8 +973,8 @@ describe('Slack session routing', () => {
         bridge.start();
 
         const sentMessages: string[] = [];
-        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {

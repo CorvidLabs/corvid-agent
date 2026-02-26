@@ -302,7 +302,7 @@ describe('createWebSocketHandler', () => {
 
         it('handles close with no data gracefully', () => {
             const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
-            const ws = { data: undefined } as unknown as import('bun').ServerWebSocket<{ subscriptions: Map<string, unknown>; walletAddress?: string; authenticated: boolean }>;
+            const ws = { data: undefined } as unknown as import('bun').ServerWebSocket<{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }>;
 
             // Should not throw
             handler.close(ws);
