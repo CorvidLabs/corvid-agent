@@ -89,8 +89,8 @@ describe('saveHealthSnapshot', () => {
             todoCount: 5,
             fixmeCount: 2,
             hackCount: 1,
-            largeFiles: [{ file: 'big.ts', lines: 600 }] as any,
-            outdatedDeps: [{ name: 'foo', current: '1.0', latest: '2.0' }] as any,
+            largeFiles: [{ file: 'big.ts', lines: 600 }],
+            outdatedDeps: [{ name: 'foo', current: '1.0', latest: '2.0' }],
         });
 
         const snapshot = saveHealthSnapshot(db, 'agent-1', 'proj-1', metrics);
@@ -110,12 +110,12 @@ describe('saveHealthSnapshot', () => {
         expect(snapshot.id).toBeTruthy();
 
         // Verify actually in the DB
-        const row = db.query('SELECT * FROM health_snapshots WHERE id = ?').get(snapshot.id) as any;
+        const row = db.query('SELECT * FROM health_snapshots WHERE id = ?').get(snapshot.id) as Record<string, unknown> | null;
         expect(row).toBeTruthy();
-        expect(row.agent_id).toBe('agent-1');
-        expect(row.tsc_error_count).toBe(3);
-        expect(row.tsc_passed).toBe(0); // false -> 0
-        expect(row.tests_passed).toBe(1); // true -> 1
+        expect(row!.agent_id).toBe('agent-1');
+        expect(row!.tsc_error_count).toBe(3);
+        expect(row!.tsc_passed).toBe(0); // false -> 0
+        expect(row!.tests_passed).toBe(1); // true -> 1
     });
 });
 

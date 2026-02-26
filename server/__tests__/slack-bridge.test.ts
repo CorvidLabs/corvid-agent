@@ -92,10 +92,10 @@ describe('SlackBridge', () => {
         const bridge = new SlackBridge(db, pm, config);
 
         bridge.start();
-        expect((bridge as any).running).toBe(true);
+        expect((bridge as unknown as { running: boolean }).running).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect((bridge as unknown as { running: boolean }).running).toBe(false);
     });
 
     test('start is idempotent', () => {
@@ -110,10 +110,10 @@ describe('SlackBridge', () => {
 
         bridge.start();
         bridge.start(); // second call is no-op
-        expect((bridge as any).running).toBe(true);
+        expect((bridge as unknown as { running: boolean }).running).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect((bridge as unknown as { running: boolean }).running).toBe(false);
     });
 
     test('stop sets running to false', () => {
@@ -127,10 +127,10 @@ describe('SlackBridge', () => {
         const bridge = new SlackBridge(db, pm, config);
 
         bridge.start();
-        expect((bridge as any).running).toBe(true);
+        expect((bridge as unknown as { running: boolean }).running).toBe(true);
 
         bridge.stop();
-        expect((bridge as any).running).toBe(false);
+        expect((bridge as unknown as { running: boolean }).running).toBe(false);
     });
 });
 
@@ -418,8 +418,8 @@ describe('Slack user authorization', () => {
 
         // Mock sendMessage to capture what was sent
         const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {
@@ -533,8 +533,8 @@ describe('Slack rate limiting', () => {
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
         const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         // Send 10 messages (should all be allowed)
@@ -587,12 +587,12 @@ describe('Slack rate limiting', () => {
 
         // Fill user1's rate limit
         for (let i = 0; i < 10; i++) {
-            expect((bridge as any).checkRateLimit('user1')).toBe(true);
+            expect((bridge as unknown as { checkRateLimit: (userId: string) => boolean }).checkRateLimit('user1')).toBe(true);
         }
-        expect((bridge as any).checkRateLimit('user1')).toBe(false);
+        expect((bridge as unknown as { checkRateLimit: (userId: string) => boolean }).checkRateLimit('user1')).toBe(false);
 
         // user2 should still have capacity
-        expect((bridge as any).checkRateLimit('user2')).toBe(true);
+        expect((bridge as unknown as { checkRateLimit: (userId: string) => boolean }).checkRateLimit('user2')).toBe(true);
     });
 });
 
@@ -795,8 +795,8 @@ describe('Slack slash commands', () => {
         bridge.start();
 
         const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {
@@ -833,11 +833,11 @@ describe('Slack slash commands', () => {
         bridge.start();
 
         // Set a session for the user
-        (bridge as any).userSessions.set('U_CMD', 'old-session-id');
+        (bridge as unknown as { userSessions: Map<string, string> }).userSessions.set('U_CMD', 'old-session-id');
 
         const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {
@@ -855,7 +855,7 @@ describe('Slack slash commands', () => {
 
         await new Promise(r => setTimeout(r, 50));
 
-        expect((bridge as any).userSessions.has('U_CMD')).toBe(false);
+        expect((bridge as unknown as { userSessions: Map<string, string> }).userSessions.has('U_CMD')).toBe(false);
         expect(sentMessages.some(m => m.includes('cleared'))).toBe(true);
 
         bridge.stop();
@@ -881,7 +881,7 @@ describe('Slack session routing', () => {
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
         // Mock sendMessage to avoid actual API calls
-        (bridge as any).sendMessage = mock(async () => {});
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async () => {});
 
         const body = {
             type: 'event_callback',
@@ -900,7 +900,7 @@ describe('Slack session routing', () => {
 
         expect(pm.startProcess).toHaveBeenCalledTimes(1);
         // Verify user session was created
-        expect((bridge as any).userSessions.has('U_ROUTE')).toBe(true);
+        expect((bridge as unknown as { userSessions: Map<string, string> }).userSessions.has('U_ROUTE')).toBe(true);
 
         bridge.stop();
     });
@@ -920,7 +920,7 @@ describe('Slack session routing', () => {
         createAgent(db, { name: 'Test Agent', model: 'sonnet' });
         createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
 
-        (bridge as any).sendMessage = mock(async () => {});
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async () => {});
 
         // First message — creates session
         const body1 = {
@@ -973,8 +973,8 @@ describe('Slack session routing', () => {
         bridge.start();
 
         const sentMessages: string[] = [];
-        (bridge as any).sendMessage = mock(async (_ch: string, text: string) => {
-            sentMessages.push(text);
+        (bridge as unknown as { sendMessage: (...args: unknown[]) => Promise<void> }).sendMessage = mock(async (...args: unknown[]) => {
+            sentMessages.push(args[1] as string);
         });
 
         const body = {

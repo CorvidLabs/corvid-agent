@@ -44,7 +44,7 @@ describe('Work Task Routes', () => {
     it('GET /api/work-tasks returns list', async () => {
         const svc = createMockWorkTaskService({
             listTasks: mock(() => [{ id: 'task-1', description: 'fix bug' }]),
-        } as any);
+        } as unknown as Partial<WorkTaskService>);
         const { req, url } = fakeReq('GET', '/api/work-tasks');
         const res = handleWorkTaskRoutes(req, url, svc);
         expect(res).not.toBeNull();
@@ -83,7 +83,7 @@ describe('Work Task Routes', () => {
     it('GET /api/work-tasks/:id returns task', async () => {
         const svc = createMockWorkTaskService({
             getTask: mock(() => ({ id: 'task-1', description: 'fix bug' })),
-        } as any);
+        } as unknown as Partial<WorkTaskService>);
         const { req, url } = fakeReq('GET', '/api/work-tasks/task-1');
         const res = handleWorkTaskRoutes(req, url, svc);
         expect(res).not.toBeNull();

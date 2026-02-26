@@ -60,9 +60,9 @@ describe('WebSocketService', () => {
         MockWebSocket.instances = [];
 
         // Install mock WebSocket globally
-        (globalThis as any).WebSocket = MockWebSocket as any;
+        (globalThis as unknown as { WebSocket: unknown }).WebSocket = MockWebSocket;
         // Provide the OPEN constant used in the service for readyState checks
-        (globalThis as any).WebSocket.OPEN = 1;
+        (MockWebSocket as unknown as { OPEN: number }).OPEN = 1;
 
         TestBed.configureTestingModule({});
         service = TestBed.inject(WebSocketService);

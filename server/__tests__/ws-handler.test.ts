@@ -34,7 +34,7 @@ function createMockWs(authenticated = true) {
             subscribe: mock((topic: string) => { subscribed.push(topic); }),
             unsubscribe: mock((topic: string) => { unsubscribed.push(topic); }),
             close: mock((_code?: number, _reason?: string) => { closed = true; }),
-        } as any,
+        } as unknown as import('bun').ServerWebSocket<{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }>,
         sent,
         subscribed,
         unsubscribed,
@@ -302,7 +302,7 @@ describe('createWebSocketHandler', () => {
 
         it('handles close with no data gracefully', () => {
             const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
-            const ws = { data: undefined } as any;
+            const ws = { data: undefined } as unknown as import('bun').ServerWebSocket<{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }>;
 
             // Should not throw
             handler.close(ws);
@@ -325,7 +325,7 @@ describe('createWebSocketHandler', () => {
         it('sends error when session is not running', () => {
             const pmNotRunning = createMockProcessManager({
                 sendMessage: mock(() => false),
-            } as any);
+            } as unknown as Partial<ProcessManager>);
             const handler = createWebSocketHandler(pmNotRunning, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
 

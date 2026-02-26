@@ -59,7 +59,7 @@ function makeParams(overrides: Partial<LlmCompletionParams> = {}): LlmCompletion
  */
 function resetRegistrySingleton(): void {
     // Access via bracket notation to bypass private visibility
-    (LlmProviderRegistry as any).instance = null;
+    (LlmProviderRegistry as unknown as { instance: null }).instance = null;
 }
 
 // ─── LlmProviderRegistry ────────────────────────────────────────────────────
@@ -269,7 +269,7 @@ describe('BaseLlmProvider', () => {
 
         test('throws when messages is undefined', async () => {
             const provider = new MockProvider('ollama');
-            const params = makeParams({ messages: undefined as any });
+            const params = makeParams({ messages: undefined as unknown as LlmCompletionParams["messages"] });
             await expect(provider.complete(params)).rejects.toThrow(
                 '[ollama] at least one message is required',
             );

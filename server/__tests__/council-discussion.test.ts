@@ -6,6 +6,7 @@ import { createProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { waitForSessions } from '../routes/councils';
 import type { ProcessManager, EventCallback } from '../process/manager';
+import type { ClaudeStreamEvent } from '../process/types';
 
 // ─── Mock ProcessManager with full simulation ───────────────────────────────
 
@@ -39,7 +40,7 @@ function createMockPM() {
             const cbs = subscribers.get(sessionId);
             if (cbs) {
                 for (const cb of cbs) {
-                    cb(sessionId, { type: 'session_exited', exitCode: 0, duration: 1000 } as any);
+                    cb(sessionId, { type: 'session_exited', exitCode: 0, duration: 1000 } as ClaudeStreamEvent);
                 }
             }
         },
@@ -48,7 +49,7 @@ function createMockPM() {
             const cbs = subscribers.get(sessionId);
             if (cbs) {
                 for (const cb of cbs) {
-                    cb(sessionId, { type: 'session_stopped' } as any);
+                    cb(sessionId, { type: 'session_stopped' } as ClaudeStreamEvent);
                 }
             }
         },
@@ -403,7 +404,7 @@ describe('Council Discussion: Event Types', () => {
         const cbs = subscribers.get('s1');
         if (cbs) {
             for (const cb of cbs) {
-                cb('s1', { type: 'assistant', message: 'thinking...' } as any);
+                cb('s1', { type: 'assistant', message: { role: 'assistant', content: 'thinking...' } } as ClaudeStreamEvent);
             }
         }
 

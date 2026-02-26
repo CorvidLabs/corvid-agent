@@ -374,7 +374,7 @@ describe('handleManageSchedule', () => {
 
     test('unknown action returns error', async () => {
         const ctx = createMockContext();
-        const result = await handleManageSchedule(ctx, { action: 'delete' as any });
+        const result = await handleManageSchedule(ctx, { action: 'delete' as unknown as 'list' });
         expect(result.isError).toBe(true);
         expect((result.content[0] as { text: string }).text).toContain('Unknown action');
     });

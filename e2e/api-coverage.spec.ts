@@ -341,7 +341,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
             expect([200, 400, 404, 500, 503]).toContain(res.status);
         } catch (e: unknown) {
             // AbortError, SocketError, or fetch failed due to server closing connection
-            const msg = e instanceof Error ? `${e.message} ${(e as any).cause?.message ?? ''}` : '';
+            const msg = e instanceof Error ? `${e.message} ${(e as Error & { cause?: { message?: string } }).cause?.message ?? ''}` : '';
             if (e instanceof Error && (e.name === 'AbortError' || msg.includes('closed') || msg.includes('fetch failed'))) {
                 console.log('[mcp/list-agents] Request failed — MCP likely unavailable');
             } else {
@@ -371,7 +371,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
             // If HTML (SPA fallback), MCP route was not matched — acceptable
         } catch (e: unknown) {
             // AbortError, SocketError, or fetch failed due to server closing connection
-            const msg = e instanceof Error ? `${e.message} ${(e as any).cause?.message ?? ''}` : '';
+            const msg = e instanceof Error ? `${e.message} ${(e as Error & { cause?: { message?: string } }).cause?.message ?? ''}` : '';
             if (e instanceof Error && (e.name === 'AbortError' || msg.includes('closed') || msg.includes('fetch failed'))) {
                 console.log('[mcp/list-agents] Request failed — MCP likely unavailable');
             } else {
@@ -667,7 +667,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
             });
             expect([200, 400, 404, 500, 503]).toContain(res.status);
         } catch (e: unknown) {
-            const msg = e instanceof Error ? `${e.message} ${(e as any).cause?.message ?? ''}` : '';
+            const msg = e instanceof Error ? `${e.message} ${(e as Error & { cause?: { message?: string } }).cause?.message ?? ''}` : '';
             if (e instanceof Error && (e.name === 'AbortError' || msg.includes('closed') || msg.includes('fetch failed'))) {
                 console.log('[mcp/send-message] Request failed — MCP likely unavailable');
             } else {
@@ -690,7 +690,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
             });
             expect([200, 400, 404, 500, 503]).toContain(res.status);
         } catch (e: unknown) {
-            const msg = e instanceof Error ? `${e.message} ${(e as any).cause?.message ?? ''}` : '';
+            const msg = e instanceof Error ? `${e.message} ${(e as Error & { cause?: { message?: string } }).cause?.message ?? ''}` : '';
             if (e instanceof Error && (e.name === 'AbortError' || msg.includes('closed') || msg.includes('fetch failed'))) {
                 console.log('[mcp/save-memory] Request failed — MCP likely unavailable');
             } else {
@@ -713,7 +713,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
             });
             expect([200, 400, 404, 500, 503]).toContain(res.status);
         } catch (e: unknown) {
-            const msg = e instanceof Error ? `${e.message} ${(e as any).cause?.message ?? ''}` : '';
+            const msg = e instanceof Error ? `${e.message} ${(e as Error & { cause?: { message?: string } }).cause?.message ?? ''}` : '';
             if (e instanceof Error && (e.name === 'AbortError' || msg.includes('closed') || msg.includes('fetch failed'))) {
                 console.log('[mcp/recall-memory] Request failed — MCP likely unavailable');
             } else {

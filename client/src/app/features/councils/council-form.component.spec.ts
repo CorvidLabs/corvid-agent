@@ -46,7 +46,7 @@ describe('CouncilFormComponent', () => {
     };
 
     const mockCouncilService = {
-        createCouncil: vi.fn(async (input: any) => ({
+        createCouncil: vi.fn(async (input: Record<string, unknown>) => ({
             id: 'c-new',
             name: input.name,
             description: input.description ?? '',
