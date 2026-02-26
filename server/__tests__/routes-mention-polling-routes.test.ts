@@ -62,7 +62,7 @@ describe('Mention Polling Routes', () => {
     it('POST /api/mention-polling rejects invalid repo format', async () => {
         const { req, url } = fakeReq('POST', '/api/mention-polling', {
             agentId,
-            repo: 'invalid-repo-no-slash',
+            repo: 'owner/middle/extra',
             mentionUsername: 'bot',
         });
         const res = await handleMentionPollingRoutes(req, url, db, null);

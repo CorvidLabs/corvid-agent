@@ -714,7 +714,7 @@ describe('Mention Polling Routes', () => {
             const service = createPollingService();
             const { req, url } = fakeReq('POST', '/api/mention-polling', {
                 agentId,
-                repo: 'invalid-repo-format',
+                repo: 'owner/middle/extra',
                 mentionUsername: 'bot',
             });
 
