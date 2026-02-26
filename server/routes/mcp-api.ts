@@ -14,7 +14,7 @@ function extractResultText(result: CallToolResult): string {
     return '';
 }
 
-interface McpApiDeps {
+export interface McpApiDeps {
     db: Database;
     agentMessenger: AgentMessenger;
     agentDirectory: AgentDirectory;
