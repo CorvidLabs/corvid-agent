@@ -47,10 +47,12 @@ import { createLogger } from '../lib/logger';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
 import { RateLimiter, loadRateLimitConfig } from '../middleware/rate-limit';
+import { EndpointRateLimiter, loadEndpointRateLimitConfig } from '../middleware/endpoint-rate-limit';
 import {
     authGuard,
     roleGuard,
     rateLimitGuard,
+    endpointRateLimitGuard,
     applyGuards,
     createRequestContext,
     requiresAdminRole,
@@ -70,8 +72,9 @@ function getAuthConfig(): AuthConfig {
     return authConfig;
 }
 
-// Load rate limiter once at module level
+// Load rate limiters once at module level
 const rateLimiter = new RateLimiter(loadRateLimitConfig());
+const endpointRateLimiter = new EndpointRateLimiter(loadEndpointRateLimitConfig());
 
 const log = createLogger('Router');
 
@@ -161,10 +164,11 @@ export async function handleRequest(
     // Build request context and apply declarative guard chain
     const context = createRequestContext(url.searchParams.get('wallet') || undefined);
 
-    // Guard chain: rate limit → auth → (optional role guard for admin paths)
+    // Guard chain: global rate limit → auth → endpoint rate limit → (optional role guard)
     const guards = [
         rateLimitGuard(rateLimiter),
         authGuard(config),
+        endpointRateLimitGuard(endpointRateLimiter),
     ];
 
     // Apply admin role guard for sensitive endpoints
@@ -180,7 +184,14 @@ export async function handleRequest(
 
     try {
         const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter);
-        if (response) applyCors(response, req, config);
+        if (response) {
+            applyCors(response, req, config);
+            if (context.rateLimitHeaders) {
+                for (const [header, value] of Object.entries(context.rateLimitHeaders)) {
+                    response.headers.set(header, value);
+                }
+            }
+        }
         return response;
     } catch (err) {
         return errorResponse(err);
