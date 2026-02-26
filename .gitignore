@@ -2,6 +2,7 @@ node_modules/
 *.db
 *.db-shm
 *.db-wal
+*.db.bak-*
 wallet-keystore.json
 .env
 dist/
