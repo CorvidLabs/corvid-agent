@@ -50,6 +50,10 @@ function makeSandboxConfig(overrides: Partial<SandboxConfig> = {}): SandboxConfi
     };
 }
 
+// Wrap in a top-level describe to scope beforeEach/afterEach Bun.spawn mocks
+// to this file only, preventing leakage into parallel test files.
+describe('sandbox/container', () => {
+
 // ─── Setup / Teardown ──────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -603,3 +607,5 @@ describe('listSandboxContainers', () => {
         expect(ids).toEqual(['abc123', 'def456']);
     });
 });
+
+}); // end sandbox/container
