@@ -16,6 +16,12 @@ afterEach(() => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Create a typed mock fetch and install it on globalThis. */
+function installMockFetch(handler: (url: string, init?: RequestInit) => Promise<Response>): void {
+    // Bun's `typeof fetch` includes a `preconnect` static method that mocks don't provide.
+    globalThis.fetch = mock(handler) as unknown as typeof fetch;
+}
+
 /** Build a completed-task poll response with an agent message. */
 function completedTaskResponse(taskId: string, agentText: string) {
     return {
@@ -44,7 +50,7 @@ function failedTaskResponse(taskId: string, agentText: string) {
 
 describe('invokeRemoteAgent', () => {
     it('returns success when remote agent completes', async () => {
-        globalThis.fetch = mock((url: string, _opts?: any) => {
+        installMockFetch((url) => {
             if (url.includes('/a2a/tasks/send')) {
                 return Promise.resolve(
                     new Response(JSON.stringify({ id: 'task-200', state: 'submitted' }), { status: 200 }),
@@ -56,7 +62,7 @@ describe('invokeRemoteAgent', () => {
                 );
             }
             return Promise.resolve(new Response('Not found', { status: 404 }));
-        }) as any;
+        });
 
         const result = await invokeRemoteAgent(BASE_URL, 'Do something');
 
@@ -66,14 +72,14 @@ describe('invokeRemoteAgent', () => {
     });
 
     it('returns error when submit request fails with non-ok response', async () => {
-        globalThis.fetch = mock((url: string, _opts?: any) => {
+        installMockFetch((url) => {
             if (url.includes('/a2a/tasks/send')) {
                 return Promise.resolve(
                     new Response('Service Unavailable', { status: 503 }),
                 );
             }
             return Promise.resolve(new Response('Not found', { status: 404 }));
-        }) as any;
+        });
 
         const result = await invokeRemoteAgent(BASE_URL, 'Do something');
 
@@ -85,7 +91,7 @@ describe('invokeRemoteAgent', () => {
     });
 
     it('returns error when task fails', async () => {
-        globalThis.fetch = mock((url: string, _opts?: any) => {
+        installMockFetch((url) => {
             if (url.includes('/a2a/tasks/send')) {
                 return Promise.resolve(
                     new Response(JSON.stringify({ id: 'task-fail', state: 'submitted' }), { status: 200 }),
@@ -100,7 +106,7 @@ describe('invokeRemoteAgent', () => {
                 );
             }
             return Promise.resolve(new Response('Not found', { status: 404 }));
-        }) as any;
+        });
 
         const result = await invokeRemoteAgent(BASE_URL, 'Do something');
 
@@ -110,7 +116,7 @@ describe('invokeRemoteAgent', () => {
     });
 
     it('includes the taskId in the result', async () => {
-        globalThis.fetch = mock((url: string, _opts?: any) => {
+        installMockFetch((url) => {
             if (url.includes('/a2a/tasks/send')) {
                 return Promise.resolve(
                     new Response(JSON.stringify({ id: 'task-abc-999', state: 'submitted' }), { status: 200 }),
@@ -125,7 +131,7 @@ describe('invokeRemoteAgent', () => {
                 );
             }
             return Promise.resolve(new Response('Not found', { status: 404 }));
-        }) as any;
+        });
 
         const result = await invokeRemoteAgent(BASE_URL, 'Check status');
 
@@ -137,7 +143,7 @@ describe('invokeRemoteAgent', () => {
         // The poll loop sleeps 3 000 ms per iteration.  With a 100 ms timeout the
         // deadline expires before the first poll response is consumed, so the
         // function should return a timeout error without ever reaching 'completed'.
-        globalThis.fetch = mock((url: string, _opts?: any) => {
+        installMockFetch((url) => {
             if (url.includes('/a2a/tasks/send')) {
                 return Promise.resolve(
                     new Response(JSON.stringify({ id: 'task-slow', state: 'submitted' }), { status: 200 }),
@@ -153,7 +159,7 @@ describe('invokeRemoteAgent', () => {
                 );
             }
             return Promise.resolve(new Response('Not found', { status: 404 }));
-        }) as any;
+        });
 
         const result = await invokeRemoteAgent(BASE_URL, 'Slow task', { timeoutMs: 100 });
 
