@@ -27,6 +27,8 @@
     "migrate:status": "bun server/db/migrate-cli.ts status",
     "migrate:create": "bun server/db/migrate-create.ts",
     "spec:check": "bun scripts/spec-check.ts",
+    "openapi:validate": "bun scripts/openapi-validate.ts",
+    "openapi:export": "bun scripts/openapi-validate.ts --export",
     "lint:sql": "bash scripts/check-sql-injection.sh"
   },
   "optionalDependencies": {
