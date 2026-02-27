@@ -74,7 +74,7 @@ describe('ShutdownCoordinator', () => {
         coordinator.register({
             name: 'slow',
             priority: 0,
-            handler: () => delay(10_000), // 10s — way over timeout
+            handler: () => delay(10_000),
             timeoutMs: 100,
         });
         coordinator.register({
@@ -88,7 +88,6 @@ describe('ShutdownCoordinator', () => {
         expect(result.handlers[0].name).toBe('slow');
         expect(result.handlers[0].status).toBe('timeout');
         expect(result.handlers[1].status).toBe('ok');
-        // Phase should be 'forced' since a timeout occurred
         expect(result.phase).toBe('forced');
     });
 
@@ -115,11 +114,10 @@ describe('ShutdownCoordinator', () => {
 
         await coordinator.shutdown();
 
-        // This should be silently ignored (logged as warning)
         coordinator.register({ name: 'late', priority: 0, handler: () => {} });
 
         const status = coordinator.getStatus();
-        expect(status.handlerCount).toBe(1); // only 'initial'
+        expect(status.handlerCount).toBe(1);
     });
 
     test('registerService convenience method works', async () => {
@@ -150,9 +148,8 @@ describe('ShutdownCoordinator', () => {
     });
 
     test('grace period caps total shutdown time', async () => {
-        const coordinator = new ShutdownCoordinator(200); // 200ms grace period
+        const coordinator = new ShutdownCoordinator(200);
 
-        // Register multiple slow handlers that would total well over 200ms
         for (let i = 0; i < 5; i++) {
             coordinator.register({
                 name: `slow-${i}`,
@@ -166,9 +163,7 @@ describe('ShutdownCoordinator', () => {
         const result = await coordinator.shutdown();
         const elapsed = Date.now() - start;
 
-        // Should complete within grace period + tolerance (not 5 * 500ms = 2500ms)
         expect(elapsed).toBeLessThan(500);
-        // Some handlers should be marked as timeout due to grace period exhaustion
         const timeouts = result.handlers.filter((h) => h.status === 'timeout');
         expect(timeouts.length).toBeGreaterThan(0);
     });
@@ -244,5 +239,68 @@ describe('ShutdownCoordinator', () => {
         await coordinator.shutdown();
 
         expect(order).toEqual(['a', 'b', 'c']);
+    });
+
+    test('concurrent shutdown calls return the same result', async () => {
+        const coordinator = new ShutdownCoordinator();
+        let callCount = 0;
+
+        coordinator.register({
+            name: 'slow',
+            priority: 0,
+            handler: async () => { await delay(50); callCount++; },
+        });
+
+        const [r1, r2, r3] = await Promise.all([
+            coordinator.shutdown(),
+            coordinator.shutdown(),
+            coordinator.shutdown(),
+        ]);
+
+        expect(callCount).toBe(1);
+        expect(r1).toBe(r2);
+        expect(r2).toBe(r3);
+    });
+
+    test('registerService uses default priority of 10', async () => {
+        const coordinator = new ShutdownCoordinator();
+        const order: string[] = [];
+
+        coordinator.register({ name: 'first', priority: 0, handler: () => { order.push('first'); } });
+        coordinator.registerService('service', { stop: () => { order.push('service'); } });
+
+        await coordinator.shutdown();
+        expect(order).toEqual(['first', 'service']);
+    });
+
+    test('handler with rejected promise is caught as error', async () => {
+        const coordinator = new ShutdownCoordinator();
+
+        coordinator.register({
+            name: 'rejecting',
+            priority: 0,
+            handler: () => Promise.reject(new Error('async boom')),
+        });
+
+        const result = await coordinator.shutdown();
+        expect(result.handlers[0].status).toBe('error');
+        expect(result.handlers[0].error).toBe('async boom');
+    });
+
+    test('default handler timeout is 5000ms', async () => {
+        const coordinator = new ShutdownCoordinator();
+
+        coordinator.register({
+            name: 'slow-default-timeout',
+            priority: 0,
+            handler: () => delay(10_000),
+        });
+
+        const start = Date.now();
+        const result = await coordinator.shutdown();
+        const elapsed = Date.now() - start;
+
+        expect(result.handlers[0].status).toBe('timeout');
+        expect(elapsed).toBeLessThan(6000);
     });
 });

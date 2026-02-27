@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { encryptMnemonic, decryptMnemonic, getEncryptionPassphrase } from '../lib/crypto';
+import {
+    encryptMnemonic,
+    decryptMnemonic,
+    encryptMemoryContent,
+    decryptMemoryContent,
+    getEncryptionPassphrase,
+} from '../lib/crypto';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
@@ -115,5 +121,72 @@ describe('getEncryptionPassphrase', () => {
         process.env.WALLET_ENCRYPTION_KEY = 'env-key';
         const passphrase = getEncryptionPassphrase('localnet', 'server-mnemonic');
         expect(passphrase).toBe('env-key');
+    });
+
+    it('treats empty string env key as unset', () => {
+        process.env.WALLET_ENCRYPTION_KEY = '';
+        const passphrase = getEncryptionPassphrase('localnet', 'mnemonic');
+        expect(passphrase).toBe('mnemonic');
+    });
+
+    it('treats whitespace-only env key as unset', () => {
+        process.env.WALLET_ENCRYPTION_KEY = '   ';
+        const passphrase = getEncryptionPassphrase('localnet', 'mnemonic');
+        expect(passphrase).toBe('mnemonic');
+    });
+});
+
+// ── encryptMemoryContent / decryptMemoryContent ─────────────────────────────
+
+describe('encryptMemoryContent / decryptMemoryContent', () => {
+    let originalKey: string | undefined;
+
+    beforeEach(() => {
+        originalKey = process.env.WALLET_ENCRYPTION_KEY;
+        process.env.WALLET_ENCRYPTION_KEY = 'test-encryption-key-for-unit-tests-only';
+    });
+
+    afterEach(() => {
+        if (originalKey === undefined) {
+            delete process.env.WALLET_ENCRYPTION_KEY;
+        } else {
+            process.env.WALLET_ENCRYPTION_KEY = originalKey;
+        }
+    });
+
+    it('encrypts and decrypts memory content', async () => {
+        const content = 'This is a memory entry with important data.';
+        const encrypted = await encryptMemoryContent(content);
+        expect(encrypted).not.toBe(content);
+
+        const decrypted = await decryptMemoryContent(encrypted);
+        expect(decrypted).toBe(content);
+    });
+
+    it('handles empty content', async () => {
+        const encrypted = await encryptMemoryContent('');
+        const decrypted = await decryptMemoryContent(encrypted);
+        expect(decrypted).toBe('');
+    });
+
+    it('handles special characters and newlines', async () => {
+        const content = 'Line 1\nLine 2\n\t"quoted" & <special>';
+        const encrypted = await encryptMemoryContent(content);
+        const decrypted = await decryptMemoryContent(encrypted);
+        expect(decrypted).toBe(content);
+    });
+
+    it('handles long content', async () => {
+        const content = 'x'.repeat(10_000);
+        const encrypted = await encryptMemoryContent(content);
+        const decrypted = await decryptMemoryContent(encrypted);
+        expect(decrypted).toBe(content);
+    });
+
+    it('handles multi-byte unicode', async () => {
+        const content = '日本語テスト 🎉 Ñoño café résumé';
+        const encrypted = await encryptMemoryContent(content);
+        const decrypted = await decryptMemoryContent(encrypted);
+        expect(decrypted).toBe(content);
     });
 });

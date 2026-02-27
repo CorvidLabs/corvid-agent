@@ -4,6 +4,7 @@ import {
     extractPathsFromCommand,
     detectDangerousPatterns,
     analyzeBashCommand,
+    EXPANDED_WRITE_OPERATORS,
 } from '../lib/bash-security';
 
 // ── tokenizeBashCommand ─────────────────────────────────────────────────
@@ -69,6 +70,44 @@ describe('tokenizeBashCommand', () => {
     test('backslash escaping inside double quotes', () => {
         expect(tokenizeBashCommand('"hello\\"world"')).toEqual(['hello"world']);
     });
+
+    test('handles || operator', () => {
+        expect(tokenizeBashCommand('cmd1 || cmd2')).toEqual(['cmd1', '||', 'cmd2']);
+    });
+
+    test('handles & background operator', () => {
+        expect(tokenizeBashCommand('sleep 10 &')).toEqual(['sleep', '10', '&']);
+    });
+
+    test('handles semicolon separator', () => {
+        expect(tokenizeBashCommand('cd /tmp; ls')).toEqual(['cd', '/tmp', ';', 'ls']);
+    });
+
+    test('handles << heredoc operator', () => {
+        expect(tokenizeBashCommand('cat << EOF')).toEqual(['cat', '<<', 'EOF']);
+    });
+
+    test('handles < input redirection', () => {
+        expect(tokenizeBashCommand('sort < input.txt')).toEqual(['sort', '<', 'input.txt']);
+    });
+
+    test('handles multiple operators in sequence', () => {
+        expect(tokenizeBashCommand('a && b || c ; d')).toEqual([
+            'a', '&&', 'b', '||', 'c', ';', 'd',
+        ]);
+    });
+
+    test('whitespace-only input returns empty array', () => {
+        expect(tokenizeBashCommand('   ')).toEqual([]);
+    });
+
+    test('preserves backslash escaping of special chars', () => {
+        expect(tokenizeBashCommand('echo \\$HOME')).toEqual(['echo', '$HOME']);
+    });
+
+    test('handles adjacent quotes', () => {
+        expect(tokenizeBashCommand('"hello""world"')).toEqual(['helloworld']);
+    });
 });
 
 // ── extractPathsFromCommand ─────────────────────────────────────────────
@@ -97,6 +136,20 @@ describe('extractPathsFromCommand', () => {
     test('handles semicolon-separated commands', () => {
         const paths = extractPathsFromCommand('cd /tmp ; ls somefile');
         expect(paths).toEqual(['/tmp', 'somefile']);
+    });
+
+    test('filters out flags with values', () => {
+        const paths = extractPathsFromCommand('grep -n pattern file.ts');
+        expect(paths).toEqual(['pattern', 'file.ts']);
+    });
+
+    test('handles empty command', () => {
+        expect(extractPathsFromCommand('')).toEqual([]);
+    });
+
+    test('filters out all known command names', () => {
+        const paths = extractPathsFromCommand('bash script.sh');
+        expect(paths).toEqual(['script.sh']);
     });
 });
 
@@ -155,6 +208,21 @@ describe('detectDangerousPatterns', () => {
         const result = detectDangerousPatterns('cat readme.md');
         expect(result.isDangerous).toBe(false);
     });
+
+    test('safe command with pipe passes', () => {
+        const result = detectDangerousPatterns('cat file.txt | grep pattern');
+        expect(result.isDangerous).toBe(false);
+    });
+
+    test('safe command with redirect passes', () => {
+        const result = detectDangerousPatterns('echo hello > output.txt');
+        expect(result.isDangerous).toBe(false);
+    });
+
+    test('nested $() is detected', () => {
+        const result = detectDangerousPatterns('echo $(cat $(whoami))');
+        expect(result.isDangerous).toBe(true);
+    });
 });
 
 // ── analyzeBashCommand ──────────────────────────────────────────────────
@@ -181,5 +249,36 @@ describe('analyzeBashCommand', () => {
     test('detects bypass via command substitution', () => {
         const result = analyzeBashCommand('rm $(printf "manager.ts")');
         expect(result.hasDangerousPatterns).toBe(true);
+    });
+});
+
+// ── EXPANDED_WRITE_OPERATORS regex ──────────────────────────────────────
+
+describe('EXPANDED_WRITE_OPERATORS', () => {
+    test('matches redirect operators', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('echo data > file.txt')).toBe(true);
+        expect(EXPANDED_WRITE_OPERATORS.test('echo data >> file.txt')).toBe(true);
+    });
+
+    test('matches rm command', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('rm file.txt')).toBe(true);
+    });
+
+    test('matches mv command', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('mv a.txt b.txt')).toBe(true);
+    });
+
+    test('matches sed -i', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('sed -i s/a/b/ file.txt')).toBe(true);
+    });
+
+    test('matches tee', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('echo data | tee file.txt')).toBe(true);
+    });
+
+    test('does not match read-only commands', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('cat file.txt')).toBe(false);
+        expect(EXPANDED_WRITE_OPERATORS.test('grep pattern file.txt')).toBe(false);
+        expect(EXPANDED_WRITE_OPERATORS.test('ls -la')).toBe(false);
     });
 });
