@@ -26,6 +26,29 @@ const LOG_FORMAT = (() => {
 const HOST = hostname();
 const PID = process.pid;
 
+// Capture original write references at module load time so tests that
+// monkey-patch process.stdout/stderr cannot break the logger.
+const _origStdoutWrite = process.stdout.write.bind(process.stdout);
+const _origStderrWrite = process.stderr.write.bind(process.stderr);
+
+function writeStdout(line: string): void {
+    const w = process.stdout.write;
+    if (typeof w === 'function') {
+        w.call(process.stdout, line);
+    } else {
+        _origStdoutWrite(line);
+    }
+}
+
+function writeStderr(line: string): void {
+    const w = process.stderr.write;
+    if (typeof w === 'function') {
+        w.call(process.stderr, line);
+    } else {
+        _origStderrWrite(line);
+    }
+}
+
 function getMinLevel(): LogLevel {
     const env = process.env.LOG_LEVEL?.toLowerCase();
     if (env && env in LEVEL_ORDER) return env as LogLevel;
@@ -111,22 +134,22 @@ export function createLogger(module: string): Logger {
     return {
         debug(msg: string, ctx?: Record<string, unknown>): void {
             if (!shouldLog('debug')) return;
-            process.stdout.write(formatLine('debug', module, msg, ctx) + '\n');
+            writeStdout(formatLine('debug', module, msg, ctx) + '\n');
         },
 
         info(msg: string, ctx?: Record<string, unknown>): void {
             if (!shouldLog('info')) return;
-            process.stdout.write(formatLine('info', module, msg, ctx) + '\n');
+            writeStdout(formatLine('info', module, msg, ctx) + '\n');
         },
 
         warn(msg: string, ctx?: Record<string, unknown>): void {
             if (!shouldLog('warn')) return;
-            process.stderr.write(formatLine('warn', module, msg, ctx) + '\n');
+            writeStderr(formatLine('warn', module, msg, ctx) + '\n');
         },
 
         error(msg: string, ctx?: Record<string, unknown>): void {
             if (!shouldLog('error')) return;
-            process.stderr.write(formatLine('error', module, msg, ctx) + '\n');
+            writeStderr(formatLine('error', module, msg, ctx) + '\n');
         },
 
         child(childModule: string): Logger {
