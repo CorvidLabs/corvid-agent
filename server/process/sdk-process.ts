@@ -11,7 +11,7 @@ const log = createLogger('SdkProcess');
 
 // Environment variables safe to pass to agent subprocesses.
 // Everything else (ALGOCHAT_MNEMONIC, WALLET_ENCRYPTION_KEY, API_KEY, etc.) is excluded.
-const ENV_ALLOWLIST = new Set([
+export const ENV_ALLOWLIST = new Set([
     'PATH',
     'HOME',
     'USER',
@@ -44,7 +44,7 @@ const ENV_ALLOWLIST = new Set([
     'OLLAMA_HOST',
 ]);
 
-function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, string> {
+export function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, string> {
     const safe: Record<string, string> = {};
     for (const key of ENV_ALLOWLIST) {
         if (process.env[key]) {
@@ -62,9 +62,9 @@ function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, s
     return safe;
 }
 
-const API_FAILURE_THRESHOLD = 3;
+export const API_FAILURE_THRESHOLD = 3;
 
-const API_ERROR_PATTERNS = [
+export const API_ERROR_PATTERNS = [
     'ECONNREFUSED',
     'ETIMEDOUT',
     'fetch failed',
@@ -72,7 +72,7 @@ const API_ERROR_PATTERNS = [
     'socket hang up',
 ];
 
-function isApiError(error: string): boolean {
+export function isApiError(error: string): boolean {
     const lower = error.toLowerCase();
     // Network errors
     if (API_ERROR_PATTERNS.some((p) => error.includes(p))) return true;
@@ -391,7 +391,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     return { pid: pseudoPid, sendMessage, kill };
 }
 
-function mapSdkMessageToEvent(message: SDKMessage, sessionId: string): ClaudeStreamEvent | null {
+export function mapSdkMessageToEvent(message: SDKMessage, sessionId: string): ClaudeStreamEvent | null {
     switch (message.type) {
         case 'assistant':
             return {
