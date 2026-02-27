@@ -5,14 +5,16 @@ import { createLogger } from '../lib/logger';
 
 let capturedStdout: string[] = [];
 let capturedStderr: string[] = [];
-let origStdoutWrite: typeof process.stdout.write;
-let origStderrWrite: typeof process.stderr.write;
+let origStdoutWrite: typeof process.stdout.write = process.stdout.write.bind(process.stdout);
+let origStderrWrite: typeof process.stderr.write = process.stderr.write.bind(process.stderr);
+let capturing = false;
 
 function startCapture(): void {
     capturedStdout = [];
     capturedStderr = [];
     origStdoutWrite = process.stdout.write;
     origStderrWrite = process.stderr.write;
+    capturing = true;
 
     process.stdout.write = ((chunk: string | Uint8Array) => {
         capturedStdout.push(String(chunk));
@@ -26,8 +28,10 @@ function startCapture(): void {
 }
 
 function stopCapture(): void {
+    if (!capturing) return;
     process.stdout.write = origStdoutWrite;
     process.stderr.write = origStderrWrite;
+    capturing = false;
 }
 
 // We need fresh logger instances for each test since getMinLevel() is captured
