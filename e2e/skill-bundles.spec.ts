@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 test.describe('Skill Bundles', () => {
     test('navigate to skill bundles page and verify empty state', async ({ page }) => {
@@ -154,7 +154,7 @@ test.describe('Skill Bundles', () => {
         const name = `API Bundle ${Date.now()}`;
 
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/skill-bundles`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/skill-bundles`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, description: 'API test', tools: ['Read'], promptAdditions: 'test' }),
@@ -164,11 +164,11 @@ test.describe('Skill Bundles', () => {
         expect(bundle.name).toBe(name);
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`);
         expect(readRes.ok).toBe(true);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description: 'Updated' }),
@@ -176,24 +176,24 @@ test.describe('Skill Bundles', () => {
         expect(updateRes.ok).toBe(true);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/skill-bundles`);
+        const listRes = await authedFetch(`${BASE_URL}/api/skill-bundles`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(Array.isArray(list)).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/skill-bundles/${bundle.id}`);
         expect(gone.status).toBe(404);
     });
 
     test('validation rejects missing name', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(`${BASE_URL}/api/skill-bundles`, {
+        const res = await authedFetch(`${BASE_URL}/api/skill-bundles`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description: 'No name', tools: ['Read'] }),
@@ -207,7 +207,7 @@ test.describe('Skill Bundles', () => {
         const bundle = await api.seedSkillBundle({ name: `Assign Bundle ${Date.now()}` });
 
         // Assign
-        const assignRes = await fetch(`${BASE_URL}/api/agents/${agent.id}/skills`, {
+        const assignRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/skills`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bundleId: bundle.id }),
@@ -215,20 +215,20 @@ test.describe('Skill Bundles', () => {
         expect(assignRes.status).toBe(201);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/agents/${agent.id}/skills`);
+        const listRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/skills`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(Array.isArray(list)).toBe(true);
         expect(list.some((b: { id: string }) => b.id === bundle.id)).toBe(true);
 
         // Remove
-        const removeRes = await fetch(`${BASE_URL}/api/agents/${agent.id}/skills/${bundle.id}`, {
+        const removeRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/skills/${bundle.id}`, {
             method: 'DELETE',
         });
         expect(removeRes.ok).toBe(true);
 
         // Verify removed
-        const listRes2 = await fetch(`${BASE_URL}/api/agents/${agent.id}/skills`);
+        const listRes2 = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/skills`);
         const list2 = await listRes2.json();
         expect(list2.some((b: { id: string }) => b.id === bundle.id)).toBe(false);
     });
@@ -239,7 +239,7 @@ test.describe('Skill Bundles', () => {
         const bundle = await api.seedSkillBundle({ name: `Project Bundle ${Date.now()}` });
 
         // Assign
-        const assignRes = await fetch(`${BASE_URL}/api/projects/${project.id}/skills`, {
+        const assignRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}/skills`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bundleId: bundle.id }),
@@ -247,20 +247,20 @@ test.describe('Skill Bundles', () => {
         expect(assignRes.status).toBe(201);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/projects/${project.id}/skills`);
+        const listRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}/skills`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(Array.isArray(list)).toBe(true);
         expect(list.some((b: { id: string }) => b.id === bundle.id)).toBe(true);
 
         // Remove
-        const removeRes = await fetch(`${BASE_URL}/api/projects/${project.id}/skills/${bundle.id}`, {
+        const removeRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}/skills/${bundle.id}`, {
             method: 'DELETE',
         });
         expect(removeRes.ok).toBe(true);
 
         // Verify removed
-        const listRes2 = await fetch(`${BASE_URL}/api/projects/${project.id}/skills`);
+        const listRes2 = await authedFetch(`${BASE_URL}/api/projects/${project.id}/skills`);
         const list2 = await listRes2.json();
         expect(list2.some((b: { id: string }) => b.id === bundle.id)).toBe(false);
     });
@@ -269,7 +269,7 @@ test.describe('Skill Bundles', () => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Bad Assign Agent');
 
-        const res = await fetch(`${BASE_URL}/api/agents/${agent.id}/skills`, {
+        const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/skills`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bundleId: 'nonexistent' }),
@@ -281,7 +281,7 @@ test.describe('Skill Bundles', () => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const project = await api.seedProject('Bad Assign Project');
 
-        const res = await fetch(`${BASE_URL}/api/projects/${project.id}/skills`, {
+        const res = await authedFetch(`${BASE_URL}/api/projects/${project.id}/skills`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bundleId: 'nonexistent' }),

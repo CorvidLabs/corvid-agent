@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -43,7 +43,7 @@ test.describe('Feed', () => {
     });
 
     test('feed API returns messages', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/feed/history?limit=10&offset=0`);
+        const res = await authedFetch(`${BASE_URL}/api/feed/history?limit=10&offset=0`);
         expect(res.ok).toBe(true);
 
         const data = await res.json();

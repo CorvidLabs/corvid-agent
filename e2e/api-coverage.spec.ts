@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
 test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('POST /api/backup creates database backup', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/backup`, { method: 'POST' });
+        const res = await authedFetch(`${BASE_URL}/api/backup`, { method: 'POST' });
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(data.path).toBeTruthy();
@@ -12,7 +12,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('POST /api/selftest/run starts a self-test', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/selftest/run`, {
+        const res = await authedFetch(`${BASE_URL}/api/selftest/run`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ testType: 'unit' }),
@@ -26,7 +26,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const agent = await api.seedAgent('Resume Agent');
         const session = await api.seedSession(project.id, agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/sessions/${session.id}/resume`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions/${session.id}/resume`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt: 'Continue' }),
@@ -40,11 +40,11 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const agent = await api.seedAgent('Delete Session Agent');
         const session = await api.seedSession(project.id, agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
+        const res = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
         expect(res.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/sessions/${session.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`);
         expect(gone.status).toBe(404);
     });
 
@@ -54,14 +54,14 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const session = await api.seedSession(project.id, agent.id);
         const newName = `Updated ${Date.now()}`;
 
-        const res = await fetch(`${BASE_URL}/api/sessions/${session.id}`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newName }),
         });
         expect(res.ok).toBe(true);
 
-        const getRes = await fetch(`${BASE_URL}/api/sessions/${session.id}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`);
         const updated = await getRes.json();
         expect(updated.name).toBe(newName);
     });
@@ -71,7 +71,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const agent = await api.seedAgent('Stop Session Agent');
         const session = await api.seedSession(project.id, agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+        const res = await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         // Accept 200 (stopped) or 400 (already stopped/idle)
         expect([200, 400]).toContain(res.status);
     });
@@ -81,7 +81,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const agent = await api.seedAgent('Messages Agent');
         const session = await api.seedSession(project.id, agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/sessions/${session.id}/messages`);
+        const res = await authedFetch(`${BASE_URL}/api/sessions/${session.id}/messages`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -89,7 +89,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
 
     test('GET /api/wallets/:address/messages returns wallet messages', async ({}) => {
         // Use a placeholder address — may return empty array if no messages
-        const res = await fetch(`${BASE_URL}/api/wallets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ/messages?limit=10&offset=0`);
+        const res = await authedFetch(`${BASE_URL}/api/wallets/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ/messages?limit=10&offset=0`);
         // Accept 200 (found) or 404 (wallet not tracked)
         expect([200, 404]).toContain(res.status);
         if (res.status === 200) {
@@ -101,12 +101,12 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
 
     test('POST /api/operational-mode sets operational mode', async ({}) => {
         // Get current mode first
-        const getRes = await fetch(`${BASE_URL}/api/operational-mode`);
+        const getRes = await authedFetch(`${BASE_URL}/api/operational-mode`);
         expect(getRes.ok).toBe(true);
         const current = await getRes.json();
 
         // Set back to the same mode (safe, no side effects)
-        const setRes = await fetch(`${BASE_URL}/api/operational-mode`, {
+        const setRes = await authedFetch(`${BASE_URL}/api/operational-mode`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode: current.mode }),
@@ -115,7 +115,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/browse-dirs returns directory listing', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/browse-dirs?path=/tmp`);
+        const res = await authedFetch(`${BASE_URL}/api/browse-dirs?path=/tmp`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(data.current).toBeTruthy();
@@ -123,13 +123,13 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('POST /api/memories/backfill triggers memory backfill', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/memories/backfill`, { method: 'POST' });
+        const res = await authedFetch(`${BASE_URL}/api/memories/backfill`, { method: 'POST' });
         // May 200 or 503 depending on AlgoChat availability
         expect([200, 503]).toContain(res.status);
     });
 
     test('GET /api/algochat/psk-contacts lists PSK contacts', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/algochat/psk-contacts`);
+        const res = await authedFetch(`${BASE_URL}/api/algochat/psk-contacts`);
         // May fail if AlgoChat not configured
         expect([200, 500, 503]).toContain(res.status);
         if (res.status === 200) {
@@ -139,7 +139,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/algochat/psk-exchange returns exchange URI', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/algochat/psk-exchange`);
+        const res = await authedFetch(`${BASE_URL}/api/algochat/psk-exchange`);
         // May fail if AlgoChat not configured
         expect([200, 500, 503]).toContain(res.status);
     });
@@ -149,7 +149,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/network`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/network`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ network: 'testnet' }),
@@ -170,7 +170,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/escalation-queue returns queue', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/escalation-queue`);
+        const res = await authedFetch(`${BASE_URL}/api/escalation-queue`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(data.requests).toBeDefined();
@@ -178,14 +178,14 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/audit-log returns audit entries', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/audit-log`);
+        const res = await authedFetch(`${BASE_URL}/api/audit-log`);
         expect(res.ok).toBe(true);
     });
 
     test('GET /api/agents/:id/agent-card returns A2A agent card', async ({ api }) => {
         const agent = await api.seedAgent('AgentCard Agent');
 
-        const res = await fetch(`${BASE_URL}/api/agents/${agent.id}/agent-card`);
+        const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/agent-card`);
         // May 200 or 404 if agent card not configured
         expect([200, 404]).toContain(res.status);
     });
@@ -193,7 +193,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Billing endpoints (partial — no Stripe webhook) ──────────────────
 
     test('GET /api/billing/calculate returns cost calculation', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/calculate?credits=100`);
+        const res = await authedFetch(`${BASE_URL}/api/billing/calculate?credits=100`);
         // 200 if billing available, 503 if not
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
@@ -204,13 +204,13 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/billing/calculate rejects negative credits', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/calculate?credits=-10`);
+        const res = await authedFetch(`${BASE_URL}/api/billing/calculate?credits=-10`);
         // 400 (bad request) or 503 (billing not available)
         expect([400, 503]).toContain(res.status);
     });
 
     test('GET /api/billing/usage/:tenantId returns usage data', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/usage/e2e-tenant`);
+        const res = await authedFetch(`${BASE_URL}/api/billing/usage/e2e-tenant`);
         // 200 if billing available, 503 if not
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
@@ -221,7 +221,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/billing/invoices/:tenantId returns invoices', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/invoices/e2e-tenant`);
+        const res = await authedFetch(`${BASE_URL}/api/billing/invoices/e2e-tenant`);
         // 200 (may be empty array) or 503 (billing not available)
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
@@ -231,7 +231,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/billing/subscription/:id returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/subscription/nonexistent-sub`);
+        const res = await authedFetch(`${BASE_URL}/api/billing/subscription/nonexistent-sub`);
         // 404 (not found) or 503 (billing not available)
         expect([404, 503]).toContain(res.status);
     });
@@ -239,7 +239,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Sandbox endpoints (partial — no container infra) ─────────────────
 
     test('GET /api/sandbox/stats returns pool statistics', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/sandbox/stats`);
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/stats`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(typeof data.enabled).toBe('boolean');
@@ -249,7 +249,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/sandbox/policies returns policy list', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/sandbox/policies`);
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/policies`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -258,7 +258,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('PUT /api/sandbox/policies/:agentId sets agent policy', async ({ api }) => {
         const agent = await api.seedAgent('Sandbox Policy Agent');
 
-        const res = await fetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`, {
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -273,18 +273,18 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         expect(policy.networkPolicy).toBe('restricted');
 
         // Verify GET returns the policy
-        const getRes = await fetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`);
         expect(getRes.ok).toBe(true);
 
         // Clean up
-        const delRes = await fetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`, { method: 'DELETE' });
+        const delRes = await authedFetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`, { method: 'DELETE' });
         expect(delRes.ok).toBe(true);
     });
 
     test('PUT /api/sandbox/policies/:agentId rejects invalid networkPolicy', async ({ api }) => {
         const agent = await api.seedAgent('Sandbox Invalid Policy Agent');
 
-        const res = await fetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`, {
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/policies/${agent.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ networkPolicy: 'invalid-value' }),
@@ -293,12 +293,12 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('DELETE /api/sandbox/policies/:agentId returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/sandbox/policies/nonexistent-agent`, { method: 'DELETE' });
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/policies/nonexistent-agent`, { method: 'DELETE' });
         expect(res.status).toBe(404);
     });
 
     test('POST /api/sandbox/assign returns 503 when sandboxing disabled', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/sandbox/assign`, {
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/assign`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ agentId: 'test', sessionId: 'test' }),
@@ -310,7 +310,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Exam endpoints ───────────────────────────────────────────────────
 
     test('GET /api/exam/categories returns exam categories', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/exam/categories`);
+        const res = await authedFetch(`${BASE_URL}/api/exam/categories`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(data.categories).toBeDefined();
@@ -322,7 +322,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('POST /api/exam/run rejects missing model', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/exam/run`, {
+        const res = await authedFetch(`${BASE_URL}/api/exam/run`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -336,7 +336,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/mcp/list-agents`, { signal: controller.signal });
+            const res = await authedFetch(`${BASE_URL}/api/mcp/list-agents`, { signal: controller.signal });
             // 200 (SPA fallback), 400 (missing param), 404 (MCP deps null), or 500/503
             expect([200, 400, 404, 500, 503]).toContain(res.status);
         } catch (e: unknown) {
@@ -357,7 +357,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/mcp/list-agents?agentId=${agent.id}`, {
+            const res = await authedFetch(`${BASE_URL}/api/mcp/list-agents?agentId=${agent.id}`, {
                 signal: controller.signal,
             });
             // 200 (success or SPA fallback), 404, or 500/503 (deps unavailable)
@@ -387,7 +387,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('GET /api/agents/:id/balance returns balance and address', async ({ api }) => {
         const agent = await api.seedAgent('Balance Agent');
 
-        const res = await fetch(`${BASE_URL}/api/agents/${agent.id}/balance`);
+        const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/balance`);
         // 200 if wallet exists, 404 if agent has no wallet
         expect([200, 404]).toContain(res.status);
         if (res.status === 200) {
@@ -401,7 +401,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('POST /api/agents/:id/fund rejects agent without wallet or returns funded', async ({ api }) => {
         const agent = await api.seedAgent('Fund Agent');
 
-        const res = await fetch(`${BASE_URL}/api/agents/${agent.id}/fund`, {
+        const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/fund`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ microAlgos: 1000 }),
@@ -413,7 +413,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('GET /api/agents/:id/messages returns array', async ({ api }) => {
         const agent = await api.seedAgent('Messages Agent');
 
-        const res = await fetch(`${BASE_URL}/api/agents/${agent.id}/messages`);
+        const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/messages`);
         expect([200, 404]).toContain(res.status);
         if (res.status === 200) {
             const data = await res.json();
@@ -424,7 +424,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('POST /api/agents/:id/invoke rejects missing fields', async ({ api }) => {
         const agent = await api.seedAgent('Invoke Agent');
 
-        const res = await fetch(`${BASE_URL}/api/agents/${agent.id}/invoke`, {
+        const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/invoke`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -436,7 +436,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Escalation ──────────────────────────────────────────────────────
 
     test('POST /api/escalation-queue/:id/resolve returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/escalation-queue/99999/resolve`, {
+        const res = await authedFetch(`${BASE_URL}/api/escalation-queue/99999/resolve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ approved: true }),
@@ -450,7 +450,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/status`, { signal: controller.signal });
+            const res = await authedFetch(`${BASE_URL}/api/algochat/status`, { signal: controller.signal });
             expect([200, 503]).toContain(res.status);
             if (res.status === 200) {
                 const data = await res.json();
@@ -472,7 +472,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/conversations`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/conversations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -494,7 +494,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/psk-exchange`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/psk-exchange`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -516,7 +516,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/psk-contacts`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/psk-contacts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -538,7 +538,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/psk-contacts/nonexistent`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/psk-contacts/nonexistent`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nickname: 'test' }),
@@ -560,7 +560,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/psk-contacts/nonexistent`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/psk-contacts/nonexistent`, {
                 method: 'DELETE',
                 signal: controller.signal,
             });
@@ -580,7 +580,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/algochat/psk-contacts/nonexistent/qr`, {
+            const res = await authedFetch(`${BASE_URL}/api/algochat/psk-contacts/nonexistent/qr`, {
                 signal: controller.signal,
             });
             expect([404, 500, 503]).toContain(res.status);
@@ -598,7 +598,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Ollama ──────────────────────────────────────────────────────────
 
     test('GET /api/ollama/models/running returns models or 503', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/ollama/models/running`);
+        const res = await authedFetch(`${BASE_URL}/api/ollama/models/running`);
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
             const data = await res.json();
@@ -608,7 +608,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('POST /api/ollama/models/pull rejects missing model', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/ollama/models/pull`, {
+        const res = await authedFetch(`${BASE_URL}/api/ollama/models/pull`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -617,7 +617,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('DELETE /api/ollama/models rejects missing model', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/ollama/models`, {
+        const res = await authedFetch(`${BASE_URL}/api/ollama/models`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -626,7 +626,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/ollama/models/pull/status returns statuses', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/ollama/models/pull/status`);
+        const res = await authedFetch(`${BASE_URL}/api/ollama/models/pull/status`);
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
             const data = await res.json();
@@ -638,7 +638,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Billing extended ────────────────────────────────────────────────
 
     test('POST /api/billing/subscription rejects missing fields', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/subscription`, {
+        const res = await authedFetch(`${BASE_URL}/api/billing/subscription`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -647,7 +647,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('POST /api/billing/subscription/:tenantId/cancel returns result', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/billing/subscription/e2e-tenant/cancel`, {
+        const res = await authedFetch(`${BASE_URL}/api/billing/subscription/e2e-tenant/cancel`, {
             method: 'POST',
         });
         expect([200, 404, 503]).toContain(res.status);
@@ -659,7 +659,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/mcp/send-message`, {
+            const res = await authedFetch(`${BASE_URL}/api/mcp/send-message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -682,7 +682,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/mcp/save-memory`, {
+            const res = await authedFetch(`${BASE_URL}/api/mcp/save-memory`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -705,7 +705,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-            const res = await fetch(`${BASE_URL}/api/mcp/recall-memory`, {
+            const res = await authedFetch(`${BASE_URL}/api/mcp/recall-memory`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -727,7 +727,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Sandbox extended ────────────────────────────────────────────────
 
     test('POST /api/sandbox/release/:sessionId returns 503 when disabled', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/sandbox/release/test-session`, {
+        const res = await authedFetch(`${BASE_URL}/api/sandbox/release/test-session`, {
             method: 'POST',
         });
         // 200 (released) or 503 (sandboxing not enabled)
@@ -737,7 +737,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Allowlist ───────────────────────────────────────────────────────
 
     test('PUT /api/allowlist/:address returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/allowlist/NONEXISTENT`, {
+        const res = await authedFetch(`${BASE_URL}/api/allowlist/NONEXISTENT`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ label: 'test' }),
@@ -749,7 +749,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── A2A ─────────────────────────────────────────────────────────────
 
     test('POST /a2a/tasks/send rejects missing message', async ({}) => {
-        const res = await fetch(`${BASE_URL}/a2a/tasks/send`, {
+        const res = await authedFetch(`${BASE_URL}/a2a/tasks/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -758,14 +758,14 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /a2a/tasks/:id returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/a2a/tasks/nonexistent`);
+        const res = await authedFetch(`${BASE_URL}/a2a/tasks/nonexistent`);
         expect(res.status).toBe(404);
     });
 
     // ─── Analytics sessions ──────────────────────────────────────────────
 
     test('GET /api/analytics/sessions returns breakdown', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/analytics/sessions`);
+        const res = await authedFetch(`${BASE_URL}/api/analytics/sessions`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data.byAgent)).toBe(true);
@@ -777,7 +777,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── GitHub status ───────────────────────────────────────────────────
 
     test('GET /api/github/status returns configured flag', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/github/status`);
+        const res = await authedFetch(`${BASE_URL}/api/github/status`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(typeof data.configured).toBe('boolean');
@@ -786,7 +786,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     // ─── Well-known / Discovery endpoints ────────────────────────────────
 
     test('GET /.well-known/agent-card.json returns A2A agent card', async ({}) => {
-        const res = await fetch(`${BASE_URL}/.well-known/agent-card.json`);
+        const res = await authedFetch(`${BASE_URL}/.well-known/agent-card.json`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(data.name).toBeTruthy();
@@ -795,7 +795,7 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /metrics returns Prometheus format or 401', async ({}) => {
-        const res = await fetch(`${BASE_URL}/metrics`);
+        const res = await authedFetch(`${BASE_URL}/metrics`);
         // 200 (no ADMIN_API_KEY set) or 401 (auth required)
         expect([200, 401]).toContain(res.status);
         if (res.status === 200) {
@@ -806,14 +806,14 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/providers lists LLM providers', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/providers`);
+        const res = await authedFetch(`${BASE_URL}/api/providers`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
     });
 
     test('GET /api/providers/:type/models returns 404 for unknown provider', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/providers/nonexistent/models`);
+        const res = await authedFetch(`${BASE_URL}/api/providers/nonexistent/models`);
         expect(res.status).toBe(404);
     });
 });

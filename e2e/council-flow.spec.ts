@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -23,12 +23,12 @@ test.describe.serial('Council Deliberation Flow', () => {
         const page = await ctx.newPage();
 
         // Check network context
-        const healthRes = await fetch(`${BASE_URL}/api/health`);
+        const healthRes = await authedFetch(`${BASE_URL}/api/health`);
         networkInfo = await healthRes.json();
         console.log(`[council-flow] Network context: algochat=${networkInfo.algochat}`);
 
         // Seed test data
-        const projectRes = await fetch(`${BASE_URL}/api/projects`, {
+        const projectRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Council Flow Project', workingDir: '/tmp' }),
@@ -36,7 +36,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const project = await projectRes.json();
         projectId = project.id;
 
-        const agent1Res = await fetch(`${BASE_URL}/api/agents`, {
+        const agent1Res = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Flow Agent Alpha', model: 'claude-sonnet-4-20250514' }),
@@ -44,7 +44,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const agent1 = await agent1Res.json();
         agent1Id = agent1.id;
 
-        const agent2Res = await fetch(`${BASE_URL}/api/agents`, {
+        const agent2Res = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Flow Agent Beta', model: 'claude-sonnet-4-20250514' }),
@@ -53,7 +53,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         agent2Id = agent2.id;
 
         // Council WITH chairman
-        const councilRes = await fetch(`${BASE_URL}/api/councils`, {
+        const councilRes = await authedFetch(`${BASE_URL}/api/councils`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -66,7 +66,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         councilWithChairmanId = council.id;
 
         // Council WITHOUT chairman
-        const noChairRes = await fetch(`${BASE_URL}/api/councils`, {
+        const noChairRes = await authedFetch(`${BASE_URL}/api/councils`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -276,13 +276,13 @@ test.describe.serial('Council Deliberation Flow', () => {
 
     test('API council launches endpoint', async ({}) => {
         // List launches
-        const listRes = await fetch(`${BASE_URL}/api/council-launches`);
+        const listRes = await authedFetch(`${BASE_URL}/api/council-launches`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(Array.isArray(list)).toBe(true);
 
         // Get specific launch
-        const getRes = await fetch(`${BASE_URL}/api/council-launches/${launchId}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/council-launches/${launchId}`);
         expect(getRes.ok).toBe(true);
         const launch = await getRes.json();
         expect(launch.stage).toBe('complete');

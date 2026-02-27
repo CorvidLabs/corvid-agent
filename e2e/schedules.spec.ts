@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -102,7 +102,7 @@ test.describe('Schedules', () => {
         const agent = await api.seedAgent('CRUD Agent');
 
         // Create (201)
-        const createRes = await fetch(`${BASE_URL}/api/schedules`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/schedules`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -117,11 +117,11 @@ test.describe('Schedules', () => {
         const schedule = await createRes.json();
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/schedules/${schedule.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}`);
         expect(readRes.ok).toBe(true);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/schedules/${schedule.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated Schedule' }),
@@ -129,26 +129,26 @@ test.describe('Schedules', () => {
         expect(updateRes.ok).toBe(true);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/schedules`);
+        const listRes = await authedFetch(`${BASE_URL}/api/schedules`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(Array.isArray(list)).toBe(true);
 
         // Executions
-        const execRes = await fetch(`${BASE_URL}/api/schedules/${schedule.id}/executions`);
+        const execRes = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}/executions`);
         expect(execRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/schedules/${schedule.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404 after delete
-        const gone = await fetch(`${BASE_URL}/api/schedules/${schedule.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}`);
         expect(gone.status).toBe(404);
     });
 
     test('validation rejects missing agentId', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/schedules`, {
+        const res = await authedFetch(`${BASE_URL}/api/schedules`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -162,7 +162,7 @@ test.describe('Schedules', () => {
 
     test('validation rejects missing timing', async ({ api }) => {
         const agent = await api.seedAgent('No Timing Agent');
-        const res = await fetch(`${BASE_URL}/api/schedules`, {
+        const res = await authedFetch(`${BASE_URL}/api/schedules`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -177,21 +177,21 @@ test.describe('Schedules', () => {
     // ─── Additional API coverage ─────────────────────────────────────────
 
     test('schedule-executions list returns array', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/schedule-executions?limit=10`);
+        const res = await authedFetch(`${BASE_URL}/api/schedule-executions?limit=10`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
     });
 
     test('scheduler health returns stats', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/scheduler/health`);
+        const res = await authedFetch(`${BASE_URL}/api/scheduler/health`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(typeof data.running).toBe('boolean');
     });
 
     test('schedule-executions/:id returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/schedule-executions/nonexistent`);
+        const res = await authedFetch(`${BASE_URL}/api/schedule-executions/nonexistent`);
         expect(res.status).toBe(404);
     });
 
@@ -199,7 +199,7 @@ test.describe('Schedules', () => {
         const agent = await api.seedAgent('Trigger Schedule Agent');
         const schedule = await api.seedSchedule(agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/schedules/${schedule.id}/trigger`, {
+        const res = await authedFetch(`${BASE_URL}/api/schedules/${schedule.id}/trigger`, {
             method: 'POST',
         });
         // 200 (triggered), 400 (not active), or 503 (scheduler not available)
@@ -207,7 +207,7 @@ test.describe('Schedules', () => {
     });
 
     test('POST /api/schedule-executions/:id/resolve returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/schedule-executions/nonexistent/resolve`, {
+        const res = await authedFetch(`${BASE_URL}/api/schedule-executions/nonexistent/resolve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ approved: true }),

@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -262,7 +262,7 @@ test.describe('Marketplace', () => {
         const listingName = `API Listing ${Date.now()}`;
 
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/marketplace/listings`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/marketplace/listings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -278,11 +278,11 @@ test.describe('Marketplace', () => {
         const listing = await createRes.json();
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`);
         expect(readRes.ok).toBe(true);
 
         // Update (publish)
-        const updateRes = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'published' }),
@@ -290,11 +290,11 @@ test.describe('Marketplace', () => {
         expect(updateRes.ok).toBe(true);
 
         // Search
-        const searchRes = await fetch(`${BASE_URL}/api/marketplace/listings?q=${encodeURIComponent(listingName)}`);
+        const searchRes = await authedFetch(`${BASE_URL}/api/marketplace/listings?q=${encodeURIComponent(listingName)}`);
         expect(searchRes.ok).toBe(true);
 
         // Leave review
-        const reviewRes = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/reviews`, {
+        const reviewRes = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/reviews`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rating: 5, comment: 'Great!' }),
@@ -302,11 +302,11 @@ test.describe('Marketplace', () => {
         expect([200, 201]).toContain(reviewRes.status);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}`);
         expect(gone.status).toBe(404);
     });
 
@@ -333,7 +333,7 @@ test.describe('Marketplace', () => {
     test('search endpoint returns paginated results', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/search`);
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/search`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data.listings)).toBe(true);
@@ -346,7 +346,7 @@ test.describe('Marketplace', () => {
         const agent = await api.seedAgent('Use Listing Agent');
         const listing = await api.seedMarketplaceListing(agent.id, { name: 'Use Target Listing' });
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/use`, {
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/use`, {
             method: 'POST',
         });
         expect(res.ok).toBe(true);
@@ -359,7 +359,7 @@ test.describe('Marketplace', () => {
         const agent = await api.seedAgent('Reviews List Agent');
         const listing = await api.seedMarketplaceListing(agent.id, { name: 'Reviews Listing' });
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/reviews`);
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/reviews`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -368,7 +368,7 @@ test.describe('Marketplace', () => {
     test('delete review returns 404 for nonexistent', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/reviews/nonexistent`, {
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/reviews/nonexistent`, {
             method: 'DELETE',
         });
         expect(res.status).toBe(404);
@@ -377,7 +377,7 @@ test.describe('Marketplace', () => {
     test('federation instances list', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/federation/instances`);
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/federation/instances`);
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
             const data = await res.json();
@@ -388,7 +388,7 @@ test.describe('Marketplace', () => {
     test('federated listings', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/federated`);
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/federated`);
         expect([200, 503]).toContain(res.status);
         if (res.status === 200) {
             const data = await res.json();
@@ -400,7 +400,7 @@ test.describe('Marketplace', () => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         // Register instance
-        const registerRes = await fetch(`${BASE_URL}/api/marketplace/federation/instances`, {
+        const registerRes = await authedFetch(`${BASE_URL}/api/marketplace/federation/instances`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: 'https://e2e-test-instance.example.com', name: 'E2E Test Instance' }),
@@ -409,13 +409,13 @@ test.describe('Marketplace', () => {
 
         if (registerRes.status === 201) {
             // Sync
-            const syncRes = await fetch(`${BASE_URL}/api/marketplace/federation/sync`, {
+            const syncRes = await authedFetch(`${BASE_URL}/api/marketplace/federation/sync`, {
                 method: 'POST',
             });
             expect([200, 503]).toContain(syncRes.status);
 
             // Remove instance
-            const deleteRes = await fetch(
+            const deleteRes = await authedFetch(
                 `${BASE_URL}/api/marketplace/federation/instances/${encodeURIComponent('https://e2e-test-instance.example.com')}`,
                 { method: 'DELETE' },
             );
@@ -426,7 +426,7 @@ test.describe('Marketplace', () => {
     test('federation sync returns result or 503', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(`${BASE_URL}/api/marketplace/federation/sync`, {
+        const res = await authedFetch(`${BASE_URL}/api/marketplace/federation/sync`, {
             method: 'POST',
         });
         expect([200, 503]).toContain(res.status);
@@ -435,7 +435,7 @@ test.describe('Marketplace', () => {
     test('federation delete instance returns 404 for nonexistent', async ({}) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
-        const res = await fetch(
+        const res = await authedFetch(
             `${BASE_URL}/api/marketplace/federation/instances/${encodeURIComponent('https://nonexistent.example.com')}`,
             { method: 'DELETE' },
         );

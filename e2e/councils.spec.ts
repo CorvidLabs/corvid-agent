@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -127,13 +127,13 @@ test.describe('Councils', () => {
         expect(council.chairmanAgentId).toBe(agent1.id);
 
         // Read
-        const getRes = await fetch(`${BASE_URL}/api/councils/${council.id}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}`);
         expect(getRes.ok).toBe(true);
         const fetched = await getRes.json();
         expect(fetched.name).toBe('API Council');
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/councils/${council.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated Council', agentIds: [agent1.id] }),
@@ -144,13 +144,13 @@ test.describe('Councils', () => {
         expect(updated.agentIds).toHaveLength(1);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/councils/${council.id}`, {
+        const deleteRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}`, {
             method: 'DELETE',
         });
         expect(deleteRes.ok).toBe(true);
 
         // Verify deleted
-        const checkRes = await fetch(`${BASE_URL}/api/councils/${council.id}`);
+        const checkRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}`);
         expect(checkRes.status).toBe(404);
     });
 
@@ -161,7 +161,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id, agent2.id], 'Launch Council', agent1.id);
 
         // Launch council
-        const launchRes = await fetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
+        const launchRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId: project.id, prompt: 'Say hello' }),
@@ -172,7 +172,7 @@ test.describe('Councils', () => {
         expect(launch.sessionIds).toHaveLength(2);
 
         // Get launch
-        const getLaunchRes = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}`);
+        const getLaunchRes = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}`);
         expect(getLaunchRes.ok).toBe(true);
         const launchData = await getLaunchRes.json();
         // Stage may be 'responding', 'discussing', or 'reviewing' if auto-advance triggered
@@ -181,7 +181,7 @@ test.describe('Councils', () => {
         expect(launchData.prompt).toBe('Say hello');
 
         // List launches for this council
-        const listRes = await fetch(`${BASE_URL}/api/councils/${council.id}/launches`);
+        const listRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}/launches`);
         expect(listRes.ok).toBe(true);
         const launches = await listRes.json();
         expect(launches.length).toBeGreaterThanOrEqual(1);
@@ -194,7 +194,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id, agent2.id], 'View Council');
 
         // Launch via API
-        const launchRes = await fetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
+        const launchRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId: project.id, prompt: 'Test prompt' }),
@@ -217,7 +217,7 @@ test.describe('Councils', () => {
     });
 
     test('council validation rejects empty agentIds', async () => {
-        const res = await fetch(`${BASE_URL}/api/councils`, {
+        const res = await authedFetch(`${BASE_URL}/api/councils`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Bad Council', agentIds: [] }),
@@ -228,7 +228,7 @@ test.describe('Councils', () => {
     });
 
     test('council validation rejects missing name', async () => {
-        const res = await fetch(`${BASE_URL}/api/councils`, {
+        const res = await authedFetch(`${BASE_URL}/api/councils`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ agentIds: ['fake-id'] }),
@@ -244,7 +244,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id], 'Review Reject Council');
 
         // Launch
-        const launchRes = await fetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
+        const launchRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId: project.id, prompt: 'test' }),
@@ -252,7 +252,7 @@ test.describe('Councils', () => {
         const launch = await launchRes.json();
 
         // Trigger review — may succeed (manual) or fail (auto-advance beat us)
-        await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/review`, {
+        await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/review`, {
             method: 'POST',
         });
 
@@ -260,7 +260,7 @@ test.describe('Councils', () => {
         await new Promise((r) => setTimeout(r, 500));
 
         // Either way, the stage should no longer be 'responding' — a second call must fail
-        const reviewRes2 = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/review`, {
+        const reviewRes2 = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/review`, {
             method: 'POST',
         });
         expect(reviewRes2.status).toBe(400);
@@ -273,7 +273,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id], 'No Chairman Council');
 
         // Launch
-        const launchRes = await fetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
+        const launchRes = await authedFetch(`${BASE_URL}/api/councils/${council.id}/launch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId: project.id, prompt: 'test' }),
@@ -286,7 +286,7 @@ test.describe('Councils', () => {
 
         // A manual /synthesize call should fail because the stage has already
         // advanced past 'reviewing' (auto-advance handled synthesis via fallback)
-        const synthRes = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/synthesize`, {
+        const synthRes = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/synthesize`, {
             method: 'POST',
         });
         expect(synthRes.status).toBe(400);
@@ -305,7 +305,7 @@ test.describe('Councils', () => {
         // Create a launch
         await api.launchCouncil(council.id, project.id, 'List test');
 
-        const res = await fetch(`${BASE_URL}/api/councils/${council.id}/launches`);
+        const res = await authedFetch(`${BASE_URL}/api/councils/${council.id}/launches`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -318,7 +318,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id], 'Discussion Council');
         const launch = await api.launchCouncil(council.id, project.id, 'Discussion test');
 
-        const res = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/discussion-messages`);
+        const res = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/discussion-messages`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -333,7 +333,7 @@ test.describe('Councils', () => {
         // Wait briefly for auto-advance
         await new Promise((r) => setTimeout(r, 2000));
 
-        const res = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/abort`, {
+        const res = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/abort`, {
             method: 'POST',
         });
         // 200 (aborted), 400 (already complete), or 404
@@ -346,7 +346,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id], 'Chat Reject Council');
         const launch = await api.launchCouncil(council.id, project.id, 'Chat test');
 
-        const res = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/chat`, {
+        const res = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: 'test' }),
@@ -361,7 +361,7 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id], 'Logs Council');
         const launch = await api.launchCouncil(council.id, project.id, 'Logs test');
 
-        const res = await fetch(`${BASE_URL}/api/council-launches/${launch.launchId}/logs`);
+        const res = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/logs`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);

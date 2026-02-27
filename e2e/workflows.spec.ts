@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -37,7 +37,7 @@ test.describe('Workflows', () => {
         const newName = `Updated Workflow ${Date.now()}`;
 
         // Update via API
-        const res = await fetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
+        const res = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newName }),
@@ -54,7 +54,7 @@ test.describe('Workflows', () => {
         const workflow = await api.seedWorkflow(agent.id);
 
         // Activate the workflow first
-        const activateRes = await fetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
+        const activateRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'active' }),
@@ -62,7 +62,7 @@ test.describe('Workflows', () => {
         expect(activateRes.ok).toBe(true);
 
         // Trigger — may 503 if workflow service unavailable
-        const triggerRes = await fetch(`${BASE_URL}/api/workflows/${workflow.id}/trigger`, {
+        const triggerRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}/trigger`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId: project.id }),
@@ -94,7 +94,7 @@ test.describe('Workflows', () => {
         const agent = await api.seedAgent('CRUD Agent');
 
         // Create (201, status=draft)
-        const createRes = await fetch(`${BASE_URL}/api/workflows`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/workflows`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -117,11 +117,11 @@ test.describe('Workflows', () => {
         expect(workflow.status).toBe('draft');
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/workflows/${workflow.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`);
         expect(readRes.ok).toBe(true);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated' }),
@@ -129,25 +129,25 @@ test.describe('Workflows', () => {
         expect(updateRes.ok).toBe(true);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/workflows`);
+        const listRes = await authedFetch(`${BASE_URL}/api/workflows`);
         expect(listRes.ok).toBe(true);
 
         // Runs
-        const runsRes = await fetch(`${BASE_URL}/api/workflows/${workflow.id}/runs`);
+        const runsRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}/runs`);
         expect(runsRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/workflows/${workflow.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/workflows/${workflow.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/workflows/${workflow.id}`);
         expect(gone.status).toBe(404);
     });
 
     test('validation rejects missing start node', async ({ api }) => {
         const agent = await api.seedAgent('NoStart Agent');
-        const res = await fetch(`${BASE_URL}/api/workflows`, {
+        const res = await authedFetch(`${BASE_URL}/api/workflows`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -178,7 +178,7 @@ test.describe('Workflows', () => {
     // ─── Additional API coverage ─────────────────────────────────────────
 
     test('workflow-runs list returns array', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/workflow-runs?limit=10`);
+        const res = await authedFetch(`${BASE_URL}/api/workflow-runs?limit=10`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -186,18 +186,18 @@ test.describe('Workflows', () => {
 
     test('workflow health is shadowed by :id route', async ({}) => {
         // /api/workflows/health is unreachable because /api/workflows/:id matches first
-        const res = await fetch(`${BASE_URL}/api/workflows/health`);
+        const res = await authedFetch(`${BASE_URL}/api/workflows/health`);
         // Returns 404 because getWorkflow(db, "health") returns null
         expect(res.status).toBe(404);
     });
 
     test('workflow-runs/:id returns 404 for nonexistent', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/workflow-runs/nonexistent`);
+        const res = await authedFetch(`${BASE_URL}/api/workflow-runs/nonexistent`);
         expect(res.status).toBe(404);
     });
 
     test('POST /api/workflow-runs/:id/action rejects nonexistent run', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/workflow-runs/nonexistent/action`, {
+        const res = await authedFetch(`${BASE_URL}/api/workflow-runs/nonexistent/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'cancel' }),
@@ -207,7 +207,7 @@ test.describe('Workflows', () => {
     });
 
     test('GET /api/workflow-runs/:id/nodes returns array for nonexistent run', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/workflow-runs/nonexistent/nodes`);
+        const res = await authedFetch(`${BASE_URL}/api/workflow-runs/nonexistent/nodes`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         // Returns empty array for nonexistent run (no 404 check in handler)

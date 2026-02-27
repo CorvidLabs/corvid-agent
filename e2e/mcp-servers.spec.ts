@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -89,7 +89,7 @@ test.describe('MCP Servers', () => {
 
     test('API CRUD', async ({}) => {
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/mcp-servers`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/mcp-servers`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -103,11 +103,11 @@ test.describe('MCP Servers', () => {
         const server = await createRes.json();
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/mcp-servers`);
+        const listRes = await authedFetch(`${BASE_URL}/api/mcp-servers`);
         expect(listRes.ok).toBe(true);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/mcp-servers/${server.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/mcp-servers/${server.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated MCP Server' }),
@@ -115,14 +115,14 @@ test.describe('MCP Servers', () => {
         expect(updateRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/mcp-servers/${server.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/mcp-servers/${server.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
     });
 
     test('POST /api/mcp-servers/:id/test returns 502 for unreachable server', async ({ api }) => {
         const server = await api.seedMcpServer({ name: 'Test Connectivity Server' });
 
-        const res = await fetch(`${BASE_URL}/api/mcp-servers/${server.id}/test`, {
+        const res = await authedFetch(`${BASE_URL}/api/mcp-servers/${server.id}/test`, {
             method: 'POST',
         });
         // 502 (server unreachable) — echo command isn't a valid MCP server
