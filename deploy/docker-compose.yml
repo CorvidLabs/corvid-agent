@@ -1,5 +1,6 @@
 services:
   corvid-agent:
+    container_name: corvid-agent
     build:
       context: ..
       dockerfile: deploy/Dockerfile
@@ -8,30 +9,48 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     volumes:
-      - db-data:/app/data
+      - corvid-data:/app/data
     environment:
       - PORT=3000
-      # WARNING: 0.0.0.0 exposes the API on ALL network interfaces.
-      # In production, use a reverse proxy (nginx/caddy) with TLS and
-      # restrict BIND_HOST to 127.0.0.1 or a private network interface.
       - BIND_HOST=0.0.0.0
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - ALGOCHAT_MNEMONIC=${ALGOCHAT_MNEMONIC:-}
+      # Persistent paths inside the named volume
+      - DB_PATH=/app/data/corvid-agent.db
+      - WALLET_KEYSTORE_PATH=/app/data/wallet-keystore.json
+      # API authentication — set in deploy/.env before starting
+      - API_KEY=${API_KEY:-}
+      # AI Providers
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ENABLED_PROVIDERS=${ENABLED_PROVIDERS:-anthropic,ollama}
+      # Ollama on the Docker host machine
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Algorand / AlgoChat
       - ALGORAND_NETWORK=${ALGORAND_NETWORK:-localnet}
+      - ALGOCHAT_MNEMONIC=${ALGOCHAT_MNEMONIC:-}
       - ALGOCHAT_SYNC_INTERVAL=${ALGOCHAT_SYNC_INTERVAL:-30000}
       - ALGOCHAT_DEFAULT_AGENT_ID=${ALGOCHAT_DEFAULT_AGENT_ID:-}
       - ALGOCHAT_PSK_URI=${ALGOCHAT_PSK_URI:-}
+      - ALGOCHAT_OWNER_ADDRESSES=${ALGOCHAT_OWNER_ADDRESSES:-}
       - AGENT_TIMEOUT_MS=${AGENT_TIMEOUT_MS:-1800000}
-      - LOCALNET_ALGOD_URL=${LOCALNET_ALGOD_URL:-}
-      - LOCALNET_KMD_URL=${LOCALNET_KMD_URL:-}
-      - LOCALNET_INDEXER_URL=${LOCALNET_INDEXER_URL:-}
+      # Algorand localnet running on the Docker host machine (separate container or algokit).
+      # host.docker.internal resolves to the host on macOS/Windows Docker Desktop and Linux
+      # (via extra_hosts above). Override these if your localnet uses different ports.
+      - LOCALNET_ALGOD_URL=${LOCALNET_ALGOD_URL:-http://host.docker.internal:4001}
+      - LOCALNET_KMD_URL=${LOCALNET_KMD_URL:-http://host.docker.internal:4002}
+      - LOCALNET_INDEXER_URL=${LOCALNET_INDEXER_URL:-http://host.docker.internal:8980}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "bun", "-e", "const r = await fetch('http://localhost:3000/health/ready'); process.exit(r.ok ? 0 : 1)"]
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "const r = await fetch('http://localhost:3000/health/ready'); process.exit(r.ok ? 0 : 1)",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
 volumes:
-  db-data:
+  corvid-data:

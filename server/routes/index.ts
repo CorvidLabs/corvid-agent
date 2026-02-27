@@ -161,6 +161,13 @@ export async function handleRequest(
         }
     }
 
+    // Only apply auth and guards to API/A2A paths.
+    // Any other path (Angular SPA routes, static assets) falls through to
+    // the static file handler in server/index.ts — no auth required there.
+    if (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/a2a/')) {
+        return null;
+    }
+
     // Build request context and apply declarative guard chain
     const context = createRequestContext(url.searchParams.get('wallet') || undefined);
 

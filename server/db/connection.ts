@@ -26,7 +26,7 @@ function setDbFilePermissions(path: string): void {
  * ensure the v1–52 schema is present. Call `await initDb()` early
  * in your startup to also apply any newer file-based migrations.
  */
-export function getDb(path: string = 'corvid-agent.db'): Database {
+export function getDb(path: string = process.env.DB_PATH ?? 'corvid-agent.db'): Database {
     if (db) return db;
 
     db = new Database(path, { create: true });
