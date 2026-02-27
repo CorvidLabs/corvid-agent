@@ -23,7 +23,12 @@ while true; do
         echo "[run-loop] Server exited cleanly (code 0). Stopping."
         break
     elif [[ $exit_code -eq $RESTART_EXIT_CODE ]]; then
-        echo "[run-loop] Server requested restart after auto-update (code $RESTART_EXIT_CODE). Restarting immediately..."
+        echo "[run-loop] Server requested restart after auto-update (code $RESTART_EXIT_CODE)."
+        # The server runs bun install before exiting, but as a safety net
+        # ensure deps are fresh in case that step was skipped or failed.
+        echo "[run-loop] Running bun install..."
+        bun install --frozen-lockfile 2>/dev/null || bun install
+        echo "[run-loop] Restarting..."
     else
         echo "[run-loop] Server crashed (code $exit_code). Restarting in ${CRASH_COOLDOWN_SECS}s..."
         sleep "$CRASH_COOLDOWN_SECS"
