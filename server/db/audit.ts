@@ -26,7 +26,9 @@ export type AuditAction =
     | 'workflow_create'
     | 'workflow_trigger'
     | 'agent_message_send'
-    | 'config_change';
+    | 'config_change'
+    | 'injection_blocked'
+    | 'psk_drift_alert';
 
 export interface AuditEntry {
     id: number;

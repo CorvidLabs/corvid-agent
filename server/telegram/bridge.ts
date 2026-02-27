@@ -9,6 +9,8 @@ import { transcribe } from '../voice/stt';
 import { synthesizeWithCache } from '../voice/tts';
 import { createLogger } from '../lib/logger';
 import { ExternalServiceError, NotFoundError } from '../lib/errors';
+import { scanForInjection } from '../lib/prompt-injection';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('TelegramBridge');
 
@@ -147,6 +149,32 @@ export class TelegramBridge {
         }
 
         if (!text) return;
+
+        // Prompt injection scan
+        const injectionResult = scanForInjection(text);
+        if (injectionResult.blocked) {
+            log.warn('Blocked message: prompt injection detected', {
+                userId,
+                confidence: injectionResult.confidence,
+                patterns: injectionResult.matches.map((m) => m.pattern),
+                contentPreview: text.slice(0, 100),
+            });
+            recordAudit(
+                this.db,
+                'injection_blocked',
+                String(userId),
+                'telegram_message',
+                null,
+                JSON.stringify({
+                    channel: 'telegram',
+                    confidence: injectionResult.confidence,
+                    patterns: injectionResult.matches.map((m) => m.pattern),
+                    contentPreview: text.slice(0, 200),
+                }),
+            );
+            await this.sendText(message.chat.id, 'Message blocked: content policy violation.');
+            return;
+        }
 
         // Handle /start command
         if (text === '/start') {
