@@ -36,9 +36,14 @@ ENV BIND_HOST=0.0.0.0
 ENV LOG_LEVEL=info
 ENV NODE_ENV=production
 
+# Install Claude Code CLI — lets agents authenticate via `claude login` instead
+# of requiring ANTHROPIC_API_KEY. Credentials survive restarts but not `docker compose down`.
+RUN BUN_INSTALL=/usr/local bun add --global @anthropic-ai/claude-code
+
 # Run as non-root user (oven/bun:1 is Debian-slim — use native commands)
-RUN groupadd --system corvid && useradd --system --gid corvid corvid
-RUN chown -R corvid:corvid /app
+# -m creates /home/corvid so `claude login` can store credentials there
+RUN groupadd --system corvid && useradd --system -m --gid corvid corvid
+RUN mkdir -p /app/data && chown -R corvid:corvid /app
 USER corvid
 
 EXPOSE 3000
