@@ -550,6 +550,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                                 resultText = resultText.slice(0, maxChars) + `\n\n[... truncated, ${toolResult.text.length - maxChars} chars omitted]`;
                             }
                         }
+                        // Strip lone surrogates that would produce invalid JSON
+                        // (e.g. from binary output or malformed UTF-16 in tool results)
+                        resultText = resultText.replace(/[\uD800-\uDFFF]/g, '\uFFFD');
                         messages.push({
                             role: 'tool',
                             content: resultText,
