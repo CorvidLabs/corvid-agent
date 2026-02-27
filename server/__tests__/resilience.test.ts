@@ -121,8 +121,10 @@ describe('withRetry', () => {
                 },
             ),
         ).rejects.toThrow('check me');
-        expect(errors).toHaveLength(1);
+        // retryIf is called on every failed attempt (2 attempts = 2 calls)
+        expect(errors).toHaveLength(2);
         expect((errors[0] as Error).message).toBe('check me');
+        expect((errors[1] as Error).message).toBe('check me');
     });
 });
 
