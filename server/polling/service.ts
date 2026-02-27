@@ -81,6 +81,10 @@ export class MentionPollingService {
     private eventCallbacks = new Set<PollingEventCallback>();
     private running = false;
 
+    /** Cache: "owner/repo#123" → { open, checkedAt } */
+    private issueStateCache = new Map<string, { open: boolean; checkedAt: number }>();
+    private static readonly ISSUE_STATE_TTL_MS = 5 * 60 * 1000; // 5 min
+
     constructor(
         db: Database,
         processManager: ProcessManager,
@@ -686,6 +690,62 @@ export class MentionPollingService {
         }
     }
 
+    // ─── Dependency Checking ─────────────────────────────────────────────────
+
+    /** Parse `<!-- blocked-by: #123 #456 -->` markers from an issue body. */
+    private parseBlockedBy(body: string): number[] {
+        const match = body.match(/<!--\s*blocked-by:\s*(.*?)\s*-->/);
+        if (!match) return [];
+        return [...match[1].matchAll(/#(\d+)/g)].map(m => parseInt(m[1]));
+    }
+
+    /** Check whether a GitHub issue is still open (cached, 5-min TTL). */
+    private async isIssueOpen(repo: string, issueNumber: number): Promise<boolean> {
+        const cacheKey = `${repo}#${issueNumber}`;
+        const cached = this.issueStateCache.get(cacheKey);
+        if (cached && Date.now() - cached.checkedAt < MentionPollingService.ISSUE_STATE_TTL_MS) {
+            return cached.open;
+        }
+
+        const result = await this.runGh([
+            'api', `repos/${repo}/issues/${issueNumber}`, '--jq', '.state',
+        ]);
+        const open = result.ok && result.stdout.trim() === 'open';
+        this.issueStateCache.set(cacheKey, { open, checkedAt: Date.now() });
+        return open;
+    }
+
+    /** Fetch the body of a GitHub issue (needed when mention.body is a comment, not the issue). */
+    private async getIssueBody(repo: string, issueNumber: number): Promise<string> {
+        const result = await this.runGh([
+            'api', `repos/${repo}/issues/${issueNumber}`, '--jq', '.body',
+        ]);
+        return result.ok ? result.stdout : '';
+    }
+
+    /**
+     * Check whether a mention's issue has open blockers (via `<!-- blocked-by: ... -->` markers).
+     * Returns the list of still-open blocker issue numbers (empty = unblocked).
+     */
+    private async checkDependencies(repo: string, mention: DetectedMention): Promise<number[]> {
+        // For issue_comment mentions, mention.body is the comment text, not the issue body.
+        // We need the issue body to find the blocked-by marker.
+        const issueBody = mention.type === 'issue_comment'
+            ? await this.getIssueBody(repo, mention.number)
+            : mention.body;
+
+        const blockers = this.parseBlockedBy(issueBody);
+        if (blockers.length === 0) return [];
+
+        const openBlockers: number[] = [];
+        for (const blocker of blockers) {
+            if (await this.isIssueOpen(repo, blocker)) {
+                openBlockers.push(blocker);
+            }
+        }
+        return openBlockers;
+    }
+
     // ─── Trigger Logic ──────────────────────────────────────────────────────
 
     /**
@@ -719,6 +779,16 @@ export class MentionPollingService {
         ).get(sessionPrefix + '%') as { id: string } | null;
         if (existing) {
             log.debug('Running session already exists for issue', { number: mention.number, existingId: existing.id });
+            return false;
+        }
+
+        // Dependency check: skip if the issue has open blockers.
+        // Returning false keeps the mention unprocessed so it retries next cycle.
+        const openBlockers = await this.checkDependencies(fullRepo, mention);
+        if (openBlockers.length > 0) {
+            log.info('Skipping mention — blocked by open issues', {
+                number: mention.number, blockers: openBlockers,
+            });
             return false;
         }
 
