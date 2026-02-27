@@ -302,5 +302,5 @@ describe('ShutdownCoordinator', () => {
 
         expect(result.handlers[0].status).toBe('timeout');
         expect(elapsed).toBeLessThan(6000);
-    });
+    }, 10_000);
 });
