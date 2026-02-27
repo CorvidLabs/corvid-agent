@@ -13,6 +13,8 @@ import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
 import { createLogger } from '../lib/logger';
+import { scanForInjection } from '../lib/prompt-injection';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('DiscordBridge');
 
@@ -305,6 +307,33 @@ export class DiscordBridge {
         // Per-user rate limiting (10 messages per 60 seconds)
         if (!this.checkRateLimit(userId)) {
             await this.sendMessage(data.channel_id, 'Rate limit exceeded. Please wait before sending more messages.');
+            return;
+        }
+
+        // Prompt injection scan
+        const injectionResult = scanForInjection(text);
+        if (injectionResult.blocked) {
+            log.warn('Blocked message: prompt injection detected', {
+                userId,
+                username: data.author.username,
+                confidence: injectionResult.confidence,
+                patterns: injectionResult.matches.map((m) => m.pattern),
+                contentPreview: text.slice(0, 100),
+            });
+            recordAudit(
+                this.db,
+                'injection_blocked',
+                userId,
+                'discord_message',
+                null,
+                JSON.stringify({
+                    channel: 'discord',
+                    confidence: injectionResult.confidence,
+                    patterns: injectionResult.matches.map((m) => m.pattern),
+                    contentPreview: text.slice(0, 200),
+                }),
+            );
+            await this.sendMessage(data.channel_id, 'Message blocked: content policy violation.');
             return;
         }
 

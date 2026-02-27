@@ -5,8 +5,12 @@ import type { PSKState } from '@corvidlabs/ts-algochat';
 import type { AlgoChatNetwork } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { DedupService } from '../lib/dedup';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('PSK');
+
+/** Counter drift threshold that triggers escalation to owner. */
+const PSK_DRIFT_ESCALATION_THRESHOLD = 100;
 
 export interface PSKMessage {
     sender: string;
@@ -313,7 +317,33 @@ export class PSKManager {
                             // Counter is out of window — auto-resync peerLastCounter.
                             // This handles cases where the peer's send counter drifted
                             // (e.g. same wallet on different device, app reinstall, etc.)
-                            log.info(`Counter ${envelope.ratchetCounter} out of window (peerLast=${this.contact.state.peerLastCounter}), resyncing`);
+                            const drift = Math.abs(envelope.ratchetCounter - this.contact.state.peerLastCounter);
+                            log.info(`Counter ${envelope.ratchetCounter} out of window (peerLast=${this.contact.state.peerLastCounter}), resyncing`, { drift });
+
+                            // Escalate if drift exceeds threshold — potential replay attack or key compromise
+                            if (drift > PSK_DRIFT_ESCALATION_THRESHOLD) {
+                                log.warn('PSK counter drift exceeds threshold — potential replay or key compromise', {
+                                    contact: this.contact.label || contactAddress.slice(0, 8) + '...',
+                                    drift,
+                                    threshold: PSK_DRIFT_ESCALATION_THRESHOLD,
+                                    incomingCounter: envelope.ratchetCounter,
+                                    peerLastCounter: this.contact.state.peerLastCounter,
+                                });
+                                recordAudit(
+                                    this.db,
+                                    'psk_drift_alert',
+                                    contactAddress,
+                                    'psk_contact',
+                                    this.contactId,
+                                    JSON.stringify({
+                                        drift,
+                                        threshold: PSK_DRIFT_ESCALATION_THRESHOLD,
+                                        incomingCounter: envelope.ratchetCounter,
+                                        peerLastCounter: this.contact.state.peerLastCounter,
+                                    }),
+                                );
+                            }
+
                             this.contact.state = {
                                 ...this.contact.state,
                                 peerLastCounter: envelope.ratchetCounter,

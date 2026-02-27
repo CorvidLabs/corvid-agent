@@ -42,8 +42,13 @@ import { parseGroupPrefix, reassembleGroupMessage } from './group-sender';
 import { createLogger } from '../lib/logger';
 import { DedupService } from '../lib/dedup';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
+import { scanForInjection } from '../lib/prompt-injection';
+import { recordAudit } from '../db/audit';
 
 const log = createLogger('MessageRouter');
+
+/** Maximum reassembled group message size (16 KB). Prevents memory exhaustion. */
+const MAX_GROUP_MESSAGE_BYTES = 16 * 1024;
 
 // On-chain txid dedup namespace (10 min TTL, bounded at 500 entries)
 const ALGOCHAT_TXID_DEDUP_NS = 'algochat:txids';
@@ -164,6 +169,27 @@ export class MessageRouter {
                 const contents = chunks.map((c) => c.content);
                 const reassembled = reassembleGroupMessage(contents);
                 if (reassembled) {
+                    // Enforce 16KB max for reassembled group messages
+                    const reassembledBytes = new TextEncoder().encode(reassembled).byteLength;
+                    if (reassembledBytes > MAX_GROUP_MESSAGE_BYTES) {
+                        log.warn('Rejected oversized group message', {
+                            round,
+                            bytes: reassembledBytes,
+                            limit: MAX_GROUP_MESSAGE_BYTES,
+                            chunks: chunks.length,
+                            participant: participant.slice(0, 8) + '...',
+                        });
+                        recordAudit(
+                            this.db,
+                            'injection_blocked',
+                            participant,
+                            'group_message',
+                            String(round),
+                            JSON.stringify({ reason: 'oversized', bytes: reassembledBytes, limit: MAX_GROUP_MESSAGE_BYTES }),
+                        );
+                        continue;
+                    }
+
                     const totalAmount = chunks.reduce((sum, c) => {
                         const a = (c as unknown as Record<string, unknown>).amount;
                         return sum + (a != null ? Number(a) : 0);
@@ -397,6 +423,33 @@ export class MessageRouter {
                     deviceName = typeof parsed.d === 'string' ? parsed.d : undefined;
                 }
             } catch { /* plain text */ }
+        }
+
+        // ── Prompt injection scan ─────────────────────────────────────
+        const injectionResult = scanForInjection(messageContent);
+        if (injectionResult.blocked) {
+            log.warn('Blocked message: prompt injection detected', {
+                participant: participant.slice(0, 8) + '...',
+                confidence: injectionResult.confidence,
+                patterns: injectionResult.matches.map((m) => m.pattern),
+                scanTimeMs: injectionResult.scanTimeMs,
+                contentPreview: messageContent.slice(0, 100),
+            });
+            recordAudit(
+                this.db,
+                'injection_blocked',
+                participant,
+                'algochat_message',
+                null,
+                JSON.stringify({
+                    channel: 'algochat',
+                    confidence: injectionResult.confidence,
+                    patterns: injectionResult.matches.map((m) => m.pattern),
+                    contentPreview: messageContent.slice(0, 200),
+                }),
+            );
+            this.responseFormatter.sendResponse(participant, '[Message blocked: content policy violation]');
+            return;
         }
 
         // Safety guard: reject raw group chunks that weren't reassembled
