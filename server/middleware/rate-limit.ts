@@ -9,9 +9,13 @@
  * expired entries are pruned on access. Returns 429 with Retry-After header when
  * the limit is exceeded.
  *
- * Stale IP entries are periodically swept to prevent unbounded memory growth.
+ * When a SQLite database is attached via `setDb()`, rate-limit counters are
+ * persisted to `rate_limit_state` so they survive server restarts.
+ *
+ * Stale entries are periodically swept to prevent unbounded memory/storage growth.
  */
 
+import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('RateLimit');
@@ -56,6 +60,9 @@ interface BucketEntry {
  * (fallback). Maintains two buckets per key: "read" (GET/HEAD/OPTIONS)
  * and "mutation" (POST/PUT/DELETE). Each bucket independently tracks
  * request timestamps within the configured window.
+ *
+ * Optionally backed by SQLite for persistence across restarts.
+ * Call `setDb(db)` after migrations to enable persistence.
  */
 export class RateLimiter {
     readonly config: RateLimitConfig;
@@ -63,6 +70,8 @@ export class RateLimiter {
     private readonly clients: Map<string, { read: BucketEntry; mutation: BucketEntry }> = new Map();
     /** Periodic sweep interval handle. */
     private sweepTimer: ReturnType<typeof setInterval> | null = null;
+    /** Optional SQLite database for persistence. */
+    private db: Database | null = null;
 
     constructor(config: RateLimitConfig) {
         this.config = config;
@@ -73,6 +82,17 @@ export class RateLimiter {
         if (this.sweepTimer && typeof this.sweepTimer === 'object' && 'unref' in this.sweepTimer) {
             (this.sweepTimer as NodeJS.Timeout).unref();
         }
+    }
+
+    /**
+     * Attach a database for persistent rate limiting.
+     * Loads existing state from SQLite and purges expired windows.
+     * Call after migrations have run.
+     */
+    setDb(db: Database): void {
+        this.db = db;
+        this.loadFromDb();
+        this.purgeExpiredWindows();
     }
 
     /**
@@ -131,6 +151,10 @@ export class RateLimiter {
         }
 
         bucket.timestamps.push(now);
+
+        // Persist to SQLite if available
+        this.persistCheck(key, bucketKey, now);
+
         return null;
     }
 
@@ -152,6 +176,9 @@ export class RateLimiter {
         if (swept > 0) {
             log.debug('Swept stale rate-limit entries', { swept, remaining: this.clients.size });
         }
+
+        // Also purge expired SQLite rows
+        this.purgeExpiredWindows();
     }
 
     /** Stop the periodic sweep timer. */
@@ -165,6 +192,84 @@ export class RateLimiter {
     /** For testing: clear all tracked clients. */
     reset(): void {
         this.clients.clear();
+    }
+
+    // ─── SQLite persistence ──────────────────────────────────────────────
+
+    /** Persist a rate-limit check to SQLite. */
+    private persistCheck(key: string, bucket: string, timestamp: number): void {
+        if (!this.db) return;
+        try {
+            // Use window_start as the start of the current window (rounded to seconds)
+            const windowStart = Math.floor(timestamp / 1000) * 1000;
+            this.db.query(
+                `INSERT INTO rate_limit_state (key, bucket, window_start, request_count)
+                 VALUES (?, ?, ?, 1)
+                 ON CONFLICT(key, bucket, window_start) DO UPDATE SET
+                    request_count = request_count + 1,
+                    updated_at = datetime('now')`
+            ).run(key, bucket, windowStart);
+        } catch (err) {
+            // Persistence failure is non-fatal — in-memory state is still authoritative
+            log.debug('Failed to persist rate limit', { key, error: err instanceof Error ? err.message : String(err) });
+        }
+    }
+
+    /** Load rate-limit state from SQLite on startup. */
+    private loadFromDb(): void {
+        if (!this.db) return;
+        try {
+            const now = Date.now();
+            const windowStart = now - this.config.windowMs;
+
+            const rows = this.db.query(
+                `SELECT key, bucket, window_start, request_count
+                 FROM rate_limit_state
+                 WHERE window_start >= ?`
+            ).all(windowStart) as Array<{
+                key: string;
+                bucket: string;
+                window_start: number;
+                request_count: number;
+            }>;
+
+            let loaded = 0;
+            for (const row of rows) {
+                let entry = this.clients.get(row.key);
+                if (!entry) {
+                    entry = { read: { timestamps: [] }, mutation: { timestamps: [] } };
+                    this.clients.set(row.key, entry);
+                }
+                const bucketEntry = row.bucket === 'read' ? entry.read : entry.mutation;
+                // Reconstruct timestamps: spread request_count across the window_start second
+                for (let i = 0; i < row.request_count; i++) {
+                    bucketEntry.timestamps.push(row.window_start + i);
+                }
+                loaded += row.request_count;
+            }
+
+            if (loaded > 0) {
+                log.info('Loaded rate-limit state from SQLite', { entries: loaded, keys: this.clients.size });
+            }
+        } catch (err) {
+            log.warn('Failed to load rate-limit state', { error: err instanceof Error ? err.message : String(err) });
+        }
+    }
+
+    /** Remove expired windows from SQLite. */
+    private purgeExpiredWindows(): void {
+        if (!this.db) return;
+        try {
+            const windowStart = Date.now() - this.config.windowMs;
+            const result = this.db.query(
+                'DELETE FROM rate_limit_state WHERE window_start < ?'
+            ).run(windowStart);
+            if (result.changes > 0) {
+                log.debug('Purged expired rate-limit windows', { purged: result.changes });
+            }
+        } catch (err) {
+            log.debug('Failed to purge rate-limit windows', { error: err instanceof Error ? err.message : String(err) });
+        }
     }
 }
 

@@ -1,9 +1,13 @@
 import type { Database } from 'bun:sqlite';
 import { listAgents, getAgent, createAgent, updateAgent, deleteAgent } from '../db/agents';
 import { listAgentMessages } from '../db/agent-messages';
+import {
+    getAgentSpendingCap, setAgentSpendingCap, removeAgentSpendingCap,
+    getAgentDailySpending, getDefaultAgentDailyCap,
+} from '../db/spending';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AgentMessenger } from '../algochat/agent-messenger';
-import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
 
@@ -47,6 +51,20 @@ export function handleAgentRoutes(
     const messagesMatch = path.match(/^\/api\/agents\/([^/]+)\/messages$/);
     if (messagesMatch && method === 'GET') {
         return handleMessages(messagesMatch[1], db);
+    }
+
+    // Agent spending endpoints
+    const spendingMatch = path.match(/^\/api\/agents\/([^/]+)\/spending$/);
+    if (spendingMatch && method === 'GET') {
+        return handleGetSpending(spendingMatch[1], db);
+    }
+
+    const spendingCapMatch = path.match(/^\/api\/agents\/([^/]+)\/spending-cap$/);
+    if (spendingCapMatch && method === 'PUT') {
+        return handleSetSpendingCap(req, spendingCapMatch[1], db);
+    }
+    if (spendingCapMatch && method === 'DELETE') {
+        return handleDeleteSpendingCap(spendingCapMatch[1], db);
     }
 
     // A2A Agent Card for a specific agent
@@ -197,4 +215,48 @@ function handleMessages(agentId: string, db: Database): Response {
     const agent = getAgent(db, agentId);
     if (!agent) return json({ error: 'Not found' }, 404);
     return json(listAgentMessages(db, agentId));
+}
+
+// ─── Spending cap handlers ───────────────────────────────────────────────
+
+function handleGetSpending(agentId: string, db: Database): Response {
+    const agent = getAgent(db, agentId);
+    if (!agent) return json({ error: 'Not found' }, 404);
+
+    const cap = getAgentSpendingCap(db, agentId);
+    const today = getAgentDailySpending(db, agentId);
+    const defaults = getDefaultAgentDailyCap();
+
+    return json({
+        agentId,
+        cap: cap ?? { dailyLimitMicroalgos: defaults.microalgos, dailyLimitUsdc: 0, isDefault: true },
+        today: {
+            algoMicro: today.algoMicro,
+            usdcMicro: today.usdcMicro,
+        },
+    });
+}
+
+async function handleSetSpendingCap(req: Request, agentId: string, db: Database): Promise<Response> {
+    const agent = getAgent(db, agentId);
+    if (!agent) return json({ error: 'Not found' }, 404);
+
+    try {
+        const data = await parseBodyOrThrow(req, SetSpendingCapSchema);
+        const cap = setAgentSpendingCap(db, agentId, data.dailyLimitMicroalgos, data.dailyLimitUsdc);
+        return json(cap);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
+    }
+}
+
+function handleDeleteSpendingCap(agentId: string, db: Database): Response {
+    const agent = getAgent(db, agentId);
+    if (!agent) return json({ error: 'Not found' }, 404);
+
+    const deleted = removeAgentSpendingCap(db, agentId);
+    return deleted
+        ? json({ ok: true, message: 'Spending cap removed, agent will use global default' })
+        : json({ error: 'No spending cap found for agent' }, 404);
 }

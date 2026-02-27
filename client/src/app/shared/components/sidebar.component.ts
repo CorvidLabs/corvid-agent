@@ -173,6 +173,12 @@ import { filter, Subscription } from 'rxjs';
                     </a>
                 </li>
                 <li>
+                    <a class="sidebar__link" routerLink="/spending" routerLinkActive="sidebar__link--active" title="Spending">
+                        <span class="sidebar__label">Spending</span>
+                        <span class="sidebar__abbr">$</span>
+                    </a>
+                </li>
+                <li>
                     <a class="sidebar__link" routerLink="/settings" routerLinkActive="sidebar__link--active" title="Settings">
                         <span class="sidebar__label">Settings</span>
                         <span class="sidebar__abbr">S</span>

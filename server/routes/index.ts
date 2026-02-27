@@ -76,6 +76,11 @@ function getAuthConfig(): AuthConfig {
 const rateLimiter = new RateLimiter(loadRateLimitConfig());
 const endpointRateLimiter = new EndpointRateLimiter(loadEndpointRateLimitConfig());
 
+/** Attach database to rate limiter for persistent state across restarts. */
+export function initRateLimiterDb(db: Database): void {
+    rateLimiter.setDb(db);
+}
+
 const log = createLogger('Router');
 
 /**
