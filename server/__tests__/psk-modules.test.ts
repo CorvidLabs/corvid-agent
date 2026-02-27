@@ -19,8 +19,8 @@ import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { PSKContactManager } from '../algochat/psk-contact-manager';
-import { PSKManager } from '../algochat/psk.ts';
-import type { PSKMessage } from '../algochat/psk.ts';
+import { PSKManager } from '../algochat/psk';
+import type { PSKMessage } from '../algochat/psk';
 import { PSKDiscoveryPoller } from '../algochat/psk-discovery-poller';
 import type { AlgoChatConfig } from '../algochat/config';
 import type { AlgoChatService } from '../algochat/service';
@@ -293,6 +293,7 @@ describe('PSKContactManager', () => {
             manager.cancelPSKContact(a.id);
             const contacts = manager.listPSKContacts();
             expect(contacts).toHaveLength(1);
+            expect(contacts[0].id).toBe(b.id);
             expect(contacts[0].nickname).toBe('B');
         });
     });
@@ -553,11 +554,9 @@ describe('PSKContactManager', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('PSKManager', () => {
-    let config: AlgoChatConfig;
     let service: AlgoChatService;
 
     beforeEach(() => {
-        config = createMockConfig();
         service = createMockService();
     });
 
@@ -1036,14 +1035,24 @@ describe('condenseMessage', () => {
     });
 
     test('falls back to truncation when LLM provider is unavailable', async () => {
-        // With no LLM provider registered, condensation should fall back to truncation
-        const longContent = 'This is a very long message. '.repeat(50); // ~1450 bytes
-        const result = await condenseMessage(longContent, 200);
+        // Reset the provider registry singleton so no LLM provider is available
+        const { LlmProviderRegistry } = await import('../providers/registry');
+        const saved = LlmProviderRegistry.getInstance();
+        (LlmProviderRegistry as unknown as { instance: null }).instance = null;
 
-        expect(result.wasCondensed).toBe(true);
-        expect(result.originalBytes).toBeGreaterThan(200);
-        // Truncated content should end with '...'
-        expect(result.content).toContain('...');
+        try {
+            // With no LLM provider registered, condensation should fall back to truncation
+            const longContent = 'This is a very long message. '.repeat(50); // ~1450 bytes
+            const result = await condenseMessage(longContent, 200);
+
+            expect(result.wasCondensed).toBe(true);
+            expect(result.originalBytes).toBeGreaterThan(200);
+            // Truncated content should end with '...'
+            expect(result.content).toContain('...');
+        } finally {
+            // Restore the original registry instance
+            (LlmProviderRegistry as unknown as { instance: typeof saved }).instance = saved;
+        }
     });
 
     test('includes messageId reference suffix when provided', async () => {
