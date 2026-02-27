@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { HealthStatus, DependencyHealth, HealthCheckResult } from './types';
+import { hasClaudeAccess } from '../providers/router';
 
 export interface HealthCheckDeps {
     db: Database;
@@ -69,7 +70,7 @@ async function checkAlgorand(isConnected: boolean): Promise<DependencyHealth> {
 }
 
 async function checkLlmProviders(): Promise<DependencyHealth> {
-    const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+    const hasAnthropic = hasClaudeAccess();
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
     // Check Ollama connectivity (lightweight, local)
@@ -84,7 +85,7 @@ async function checkLlmProviders(): Promise<DependencyHealth> {
     if (hasAnthropic || ollamaStatus === 'healthy') {
         return {
             status: 'healthy',
-            anthropic: hasAnthropic ? 'configured' : 'not_configured',
+            anthropic: hasAnthropic ? 'healthy' : 'not_configured',
             ollama: ollamaStatus,
         };
     }
