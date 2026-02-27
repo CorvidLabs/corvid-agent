@@ -12,7 +12,7 @@
  *
  * @module
  */
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import {
     buildSafeEnv,
     isApiError,
@@ -448,10 +448,6 @@ describe('mapSdkMessageToEvent', () => {
 // ── startSdkProcess integration tests ────────────────────────────────────────
 
 describe('startSdkProcess', () => {
-    // These tests use mock.module to replace the SDK query function.
-    // Since startSdkProcess creates an async generator loop internally,
-    // we test the observable behavior through callbacks.
-
     // Note: Full integration tests for startSdkProcess require mocking the
     // @anthropic-ai/claude-agent-sdk module. The following tests verify
     // the exported utility functions that startSdkProcess depends on,
