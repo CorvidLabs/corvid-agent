@@ -513,6 +513,33 @@ export class MentionPollingService {
                 return;
             }
 
+            // Check if bun.lock changed — if so, install updated dependencies
+            // before restarting to avoid running with stale node_modules.
+            const lockDiff = Bun.spawnSync(
+                ['git', 'diff', localHash, 'HEAD', '--name-only', '--', 'bun.lock', 'package.json'],
+                { cwd: import.meta.dir + '/..', stdout: 'pipe' },
+            );
+            const changedFiles = lockDiff.stdout.toString().trim();
+            if (changedFiles) {
+                log.info('Dependencies changed — running bun install', { changedFiles });
+                const installResult = Bun.spawnSync(
+                    ['bun', 'install', '--frozen-lockfile', '--ignore-scripts'],
+                    { cwd: import.meta.dir + '/..', stdout: 'pipe', stderr: 'pipe' },
+                );
+                if (installResult.exitCode !== 0) {
+                    log.error('bun install failed after pull — reverting', {
+                        stderr: installResult.stderr.toString().trim(),
+                    });
+                    // Roll back to the known-good commit so we don't run with mismatched code + deps
+                    Bun.spawnSync(['git', 'reset', '--hard', localHash], {
+                        cwd: import.meta.dir + '/..',
+                        stdout: 'pipe', stderr: 'pipe',
+                    });
+                    return;
+                }
+                log.info('bun install completed successfully');
+            }
+
             log.info('Git pull successful — exiting for restart');
             // Exit with code 75 (EX_TEMPFAIL) to signal "restart me"
             // The run-loop.sh wrapper and launchd both treat non-zero as restartable
