@@ -81,12 +81,16 @@ const CI_RETRY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 /** Cooldown per PR before spawning another CI-fix session. */
 const CI_RETRY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 
+/** How often to check if origin/main has new commits. */
+const AUTO_UPDATE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 export class MentionPollingService {
     private db: Database;
     private processManager: ProcessManager;
     private loopTimer: ReturnType<typeof setInterval> | null = null;
     private autoMergeTimer: ReturnType<typeof setInterval> | null = null;
     private ciRetryTimer: ReturnType<typeof setInterval> | null = null;
+    private autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
     /** Tracks last CI-fix session spawn time per "repo#number" to enforce cooldown. */
     private ciRetryLastSpawn = new Map<string, number>();
     private activePolls = new Set<string>(); // config IDs currently being polled
@@ -132,6 +136,9 @@ export class MentionPollingService {
 
         // CI retry loop: spawn fix sessions for PRs with failed CI
         this.ciRetryTimer = setInterval(() => this.retryFailedCIPRs(), CI_RETRY_INTERVAL_MS);
+
+        // Auto-update loop: pull new commits and restart when sessions are idle
+        this.autoUpdateTimer = setInterval(() => this.checkForUpdates(), AUTO_UPDATE_INTERVAL_MS);
     }
 
     /** Stop the polling loop. */
@@ -148,6 +155,10 @@ export class MentionPollingService {
         if (this.ciRetryTimer) {
             clearInterval(this.ciRetryTimer);
             this.ciRetryTimer = null;
+        }
+        if (this.autoUpdateTimer) {
+            clearInterval(this.autoUpdateTimer);
+            this.autoUpdateTimer = null;
         }
         log.info('Mention polling service stopped');
     }
@@ -442,6 +453,72 @@ export class MentionPollingService {
                 repo, prNumber,
                 error: err instanceof Error ? err.message : String(err),
             });
+        }
+    }
+
+    // ─── Auto-Update Loop ──────────────────────────────────────────────
+
+    /**
+     * Check if origin/main has new commits. If so, wait for all running
+     * sessions to finish, pull the changes, and exit so the wrapper
+     * script restarts the server with the new code.
+     */
+    private async checkForUpdates(): Promise<void> {
+        if (!this.running) return;
+
+        try {
+            // Fetch latest from origin
+            const fetchResult = Bun.spawnSync(['git', 'fetch', 'origin', 'main'], {
+                cwd: import.meta.dir + '/..',
+                stdout: 'pipe', stderr: 'pipe',
+            });
+            if (fetchResult.exitCode !== 0) return;
+
+            // Compare HEAD with origin/main
+            const localHash = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], {
+                cwd: import.meta.dir + '/..',
+                stdout: 'pipe',
+            }).stdout.toString().trim();
+
+            const remoteHash = Bun.spawnSync(['git', 'rev-parse', 'origin/main'], {
+                cwd: import.meta.dir + '/..',
+                stdout: 'pipe',
+            }).stdout.toString().trim();
+
+            if (localHash === remoteHash) return;
+
+            log.info('New commits detected on origin/main', { local: localHash.slice(0, 8), remote: remoteHash.slice(0, 8) });
+
+            // Check for running sessions — wait for them to finish
+            const running = this.db.query(
+                `SELECT COUNT(*) as count FROM sessions WHERE status = 'running' AND pid IS NOT NULL`
+            ).get() as { count: number } | null;
+
+            const activeCount = running?.count ?? 0;
+            if (activeCount > 0) {
+                log.info('Deferring auto-update — waiting for active sessions to finish', { activeCount });
+                return;
+            }
+
+            // No active sessions — pull and restart
+            log.info('No active sessions — pulling and restarting');
+
+            const pullResult = Bun.spawnSync(['git', 'pull', '--rebase', 'origin', 'main'], {
+                cwd: import.meta.dir + '/..',
+                stdout: 'pipe', stderr: 'pipe',
+            });
+
+            if (pullResult.exitCode !== 0) {
+                log.error('Git pull failed', { stderr: pullResult.stderr.toString().trim() });
+                return;
+            }
+
+            log.info('Git pull successful — exiting for restart');
+            // Exit with code 75 (EX_TEMPFAIL) to signal "restart me"
+            // The run-loop.sh wrapper and launchd both treat non-zero as restartable
+            process.exit(75);
+        } catch (err) {
+            log.error('Error in auto-update check', { error: err instanceof Error ? err.message : String(err) });
         }
     }
 
