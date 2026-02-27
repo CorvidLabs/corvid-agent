@@ -37,6 +37,7 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { ApprovalManager } from '../process/approval-manager';
 import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import type { ClaudeStreamEvent } from '../process/types';
+import type { SessionMessage } from '../channels/types';
 
 // ── Test constants ────────────────────────────────────────────────────────
 
@@ -543,7 +544,7 @@ describe('handleIncomingMessage', () => {
     describe('ChannelAdapter message handler notification', () => {
         test('notifies registered message handlers for authorized messages', async () => {
             (ch.isOwner as ReturnType<typeof mock>).mockReturnValue(true);
-            const handler = mock(() => {});
+            const handler = mock((_msg: SessionMessage) => {});
             router.onMessage(handler);
 
             await router.handleIncomingMessage(OWNER_ADDR, 'Hello', 1000, 100);
@@ -1000,7 +1001,7 @@ describe('setupSessionNotifications', () => {
         callback('some-session', {
             type: 'message',
             content: 'Hello',
-        } as ClaudeStreamEvent);
+        } as unknown as ClaudeStreamEvent);
 
         expect(rf.calls.length).toBe(0);
     });
