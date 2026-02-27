@@ -1,6 +1,8 @@
 # corvid-agent
 
-Agent orchestration platform — manages Claude agent sessions with MCP tools, AlgoChat messaging, on-chain wallet integration, bidirectional Telegram/Discord bridges, persona system, skill bundles, and voice TTS/STT.
+Decentralized development agent platform built on Algorand — spawns, orchestrates, and monitors AI agents that do real software engineering work with on-chain identity, encrypted inter-agent communication, and structured multi-agent deliberation.
+
+See [VISION.md](VISION.md) for the full project manifesto: positioning, architecture, competitive landscape, technical principles, and long-term direction. VISION.md is the canonical source of truth for project identity.
 
 ## Architecture
 
