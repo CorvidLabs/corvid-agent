@@ -30,7 +30,6 @@ import { createSession } from '../db/sessions';
 
 const MY_ADDR = 'MY_CHAT_ACCOUNT_ADDR';
 const PARTICIPANT_A = 'PARTICIPANT_ADDR_AAAA';
-const PARTICIPANT_B = 'PARTICIPANT_ADDR_BBBB';
 
 // ── Mock factories ────────────────────────────────────────────────────────
 
@@ -74,13 +73,17 @@ function createMockTransactor(overrides: Partial<Record<string, unknown>> = {}) 
             (overrides.sendToAddress as ((...args: unknown[]) => Promise<unknown>)) ??
             (() => Promise.resolve({ fee: 1000 })),
         ),
-    } as unknown as import('../algochat/on-chain-transactor').OnChainTransactor;
+    } as unknown as import('../algochat/on-chain-transactor').OnChainTransactor & {
+        sendToAddress: ReturnType<typeof mock>;
+    };
 }
 
 function createMockAgentWalletService(agentAccount: { account: unknown; address: string } | null = null) {
     return {
         getAgentChatAccount: mock(() => Promise.resolve(agentAccount)),
-    } as unknown as import('../algochat/agent-wallet').AgentWalletService;
+    } as unknown as import('../algochat/agent-wallet').AgentWalletService & {
+        getAgentChatAccount: ReturnType<typeof mock>;
+    };
 }
 
 // ── Test suite ────────────────────────────────────────────────────────────
@@ -228,7 +231,7 @@ describe('ResponseFormatter', () => {
             formatter.emitEvent(PARTICIPANT_A, 'hello', 'inbound');
 
             expect(callback.mock.calls.length).toBe(1);
-            expect(callback.mock.calls[0]).toEqual([PARTICIPANT_A, 'hello', 'inbound', undefined]);
+            expect(callback.mock.calls[0] as unknown[]).toEqual([PARTICIPANT_A, 'hello', 'inbound', undefined]);
         });
 
         test('should support multiple callbacks', () => {
@@ -323,7 +326,7 @@ describe('ResponseFormatter', () => {
 
             formatter.emitEvent(PARTICIPANT_A, 'hello', 'status', 1500);
 
-            expect(callback.mock.calls[0]).toEqual([PARTICIPANT_A, 'hello', 'status', 1500]);
+            expect(callback.mock.calls[0] as unknown[]).toEqual([PARTICIPANT_A, 'hello', 'status', 1500]);
         });
 
         test('should continue invoking callbacks even if one throws', () => {
@@ -374,7 +377,7 @@ describe('ResponseFormatter', () => {
             await formatter.sendResponse(PARTICIPANT_A, 'psk hello');
 
             expect(pskManager.sendMessage.mock.calls.length).toBe(1);
-            expect(pskManager.sendMessage.mock.calls[0][0]).toBe('psk hello');
+            expect((pskManager.sendMessage.mock.calls[0] as unknown[])[0]).toBe('psk hello');
         });
 
         test('should split large PSK messages into chunks', async () => {
@@ -411,7 +414,7 @@ describe('ResponseFormatter', () => {
             await formatter.sendResponse(PARTICIPANT_A, 'psk msg');
 
             expect(callback.mock.calls.length).toBe(1);
-            expect(callback.mock.calls[0][2]).toBe('outbound');
+            expect((callback.mock.calls[0] as unknown[])[2]).toBe('outbound');
         });
 
         test('should route through OnChainTransactor when no PSK manager', async () => {
@@ -430,7 +433,7 @@ describe('ResponseFormatter', () => {
 
         test('should use per-agent wallet when conversation has agentId', async () => {
             // Create an agent and project, then a conversation with agentId
-            const project = createProject(db, {
+            createProject(db, {
                 name: 'Test Project',
                 workingDir: '/tmp',
             });
@@ -460,7 +463,7 @@ describe('ResponseFormatter', () => {
         });
 
         test('should fall back to main account when agent wallet service returns null', async () => {
-            const project = createProject(db, {
+            createProject(db, {
                 name: 'Test Project',
                 workingDir: '/tmp',
             });
@@ -498,7 +501,7 @@ describe('ResponseFormatter', () => {
             await formatter.sendResponse(PARTICIPANT_A, 'msg');
 
             expect(callback.mock.calls.length).toBe(1);
-            expect(callback.mock.calls[0][3]).toBe(2000); // fee
+            expect((callback.mock.calls[0] as unknown[])[3]).toBe(2000); // fee
         });
 
         test('should handle transactor returning null (spending limit)', async () => {
@@ -569,7 +572,7 @@ describe('ResponseFormatter', () => {
             await formatter.sendResponse(PARTICIPANT_A, largeContent);
 
             // The content sent should be truncated to ~840 chars + '...'
-            const sentContent = algorandService.sendMessage.mock.calls[0][3] as string;
+            const sentContent = (algorandService.sendMessage.mock.calls[0] as unknown[])[3] as string;
             expect(sentContent.length).toBeLessThan(1000);
             expect(sentContent.endsWith('...')).toBe(true);
         });

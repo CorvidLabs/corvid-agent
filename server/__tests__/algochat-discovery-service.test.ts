@@ -32,7 +32,6 @@ import { createProject } from '../db/projects';
 const MY_ADDR = 'MY_CHAT_ACCOUNT_ADDR';
 const SENDER_A = 'SENDER_ADDR_AAAA';
 const SENDER_B = 'SENDER_ADDR_BBBB';
-const SENDER_C = 'SENDER_ADDR_CCCC';
 const OWNER_ADDR = 'OWNER_ADDR_ABC123';
 
 // ── Mock factories ────────────────────────────────────────────────────────
@@ -684,7 +683,7 @@ describe('DiscoveryService', () => {
             await new Promise((r) => setTimeout(r, 5200));
 
             // Approval manager was checked
-            expect(approvalMgr.hasPendingRequests.mock.calls.length).toBeGreaterThanOrEqual(1);
+            expect((approvalMgr.hasPendingRequests as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(1);
 
             discovery.stopFastPolling();
         }, 10_000);
