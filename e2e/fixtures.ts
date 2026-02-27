@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+const E2E_API_KEY = process.env.API_KEY || 'e2e-test-key';
 
 /**
  * Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load.
@@ -19,7 +20,8 @@ export async function gotoWithRetry(
         (await p.locator('main').locator('*').first().count()) > 0);
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto(path);
+        const sep = path.includes('?') ? '&' : '?';
+        await page.goto(`${path}${sep}apiKey=${E2E_API_KEY}`);
         await page.waitForLoadState('networkidle');
 
         const body = await page.locator('body').textContent() ?? '';
@@ -66,8 +68,15 @@ async function fetchWithRetry(
     init: RequestInit,
     maxRetries: number = 3,
 ): Promise<Response> {
+    // Inject API key header for server-side auth
+    const headers = new Headers(init.headers);
+    if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${E2E_API_KEY}`);
+    }
+    const authedInit = { ...init, headers };
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        const res = await fetch(url, init);
+        const res = await fetch(url, authedInit);
         if (res.status === 429 && attempt < maxRetries) {
             const retryAfter = parseInt(res.headers.get('Retry-After') ?? '2', 10);
             await new Promise((r) => setTimeout(r, retryAfter * 1000));
@@ -470,3 +479,15 @@ export const test = base.extend<{ api: ApiHelpers }>({
 });
 
 export { expect };
+
+/** Fetch wrapper that injects the E2E API key as a Bearer token. */
+export function authedFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${E2E_API_KEY}`);
+    }
+    return fetch(url, { ...init, headers });
+}
+
+/** The API key used for E2E auth, for tests that need to construct URLs. */
+export { E2E_API_KEY };
