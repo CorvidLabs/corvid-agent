@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
 test.describe('Auth Flow — Device Authorization', () => {
     test('POST /api/auth/device initiates device auth flow', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
+        const res = await authedFetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
         expect(res.ok).toBe(true);
         const data = await res.json();
 
@@ -21,11 +21,11 @@ test.describe('Auth Flow — Device Authorization', () => {
 
     test('POST /api/auth/device/token returns pending for new device code', async ({}) => {
         // First initiate a device auth
-        const initRes = await fetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
+        const initRes = await authedFetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
         const { deviceCode } = await initRes.json();
 
         // Poll for token — should be pending
-        const tokenRes = await fetch(`${BASE_URL}/api/auth/device/token`, {
+        const tokenRes = await authedFetch(`${BASE_URL}/api/auth/device/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deviceCode }),
@@ -36,7 +36,7 @@ test.describe('Auth Flow — Device Authorization', () => {
     });
 
     test('POST /api/auth/device/token rejects missing deviceCode', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/device/token`, {
+        const res = await authedFetch(`${BASE_URL}/api/auth/device/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -45,7 +45,7 @@ test.describe('Auth Flow — Device Authorization', () => {
     });
 
     test('POST /api/auth/device/token rejects invalid deviceCode', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/device/token`, {
+        const res = await authedFetch(`${BASE_URL}/api/auth/device/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deviceCode: 'nonexistent-code' }),
@@ -57,12 +57,12 @@ test.describe('Auth Flow — Device Authorization', () => {
 
     test('full device auth flow: initiate → authorize → get token', async ({}) => {
         // Step 1: Initiate
-        const initRes = await fetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
+        const initRes = await authedFetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
         expect(initRes.ok).toBe(true);
         const { deviceCode, userCode } = await initRes.json();
 
         // Step 2: Authorize (simulate web UI approval)
-        const authRes = await fetch(`${BASE_URL}/api/auth/device/authorize`, {
+        const authRes = await authedFetch(`${BASE_URL}/api/auth/device/authorize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -78,7 +78,7 @@ test.describe('Auth Flow — Device Authorization', () => {
         expect(authData.status).toBe('authorized');
 
         // Step 3: Poll for token — should now succeed
-        const tokenRes = await fetch(`${BASE_URL}/api/auth/device/token`, {
+        const tokenRes = await authedFetch(`${BASE_URL}/api/auth/device/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deviceCode }),
@@ -93,11 +93,11 @@ test.describe('Auth Flow — Device Authorization', () => {
 
     test('device auth flow: deny prevents token retrieval', async ({}) => {
         // Initiate
-        const initRes = await fetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
+        const initRes = await authedFetch(`${BASE_URL}/api/auth/device`, { method: 'POST' });
         const { deviceCode, userCode } = await initRes.json();
 
         // Deny
-        const denyRes = await fetch(`${BASE_URL}/api/auth/device/authorize`, {
+        const denyRes = await authedFetch(`${BASE_URL}/api/auth/device/authorize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -112,7 +112,7 @@ test.describe('Auth Flow — Device Authorization', () => {
         expect(denyData.status).toBe('denied');
 
         // Token poll should return denied
-        const tokenRes = await fetch(`${BASE_URL}/api/auth/device/token`, {
+        const tokenRes = await authedFetch(`${BASE_URL}/api/auth/device/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deviceCode }),
@@ -123,7 +123,7 @@ test.describe('Auth Flow — Device Authorization', () => {
     });
 
     test('POST /api/auth/device/authorize rejects missing userCode', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/device/authorize`, {
+        const res = await authedFetch(`${BASE_URL}/api/auth/device/authorize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tenantId: 'test', email: 'test@test.com', approve: true }),
@@ -132,7 +132,7 @@ test.describe('Auth Flow — Device Authorization', () => {
     });
 
     test('POST /api/auth/device/authorize rejects invalid userCode', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/device/authorize`, {
+        const res = await authedFetch(`${BASE_URL}/api/auth/device/authorize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userCode: 'INVALID1', tenantId: 'test', email: 'test@test.com', approve: true }),
@@ -141,7 +141,7 @@ test.describe('Auth Flow — Device Authorization', () => {
     });
 
     test('GET /api/auth/verify returns HTML verification page', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/verify?code=TESTCODE`);
+        const res = await authedFetch(`${BASE_URL}/api/auth/verify?code=TESTCODE`);
         expect(res.ok).toBe(true);
         expect(res.headers.get('content-type')).toContain('text/html');
 
@@ -152,7 +152,7 @@ test.describe('Auth Flow — Device Authorization', () => {
     });
 
     test('GET /api/auth/verify sanitizes XSS in code param', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/auth/verify?code=<script>alert(1)</script>`);
+        const res = await authedFetch(`${BASE_URL}/api/auth/verify?code=<script>alert(1)</script>`);
         expect(res.ok).toBe(true);
         const html = await res.text();
         // Code should be empty (fails alphanumeric validation) or escaped

@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -80,18 +80,18 @@ test.describe('Models', () => {
 
     test('API status and models endpoints', async ({}) => {
         // Status
-        const statusRes = await fetch(`${BASE_URL}/api/ollama/status`);
+        const statusRes = await authedFetch(`${BASE_URL}/api/ollama/status`);
         expect(statusRes.ok).toBe(true);
         const status = await statusRes.json();
         expect(typeof status.available).toBe('boolean');
 
         // Models list (may be empty if Ollama not running)
-        const modelsRes = await fetch(`${BASE_URL}/api/ollama/models`);
+        const modelsRes = await authedFetch(`${BASE_URL}/api/ollama/models`);
         // Accept 200 (ok) or 502/503 (Ollama unavailable)
         expect([200, 502, 503]).toContain(modelsRes.status);
 
         // Library search
-        const libraryRes = await fetch(`${BASE_URL}/api/ollama/library?q=test`);
+        const libraryRes = await authedFetch(`${BASE_URL}/api/ollama/library?q=test`);
         expect(libraryRes.ok).toBe(true);
     });
 });

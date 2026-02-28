@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -75,7 +75,7 @@ test.describe('Mention Polling', () => {
         const project = await api.seedProject('MP CRUD Project');
 
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/mention-polling`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/mention-polling`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -92,21 +92,21 @@ test.describe('Mention Polling', () => {
         expect(config.status).toBe('active');
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/mention-polling/${config.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/mention-polling/${config.id}`);
         expect(readRes.ok).toBe(true);
 
         // Stats
-        const statsRes = await fetch(`${BASE_URL}/api/mention-polling/stats`);
+        const statsRes = await authedFetch(`${BASE_URL}/api/mention-polling/stats`);
         expect(statsRes.ok).toBe(true);
         const stats = await statsRes.json();
         expect(typeof stats.totalConfigs).toBe('number');
 
         // Activity
-        const actRes = await fetch(`${BASE_URL}/api/mention-polling/${config.id}/activity`);
+        const actRes = await authedFetch(`${BASE_URL}/api/mention-polling/${config.id}/activity`);
         expect(actRes.ok).toBe(true);
 
         // Update (pause)
-        const updateRes = await fetch(`${BASE_URL}/api/mention-polling/${config.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/mention-polling/${config.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'paused' }),
@@ -114,21 +114,21 @@ test.describe('Mention Polling', () => {
         expect(updateRes.ok).toBe(true);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/mention-polling`);
+        const listRes = await authedFetch(`${BASE_URL}/api/mention-polling`);
         expect(listRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/mention-polling/${config.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/mention-polling/${config.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify gone
-        const gone = await fetch(`${BASE_URL}/api/mention-polling/${config.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/mention-polling/${config.id}`);
         expect(gone.status).toBe(404);
     });
 
     test('validation rejects missing fields', async ({}) => {
         // Missing agentId
-        const res1 = await fetch(`${BASE_URL}/api/mention-polling`, {
+        const res1 = await authedFetch(`${BASE_URL}/api/mention-polling`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -139,7 +139,7 @@ test.describe('Mention Polling', () => {
         expect(res1.status).toBe(400);
 
         // Missing repo
-        const res2 = await fetch(`${BASE_URL}/api/mention-polling`, {
+        const res2 = await authedFetch(`${BASE_URL}/api/mention-polling`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

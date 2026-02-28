@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -39,7 +39,7 @@ test.describe('Wallets', () => {
     });
 
     test('API summary returns data', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/wallets/summary`);
+        const res = await authedFetch(`${BASE_URL}/api/wallets/summary`);
         expect(res.ok).toBe(true);
 
         const data = await res.json();
@@ -53,7 +53,7 @@ test.describe('Wallets', () => {
 
     test('allowlist API (add/remove)', async ({}) => {
         // POST to add — accept 201 (created), 400 (invalid address), or 409 (duplicate)
-        const addRes = await fetch(`${BASE_URL}/api/allowlist`, {
+        const addRes = await authedFetch(`${BASE_URL}/api/allowlist`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ address: 'TESTADDRESS' }),
@@ -63,7 +63,7 @@ test.describe('Wallets', () => {
 
         // If it was added successfully, clean up
         if (addRes.status === 201) {
-            const deleteRes = await fetch(`${BASE_URL}/api/allowlist/TESTADDRESS`, {
+            const deleteRes = await authedFetch(`${BASE_URL}/api/allowlist/TESTADDRESS`, {
                 method: 'DELETE',
             });
             expect([200, 404]).toContain(deleteRes.status);

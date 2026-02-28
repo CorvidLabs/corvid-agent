@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
  */
 async function gotoReputation(page: Page, maxRetries = 3): Promise<void> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto('/reputation');
+        await gotoWithRetry(page, '/reputation');
         await page.waitForLoadState('networkidle');
 
         const body = await page.locator('body').textContent() ?? '';
@@ -262,7 +262,7 @@ test.describe('Reputation', () => {
         await api.seedReputationEvent(agent.id, 'task_failed', -3);
 
         // Compute score
-        const computeRes = await fetch(`${BASE_URL}/api/reputation/scores/${agent.id}`, { method: 'POST' });
+        const computeRes = await authedFetch(`${BASE_URL}/api/reputation/scores/${agent.id}`, { method: 'POST' });
         expect(computeRes.ok).toBe(true);
         const score = await computeRes.json();
         expect(typeof score.overallScore).toBe('number');
@@ -270,18 +270,18 @@ test.describe('Reputation', () => {
         expect(score.components).toBeDefined();
 
         // Get score
-        const getRes = await fetch(`${BASE_URL}/api/reputation/scores/${agent.id}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/reputation/scores/${agent.id}`);
         expect(getRes.ok).toBe(true);
 
         // Get events
-        const eventsRes = await fetch(`${BASE_URL}/api/reputation/events/${agent.id}`);
+        const eventsRes = await authedFetch(`${BASE_URL}/api/reputation/events/${agent.id}`);
         expect(eventsRes.ok).toBe(true);
         const events = await eventsRes.json();
         expect(Array.isArray(events)).toBe(true);
         expect(events.length).toBeGreaterThanOrEqual(2);
 
         // Compute all scores
-        const allRes = await fetch(`${BASE_URL}/api/reputation/scores`, { method: 'POST' });
+        const allRes = await authedFetch(`${BASE_URL}/api/reputation/scores`, { method: 'POST' });
         expect(allRes.ok).toBe(true);
     });
 
@@ -295,7 +295,7 @@ test.describe('Reputation', () => {
         await api.seedReputationEvent(agent.id, 'task_completed', 10);
         await api.computeScore(agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/reputation/scores`);
+        const res = await authedFetch(`${BASE_URL}/api/reputation/scores`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(Array.isArray(data)).toBe(true);
@@ -309,7 +309,7 @@ test.describe('Reputation', () => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Event API Agent');
 
-        const res = await fetch(`${BASE_URL}/api/reputation/events`, {
+        const res = await authedFetch(`${BASE_URL}/api/reputation/events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -325,7 +325,7 @@ test.describe('Reputation', () => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('No Attestation Agent');
 
-        const res = await fetch(`${BASE_URL}/api/reputation/attestation/${agent.id}`);
+        const res = await authedFetch(`${BASE_URL}/api/reputation/attestation/${agent.id}`);
         // 404 (no attestation) or 503 (AlgoChat unavailable)
         expect([404, 503]).toContain(res.status);
     });
@@ -336,7 +336,7 @@ test.describe('Reputation', () => {
         await api.seedReputationEvent(agent.id, 'task_completed', 10);
         await api.computeScore(agent.id);
 
-        const res = await fetch(`${BASE_URL}/api/reputation/attestation/${agent.id}`, {
+        const res = await authedFetch(`${BASE_URL}/api/reputation/attestation/${agent.id}`, {
             method: 'POST',
         });
         // 201 (created) or 503 (AlgoChat unavailable)

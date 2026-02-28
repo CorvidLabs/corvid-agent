@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -56,7 +56,7 @@ test.describe('Analytics', () => {
         const agent = await api.seedAgent('Analytics Agent');
 
         // Create a session to generate analytics data
-        await fetch(`${BASE_URL}/api/sessions`, {
+        await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -76,7 +76,7 @@ test.describe('Analytics', () => {
     });
 
     test('API overview returns data', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/analytics/overview`);
+        const res = await authedFetch(`${BASE_URL}/api/analytics/overview`);
         expect(res.ok).toBe(true);
 
         const data = await res.json();
@@ -88,7 +88,7 @@ test.describe('Analytics', () => {
     });
 
     test('API spending returns data', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/analytics/spending?days=7`);
+        const res = await authedFetch(`${BASE_URL}/api/analytics/spending?days=7`);
         expect(res.ok).toBe(true);
 
         const data = await res.json();

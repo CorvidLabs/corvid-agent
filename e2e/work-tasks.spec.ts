@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -41,14 +41,14 @@ test.describe('Work Tasks', () => {
         const agent = await api.seedAgent('Cancel Agent');
         const task = await api.seedWorkTask(agent.id, `Cancel me ${Date.now()}`);
 
-        const cancelRes = await fetch(`${BASE_URL}/api/work-tasks/${task.id}/cancel`, {
+        const cancelRes = await authedFetch(`${BASE_URL}/api/work-tasks/${task.id}/cancel`, {
             method: 'POST',
         });
         // Cancel may fail if task already completed/failed quickly — accept 200 or 400/404
         expect([200, 400, 404]).toContain(cancelRes.status);
 
         // Task should still exist via GET
-        const getRes = await fetch(`${BASE_URL}/api/work-tasks/${task.id}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/work-tasks/${task.id}`);
         expect(getRes.ok).toBe(true);
     });
 
@@ -84,7 +84,7 @@ test.describe('Work Tasks', () => {
 
     test('API validation rejects missing fields', async ({}) => {
         // Missing agentId
-        const res1 = await fetch(`${BASE_URL}/api/work-tasks`, {
+        const res1 = await authedFetch(`${BASE_URL}/api/work-tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description: 'no agent' }),
@@ -92,7 +92,7 @@ test.describe('Work Tasks', () => {
         expect(res1.status).toBe(400);
 
         // Missing description
-        const res2 = await fetch(`${BASE_URL}/api/work-tasks`, {
+        const res2 = await authedFetch(`${BASE_URL}/api/work-tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ agentId: 'fake-id' }),

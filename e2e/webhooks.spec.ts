@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -110,7 +110,7 @@ test.describe('Webhooks', () => {
         const project = await api.seedProject('WH CRUD Project');
 
         // Create (201)
-        const createRes = await fetch(`${BASE_URL}/api/webhooks`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/webhooks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -126,11 +126,11 @@ test.describe('Webhooks', () => {
         expect(webhook.status).toBe('active');
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/webhooks/${webhook.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/webhooks/${webhook.id}`);
         expect(readRes.ok).toBe(true);
 
         // Update (pause)
-        const updateRes = await fetch(`${BASE_URL}/api/webhooks/${webhook.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/webhooks/${webhook.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'paused' }),
@@ -140,27 +140,27 @@ test.describe('Webhooks', () => {
         expect(updated.status).toBe('paused');
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/webhooks`);
+        const listRes = await authedFetch(`${BASE_URL}/api/webhooks`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(list.registrations).toBeDefined();
 
         // Deliveries
-        const delRes = await fetch(`${BASE_URL}/api/webhooks/${webhook.id}/deliveries`);
+        const delRes = await authedFetch(`${BASE_URL}/api/webhooks/${webhook.id}/deliveries`);
         expect(delRes.ok).toBe(true);
         const deliveries = await delRes.json();
         expect(deliveries.deliveries).toBeDefined();
 
         // All deliveries
-        const allDelRes = await fetch(`${BASE_URL}/api/webhooks/deliveries`);
+        const allDelRes = await authedFetch(`${BASE_URL}/api/webhooks/deliveries`);
         expect(allDelRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/webhooks/${webhook.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/webhooks/${webhook.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/webhooks/${webhook.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/webhooks/${webhook.id}`);
         expect(gone.status).toBe(404);
     });
 
@@ -168,7 +168,7 @@ test.describe('Webhooks', () => {
         const agent = await api.seedAgent('WH Validation Agent');
 
         // Missing repo
-        const res1 = await fetch(`${BASE_URL}/api/webhooks`, {
+        const res1 = await authedFetch(`${BASE_URL}/api/webhooks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -180,7 +180,7 @@ test.describe('Webhooks', () => {
         expect(res1.status).toBe(400);
 
         // Missing agentId
-        const res2 = await fetch(`${BASE_URL}/api/webhooks`, {
+        const res2 = await authedFetch(`${BASE_URL}/api/webhooks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

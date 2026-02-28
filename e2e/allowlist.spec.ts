@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -38,7 +38,7 @@ test.describe('Allowlist', () => {
         const testAddr = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 
         // Create — may fail if AlgoChat not configured (accept 201 or 400)
-        const createRes = await fetch(`${BASE_URL}/api/allowlist`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/allowlist`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ address: testAddr, label: 'E2E Test' }),
@@ -47,13 +47,13 @@ test.describe('Allowlist', () => {
 
         if (createRes.status === 201) {
             // List
-            const listRes = await fetch(`${BASE_URL}/api/allowlist`);
+            const listRes = await authedFetch(`${BASE_URL}/api/allowlist`);
             expect(listRes.ok).toBe(true);
             const list = await listRes.json();
             expect(Array.isArray(list)).toBe(true);
 
             // Update label
-            const updateRes = await fetch(`${BASE_URL}/api/allowlist/${testAddr}`, {
+            const updateRes = await authedFetch(`${BASE_URL}/api/allowlist/${testAddr}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ label: 'Updated Label' }),
@@ -61,13 +61,13 @@ test.describe('Allowlist', () => {
             expect(updateRes.ok).toBe(true);
 
             // Delete
-            const deleteRes = await fetch(`${BASE_URL}/api/allowlist/${testAddr}`, { method: 'DELETE' });
+            const deleteRes = await authedFetch(`${BASE_URL}/api/allowlist/${testAddr}`, { method: 'DELETE' });
             expect(deleteRes.ok).toBe(true);
         }
     });
 
     test('validation rejects empty address', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/allowlist`, {
+        const res = await authedFetch(`${BASE_URL}/api/allowlist`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ address: '' }),

@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -118,19 +118,19 @@ test.describe('Settings', () => {
         expect(typeof settings.system.schemaVersion).toBe('number');
 
         // GET /api/health
-        const healthRes = await fetch(`${BASE_URL}/api/health`);
+        const healthRes = await authedFetch(`${BASE_URL}/api/health`);
         expect(healthRes.ok).toBe(true);
         const health = await healthRes.json();
         expect(health.status).toBeTruthy();
 
         // GET /api/operational-mode
-        const modeRes = await fetch(`${BASE_URL}/api/operational-mode`);
+        const modeRes = await authedFetch(`${BASE_URL}/api/operational-mode`);
         expect(modeRes.ok).toBe(true);
         const mode = await modeRes.json();
         expect(mode.mode).toBeTruthy();
 
         // PUT /api/settings/credits (with valid key)
-        const creditRes = await fetch(`${BASE_URL}/api/settings/credits`, {
+        const creditRes = await authedFetch(`${BASE_URL}/api/settings/credits`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ credits_per_algo: '1000' }),
@@ -139,7 +139,7 @@ test.describe('Settings', () => {
     });
 
     test('credit config rejects unknown keys', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/settings/credits`, {
+        const res = await authedFetch(`${BASE_URL}/api/settings/credits`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ unknown_key: '123' }),

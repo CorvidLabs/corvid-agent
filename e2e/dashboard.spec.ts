@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures';
+import { test, expect , gotoWithRetry } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /** Navigate to dashboard, retrying on 429 rate-limit responses or empty lazy-load. */
 async function gotoDashboard(page: Page, maxRetries = 3): Promise<void> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto('/dashboard');
+        await gotoWithRetry(page, '/dashboard');
         await page.waitForLoadState('networkidle');
 
         const body = await page.locator('body').textContent() ?? '';
