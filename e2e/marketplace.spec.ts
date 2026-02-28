@@ -261,6 +261,13 @@ test.describe('Marketplace', () => {
         const agent = await api.seedAgent('MP API Agent');
         const listingName = `API Listing ${Date.now()}`;
 
+        // Set verification tier so publishing is allowed
+        await authedFetch(`${BASE_URL}/api/reputation/identity/${agent.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tier: 'GITHUB_VERIFIED', dataHash: 'e2e-test' }),
+        });
+
         // Create
         const createRes = await authedFetch(`${BASE_URL}/api/marketplace/listings`, {
             method: 'POST',

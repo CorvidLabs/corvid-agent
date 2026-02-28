@@ -23,6 +23,15 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('ReputationScorer');
 
+// ─── Decay Constants ─────────────────────────────────────────────────────────
+
+/** Days of inactivity before decay begins */
+const DECAY_GRACE_DAYS = 30;
+/** Decay rate per week after grace period */
+const DECAY_RATE_PER_WEEK = 0.95;
+/** Minimum reputation floor (never fully zero) */
+const REPUTATION_FLOOR = 0.1;
+
 // ─── Trust Level Thresholds ──────────────────────────────────────────────────
 
 function computeTrustLevel(score: number): TrustLevel {
@@ -132,6 +141,48 @@ function computeActivityLevel(db: Database, agentId: string): number {
     return Math.min(100, sessions * 10);
 }
 
+// ─── Reputation Decay ────────────────────────────────────────────────────────
+
+/**
+ * Compute time-based decay factor for an inactive agent.
+ *
+ * "Inactivity" = no completed work tasks AND no positive attestations
+ * after the grace period. Decay is 5% per week beyond 30 days.
+ * Returns a multiplier in the range [REPUTATION_FLOOR, 1.0].
+ */
+function computeDecayFactor(db: Database, agentId: string): number {
+    // Find the most recent positive signal: completed task or positive attestation
+    const lastActivity = db.query(`
+        SELECT MAX(latest) as last_active FROM (
+            SELECT MAX(created_at) as latest FROM work_tasks
+            WHERE agent_id = ? AND status = 'completed'
+            UNION ALL
+            SELECT MAX(created_at) as latest FROM reputation_events
+            WHERE agent_id = ? AND event_type IN ('task_completed', 'attestation_published')
+        )
+    `).get(agentId, agentId) as { last_active: string | null } | null;
+
+    if (!lastActivity?.last_active) {
+        // No activity at all — check if agent even exists
+        const agent = db.query('SELECT created_at FROM agents WHERE id = ?').get(agentId) as { created_at: string } | null;
+        if (!agent) return 1.0; // Unknown agent, no decay
+        // Use agent creation date as baseline
+        const ageDays = (Date.now() - new Date(agent.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        if (ageDays <= DECAY_GRACE_DAYS) return 1.0;
+        const weeksInactive = (ageDays - DECAY_GRACE_DAYS) / 7;
+        return Math.max(REPUTATION_FLOOR, Math.pow(DECAY_RATE_PER_WEEK, weeksInactive));
+    }
+
+    const lastActiveDate = new Date(lastActivity.last_active);
+    if (isNaN(lastActiveDate.getTime())) return 1.0; // Invalid date, no decay
+
+    const daysSinceActivity = (Date.now() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceActivity <= DECAY_GRACE_DAYS) return 1.0;
+
+    const weeksInactive = (daysSinceActivity - DECAY_GRACE_DAYS) / 7;
+    return Math.max(REPUTATION_FLOOR, Math.pow(DECAY_RATE_PER_WEEK, weeksInactive));
+}
+
 // ─── Scorer Service ──────────────────────────────────────────────────────────
 
 export class ReputationScorer {
@@ -148,7 +199,14 @@ export class ReputationScorer {
      */
     computeScore(agentId: string): ReputationScore {
         const components = this.computeComponents(agentId);
-        const overallScore = this.computeOverall(components);
+        const rawScore = this.computeOverall(components);
+
+        // Apply time-based decay for inactive agents
+        const decayFactor = computeDecayFactor(this.db, agentId);
+        const overallScore = Math.max(
+            1, // Never fully zero — minimum floor
+            Math.round(rawScore * decayFactor),
+        );
         const trustLevel = computeTrustLevel(overallScore);
 
         // Check for existing attestation hash

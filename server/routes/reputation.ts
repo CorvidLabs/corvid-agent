@@ -4,8 +4,11 @@
 import type { Database } from 'bun:sqlite';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { ReputationAttestation } from '../reputation/attestation';
+import { IdentityVerification, type VerificationTier } from '../reputation/identity-verification';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, RecordReputationEventSchema } from '../lib/validation';
+
+const VALID_TIERS: Set<string> = new Set(['UNVERIFIED', 'GITHUB_VERIFIED', 'OWNER_VOUCHED', 'ESTABLISHED']);
 
 export function handleReputationRoutes(
     req: Request,
@@ -71,6 +74,28 @@ export function handleReputationRoutes(
 
     // ─── Attestation ─────────────────────────────────────────────────────────
 
+    // ─── Identity Verification ─────────────────────────────────────────────
+
+    if (path === '/api/reputation/identities' && method === 'GET') {
+        const iv = new IdentityVerification(_db);
+        return json(iv.getAllIdentities());
+    }
+
+    const identityMatch = path.match(/^\/api\/reputation\/identity\/([^/]+)$/);
+    if (identityMatch) {
+        const agentId = identityMatch[1];
+        const iv = new IdentityVerification(_db);
+
+        if (method === 'GET') {
+            const identity = iv.getIdentity(agentId);
+            return identity ? json(identity) : json({ agentId, tier: 'UNVERIFIED' });
+        }
+
+        if (method === 'PUT') {
+            return handleSetIdentityTier(req, agentId, iv);
+        }
+    }
+
     const attestMatch = path.match(/^\/api\/reputation\/attestation\/([^/]+)$/);
     if (attestMatch) {
         const agentId = attestMatch[1];
@@ -114,6 +139,23 @@ async function handleCreateAttestation(
         const score = scorer.computeScore(agentId);
         const hash = await attestation.createAttestation(score);
         return json({ hash, agentId, trustLevel: score.trustLevel }, 201);
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleSetIdentityTier(
+    req: Request,
+    agentId: string,
+    iv: IdentityVerification,
+): Promise<Response> {
+    try {
+        const body = await req.json() as { tier?: string; dataHash?: string };
+        if (!body.tier || !VALID_TIERS.has(body.tier)) {
+            return badRequest(`Invalid tier. Must be one of: ${[...VALID_TIERS].join(', ')}`);
+        }
+        const identity = iv.setTier(agentId, body.tier as VerificationTier, body.dataHash);
+        return json(identity);
     } catch (err) {
         return handleRouteError(err);
     }

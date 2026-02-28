@@ -49,6 +49,8 @@ export interface MarketplaceSearchParams {
     pricingModel?: PricingModel;
     minRating?: number;
     tags?: string[];
+    /** Filter listings to agents with at least this verification tier */
+    minVerificationTier?: string;
     limit?: number;
     offset?: number;
 }
