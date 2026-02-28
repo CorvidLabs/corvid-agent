@@ -161,6 +161,13 @@ export async function handleRequest(
         }
     }
 
+    // Non-API paths (e.g. /agents, /projects) are client SPA routes served
+    // as static files — they must bypass auth so the browser can load the HTML.
+    // Auth for API requests is handled below.
+    if (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/a2a/') && !url.pathname.startsWith('/webhooks/') && !url.pathname.startsWith('/slack/')) {
+        return null;
+    }
+
     // Build request context and apply declarative guard chain
     const context = createRequestContext(url.searchParams.get('wallet') || undefined);
 

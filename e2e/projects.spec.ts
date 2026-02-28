@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -69,7 +69,7 @@ test.describe('Projects', () => {
 
     test('API CRUD works', async ({}) => {
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/projects`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: `API CRUD ${Date.now()}`, workingDir: '/tmp' }),
@@ -79,13 +79,13 @@ test.describe('Projects', () => {
         expect(project.id).toBeTruthy();
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/projects/${project.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}`);
         expect(readRes.ok).toBe(true);
         const read = await readRes.json();
         expect(read.id).toBe(project.id);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/projects/${project.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated Name' }),
@@ -93,11 +93,11 @@ test.describe('Projects', () => {
         expect(updateRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/projects/${project.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/projects/${project.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404 after delete
-        const gone = await fetch(`${BASE_URL}/api/projects/${project.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/projects/${project.id}`);
         expect(gone.status).toBe(404);
     });
 
@@ -116,7 +116,7 @@ test.describe('Projects', () => {
 
     test('validation rejects missing fields', async ({}) => {
         // Missing workingDir
-        const res1 = await fetch(`${BASE_URL}/api/projects`, {
+        const res1 = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'No Dir' }),
@@ -124,7 +124,7 @@ test.describe('Projects', () => {
         expect(res1.status).toBe(400);
 
         // Missing name
-        const res2 = await fetch(`${BASE_URL}/api/projects`, {
+        const res2 = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ workingDir: '/tmp' }),

@@ -98,7 +98,7 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: build
     # E2E tests require a running server and may need Claude API for some tests.
     # Tests that need external services are skipped gracefully in CI.

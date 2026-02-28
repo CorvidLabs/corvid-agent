@@ -22,7 +22,7 @@ export async function gotoWithRetry(
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         const sep = path.includes('?') ? '&' : '?';
         await page.goto(`${path}${sep}apiKey=${E2E_API_KEY}`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('domcontentloaded');
 
         const body = await page.locator('body').textContent() ?? '';
         const rateLimited = body.includes('Too many requests');
@@ -85,7 +85,7 @@ async function fetchWithRetry(
         return res;
     }
     // Unreachable, but TypeScript needs it
-    return fetch(url, init);
+    return fetch(url, authedInit);
 }
 
 export const test = base.extend<{ api: ApiHelpers }>({
@@ -452,7 +452,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
             },
 
             async getLaunch(launchId: string) {
-                const res = await fetch(`${BASE_URL}/api/council-launches/${launchId}`);
+                const res = await authedFetch(`${BASE_URL}/api/council-launches/${launchId}`);
                 expect(res.ok).toBe(true);
                 return res.json();
             },
@@ -460,7 +460,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
             async waitForStage(launchId: string, stage: string, timeoutMs = 60_000) {
                 const start = Date.now();
                 while (Date.now() - start < timeoutMs) {
-                    const res = await fetch(`${BASE_URL}/api/council-launches/${launchId}`);
+                    const res = await authedFetch(`${BASE_URL}/api/council-launches/${launchId}`);
                     if (res.ok) {
                         const data = await res.json();
                         if (data.stage === stage) return;

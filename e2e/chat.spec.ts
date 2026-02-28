@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect , gotoWithRetry } from './fixtures';
 
 test.describe('Chat', () => {
     test.describe.configure({ mode: 'serial' });
@@ -9,7 +9,7 @@ test.describe('Chat', () => {
     });
 
     async function setupChat(page: import('@playwright/test').Page) {
-        await page.goto('/dashboard');
+        await gotoWithRetry(page, '/dashboard');
         await page.waitForLoadState('networkidle');
 
         // Wait for dashboard to fully render with AlgoChat section

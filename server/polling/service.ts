@@ -474,7 +474,18 @@ export class MentionPollingService {
             });
             if (fetchResult.exitCode !== 0) return;
 
-            // Compare HEAD with origin/main
+            // Only auto-update if we're on the main branch
+            const currentBranch = Bun.spawnSync(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
+                cwd: import.meta.dir + '/..',
+                stdout: 'pipe',
+            }).stdout.toString().trim();
+
+            if (currentBranch !== 'main') {
+                log.debug('Skipping auto-update — not on main branch', { branch: currentBranch });
+                return;
+            }
+
+            // Compare local main with origin/main
             const localHash = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe',
@@ -540,7 +551,23 @@ export class MentionPollingService {
                 log.info('bun install completed successfully');
             }
 
-            log.info('Git pull successful — exiting for restart');
+            // Verify pull actually advanced HEAD to origin/main
+            const newLocalHash = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], {
+                cwd: import.meta.dir + '/..',
+                stdout: 'pipe',
+            }).stdout.toString().trim();
+
+            if (newLocalHash === localHash) {
+                log.warn('Git pull did not advance HEAD — skipping restart to avoid loop', {
+                    hash: localHash.slice(0, 8),
+                });
+                return;
+            }
+
+            log.info('Git pull successful — exiting for restart', {
+                oldHash: localHash.slice(0, 8),
+                newHash: newLocalHash.slice(0, 8),
+            });
             // Exit with code 75 (EX_TEMPFAIL) to signal "restart me"
             // The run-loop.sh wrapper and launchd both treat non-zero as restartable
             process.exit(75);
