@@ -1,4 +1,4 @@
-import { test, expect , authedFetch } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test';
  */
 async function gotoMarketplace(page: Page, maxRetries = 3): Promise<void> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-        await page.goto('/marketplace');
+        await gotoWithRetry(page, '/marketplace');
         await page.waitForLoadState('networkidle');
 
         const body = await page.locator('body').textContent();
@@ -20,7 +20,7 @@ async function gotoMarketplace(page: Page, maxRetries = 3): Promise<void> {
         await page.waitForTimeout(wait * 1000 + 500);
     }
     // Final attempt — let assertion errors propagate
-    await page.goto('/marketplace');
+    await gotoWithRetry(page, '/marketplace');
     await page.waitForLoadState('networkidle');
 }
 

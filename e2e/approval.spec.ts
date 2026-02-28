@@ -1,4 +1,4 @@
-import { test, expect , authedFetch } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -161,7 +161,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
      */
     async function navigateToSession(page: import('@playwright/test').Page, sid: string) {
         await installWsHooks(page);
-        await page.goto(`/sessions/${sid}`);
+        await gotoWithRetry(page, `/sessions/${sid}`);
         await page.waitForLoadState('networkidle');
         // Wait for the session view to render
         await expect(page.locator('.session-view')).toBeVisible({ timeout: 10_000 });

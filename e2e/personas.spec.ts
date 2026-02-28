@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures';
+import { test, expect , gotoWithRetry } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /** Navigate to personas page, retrying on 429 or empty agent list (component data fetch rate-limited). */
 async function gotoPersonas(page: Page, agentName: string, maxRetries = 5): Promise<void> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto('/personas');
+        await gotoWithRetry(page, '/personas');
         await page.waitForLoadState('networkidle');
 
         const body = await page.locator('body').textContent() ?? '';

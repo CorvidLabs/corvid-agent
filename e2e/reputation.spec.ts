@@ -1,4 +1,4 @@
-import { test, expect , authedFetch } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
  */
 async function gotoReputation(page: Page, maxRetries = 3): Promise<void> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        await page.goto('/reputation');
+        await gotoWithRetry(page, '/reputation');
         await page.waitForLoadState('networkidle');
 
         const body = await page.locator('body').textContent() ?? '';
