@@ -1,5 +1,9 @@
 /**
- * Migration 004: Identity verification tiers and marketplace escrow.
+ * Migration 053: Identity verification tiers and marketplace escrow.
+ *
+ * NOTE: File-based migrations must use version numbers > 52 because
+ * the legacy inline migration system (server/db/schema.ts) occupies
+ * versions 1–52.
  *
  * Adds agent_identity table for verification tiers and
  * escrow_transactions table for marketplace escrow flow.
