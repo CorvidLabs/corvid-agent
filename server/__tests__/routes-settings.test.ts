@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleSettingsRoutes } from '../routes/settings';
+import type { RequestContext } from '../middleware/guards';
 
 let db: Database;
 
@@ -15,6 +16,14 @@ function fakeReq(method: string, path: string, body?: unknown): { req: Request; 
     return { req: new Request(url.toString(), opts), url };
 }
 
+function adminContext(): RequestContext {
+    return { authenticated: true, role: 'admin' };
+}
+
+function userContext(): RequestContext {
+    return { authenticated: true, role: 'user' };
+}
+
 beforeAll(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
@@ -24,9 +33,9 @@ beforeAll(() => {
 afterAll(() => db.close());
 
 describe('Settings Routes', () => {
-    it('GET /api/settings returns creditConfig and system stats', async () => {
+    it('GET /api/settings returns creditConfig and system stats for admin', async () => {
         const { req, url } = fakeReq('GET', '/api/settings');
-        const res = handleSettingsRoutes(req, url, db);
+        const res = handleSettingsRoutes(req, url, db, adminContext());
         expect(res).not.toBeNull();
         const resolved = await Promise.resolve(res!);
         expect(resolved.status).toBe(200);
@@ -38,6 +47,18 @@ describe('Settings Routes', () => {
         expect(typeof data.system.agentCount).toBe('number');
         expect(typeof data.system.projectCount).toBe('number');
         expect(typeof data.system.sessionCount).toBe('number');
+    });
+
+    it('GET /api/settings omits system metadata for non-admin users', async () => {
+        const { req, url } = fakeReq('GET', '/api/settings');
+        const res = handleSettingsRoutes(req, url, db, userContext());
+        expect(res).not.toBeNull();
+        const resolved = await Promise.resolve(res!);
+        expect(resolved.status).toBe(200);
+        const data = await resolved.json();
+        expect(data.creditConfig).toBeDefined();
+        expect(data.creditConfig.credits_per_algo).toBeDefined();
+        expect(data.system).toBeUndefined();
     });
 
     it('PUT /api/settings/credits updates credit config keys', async () => {
@@ -54,7 +75,7 @@ describe('Settings Routes', () => {
 
         // Verify persisted
         const { req: gReq, url: gUrl } = fakeReq('GET', '/api/settings');
-        const gRes = await Promise.resolve(handleSettingsRoutes(gReq, gUrl, db)!);
+        const gRes = await Promise.resolve(handleSettingsRoutes(gReq, gUrl, db, adminContext())!);
         const settings = await gRes.json();
         expect(settings.creditConfig.credits_per_algo).toBe('2000');
         expect(settings.creditConfig.low_credit_threshold).toBe('100');

@@ -371,6 +371,10 @@ describe('requiresAdminRole', () => {
         expect(requiresAdminRole('/api/projects')).toBe(false);
     });
 
+    it('returns true for /api/settings/credits', () => {
+        expect(requiresAdminRole('/api/settings/credits')).toBe(true);
+    });
+
     it('returns true for credit grant endpoint', () => {
         expect(requiresAdminRole('/api/wallets/ABCDEFGH1234567890ABCDEFGH1234567890ABCDEFGH1234567890ABCDEF/credits')).toBe(true);
     });
