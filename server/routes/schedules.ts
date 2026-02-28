@@ -15,6 +15,10 @@ import { getNextCronDate } from '../scheduler/cron-parser';
 import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
 import { json, handleRouteError, badRequest, safeNumParam } from '../lib/response';
+import { scanForInjection } from '../lib/prompt-injection';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('ScheduleRoutes');
 
 export function handleScheduleRoutes(
     req: Request,
@@ -106,10 +110,39 @@ export function handleScheduleRoutes(
     return null;
 }
 
+/**
+ * Scan all prompt/description fields in schedule actions for injection patterns.
+ * Returns an error message if blocked, or null if safe.
+ */
+function scanScheduleActions(actions: Array<{ prompt?: string; description?: string; message?: string }>): string | null {
+    for (const action of actions) {
+        for (const field of ['prompt', 'description', 'message'] as const) {
+            const value = action[field];
+            if (!value) continue;
+            const result = scanForInjection(value);
+            if (result.blocked) {
+                const categories = [...new Set(result.matches.map((m) => m.category))].join(', ');
+                log.warn('Schedule action blocked by injection scanner', {
+                    field,
+                    confidence: result.confidence,
+                    categories,
+                    preview: value.slice(0, 80),
+                });
+                return `Schedule action ${field} was rejected: suspicious content detected (${categories})`;
+            }
+        }
+    }
+    return null;
+}
+
 async function handleCreateSchedule(req: Request, db: Database): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateScheduleSchema);
         validateScheduleFrequency(data.cronExpression, data.intervalMs);
+
+        const injectionError = scanScheduleActions(data.actions);
+        if (injectionError) return badRequest(injectionError);
+
         const schedule = createSchedule(db, data);
 
         // Compute and persist next_run_at so the scheduler picks it up
@@ -145,6 +178,11 @@ async function handleUpdateSchedule(req: Request, db: Database, id: string): Pro
             const effectiveCron = data.cronExpression ?? existing.cronExpression;
             const effectiveInterval = data.intervalMs ?? existing.intervalMs;
             validateScheduleFrequency(effectiveCron, effectiveInterval ?? undefined);
+        }
+
+        if (data.actions) {
+            const injectionError = scanScheduleActions(data.actions);
+            if (injectionError) return badRequest(injectionError);
         }
 
         const schedule = updateSchedule(db, id, data);

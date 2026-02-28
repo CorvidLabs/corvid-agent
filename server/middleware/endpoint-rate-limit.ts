@@ -121,6 +121,15 @@ export function loadEndpointRateLimitConfig(): EndpointRateLimitConfig {
                     admin: { max: safeMutation, windowMs: ONE_MINUTE },
                 },
             },
+            // Credit grant is admin-only but gets extra rate limiting as defense-in-depth
+            {
+                pattern: 'POST /api/wallets/*',
+                tiers: {
+                    public: { max: 0, windowMs: ONE_MINUTE },
+                    user: { max: 0, windowMs: ONE_MINUTE },
+                    admin: { max: 5, windowMs: ONE_MINUTE },
+                },
+            },
         ],
         exemptPaths: ['/api/health', '/webhooks/github', '/ws', '/.well-known/agent-card.json'],
     };
