@@ -89,6 +89,11 @@ html, body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Scale up for 1080p displays — the 8px base is too small at this resolution */
+@media (max-height: 1200px) and (min-width: 769px) {
+    html { font-size: 10px; }
+}
+
 a {
     color: inherit;
 }
