@@ -57,6 +57,7 @@ import {
     applyGuards,
     createRequestContext,
     requiresAdminRole,
+    type RequestContext,
 } from '../middleware/guards';
 import type { SandboxManager } from '../sandbox/manager';
 import type { MarketplaceService } from '../marketplace/service';
@@ -201,7 +202,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -221,6 +222,7 @@ async function handleRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context: RequestContext,
     processManager: ProcessManager,
     algochatBridge: AlgoChatBridge | null,
     agentWalletService?: AgentWalletService | null,
@@ -273,7 +275,7 @@ async function handleRoutes(
     const systemLogResponse = handleSystemLogRoutes(req, url, db);
     if (systemLogResponse) return systemLogResponse;
 
-    const settingsResponse = await handleSettingsRoutes(req, url, db);
+    const settingsResponse = await handleSettingsRoutes(req, url, db, context);
     if (settingsResponse) return settingsResponse;
 
     const sessionResponse = await handleSessionRoutes(req, url, db, processManager);
