@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { ApiService } from '../../core/services/api.service';
 import { AllowlistService } from '../../core/services/allowlist.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { firstValueFrom } from 'rxjs';
@@ -107,6 +108,11 @@ interface WalletMessage {
                                             Allow
                                         </button>
                                     }
+                                    <button
+                                        class="btn btn--small btn--grant"
+                                        (click)="openGrant($event, wallet.address)">
+                                        Grant
+                                    </button>
                                     <span class="expand-icon">{{ expandedWallet() === wallet.address ? '&#x25B2;' : '&#x25BC;' }}</span>
                                 </div>
                             </div>
@@ -153,6 +159,35 @@ interface WalletMessage {
                             }
                         </div>
                     }
+                </div>
+            }
+
+            @if (grantAddress()) {
+                <div class="modal-overlay" (click)="closeGrant()" (keydown.escape)="closeGrant()">
+                    <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-label="Grant credits">
+                        <div class="modal__title">Grant Credits</div>
+                        <div class="modal__address">{{ truncateAddress(grantAddress()!) }}</div>
+                        <div class="modal__field">
+                            <label class="modal__label">Amount</label>
+                            <input class="input" type="number" min="1" step="1" placeholder="100"
+                                #grantAmountInput
+                                (keydown.enter)="submitGrant(grantAmountInput.value, grantRefInput.value)" />
+                        </div>
+                        <div class="modal__field">
+                            <label class="modal__label">Reference (optional)</label>
+                            <input class="input" type="text" placeholder="e.g. bonus, promo"
+                                #grantRefInput
+                                (keydown.enter)="submitGrant(grantAmountInput.value, grantRefInput.value)" />
+                        </div>
+                        <div class="modal__actions">
+                            <button class="btn btn--small btn--primary"
+                                [disabled]="grantBusy()"
+                                (click)="submitGrant(grantAmountInput.value, grantRefInput.value)">
+                                {{ grantBusy() ? 'Granting...' : 'Grant' }}
+                            </button>
+                            <button class="btn btn--small btn--ghost" (click)="closeGrant()">Cancel</button>
+                        </div>
+                    </div>
                 </div>
             }
         </div>
@@ -276,6 +311,28 @@ interface WalletMessage {
             white-space: pre-wrap; word-break: break-word;
         }
 
+        .btn--grant { color: var(--accent-green); border-color: var(--accent-green); }
+        .btn--grant:hover { background: rgba(0, 255, 136, 0.1); box-shadow: 0 0 8px rgba(0, 255, 136, 0.2); }
+
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal {
+            background: var(--bg-surface); border: 1px solid var(--accent-cyan);
+            border-radius: var(--radius-lg); padding: 1.5rem; width: 360px; max-width: 90vw;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        .modal__title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem; }
+        .modal__address {
+            font-family: monospace; font-size: 0.75rem; color: var(--accent-cyan);
+            margin-bottom: 1rem; word-break: break-all;
+        }
+        .modal__field { margin-bottom: 0.75rem; }
+        .modal__label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .modal__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
         .load-more { margin-top: 0.5rem; width: 100%; }
 
         @media (max-width: 600px) {
@@ -288,6 +345,7 @@ interface WalletMessage {
 export class WalletViewerComponent implements OnInit, OnDestroy {
     private readonly api = inject(ApiService);
     private readonly allowlistService = inject(AllowlistService);
+    private readonly notifications = inject(NotificationService);
     private readonly ws = inject(WebSocketService);
 
     readonly wallets = signal<WalletSummary[]>([]);
@@ -297,6 +355,8 @@ export class WalletViewerComponent implements OnInit, OnDestroy {
     readonly messages = signal<WalletMessage[]>([]);
     readonly messagesLoading = signal(false);
     readonly messageTotal = signal(0);
+    readonly grantAddress = signal<string | null>(null);
+    readonly grantBusy = signal(false);
 
     readonly filteredWallets = computed(() => {
         const query = this.searchQuery().toLowerCase();
@@ -384,6 +444,41 @@ export class WalletViewerComponent implements OnInit, OnDestroy {
         );
         this.messages.update((msgs) => [...msgs, ...result.messages]);
         this.messageTotal.set(result.total);
+    }
+
+    openGrant(event: Event, address: string): void {
+        event.stopPropagation();
+        this.grantAddress.set(address);
+    }
+
+    closeGrant(): void {
+        this.grantAddress.set(null);
+    }
+
+    async submitGrant(amountStr: string, reference: string): Promise<void> {
+        const address = this.grantAddress();
+        if (!address) return;
+        const amount = parseInt(amountStr, 10);
+        if (!amount || amount <= 0) {
+            this.notifications.error('Enter a positive amount');
+            return;
+        }
+        this.grantBusy.set(true);
+        try {
+            await firstValueFrom(
+                this.api.post<{ ok: boolean }>(
+                    `/wallets/${encodeURIComponent(address)}/credits`,
+                    { amount, reference: reference.trim() || undefined },
+                ),
+            );
+            this.notifications.success(`Granted ${amount} credits to ${address.slice(0, 8)}...`);
+            this.closeGrant();
+            this.loadWallets();
+        } catch {
+            this.notifications.error('Failed to grant credits');
+        } finally {
+            this.grantBusy.set(false);
+        }
     }
 
     async addToAllowlist(event: Event, address: string): Promise<void> {

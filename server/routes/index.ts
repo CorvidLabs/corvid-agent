@@ -38,6 +38,7 @@ import type { WorkTaskService } from '../work/service';
 import { listConversations } from '../db/sessions';
 import { searchAgentMessages } from '../db/agent-messages';
 import { searchAlgoChatMessages, getWalletSummaries, getWalletMessages } from '../db/algochat-messages';
+import { grantCredits, getBalance } from '../db/credits';
 import { backupDatabase } from '../db/backup';
 import { updateMemoryTxid } from '../db/agent-memories';
 import { encryptMemoryContent } from '../lib/crypto';
@@ -551,6 +552,27 @@ async function handleRoutes(
         const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const result = getWalletMessages(db, address, limit, offset);
         return json(result);
+    }
+
+    // Wallet viewer — grant credits to a wallet
+    const walletCreditsMatch = url.pathname.match(/^\/api\/wallets\/([^/]+)\/credits$/);
+    if (walletCreditsMatch && req.method === 'POST') {
+        const address = decodeURIComponent(walletCreditsMatch[1]);
+        try {
+            const body = await req.json() as { amount?: number; reference?: string };
+            const amount = body.amount;
+            if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
+                return json({ error: 'amount must be a positive number' }, 400);
+            }
+            if (!address || address.length < 58) {
+                return json({ error: 'Invalid wallet address' }, 400);
+            }
+            grantCredits(db, address, Math.round(amount), body.reference);
+            const balance = getBalance(db, address);
+            return json({ ok: true, balance });
+        } catch (err) {
+            return handleRouteError(err);
+        }
     }
 
     return null;
