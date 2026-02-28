@@ -23,7 +23,8 @@ export type CreditTransactionType =
     | 'reserve'         // Reserved for group messages
     | 'release'         // Released from reserve
     | 'grant'           // Free credits (first message, admin grant)
-    | 'refund';         // Refund (session error, etc.)
+    | 'refund'          // Refund (session error, etc.)
+    | 'usdc_deposit';   // USDC deposit → credits
 
 export interface CreditTransaction {
     id: number;
@@ -39,6 +40,7 @@ export interface CreditTransaction {
 
 export interface CreditConfig {
     creditsPerAlgo: number;
+    creditsPerUsdc: number;
     lowCreditThreshold: number;
     reservePerGroupMessage: number;
     creditsPerTurn: number;
@@ -53,6 +55,7 @@ export function getCreditConfig(db: Database): CreditConfig {
     const map = new Map(rows.map((r) => [r.key, r.value]));
     return {
         creditsPerAlgo: parseInt(map.get('credits_per_algo') ?? '1000', 10),
+        creditsPerUsdc: parseInt(map.get('credits_per_usdc') ?? '100', 10),
         lowCreditThreshold: parseInt(map.get('low_credit_threshold') ?? '50', 10),
         reservePerGroupMessage: parseInt(map.get('reserve_per_group_message') ?? '10', 10),
         creditsPerTurn: parseInt(map.get('credits_per_turn') ?? '1', 10),
@@ -68,6 +71,7 @@ export function getCreditConfig(db: Database): CreditConfig {
 export function initCreditConfigFromEnv(db: Database): void {
     const envMappings: [string, string][] = [
         ['CREDITS_PER_ALGO', 'credits_per_algo'],
+        ['CREDITS_PER_USDC', 'credits_per_usdc'],
         ['LOW_CREDIT_THRESHOLD', 'low_credit_threshold'],
         ['RESERVE_PER_GROUP_MESSAGE', 'reserve_per_group_message'],
         ['CREDITS_PER_TURN', 'credits_per_turn'],
@@ -458,4 +462,109 @@ export function maybeGrantFirstTimeCredits(db: Database, walletAddress: string):
         amount: config.freeCreditsOnFirstMessage,
     });
     return config.freeCreditsOnFirstMessage;
+}
+
+// ─── USDC deposit operations ─────────────────────────────────────────────
+
+/**
+ * Convert a USDC deposit to credits.
+ * USDC amounts are in micro-units (1 USDC = 1,000,000 micro-USDC).
+ *
+ * @param walletAddress The recipient wallet
+ * @param usdcMicro The USDC amount in micro-units
+ * @param txid The on-chain transaction ID
+ * @returns The number of credits added
+ */
+export function depositUsdc(
+    db: Database,
+    walletAddress: string,
+    usdcMicro: number,
+    txid: string,
+): number {
+    const config = getCreditConfig(db);
+    const usdcAmount = usdcMicro / 1_000_000;
+    const creditsToAdd = Math.floor(usdcAmount * config.creditsPerUsdc);
+
+    if (creditsToAdd <= 0) {
+        log.debug('USDC deposit too small for credits', { walletAddress, usdcMicro });
+        return 0;
+    }
+
+    // Check for duplicate txid (idempotency)
+    const existing = db.query(
+        `SELECT id FROM credit_transactions WHERE txid = ? AND type = 'usdc_deposit'`
+    ).get(txid) as { id: number } | null;
+    if (existing) {
+        log.debug('USDC deposit already processed', { txid });
+        return 0;
+    }
+
+    const deposit = db.transaction(() => {
+        ensureLedgerRow(db, walletAddress);
+
+        db.query(
+            `UPDATE credit_ledger
+             SET credits = credits + ?,
+                 total_purchased = total_purchased + ?,
+                 updated_at = datetime('now')
+             WHERE wallet_address = ?`
+        ).run(creditsToAdd, creditsToAdd, walletAddress);
+
+        const balance = getBalance(db, walletAddress);
+        recordTransaction(db, walletAddress, 'usdc_deposit', creditsToAdd, balance.credits, `${usdcAmount} USDC`, txid);
+
+        return creditsToAdd;
+    });
+
+    const added = deposit();
+
+    log.info('USDC deposit converted to credits', {
+        walletAddress: walletAddress.slice(0, 8) + '...',
+        usdcMicro,
+        creditsAdded: added,
+    });
+
+    recordAudit(db, 'credit_grant', 'system', 'credit_ledger', walletAddress,
+        `USDC deposit: ${usdcAmount} USDC → ${added} credits (txid: ${txid})`);
+
+    return added;
+}
+
+/**
+ * Get USDC deposit history for a wallet.
+ */
+export function getUsdcDepositHistory(
+    db: Database,
+    walletAddress: string,
+    limit = 20,
+): CreditTransaction[] {
+    const rows = db.query(
+        `SELECT id, wallet_address, type, amount, balance_after, reference, txid, session_id, created_at
+         FROM credit_transactions
+         WHERE wallet_address = ? AND type = 'usdc_deposit'
+         ORDER BY created_at DESC
+         LIMIT ?`
+    ).all(walletAddress, limit) as Array<{
+        id: number;
+        wallet_address: string;
+        type: string;
+        amount: number;
+        balance_after: number;
+        reference: string | null;
+        txid: string | null;
+        session_id: string | null;
+        created_at: string;
+    }>;
+
+    return rows.map((r) => ({
+        id: r.id,
+        walletAddress: r.wallet_address,
+        type: r.type as CreditTransactionType,
+        amount: r.amount,
+        balanceAfter: r.balance_after,
+        reference: r.reference,
+        txid: r.txid,
+        sessionId: r.session_id,
+        createdAt: r.created_at,
+    }));
 }

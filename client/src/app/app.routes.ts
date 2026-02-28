@@ -172,4 +172,9 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/mcp-servers/mcp-server-list.component').then((m) => m.McpServerListComponent),
     },
+    {
+        path: 'spending',
+        loadComponent: () =>
+            import('./features/spending/spending.component').then((m) => m.SpendingComponent),
+    },
 ];

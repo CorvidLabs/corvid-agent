@@ -1,5 +1,5 @@
 import { getDb, closeDb, initDb } from './db/connection';
-import { handleRequest } from './routes/index';
+import { handleRequest, initRateLimiterDb } from './routes/index';
 import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
 import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from './routes/councils';
@@ -80,7 +80,10 @@ const startTime = Date.now();
 const db = getDb();
 
 // Run file-based migrations (v53+) — non-blocking, logs on completion
-initDb().catch((err) => {
+initDb().then(() => {
+    // Attach db to rate limiter for persistent state after migrations are applied
+    initRateLimiterDb(db);
+}).catch((err) => {
     log.error('File-based migration failed', { error: err instanceof Error ? err.message : String(err) });
 });
 

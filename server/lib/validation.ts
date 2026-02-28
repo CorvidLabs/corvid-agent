@@ -152,6 +152,11 @@ export const FundAgentSchema = z.object({
     microAlgos: z.number().min(1000, 'microAlgos must be at least 1000').max(100_000_000, 'microAlgos must be at most 100000000'),
 });
 
+export const SetSpendingCapSchema = z.object({
+    dailyLimitMicroalgos: z.number().min(0, 'dailyLimitMicroalgos must be >= 0').max(1_000_000_000, 'dailyLimitMicroalgos too large'),
+    dailyLimitUsdc: z.number().min(0, 'dailyLimitUsdc must be >= 0').max(1_000_000_000, 'dailyLimitUsdc too large').optional().default(0),
+});
+
 export const InvokeAgentSchema = z.object({
     toAgentId: z.string().min(1, 'toAgentId is required'),
     content: z.string().min(1, 'content is required'),
