@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 53;
+const SCHEMA_VERSION = 54;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1064,6 +1064,14 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_escrow_buyer ON escrow_transactions(buyer_tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_transactions(seller_tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_escrow_listing ON escrow_transactions(listing_id)`,
+    ],
+    54: [
+        // Global GitHub user allowlist — controls who can trigger agents via GitHub mentions
+        `CREATE TABLE IF NOT EXISTS github_allowlist (
+            username   TEXT PRIMARY KEY,
+            label      TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
     ],
 };
 

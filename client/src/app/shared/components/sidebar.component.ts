@@ -167,6 +167,18 @@ import { filter, Subscription } from 'rxjs';
 
                 <li class="sidebar__section"><span class="sidebar__section-label">Config</span></li>
                 <li>
+                    <a class="sidebar__link" routerLink="/allowlist" routerLinkActive="sidebar__link--active" title="AlgoChat Allowlist">
+                        <span class="sidebar__label">Allowlist</span>
+                        <span class="sidebar__abbr">Al</span>
+                    </a>
+                </li>
+                <li>
+                    <a class="sidebar__link" routerLink="/github-allowlist" routerLinkActive="sidebar__link--active" title="GitHub Allowlist">
+                        <span class="sidebar__label">GH Allowlist</span>
+                        <span class="sidebar__abbr">Gh</span>
+                    </a>
+                </li>
+                <li>
                     <a class="sidebar__link" routerLink="/wallets" routerLinkActive="sidebar__link--active" title="Wallets">
                         <span class="sidebar__label">Wallets</span>
                         <span class="sidebar__abbr">W</span>

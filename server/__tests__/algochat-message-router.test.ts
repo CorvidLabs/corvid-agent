@@ -512,11 +512,21 @@ describe('handleIncomingMessage', () => {
             expect((ch.handleCommand as ReturnType<typeof mock>).mock.calls.length).toBe(1);
         });
 
-        test('rejects messages from non-owner, non-PSK addresses', async () => {
+        test('rejects messages from non-owner, non-PSK addresses when allowlist is non-empty', async () => {
+            // Add an unrelated address to the allowlist so it's no longer open mode
+            db.exec("INSERT INTO algochat_allowlist (address, label) VALUES ('SOME_OTHER_ADDR', 'test')");
+
             await router.handleIncomingMessage(NON_OWNER_ADDR, 'Hello', 1000);
 
             expect((ch.handleCommand as ReturnType<typeof mock>).mock.calls.length).toBe(0);
             expect((pm.startProcess as ReturnType<typeof mock>).mock.calls.length).toBe(0);
+        });
+
+        test('allows messages from non-owner addresses when allowlist is empty (open mode)', async () => {
+            await router.handleIncomingMessage(NON_OWNER_ADDR, 'Hello', 1000);
+
+            // In open mode (empty allowlist), non-owners are allowed through
+            expect((ch.handleCommand as ReturnType<typeof mock>).mock.calls.length).toBe(1);
         });
     });
 
@@ -535,6 +545,9 @@ describe('handleIncomingMessage', () => {
         });
 
         test('does not emit feed event for rejected messages', async () => {
+            // Add an unrelated address to the allowlist so it's no longer open mode
+            db.exec("INSERT OR IGNORE INTO algochat_allowlist (address, label) VALUES ('SOME_OTHER_ADDR', 'test')");
+
             await router.handleIncomingMessage(NON_OWNER_ADDR, 'Hello', 1000);
 
             expect((rf.emitEvent as ReturnType<typeof mock>).mock.calls.length).toBe(0);
