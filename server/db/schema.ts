@@ -1094,26 +1094,67 @@ export function runMigrations(db: Database): void {
         | null;
     const currentVersion = row?.version ?? 0;
 
-    if (currentVersion >= SCHEMA_VERSION) return;
-
-    db.transaction(() => {
-        for (let v = currentVersion + 1; v <= SCHEMA_VERSION; v++) {
-            const statements = MIGRATIONS[v];
-            if (!statements) continue;
-            for (const sql of statements) {
-                // Skip ALTER TABLE ADD COLUMN if the column already exists
-                const alterMatch = sql.match(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
-                if (alterMatch && hasColumn(db, alterMatch[1], alterMatch[2])) {
-                    continue;
+    if (currentVersion < SCHEMA_VERSION) {
+        db.transaction(() => {
+            for (let v = currentVersion + 1; v <= SCHEMA_VERSION; v++) {
+                const statements = MIGRATIONS[v];
+                if (!statements) continue;
+                for (const sql of statements) {
+                    // Skip ALTER TABLE ADD COLUMN if the column already exists
+                    const alterMatch = sql.match(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
+                    if (alterMatch && hasColumn(db, alterMatch[1], alterMatch[2])) {
+                        continue;
+                    }
+                    db.exec(sql);
                 }
+            }
+
+            if (currentVersion === 0) {
+                db.query('INSERT INTO schema_version (version) VALUES (?)').run(SCHEMA_VERSION);
+            } else {
+                db.query('UPDATE schema_version SET version = ?').run(SCHEMA_VERSION);
+            }
+        })();
+    }
+
+    // Safety net: re-run all idempotent CREATE TABLE/INDEX IF NOT EXISTS
+    // statements regardless of version. This catches tables that were missed
+    // when the schema_version was bumped by file-based migrations before the
+    // corresponding inline migration was added (see #368).
+    reconcileTables(db);
+}
+
+const IDEMPOTENT_CREATE_TABLE = /^\s*CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\w+)/i;
+const IDEMPOTENT_CREATE_INDEX = /^\s*CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/i;
+const DROP_TABLE_RE = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)/i;
+const RENAME_TABLE_RE = /ALTER\s+TABLE\s+(\w+)\s+RENAME\s+TO\s+(\w+)/i;
+
+function reconcileTables(db: Database): void {
+    // Collect table names that are dropped or renamed away in migrations.
+    // These are transitional tables (e.g. _v2 swap pattern) that should
+    // NOT be recreated by the safety net.
+    const transient = new Set<string>();
+    for (const statements of Object.values(MIGRATIONS)) {
+        for (const sql of statements) {
+            const dropMatch = DROP_TABLE_RE.exec(sql);
+            if (dropMatch) transient.add(dropMatch[1]);
+            const renameMatch = RENAME_TABLE_RE.exec(sql);
+            if (renameMatch) transient.add(renameMatch[1]);
+        }
+    }
+
+    for (const statements of Object.values(MIGRATIONS)) {
+        for (const sql of statements) {
+            // Always reconcile CREATE INDEX IF NOT EXISTS
+            if (IDEMPOTENT_CREATE_INDEX.test(sql)) {
+                db.exec(sql);
+                continue;
+            }
+            // Only reconcile CREATE TABLE for non-transient tables
+            const tableMatch = IDEMPOTENT_CREATE_TABLE.exec(sql);
+            if (tableMatch && !transient.has(tableMatch[1])) {
                 db.exec(sql);
             }
         }
-
-        if (currentVersion === 0) {
-            db.query('INSERT INTO schema_version (version) VALUES (?)').run(SCHEMA_VERSION);
-        } else {
-            db.query('UPDATE schema_version SET version = ?').run(SCHEMA_VERSION);
-        }
-    })();
+    }
 }

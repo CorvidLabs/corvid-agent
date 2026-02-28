@@ -1,17 +1,56 @@
 /**
- * Migration 053: Identity verification tiers and marketplace escrow.
+ * Migration 053: Per-agent spending caps, persistent rate limits,
+ * identity verification tiers, and marketplace escrow.
  *
  * NOTE: File-based migrations must use version numbers > 52 because
  * the legacy inline migration system (server/db/schema.ts) occupies
  * versions 1–52.
  *
- * Adds agent_identity table for verification tiers and
- * escrow_transactions table for marketplace escrow flow.
+ * This migration mirrors ALL of inline migration 53 in schema.ts.
  */
 
 import { Database } from 'bun:sqlite';
 
 export function up(db: Database): void {
+    // ─── Per-agent spending caps ──────────────────────────────────────────
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_spending_caps (
+            agent_id              TEXT PRIMARY KEY,
+            daily_limit_microalgos INTEGER NOT NULL DEFAULT 5000000,
+            daily_limit_usdc      INTEGER NOT NULL DEFAULT 0,
+            created_at            TEXT DEFAULT (datetime('now')),
+            updated_at            TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+        )
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_daily_spending (
+            agent_id   TEXT    NOT NULL,
+            date       TEXT    NOT NULL,
+            algo_micro INTEGER NOT NULL DEFAULT 0,
+            usdc_micro INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (agent_id, date),
+            FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+        )
+    `);
+
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_daily_spending_date ON agent_daily_spending(date)`);
+
+    // ─── Persistent rate limits ───────────────────────────────────────────
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS rate_limit_state (
+            key           TEXT    NOT NULL,
+            bucket        TEXT    NOT NULL,
+            window_start  INTEGER NOT NULL,
+            request_count INTEGER NOT NULL DEFAULT 1,
+            updated_at    TEXT    DEFAULT (datetime('now')),
+            PRIMARY KEY (key, bucket, window_start)
+        )
+    `);
+
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_rate_limit_window ON rate_limit_state(window_start)`);
+
     // ─── Agent Identity Verification ─────────────────────────────────────
     db.exec(`
         CREATE TABLE IF NOT EXISTS agent_identity (
@@ -51,4 +90,7 @@ export function up(db: Database): void {
 export function down(db: Database): void {
     db.exec('DROP TABLE IF EXISTS escrow_transactions');
     db.exec('DROP TABLE IF EXISTS agent_identity');
+    db.exec('DROP TABLE IF EXISTS rate_limit_state');
+    db.exec('DROP TABLE IF EXISTS agent_daily_spending');
+    db.exec('DROP TABLE IF EXISTS agent_spending_caps');
 }
