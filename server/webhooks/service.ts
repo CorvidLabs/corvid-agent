@@ -22,6 +22,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { scanGitHubContent } from '../lib/prompt-injection';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { NotFoundError } from '../lib/errors';
 
@@ -494,6 +495,10 @@ export class WebhookService {
             ].filter(Boolean).join('\n');
         }
 
+        // Scan for social engineering / injection in the mention body
+        const scan = scanGitHubContent(mentionBody);
+        const warningBlock = scan.warning ? `\n\n${scan.warning}\n` : '';
+
         const instructions = [
             ``,
             `## Instructions`,
@@ -509,7 +514,7 @@ export class WebhookService {
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 
-        return context + instructions;
+        return context + warningBlock + instructions;
     }
 
     /**

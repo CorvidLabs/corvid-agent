@@ -24,6 +24,7 @@ import {
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { scanGitHubContent } from '../lib/prompt-injection';
 import { DedupService } from '../lib/dedup';
 import { buildSafeGhEnv } from '../lib/env';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
@@ -1361,6 +1362,10 @@ export class MentionPollingService {
             `4. Post your reply using: \`${replyCmd}\``,
         ];
 
+        // Scan for social engineering / injection in the mention body
+        const scan = scanGitHubContent(mention.body);
+        const warningBlock = scan.warning ? `\n\n${scan.warning}\n` : '';
+
         const instructions = [
             ``,
             `## Instructions`,
@@ -1382,7 +1387,7 @@ export class MentionPollingService {
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 
-        return context + instructions;
+        return context + warningBlock + instructions;
     }
 
     /**
@@ -1407,6 +1412,10 @@ export class MentionPollingService {
             mention.body,
             '```',
         ].join('\n');
+
+        // Scan for social engineering / injection in the review body
+        const scan = scanGitHubContent(mention.body);
+        const warningBlock = scan.warning ? `\n\n${scan.warning}\n` : '';
 
         const instructions = [
             ``,
@@ -1445,7 +1454,7 @@ export class MentionPollingService {
             `- Be concise, helpful, and professional.`,
         ].join('\n');
 
-        return context + instructions;
+        return context + warningBlock + instructions;
     }
 
     private async runGh(args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
