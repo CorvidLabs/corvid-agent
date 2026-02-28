@@ -2,7 +2,7 @@
  * Marketplace routes — Listing CRUD, search, reviews, federation.
  */
 import type { Database } from 'bun:sqlite';
-import type { MarketplaceService } from '../marketplace/service';
+import { type MarketplaceService, VerificationGateError } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
 import type {
     ListingCategory,
@@ -161,6 +161,9 @@ async function handleUpdateListing(
         return listing ? json(listing) : notFound('Listing not found');
     } catch (err) {
         if (err instanceof ValidationError) return badRequest(err.detail);
+        if (err instanceof VerificationGateError) {
+            return json({ error: err.message, tier: err.tier, required: err.required }, 403);
+        }
         return handleRouteError(err);
     }
 }

@@ -101,9 +101,8 @@ describe('Marketplace Verification Gate', () => {
         });
         expect(listing.status).toBe('draft');
 
-        // Try to publish — should be blocked
-        const result = svc.updateListing(listing.id, { status: 'published' });
-        expect(result).toBeNull();
+        // Try to publish — should be blocked by verification gate
+        expect(() => svc.updateListing(listing.id, { status: 'published' })).toThrow('Publishing blocked');
 
         // Verify still in draft
         const check = svc.getListing(listing.id);

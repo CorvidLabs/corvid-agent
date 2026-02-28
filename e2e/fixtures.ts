@@ -174,6 +174,13 @@ export const test = base.extend<{ api: ApiHelpers }>({
             },
 
             async seedMarketplaceListing(agentId: string, data: Record<string, unknown> = {}) {
+                // Ensure the agent meets the verification gate for publishing
+                await fetchWithRetry(`${BASE_URL}/api/reputation/identity/${agentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tier: 'GITHUB_VERIFIED', dataHash: 'e2e-test' }),
+                });
+
                 const res = await fetchWithRetry(`${BASE_URL}/api/marketplace/listings`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

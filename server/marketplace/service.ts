@@ -22,6 +22,21 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('Marketplace');
 
+/**
+ * Error thrown when a listing update is blocked by the verification gate.
+ */
+export class VerificationGateError extends Error {
+    tier: VerificationTier;
+    required: VerificationTier;
+
+    constructor(tier: VerificationTier, required: VerificationTier) {
+        super(`Publishing blocked: agent tier ${tier} does not meet required ${required}`);
+        this.name = 'VerificationGateError';
+        this.tier = tier;
+        this.required = required;
+    }
+}
+
 // ─── Row Mappers ─────────────────────────────────────────────────────────────
 
 function recordToListing(row: ListingRecord): MarketplaceListing {
@@ -140,7 +155,7 @@ export class MarketplaceService {
                 log.warn('Publishing blocked: insufficient verification tier', {
                     id, agentId: existing.agentId, tier: check.tier, required: check.required,
                 });
-                return null;
+                throw new VerificationGateError(check.tier, check.required);
             }
         }
 
