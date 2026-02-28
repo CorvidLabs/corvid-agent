@@ -259,10 +259,10 @@ describe('baseline migration (001_baseline.ts)', () => {
     });
 
     test('produces same schema as legacy runMigrations', async () => {
-        // Run ONLY the baseline migration (001) on db1 — not newer migrations
+        // Run ALL file-based migrations on db1 (baseline + incremental)
         const db1 = new Database(':memory:');
         db1.exec('PRAGMA foreign_keys = ON');
-        await migrateUp(db1, 1);
+        await migrateUp(db1);
 
         // Run legacy migration on db2
         const db2 = new Database(':memory:');
