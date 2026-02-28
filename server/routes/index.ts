@@ -73,6 +73,11 @@ function getAuthConfig(): AuthConfig {
     return authConfig;
 }
 
+/** Reset cached auth config — for test isolation only. */
+export function resetAuthConfigForTest(): void {
+    authConfig = null;
+}
+
 // Load rate limiters once at module level
 const rateLimiter = new RateLimiter(loadRateLimitConfig());
 const endpointRateLimiter = new EndpointRateLimiter(loadEndpointRateLimitConfig());

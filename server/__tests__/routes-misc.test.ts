@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
-import { handleRequest } from '../routes/index';
+import { handleRequest, resetAuthConfigForTest } from '../routes/index';
 import type { ProcessManager } from '../process/manager';
 
 /**
@@ -44,6 +44,10 @@ function createMockPM(overrides?: Record<string, unknown>): ProcessManager {
 }
 
 beforeAll(() => {
+    // Ensure no API_KEY leak from prior test files (e.g. crypto-audit rotateApiKey sets process.env.API_KEY)
+    delete process.env.API_KEY;
+    resetAuthConfigForTest();
+
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
