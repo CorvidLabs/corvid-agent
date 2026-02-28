@@ -192,7 +192,7 @@ export function getWalletMessages(
     ).get(address) as { cnt: number };
 
     const rows = db.query(
-        `SELECT * FROM algochat_messages WHERE participant = ? ORDER BY created_at ASC LIMIT ? OFFSET ?`,
+        `SELECT * FROM algochat_messages WHERE participant = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     ).all(address, limit, offset) as AlgoChatMessageRow[];
 
     return { messages: rows.map(rowToMessage), total: countRow.cnt };
