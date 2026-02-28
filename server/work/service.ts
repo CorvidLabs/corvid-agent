@@ -17,6 +17,7 @@ import {
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
+import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
@@ -567,6 +568,35 @@ export class WorkTaskService {
         } catch (err) {
             passed = false;
             outputs.push(`=== Test Runner Error ===\n${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        // Security scan: check git diff for unapproved external fetch calls
+        try {
+            const diffProc = Bun.spawn(['git', 'diff', 'main...HEAD'], {
+                cwd: workingDir,
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+            const diffOutput = await new Response(diffProc.stdout).text();
+            await diffProc.exited;
+
+            if (diffOutput.trim()) {
+                const scanResult = scanDiff(diffOutput);
+                if (scanResult.hasUnapprovedFetches) {
+                    passed = false;
+                    outputs.push(formatScanReport(scanResult));
+                    log.warn('Security scan detected unapproved fetch calls', {
+                        findings: scanResult.findings.map((f) => `${f.domain} (${f.pattern})`),
+                    });
+                } else {
+                    outputs.push('=== Security Scan Passed ===');
+                }
+            }
+        } catch (err) {
+            // Non-fatal: log but don't block — prefer false negatives over broken validation
+            log.warn('Security scan error', {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
 
         return { passed, output: outputs.join('\n\n') };
