@@ -61,6 +61,16 @@ function setupDb(): Database {
         )
     `);
 
+    d.exec(`
+        CREATE TABLE IF NOT EXISTS agent_identity (
+            agent_id               TEXT PRIMARY KEY,
+            tier                   TEXT NOT NULL DEFAULT 'UNVERIFIED',
+            verified_at            TEXT DEFAULT NULL,
+            verification_data_hash TEXT DEFAULT NULL,
+            updated_at             TEXT DEFAULT (datetime('now'))
+        )
+    `);
+
     return d;
 }
 
@@ -71,7 +81,7 @@ describe('MarketplaceService', () => {
 
     beforeEach(() => {
         db = setupDb();
-        svc = new MarketplaceService(db);
+        svc = new MarketplaceService(db, 'UNVERIFIED');
     });
 
     // ─── Listings ────────────────────────────────────────────────────────────

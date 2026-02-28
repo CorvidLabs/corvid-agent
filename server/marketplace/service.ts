@@ -16,6 +16,8 @@ import type {
     ListingRecord,
     ReviewRecord,
 } from './types';
+import { IdentityVerification } from '../reputation/identity-verification';
+import type { VerificationTier } from '../reputation/identity-verification';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('Marketplace');
@@ -57,14 +59,42 @@ function recordToReview(row: ReviewRecord): MarketplaceReview {
 
 // ─── Service ─────────────────────────────────────────────────────────────────
 
+/** Default minimum verification tier required to publish a listing */
+const DEFAULT_MIN_LISTING_TIER: VerificationTier = 'GITHUB_VERIFIED';
+
 export class MarketplaceService {
     private db: Database;
+    private identity: IdentityVerification;
+    private minListingTier: VerificationTier;
 
-    constructor(db: Database) {
+    constructor(db: Database, minListingTier: VerificationTier = DEFAULT_MIN_LISTING_TIER) {
         this.db = db;
+        this.identity = new IdentityVerification(db);
+        this.minListingTier = minListingTier;
     }
 
     // ─── Listings ────────────────────────────────────────────────────────────
+
+    /**
+     * Check if an agent meets the minimum verification tier to publish.
+     */
+    canPublish(agentId: string): { allowed: boolean; tier: VerificationTier; required: VerificationTier } {
+        const tier = this.identity.getTier(agentId);
+        return {
+            allowed: this.identity.meetsMinimumTier(tier, this.minListingTier),
+            tier,
+            required: this.minListingTier,
+        };
+    }
+
+    /**
+     * Get the verification tier for a listing's agent.
+     */
+    getListingVerificationTier(listingId: string): VerificationTier | null {
+        const listing = this.getListing(listingId);
+        if (!listing) return null;
+        return this.identity.getTier(listing.agentId);
+    }
 
     createListing(input: CreateListingInput): MarketplaceListing {
         const id = crypto.randomUUID();
@@ -102,6 +132,17 @@ export class MarketplaceService {
     updateListing(id: string, input: UpdateListingInput): MarketplaceListing | null {
         const existing = this.getListing(id);
         if (!existing) return null;
+
+        // Enforce verification gate when publishing
+        if (input.status === 'published' && existing.status !== 'published') {
+            const check = this.canPublish(existing.agentId);
+            if (!check.allowed) {
+                log.warn('Publishing blocked: insufficient verification tier', {
+                    id, agentId: existing.agentId, tier: check.tier, required: check.required,
+                });
+                return null;
+            }
+        }
 
         const updates: string[] = [];
         const values: SQLQueryBindings[] = [];
@@ -156,27 +197,27 @@ export class MarketplaceService {
         const limit = params.limit ?? 20;
         const offset = params.offset ?? 0;
 
-        const conditions: string[] = ["status = 'published'"];
+        const conditions: string[] = ["ml.status = 'published'"];
         const values: SQLQueryBindings[] = [];
 
         if (params.category) {
-            conditions.push('category = ?');
+            conditions.push('ml.category = ?');
             values.push(params.category);
         }
 
         if (params.pricingModel) {
-            conditions.push('pricing_model = ?');
+            conditions.push('ml.pricing_model = ?');
             values.push(params.pricingModel);
         }
 
         if (params.minRating !== undefined) {
-            conditions.push('avg_rating >= ?');
+            conditions.push('ml.avg_rating >= ?');
             values.push(params.minRating);
         }
 
         if (params.tags && params.tags.length > 0) {
             // Match any of the provided tags (JSON array stored as string)
-            const tagConditions = params.tags.map(() => "tags LIKE ?");
+            const tagConditions = params.tags.map(() => "ml.tags LIKE ?");
             conditions.push(`(${tagConditions.join(' OR ')})`);
             for (const tag of params.tags) {
                 values.push(`%"${tag}"%`);
@@ -185,24 +226,33 @@ export class MarketplaceService {
 
         // Full-text search on name + description
         if (params.query) {
-            conditions.push('(name LIKE ? OR description LIKE ?)');
+            conditions.push('(ml.name LIKE ? OR ml.description LIKE ?)');
             const pattern = `%${params.query}%`;
             values.push(pattern, pattern);
         }
 
+        // Verification tier filter via LEFT JOIN on agent_identity
+        let joinClause = '';
+        if (params.minVerificationTier) {
+            joinClause = ' LEFT JOIN agent_identity ai ON ai.agent_id = ml.agent_id';
+            conditions.push("COALESCE(ai.tier, 'UNVERIFIED') = ?");
+            values.push(params.minVerificationTier);
+        }
+
+        // Prefix conditions with table alias for disambiguation
         const where = conditions.length > 0
             ? `WHERE ${conditions.join(' AND ')}`
             : '';
 
         // Count total
         const countRow = this.db.query(
-            `SELECT COUNT(*) as total FROM marketplace_listings ${where}`,
+            `SELECT COUNT(*) as total FROM marketplace_listings ml${joinClause} ${where}`,
         ).get(...values) as { total: number };
 
         // Fetch page
         const rows = this.db.query(
-            `SELECT * FROM marketplace_listings ${where}
-             ORDER BY avg_rating DESC, use_count DESC
+            `SELECT ml.* FROM marketplace_listings ml${joinClause} ${where}
+             ORDER BY ml.avg_rating DESC, ml.use_count DESC
              LIMIT ? OFFSET ?`,
         ).all(...values, limit, offset) as ListingRecord[];
 

@@ -30,6 +30,22 @@ beforeAll(() => {
     agentId = crypto.randomUUID();
     db.query("INSERT INTO agents (id, name) VALUES (?, 'Test Agent')").run(agentId);
 
+    // Create identity verification table (file-based migration 004)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_identity (
+            agent_id               TEXT PRIMARY KEY,
+            tier                   TEXT NOT NULL DEFAULT 'UNVERIFIED',
+            verified_at            TEXT DEFAULT NULL,
+            verification_data_hash TEXT DEFAULT NULL,
+            updated_at             TEXT DEFAULT (datetime('now'))
+        )
+    `);
+
+    // Set agent verification tier for marketplace gate
+    db.query(
+        "INSERT INTO agent_identity (agent_id, tier) VALUES (?, 'GITHUB_VERIFIED')",
+    ).run(agentId);
+
     marketplace = new MarketplaceService(db);
     federation = new MarketplaceFederation(db);
 });
