@@ -341,6 +341,17 @@ describe('Wallet Encryption Key Rotation', () => {
 // ══════════════════════════════════════════════════════════════════════════
 
 describe('API Key Rotation with Grace Period', () => {
+    const savedApiKey = process.env.API_KEY;
+
+    afterEach(() => {
+        // Restore original API_KEY to avoid leaking into other test files
+        if (savedApiKey === undefined) {
+            delete process.env.API_KEY;
+        } else {
+            process.env.API_KEY = savedApiKey;
+        }
+    });
+
     it('rotateApiKey generates a new key and retains old key', () => {
         const config: AuthConfig = {
             apiKey: 'original-key-12345',
@@ -483,9 +494,19 @@ describe('API Key Rotation with Grace Period', () => {
 
 describe('Encryption/Decryption Integrity', () => {
     const PASSPHRASE = 'z'.repeat(32) + '-test-passphrase';
+    const savedEncKey = process.env.WALLET_ENCRYPTION_KEY;
 
     beforeEach(() => {
         process.env.WALLET_ENCRYPTION_KEY = PASSPHRASE;
+    });
+
+    afterEach(() => {
+        // Restore original value to avoid leaking into other test files
+        if (savedEncKey === undefined) {
+            delete process.env.WALLET_ENCRYPTION_KEY;
+        } else {
+            process.env.WALLET_ENCRYPTION_KEY = savedEncKey;
+        }
     });
 
     it('encrypt then decrypt produces original plaintext', async () => {
