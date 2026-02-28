@@ -370,6 +370,15 @@ describe('requiresAdminRole', () => {
         expect(requiresAdminRole('/api/agents')).toBe(false);
         expect(requiresAdminRole('/api/projects')).toBe(false);
     });
+
+    it('returns true for credit grant endpoint', () => {
+        expect(requiresAdminRole('/api/wallets/ABCDEFGH1234567890ABCDEFGH1234567890ABCDEFGH1234567890ABCDEF/credits')).toBe(true);
+    });
+
+    it('returns false for wallet paths that are not credit grants', () => {
+        expect(requiresAdminRole('/api/wallets')).toBe(false);
+        expect(requiresAdminRole('/api/wallets/ABCD1234')).toBe(false);
+    });
 });
 
 // --- createRequestContext ---------------------------------------------------

@@ -119,5 +119,7 @@ export const ADMIN_PATHS = new Set([
 export function requiresAdminRole(pathname: string): boolean {
     if (ADMIN_PATHS.has(pathname)) return true;
     if (pathname.startsWith('/api/escalation-queue')) return true;
+    // Credit grant endpoint requires admin — prevents any authenticated user from granting themselves credits
+    if (/^\/api\/wallets\/[^/]+\/credits$/.test(pathname)) return true;
     return false;
 }
