@@ -1,10 +1,10 @@
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
 test.describe('Plugin System API', () => {
     test('GET /api/plugins returns plugin list or 503 if unavailable', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/plugins`);
+        const res = await authedFetch(`${BASE_URL}/api/plugins`);
         // Accept 200 (plugins available) or 503 (plugin system not initialized)
         expect([200, 503]).toContain(res.status);
 
@@ -21,7 +21,7 @@ test.describe('Plugin System API', () => {
     });
 
     test('POST /api/plugins/load rejects missing packageName', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/plugins/load`, {
+        const res = await authedFetch(`${BASE_URL}/api/plugins/load`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -31,7 +31,7 @@ test.describe('Plugin System API', () => {
     });
 
     test('POST /api/plugins/load rejects nonexistent package', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/plugins/load`, {
+        const res = await authedFetch(`${BASE_URL}/api/plugins/load`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ packageName: 'nonexistent-e2e-plugin-9999' }),
@@ -41,7 +41,7 @@ test.describe('Plugin System API', () => {
     });
 
     test('POST /api/plugins/:name/unload returns 404 for unknown plugin', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/plugins/nonexistent-plugin/unload`, {
+        const res = await authedFetch(`${BASE_URL}/api/plugins/nonexistent-plugin/unload`, {
             method: 'POST',
         });
         // 404 (not found) or 503 (plugin system not available)
@@ -49,7 +49,7 @@ test.describe('Plugin System API', () => {
     });
 
     test('POST /api/plugins/:name/grant rejects invalid capability', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/plugins/test-plugin/grant`, {
+        const res = await authedFetch(`${BASE_URL}/api/plugins/test-plugin/grant`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ capability: 'invalid:capability' }),
@@ -67,7 +67,7 @@ test.describe('Plugin System API', () => {
         const validCapabilities = ['db:read', 'network:outbound', 'fs:project-dir', 'agent:read', 'session:read'];
 
         for (const cap of validCapabilities) {
-            const res = await fetch(`${BASE_URL}/api/plugins/e2e-test-plugin/grant`, {
+            const res = await authedFetch(`${BASE_URL}/api/plugins/e2e-test-plugin/grant`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ capability: cap }),
@@ -83,7 +83,7 @@ test.describe('Plugin System API', () => {
     });
 
     test('POST /api/plugins/:name/revoke rejects invalid capability', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/plugins/test-plugin/revoke`, {
+        const res = await authedFetch(`${BASE_URL}/api/plugins/test-plugin/revoke`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ capability: 'bogus:cap' }),

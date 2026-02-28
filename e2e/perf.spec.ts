@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -12,7 +12,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await gotoWithRetry(page, '/sessions');
 
             // Create session via API
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -30,7 +30,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await expect(page.locator(`.session-table__row:has-text("${uniqueName}")`).first()).toBeVisible({ timeout: 10000 });
 
             // Stop the session
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
 
             // Wait for status update via WS or poll, then verify stopped status
             await page.waitForTimeout(1000);
@@ -40,7 +40,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await expect(page.locator(`.session-table__row:has-text("${uniqueName}")`).first()).toBeVisible();
 
             // Delete the session
-            await fetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
 
             // Verify removal
             await gotoWithRetry(page, '/sessions');
@@ -56,7 +56,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await gotoWithRetry(page, '/agents');
 
             // Create agent via API
-            const res = await fetch(`${BASE_URL}/api/agents`, {
+            const res = await authedFetch(`${BASE_URL}/api/agents`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: uniqueName, model: 'claude-sonnet-4-20250514' }),
@@ -69,7 +69,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await expect(page.locator(`.agent-card:has-text("${uniqueName}")`).first()).toBeVisible({ timeout: 10000 });
 
             // Update the agent name
-            await fetch(`${BASE_URL}/api/agents/${agent.id}`, {
+            await authedFetch(`${BASE_URL}/api/agents/${agent.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: renamedName }),
@@ -80,7 +80,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await expect(page.locator(`.agent-card:has-text("${renamedName}")`)).toBeVisible({ timeout: 10000 });
 
             // Delete the agent
-            await fetch(`${BASE_URL}/api/agents/${agent.id}`, { method: 'DELETE' });
+            await authedFetch(`${BASE_URL}/api/agents/${agent.id}`, { method: 'DELETE' });
 
             // Verify removal
             await gotoWithRetry(page, '/agents');
@@ -94,7 +94,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             const agent = await api.seedAgent('Render Window Agent');
 
             // Create a session
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -118,14 +118,14 @@ test.describe('Optimistic Updates & Render Performance', () => {
             }
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
 
         test('session output component renders without errors', async ({ page, api }) => {
             const project = await api.seedProject('Output Render Project');
             const agent = await api.seedAgent('Output Render Agent');
 
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -154,7 +154,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             expect(angularErrors).toHaveLength(0);
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
     });
 
@@ -164,7 +164,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             const agent = await api.seedAgent('View Header Agent');
             const sessionName = `Header Session ${Date.now()}`;
 
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -187,14 +187,14 @@ test.describe('Optimistic Updates & Render Performance', () => {
             await expect(info).toBeVisible();
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
 
         test('session view metadata shows agent, turns, cost', async ({ page, api }) => {
             const project = await api.seedProject('View Meta Project');
             const agent = await api.seedAgent('View Meta Agent');
 
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -224,14 +224,14 @@ test.describe('Optimistic Updates & Render Performance', () => {
             expect(allLabels.some((l) => l.includes('Agent'))).toBe(true);
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
 
         test('session view action buttons visible', async ({ page, api }) => {
             const project = await api.seedProject('View Actions Project');
             const agent = await api.seedAgent('View Actions Agent');
 
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -254,14 +254,14 @@ test.describe('Optimistic Updates & Render Performance', () => {
             expect(await btns.count()).toBeGreaterThanOrEqual(1);
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
 
         test('session view export group buttons', async ({ page, api }) => {
             const project = await api.seedProject('View Export Project');
             const agent = await api.seedAgent('View Export Agent');
 
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -284,14 +284,14 @@ test.describe('Optimistic Updates & Render Performance', () => {
             expect(await exportBtns.count()).toBeGreaterThanOrEqual(2);
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
 
         test('terminal container renders with event lines', async ({ page, api }) => {
             const project = await api.seedProject('Terminal Project');
             const agent = await api.seedAgent('Terminal Agent');
 
-            const res = await fetch(`${BASE_URL}/api/sessions`, {
+            const res = await authedFetch(`${BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -321,7 +321,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             }
 
             // Cleanup
-            await fetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
+            await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
         });
     });
 });

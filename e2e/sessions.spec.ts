@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -17,7 +17,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('View Agent');
 
         // Create a session via API
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -40,7 +40,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('Table Agent');
 
         // Create a session via API
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -127,7 +127,7 @@ test.describe('Sessions', () => {
         const agent = await api.seedAgent('CRUD Session Agent');
 
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/sessions`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -140,15 +140,15 @@ test.describe('Sessions', () => {
         const session = await createRes.json();
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/sessions/${session.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`);
         expect(readRes.ok).toBe(true);
 
         // Messages
-        const msgRes = await fetch(`${BASE_URL}/api/sessions/${session.id}/messages`);
+        const msgRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}/messages`);
         expect(msgRes.ok).toBe(true);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/sessions/${session.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated Session' }),
@@ -156,19 +156,19 @@ test.describe('Sessions', () => {
         expect(updateRes.ok).toBe(true);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/sessions`);
+        const listRes = await authedFetch(`${BASE_URL}/api/sessions`);
         expect(listRes.ok).toBe(true);
 
         // List by project
-        const projListRes = await fetch(`${BASE_URL}/api/sessions?projectId=${project.id}`);
+        const projListRes = await authedFetch(`${BASE_URL}/api/sessions?projectId=${project.id}`);
         expect(projListRes.ok).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/sessions/${session.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`);
         expect(gone.status).toBe(404);
     });
 

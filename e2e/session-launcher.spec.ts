@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -58,7 +58,7 @@ test.describe('Session Launcher', () => {
         const agent = await api.seedAgent('API Session Agent');
 
         // Create session
-        const createRes = await fetch(`${BASE_URL}/api/sessions`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -73,12 +73,12 @@ test.describe('Session Launcher', () => {
         expect(session.status).toBeTruthy();
 
         // Verify via GET
-        const getRes = await fetch(`${BASE_URL}/api/sessions/${session.id}`);
+        const getRes = await authedFetch(`${BASE_URL}/api/sessions/${session.id}`);
         expect(getRes.ok).toBe(true);
     });
 
     test('validation rejects missing projectId', async ({}) => {
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'No Project' }),

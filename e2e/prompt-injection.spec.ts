@@ -8,7 +8,7 @@
  * via the unit test suite since those channels require external infrastructure.
  * These E2E tests focus on the API endpoint path and audit trail verification.
  */
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -31,7 +31,7 @@ test.describe('Prompt Injection Detection', () => {
     });
 
     test('normal session creation succeeds', async () => {
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -48,7 +48,7 @@ test.describe('Prompt Injection Detection', () => {
     });
 
     test('session creation with legitimate technical content succeeds', async () => {
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -62,7 +62,7 @@ test.describe('Prompt Injection Detection', () => {
     });
 
     test('session creation with legitimate security discussion succeeds', async () => {
-        const res = await fetch(`${BASE_URL}/api/sessions`, {
+        const res = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -76,7 +76,7 @@ test.describe('Prompt Injection Detection', () => {
     });
 
     test('audit log is queryable via API', async () => {
-        const res = await fetch(`${BASE_URL}/api/audit-log?limit=5`);
+        const res = await authedFetch(`${BASE_URL}/api/audit-log?limit=5`);
         // May return 200 or 404 depending on whether the endpoint is exposed
         // We just check that the server doesn't crash
         expect(res.status).toBeLessThan(500);

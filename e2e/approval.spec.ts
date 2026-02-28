@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -25,7 +25,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
 
     test.beforeAll(async () => {
         // Seed a project, agent, and session via the REST API
-        const projectRes = await fetch(`${BASE_URL}/api/projects`, {
+        const projectRes = await authedFetch(`${BASE_URL}/api/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Approval E2E Project', workingDir: '/tmp' }),
@@ -34,7 +34,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         const project = await projectRes.json();
         projectId = project.id;
 
-        const agentRes = await fetch(`${BASE_URL}/api/agents`, {
+        const agentRes = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -46,7 +46,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         const agent = await agentRes.json();
         agentId = agent.id;
 
-        const sessionRes = await fetch(`${BASE_URL}/api/sessions`, {
+        const sessionRes = await authedFetch(`${BASE_URL}/api/sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -161,7 +161,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
      */
     async function navigateToSession(page: import('@playwright/test').Page, sid: string) {
         await installWsHooks(page);
-        await page.goto(`/sessions/${sid}`);
+        await gotoWithRetry(page, `/sessions/${sid}`);
         await page.waitForLoadState('networkidle');
         // Wait for the session view to render
         await expect(page.locator('.session-view')).toBeVisible({ timeout: 10_000 });

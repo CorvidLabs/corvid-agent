@@ -165,11 +165,17 @@ export function updateSessionAgent(db: Database, id: string, agentId: string): v
 }
 
 export function updateSessionPid(db: Database, id: string, pid: number | null): void {
-    db.query("UPDATE sessions SET pid = ?, updated_at = datetime('now') WHERE id = ?").run(pid, id);
+    const result = db.query("UPDATE sessions SET pid = ?, updated_at = datetime('now') WHERE id = ?").run(pid, id);
+    if (result.changes === 0) {
+        console.warn(`[sessions] updateSessionPid: 0 rows affected for id=${id} pid=${pid}`);
+    }
 }
 
 export function updateSessionStatus(db: Database, id: string, status: string): void {
-    db.query("UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+    const result = db.query("UPDATE sessions SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+    if (result.changes === 0) {
+        console.warn(`[sessions] updateSessionStatus: 0 rows affected for id=${id} status=${status}`);
+    }
 }
 
 export function updateSessionCost(db: Database, id: string, costUsd: number, turns: number): void {

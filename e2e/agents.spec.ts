@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
 
 const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
@@ -156,7 +156,7 @@ test.describe('Agents', () => {
 
     test('API CRUD', async ({ api }) => {
         // Create
-        const createRes = await fetch(`${BASE_URL}/api/agents`, {
+        const createRes = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -168,11 +168,11 @@ test.describe('Agents', () => {
         const agent = await createRes.json();
 
         // Read
-        const readRes = await fetch(`${BASE_URL}/api/agents/${agent.id}`);
+        const readRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}`);
         expect(readRes.ok).toBe(true);
 
         // Update
-        const updateRes = await fetch(`${BASE_URL}/api/agents/${agent.id}`, {
+        const updateRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Updated CRUD Agent' }),
@@ -180,17 +180,17 @@ test.describe('Agents', () => {
         expect(updateRes.ok).toBe(true);
 
         // List
-        const listRes = await fetch(`${BASE_URL}/api/agents`);
+        const listRes = await authedFetch(`${BASE_URL}/api/agents`);
         expect(listRes.ok).toBe(true);
         const list = await listRes.json();
         expect(Array.isArray(list)).toBe(true);
 
         // Delete
-        const deleteRes = await fetch(`${BASE_URL}/api/agents/${agent.id}`, { method: 'DELETE' });
+        const deleteRes = await authedFetch(`${BASE_URL}/api/agents/${agent.id}`, { method: 'DELETE' });
         expect(deleteRes.ok).toBe(true);
 
         // Verify 404
-        const gone = await fetch(`${BASE_URL}/api/agents/${agent.id}`);
+        const gone = await authedFetch(`${BASE_URL}/api/agents/${agent.id}`);
         expect(gone.status).toBe(404);
     });
 });

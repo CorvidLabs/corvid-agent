@@ -469,6 +469,16 @@ export class ProcessManager {
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
 
+        // Debug: verify DB write persisted
+        const verify = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as { status: string; pid: number | null } | null;
+        if (verify?.status !== 'running' || verify?.pid !== process.pid) {
+            log.error(`registerProcess DB verification FAILED`, {
+                sessionId: session.id,
+                expected: { status: 'running', pid: process.pid },
+                actual: verify,
+            });
+        }
+
         // Start stable period timer — resets restart counter after sustained uptime
         this.startStableTimer(session.id);
 
