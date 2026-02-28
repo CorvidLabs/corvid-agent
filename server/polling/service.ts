@@ -28,6 +28,7 @@ import { scanGitHubContent } from '../lib/prompt-injection';
 import { DedupService } from '../lib/dedup';
 import { buildSafeGhEnv } from '../lib/env';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
+import { isGitHubUserAllowed } from '../db/github-allowlist';
 
 const log = createLogger('MentionPoller');
 const TRIGGER_DEDUP_NS = 'polling:triggers';
@@ -719,13 +720,16 @@ export class MentionPollingService {
         // Sort by creation time descending (newest first)
         mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        // Filter by allowed users if configured
+        // Global GitHub allowlist filter (empty = open mode)
+        const globalFiltered = mentions.filter(m => isGitHubUserAllowed(this.db, m.sender));
+
+        // Per-config allowed users filter (further restricts global list)
         if (config.allowedUsers.length > 0) {
             const allowed = new Set(config.allowedUsers.map(u => u.toLowerCase()));
-            return mentions.filter(m => allowed.has(m.sender.toLowerCase()));
+            return globalFiltered.filter(m => allowed.has(m.sender.toLowerCase()));
         }
 
-        return mentions;
+        return globalFiltered;
     }
 
     /**

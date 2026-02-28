@@ -233,6 +233,22 @@ export const UpdateAllowlistSchema = z.object({
     label: z.string({ message: 'label is required' }),
 });
 
+// ─── GitHub Allowlist ───────────────────────────────────────────────────────
+
+const GitHubUsernameSchema = z.string()
+    .min(1, 'username is required')
+    .max(39, 'GitHub usernames are at most 39 characters')
+    .regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/, 'Invalid GitHub username format');
+
+export const AddGitHubAllowlistSchema = z.object({
+    username: GitHubUsernameSchema,
+    label: z.string().optional(),
+});
+
+export const UpdateGitHubAllowlistSchema = z.object({
+    label: z.string({ message: 'label is required' }),
+});
+
 // ─── MCP API ──────────────────────────────────────────────────────────────────
 
 export const McpSendMessageSchema = z.object({

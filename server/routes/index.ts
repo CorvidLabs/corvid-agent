@@ -6,6 +6,7 @@ import { handleCouncilRoutes } from './councils';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleMcpApiRoutes } from './mcp-api';
 import { handleAllowlistRoutes } from './allowlist';
+import { handleGitHubAllowlistRoutes } from './github-allowlist';
 import { handleAnalyticsRoutes } from './analytics';
 import { handleSystemLogRoutes } from './system-logs';
 import { handleSettingsRoutes } from './settings';
@@ -268,6 +269,9 @@ async function handleRoutes(
 
     const allowlistResponse = handleAllowlistRoutes(req, url, db);
     if (allowlistResponse) return allowlistResponse;
+
+    const githubAllowlistResponse = handleGitHubAllowlistRoutes(req, url, db);
+    if (githubAllowlistResponse) return githubAllowlistResponse;
 
     const analyticsResponse = handleAnalyticsRoutes(req, url, db);
     if (analyticsResponse) return analyticsResponse;

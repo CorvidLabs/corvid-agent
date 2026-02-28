@@ -18,6 +18,7 @@ import type { ProcessManager } from '../process/manager';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
 import type { ResponseFormatter } from './response-formatter';
+import { isAllowed } from '../db/allowlist';
 import type { CommandHandler } from './command-handler';
 import type { SubscriptionManager, LocalChatSendFn, LocalChatEventFn } from './subscription-manager';
 import type { DiscoveryService } from './discovery-service';
@@ -522,9 +523,9 @@ export class MessageRouter {
         const isPskContact = this.contactManager.isPskContact(participant);
         const isOwner = isPskContact || this.commandHandler.isOwner(participant);
 
-        // Non-owners are blocked unless guest access is enabled in the future.
-        if (!isOwner) {
-            log.info('Ignoring message from non-owner address', { address: participant.slice(0, 8) + '...' });
+        // Non-owners must be on the allowlist (empty allowlist = open mode)
+        if (!isOwner && !isAllowed(this.db, participant)) {
+            log.info('Blocked message from non-allowlisted address', { address: participant.slice(0, 8) + '...' });
             return;
         }
 

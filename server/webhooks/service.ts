@@ -25,6 +25,7 @@ import { createLogger } from '../lib/logger';
 import { scanGitHubContent } from '../lib/prompt-injection';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { NotFoundError } from '../lib/errors';
+import { isGitHubUserAllowed } from '../db/github-allowlist';
 
 const log = createLogger('Webhook');
 
@@ -213,6 +214,13 @@ export class WebhookService {
             if (commentAuthor && commentAuthor.toLowerCase() === reg.mentionUsername.toLowerCase()) {
                 skipped++;
                 details.push(`${reg.id}: Ignoring self-mention`);
+                continue;
+            }
+
+            // Global GitHub allowlist check (empty = open mode)
+            if (!isGitHubUserAllowed(this.db, sender)) {
+                skipped++;
+                details.push(`${reg.id}: User ${sender} not in GitHub allowlist`);
                 continue;
             }
 
