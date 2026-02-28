@@ -4,6 +4,7 @@ import type { AlgoChatService } from './service';
 import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, listAgents } from '../db/agents';
 import { encryptMnemonic, decryptMnemonic } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
+import { wipeBuffer } from '../lib/secure-wipe';
 import { createLogger } from '../lib/logger';
 import { NotFoundError } from '../lib/errors';
 
@@ -262,7 +263,12 @@ export class AgentWalletService {
 
         // Sign with master account's secret key
         const signedTxn = txn.signTxn(this.service.chatAccount.account.sk);
-        await this.service.algodClient.sendRawTransaction(signedTxn).do();
+        try {
+            await this.service.algodClient.sendRawTransaction(signedTxn).do();
+        } finally {
+            // Wipe signed transaction bytes
+            wipeBuffer(signedTxn);
+        }
     }
 
     private async fundFromDispenser(address: string, microAlgos: number): Promise<void> {
@@ -293,16 +299,24 @@ export class AgentWalletService {
                 algosdk.secretKeyToMnemonic(keyResponse.private_key),
             );
 
-            const params = await this.service.algodClient.getTransactionParams().do();
-            const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-                sender: dispenserAddress,
-                receiver: address,
-                amount: microAlgos,
-                suggestedParams: params,
-            });
+            try {
+                const params = await this.service.algodClient.getTransactionParams().do();
+                const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+                    sender: dispenserAddress,
+                    receiver: address,
+                    amount: microAlgos,
+                    suggestedParams: params,
+                });
 
-            const signedTxn = txn.signTxn(dispenserAccount.sk);
-            await this.service.algodClient.sendRawTransaction(signedTxn).do();
+                const signedTxn = txn.signTxn(dispenserAccount.sk);
+                await this.service.algodClient.sendRawTransaction(signedTxn).do();
+            } finally {
+                // Wipe dispenser secret key after signing
+                wipeBuffer(dispenserAccount.sk);
+                if (keyResponse.private_key instanceof Uint8Array) {
+                    wipeBuffer(keyResponse.private_key);
+                }
+            }
         } finally {
             await kmd.releaseWalletHandle(walletHandle);
         }

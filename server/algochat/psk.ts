@@ -5,12 +5,16 @@ import type { PSKState } from '@corvidlabs/ts-algochat';
 import type { AlgoChatNetwork } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { DedupService } from '../lib/dedup';
+import { wipeBuffer } from '../lib/secure-wipe';
 import { recordAudit } from '../db/audit';
 
 const log = createLogger('PSK');
 
 /** Counter drift threshold that triggers escalation to owner. */
 const PSK_DRIFT_ESCALATION_THRESHOLD = 100;
+
+/** Default grace period for PSK rotation (5 minutes). */
+const PSK_ROTATION_GRACE_MS = 5 * 60 * 1000;
 
 export interface PSKMessage {
     sender: string;
@@ -69,6 +73,10 @@ export class PSKManager {
     private contactEncryptionKey: Uint8Array | null = null;
     /** Unique contact ID (psk_contacts.id). Used to key multi-contact maps in bridge. */
     readonly contactId: string;
+    /** Old PSK retained during rotation grace period. */
+    private oldPSK: Uint8Array | null = null;
+    /** Timestamp when the old PSK grace period expires. */
+    private oldPSKExpiry: number = 0;
 
     constructor(
         db: Database,
@@ -191,6 +199,62 @@ export class PSKManager {
         }
     }
 
+    /**
+     * Rotate the PSK for this contact with a grace period.
+     * During the grace period, incoming messages are accepted under either the old or new PSK.
+     * After the grace period, only the new PSK is accepted.
+     *
+     * @returns The new PSK bytes (caller should send to contact encrypted with old PSK).
+     */
+    rotatePSK(gracePeriodMs: number = PSK_ROTATION_GRACE_MS): Uint8Array {
+        const newPSK = crypto.getRandomValues(new Uint8Array(32));
+
+        // Stash old PSK for grace period
+        this.oldPSK = this.contact.initialPSK;
+        this.oldPSKExpiry = Date.now() + gracePeriodMs;
+
+        // Switch to new PSK (reset ratchet state)
+        this.contact.initialPSK = newPSK;
+        this.contact.state = { sendCounter: 0, peerLastCounter: 0, seenCounters: new Set() };
+        this.contact.lastRound = 0;
+        this.contactEncryptionKey = null;
+        this.dedup.clear(this.dedupNs);
+        this.saveState();
+
+        const pskFp = Array.from(newPSK.slice(0, 8)).map((b: number) => b.toString(16).padStart(2, '0')).join('');
+        log.info(`PSK rotated for ${this.contact.label || this.contact.address.slice(0, 8)}...`, {
+            pskFp,
+            gracePeriodMs,
+            oldPSKExpiry: new Date(this.oldPSKExpiry).toISOString(),
+        });
+
+        recordAudit(
+            this.db,
+            'psk_rotation',
+            'owner',
+            'psk_contact',
+            this.contactId,
+            JSON.stringify({ gracePeriodMs }),
+        );
+
+        return newPSK;
+    }
+
+    /** Check whether this manager is currently in a PSK rotation grace period. */
+    get isInGracePeriod(): boolean {
+        return this.oldPSK !== null && Date.now() < this.oldPSKExpiry;
+    }
+
+    /** Clear the old PSK if the grace period has expired. */
+    private cleanupExpiredGracePeriod(): void {
+        if (this.oldPSK && Date.now() >= this.oldPSKExpiry) {
+            this.oldPSK.fill(0); // wipe
+            this.oldPSK = null;
+            this.oldPSKExpiry = 0;
+            log.info(`PSK grace period expired for ${this.contact.label || this.contact.address.slice(0, 8)}...`);
+        }
+    }
+
     async sendMessage(content: string): Promise<string> {
         const algochat = await import('@corvidlabs/ts-algochat');
         const algosdk = (await import('algosdk')).default;
@@ -231,17 +295,26 @@ export class PSKManager {
         });
 
         const signedTxn = txn.signTxn(chatAccount.account.sk);
-        const { txid } = await this.service.algodClient.sendRawTransaction(signedTxn).do();
+        try {
+            const { txid } = await this.service.algodClient.sendRawTransaction(signedTxn).do();
 
-        this.saveState();
-        log.info(`Sent message to ${this.contact.label || this.contact.address.slice(0, 8)}...`, { txid, counter });
+            this.saveState();
+            log.info(`Sent message to ${this.contact.label || this.contact.address.slice(0, 8)}...`, { txid, counter });
 
-        return txid;
+            return txid;
+        } finally {
+            // Wipe derived PSK and signed transaction bytes
+            wipeBuffer(currentPSK);
+            wipeBuffer(signedTxn);
+        }
     }
 
     // -- Private --
 
     private async poll(): Promise<void> {
+        // Clean up expired grace period PSK
+        this.cleanupExpiredGracePeriod();
+
         const indexer = this.service.indexerClient;
         if (!indexer) {
             log.warn('No indexer client available, cannot poll');
@@ -352,16 +425,29 @@ export class PSKManager {
                         }
                     }
 
-                    // Derive PSK at this counter
+                    // Derive PSK at this counter and attempt decryption.
+                    // During rotation grace period, try new PSK first, then fall back to old PSK.
                     const currentPSK = algochat.derivePSKAtCounter(this.contact.initialPSK, envelope.ratchetCounter);
-
-                    // Decrypt
-                    const decrypted = algochat.decryptPSKMessage(
+                    let decrypted = algochat.decryptPSKMessage(
                         envelope,
                         chatAccount.encryptionKeys.privateKey,
                         chatAccount.encryptionKeys.publicKey,
                         currentPSK,
                     );
+
+                    // Grace period fallback: try old PSK if new PSK decryption failed
+                    if (!decrypted && this.oldPSK && Date.now() < this.oldPSKExpiry) {
+                        const oldDerivedPSK = algochat.derivePSKAtCounter(this.oldPSK, envelope.ratchetCounter);
+                        decrypted = algochat.decryptPSKMessage(
+                            envelope,
+                            chatAccount.encryptionKeys.privateKey,
+                            chatAccount.encryptionKeys.publicKey,
+                            oldDerivedPSK,
+                        );
+                        if (decrypted) {
+                            log.info('Decrypted with old PSK (grace period)', { txid: tx.id.slice(0, 12) });
+                        }
+                    }
 
                     if (!decrypted) {
                         log.warn(`Failed to decrypt message`, { txid: tx.id });

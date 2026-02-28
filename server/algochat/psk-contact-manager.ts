@@ -109,6 +109,41 @@ export class PSKContactManager {
         return (result.changes ?? 0) > 0;
     }
 
+    /**
+     * Rotate the PSK for a contact. Generates a new PSK, installs it on the
+     * PSKManager with a grace period, and updates the DB.
+     *
+     * The old PSK remains valid for `gracePeriodMs` to handle in-flight messages.
+     * Caller is responsible for notifying the contact of the new PSK
+     * (e.g. sending a key-exchange message encrypted with the old PSK).
+     *
+     * @returns The new PSK bytes, or null if the contact was not found.
+     */
+    rotatePSKContact(id: string, gracePeriodMs: number = 5 * 60 * 1000): Uint8Array | null {
+        const mgr = this.pskManagers.get(id);
+        if (!mgr) {
+            log.warn('Cannot rotate PSK: no manager for contact', { id });
+            return null;
+        }
+
+        const newPSK = mgr.rotatePSK(gracePeriodMs);
+
+        // Update the DB with the new PSK
+        this.db.prepare(
+            "UPDATE psk_contacts SET initial_psk = ?, updated_at = datetime('now') WHERE id = ?",
+        ).run(newPSK, id);
+
+        // Update algochat_psk_state with new PSK
+        const contact = this.db.prepare('SELECT mobile_address FROM psk_contacts WHERE id = ?').get(id) as { mobile_address: string | null } | null;
+        const stateAddr = contact?.mobile_address ?? id;
+        this.db.prepare(
+            "UPDATE algochat_psk_state SET initial_psk = ?, send_counter = 0, peer_last_counter = 0, seen_counters = '[]', updated_at = datetime('now') WHERE address = ? AND network = ?",
+        ).run(newPSK, stateAddr, this.config.network);
+
+        log.info(`Rotated PSK for contact`, { id, gracePeriodMs });
+        return newPSK;
+    }
+
     /** Delete a PSK contact permanently. Stops its manager and removes all state. */
     cancelPSKContact(id: string): boolean {
         // Stop and remove the manager first

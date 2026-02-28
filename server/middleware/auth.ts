@@ -28,6 +28,10 @@ export interface AuthConfig {
     allowedOrigins: string[];
     /** The bind host — used to enforce the "must have key if not localhost" rule. */
     bindHost: string;
+    /** Previous API key retained during rotation grace period. */
+    previousApiKey?: string | null;
+    /** Timestamp (ms since epoch) when the previous API key expires. */
+    previousKeyExpiry?: number;
 }
 
 /**
@@ -194,7 +198,7 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
         });
     }
 
-    if (!timingSafeEqual(match[1], config.apiKey)) {
+    if (!isValidApiKey(match[1], config)) {
         log.warn('Rejected request with invalid API key', { path: url.pathname, ip: req.headers.get('x-forwarded-for') ?? 'unknown' });
         return new Response(JSON.stringify({ error: 'Invalid API key' }), {
             status: 403,
@@ -222,15 +226,94 @@ export function checkWsAuth(req: Request, url: URL, config: AuthConfig): boolean
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
         const match = authHeader.match(/^Bearer\s+(.+)$/i);
-        if (match && timingSafeEqual(match[1], config.apiKey)) return true;
+        if (match && isValidApiKey(match[1], config)) return true;
     }
 
     // Check query parameter (browsers can't set headers on WebSocket upgrade)
     const key = url.searchParams.get('key');
-    if (key && timingSafeEqual(key, config.apiKey)) return true;
+    if (key && isValidApiKey(key, config)) return true;
 
     log.warn('Rejected WebSocket connection: invalid or missing auth', { ip: req.headers.get('x-forwarded-for') ?? 'unknown' });
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// API Key Rotation
+// ---------------------------------------------------------------------------
+
+/** Default grace period for API key rotation: 24 hours. */
+const DEFAULT_API_KEY_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Check whether a provided key matches either the current API key
+ * or (during grace period) the previous API key.
+ */
+function isValidApiKey(key: string, config: AuthConfig): boolean {
+    if (!config.apiKey) return false;
+
+    // Check current key
+    if (timingSafeEqual(key, config.apiKey)) return true;
+
+    // Check previous key during grace period
+    if (
+        config.previousApiKey &&
+        config.previousKeyExpiry &&
+        Date.now() < config.previousKeyExpiry &&
+        timingSafeEqual(key, config.previousApiKey)
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Rotate the API key. The old key remains valid for `gracePeriodMs`.
+ * Returns the new API key.
+ */
+export function rotateApiKey(
+    config: AuthConfig,
+    gracePeriodMs: number = DEFAULT_API_KEY_GRACE_MS,
+): string {
+    const newKey = randomBytes(32).toString('base64url');
+
+    // Stash current key as previous (with grace period)
+    config.previousApiKey = config.apiKey;
+    config.previousKeyExpiry = Date.now() + gracePeriodMs;
+
+    // Install new key
+    config.apiKey = newKey;
+    process.env.API_KEY = newKey;
+
+    log.info('API key rotated', {
+        gracePeriodMs,
+        previousKeyExpiry: new Date(config.previousKeyExpiry).toISOString(),
+    });
+
+    return newKey;
+}
+
+/**
+ * Get the rotation status for the API key.
+ */
+export function getApiKeyRotationStatus(config: AuthConfig): {
+    hasActiveKey: boolean;
+    isInGracePeriod: boolean;
+    gracePeriodExpiry: string | null;
+} {
+    const isInGracePeriod = !!(
+        config.previousApiKey &&
+        config.previousKeyExpiry &&
+        Date.now() < config.previousKeyExpiry
+    );
+
+    return {
+        hasActiveKey: !!config.apiKey,
+        isInGracePeriod,
+        gracePeriodExpiry: isInGracePeriod && config.previousKeyExpiry
+            ? new Date(config.previousKeyExpiry).toISOString()
+            : null,
+    };
 }
 
 // ---------------------------------------------------------------------------

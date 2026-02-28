@@ -28,7 +28,10 @@ export type AuditAction =
     | 'agent_message_send'
     | 'config_change'
     | 'injection_blocked'
-    | 'psk_drift_alert';
+    | 'psk_drift_alert'
+    | 'key_rotation'
+    | 'psk_rotation'
+    | 'api_key_rotation';
 
 export interface AuditEntry {
     id: number;

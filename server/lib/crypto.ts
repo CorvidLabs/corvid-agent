@@ -12,6 +12,7 @@
  */
 
 import { createLogger } from './logger';
+import { wipeBuffer } from './secure-wipe';
 
 const log = createLogger('Crypto');
 
@@ -105,19 +106,26 @@ export async function encryptMnemonic(
     const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
     const encoder = new TextEncoder();
 
-    const ciphertext = await crypto.subtle.encrypt(
-        { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
-        key,
-        encoder.encode(plaintext),
-    );
+    try {
+        const ciphertext = await crypto.subtle.encrypt(
+            { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+            key,
+            encoder.encode(plaintext),
+        );
 
-    // v2 format: salt(16) + iv(12) + ciphertext
-    const combined = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
-    combined.set(salt);
-    combined.set(iv, salt.length);
-    combined.set(new Uint8Array(ciphertext), salt.length + iv.length);
+        // v2 format: salt(16) + iv(12) + ciphertext
+        const combined = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+        combined.set(salt);
+        combined.set(iv, salt.length);
+        combined.set(new Uint8Array(ciphertext), salt.length + iv.length);
 
-    return btoa(String.fromCharCode(...combined));
+        const result = btoa(String.fromCharCode(...combined));
+        wipeBuffer(combined);
+        return result;
+    } finally {
+        wipeBuffer(salt);
+        wipeBuffer(iv);
+    }
 }
 
 export async function decryptMnemonic(
@@ -128,38 +136,50 @@ export async function decryptMnemonic(
     const passphrase = getEncryptionPassphrase(network, serverMnemonic);
     const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
 
-    // Try v2 format first: salt(16) + iv(12) + ciphertext
-    if (combined.length >= SALT_LENGTH + IV_LENGTH + 1) {
-        try {
+    try {
+        // Try v2 format first: salt(16) + iv(12) + ciphertext
+        if (combined.length >= SALT_LENGTH + IV_LENGTH + 1) {
             const salt = combined.slice(0, SALT_LENGTH);
             const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
             const ciphertext = combined.slice(SALT_LENGTH + IV_LENGTH);
 
-            const key = await deriveKey(passphrase, salt, CURRENT_ITERATIONS);
+            try {
+                const key = await deriveKey(passphrase, salt, CURRENT_ITERATIONS);
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+                    key,
+                    ciphertext,
+                );
+                return new TextDecoder().decode(decrypted);
+            } catch {
+                // Fall through to legacy format
+            } finally {
+                wipeBuffer(salt);
+                wipeBuffer(iv);
+                wipeBuffer(ciphertext);
+            }
+        }
+
+        // Legacy v1 format: iv(12) + ciphertext, static salt, 100k iterations
+        const legacySalt = new TextEncoder().encode(LEGACY_SALT);
+        const iv = combined.slice(0, IV_LENGTH);
+        const ciphertext = combined.slice(IV_LENGTH);
+
+        try {
+            const key = await deriveKey(passphrase, legacySalt, LEGACY_ITERATIONS);
             const decrypted = await crypto.subtle.decrypt(
                 { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
                 key,
                 ciphertext,
             );
             return new TextDecoder().decode(decrypted);
-        } catch {
-            // Fall through to legacy format
+        } finally {
+            wipeBuffer(iv);
+            wipeBuffer(ciphertext);
         }
+    } finally {
+        wipeBuffer(combined);
     }
-
-    // Legacy v1 format: iv(12) + ciphertext, static salt, 100k iterations
-    const legacySalt = new TextEncoder().encode(LEGACY_SALT);
-    const iv = combined.slice(0, IV_LENGTH);
-    const ciphertext = combined.slice(IV_LENGTH);
-
-    const key = await deriveKey(passphrase, legacySalt, LEGACY_ITERATIONS);
-    const decrypted = await crypto.subtle.decrypt(
-        { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
-        key,
-        ciphertext,
-    );
-
-    return new TextDecoder().decode(decrypted);
 }
 
 /**
