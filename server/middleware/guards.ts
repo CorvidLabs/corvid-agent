@@ -207,6 +207,8 @@ export const ADMIN_PATHS = new Set([
     '/api/memories/backfill',
     '/api/selftest/run',
     '/api/settings/credits',
+    '/api/settings/api-key/rotate',
+    '/api/settings/api-key/status',
 ]);
 
 export function requiresAdminRole(pathname: string): boolean {

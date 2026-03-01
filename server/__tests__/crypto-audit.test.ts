@@ -25,6 +25,9 @@ import {
     checkWsAuth,
     rotateApiKey,
     getApiKeyRotationStatus,
+    setApiKeyExpiry,
+    isApiKeyExpired,
+    getApiKeyExpiryWarning,
     type AuthConfig,
 } from '../middleware/auth';
 
@@ -551,5 +554,127 @@ describe('Encryption/Decryption Integrity', () => {
         } catch {
             // Expected: GCM authentication tag should fail
         }
+    });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// 5. API Key Expiration
+// ══════════════════════════════════════════════════════════════════════════
+
+describe('API Key Expiration', () => {
+    it('setApiKeyExpiry sets createdAt and expiresAt', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+
+        setApiKeyExpiry(config, 7 * 24 * 60 * 60 * 1000); // 7 days
+
+        expect(config.apiKeyCreatedAt).toBeDefined();
+        expect(config.apiKeyExpiresAt).toBeDefined();
+        expect(config.apiKeyExpiresAt! - config.apiKeyCreatedAt!).toBeGreaterThanOrEqual(
+            7 * 24 * 60 * 60 * 1000 - 100, // allow small timing tolerance
+        );
+    });
+
+    it('isApiKeyExpired returns false when no expiry is set', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+        expect(isApiKeyExpired(config)).toBe(false);
+    });
+
+    it('isApiKeyExpired returns false when key has not expired', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() + 60_000,
+        };
+        expect(isApiKeyExpired(config)).toBe(false);
+    });
+
+    it('isApiKeyExpired returns true when key has expired', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() - 1000,
+        };
+        expect(isApiKeyExpired(config)).toBe(true);
+    });
+
+    it('getApiKeyExpiryWarning returns null when no expiry', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+        expect(getApiKeyExpiryWarning(config)).toBeNull();
+    });
+
+    it('getApiKeyExpiryWarning returns null when >7 days remaining', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() + 8 * 24 * 60 * 60 * 1000,
+        };
+        expect(getApiKeyExpiryWarning(config)).toBeNull();
+    });
+
+    it('getApiKeyExpiryWarning returns warning when <7 days remaining', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() + 3 * 24 * 60 * 60 * 1000,
+        };
+        const warning = getApiKeyExpiryWarning(config);
+        expect(warning).not.toBeNull();
+        expect(warning).toContain('3 days');
+        expect(warning).toContain('rotate');
+    });
+
+    it('getApiKeyExpiryWarning returns null when already expired', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() - 1000,
+        };
+        expect(getApiKeyExpiryWarning(config)).toBeNull();
+    });
+
+    it('getApiKeyExpiryWarning returns singular "day" for 1 day', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() + 12 * 60 * 60 * 1000, // 12 hours rounds up to 1 day
+        };
+        const warning = getApiKeyExpiryWarning(config);
+        expect(warning).not.toBeNull();
+        expect(warning).toContain('1 day');
+        expect(warning).not.toContain('1 days');
+    });
+
+    it('rotateApiKey with setApiKeyExpiry works together', () => {
+        const config: AuthConfig = {
+            apiKey: 'old-key',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+
+        const newKey = rotateApiKey(config, 60_000);
+        setApiKeyExpiry(config, 30 * 24 * 60 * 60 * 1000); // 30 days
+
+        expect(config.apiKey).toBe(newKey);
+        expect(config.previousApiKey).toBe('old-key');
+        expect(isApiKeyExpired(config)).toBe(false);
+        expect(getApiKeyExpiryWarning(config)).toBeNull(); // >7 days away
     });
 });

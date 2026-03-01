@@ -11,6 +11,7 @@ import {
     type Guard,
 } from '../middleware/guards';
 import type { AuthConfig } from '../middleware/auth';
+import { checkHttpAuth } from '../middleware/auth';
 import { RateLimiter } from '../middleware/rate-limit';
 
 // --- Helpers ----------------------------------------------------------------
@@ -467,6 +468,66 @@ describe('requiresAdminRole', () => {
     it('returns false for wallet paths that are not credit grants', () => {
         expect(requiresAdminRole('/api/wallets')).toBe(false);
         expect(requiresAdminRole('/api/wallets/ABCD1234')).toBe(false);
+    });
+});
+
+// --- expired API key rejection -----------------------------------------------
+
+describe('expired API key rejection', () => {
+    it('rejects valid key when API key is expired', async () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key-123',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() - 1000, // expired 1 second ago
+        };
+        const req = makeRequest('/api/sessions', {
+            headers: { Authorization: 'Bearer test-key-123' },
+        });
+        const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
+        expect(result).not.toBeNull();
+        expect(result!.status).toBe(401);
+        const body = await result!.json();
+        expect(body.error).toContain('expired');
+    });
+
+    it('allows valid key when API key is not expired', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key-123',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+            apiKeyExpiresAt: Date.now() + 60_000, // expires in 1 minute
+        };
+        const req = makeRequest('/api/sessions', {
+            headers: { Authorization: 'Bearer test-key-123' },
+        });
+        const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
+        expect(result).toBeNull();
+    });
+
+    it('allows valid key when no expiry is configured', () => {
+        const config: AuthConfig = {
+            apiKey: 'test-key-123',
+            allowedOrigins: [],
+            bindHost: '0.0.0.0',
+        };
+        const req = makeRequest('/api/sessions', {
+            headers: { Authorization: 'Bearer test-key-123' },
+        });
+        const result = checkHttpAuth(req, makeUrl('/api/sessions'), config);
+        expect(result).toBeNull();
+    });
+});
+
+// --- requiresAdminRole includes api-key paths --------------------------------
+
+describe('requiresAdminRole api-key paths', () => {
+    it('returns true for /api/settings/api-key/rotate', () => {
+        expect(requiresAdminRole('/api/settings/api-key/rotate')).toBe(true);
+    });
+
+    it('returns true for /api/settings/api-key/status', () => {
+        expect(requiresAdminRole('/api/settings/api-key/status')).toBe(true);
     });
 });
 
