@@ -40,7 +40,7 @@ import { NotificationService } from '../../core/services/notification.service';
                             <button class="btn btn--secondary" (click)="onExportJson()">JSON</button>
                             <button class="btn btn--secondary" (click)="onExportMarkdown()">MD</button>
                         </div>
-                        @if (s.status === 'running') {
+                        @if (s.status === 'running' || s.status === 'loading') {
                             <button class="btn btn--danger" (click)="onStop()">Stop</button>
                         } @else {
                             <button class="btn btn--primary" (click)="onResume()">Resume</button>
@@ -49,11 +49,11 @@ import { NotificationService } from '../../core/services/notification.service';
                     </div>
                 </div>
 
-                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running'" [agentName]="agentName()" />
+                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running' || s.status === 'loading'" [agentName]="agentName()" />
 
                 <app-session-input
                     [disabled]="false"
-                    [placeholder]="s.status === 'running' ? 'Send message to session' : 'Send message to resume...'"
+                    [placeholder]="s.status === 'running' || s.status === 'loading' ? 'Send message to session' : 'Send message to resume...'"
                     (messageSent)="onSendMessage($event)" />
             </div>
 

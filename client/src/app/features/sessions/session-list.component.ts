@@ -158,7 +158,7 @@ export class SessionListComponent implements OnInit {
     private agentNameCache: Record<string, string> = {};
 
     protected readonly runningCount = computed(() =>
-        this.sessionService.sessions().filter((s) => s.status === 'running').length,
+        this.sessionService.sessions().filter((s) => s.status === 'running' || s.status === 'loading').length,
     );
 
     protected readonly completedCount = computed(() =>
@@ -180,6 +180,8 @@ export class SessionListComponent implements OnInit {
         if (status) {
             if (status === 'stopped') {
                 sessions = sessions.filter((s) => s.status === 'stopped' || s.status === 'idle');
+            } else if (status === 'running') {
+                sessions = sessions.filter((s) => s.status === 'running' || s.status === 'loading');
             } else {
                 sessions = sessions.filter((s) => s.status === status);
             }
