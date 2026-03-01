@@ -148,6 +148,10 @@ async function handleResume(
     } catch {
         // Empty body is fine for resume
     }
-    processManager.resumeProcess(session, prompt);
+    try {
+        processManager.resumeProcess(session, prompt);
+    } catch (err) {
+        log.error('Failed to resume process', { sessionId: session.id, error: err instanceof Error ? err.message : String(err) });
+    }
     return json({ ok: true });
 }
