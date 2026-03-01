@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 54;
+const SCHEMA_VERSION = 55;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1071,6 +1071,39 @@ const MIGRATIONS: Record<number, string[]> = {
             username   TEXT PRIMARY KEY,
             label      TEXT DEFAULT '',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+    ],
+    55: [
+        // Multi-tenant isolation — add tenant_id to all resource tables
+        `ALTER TABLE projects ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE agents ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE session_messages ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE work_tasks ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE marketplace_listings ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE agent_reputation ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE sandbox_configs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `ALTER TABLE notification_channels ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+
+        // Indexes for tenant-scoped queries
+        `CREATE INDEX IF NOT EXISTS idx_projects_tenant ON projects(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_tenant ON work_tasks(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_listings_tenant ON marketplace_listings(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_reputation_tenant ON agent_reputation(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_sandbox_configs_tenant ON sandbox_configs(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_notification_channels_tenant ON notification_channels(tenant_id)`,
+
+        // Tenant members — RBAC membership for multi-tenant access control
+        `CREATE TABLE IF NOT EXISTS tenant_members (
+            tenant_id  TEXT NOT NULL,
+            key_hash   TEXT NOT NULL,
+            role       TEXT NOT NULL DEFAULT 'viewer',
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (tenant_id, key_hash)
         )`,
     ],
 };

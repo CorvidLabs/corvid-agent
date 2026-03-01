@@ -1,6 +1,8 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../shared/types';
 import { NotFoundError } from '../lib/errors';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface AgentRow {
     id: string;
@@ -55,17 +57,19 @@ function rowToAgent(row: AgentRow): Agent {
     };
 }
 
-export function listAgents(db: Database): Agent[] {
-    const rows = db.query('SELECT * FROM agents ORDER BY updated_at DESC').all() as AgentRow[];
+export function listAgents(db: Database, tenantId: string = DEFAULT_TENANT_ID): Agent[] {
+    const { query, bindings } = withTenantFilter('SELECT * FROM agents ORDER BY updated_at DESC', tenantId);
+    const rows = db.query(query).all(...bindings) as AgentRow[];
     return rows.map(rowToAgent);
 }
 
-export function getAgent(db: Database, id: string): Agent | null {
+export function getAgent(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Agent | null {
+    if (!validateTenantOwnership(db, 'agents', id, tenantId)) return null;
     const row = db.query('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | null;
     return row ? rowToAgent(row) : null;
 }
 
-export function createAgent(db: Database, input: CreateAgentInput): Agent {
+export function createAgent(db: Database, input: CreateAgentInput, tenantId: string = DEFAULT_TENANT_ID): Agent {
     const id = crypto.randomUUID();
     const customFlags = JSON.stringify(input.customFlags ?? {});
 
@@ -75,8 +79,8 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
          algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions,
-         voice_enabled, voice_preset)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         voice_enabled, voice_preset, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -96,6 +100,7 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
         mcpToolPermissions,
         input.voiceEnabled ? 1 : 0,
         input.voicePreset ?? 'alloy',
+        tenantId,
     );
 
     const created = getAgent(db, id);
@@ -103,8 +108,8 @@ export function createAgent(db: Database, input: CreateAgentInput): Agent {
     return created;
 }
 
-export function updateAgent(db: Database, id: string, input: UpdateAgentInput): Agent | null {
-    const existing = getAgent(db, id);
+export function updateAgent(db: Database, id: string, input: UpdateAgentInput, tenantId: string = DEFAULT_TENANT_ID): Agent | null {
+    const existing = getAgent(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -168,11 +173,11 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput): 
     values.push(id);
 
     db.query(`UPDATE agents SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
-    return getAgent(db, id);
+    return getAgent(db, id, tenantId);
 }
 
-export function deleteAgent(db: Database, id: string): boolean {
-    const existing = getAgent(db, id);
+export function deleteAgent(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    const existing = getAgent(db, id, tenantId);
     if (!existing) return false;
 
     db.transaction(() => {

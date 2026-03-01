@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite';
 import { handleProjectRoutes } from '../routes/projects';
 import { handleAgentRoutes } from '../routes/agents';
 import { handleAllowlistRoutes } from '../routes/allowlist';
+import { createRequestContext } from '../middleware/guards';
 
 /**
  * API Route Integration Tests
@@ -12,6 +13,7 @@ import { handleAllowlistRoutes } from '../routes/allowlist';
  */
 
 let db: Database;
+const defaultContext = createRequestContext();
 
 function fakeReq(method: string, path: string, body?: unknown): { req: Request; url: URL } {
     const url = new URL(`http://localhost:3000${path}`);
@@ -41,6 +43,7 @@ beforeAll(() => {
             mcp_servers TEXT DEFAULT '[]',
             claude_md TEXT DEFAULT '',
             env_vars TEXT DEFAULT '{}',
+            tenant_id TEXT NOT NULL DEFAULT 'default',
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         );
@@ -66,6 +69,7 @@ beforeAll(() => {
             mcp_tool_permissions TEXT DEFAULT NULL,
             voice_enabled INTEGER DEFAULT 0,
             voice_preset TEXT DEFAULT 'alloy',
+            tenant_id TEXT NOT NULL DEFAULT 'default',
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         );
@@ -156,7 +160,7 @@ describe('Project Routes', () => {
 describe('Agent Routes', () => {
     it('GET /api/agents returns empty list', async () => {
         const { req, url } = fakeReq('GET', '/api/agents');
-        const res = handleAgentRoutes(req, url, db);
+        const res = handleAgentRoutes(req, url, db, defaultContext);
         expect(res).not.toBeNull();
         const data = await getJson(res!);
         expect(Array.isArray(data)).toBe(true);
@@ -164,7 +168,7 @@ describe('Agent Routes', () => {
 
     it('POST /api/agents rejects empty body', async () => {
         const { req, url } = fakeReq('POST', '/api/agents', {});
-        const res = handleAgentRoutes(req, url, db);
+        const res = handleAgentRoutes(req, url, db, defaultContext);
         const resolved = await res!;
         expect(resolved.status).toBe(400);
     });
@@ -174,7 +178,7 @@ describe('Agent Routes', () => {
             name: 'BadAgent',
             permissionMode: 'super-auto',
         });
-        const res = handleAgentRoutes(req, url, db);
+        const res = handleAgentRoutes(req, url, db, defaultContext);
         const resolved = await res!;
         expect(resolved.status).toBe(400);
     });
@@ -184,7 +188,7 @@ describe('Agent Routes', () => {
             name: 'TestAgent',
             description: 'A test agent',
         });
-        const res = handleAgentRoutes(req, url, db);
+        const res = handleAgentRoutes(req, url, db, defaultContext);
         const resolved = await res!;
         expect(resolved.status).toBe(201);
         const data = await resolved.json();
@@ -193,7 +197,7 @@ describe('Agent Routes', () => {
 
     it('GET /api/agents/:id returns 404 for unknown', async () => {
         const { req, url } = fakeReq('GET', '/api/agents/nonexistent');
-        const res = handleAgentRoutes(req, url, db);
+        const res = handleAgentRoutes(req, url, db, defaultContext);
         const resolved = await res!;
         expect(resolved.status).toBe(404);
     });

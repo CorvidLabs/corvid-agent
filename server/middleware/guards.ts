@@ -2,12 +2,17 @@
  * Declarative guard chain pattern for route-level middleware.
  */
 
+import type { Database } from 'bun:sqlite';
 import type { AuthConfig } from './auth';
 import { checkHttpAuth } from './auth';
 import type { RateLimiter } from './rate-limit';
 import { getClientIp } from './rate-limit';
 import type { EndpointRateLimiter, RateLimitResult } from './endpoint-rate-limit';
 import { resolveTier } from './endpoint-rate-limit';
+import type { TenantService } from '../tenant/context';
+import type { TenantContext, TenantRole } from '../tenant/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { extractTenantId } from '../tenant/middleware';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('Guards');
@@ -17,6 +22,9 @@ export interface RequestContext {
     role?: string;
     authenticated: boolean;
     rateLimitHeaders?: Record<string, string>;
+    tenantId: string;
+    tenantContext?: TenantContext;
+    tenantRole?: TenantRole;
 }
 
 export type Guard = (req: Request, url: URL, context: RequestContext) => Response | null;
@@ -104,6 +112,76 @@ export function createRequestContext(walletAddress?: string): RequestContext {
     return {
         walletAddress,
         authenticated: false,
+        tenantId: DEFAULT_TENANT_ID,
+    };
+}
+
+/**
+ * Tenant guard — resolves tenant context from the request and sets it on the context.
+ * Returns 403 if the tenant is suspended.
+ */
+export function tenantGuard(db: Database, tenantService: TenantService | null): Guard {
+    return (req: Request, _url: URL, context: RequestContext): Response | null => {
+        if (!tenantService || !tenantService.isMultiTenant()) {
+            context.tenantId = DEFAULT_TENANT_ID;
+            return null;
+        }
+
+        const tenantCtx = extractTenantId(req, db, tenantService);
+        context.tenantId = tenantCtx.tenantId;
+        context.tenantContext = tenantCtx;
+
+        // Check tenant status
+        const tenant = tenantService.getTenant(tenantCtx.tenantId);
+        if (tenant && tenant.status === 'suspended') {
+            return new Response(JSON.stringify({ error: 'Tenant suspended' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Look up tenant member role from API key hash
+        const authHeader = req.headers.get('authorization');
+        if (authHeader?.startsWith('Bearer ')) {
+            const token = authHeader.slice(7);
+            const hasher = new Bun.CryptoHasher('sha256');
+            hasher.update(token);
+            const keyHash = hasher.digest('hex');
+
+            const member = db.query(
+                'SELECT role FROM tenant_members WHERE tenant_id = ? AND key_hash = ?',
+            ).get(tenantCtx.tenantId, keyHash) as { role: string } | null;
+
+            if (member) {
+                context.tenantRole = member.role as TenantRole;
+            }
+        }
+
+        return null;
+    };
+}
+
+/**
+ * Tenant role guard — returns 403 if the user's tenant role is not in the allowed list.
+ * No-op in single-tenant mode (tenantRole is undefined).
+ */
+export function tenantRoleGuard(...roles: TenantRole[]): Guard {
+    return (_req: Request, _url: URL, context: RequestContext): Response | null => {
+        // No-op in single-tenant mode
+        if (context.tenantId === DEFAULT_TENANT_ID && !context.tenantRole) {
+            return null;
+        }
+
+        if (!context.tenantRole || !roles.includes(context.tenantRole)) {
+            return new Response(JSON.stringify({
+                error: 'Forbidden: insufficient tenant role',
+                requiredRoles: roles,
+            }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+        return null;
     };
 }
 

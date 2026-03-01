@@ -6,6 +6,8 @@ import type {
     UpdateSessionInput,
     AlgoChatConversation,
 } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface SessionRow {
     id: string;
@@ -91,28 +93,29 @@ function rowToConversation(row: ConversationRow): AlgoChatConversation {
 
 // MARK: - Session CRUD
 
-export function listSessions(db: Database, projectId?: string): Session[] {
+export function listSessions(db: Database, projectId?: string, tenantId: string = DEFAULT_TENANT_ID): Session[] {
     if (projectId) {
-        const rows = db.query(
-            'SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC'
-        ).all(projectId) as SessionRow[];
+        const { query, bindings } = withTenantFilter('SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC', tenantId);
+        const rows = db.query(query).all(...bindings, projectId) as SessionRow[];
         return rows.map(rowToSession);
     }
-    const rows = db.query('SELECT * FROM sessions ORDER BY updated_at DESC').all() as SessionRow[];
+    const { query, bindings } = withTenantFilter('SELECT * FROM sessions ORDER BY updated_at DESC', tenantId);
+    const rows = db.query(query).all(...bindings) as SessionRow[];
     return rows.map(rowToSession);
 }
 
-export function getSession(db: Database, id: string): Session | null {
+export function getSession(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Session | null {
+    if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return null;
     const row = db.query('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | null;
     return row ? rowToSession(row) : null;
 }
 
-export function createSession(db: Database, input: CreateSessionInput): Session {
+export function createSession(db: Database, input: CreateSessionInput, tenantId: string = DEFAULT_TENANT_ID): Session {
     const id = crypto.randomUUID();
 
     db.query(
-        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, council_launch_id, council_role, work_dir)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, council_launch_id, council_role, work_dir, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.projectId ?? null,
@@ -123,6 +126,7 @@ export function createSession(db: Database, input: CreateSessionInput): Session 
         input.councilLaunchId ?? null,
         input.councilRole ?? null,
         input.workDir ?? null,
+        tenantId,
     );
 
     return getSession(db, id) as Session;
@@ -190,7 +194,8 @@ export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: num
     ).run(microAlgos, id);
 }
 
-export function deleteSession(db: Database, id: string): boolean {
+export function deleteSession(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return false;
     const result = db.transaction(() => {
         // Clean up dependent records
         db.query('DELETE FROM session_messages WHERE session_id = ?').run(id);

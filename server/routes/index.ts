@@ -26,6 +26,7 @@ import { handleSkillBundleRoutes } from './skill-bundles';
 import { handleMcpServerRoutes } from './mcp-servers';
 import { handleExamRoutes } from './exam';
 import { handleSlackRoutes } from './slack';
+import { handleTenantRoutes } from './tenants';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -55,11 +56,13 @@ import {
     roleGuard,
     rateLimitGuard,
     endpointRateLimitGuard,
+    tenantGuard,
     applyGuards,
     createRequestContext,
     requiresAdminRole,
     type RequestContext,
 } from '../middleware/guards';
+import type { TenantService } from '../tenant/context';
 import type { SandboxManager } from '../sandbox/manager';
 import type { MarketplaceService } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
@@ -129,6 +132,7 @@ export interface RouteServices {
     reputationAttestation?: ReputationAttestation | null;
     billing?: BillingService | null;
     usageMeter?: UsageMeter | null;
+    tenantService?: TenantService | null;
 }
 
 export async function handleRequest(
@@ -153,6 +157,7 @@ export async function handleRequest(
     reputationAttestation?: ReputationAttestation | null,
     billing?: BillingService | null,
     usageMeter?: UsageMeter | null,
+    tenantService?: TenantService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
     const config = getAuthConfig();
@@ -184,10 +189,11 @@ export async function handleRequest(
     // Build request context and apply declarative guard chain
     const context = createRequestContext(url.searchParams.get('wallet') || undefined);
 
-    // Guard chain: global rate limit → auth → endpoint rate limit → (optional role guard)
+    // Guard chain: global rate limit → auth → tenant → endpoint rate limit → (optional role guard)
     const guards = [
         rateLimitGuard(rateLimiter),
         authGuard(config),
+        tenantGuard(db, tenantService ?? null),
         endpointRateLimitGuard(endpointRateLimiter),
     ];
 
@@ -203,7 +209,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -243,16 +249,21 @@ async function handleRoutes(
     reputationAttestation?: ReputationAttestation | null,
     billing?: BillingService | null,
     usageMeter?: UsageMeter | null,
+    tenantService?: TenantService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
         return handleBrowseDirs(req, url, db);
     }
 
-    const projectResponse = handleProjectRoutes(req, url, db);
+    // Tenant routes (registration, info, members)
+    const tenantResponse = await handleTenantRoutes(req, url, db, context, tenantService ?? null);
+    if (tenantResponse) return tenantResponse;
+
+    const projectResponse = handleProjectRoutes(req, url, db, context);
     if (projectResponse) return projectResponse;
 
-    const agentResponse = handleAgentRoutes(req, url, db, agentWalletService, agentMessenger);
+    const agentResponse = handleAgentRoutes(req, url, db, context, agentWalletService, agentMessenger);
     if (agentResponse) return agentResponse;
 
     // Persona routes (agent identity/personality)
@@ -282,7 +293,7 @@ async function handleRoutes(
     const settingsResponse = await handleSettingsRoutes(req, url, db, context);
     if (settingsResponse) return settingsResponse;
 
-    const sessionResponse = await handleSessionRoutes(req, url, db, processManager);
+    const sessionResponse = await handleSessionRoutes(req, url, db, processManager, context);
     if (sessionResponse) return sessionResponse;
 
     const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger);

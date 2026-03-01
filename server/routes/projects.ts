@@ -6,6 +6,7 @@ import { listProjects, getProject, createProject, updateProject, deleteProject }
 import { parseBodyOrThrow, ValidationError, CreateProjectSchema, UpdateProjectSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json } from '../lib/response';
+import type { RequestContext } from '../middleware/guards';
 
 const log = createLogger('BrowseDirs');
 
@@ -13,16 +14,18 @@ export function handleProjectRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
+    const tenantId = context?.tenantId ?? 'default';
 
     if (path === '/api/projects' && method === 'GET') {
-        return json(listProjects(db));
+        return json(listProjects(db, tenantId));
     }
 
     if (path === '/api/projects' && method === 'POST') {
-        return handleCreate(req, db);
+        return handleCreate(req, db, tenantId);
     }
 
     const match = path.match(/^\/api\/projects\/([^/]+)$/);
@@ -31,26 +34,26 @@ export function handleProjectRoutes(
     const id = match[1];
 
     if (method === 'GET') {
-        const project = getProject(db, id);
+        const project = getProject(db, id, tenantId);
         return project ? json(project) : json({ error: 'Not found' }, 404);
     }
 
     if (method === 'PUT') {
-        return handleUpdate(req, db, id);
+        return handleUpdate(req, db, id, tenantId);
     }
 
     if (method === 'DELETE') {
-        const deleted = deleteProject(db, id);
+        const deleted = deleteProject(db, id, tenantId);
         return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
     }
 
     return null;
 }
 
-async function handleCreate(req: Request, db: Database): Promise<Response> {
+async function handleCreate(req: Request, db: Database, tenantId: string = 'default'): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateProjectSchema);
-        const project = createProject(db, data);
+        const project = createProject(db, data, tenantId);
         return json(project, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
@@ -58,10 +61,10 @@ async function handleCreate(req: Request, db: Database): Promise<Response> {
     }
 }
 
-async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdate(req: Request, db: Database, id: string, tenantId: string = 'default'): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateProjectSchema);
-        const project = updateProject(db, id, data);
+        const project = updateProject(db, id, data, tenantId);
         return project ? json(project) : json({ error: 'Not found' }, 404);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);

@@ -225,7 +225,7 @@ schedulerService.setNotificationService(notificationService);
 
 // Initialize multi-tenant (opt-in via MULTI_TENANT=true)
 const multiTenant = process.env.MULTI_TENANT === 'true';
-new TenantService(db, multiTenant);
+const tenantService = new TenantService(db, multiTenant);
 
 // Initialize billing
 const billingService = new BillingService(db);
@@ -635,7 +635,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter);
+            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');

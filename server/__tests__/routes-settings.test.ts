@@ -17,11 +17,11 @@ function fakeReq(method: string, path: string, body?: unknown): { req: Request; 
 }
 
 function adminContext(): RequestContext {
-    return { authenticated: true, role: 'admin' };
+    return { authenticated: true, role: 'admin', tenantId: 'default' };
 }
 
 function userContext(): RequestContext {
-    return { authenticated: true, role: 'user' };
+    return { authenticated: true, role: 'user', tenantId: 'default' };
 }
 
 beforeAll(() => {

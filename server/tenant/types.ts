@@ -94,6 +94,18 @@ export interface TenantContext {
 /** Default tenant ID for self-hosted / single-tenant deployments. */
 export const DEFAULT_TENANT_ID = 'default';
 
+// ─── RBAC ─────────────────────────────────────────────────────────────────────
+
+export type TenantRole = 'owner' | 'operator' | 'viewer';
+
+export interface TenantMember {
+    tenantId: string;
+    keyHash: string;
+    role: TenantRole;
+    createdAt: string;
+    updatedAt: string;
+}
+
 // ─── DB Record ───────────────────────────────────────────────────────────────
 
 export interface TenantRecord {

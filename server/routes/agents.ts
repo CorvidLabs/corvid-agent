@@ -10,11 +10,13 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
+import type { RequestContext } from '../middleware/guards';
 
 export function handleAgentRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context: RequestContext,
     agentWalletService?: AgentWalletService | null,
     agentMessenger?: AgentMessenger | null,
 ): Response | Promise<Response> | null {
@@ -22,55 +24,55 @@ export function handleAgentRoutes(
     const method = req.method;
 
     if (path === '/api/agents' && method === 'GET') {
-        return json(listAgents(db));
+        return json(listAgents(db, context.tenantId));
     }
 
     if (path === '/api/agents' && method === 'POST') {
-        return handleCreate(req, db, agentWalletService);
+        return handleCreate(req, db, context, agentWalletService);
     }
 
     // Agent balance endpoint
     const balanceMatch = path.match(/^\/api\/agents\/([^/]+)\/balance$/);
     if (balanceMatch && method === 'GET') {
-        return handleBalance(balanceMatch[1], db, agentWalletService);
+        return handleBalance(balanceMatch[1], db, context, agentWalletService);
     }
 
     // Agent fund endpoint
     const fundMatch = path.match(/^\/api\/agents\/([^/]+)\/fund$/);
     if (fundMatch && method === 'POST') {
-        return handleFund(req, fundMatch[1], db, agentWalletService);
+        return handleFund(req, fundMatch[1], db, context, agentWalletService);
     }
 
     // Agent invoke endpoint
     const invokeMatch = path.match(/^\/api\/agents\/([^/]+)\/invoke$/);
     if (invokeMatch && method === 'POST') {
-        return handleInvoke(req, invokeMatch[1], db, agentMessenger);
+        return handleInvoke(req, invokeMatch[1], db, context, agentMessenger);
     }
 
     // Agent messages endpoint
     const messagesMatch = path.match(/^\/api\/agents\/([^/]+)\/messages$/);
     if (messagesMatch && method === 'GET') {
-        return handleMessages(messagesMatch[1], db);
+        return handleMessages(messagesMatch[1], db, context);
     }
 
     // Agent spending endpoints
     const spendingMatch = path.match(/^\/api\/agents\/([^/]+)\/spending$/);
     if (spendingMatch && method === 'GET') {
-        return handleGetSpending(spendingMatch[1], db);
+        return handleGetSpending(spendingMatch[1], db, context);
     }
 
     const spendingCapMatch = path.match(/^\/api\/agents\/([^/]+)\/spending-cap$/);
     if (spendingCapMatch && method === 'PUT') {
-        return handleSetSpendingCap(req, spendingCapMatch[1], db);
+        return handleSetSpendingCap(req, spendingCapMatch[1], db, context);
     }
     if (spendingCapMatch && method === 'DELETE') {
-        return handleDeleteSpendingCap(spendingCapMatch[1], db);
+        return handleDeleteSpendingCap(spendingCapMatch[1], db, context);
     }
 
     // A2A Agent Card for a specific agent
     const agentCardMatch = path.match(/^\/api\/agents\/([^/]+)\/agent-card$/);
     if (agentCardMatch && method === 'GET') {
-        const agent = getAgent(db, agentCardMatch[1]);
+        const agent = getAgent(db, agentCardMatch[1], context.tenantId);
         if (!agent) return json({ error: 'Not found' }, 404);
         const baseUrl = `${new URL(req.url).protocol}//${new URL(req.url).host}`;
         const card = buildAgentCardForAgent(agent, baseUrl);
@@ -83,16 +85,16 @@ export function handleAgentRoutes(
     const id = match[1];
 
     if (method === 'GET') {
-        const agent = getAgent(db, id);
+        const agent = getAgent(db, id, context.tenantId);
         return agent ? json(agent) : json({ error: 'Not found' }, 404);
     }
 
     if (method === 'PUT') {
-        return handleUpdate(req, db, id);
+        return handleUpdate(req, db, id, context);
     }
 
     if (method === 'DELETE') {
-        const deleted = deleteAgent(db, id);
+        const deleted = deleteAgent(db, id, context.tenantId);
         return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
     }
 
@@ -102,11 +104,12 @@ export function handleAgentRoutes(
 async function handleCreate(
     req: Request,
     db: Database,
+    context: RequestContext,
     agentWalletService?: AgentWalletService | null,
 ): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateAgentSchema);
-        const agent = createAgent(db, data);
+        const agent = createAgent(db, data, context.tenantId);
 
         // Auto-create wallet on localnet if AlgoChat is available
         if (agentWalletService) {
@@ -125,9 +128,10 @@ async function handleCreate(
 async function handleBalance(
     agentId: string,
     db: Database,
+    context: RequestContext,
     agentWalletService?: AgentWalletService | null,
 ): Promise<Response> {
-    const agent = getAgent(db, agentId);
+    const agent = getAgent(db, agentId, context.tenantId);
     if (!agent) return json({ error: 'Not found' }, 404);
 
     let balance = 0;
@@ -142,13 +146,14 @@ async function handleFund(
     req: Request,
     agentId: string,
     db: Database,
+    context: RequestContext,
     agentWalletService?: AgentWalletService | null,
 ): Promise<Response> {
     if (!agentWalletService) {
         return json({ error: 'Wallet service not available' }, 503);
     }
 
-    const agent = getAgent(db, agentId);
+    const agent = getAgent(db, agentId, context.tenantId);
     if (!agent) return json({ error: 'Not found' }, 404);
     if (!agent.walletAddress) return json({ error: 'Agent has no wallet' }, 400);
 
@@ -165,10 +170,10 @@ async function handleFund(
     }
 }
 
-async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdate(req: Request, db: Database, id: string, context: RequestContext): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateAgentSchema);
-        const agent = updateAgent(db, id, data);
+        const agent = updateAgent(db, id, data, context.tenantId);
         return agent ? json(agent) : json({ error: 'Not found' }, 404);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
@@ -180,13 +185,14 @@ async function handleInvoke(
     req: Request,
     fromAgentId: string,
     db: Database,
+    context: RequestContext,
     agentMessenger?: AgentMessenger | null,
 ): Promise<Response> {
     if (!agentMessenger) {
         return json({ error: 'Agent messaging not available' }, 503);
     }
 
-    const fromAgent = getAgent(db, fromAgentId);
+    const fromAgent = getAgent(db, fromAgentId, context.tenantId);
     if (!fromAgent) return json({ error: 'Source agent not found' }, 404);
 
     try {
@@ -211,16 +217,16 @@ async function handleInvoke(
     }
 }
 
-function handleMessages(agentId: string, db: Database): Response {
-    const agent = getAgent(db, agentId);
+function handleMessages(agentId: string, db: Database, context: RequestContext): Response {
+    const agent = getAgent(db, agentId, context.tenantId);
     if (!agent) return json({ error: 'Not found' }, 404);
     return json(listAgentMessages(db, agentId));
 }
 
 // ─── Spending cap handlers ───────────────────────────────────────────────
 
-function handleGetSpending(agentId: string, db: Database): Response {
-    const agent = getAgent(db, agentId);
+function handleGetSpending(agentId: string, db: Database, context: RequestContext): Response {
+    const agent = getAgent(db, agentId, context.tenantId);
     if (!agent) return json({ error: 'Not found' }, 404);
 
     const cap = getAgentSpendingCap(db, agentId);
@@ -237,8 +243,8 @@ function handleGetSpending(agentId: string, db: Database): Response {
     });
 }
 
-async function handleSetSpendingCap(req: Request, agentId: string, db: Database): Promise<Response> {
-    const agent = getAgent(db, agentId);
+async function handleSetSpendingCap(req: Request, agentId: string, db: Database, context: RequestContext): Promise<Response> {
+    const agent = getAgent(db, agentId, context.tenantId);
     if (!agent) return json({ error: 'Not found' }, 404);
 
     try {
@@ -251,8 +257,8 @@ async function handleSetSpendingCap(req: Request, agentId: string, db: Database)
     }
 }
 
-function handleDeleteSpendingCap(agentId: string, db: Database): Response {
-    const agent = getAgent(db, agentId);
+function handleDeleteSpendingCap(agentId: string, db: Database, context: RequestContext): Response {
+    const agent = getAgent(db, agentId, context.tenantId);
     if (!agent) return json({ error: 'Not found' }, 404);
 
     const deleted = removeAgentSpendingCap(db, agentId);
