@@ -223,13 +223,13 @@ describe('run_command', () => {
         const result = await getTool('run_command').handler({ command: 'echo hello' });
         expect(result.isError).toBeUndefined();
         expect(result.text.trim()).toBe('hello');
-    });
+    }, 20_000); // Windows process spawning via sh -c is ~3-5x slower
 
     test('returns exit code on failure', async () => {
         const result = await getTool('run_command').handler({ command: 'exit 42' });
         expect(result.isError).toBe(true);
         expect(result.text).toContain('Exit code 42');
-    });
+    }, 20_000);
 
     test('blocks sudo', async () => {
         const result = await getTool('run_command').handler({ command: 'sudo rm -rf /' });
@@ -258,7 +258,7 @@ describe('run_command', () => {
             const normalizePrivate = (p: string) => p.replace(/^\/private/, '');
             expect(normalizePrivate(output)).toEndWith(normalizePrivate(workDir));
         }
-    });
+    }, 20_000);
 
     test('respects timeout', async () => {
         const isWindows = process.platform === 'win32';

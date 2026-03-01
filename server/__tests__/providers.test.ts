@@ -341,7 +341,7 @@ describe('AnthropicProvider', () => {
         // the SDK check may still pass if env has a key. We just verify it doesn't throw.
         const available = await provider.isAvailable();
         expect(typeof available).toBe('boolean');
-    });
+    }, 20_000); // dynamic SDK import can be slow on Windows CI
 });
 
 // ─── OllamaProvider ─────────────────────────────────────────────────────────
