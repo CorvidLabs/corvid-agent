@@ -22,11 +22,51 @@ import {
     deleteWebhookRegistration,
     listDeliveries,
 } from '../db/webhooks';
+import { DedupService } from '../lib/dedup';
+import { recordAudit } from '../db/audit';
+import { getClientIp } from '../middleware/rate-limit';
 import { parseBodyOrThrow, CreateWebhookRegistrationSchema, UpdateWebhookRegistrationSchema } from '../lib/validation';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebhookRoutes');
+
+// ── Per-repo sliding-window rate limiter ─────────────────────────────────
+
+const WEBHOOK_RATE_WINDOW_MS = 60_000; // 60 seconds
+const WEBHOOK_RATE_MAX = 100; // max 100 requests per window per repo
+
+interface RateEntry {
+    timestamps: number[];
+}
+
+const repoRateMap = new Map<string, RateEntry>();
+
+function isRepoRateLimited(repoFullName: string): boolean {
+    const now = Date.now();
+    const cutoff = now - WEBHOOK_RATE_WINDOW_MS;
+
+    let entry = repoRateMap.get(repoFullName);
+    if (!entry) {
+        entry = { timestamps: [] };
+        repoRateMap.set(repoFullName, entry);
+    }
+
+    // Purge old timestamps
+    entry.timestamps = entry.timestamps.filter(t => t > cutoff);
+
+    if (entry.timestamps.length >= WEBHOOK_RATE_MAX) {
+        return true;
+    }
+
+    entry.timestamps.push(now);
+    return false;
+}
+
+/** Exported for testing. */
+export function _resetRepoRateMap(): void {
+    repoRateMap.clear();
+}
 
 /**
  * Handle the incoming GitHub webhook POST.
@@ -45,6 +85,27 @@ export async function handleGitHubWebhook(
     if (!isValid) {
         log.warn('Webhook signature validation failed');
         return json({ error: 'Invalid signature' }, 401);
+    }
+
+    // Idempotency: deduplicate by X-GitHub-Delivery header
+    const deliveryId = req.headers.get('X-GitHub-Delivery');
+    if (deliveryId) {
+        const dedup = DedupService.global();
+        if (dedup.isDuplicate('webhook-delivery', deliveryId)) {
+            log.debug('Duplicate webhook delivery', { deliveryId });
+            return json({ ok: true, deduplicated: true });
+        }
+    }
+
+    // Per-repo rate limiting (applied after sig validation to prevent unauthenticated abuse)
+    let parsedForRateLimit: { repository?: { full_name?: string } } | undefined;
+    try {
+        parsedForRateLimit = JSON.parse(rawBody) as typeof parsedForRateLimit;
+    } catch { /* will be caught again below */ }
+    const repoName = parsedForRateLimit?.repository?.full_name;
+    if (repoName && isRepoRateLimited(repoName)) {
+        log.warn('Webhook rate limit exceeded', { repo: repoName });
+        return json({ error: 'Rate limit exceeded for this repository' }, 429);
     }
 
     // Parse the event type
@@ -129,6 +190,8 @@ export function handleWebhookRoutes(
             try {
                 const data = await parseBodyOrThrow(req, CreateWebhookRegistrationSchema);
                 const registration = createWebhookRegistration(db, data);
+                const ip = getClientIp(req);
+                recordAudit(db, 'webhook_register', ip, 'webhook', registration.id, `repo=${registration.repo}`, null, ip);
                 log.info('Webhook registration created', { id: registration.id, repo: registration.repo });
                 return json(registration, 201);
             } catch (err) {
@@ -174,6 +237,8 @@ export function handleWebhookRoutes(
         if (req.method === 'DELETE') {
             const deleted = deleteWebhookRegistration(db, id);
             if (!deleted) return json({ error: 'Webhook registration not found' }, 404);
+            const ip = getClientIp(req);
+            recordAudit(db, 'webhook_delete', ip, 'webhook', id, null, null, ip);
             return json({ ok: true });
         }
     }

@@ -219,6 +219,36 @@ describe('detectDangerousPatterns', () => {
         expect(result.isDangerous).toBe(false);
     });
 
+    test('detects command -p bypass', () => {
+        const result = detectDangerousPatterns('command -p rm .env');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('command -p');
+    });
+
+    test('detects env rm bypass', () => {
+        const result = detectDangerousPatterns('env rm .env');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('env command wrapper');
+    });
+
+    test('detects env perl bypass', () => {
+        const result = detectDangerousPatterns('env perl -e "print"');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('env command wrapper');
+    });
+
+    test('detects env ruby bypass', () => {
+        const result = detectDangerousPatterns('env ruby -e "File.write"');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('env command wrapper');
+    });
+
+    test('detects env python bypass', () => {
+        const result = detectDangerousPatterns('env python -c "import os"');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('env command wrapper');
+    });
+
     test('nested $() is detected', () => {
         const result = detectDangerousPatterns('echo $(cat $(whoami))');
         expect(result.isDangerous).toBe(true);
@@ -280,5 +310,25 @@ describe('EXPANDED_WRITE_OPERATORS', () => {
         expect(EXPANDED_WRITE_OPERATORS.test('cat file.txt')).toBe(false);
         expect(EXPANDED_WRITE_OPERATORS.test('grep pattern file.txt')).toBe(false);
         expect(EXPANDED_WRITE_OPERATORS.test('ls -la')).toBe(false);
+    });
+
+    test('matches ruby -e', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('ruby -e \'File.write(".env", "")\'')).toBe(true);
+    });
+
+    test('matches ruby -i', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('ruby -i.bak script.rb')).toBe(true);
+    });
+
+    test('matches php -r', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('php -r \'file_put_contents(".env", "")\'')).toBe(true);
+    });
+
+    test('matches command -p', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('command -p rm .env')).toBe(true);
+    });
+
+    test('perl -pi is already caught by perl -', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('perl -pi -e \'s/x/y/\' .env')).toBe(true);
     });
 });

@@ -10,6 +10,8 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
+import { recordAudit } from '../db/audit';
+import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
 
 export function handleAgentRoutes(
@@ -95,7 +97,12 @@ export function handleAgentRoutes(
 
     if (method === 'DELETE') {
         const deleted = deleteAgent(db, id, context.tenantId);
-        return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
+        if (deleted) {
+            const actor = context.walletAddress ?? getClientIp(req);
+            recordAudit(db, 'agent_delete', actor, 'agent', id, null, null, getClientIp(req));
+            return json({ ok: true });
+        }
+        return json({ error: 'Not found' }, 404);
     }
 
     return null;
@@ -110,6 +117,9 @@ async function handleCreate(
     try {
         const data = await parseBodyOrThrow(req, CreateAgentSchema);
         const agent = createAgent(db, data, context.tenantId);
+
+        const actor = context.walletAddress ?? getClientIp(req);
+        recordAudit(db, 'agent_create', actor, 'agent', agent.id, null, null, getClientIp(req));
 
         // Auto-create wallet on localnet if AlgoChat is available
         if (agentWalletService) {
@@ -174,6 +184,10 @@ async function handleUpdate(req: Request, db: Database, id: string, context: Req
     try {
         const data = await parseBodyOrThrow(req, UpdateAgentSchema);
         const agent = updateAgent(db, id, data, context.tenantId);
+        if (agent) {
+            const actor = context.walletAddress ?? getClientIp(req);
+            recordAudit(db, 'agent_update', actor, 'agent', id, null, null, getClientIp(req));
+        }
         return agent ? json(agent) : json({ error: 'Not found' }, 404);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);

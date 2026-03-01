@@ -56,6 +56,7 @@ import {
     roleGuard,
     rateLimitGuard,
     endpointRateLimitGuard,
+    contentLengthGuard,
     tenantGuard,
     applyGuards,
     createRequestContext,
@@ -189,8 +190,9 @@ export async function handleRequest(
     // Build request context and apply declarative guard chain
     const context = createRequestContext(url.searchParams.get('wallet') || undefined);
 
-    // Guard chain: global rate limit → auth → tenant → endpoint rate limit → (optional role guard)
+    // Guard chain: content-length → global rate limit → auth → tenant → endpoint rate limit → (optional role guard)
     const guards = [
+        contentLengthGuard(),
         rateLimitGuard(rateLimiter),
         authGuard(config),
         tenantGuard(db, tenantService ?? null),

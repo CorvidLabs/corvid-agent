@@ -100,6 +100,20 @@ export function endpointRateLimitGuard(limiter: EndpointRateLimiter): Guard {
     };
 }
 
+export function contentLengthGuard(maxBytes: number = 1_048_576): Guard {
+    return (req, _url, _ctx) => {
+        if (['GET', 'HEAD', 'OPTIONS', 'DELETE'].includes(req.method)) return null;
+        const cl = req.headers.get('Content-Length');
+        if (cl && parseInt(cl, 10) > maxBytes) {
+            return new Response(JSON.stringify({ error: 'Payload too large' }), {
+                status: 413,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+        return null;
+    };
+}
+
 export function applyGuards(req: Request, url: URL, context: RequestContext, ...guards: Guard[]): Response | null {
     for (const guard of guards) {
         const denied = guard(req, url, context);

@@ -131,6 +131,7 @@ const COMMON_COMMANDS = new Set([
     'rm', 'mv', 'cp', 'chmod', 'chown', 'ln', 'tee', 'dd',
     'sed', 'awk', 'perl', 'python', 'python3', 'node', 'bun',
     'curl', 'wget', 'rsync', 'install', 'truncate', 'xargs', 'ed',
+    'ruby', 'php', 'command',
 ]);
 
 /**
@@ -163,7 +164,7 @@ export function extractPathsFromCommand(command: string): string[] {
  * Enhanced regex covering write/destructive bash operators.
  * Superset of the original BASH_WRITE_OPERATORS.
  */
-export const EXPANDED_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|awk\s.*>|perl\s+-|rsync\s|install\s|truncate\s|xargs\s.*rm)/;
+export const EXPANDED_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|awk\s.*>|perl\s+-|rsync\s|install\s|truncate\s|xargs\s.*rm|ruby\s+-[ie]|php\s+-r|command\s+-p\s+\w)/;
 
 // ── Dangerous pattern detection ─────────────────────────────────────────
 
@@ -206,6 +207,16 @@ export function detectDangerousPatterns(command: string): DangerousPatternResult
     // bash -c / sh -c
     if (/\b(?:bash|sh)\s+-c\b/.test(command)) {
         return { isDangerous: true, reason: 'Contains shell -c invocation' };
+    }
+
+    // command -p bypass (runs PATH version, bypasses aliases/functions)
+    if (/\bcommand\s+-p\b/.test(command)) {
+        return { isDangerous: true, reason: 'Contains command -p bypass' };
+    }
+
+    // env as command wrapper bypass
+    if (/\benv\s+(?:rm|mv|cp|chmod|chown|sed|perl|ruby|php|python)\b/.test(command)) {
+        return { isDangerous: true, reason: 'Contains env command wrapper bypass' };
     }
 
     return { isDangerous: false };

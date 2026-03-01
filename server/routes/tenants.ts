@@ -8,6 +8,8 @@ import { tenantRoleGuard } from '../middleware/guards';
 import { registerApiKey } from '../tenant/middleware';
 import { json } from '../lib/response';
 import { createLogger } from '../lib/logger';
+import { recordAudit } from '../db/audit';
+import { getClientIp } from '../middleware/rate-limit';
 import { randomBytes } from 'node:crypto';
 import type { TenantRole } from '../tenant/types';
 
@@ -55,7 +57,7 @@ export async function handleTenantRoutes(
     if (memberDeleteMatch && method === 'DELETE') {
         const denied = tenantRoleGuard('owner')(req, url, context);
         if (denied) return denied;
-        return handleRemoveMember(db, context, memberDeleteMatch[1]);
+        return handleRemoveMember(req, db, context, memberDeleteMatch[1]);
     }
 
     return null;
@@ -128,6 +130,9 @@ async function handleRegister(
         INSERT INTO tenant_members (tenant_id, key_hash, role, created_at, updated_at)
         VALUES (?, ?, 'owner', datetime('now'), datetime('now'))
     `).run(tenant.id, keyHash);
+
+    const ip = getClientIp(req);
+    recordAudit(db, 'tenant_register', ip, 'tenant', tenant.id, `slug=${slug}`, null, ip);
 
     log.info('Tenant registered', { tenantId: tenant.id, slug });
 
@@ -207,10 +212,14 @@ async function handleAddMember(
         VALUES (?, ?, ?, datetime('now'), datetime('now'))
     `).run(context.tenantId, keyHash, memberRole);
 
+    const ip = getClientIp(req);
+    recordAudit(db, 'tenant_member_add', context.walletAddress ?? ip, 'tenant_member', keyHash, `role=${memberRole}`, null, ip);
+
     return json({ ok: true, keyHash, role: memberRole }, 201);
 }
 
 function handleRemoveMember(
+    req: Request,
     db: Database,
     context: RequestContext,
     keyHash: string,
@@ -222,6 +231,9 @@ function handleRemoveMember(
     if (result.changes === 0) {
         return json({ error: 'Member not found' }, 404);
     }
+
+    const ip = getClientIp(req);
+    recordAudit(db, 'tenant_member_remove', context.walletAddress ?? ip, 'tenant_member', keyHash, null, null, ip);
 
     return json({ ok: true });
 }

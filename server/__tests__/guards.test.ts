@@ -3,6 +3,7 @@ import {
     authGuard,
     roleGuard,
     rateLimitGuard,
+    contentLengthGuard,
     applyGuards,
     createRequestContext,
     requiresAdminRole,
@@ -225,6 +226,90 @@ describe('rateLimitGuard', () => {
         for (let i = 0; i < 10; i++) {
             expect(guard(req, url, context)).toBeNull();
         }
+    });
+});
+
+// --- contentLengthGuard -----------------------------------------------------
+
+describe('contentLengthGuard', () => {
+    it('allows GET requests regardless of Content-Length', () => {
+        const guard = contentLengthGuard(100);
+        const req = makeRequest('/api/sessions', {
+            method: 'GET',
+            headers: { 'Content-Length': '999999' },
+        });
+        const url = makeUrl('/api/sessions');
+        const context = createRequestContext();
+
+        expect(guard(req, url, context)).toBeNull();
+    });
+
+    it('allows POST with small Content-Length', () => {
+        const guard = contentLengthGuard(1000);
+        const req = makeRequest('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Length': '500' },
+        });
+        const url = makeUrl('/api/sessions');
+        const context = createRequestContext();
+
+        expect(guard(req, url, context)).toBeNull();
+    });
+
+    it('rejects POST with oversized Content-Length', async () => {
+        const guard = contentLengthGuard(1000);
+        const req = makeRequest('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Length': '2000' },
+        });
+        const url = makeUrl('/api/sessions');
+        const context = createRequestContext();
+
+        const result = guard(req, url, context);
+        expect(result).not.toBeNull();
+        expect(result!.status).toBe(413);
+        const body = await result!.json();
+        expect(body.error).toBe('Payload too large');
+    });
+
+    it('allows POST without Content-Length header', () => {
+        const guard = contentLengthGuard(1000);
+        const req = makeRequest('/api/sessions', { method: 'POST' });
+        const url = makeUrl('/api/sessions');
+        const context = createRequestContext();
+
+        expect(guard(req, url, context)).toBeNull();
+    });
+
+    it('allows DELETE regardless of Content-Length', () => {
+        const guard = contentLengthGuard(100);
+        const req = makeRequest('/api/sessions/123', {
+            method: 'DELETE',
+            headers: { 'Content-Length': '999999' },
+        });
+        const url = makeUrl('/api/sessions/123');
+        const context = createRequestContext();
+
+        expect(guard(req, url, context)).toBeNull();
+    });
+
+    it('uses default 1MB limit', () => {
+        const guard = contentLengthGuard();
+        // Just under 1MB — should pass
+        const req = makeRequest('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Length': '1048576' },
+        });
+        const url = makeUrl('/api/sessions');
+        const context = createRequestContext();
+        expect(guard(req, url, context)).toBeNull();
+
+        // Over 1MB — should block
+        const req2 = makeRequest('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Length': '1048577' },
+        });
+        expect(guard(req2, url, createRequestContext())).not.toBeNull();
     });
 });
 

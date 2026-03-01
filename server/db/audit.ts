@@ -31,7 +31,19 @@ export type AuditAction =
     | 'psk_drift_alert'
     | 'key_rotation'
     | 'psk_rotation'
-    | 'api_key_rotation';
+    | 'api_key_rotation'
+    | 'session_create'
+    | 'session_kill'
+    | 'agent_create'
+    | 'agent_update'
+    | 'agent_delete'
+    | 'tenant_register'
+    | 'tenant_member_add'
+    | 'tenant_member_remove'
+    | 'webhook_register'
+    | 'webhook_delete'
+    | 'auth_login'
+    | 'auth_failed';
 
 export interface AuditEntry {
     id: number;
