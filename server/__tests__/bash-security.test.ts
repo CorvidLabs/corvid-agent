@@ -249,6 +249,43 @@ describe('detectDangerousPatterns', () => {
         expect(result.reason).toContain('env command wrapper');
     });
 
+    test('detects env node bypass', () => {
+        const result = detectDangerousPatterns('env node -e "require(\'fs\').writeFileSync(\'.env\', \'\')"');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('env command wrapper');
+    });
+
+    test('detects env bun bypass', () => {
+        const result = detectDangerousPatterns('env bun -e "await Bun.write(\'.env\', \'\')"');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('env command wrapper');
+    });
+
+    test('detects env bash bypass', () => {
+        const result = detectDangerousPatterns('env bash -c "rm .env"');
+        expect(result.isDangerous).toBe(true);
+        // Detected as shell -c invocation (checked before env wrapper) — still blocked
+        expect(result.reason).toContain('shell -c');
+    });
+
+    test('detects zsh -c invocation', () => {
+        const result = detectDangerousPatterns('zsh -c "rm .env"');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('shell -c');
+    });
+
+    test('detects find -delete', () => {
+        const result = detectDangerousPatterns('find /app -name "*.env" -delete');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('find');
+    });
+
+    test('detects find -exec', () => {
+        const result = detectDangerousPatterns('find . -name ".env" -exec rm {} \\;');
+        expect(result.isDangerous).toBe(true);
+        expect(result.reason).toContain('find');
+    });
+
     test('nested $() is detected', () => {
         const result = detectDangerousPatterns('echo $(cat $(whoami))');
         expect(result.isDangerous).toBe(true);
@@ -330,5 +367,17 @@ describe('EXPANDED_WRITE_OPERATORS', () => {
 
     test('perl -pi is already caught by perl -', () => {
         expect(EXPANDED_WRITE_OPERATORS.test('perl -pi -e \'s/x/y/\' .env')).toBe(true);
+    });
+
+    test('matches find -delete', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('find /app -name "*.env" -delete')).toBe(true);
+    });
+
+    test('matches find -exec', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('find . -name ".env" -exec rm {} \\;')).toBe(true);
+    });
+
+    test('does not match safe find command', () => {
+        expect(EXPANDED_WRITE_OPERATORS.test('find . -name "*.ts" -print')).toBe(false);
     });
 });

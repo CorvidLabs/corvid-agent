@@ -30,7 +30,7 @@ export const PROTECTED_SUBSTRINGS = [
 ];
 
 // Shell operators/commands that indicate write/destructive file operations.
-export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|perl\s+-|rsync\s|install\s|truncate\s|ruby\s+-[ie]|php\s+-r|command\s+-p\s+\w)/;
+export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|perl\s+-|rsync\s|install\s|truncate\s|ruby\s+-[ie]|php\s+-r|command\s+-p\s+\w|find\s.*-(?:delete|exec))/;
 
 export function isProtectedPath(filePath: string): boolean {
     // Normalize to forward slashes for cross-platform matching

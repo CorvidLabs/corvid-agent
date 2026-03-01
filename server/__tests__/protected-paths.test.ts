@@ -48,10 +48,16 @@ describe('BASH_WRITE_OPERATORS', () => {
         expect(BASH_WRITE_OPERATORS.test('truncate -s 0 file')).toBe(true);
     });
 
+    test('matches find -delete and find -exec', () => {
+        expect(BASH_WRITE_OPERATORS.test('find . -name "*.tmp" -delete')).toBe(true);
+        expect(BASH_WRITE_OPERATORS.test('find . -exec rm {} \\;')).toBe(true);
+    });
+
     test('does not match read-only commands', () => {
         expect(BASH_WRITE_OPERATORS.test('cat file')).toBe(false);
         expect(BASH_WRITE_OPERATORS.test('grep pattern file')).toBe(false);
         expect(BASH_WRITE_OPERATORS.test('ls -la')).toBe(false);
+        expect(BASH_WRITE_OPERATORS.test('find . -name "*.ts" -print')).toBe(false);
     });
 });
 
@@ -94,6 +100,37 @@ describe('isProtectedBashCommand', () => {
 
     test('blocks bash -c targeting write operations', () => {
         const result = isProtectedBashCommand('bash -c "rm something"');
+        expect(result.blocked).toBe(true);
+    });
+
+    test('blocks zsh -c targeting write operations', () => {
+        const result = isProtectedBashCommand('zsh -c "rm something"');
+        expect(result.blocked).toBe(true);
+    });
+
+    test('blocks perl -i -pe targeting protected file', () => {
+        const result = isProtectedBashCommand("perl -i -pe 's/x/y/' .env");
+        expect(result.blocked).toBe(true);
+        expect(result.path).toContain('.env');
+    });
+
+    test('blocks find -delete targeting protected paths', () => {
+        const result = isProtectedBashCommand('find /app -name "*.env" -delete');
+        expect(result.blocked).toBe(true);
+    });
+
+    test('blocks find -exec rm targeting protected paths', () => {
+        const result = isProtectedBashCommand('find . -name ".env" -exec rm {} \\;');
+        expect(result.blocked).toBe(true);
+    });
+
+    test('blocks env node -e with write operator', () => {
+        const result = isProtectedBashCommand('env node -e "require(\'fs\').writeFileSync(\'.env\', \'\')"');
+        expect(result.blocked).toBe(true);
+    });
+
+    test('blocks command -p rm targeting protected file', () => {
+        const result = isProtectedBashCommand('command -p rm .env');
         expect(result.blocked).toBe(true);
     });
 });
