@@ -48,7 +48,7 @@ export async function handleSessionRoutes(
             return session ? json(session) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
-            return handleUpdate(req, db, id);
+            return handleUpdate(req, db, id, tenantId);
         }
         if (method === 'DELETE') {
             processManager.stopProcess(id);
@@ -58,15 +58,15 @@ export async function handleSessionRoutes(
     }
 
     if (action === 'messages' && method === 'GET') {
-        return json(getSessionMessages(db, id));
+        return json(getSessionMessages(db, id, tenantId));
     }
 
     if (action === 'stop' && method === 'POST') {
-        return handleStop(db, processManager, id);
+        return handleStop(db, processManager, id, tenantId);
     }
 
     if (action === 'resume' && method === 'POST') {
-        return handleResume(req, db, processManager, id);
+        return handleResume(req, db, processManager, id, tenantId);
     }
 
     return null;
@@ -98,10 +98,10 @@ async function handleCreate(
     }
 }
 
-async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdate(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateSessionSchema);
-        const session = updateSession(db, id, data);
+        const session = updateSession(db, id, data, tenantId);
         return session ? json(session) : json({ error: 'Not found' }, 404);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
@@ -113,8 +113,9 @@ function handleStop(
     db: Database,
     processManager: ProcessManager,
     id: string,
+    tenantId: string,
 ): Response {
-    const session = getSession(db, id);
+    const session = getSession(db, id, tenantId);
     if (!session) return json({ error: 'Not found' }, 404);
 
     processManager.stopProcess(id);
@@ -126,8 +127,9 @@ async function handleResume(
     db: Database,
     processManager: ProcessManager,
     id: string,
+    tenantId: string,
 ): Promise<Response> {
-    const session = getSession(db, id);
+    const session = getSession(db, id, tenantId);
     if (!session) return json({ error: 'Not found' }, 404);
 
     let prompt: string | undefined;

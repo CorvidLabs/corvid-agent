@@ -42,26 +42,19 @@ export function withTenantFilter(
         return { query, bindings: [] };
     }
 
-    // Check if query already has a WHERE clause
-    const upperQuery = query.toUpperCase();
-    if (upperQuery.includes('WHERE')) {
-        return {
-            query: query.replace(/WHERE/i, 'WHERE tenant_id = ? AND'),
-            bindings: [tenantId],
-        };
-    }
+    // Find the position to insert the tenant filter.
+    // Insert before ORDER BY, LIMIT, GROUP BY, HAVING — or at end.
+    const tailMatch = query.search(/\b(ORDER|LIMIT|GROUP|HAVING)\b/i);
+    const insertPos = tailMatch > -1 ? tailMatch : query.length;
 
-    // Find insertion point (before ORDER BY, LIMIT, GROUP BY, or end)
-    const insertBefore = query.search(/\b(ORDER|LIMIT|GROUP|HAVING)\b/i);
-    if (insertBefore > -1) {
-        return {
-            query: `${query.slice(0, insertBefore)} WHERE tenant_id = ? ${query.slice(insertBefore)}`,
-            bindings: [tenantId],
-        };
-    }
+    const hasWhere = /\bWHERE\b/i.test(query);
+    const clause = hasWhere ? 'AND tenant_id = ?' : 'WHERE tenant_id = ?';
+
+    const before = query.slice(0, insertPos).trimEnd();
+    const after = query.slice(insertPos).trimStart();
 
     return {
-        query: `${query} WHERE tenant_id = ?`,
+        query: after ? `${before} ${clause} ${after}` : `${before} ${clause}`,
         bindings: [tenantId],
     };
 }
@@ -77,8 +70,8 @@ export function tenantQuery<T>(
 ): T[] {
     const filtered = withTenantFilter(query, tenantId);
     return db.query(filtered.query).all(
-        ...filtered.bindings,
         ...params,
+        ...filtered.bindings,
     ) as T[];
 }
 
@@ -93,8 +86,8 @@ export function tenantQueryGet<T>(
 ): T | null {
     const filtered = withTenantFilter(query, tenantId);
     return db.query(filtered.query).get(
-        ...filtered.bindings,
         ...params,
+        ...filtered.bindings,
     ) as T | null;
 }
 

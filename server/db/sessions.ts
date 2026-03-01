@@ -96,7 +96,7 @@ function rowToConversation(row: ConversationRow): AlgoChatConversation {
 export function listSessions(db: Database, projectId?: string, tenantId: string = DEFAULT_TENANT_ID): Session[] {
     if (projectId) {
         const { query, bindings } = withTenantFilter('SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC', tenantId);
-        const rows = db.query(query).all(...bindings, projectId) as SessionRow[];
+        const rows = db.query(query).all(projectId, ...bindings) as SessionRow[];
         return rows.map(rowToSession);
     }
     const { query, bindings } = withTenantFilter('SELECT * FROM sessions ORDER BY updated_at DESC', tenantId);
@@ -139,8 +139,9 @@ export function listSessionsByCouncilLaunch(db: Database, launchId: string): Ses
     return rows.map(rowToSession);
 }
 
-export function updateSession(db: Database, id: string, input: UpdateSessionInput): Session | null {
-    const existing = getSession(db, id);
+export function updateSession(db: Database, id: string, input: UpdateSessionInput, tenantId: string = DEFAULT_TENANT_ID): Session | null {
+    if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return null;
+    const existing = getSession(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -161,7 +162,7 @@ export function updateSession(db: Database, id: string, input: UpdateSessionInpu
     values.push(id);
 
     db.query(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
-    return getSession(db, id);
+    return getSession(db, id, tenantId);
 }
 
 export function updateSessionAgent(db: Database, id: string, agentId: string): void {
@@ -207,7 +208,8 @@ export function deleteSession(db: Database, id: string, tenantId: string = DEFAU
 
 // MARK: - Session Messages
 
-export function getSessionMessages(db: Database, sessionId: string): SessionMessage[] {
+export function getSessionMessages(db: Database, sessionId: string, tenantId: string = DEFAULT_TENANT_ID): SessionMessage[] {
+    if (!validateTenantOwnership(db, 'sessions', sessionId, tenantId)) return [];
     const rows = db.query(
         'SELECT * FROM session_messages WHERE session_id = ? ORDER BY timestamp ASC'
     ).all(sessionId) as MessageRow[];

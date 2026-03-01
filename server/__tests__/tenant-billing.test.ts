@@ -217,7 +217,7 @@ describe('Tenant DB Filter', () => {
 
     test('withTenantFilter injects into existing WHERE', () => {
         const result = withTenantFilter("SELECT * FROM agents WHERE status = 'active'", 'tenant-1');
-        expect(result.query).toContain('WHERE tenant_id = ? AND');
+        expect(result.query).toContain("WHERE status = 'active' AND tenant_id = ?");
         expect(result.bindings).toEqual(['tenant-1']);
     });
 
