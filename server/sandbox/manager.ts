@@ -142,7 +142,9 @@ export class SandboxManager {
         });
 
         // Trigger pool refill in background
-        this.fillPool().catch(() => { /* best effort */ });
+        this.fillPool().catch((err) => {
+            log.debug('Background pool refill failed', { error: err instanceof Error ? err.message : String(err) });
+        });
 
         return entry.containerId;
     }
@@ -222,7 +224,9 @@ export class SandboxManager {
             promises.push(
                 stopContainer(containerId)
                     .then(() => removeContainer(containerId))
-                    .catch(() => { /* best effort cleanup */ }),
+                    .catch((err) => {
+                        log.debug('Failed to stop/remove container during shutdown', { error: err instanceof Error ? err.message : String(err) });
+                    }),
             );
         }
         await Promise.all(promises);
@@ -301,7 +305,9 @@ export class SandboxManager {
                     try {
                         await stopContainer(containerId);
                         await removeContainer(containerId);
-                    } catch { /* best effort */ }
+                    } catch (err) {
+                        log.debug('Failed to recycle idle container', { error: err instanceof Error ? err.message : String(err) });
+                    }
                     this.pool.delete(containerId);
                 }
             }
@@ -313,7 +319,9 @@ export class SandboxManager {
                 const status = await getContainerStatus(containerId);
                 if (!status || status.status === 'error') {
                     log.warn('Removing dead warm container', { containerId: containerId.slice(0, 12) });
-                    await removeContainer(containerId).catch(() => {});
+                    await removeContainer(containerId).catch((err) => {
+                        log.debug('Failed to remove dead warm container', { error: err instanceof Error ? err.message : String(err) });
+                    });
                     this.pool.delete(containerId);
                 }
             }
@@ -333,7 +341,9 @@ export class SandboxManager {
                 await stopContainer(containerId);
                 await removeContainer(containerId);
                 log.info('Cleaned up stale container', { containerId: containerId.slice(0, 12) });
-            } catch { /* best effort */ }
+            } catch (err) {
+                log.debug('Failed to cleanup stale container', { error: err instanceof Error ? err.message : String(err) });
+            }
         }
     }
 }
