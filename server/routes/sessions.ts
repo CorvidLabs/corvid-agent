@@ -11,6 +11,8 @@ import type { ProcessManager } from '../process/manager';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema } from '../lib/validation';
 import { json } from '../lib/response';
+import { recordAudit } from '../db/audit';
+import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
 
 const log = createLogger('SessionRoutes');
@@ -62,7 +64,7 @@ export async function handleSessionRoutes(
     }
 
     if (action === 'stop' && method === 'POST') {
-        return handleStop(db, processManager, id, tenantId);
+        return handleStop(req, db, processManager, id, tenantId);
     }
 
     if (action === 'resume' && method === 'POST') {
@@ -81,6 +83,9 @@ async function handleCreate(
     try {
         const data = await parseBodyOrThrow(req, CreateSessionSchema);
         const session = createSession(db, data, tenantId);
+
+        const ip = getClientIp(req);
+        recordAudit(db, 'session_create', ip, 'session', session.id, null, null, ip);
 
         if (data.initialPrompt) {
             try {
@@ -110,6 +115,7 @@ async function handleUpdate(req: Request, db: Database, id: string, tenantId: st
 }
 
 function handleStop(
+    req: Request,
     db: Database,
     processManager: ProcessManager,
     id: string,
@@ -117,6 +123,9 @@ function handleStop(
 ): Response {
     const session = getSession(db, id, tenantId);
     if (!session) return json({ error: 'Not found' }, 404);
+
+    const ip = getClientIp(req);
+    recordAudit(db, 'session_kill', ip, 'session', id, null, null, ip);
 
     processManager.stopProcess(id);
     return json({ ok: true });

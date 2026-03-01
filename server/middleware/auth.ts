@@ -199,7 +199,16 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
     }
 
     if (!isValidApiKey(match[1], config)) {
-        log.warn('Rejected request with invalid API key', { path: url.pathname, ip: req.headers.get('x-forwarded-for') ?? 'unknown' });
+        const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
+        log.warn('Rejected request with invalid API key', { path: url.pathname, ip });
+
+        // Record failed auth attempt — lazy import to avoid circular deps
+        try {
+            const { recordAudit: audit } = require('../db/audit');
+            const { getDb: getDbConn } = require('../db/connection');
+            audit(getDbConn(), 'auth_failed', ip, 'http', null, `path=${url.pathname}`, null, ip);
+        } catch { /* audit logging is best-effort */ }
+
         return new Response(JSON.stringify({ error: 'Invalid API key' }), {
             status: 403,
             headers: { 'Content-Type': 'application/json' },

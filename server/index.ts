@@ -438,6 +438,13 @@ const server = Bun.serve<WsData>({
             // Construct a new Response with the traceparent header instead of mutating the original
             const headers = new Headers(response.headers);
             headers.set('traceparent', buildTraceparent(traceId, spanId));
+            headers.set('X-Content-Type-Options', 'nosniff');
+            headers.set('X-Frame-Options', 'DENY');
+            headers.set('X-XSS-Protection', '0');
+            headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+            if (BIND_HOST !== '127.0.0.1') {
+                headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+            }
             return new Response(response.body, {
                 status: response.status,
                 statusText: response.statusText,
