@@ -234,7 +234,7 @@ export class ProcessManager {
      */
     private cleanupStaleSessions(): void {
         const result = this.db.query(
-            `UPDATE sessions SET status = 'idle', pid = NULL WHERE status = 'running'`
+            `UPDATE sessions SET status = 'idle', pid = NULL WHERE status IN ('running', 'loading')`
         ).run();
         if (result.changes > 0) {
             log.info(`Reset ${result.changes} stale session(s) from previous run`);

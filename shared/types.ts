@@ -34,7 +34,7 @@ export interface Agent {
     updatedAt: string;
 }
 
-export type SessionStatus = 'idle' | 'running' | 'paused' | 'stopped' | 'error';
+export type SessionStatus = 'idle' | 'loading' | 'running' | 'paused' | 'stopped' | 'error';
 export type SessionSource = 'web' | 'algochat' | 'agent' | 'telegram' | 'discord' | 'slack';
 
 export interface Session {

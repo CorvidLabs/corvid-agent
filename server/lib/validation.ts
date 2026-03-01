@@ -177,7 +177,7 @@ export const CreateSessionSchema = z.object({
 
 export const UpdateSessionSchema = z.object({
     name: z.string().optional(),
-    status: z.enum(['idle', 'running', 'paused', 'stopped', 'error']).optional(),
+    status: z.enum(['idle', 'loading', 'running', 'paused', 'stopped', 'error']).optional(),
 });
 
 export const ResumeSessionSchema = z.object({

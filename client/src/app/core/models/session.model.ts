@@ -1,6 +1,6 @@
 export type AlgoChatNetwork = 'localnet' | 'testnet' | 'mainnet';
 
-export type SessionStatus = 'idle' | 'running' | 'paused' | 'stopped' | 'error';
+export type SessionStatus = 'idle' | 'loading' | 'running' | 'paused' | 'stopped' | 'error';
 export type SessionSource = 'web' | 'algochat';
 
 export interface Session {

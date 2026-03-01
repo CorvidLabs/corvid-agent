@@ -92,9 +92,11 @@ export function getSchedule(db: Database, id: string): AgentSchedule | null {
 }
 
 export function listSchedules(db: Database, agentId?: string): AgentSchedule[] {
+    const cronHour = `CAST(SUBSTR(cron_expression, INSTR(cron_expression, ' ') + 1, INSTR(SUBSTR(cron_expression, INSTR(cron_expression, ' ') + 1), ' ') - 1) AS INTEGER)`;
+    const orderBy = `ORDER BY CASE WHEN cron_expression = '' OR cron_expression IS NULL THEN 1 ELSE 0 END, ${cronHour} ASC`;
     const rows = agentId
-        ? db.query('SELECT * FROM agent_schedules WHERE agent_id = ? ORDER BY created_at DESC').all(agentId)
-        : db.query('SELECT * FROM agent_schedules ORDER BY created_at DESC').all();
+        ? db.query(`SELECT * FROM agent_schedules WHERE agent_id = ? ${orderBy}`).all(agentId)
+        : db.query(`SELECT * FROM agent_schedules ${orderBy}`).all();
     return (rows as Record<string, unknown>[]).map(rowToSchedule);
 }
 

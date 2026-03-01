@@ -112,17 +112,20 @@ export function getSession(db: Database, id: string, tenantId: string = DEFAULT_
 
 export function createSession(db: Database, input: CreateSessionInput, tenantId: string = DEFAULT_TENANT_ID): Session {
     const id = crypto.randomUUID();
+    const source = input.source ?? 'web';
+    const initialStatus = source === 'agent' ? 'loading' : 'idle';
 
     db.query(
-        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, council_launch_id, council_role, work_dir, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, status, council_launch_id, council_role, work_dir, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.projectId ?? null,
         input.agentId ?? null,
         input.name ?? '',
-        input.source ?? 'web',
+        source,
         input.initialPrompt ?? '',
+        initialStatus,
         input.councilLaunchId ?? null,
         input.councilRole ?? null,
         input.workDir ?? null,
