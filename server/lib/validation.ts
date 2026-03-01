@@ -678,3 +678,10 @@ export const DeviceAuthorizeSchema = z.object({
 export const PSKContactNicknameSchema = z.object({
     nickname: z.string().min(1, 'nickname is required'),
 });
+
+// ─── Wallet Credits ─────────────────────────────────────────────────────────
+
+export const CreditGrantSchema = z.object({
+    amount: z.number().positive().finite(),
+    reference: z.string().optional(),
+});

@@ -132,7 +132,7 @@ export function validateStartupSecurity(config: AuthConfig): void {
 
             log.info('==========================================================');
             log.info('FIRST-RUN BOOTSTRAP: Generated API key for remote access');
-            log.info(`API_KEY=${generatedKey}`);
+            log.info(`API_KEY=${generatedKey.slice(0, 8)}...  (check .env for full key)`);
             log.info('This key has been persisted to .env');
             log.info('Use this key in the Authorization header: Bearer <key>');
             log.info('==========================================================');

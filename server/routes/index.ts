@@ -45,7 +45,7 @@ import { backupDatabase } from '../db/backup';
 import { updateMemoryTxid } from '../db/agent-memories';
 import { encryptMemoryContent } from '../lib/crypto';
 import { loadAlgoChatConfig } from '../algochat/config';
-import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema, PSKContactNicknameSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema, PSKContactNicknameSchema, CreditGrantSchema } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
@@ -581,15 +581,11 @@ async function handleRoutes(
     if (walletCreditsMatch && req.method === 'POST') {
         const address = decodeURIComponent(walletCreditsMatch[1]);
         try {
-            const body = await req.json() as { amount?: number; reference?: string };
-            const amount = body.amount;
-            if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
-                return json({ error: 'amount must be a positive number' }, 400);
-            }
+            const data = await parseBodyOrThrow(req, CreditGrantSchema);
             if (!address || address.length < 58) {
                 return json({ error: 'Invalid wallet address' }, 400);
             }
-            grantCredits(db, address, Math.round(amount), body.reference);
+            grantCredits(db, address, Math.round(data.amount), data.reference);
             const balance = getBalance(db, address);
             return json({ ok: true, balance });
         } catch (err) {

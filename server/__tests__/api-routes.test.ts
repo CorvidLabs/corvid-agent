@@ -4,6 +4,7 @@ import { handleProjectRoutes } from '../routes/projects';
 import { handleAgentRoutes } from '../routes/agents';
 import { handleAllowlistRoutes } from '../routes/allowlist';
 import { createRequestContext } from '../middleware/guards';
+import { CreditGrantSchema } from '../lib/validation';
 
 /**
  * API Route Integration Tests
@@ -231,5 +232,46 @@ describe('Allowlist Routes', () => {
         expect(resolved.status).toBe(400);
         const data = await resolved.json();
         expect(data.error).toContain('Invalid Algorand address');
+    });
+});
+
+// ─── Credit Grant Schema Validation ──────────────────────────────────────────
+
+describe('CreditGrantSchema', () => {
+    it('rejects non-numeric amount', () => {
+        const result = CreditGrantSchema.safeParse({ amount: 'abc' });
+        expect(result.success).toBe(false);
+    });
+
+    it('rejects missing amount', () => {
+        const result = CreditGrantSchema.safeParse({});
+        expect(result.success).toBe(false);
+    });
+
+    it('rejects negative amount', () => {
+        const result = CreditGrantSchema.safeParse({ amount: -10 });
+        expect(result.success).toBe(false);
+    });
+
+    it('rejects zero amount', () => {
+        const result = CreditGrantSchema.safeParse({ amount: 0 });
+        expect(result.success).toBe(false);
+    });
+
+    it('rejects Infinity', () => {
+        const result = CreditGrantSchema.safeParse({ amount: Infinity });
+        expect(result.success).toBe(false);
+    });
+
+    it('accepts valid positive amount', () => {
+        const result = CreditGrantSchema.safeParse({ amount: 100 });
+        expect(result.success).toBe(true);
+        expect(result.data!.amount).toBe(100);
+    });
+
+    it('accepts valid amount with reference', () => {
+        const result = CreditGrantSchema.safeParse({ amount: 50, reference: 'bonus' });
+        expect(result.success).toBe(true);
+        expect(result.data!.reference).toBe('bonus');
     });
 });
