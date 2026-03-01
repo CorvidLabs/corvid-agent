@@ -160,6 +160,20 @@ const WARNING_PATTERNS: PatternRule[] = [
 const ALL_PATTERNS: PatternRule[] = [...CRITICAL_PATTERNS, ...WARNING_PATTERNS];
 
 /**
+ * Files excluded from scanning — these contain pattern strings as test
+ * fixtures or rule definitions, not actual malicious code.
+ */
+const EXCLUDED_FILES: string[] = [
+    'server/__tests__/',
+    'server/lib/code-scanner.ts',
+];
+
+function isExcludedFile(file: string | null): boolean {
+    if (!file) return false;
+    return EXCLUDED_FILES.some((ex) => file === ex || file.startsWith(ex));
+}
+
+/**
  * Check whether the match is inside a single-line comment.
  * Returns true if `//` appears before `matchIndex` on the same line content.
  */
@@ -189,12 +203,18 @@ export function scanDiff(diff: string): CodeScanResult {
 
     let currentFile: string | null = null;
 
+    let skipFile = false;
+
     for (const rawLine of diff.split('\n')) {
         // Track current file from diff headers
         if (rawLine.startsWith('+++ b/')) {
             currentFile = rawLine.slice(6);
+            skipFile = isExcludedFile(currentFile);
             continue;
         }
+
+        // Skip excluded files (test fixtures, scanner source)
+        if (skipFile) continue;
 
         // Only scan added lines
         if (!rawLine.startsWith('+') || rawLine.startsWith('+++')) continue;
