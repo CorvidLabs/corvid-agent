@@ -18,6 +18,7 @@ import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import { scanDiff, formatScanReport } from '../lib/fetch-detector';
+import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
@@ -570,7 +571,7 @@ export class WorkTaskService {
             outputs.push(`=== Test Runner Error ===\n${err instanceof Error ? err.message : String(err)}`);
         }
 
-        // Security scan: check git diff for unapproved external fetch calls
+        // Security scan: check git diff for unapproved external fetch calls and malicious patterns
         try {
             const diffProc = Bun.spawn(['git', 'diff', 'main...HEAD'], {
                 cwd: workingDir,
@@ -581,14 +582,35 @@ export class WorkTaskService {
             await diffProc.exited;
 
             if (diffOutput.trim()) {
-                const scanResult = scanDiff(diffOutput);
-                if (scanResult.hasUnapprovedFetches) {
+                // Fetch detector
+                const fetchResult = scanDiff(diffOutput);
+                if (fetchResult.hasUnapprovedFetches) {
                     passed = false;
-                    outputs.push(formatScanReport(scanResult));
+                    outputs.push(formatScanReport(fetchResult));
                     log.warn('Security scan detected unapproved fetch calls', {
-                        findings: scanResult.findings.map((f) => `${f.domain} (${f.pattern})`),
+                        findings: fetchResult.findings.map((f) => `${f.domain} (${f.pattern})`),
                     });
-                } else {
+                }
+
+                // Code pattern scanner
+                const codeResult = scanCodeDiff(diffOutput);
+                if (codeResult.hasCriticalFindings) {
+                    passed = false;
+                    outputs.push(formatCodeScanReport(codeResult));
+                    log.warn('Code scanner detected critical findings', {
+                        findings: codeResult.findings
+                            .filter((f) => f.severity === 'critical')
+                            .map((f) => `${f.category}: ${f.pattern}`),
+                    });
+                } else if (codeResult.hasWarnings) {
+                    const report = formatCodeScanReport(codeResult);
+                    if (report) outputs.push(report);
+                    log.info('Code scanner warnings (non-blocking)', {
+                        findings: codeResult.findings.map((f) => `${f.category}: ${f.pattern}`),
+                    });
+                }
+
+                if (!fetchResult.hasUnapprovedFetches && !codeResult.hasCriticalFindings) {
                     outputs.push('=== Security Scan Passed ===');
                 }
             }

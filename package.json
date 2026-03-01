@@ -29,7 +29,8 @@
     "spec:check": "bun scripts/spec-check.ts",
     "openapi:validate": "bun scripts/openapi-validate.ts",
     "openapi:export": "bun scripts/openapi-validate.ts --export",
-    "lint:sql": "bash scripts/check-sql-injection.sh"
+    "lint:sql": "bash scripts/check-sql-injection.sh",
+    "security:scan": "bun scripts/ci-security-scan.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"
