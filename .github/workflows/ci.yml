@@ -35,7 +35,9 @@ jobs:
         run: bun run migrate:up
 
       - name: Unit tests
-        run: bun test
+        # Windows process spawning and dynamic imports are ~3-5x slower;
+        # use 30s per-test timeout there to avoid flaky failures (default 10s via bunfig).
+        run: bun test ${{ matrix.os == 'windows-latest' && '--timeout 30000' || '' }}
 
       - name: Spec check
         run: bun run spec:check
