@@ -231,6 +231,19 @@ export class WebhookService {
                 continue;
             }
 
+            // Block mentions with HIGH/CRITICAL injection confidence
+            const injectionScan = scanGitHubContent(mentionBody);
+            if (injectionScan.blocked) {
+                log.warn('Blocked webhook: prompt injection detected', {
+                    registrationId: reg.id, sender, repo,
+                    confidence: injectionScan.confidence,
+                    patterns: injectionScan.matches.map(m => m.pattern),
+                });
+                skipped++;
+                details.push(`${reg.id}: Blocked — prompt injection detected (${injectionScan.confidence})`);
+                continue;
+            }
+
             // Create delivery record
             const htmlUrl = this.getHtmlUrl(event, payload);
             const delivery = createDelivery(
