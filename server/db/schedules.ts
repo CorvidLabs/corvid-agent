@@ -9,6 +9,7 @@ import type {
     ScheduleStatus,
     ScheduleExecutionStatus,
     ScheduleActionType,
+    ScheduleTriggerEvent,
 } from '../../shared/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ function rowToSchedule(row: Record<string, unknown>): AgentSchedule {
         executionCount: (row.execution_count as number) ?? 0,
         maxBudgetPerRun: row.max_budget_per_run as number | null,
         notifyAddress: row.notify_address as string | null,
+        triggerEvents: row.trigger_events ? JSON.parse(row.trigger_events as string) as ScheduleTriggerEvent[] : null,
         lastRunAt: row.last_run_at as string | null,
         nextRunAt: row.next_run_at as string | null,
         createdAt: row.created_at as string,
@@ -62,8 +64,8 @@ export function createSchedule(db: Database, input: CreateScheduleInput): AgentS
 
     db.query(`
         INSERT INTO agent_schedules (id, agent_id, name, description, cron_expression, interval_ms,
-            actions, approval_policy, max_executions, max_budget_per_run, notify_address, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            actions, approval_policy, max_executions, max_budget_per_run, notify_address, trigger_events, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -76,6 +78,7 @@ export function createSchedule(db: Database, input: CreateScheduleInput): AgentS
         input.maxExecutions ?? null,
         input.maxBudgetPerRun ?? null,
         input.notifyAddress ?? null,
+        input.triggerEvents ? JSON.stringify(input.triggerEvents) : null,
         now,
         now,
     );
@@ -133,6 +136,7 @@ export function updateSchedule(db: Database, id: string, input: UpdateScheduleIn
     if (input.maxExecutions !== undefined) { fields.push('max_executions = ?'); values.push(input.maxExecutions); }
     if (input.maxBudgetPerRun !== undefined) { fields.push('max_budget_per_run = ?'); values.push(input.maxBudgetPerRun); }
     if (input.notifyAddress !== undefined) { fields.push('notify_address = ?'); values.push(input.notifyAddress); }
+    if (input.triggerEvents !== undefined) { fields.push('trigger_events = ?'); values.push(input.triggerEvents ? JSON.stringify(input.triggerEvents) : null); }
 
     if (fields.length === 0) return existing;
 
@@ -160,6 +164,31 @@ export function updateScheduleLastRun(db: Database, id: string): void {
 export function deleteSchedule(db: Database, id: string): boolean {
     const result = db.query('DELETE FROM agent_schedules WHERE id = ?').run(id);
     return result.changes > 0;
+}
+
+// ─── Event Trigger Queries ────────────────────────────────────────────────────
+
+export function findSchedulesForEvent(
+    db: Database,
+    source: 'github_webhook' | 'github_poll',
+    event: string,
+    repo?: string,
+): AgentSchedule[] {
+    const rows = db.query(
+        `SELECT * FROM agent_schedules WHERE status = 'active' AND trigger_events IS NOT NULL`
+    ).all() as Record<string, unknown>[];
+
+    return rows
+        .map(rowToSchedule)
+        .filter((schedule) => {
+            if (!schedule.triggerEvents) return false;
+            return schedule.triggerEvents.some((te) => {
+                if (te.source !== source) return false;
+                if (te.event !== event) return false;
+                if (te.repo && repo && te.repo !== repo) return false;
+                return true;
+            });
+        });
 }
 
 // ─── Schedule Executions ─────────────────────────────────────────────────────
@@ -192,6 +221,44 @@ export function listExecutions(db: Database, scheduleId?: string, limit: number 
     return (rows as Record<string, unknown>[]).map(rowToExecution);
 }
 
+export interface ExecutionFilterOpts {
+    scheduleId?: string;
+    status?: string;
+    actionType?: string;
+    since?: string;
+    until?: string;
+    limit?: number;
+    offset?: number;
+}
+
+export function listExecutionsFiltered(
+    db: Database,
+    opts: ExecutionFilterOpts,
+): { executions: ScheduleExecution[]; total: number } {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (opts.scheduleId) { conditions.push('schedule_id = ?'); params.push(opts.scheduleId); }
+    if (opts.status) { conditions.push('status = ?'); params.push(opts.status); }
+    if (opts.actionType) { conditions.push('action_type = ?'); params.push(opts.actionType); }
+    if (opts.since) { conditions.push('started_at >= ?'); params.push(opts.since); }
+    if (opts.until) { conditions.push('started_at <= ?'); params.push(opts.until); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = opts.limit ?? 50;
+    const offset = opts.offset ?? 0;
+
+    const countRow = db.query(`SELECT COUNT(*) as total FROM schedule_executions ${where}`).get(...params) as { total: number };
+    const rows = db.query(
+        `SELECT * FROM schedule_executions ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+
+    return {
+        executions: (rows as Record<string, unknown>[]).map(rowToExecution),
+        total: countRow.total,
+    };
+}
+
 export function updateExecutionStatus(
     db: Database,
     id: string,
@@ -201,7 +268,7 @@ export function updateExecutionStatus(
     const fields = ['status = ?'];
     const values: (string | number | null)[] = [status];
 
-    if (status === 'completed' || status === 'failed' || status === 'denied') {
+    if (status === 'completed' || status === 'failed' || status === 'denied' || status === 'cancelled') {
         fields.push("completed_at = datetime('now')");
     }
     if (extras?.result !== undefined) { fields.push('result = ?'); values.push(extras.result); }

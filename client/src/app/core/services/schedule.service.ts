@@ -111,8 +111,23 @@ export class ScheduleService {
         const path = scheduleId
             ? `/schedules/${scheduleId}/executions?limit=${limit}`
             : `/schedule-executions?limit=${limit}`;
-        const executions = await firstValueFrom(this.api.get<ScheduleExecution[]>(path));
+        const raw = await firstValueFrom(this.api.get<ScheduleExecution[] | { executions: ScheduleExecution[]; total: number }>(path));
+        // Handle both array (legacy) and { executions, total } shapes
+        const executions = Array.isArray(raw) ? raw : raw.executions;
         this.executions.set(executions);
+    }
+
+    async cancelExecution(executionId: string): Promise<ScheduleExecution> {
+        const execution = await firstValueFrom(
+            this.api.post<ScheduleExecution>(`/schedule-executions/${executionId}/cancel`, {}),
+        );
+        return execution;
+    }
+
+    async bulkAction(action: 'pause' | 'resume' | 'delete', ids: string[]): Promise<{ results: Array<{ id: string; ok: boolean; error?: string }> }> {
+        return firstValueFrom(
+            this.api.post<{ results: Array<{ id: string; ok: boolean; error?: string }> }>('/schedules/bulk', { action, ids }),
+        );
     }
 
     async resolveApproval(executionId: string, approved: boolean): Promise<ScheduleExecution> {

@@ -195,6 +195,35 @@ export class SchedulerService {
         await this.executeSchedule(schedule);
     }
 
+    /** Cancel a running execution. Returns the cancelled execution or null if not cancellable. */
+    cancelExecution(executionId: string): ScheduleExecution | null {
+        const execution = getExecution(this.db, executionId);
+        if (!execution || execution.status !== 'running') return null;
+
+        // Stop the process if a session exists
+        if (execution.sessionId) {
+            try {
+                this.processManager.stopProcess(execution.sessionId);
+            } catch {
+                // Best-effort stop
+            }
+        }
+
+        // Remove from running set
+        this.runningExecutions.delete(executionId);
+
+        // Update status
+        updateExecutionStatus(this.db, executionId, 'cancelled', {
+            result: 'Cancelled by user',
+        });
+
+        const updated = getExecution(this.db, executionId);
+        if (updated) {
+            this.emit({ type: 'schedule_execution_update', data: updated });
+        }
+        return updated;
+    }
+
     /** Resolve an approval request for a schedule execution. */
     resolveApproval(executionId: string, approved: boolean): ScheduleExecution | null {
         const execution = resolveScheduleApproval(this.db, executionId, approved);

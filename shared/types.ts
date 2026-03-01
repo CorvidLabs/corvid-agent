@@ -362,6 +362,12 @@ export type ScheduleActionType =
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
 
+export interface ScheduleTriggerEvent {
+    source: 'github_webhook' | 'github_poll';
+    event: string;
+    repo?: string;
+}
+
 export interface ScheduleAction {
     type: ScheduleActionType;
     /** Target repos (for star/fork/review/suggest) */
@@ -409,13 +415,15 @@ export interface AgentSchedule {
     maxBudgetPerRun: number | null;
     /** Algorand address to notify on execution start/complete/fail */
     notifyAddress: string | null;
+    /** Event-based triggers (optional, in addition to or instead of cron/interval) */
+    triggerEvents: ScheduleTriggerEvent[] | null;
     lastRunAt: string | null;
     nextRunAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
 
-export type ScheduleExecutionStatus = 'running' | 'completed' | 'failed' | 'awaiting_approval' | 'approved' | 'denied';
+export type ScheduleExecutionStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'awaiting_approval' | 'approved' | 'denied';
 
 export interface ScheduleExecution {
     id: string;
@@ -444,6 +452,7 @@ export interface CreateScheduleInput {
     maxExecutions?: number;
     maxBudgetPerRun?: number;
     notifyAddress?: string;
+    triggerEvents?: ScheduleTriggerEvent[];
 }
 
 export interface UpdateScheduleInput {
@@ -457,6 +466,7 @@ export interface UpdateScheduleInput {
     maxExecutions?: number;
     maxBudgetPerRun?: number;
     notifyAddress?: string | null;
+    triggerEvents?: ScheduleTriggerEvent[] | null;
 }
 
 // MARK: - Webhooks (GitHub Event Triggers)

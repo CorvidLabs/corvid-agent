@@ -1110,6 +1110,56 @@ describe('SchedulerService', () => {
         });
     });
 
+    // ── cancelExecution ─────────────────────────────────────────────────
+
+    describe('cancelExecution', () => {
+        it('returns null for non-existent execution', () => {
+            const result = scheduler.cancelExecution('non-existent');
+            expect(result).toBeNull();
+        });
+
+        it('returns null for execution that is not running', () => {
+            const { agent } = createTestAgentAndProject();
+            const schedule = createTestSchedule(agent.id);
+            const exec = createExecution(db, schedule.id, agent.id, 'star_repo', {});
+            updateExecutionStatus(db, exec.id, 'completed', { result: 'done' });
+
+            const result = scheduler.cancelExecution(exec.id);
+            expect(result).toBeNull();
+        });
+
+        it('cancels a running execution and marks it cancelled', () => {
+            const { agent } = createTestAgentAndProject();
+            const schedule = createTestSchedule(agent.id);
+            const exec = createExecution(db, schedule.id, agent.id, 'star_repo', {});
+            // Status defaults to 'running'
+
+            const events: Array<{ type: string; data: unknown }> = [];
+            scheduler.onEvent((e) => events.push(e));
+
+            const result = scheduler.cancelExecution(exec.id);
+            expect(result).not.toBeNull();
+            expect(result!.status).toBe('cancelled');
+            expect(result!.result).toBe('Cancelled by user');
+            expect(result!.completedAt).not.toBeNull();
+
+            // Should have emitted an event
+            const updateEvents = events.filter(e => e.type === 'schedule_execution_update');
+            expect(updateEvents.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('calls processManager.stopProcess when sessionId exists', () => {
+            const { agent } = createTestAgentAndProject();
+            const schedule = createTestSchedule(agent.id);
+            const exec = createExecution(db, schedule.id, agent.id, 'custom', {});
+            updateExecutionStatus(db, exec.id, 'running', { sessionId: 'session-123' });
+
+            scheduler.cancelExecution(exec.id);
+
+            expect((mockPM.stopProcess as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThanOrEqual(1);
+        });
+    });
+
     // ── calculateNextRun ────────────────────────────────────────────────
 
     describe('calculateNextRun (via start initialization)', () => {

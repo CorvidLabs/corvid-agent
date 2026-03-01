@@ -8,9 +8,20 @@ export type ScheduleActionType =
     | 'council_launch'
     | 'send_message'
     | 'github_suggest'
+    | 'codebase_review'
+    | 'dependency_audit'
+    | 'improvement_loop'
+    | 'memory_maintenance'
+    | 'reputation_attestation'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
+
+export interface ScheduleTriggerEvent {
+    source: 'github_webhook' | 'github_poll';
+    event: string;
+    repo?: string;
+}
 
 export interface ScheduleAction {
     type: ScheduleActionType;
@@ -23,6 +34,8 @@ export interface ScheduleAction {
     maxPrs?: number;
     autoCreatePr?: boolean;
     prompt?: string;
+    maxImprovementTasks?: number;
+    focusArea?: string;
 }
 
 export interface AgentSchedule {
@@ -38,13 +51,14 @@ export interface AgentSchedule {
     maxExecutions: number | null;
     executionCount: number;
     maxBudgetPerRun: number | null;
+    triggerEvents: ScheduleTriggerEvent[] | null;
     lastRunAt: string | null;
     nextRunAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
 
-export type ScheduleExecutionStatus = 'running' | 'completed' | 'failed' | 'awaiting_approval' | 'approved' | 'denied';
+export type ScheduleExecutionStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'awaiting_approval' | 'approved' | 'denied';
 
 export interface ScheduleExecution {
     id: string;
@@ -71,6 +85,7 @@ export interface CreateScheduleInput {
     approvalPolicy?: ScheduleApprovalPolicy;
     maxExecutions?: number;
     maxBudgetPerRun?: number;
+    triggerEvents?: ScheduleTriggerEvent[];
 }
 
 export interface UpdateScheduleInput {
@@ -83,4 +98,5 @@ export interface UpdateScheduleInput {
     status?: ScheduleStatus;
     maxExecutions?: number;
     maxBudgetPerRun?: number;
+    triggerEvents?: ScheduleTriggerEvent[] | null;
 }

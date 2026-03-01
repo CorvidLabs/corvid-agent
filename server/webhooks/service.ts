@@ -12,7 +12,9 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
+import type { SchedulerService } from '../scheduler/service';
 import type { WebhookRegistration, WebhookEventType } from '../../shared/types';
+import { findSchedulesForEvent } from '../db/schedules';
 import {
     findRegistrationsForRepo,
     createDelivery,
@@ -79,6 +81,7 @@ export class WebhookService {
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null;
     private webhookSecret: string | null;
+    private schedulerService: SchedulerService | null = null;
     private eventCallbacks = new Set<WebhookEventCallback>();
     private recentTriggers = new Map<string, number>(); // registrationId -> last trigger timestamp
 
@@ -95,6 +98,11 @@ export class WebhookService {
         if (!this.webhookSecret) {
             log.warn('GITHUB_WEBHOOK_SECRET not set — webhook signature validation disabled');
         }
+    }
+
+    /** Set scheduler service for triggering event-based schedules. */
+    setSchedulerService(service: SchedulerService): void {
+        this.schedulerService = service;
     }
 
     /** Subscribe to webhook events (for WebSocket broadcast). */
@@ -269,6 +277,24 @@ export class WebhookService {
                 log.error('Failed to trigger agent', { registrationId: reg.id, error: message });
                 updateDeliveryStatus(this.db, delivery.id, 'failed', { result: message });
                 details.push(`${reg.id}: Failed — ${message}`);
+            }
+        }
+
+        // Fire matching event-based schedules
+        if (this.schedulerService) {
+            try {
+                const matching = findSchedulesForEvent(this.db, 'github_webhook', event, repo);
+                for (const schedule of matching) {
+                    this.schedulerService.triggerNow(schedule.id).catch((err) => {
+                        log.debug('Event-triggered schedule failed', {
+                            scheduleId: schedule.id, error: err instanceof Error ? err.message : String(err),
+                        });
+                    });
+                }
+            } catch (err) {
+                log.debug('Failed to check event-based schedules', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
             }
         }
 

@@ -314,6 +314,12 @@ const ScheduleActionSchema = z.object({
     focusArea: z.string().optional(),
 });
 
+const ScheduleTriggerEventSchema = z.object({
+    source: z.enum(['github_webhook', 'github_poll']),
+    event: z.string().min(1),
+    repo: z.string().optional(),
+});
+
 export const CreateScheduleSchema = z.object({
     agentId: z.string().min(1, 'agentId is required'),
     name: z.string().min(1, 'name is required'),
@@ -325,9 +331,10 @@ export const CreateScheduleSchema = z.object({
     maxExecutions: z.number().int().min(1).optional(),
     maxBudgetPerRun: z.number().min(0).optional(),
     notifyAddress: z.string().min(1).optional(),
+    triggerEvents: z.array(ScheduleTriggerEventSchema).optional(),
 }).refine(
-    (d) => d.cronExpression || d.intervalMs,
-    { message: 'Either cronExpression or intervalMs must be provided' },
+    (d) => d.cronExpression || d.intervalMs || (d.triggerEvents && d.triggerEvents.length > 0),
+    { message: 'Either cronExpression, intervalMs, or triggerEvents must be provided' },
 );
 
 export const UpdateScheduleSchema = z.object({
@@ -341,10 +348,16 @@ export const UpdateScheduleSchema = z.object({
     maxExecutions: z.number().int().min(1).optional(),
     maxBudgetPerRun: z.number().min(0).optional(),
     notifyAddress: z.string().min(1).nullable().optional(),
+    triggerEvents: z.array(ScheduleTriggerEventSchema).nullable().optional(),
 });
 
 export const ScheduleApprovalSchema = z.object({
     approved: z.boolean({ message: 'approved (boolean) is required' }),
+});
+
+export const BulkScheduleActionSchema = z.object({
+    action: z.enum(['pause', 'resume', 'delete']),
+    ids: z.array(z.string().min(1)).min(1, 'At least one schedule ID is required').max(50, 'Maximum 50 IDs per bulk action'),
 });
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
