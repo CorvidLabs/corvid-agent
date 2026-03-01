@@ -1205,6 +1205,17 @@ export class MentionPollingService {
             return false;
         }
 
+        // Block mentions with HIGH/CRITICAL injection confidence before creating a session
+        const injectionScan = scanGitHubContent(mention.body);
+        if (injectionScan.blocked) {
+            log.warn('Blocked mention: prompt injection detected', {
+                configId: config.id, mentionId: mention.id,
+                sender: mention.sender, confidence: injectionScan.confidence,
+                patterns: injectionScan.matches.map(m => m.pattern),
+            });
+            return false;
+        }
+
         // Always create an agent session — the session is responsible for both
         // replying on GitHub AND deciding whether to create a work task for code
         // changes. This ensures the person who mentioned us always gets a reply.
