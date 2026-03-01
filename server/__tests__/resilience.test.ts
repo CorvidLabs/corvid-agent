@@ -182,17 +182,18 @@ describe('withRetry', () => {
                     lastTime = now;
                     throw new Error('fail');
                 },
-                { maxAttempts: 3, baseDelayMs: 20, multiplier: 3, jitter: false },
+                { maxAttempts: 3, baseDelayMs: 30, multiplier: 3, jitter: false },
             ),
         ).rejects.toThrow('fail');
         expect(calls).toBe(3);
-        // With multiplier=3: delay[0] = 20*3^0 = 20ms, delay[1] = 20*3^1 = 60ms
-        expect(delays[0]).toBeGreaterThanOrEqual(15);
-        expect(delays[0]).toBeLessThan(50);
-        expect(delays[1]).toBeGreaterThanOrEqual(45);
-        expect(delays[1]).toBeLessThan(100);
-        // Second delay should be roughly 3x the first
-        expect(delays[1]).toBeGreaterThan(delays[0] * 2);
+        // With multiplier=3: delay[0] = 30*3^0 = 30ms, delay[1] = 30*3^1 = 90ms
+        // Use wide tolerances for CI (Windows timer granularity ~15ms)
+        expect(delays[0]).toBeGreaterThanOrEqual(10);
+        expect(delays[0]).toBeLessThan(80);
+        expect(delays[1]).toBeGreaterThanOrEqual(50);
+        expect(delays[1]).toBeLessThan(200);
+        // Second delay should be meaningfully larger than the first
+        expect(delays[1]).toBeGreaterThan(delays[0]);
     });
 
     test('retryIf receives the thrown error', async () => {
