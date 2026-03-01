@@ -271,4 +271,104 @@ describe('Schedule Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
     });
+
+    // --- Filtered executions ---
+
+    it('GET /api/schedule-executions with filters returns { executions, total }', async () => {
+        const { req, url } = fakeReq('GET', '/api/schedule-executions?status=running&limit=10&offset=0');
+        const res = await handleScheduleRoutes(req, url, db, null);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data).toHaveProperty('executions');
+        expect(data).toHaveProperty('total');
+        expect(Array.isArray(data.executions)).toBe(true);
+    });
+
+    it('GET /api/schedule-executions without filters returns array (backwards-compatible)', async () => {
+        const { req, url } = fakeReq('GET', '/api/schedule-executions');
+        const res = await handleScheduleRoutes(req, url, db, null);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(Array.isArray(data)).toBe(true);
+    });
+
+    // --- Cancel execution ---
+
+    it('POST /api/schedule-executions/:id/cancel returns 503 without scheduler service', async () => {
+        const { req, url } = fakeReq('POST', '/api/schedule-executions/some-id/cancel');
+        const res = await handleScheduleRoutes(req, url, db, null);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(503);
+    });
+
+    // --- Bulk action ---
+
+    it('POST /api/schedules/bulk pauses multiple schedules', async () => {
+        // Create two schedules
+        const { req: c1Req, url: c1Url } = fakeReq('POST', '/api/schedules', {
+            agentId, name: 'Bulk 1', intervalMs: 600000, actions: [{ type: 'star_repo', repos: ['a/b'] }],
+        });
+        const s1 = await (await handleScheduleRoutes(c1Req, c1Url, db, null))!.json();
+
+        const { req: c2Req, url: c2Url } = fakeReq('POST', '/api/schedules', {
+            agentId, name: 'Bulk 2', intervalMs: 600000, actions: [{ type: 'star_repo', repos: ['c/d'] }],
+        });
+        const s2 = await (await handleScheduleRoutes(c2Req, c2Url, db, null))!.json();
+
+        // Bulk pause
+        const { req, url } = fakeReq('POST', '/api/schedules/bulk', {
+            action: 'pause', ids: [s1.id, s2.id],
+        });
+        const res = await handleScheduleRoutes(req, url, db, null);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.results).toHaveLength(2);
+        expect(data.results[0].ok).toBe(true);
+        expect(data.results[1].ok).toBe(true);
+    });
+
+    it('POST /api/schedules/bulk handles mixed success/failure', async () => {
+        const { req: cReq, url: cUrl } = fakeReq('POST', '/api/schedules', {
+            agentId, name: 'Exists', intervalMs: 600000, actions: [{ type: 'star_repo', repos: ['a/b'] }],
+        });
+        const s = await (await handleScheduleRoutes(cReq, cUrl, db, null))!.json();
+
+        const { req, url } = fakeReq('POST', '/api/schedules/bulk', {
+            action: 'delete', ids: [s.id, 'nonexistent-id'],
+        });
+        const res = await handleScheduleRoutes(req, url, db, null);
+        const data = await res!.json();
+        expect(data.results).toHaveLength(2);
+        expect(data.results[0].ok).toBe(true);
+        expect(data.results[1].ok).toBe(false);
+    });
+
+    it('POST /api/schedules/bulk rejects invalid action', async () => {
+        const { req, url } = fakeReq('POST', '/api/schedules/bulk', {
+            action: 'invalid', ids: ['x'],
+        });
+        const res = await handleScheduleRoutes(req, url, db, null);
+        expect(res!.status).toBe(400);
+    });
+
+    // --- Event-only schedules ---
+
+    it('POST /api/schedules creates event-only schedule (no cron/interval)', async () => {
+        const { req, url } = fakeReq('POST', '/api/schedules', {
+            agentId,
+            name: 'Event Only',
+            actions: [{ type: 'star_repo', repos: ['owner/repo'] }],
+            triggerEvents: [{ source: 'github_webhook', event: 'issue_comment' }],
+        });
+        const res = await handleScheduleRoutes(req, url, db, null);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(201);
+        const data = await res!.json();
+        expect(data.triggerEvents).toHaveLength(1);
+        expect(data.triggerEvents[0].source).toBe('github_webhook');
+        expect(data.nextRunAt).toBeNull();
+    });
 });

@@ -8,11 +8,12 @@ import {
     updateSchedule,
     deleteSchedule,
     listExecutions,
+    listExecutionsFiltered,
     getExecution,
     updateScheduleNextRun,
 } from '../db/schedules';
 import { getNextCronDate } from '../scheduler/cron-parser';
-import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema, BulkScheduleActionSchema } from '../lib/validation';
 import { isGitHubConfigured } from '../github/operations';
 import { json, handleRouteError, badRequest, safeNumParam } from '../lib/response';
 import { scanForInjection } from '../lib/prompt-injection';
@@ -66,11 +67,32 @@ export function handleScheduleRoutes(
         return json(executions);
     }
 
-    // List all executions
+    // List all executions (with optional filters)
     if (url.pathname === '/api/schedule-executions' && req.method === 'GET') {
+        const status = url.searchParams.get('status') ?? undefined;
+        const actionType = url.searchParams.get('actionType') ?? undefined;
+        const since = url.searchParams.get('since') ?? undefined;
+        const until = url.searchParams.get('until') ?? undefined;
+        const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const limit = safeNumParam(url.searchParams.get('limit'), 50);
+
+        // If any filter params are present, use filtered query
+        if (status || actionType || since || until || offset > 0) {
+            const result = listExecutionsFiltered(db, { status, actionType, since, until, limit, offset });
+            return json(result);
+        }
+        // Backwards-compatible: plain array when no filters
         const executions = listExecutions(db, undefined, limit);
         return json(executions);
+    }
+
+    // Cancel a running execution
+    const cancelMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/cancel$/);
+    if (cancelMatch && req.method === 'POST') {
+        if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
+        const execution = schedulerService.cancelExecution(cancelMatch[1]);
+        if (!execution) return json({ error: 'Execution not found or not running' }, 404);
+        return json(execution);
     }
 
     // Get single execution
@@ -79,6 +101,11 @@ export function handleScheduleRoutes(
         const execution = getExecution(db, execMatch[1]);
         if (!execution) return json({ error: 'Execution not found' }, 404);
         return json(execution);
+    }
+
+    // Bulk schedule actions (pause/resume/delete)
+    if (url.pathname === '/api/schedules/bulk' && req.method === 'POST') {
+        return handleBulkAction(req, db);
     }
 
     // Trigger schedule now
@@ -138,14 +165,19 @@ function scanScheduleActions(actions: Array<{ prompt?: string; description?: str
 async function handleCreateSchedule(req: Request, db: Database): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateScheduleSchema);
-        validateScheduleFrequency(data.cronExpression, data.intervalMs);
+
+        // Only validate frequency if cron/interval is provided (event-only schedules skip this)
+        const isEventOnly = !data.cronExpression && !data.intervalMs && data.triggerEvents && data.triggerEvents.length > 0;
+        if (!isEventOnly) {
+            validateScheduleFrequency(data.cronExpression, data.intervalMs);
+        }
 
         const injectionError = scanScheduleActions(data.actions);
         if (injectionError) return badRequest(injectionError);
 
         const schedule = createSchedule(db, data);
 
-        // Compute and persist next_run_at so the scheduler picks it up
+        // Compute and persist next_run_at so the scheduler picks it up (null for event-only)
         const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
         if (nextRun) {
             updateScheduleNextRun(db, schedule.id, nextRun);
@@ -235,6 +267,33 @@ async function handleTriggerNow(scheduleId: string, schedulerService: SchedulerS
         await schedulerService.triggerNow(scheduleId);
         return json({ ok: true });
     } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleBulkAction(req: Request, db: Database): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, BulkScheduleActionSchema);
+        const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+
+        for (const id of data.ids) {
+            try {
+                if (data.action === 'delete') {
+                    const deleted = deleteSchedule(db, id);
+                    results.push({ id, ok: deleted, error: deleted ? undefined : 'Not found' });
+                } else {
+                    const status = data.action === 'pause' ? 'paused' : 'active';
+                    const schedule = updateSchedule(db, id, { status });
+                    results.push({ id, ok: !!schedule, error: schedule ? undefined : 'Not found' });
+                }
+            } catch (err) {
+                results.push({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
+            }
+        }
+
+        return json({ results });
+    } catch (err) {
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }

@@ -6,7 +6,7 @@ import { ScheduleService } from '../../core/services/schedule.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy } from '../../core/models/schedule.model';
+import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy, ScheduleTriggerEvent } from '../../core/models/schedule.model';
 
 @Component({
     selector: 'app-schedule-list',
@@ -113,17 +113,53 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                             @if (action.type === 'star_repo' || action.type === 'fork_repo' || action.type === 'review_prs' || action.type === 'github_suggest') {
                                 <input [(ngModel)]="action.reposStr" class="form-input" placeholder="owner/repo, owner/repo2" />
                             }
-                            @if (action.type === 'work_task' || action.type === 'github_suggest') {
+                            @if (action.type === 'work_task' || action.type === 'codebase_review' || action.type === 'dependency_audit' || action.type === 'improvement_loop' || action.type === 'github_suggest' || action.type === 'custom') {
+                                <input [(ngModel)]="action.projectId" class="form-input" placeholder="Project ID (optional)" />
+                            }
+                            @if (action.type === 'work_task' || action.type === 'github_suggest' || action.type === 'codebase_review' || action.type === 'dependency_audit') {
                                 <input [(ngModel)]="action.description" class="form-input" placeholder="Description..." />
+                            }
+                            @if (action.type === 'council_launch') {
+                                <input [(ngModel)]="action.councilId" class="form-input" placeholder="Council ID" />
+                                <input [(ngModel)]="action.projectId" class="form-input" placeholder="Project ID" />
+                                <input [(ngModel)]="action.description" class="form-input" placeholder="Prompt / Description..." />
                             }
                             @if (action.type === 'send_message') {
                                 <input [(ngModel)]="action.toAgentId" class="form-input" placeholder="Agent ID" />
                                 <input [(ngModel)]="action.message" class="form-input" placeholder="Message..." />
                             }
+                            @if (action.type === 'review_prs') {
+                                <input type="number" [(ngModel)]="action.maxPrs" class="form-input" placeholder="Max PRs (default 5)" min="1" max="50" style="max-width:140px" />
+                            }
+                            @if (action.type === 'github_suggest') {
+                                <label class="form-checkbox"><input type="checkbox" [(ngModel)]="action.autoCreatePr" /> Auto-create PRs</label>
+                            }
+                            @if (action.type === 'improvement_loop') {
+                                <input type="number" [(ngModel)]="action.maxImprovementTasks" class="form-input" placeholder="Max tasks (1-5)" min="1" max="5" style="max-width:140px" />
+                                <input [(ngModel)]="action.focusArea" class="form-input" placeholder="Focus area (e.g. type safety)" />
+                            }
+                            @if (action.type === 'custom') {
+                                <textarea [(ngModel)]="action.prompt" class="form-input" placeholder="Custom prompt..." rows="2"></textarea>
+                            }
                             <button class="remove-action-btn" (click)="removeAction($index)">×</button>
                         </div>
                     }
                     <button class="add-action-btn" (click)="addAction()">+ Add Action</button>
+
+                    <!-- Event Triggers (optional) -->
+                    <h4>Event Triggers (optional)</h4>
+                    @for (trigger of formTriggerEvents(); track $index) {
+                        <div class="action-row">
+                            <select [(ngModel)]="trigger.source" class="form-select" style="min-width:140px">
+                                <option value="github_webhook">GitHub Webhook</option>
+                                <option value="github_poll">GitHub Poll</option>
+                            </select>
+                            <input [(ngModel)]="trigger.event" class="form-input" placeholder="Event type (e.g. issue_comment)" />
+                            <input [(ngModel)]="trigger.repo" class="form-input" placeholder="Repo filter (optional, owner/name)" />
+                            <button class="remove-action-btn" (click)="removeTriggerEvent($index)">×</button>
+                        </div>
+                    }
+                    <button class="add-action-btn" (click)="addTriggerEvent()">+ Add Trigger Event</button>
 
                     <div class="form-buttons">
                         <button class="save-btn" [disabled]="creating()" (click)="create()">
@@ -223,6 +259,9 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                                         @if (action.repos && action.repos.length) { ({{ action.repos.join(', ') }}) }
                                     </span>
                                 }
+                                @if (schedule.triggerEvents && schedule.triggerEvents.length > 0) {
+                                    <span class="action-tag" data-type="trigger">{{ schedule.triggerEvents.length }} event trigger{{ schedule.triggerEvents.length > 1 ? 's' : '' }}</span>
+                                }
                             </div>
                             @if (expandedScheduleId() === schedule.id) {
                                 <div class="schedule-execs" (click)="$event.stopPropagation()">
@@ -239,6 +278,9 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                                                 <span class="exec-time">{{ exec.startedAt | relativeTime }}</span>
                                                 @if (exec.result && expandedExecId() !== exec.id) {
                                                     <span class="exec-result">{{ exec.result | slice:0:100 }}</span>
+                                                }
+                                                @if (exec.status === 'running') {
+                                                    <button class="action-btn action-btn--danger" (click)="cancelExecution(exec.id); $event.stopPropagation()">Cancel</button>
                                                 }
                                                 @if (exec.sessionId) {
                                                     <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]" (click)="$event.stopPropagation()">Session</a>
@@ -270,6 +312,9 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
                                 <span class="exec-time">{{ exec.startedAt | relativeTime }}</span>
                                 @if (exec.result && expandedExecId() !== exec.id) {
                                     <span class="exec-result">{{ exec.result | slice:0:100 }}</span>
+                                }
+                                @if (exec.status === 'running') {
+                                    <button class="action-btn action-btn--danger" (click)="cancelExecution(exec.id); $event.stopPropagation()">Cancel</button>
                                 }
                                 @if (exec.sessionId) {
                                     <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]" (click)="$event.stopPropagation()">Session</a>
@@ -313,6 +358,7 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
         .action-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem} .action-type-select{min-width:140px}
         .remove-action-btn{padding:.25rem .5rem;background:var(--accent-red-dim);color:var(--accent-red);border:1px solid var(--accent-red);border-radius:var(--radius-sm);cursor:pointer;font-size:.9rem;font-family:inherit;line-height:1}
         .add-action-btn{padding:.35rem .75rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-secondary);font-size:.7rem;cursor:pointer;font-family:inherit;margin-top:.25rem}
+        .form-checkbox{display:flex;align-items:center;gap:.35rem;font-size:.75rem;color:var(--text-secondary);cursor:pointer;white-space:nowrap}
         .form-buttons{margin-top:1rem} .save-btn{text-transform:uppercase}
         .schedules__filters{display:flex;gap:.35rem;margin-bottom:1rem}
         .empty{text-align:center;padding:3rem;color:var(--text-tertiary)} .empty-hint{font-size:.75rem;margin-top:.5rem}
@@ -350,6 +396,7 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
         .exec-status[data-status="running"]{color:var(--accent-cyan);background:var(--accent-cyan-dim)}
         .exec-status[data-status="completed"]{color:var(--accent-green);background:var(--accent-green-dim)}
         .exec-status[data-status="failed"]{color:var(--accent-red);background:var(--accent-red-dim)}
+        .exec-status[data-status="cancelled"]{color:var(--text-tertiary);background:var(--bg-raised)}
         .exec-status[data-status="awaiting_approval"]{color:var(--accent-amber);background:var(--accent-amber-dim)}
         .exec-time{color:var(--text-tertiary);font-size:.65rem} .exec-result{color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .exec-link{font-size:.65rem;color:var(--accent-cyan);text-decoration:none;border:1px solid var(--accent-cyan);padding:1px 6px;border-radius:var(--radius-sm)}
@@ -397,6 +444,19 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         description?: string;
         toAgentId?: string;
         message?: string;
+        projectId?: string;
+        councilId?: string;
+        maxPrs?: number;
+        autoCreatePr?: boolean;
+        prompt?: string;
+        maxImprovementTasks?: number;
+        focusArea?: string;
+    }>>([]);
+
+    readonly formTriggerEvents = signal<Array<{
+        source: 'github_webhook' | 'github_poll';
+        event: string;
+        repo?: string;
     }>>([]);
 
     readonly actionTypes = [
@@ -407,6 +467,12 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         { value: 'github_suggest', label: 'GitHub Suggestions' },
         { value: 'send_message', label: 'Send Message' },
         { value: 'council_launch', label: 'Council Launch' },
+        { value: 'codebase_review', label: 'Codebase Review' },
+        { value: 'dependency_audit', label: 'Dependency Audit' },
+        { value: 'improvement_loop', label: 'Improvement Loop' },
+        { value: 'memory_maintenance', label: 'Memory Maintenance' },
+        { value: 'reputation_attestation', label: 'Reputation Attestation' },
+        { value: 'custom', label: 'Custom (Prompt)' },
     ];
 
     readonly activeCount = computed(() =>
@@ -496,6 +562,14 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         this.formActions.update((actions) => actions.filter((_, i) => i !== index));
     }
 
+    addTriggerEvent(): void {
+        this.formTriggerEvents.update((events) => [...events, { source: 'github_webhook' as const, event: '' }]);
+    }
+
+    removeTriggerEvent(index: number): void {
+        this.formTriggerEvents.update((events) => events.filter((_, i) => i !== index));
+    }
+
     async create(): Promise<void> {
         if (!this.formAgentId || !this.formName || this.formActions().length === 0) {
             this.notifications.error('Please fill in agent, name, and at least one action');
@@ -510,7 +584,22 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
                 description: a.description,
                 toAgentId: a.toAgentId,
                 message: a.message,
+                projectId: a.projectId || undefined,
+                councilId: a.councilId || undefined,
+                maxPrs: a.maxPrs || undefined,
+                autoCreatePr: a.autoCreatePr || undefined,
+                prompt: a.prompt || undefined,
+                maxImprovementTasks: a.maxImprovementTasks || undefined,
+                focusArea: a.focusArea || undefined,
             }));
+
+            const triggerEvents: ScheduleTriggerEvent[] = this.formTriggerEvents()
+                .filter((t) => t.event.trim())
+                .map((t) => ({
+                    source: t.source,
+                    event: t.event.trim(),
+                    repo: t.repo?.trim() || undefined,
+                }));
 
             await this.scheduleService.createSchedule({
                 agentId: this.formAgentId,
@@ -521,6 +610,7 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
                 actions,
                 approvalPolicy: this.formApprovalPolicy,
                 maxExecutions: this.formMaxExec ?? undefined,
+                triggerEvents: triggerEvents.length > 0 ? triggerEvents : undefined,
             });
 
             this.notifications.success('Schedule created');
@@ -586,6 +676,15 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         this.expandedExecId.set(this.expandedExecId() === execId ? null : execId);
     }
 
+    async cancelExecution(executionId: string): Promise<void> {
+        try {
+            await this.scheduleService.cancelExecution(executionId);
+            this.notifications.success('Execution cancelled');
+        } catch {
+            this.notifications.error('Failed to cancel execution');
+        }
+    }
+
     async resolveApproval(executionId: string, approved: boolean): Promise<void> {
         try {
             await this.scheduleService.resolveApproval(executionId, approved);
@@ -604,5 +703,6 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         this.formApprovalPolicy = 'owner_approve';
         this.formMaxExec = null;
         this.formActions.set([]);
+        this.formTriggerEvents.set([]);
     }
 }

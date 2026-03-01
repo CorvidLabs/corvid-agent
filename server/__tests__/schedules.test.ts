@@ -15,8 +15,10 @@ import {
     createExecution,
     getExecution,
     listExecutions,
+    listExecutionsFiltered,
     updateExecutionStatus,
     resolveScheduleApproval,
+    findSchedulesForEvent,
 } from '../db/schedules';
 
 let db: Database;
@@ -428,5 +430,181 @@ describe('Approval Workflow', () => {
 
     test('resolve returns null for nonexistent execution', () => {
         expect(resolveScheduleApproval(db, 'nonexistent', true)).toBeNull();
+    });
+});
+
+// ─── Filtered Executions ─────────────────────────────────────────────────────
+
+describe('listExecutionsFiltered', () => {
+    let scheduleId: string;
+
+    beforeEach(() => {
+        const schedule = createSchedule(db, { agentId, name: 'Filter Test', actions: [] });
+        scheduleId = schedule.id;
+    });
+
+    test('filter by status', () => {
+        const e1 = createExecution(db, scheduleId, agentId, 'star_repo', {});
+        const e2 = createExecution(db, scheduleId, agentId, 'fork_repo', {});
+        updateExecutionStatus(db, e1.id, 'completed', { result: 'done' });
+        updateExecutionStatus(db, e2.id, 'failed', { result: 'err' });
+
+        const { executions, total } = listExecutionsFiltered(db, { status: 'completed' });
+        expect(total).toBe(1);
+        expect(executions).toHaveLength(1);
+        expect(executions[0].status).toBe('completed');
+    });
+
+    test('filter by actionType', () => {
+        createExecution(db, scheduleId, agentId, 'star_repo', {});
+        createExecution(db, scheduleId, agentId, 'fork_repo', {});
+        createExecution(db, scheduleId, agentId, 'star_repo', {});
+
+        const { executions, total } = listExecutionsFiltered(db, { actionType: 'star_repo' });
+        expect(total).toBe(2);
+        expect(executions).toHaveLength(2);
+    });
+
+    test('filter by date range', () => {
+        createExecution(db, scheduleId, agentId, 'star_repo', {});
+
+        const { total: future } = listExecutionsFiltered(db, { since: '2099-01-01T00:00:00.000Z' });
+        expect(future).toBe(0);
+
+        const { total: past } = listExecutionsFiltered(db, { since: '2000-01-01T00:00:00.000Z' });
+        expect(past).toBe(1);
+    });
+
+    test('combined filters', () => {
+        const e1 = createExecution(db, scheduleId, agentId, 'star_repo', {});
+        createExecution(db, scheduleId, agentId, 'fork_repo', {});
+        updateExecutionStatus(db, e1.id, 'completed', { result: 'ok' });
+
+        const { total } = listExecutionsFiltered(db, { status: 'completed', actionType: 'star_repo' });
+        expect(total).toBe(1);
+    });
+
+    test('pagination with limit and offset', () => {
+        for (let i = 0; i < 5; i++) {
+            createExecution(db, scheduleId, agentId, 'star_repo', { i });
+        }
+
+        const page1 = listExecutionsFiltered(db, { limit: 2, offset: 0 });
+        expect(page1.executions).toHaveLength(2);
+        expect(page1.total).toBe(5);
+
+        const page2 = listExecutionsFiltered(db, { limit: 2, offset: 2 });
+        expect(page2.executions).toHaveLength(2);
+        expect(page2.total).toBe(5);
+
+        const page3 = listExecutionsFiltered(db, { limit: 2, offset: 4 });
+        expect(page3.executions).toHaveLength(1);
+    });
+
+    test('no filters returns all', () => {
+        createExecution(db, scheduleId, agentId, 'star_repo', {});
+        createExecution(db, scheduleId, agentId, 'fork_repo', {});
+
+        const { total } = listExecutionsFiltered(db, {});
+        expect(total).toBe(2);
+    });
+
+    test('cancelled status is filtered correctly', () => {
+        const exec = createExecution(db, scheduleId, agentId, 'star_repo', {});
+        updateExecutionStatus(db, exec.id, 'cancelled', { result: 'Cancelled by user' });
+
+        const { executions } = listExecutionsFiltered(db, { status: 'cancelled' });
+        expect(executions).toHaveLength(1);
+        expect(executions[0].status).toBe('cancelled');
+        expect(executions[0].completedAt).not.toBeNull();
+    });
+});
+
+// ─── Event Trigger Queries ───────────────────────────────────────────────────
+
+describe('findSchedulesForEvent', () => {
+    test('matches by source and event', () => {
+        createSchedule(db, {
+            agentId,
+            name: 'Webhook Trigger',
+            actions: [{ type: 'star_repo' }],
+            triggerEvents: [{ source: 'github_webhook', event: 'issue_comment' }],
+        });
+
+        const results = findSchedulesForEvent(db, 'github_webhook', 'issue_comment');
+        expect(results).toHaveLength(1);
+        expect(results[0].name).toBe('Webhook Trigger');
+    });
+
+    test('filters by repo when specified', () => {
+        createSchedule(db, {
+            agentId,
+            name: 'Repo-specific',
+            actions: [{ type: 'star_repo' }],
+            triggerEvents: [{ source: 'github_webhook', event: 'issues', repo: 'owner/specific' }],
+        });
+
+        const match = findSchedulesForEvent(db, 'github_webhook', 'issues', 'owner/specific');
+        expect(match).toHaveLength(1);
+
+        const noMatch = findSchedulesForEvent(db, 'github_webhook', 'issues', 'owner/other');
+        expect(noMatch).toHaveLength(0);
+    });
+
+    test('ignores paused schedules', () => {
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'Paused',
+            actions: [{ type: 'star_repo' }],
+            triggerEvents: [{ source: 'github_poll', event: 'mention' }],
+        });
+        updateSchedule(db, schedule.id, { status: 'paused' });
+
+        const results = findSchedulesForEvent(db, 'github_poll', 'mention');
+        expect(results).toHaveLength(0);
+    });
+
+    test('handles null triggerEvents', () => {
+        createSchedule(db, {
+            agentId,
+            name: 'No Triggers',
+            actions: [{ type: 'star_repo' }],
+        });
+
+        const results = findSchedulesForEvent(db, 'github_webhook', 'issue_comment');
+        expect(results).toHaveLength(0);
+    });
+
+    test('matches correct source only', () => {
+        createSchedule(db, {
+            agentId,
+            name: 'Webhook Only',
+            actions: [{ type: 'star_repo' }],
+            triggerEvents: [{ source: 'github_webhook', event: 'issue_comment' }],
+        });
+
+        const webhook = findSchedulesForEvent(db, 'github_webhook', 'issue_comment');
+        expect(webhook).toHaveLength(1);
+
+        const poll = findSchedulesForEvent(db, 'github_poll', 'issue_comment');
+        expect(poll).toHaveLength(0);
+    });
+
+    test('schedule with triggerEvents roundtrips correctly', () => {
+        const events = [
+            { source: 'github_webhook' as const, event: 'issue_comment', repo: 'owner/repo' },
+            { source: 'github_poll' as const, event: 'mention' },
+        ];
+        const schedule = createSchedule(db, {
+            agentId,
+            name: 'Multi-trigger',
+            actions: [{ type: 'star_repo' }],
+            triggerEvents: events,
+        });
+
+        const found = getSchedule(db, schedule.id);
+        expect(found!.triggerEvents).toHaveLength(2);
+        expect(found!.triggerEvents![0].repo).toBe('owner/repo');
+        expect(found!.triggerEvents![1].source).toBe('github_poll');
     });
 });

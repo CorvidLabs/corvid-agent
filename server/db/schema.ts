@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 56;
+const SCHEMA_VERSION = 57;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1112,6 +1112,11 @@ const MIGRATIONS: Record<number, string[]> = {
         `ALTER TABLE api_keys ADD COLUMN expires_at TEXT DEFAULT NULL`,
         `ALTER TABLE api_keys ADD COLUMN last_used_at TEXT DEFAULT NULL`,
     ],
+
+    // Migration 57: Schedule trigger events (event-based schedule activation)
+    57: [
+        `ALTER TABLE agent_schedules ADD COLUMN trigger_events TEXT DEFAULT NULL`,
+    ],
 };
 
 /** Allowlist pattern for valid SQL identifiers (table/column names). */
@@ -1165,6 +1170,7 @@ export function runMigrations(db: Database): void {
 
 const IDEMPOTENT_CREATE_TABLE = /^\s*CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\w+)/i;
 const IDEMPOTENT_CREATE_INDEX = /^\s*CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/i;
+const ALTER_ADD_COLUMN = /^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i;
 const DROP_TABLE_RE = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)/i;
 const RENAME_TABLE_RE = /ALTER\s+TABLE\s+(\w+)\s+RENAME\s+TO\s+(\w+)/i;
 
@@ -1186,7 +1192,13 @@ function reconcileTables(db: Database): void {
         for (const sql of statements) {
             // Always reconcile CREATE INDEX IF NOT EXISTS
             if (IDEMPOTENT_CREATE_INDEX.test(sql)) {
-                db.exec(sql);
+                try { db.exec(sql); } catch { /* column may not exist yet */ }
+                continue;
+            }
+            // Reconcile ALTER TABLE ADD COLUMN if column is missing
+            const alterMatch = ALTER_ADD_COLUMN.exec(sql);
+            if (alterMatch && !hasColumn(db, alterMatch[1], alterMatch[2])) {
+                try { db.exec(sql); } catch { /* table may not exist */ }
                 continue;
             }
             // Only reconcile CREATE TABLE for non-transient tables

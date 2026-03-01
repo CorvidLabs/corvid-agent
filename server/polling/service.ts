@@ -13,7 +13,9 @@
 
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
+import type { SchedulerService } from '../scheduler/service';
 import type { MentionPollingConfig } from '../../shared/types';
+import { findSchedulesForEvent } from '../db/schedules';
 import {
     findDuePollingConfigs,
     updatePollState,
@@ -97,6 +99,7 @@ export class MentionPollingService {
     private ciRetryLastSpawn = new Map<string, number>();
     private activePolls = new Set<string>(); // config IDs currently being polled
     private dedup = DedupService.global();
+    private schedulerService: SchedulerService | null = null;
     private eventCallbacks = new Set<PollingEventCallback>();
     private running = false;
 
@@ -113,6 +116,11 @@ export class MentionPollingService {
         this.processManager = processManager;
         // Rate limit triggers: 60s TTL matches MIN_TRIGGER_GAP_MS, bounded at 500 entries
         this.dedup.register(TRIGGER_DEDUP_NS, { maxSize: 500, ttlMs: MIN_TRIGGER_GAP_MS });
+    }
+
+    /** Set scheduler service for triggering event-based schedules. */
+    setSchedulerService(service: SchedulerService): void {
+        this.schedulerService = service;
     }
 
     /** Subscribe to polling events (for WebSocket broadcast). */
@@ -648,6 +656,24 @@ export class MentionPollingService {
                     const relatedIds = newMentions.filter(m => m.number === mention.number).map(m => m.id);
                     config.processedIds = [...config.processedIds, ...relatedIds];
                     updateProcessedIds(this.db, config.id, config.processedIds);
+                }
+            }
+
+            // Fire matching event-based schedules
+            if (this.schedulerService && triggeredThisCycle > 0) {
+                try {
+                    const matching = findSchedulesForEvent(this.db, 'github_poll', 'mention', config.repo);
+                    for (const schedule of matching) {
+                        this.schedulerService.triggerNow(schedule.id).catch((err) => {
+                            log.debug('Event-triggered schedule failed', {
+                                scheduleId: schedule.id, error: err instanceof Error ? err.message : String(err),
+                            });
+                        });
+                    }
+                } catch (err) {
+                    log.debug('Failed to check event-based schedules', {
+                        error: err instanceof Error ? err.message : String(err),
+                    });
                 }
             }
 
