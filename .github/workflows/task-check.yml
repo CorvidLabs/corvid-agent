@@ -1,0 +1,41 @@
+name: Task List Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-tasks:
+    name: Task list complete
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for unchecked task items
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+
+            // Find all task list items: - [ ] and - [x]
+            const unchecked = (body.match(/^[\s]*-\s\[ \]\s.+/gm) || []);
+            const checked = (body.match(/^[\s]*-\s\[x\]\s.+/gm) || []);
+
+            const total = unchecked.length + checked.length;
+
+            if (total === 0) {
+              console.log('No task list items found in PR body — passing.');
+              return;
+            }
+
+            console.log(`Task items: ${checked.length}/${total} complete`);
+
+            if (unchecked.length > 0) {
+              console.log('\nUnchecked items:');
+              unchecked.forEach(item => console.log(`  ${item.trim()}`));
+              core.setFailed(
+                `${unchecked.length} unchecked task item(s) in PR description. ` +
+                `All task items must be completed before merge.`
+              );
+            } else {
+              console.log('All task items checked — passing.');
+            }
