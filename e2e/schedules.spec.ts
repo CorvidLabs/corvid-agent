@@ -86,13 +86,14 @@ test.describe('Schedules', () => {
         await expect(page.locator(`text=${schedule.name}`).first()).toBeVisible({ timeout: 10000 });
 
         // Expand the card
-        await page.locator(`.schedule-card:has-text("${schedule.name}")`).first().click();
+        const card = page.locator(`.schedule-card:has-text("${schedule.name}")`).first();
+        await card.click();
 
         // Set up dialog handler for confirm()
         page.on('dialog', (dialog) => dialog.accept());
 
-        // Click Delete
-        await page.locator('.action-btn--danger, button:text("Delete")').first().click();
+        // Click Delete within the target card
+        await card.locator('.action-btn--danger, button:text("Delete")').first().click();
 
         // Verify name is gone
         await expect(page.locator(`text=${schedule.name}`)).toHaveCount(0, { timeout: 10000 });
