@@ -565,6 +565,18 @@ describe('SSRF prevention', () => {
         expect(() => validateUrl('file:///etc/passwd')).toThrow();
     });
 
+    test('rejects hex IP encoding (0x7f000001)', () => {
+        expect(() => validateUrl('http://0x7f000001/')).toThrow();
+    });
+
+    test('rejects decimal integer IP (2130706433)', () => {
+        expect(() => validateUrl('http://2130706433/')).toThrow();
+    });
+
+    test('rejects octal IP encoding (0177.0.0.1)', () => {
+        expect(() => validateUrl('http://0177.0.0.1/')).toThrow();
+    });
+
     test('allows valid public URLs', () => {
         expect(() => validateUrl('https://agent.example.com')).not.toThrow();
         expect(() => validateUrl('http://8.8.8.8/')).not.toThrow();

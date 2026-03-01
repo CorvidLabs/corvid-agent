@@ -79,6 +79,14 @@ export function validateUrl(urlString: string): void {
     if (PRIVATE_IPV4_RE.test(hostname) || ZERO_PREFIX_RE.test(hostname)) {
         throw new ValidationError(`Blocked URL: ${hostname} resolves to a private/reserved IP range`);
     }
+
+    // Block numeric IP forms that resolve to private addresses (DNS rebinding)
+    if (/^\d+$/.test(hostname)) {
+        throw new ValidationError(`Blocked URL: numeric IP address ${hostname} is not allowed`);
+    }
+    if (/^0x/i.test(hostname)) {
+        throw new ValidationError(`Blocked URL: hex IP address ${hostname} is not allowed`);
+    }
 }
 
 // ---------------------------------------------------------------------------
