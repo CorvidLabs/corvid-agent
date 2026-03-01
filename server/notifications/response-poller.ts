@@ -113,8 +113,12 @@ export class ResponsePollingService {
                         this.markAllAnswered(dispatch.questionId);
 
                         // Close the issue and add acknowledgment
-                        github.addIssueComment(repo, issueNumber, 'Answer received. Thank you!').catch(() => {});
-                        github.closeIssue(repo, issueNumber).catch(() => {});
+                        github.addIssueComment(repo, issueNumber, 'Answer received. Thank you!').catch((err) => {
+                            log.debug('Failed to add GitHub acknowledgment comment', { error: err instanceof Error ? err.message : String(err) });
+                        });
+                        github.closeIssue(repo, issueNumber).catch((err) => {
+                            log.debug('Failed to close GitHub issue after answer', { error: err instanceof Error ? err.message : String(err) });
+                        });
                     }
                 }
             } catch (err) {
@@ -224,7 +228,9 @@ export class ResponsePollingService {
                                             callback_query_id: update.callback_query.id,
                                             text: 'Answer received!',
                                         }),
-                                    }).catch(() => {});
+                                    }).catch((err) => {
+                                        log.debug('Failed to answer Telegram callback query', { error: err instanceof Error ? err.message : String(err) });
+                                    });
                                 }
                             }
                         }
@@ -258,7 +264,9 @@ export class ResponsePollingService {
                                     text: 'Answer received!',
                                     reply_to_message_id: update.message.message_id,
                                 }),
-                            }).catch(() => {});
+                            }).catch((err) => {
+                                log.debug('Failed to send Telegram confirmation message', { error: err instanceof Error ? err.message : String(err) });
+                            });
                         }
                     }
                 }

@@ -106,6 +106,95 @@ describe('withRetry', () => {
         expect(calls).toBe(3);
     });
 
+    test('applies exponential backoff delays (delay increases per attempt)', async () => {
+        const delays: number[] = [];
+        let lastTime = Date.now();
+        let calls = 0;
+        await expect(
+            withRetry(
+                async () => {
+                    calls++;
+                    const now = Date.now();
+                    if (calls > 1) delays.push(now - lastTime);
+                    lastTime = now;
+                    throw new Error('fail');
+                },
+                { maxAttempts: 4, baseDelayMs: 30, multiplier: 2, jitter: false },
+            ),
+        ).rejects.toThrow('fail');
+        expect(calls).toBe(4);
+        // delays[0] ≈ 30ms (30 * 2^0), delays[1] ≈ 60ms (30 * 2^1), delays[2] ≈ 120ms (30 * 2^2)
+        // Each successive delay should be roughly double the previous
+        expect(delays).toHaveLength(3);
+        for (let i = 1; i < delays.length; i++) {
+            expect(delays[i]).toBeGreaterThan(delays[i - 1] * 1.3); // allow margin for timing
+        }
+    });
+
+    test('no jitter when disabled (exact exponential delay)', async () => {
+        // With jitter=false, the delay formula is exactly: min(baseDelayMs * multiplier^attempt, maxDelayMs)
+        let lastTime = Date.now();
+        let calls = 0;
+        const results: number[][] = [];
+
+        // Run multiple times — without jitter, delays should be consistent
+        for (let run = 0; run < 2; run++) {
+            const runDelays: number[] = [];
+            calls = 0;
+            lastTime = Date.now();
+            await expect(
+                withRetry(
+                    async () => {
+                        calls++;
+                        const now = Date.now();
+                        if (calls > 1) runDelays.push(now - lastTime);
+                        lastTime = now;
+                        throw new Error('fail');
+                    },
+                    { maxAttempts: 3, baseDelayMs: 20, multiplier: 2, jitter: false },
+                ),
+            ).rejects.toThrow('fail');
+            results.push(runDelays);
+        }
+
+        // Both runs should produce similar delays (no randomness)
+        expect(results[0]).toHaveLength(2);
+        expect(results[1]).toHaveLength(2);
+        // First delay should be ~20ms, second ~40ms
+        for (const runDelays of results) {
+            expect(runDelays[0]).toBeGreaterThanOrEqual(15);
+            expect(runDelays[0]).toBeLessThan(50);
+            expect(runDelays[1]).toBeGreaterThanOrEqual(30);
+            expect(runDelays[1]).toBeLessThan(80);
+        }
+    });
+
+    test('custom multiplier works correctly', async () => {
+        const delays: number[] = [];
+        let lastTime = Date.now();
+        let calls = 0;
+        await expect(
+            withRetry(
+                async () => {
+                    calls++;
+                    const now = Date.now();
+                    if (calls > 1) delays.push(now - lastTime);
+                    lastTime = now;
+                    throw new Error('fail');
+                },
+                { maxAttempts: 3, baseDelayMs: 20, multiplier: 3, jitter: false },
+            ),
+        ).rejects.toThrow('fail');
+        expect(calls).toBe(3);
+        // With multiplier=3: delay[0] = 20*3^0 = 20ms, delay[1] = 20*3^1 = 60ms
+        expect(delays[0]).toBeGreaterThanOrEqual(15);
+        expect(delays[0]).toBeLessThan(50);
+        expect(delays[1]).toBeGreaterThanOrEqual(45);
+        expect(delays[1]).toBeLessThan(100);
+        // Second delay should be roughly 3x the first
+        expect(delays[1]).toBeGreaterThan(delays[0] * 2);
+    });
+
     test('retryIf receives the thrown error', async () => {
         const errors: unknown[] = [];
         await expect(

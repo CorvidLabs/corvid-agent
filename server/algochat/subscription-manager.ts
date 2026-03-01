@@ -188,7 +188,9 @@ export class SubscriptionManager {
                     if (timeoutExtensions < MAX_TIMEOUT_EXTENSIONS) {
                         log.info(`Subscription timeout extended — session still running`, { sessionId, extension: timeoutExtensions });
                         const msg = generateProgressSummary();
-                        this.responseFormatter.sendResponse(participant, `[Status] ${msg}`).catch(() => {});
+                        this.responseFormatter.sendResponse(participant, `[Status] ${msg}`).catch((err) => {
+                            log.debug('Failed to send progress update on timeout extension', { error: err instanceof Error ? err.message : String(err) });
+                        });
                         this.responseFormatter.emitEvent(participant, msg, 'status');
                         resetTimer(); // Reset for another cycle
                         return;
