@@ -228,7 +228,7 @@ export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
     if (agentId) {
         const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
-        const rows = db.query(query).all(...bindings, agentId) as WorkTaskRow[];
+        const rows = db.query(query).all(agentId, ...bindings) as WorkTaskRow[];
         return rows.map(rowToWorkTask);
     }
 

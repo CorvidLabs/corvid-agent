@@ -7,10 +7,11 @@ import { TenantService } from '../tenant/context';
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 import { registerApiKey } from '../tenant/middleware';
 import { createAgent, listAgents, getAgent, updateAgent, deleteAgent } from '../db/agents';
-import { createSession, listSessions, getSession, deleteSession } from '../db/sessions';
+import { createSession, listSessions, getSession, deleteSession, updateSession, getSessionMessages, addSessionMessage } from '../db/sessions';
 import { createProject, listProjects, getProject } from '../db/projects';
 // work-tasks unused in current tests but kept for future expansion
 import { tenantGuard, tenantRoleGuard, createRequestContext } from '../middleware/guards';
+import { validateUrl } from '../a2a/client';
 
 // ---------------------------------------------------------------------------
 // Fresh database per test
@@ -486,5 +487,121 @@ describe('Default tenant backwards compat', () => {
         expect(query).toBe(originalQuery);
         // No additional bindings
         expect(bindings).toEqual([]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Session ownership validation (#373)
+// ---------------------------------------------------------------------------
+
+describe('Session ownership validation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    test('getSessionMessages returns empty for cross-tenant session', () => {
+        const session = createSession(db, { name: 'Session B' }, TENANT_B);
+        addSessionMessage(db, session.id, 'user', 'hello');
+
+        // Tenant A should get empty array
+        const messages = getSessionMessages(db, session.id, TENANT_A);
+        expect(messages).toEqual([]);
+
+        // Tenant B should get the message
+        const messagesB = getSessionMessages(db, session.id, TENANT_B);
+        expect(messagesB).toHaveLength(1);
+    });
+
+    test('updateSession returns null for cross-tenant session', () => {
+        const session = createSession(db, { name: 'Session B' }, TENANT_B);
+
+        const result = updateSession(db, session.id, { name: 'Hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        // Original name preserved
+        const original = getSession(db, session.id, TENANT_B);
+        expect(original!.name).toBe('Session B');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// SSRF prevention (#374)
+// ---------------------------------------------------------------------------
+
+describe('SSRF prevention', () => {
+    test('rejects localhost', () => {
+        expect(() => validateUrl('http://localhost/foo')).toThrow();
+    });
+
+    test('rejects 127.0.0.1', () => {
+        expect(() => validateUrl('http://127.0.0.1/foo')).toThrow();
+    });
+
+    test('rejects ::1', () => {
+        expect(() => validateUrl('http://[::1]/foo')).toThrow();
+    });
+
+    test('rejects 0.0.0.0', () => {
+        expect(() => validateUrl('http://0.0.0.0/')).toThrow();
+    });
+
+    test('rejects 10.x.x.x', () => {
+        expect(() => validateUrl('http://10.0.0.1/')).toThrow();
+    });
+
+    test('rejects 172.16.x.x', () => {
+        expect(() => validateUrl('http://172.16.0.1/')).toThrow();
+    });
+
+    test('rejects 192.168.x.x', () => {
+        expect(() => validateUrl('http://192.168.1.1/')).toThrow();
+    });
+
+    test('rejects 169.254.x.x (link-local)', () => {
+        expect(() => validateUrl('http://169.254.169.254/')).toThrow();
+    });
+
+    test('rejects non-http schemes', () => {
+        expect(() => validateUrl('ftp://example.com/')).toThrow();
+        expect(() => validateUrl('file:///etc/passwd')).toThrow();
+    });
+
+    test('allows valid public URLs', () => {
+        expect(() => validateUrl('https://agent.example.com')).not.toThrow();
+        expect(() => validateUrl('http://8.8.8.8/')).not.toThrow();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// withTenantFilter robustness (#375)
+// ---------------------------------------------------------------------------
+
+describe('withTenantFilter robustness', () => {
+    test('handles query with existing WHERE and ORDER BY', () => {
+        const { query, bindings } = withTenantFilter(
+            'SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC',
+            'tenant-1',
+        );
+        expect(query).toBe('SELECT * FROM sessions WHERE project_id = ? AND tenant_id = ? ORDER BY updated_at DESC');
+        expect(bindings).toEqual(['tenant-1']);
+    });
+
+    test('handles query with no WHERE', () => {
+        const { query } = withTenantFilter('SELECT * FROM agents ORDER BY updated_at DESC', 'tenant-1');
+        expect(query).toBe('SELECT * FROM agents WHERE tenant_id = ? ORDER BY updated_at DESC');
+    });
+
+    test('handles query with no WHERE and no ORDER BY', () => {
+        const { query } = withTenantFilter('SELECT * FROM agents', 'tenant-1');
+        expect(query).toBe('SELECT * FROM agents WHERE tenant_id = ?');
+    });
+
+    test('handles multiple WHERE conditions safely', () => {
+        const { query } = withTenantFilter(
+            "SELECT * FROM sessions WHERE project_id = ? AND status = 'running' ORDER BY created_at",
+            'tenant-1',
+        );
+        // Should append AND tenant_id = ? before ORDER BY, not replace first WHERE
+        expect(query).toContain("WHERE project_id = ? AND status = 'running' AND tenant_id = ?");
+        expect(query).toContain('ORDER BY created_at');
     });
 });
