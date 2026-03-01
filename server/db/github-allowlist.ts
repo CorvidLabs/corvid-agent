@@ -51,11 +51,21 @@ export function removeFromGitHubAllowlist(db: Database, username: string): boole
     return result.changes > 0;
 }
 
-/** Returns true if the GitHub user is allowed to trigger agents.
- *  If the allowlist is empty, all users are allowed (open mode). */
+/**
+ * Returns true if the GitHub user is allowed to trigger agents.
+ *
+ * When the allowlist is empty:
+ *   - Default: deny all (secure by default)
+ *   - Set GITHUB_ALLOWLIST_OPEN_MODE=true to allow all users (open mode)
+ *
+ * When the allowlist has entries: only listed users are allowed.
+ */
 export function isGitHubUserAllowed(db: Database, username: string): boolean {
     const row = db.query('SELECT 1 FROM github_allowlist WHERE username = ? LIMIT 1').get(username.toLowerCase());
     if (row != null) return true;
     const count = db.query('SELECT COUNT(*) as cnt FROM github_allowlist').get() as { cnt: number };
-    return count.cnt === 0;
+    if (count.cnt === 0) {
+        return process.env.GITHUB_ALLOWLIST_OPEN_MODE === 'true';
+    }
+    return false;
 }
