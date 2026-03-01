@@ -1,5 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { WorkTask, WorkTaskStatus } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface WorkTaskRow {
     id: string;
@@ -125,7 +127,8 @@ export function createWorkTaskAtomic(
     return getWorkTask(db, id) as WorkTask;
 }
 
-export function getWorkTask(db: Database, id: string): WorkTask | null {
+export function getWorkTask(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask | null {
+    if (!validateTenantOwnership(db, 'work_tasks', id, tenantId)) return null;
     const row = db.query('SELECT * FROM work_tasks WHERE id = ?').get(id) as WorkTaskRow | null;
     return row ? rowToWorkTask(row) : null;
 }
@@ -222,16 +225,14 @@ export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
     return cleanup();
 }
 
-export function listWorkTasks(db: Database, agentId?: string): WorkTask[] {
+export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
     if (agentId) {
-        const rows = db.query(
-            'SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC'
-        ).all(agentId) as WorkTaskRow[];
+        const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
+        const rows = db.query(query).all(...bindings, agentId) as WorkTaskRow[];
         return rows.map(rowToWorkTask);
     }
 
-    const rows = db.query(
-        'SELECT * FROM work_tasks ORDER BY created_at DESC'
-    ).all() as WorkTaskRow[];
+    const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks ORDER BY created_at DESC', tenantId);
+    const rows = db.query(query).all(...bindings) as WorkTaskRow[];
     return rows.map(rowToWorkTask);
 }

@@ -1,5 +1,7 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Project, CreateProjectInput, UpdateProjectInput } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface ProjectRow {
     id: string;
@@ -25,30 +27,32 @@ function rowToProject(row: ProjectRow): Project {
     };
 }
 
-export function listProjects(db: Database): Project[] {
-    const rows = db.query('SELECT * FROM projects ORDER BY updated_at DESC').all() as ProjectRow[];
+export function listProjects(db: Database, tenantId: string = DEFAULT_TENANT_ID): Project[] {
+    const { query, bindings } = withTenantFilter('SELECT * FROM projects ORDER BY updated_at DESC', tenantId);
+    const rows = db.query(query).all(...bindings) as ProjectRow[];
     return rows.map(rowToProject);
 }
 
-export function getProject(db: Database, id: string): Project | null {
+export function getProject(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Project | null {
+    if (!validateTenantOwnership(db, 'projects', id, tenantId)) return null;
     const row = db.query('SELECT * FROM projects WHERE id = ?').get(id) as ProjectRow | null;
     return row ? rowToProject(row) : null;
 }
 
-export function createProject(db: Database, input: CreateProjectInput): Project {
+export function createProject(db: Database, input: CreateProjectInput, tenantId: string = DEFAULT_TENANT_ID): Project {
     const id = crypto.randomUUID();
     const envVars = JSON.stringify(input.envVars ?? {});
 
     db.query(
-        `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars)
-         VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(id, input.name, input.description ?? '', input.workingDir, input.claudeMd ?? '', envVars);
+        `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, input.name, input.description ?? '', input.workingDir, input.claudeMd ?? '', envVars, tenantId);
 
     return getProject(db, id) as Project;
 }
 
-export function updateProject(db: Database, id: string, input: UpdateProjectInput): Project | null {
-    const existing = getProject(db, id);
+export function updateProject(db: Database, id: string, input: UpdateProjectInput, tenantId: string = DEFAULT_TENANT_ID): Project | null {
+    const existing = getProject(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -81,11 +85,11 @@ export function updateProject(db: Database, id: string, input: UpdateProjectInpu
     values.push(id);
 
     db.query(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`).run(...(values as SQLQueryBindings[]));
-    return getProject(db, id);
+    return getProject(db, id, tenantId);
 }
 
-export function deleteProject(db: Database, id: string): boolean {
-    const existing = getProject(db, id);
+export function deleteProject(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    const existing = getProject(db, id, tenantId);
     if (!existing) return false;
 
     db.transaction(() => {

@@ -96,7 +96,7 @@ describe('roleGuard', () => {
         const guard = roleGuard('admin');
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, role: 'admin' };
+        const context: RequestContext = { authenticated: true, role: 'admin', tenantId: 'default' };
 
         const result = guard(req, url, context);
         expect(result).toBeNull();
@@ -106,7 +106,7 @@ describe('roleGuard', () => {
         const guard = roleGuard('admin', 'user');
         const req = makeRequest('/api/sessions');
         const url = makeUrl('/api/sessions');
-        const context: RequestContext = { authenticated: true, role: 'user' };
+        const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
 
         const result = guard(req, url, context);
         expect(result).toBeNull();
@@ -116,7 +116,7 @@ describe('roleGuard', () => {
         const guard = roleGuard('admin');
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, role: 'user' };
+        const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
 
         const result = guard(req, url, context);
         expect(result).not.toBeNull();
@@ -127,7 +127,7 @@ describe('roleGuard', () => {
         const guard = roleGuard('admin');
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: false };
+        const context: RequestContext = { authenticated: false, tenantId: 'default' };
 
         const result = guard(req, url, context);
         expect(result).not.toBeNull();
@@ -138,7 +138,7 @@ describe('roleGuard', () => {
         const guard = roleGuard('admin');
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true };
+        const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
         const result = guard(req, url, context);
         expect(result).not.toBeNull();
@@ -149,7 +149,7 @@ describe('roleGuard', () => {
         const guard = roleGuard('admin');
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const context: RequestContext = { authenticated: true, role: 'user' };
+        const context: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
 
         const result = guard(req, url, context);
         expect(result).not.toBeNull();
@@ -176,8 +176,8 @@ describe('rateLimitGuard', () => {
         const guard = rateLimitGuard(limiter);
         const req = makeRequest('/api/agents');
         const url = makeUrl('/api/agents');
-        const walletContext: RequestContext = { authenticated: true, walletAddress: 'WALLET123' };
-        const ipContext: RequestContext = { authenticated: true };
+        const walletContext: RequestContext = { authenticated: true, walletAddress: 'WALLET123', tenantId: 'default' };
+        const ipContext: RequestContext = { authenticated: true, tenantId: 'default' };
 
         // Exhaust rate limit for wallet
         guard(req, url, walletContext);
@@ -195,7 +195,7 @@ describe('rateLimitGuard', () => {
         const guard = rateLimitGuard(limiter);
         const req = makeRequest('/api/agents');
         const url = makeUrl('/api/agents');
-        const context: RequestContext = { authenticated: true };
+        const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
         guard(req, url, context);
         guard(req, url, context);
@@ -208,7 +208,7 @@ describe('rateLimitGuard', () => {
         const guard = rateLimitGuard(limiter);
         const req = makeRequest('/api/health');
         const url = makeUrl('/api/health');
-        const context: RequestContext = { authenticated: true };
+        const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
         // Should never be blocked
         for (let i = 0; i < 10; i++) {
@@ -220,7 +220,7 @@ describe('rateLimitGuard', () => {
         const guard = rateLimitGuard(limiter);
         const req = makeRequest('/ws');
         const url = makeUrl('/ws');
-        const context: RequestContext = { authenticated: true };
+        const context: RequestContext = { authenticated: true, tenantId: 'default' };
 
         for (let i = 0; i < 10; i++) {
             expect(guard(req, url, context)).toBeNull();

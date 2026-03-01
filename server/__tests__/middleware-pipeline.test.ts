@@ -647,7 +647,7 @@ describe('roleMiddleware', () => {
 
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const ctx = createMiddlewareContext(req, url, { authenticated: true, role: 'admin' });
+        const ctx = createMiddlewareContext(req, url, { authenticated: true, role: 'admin', tenantId: 'default' });
 
         await pipeline.execute(ctx);
 
@@ -663,7 +663,7 @@ describe('roleMiddleware', () => {
 
         const req = makeRequest('/metrics');
         const url = makeUrl('/metrics');
-        const ctx = createMiddlewareContext(req, url, { authenticated: true, role: 'user' });
+        const ctx = createMiddlewareContext(req, url, { authenticated: true, role: 'user', tenantId: 'default' });
 
         await pipeline.execute(ctx);
 
@@ -680,7 +680,7 @@ describe('roleMiddleware', () => {
 
         const req = makeRequest('/api/sessions');
         const url = makeUrl('/api/sessions');
-        const ctx = createMiddlewareContext(req, url, { authenticated: true, role: 'user' });
+        const ctx = createMiddlewareContext(req, url, { authenticated: true, role: 'user', tenantId: 'default' });
 
         await pipeline.execute(ctx);
 

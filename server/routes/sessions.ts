@@ -11,6 +11,7 @@ import type { ProcessManager } from '../process/manager';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema } from '../lib/validation';
 import { json } from '../lib/response';
+import type { RequestContext } from '../middleware/guards';
 
 const log = createLogger('SessionRoutes');
 
@@ -19,17 +20,20 @@ export async function handleSessionRoutes(
     url: URL,
     db: Database,
     processManager: ProcessManager,
+    context?: RequestContext,
 ): Promise<Response | null> {
     const path = url.pathname;
     const method = req.method;
 
+    const tenantId = context?.tenantId ?? 'default';
+
     if (path === '/api/sessions' && method === 'GET') {
         const projectId = url.searchParams.get('projectId') ?? undefined;
-        return json(listSessions(db, projectId));
+        return json(listSessions(db, projectId, tenantId));
     }
 
     if (path === '/api/sessions' && method === 'POST') {
-        return handleCreate(req, db, processManager);
+        return handleCreate(req, db, processManager, tenantId);
     }
 
     const match = path.match(/^\/api\/sessions\/([^/]+)(\/(.+))?$/);
@@ -40,7 +44,7 @@ export async function handleSessionRoutes(
 
     if (!action) {
         if (method === 'GET') {
-            const session = getSession(db, id);
+            const session = getSession(db, id, tenantId);
             return session ? json(session) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
@@ -48,7 +52,7 @@ export async function handleSessionRoutes(
         }
         if (method === 'DELETE') {
             processManager.stopProcess(id);
-            const deleted = deleteSession(db, id);
+            const deleted = deleteSession(db, id, tenantId);
             return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
         }
     }
@@ -72,10 +76,11 @@ async function handleCreate(
     req: Request,
     db: Database,
     processManager: ProcessManager,
+    tenantId: string = 'default',
 ): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateSessionSchema);
-        const session = createSession(db, data);
+        const session = createSession(db, data, tenantId);
 
         if (data.initialPrompt) {
             try {
