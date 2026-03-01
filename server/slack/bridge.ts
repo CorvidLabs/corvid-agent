@@ -11,6 +11,7 @@ import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
 import { createLogger } from '../lib/logger';
 import { DedupService } from '../lib/dedup';
+import { timingSafeEqual } from '../middleware/auth';
 
 const log = createLogger('SlackBridge');
 
@@ -129,13 +130,8 @@ export class SlackBridge {
             .map(b => b.toString(16).padStart(2, '0'))
             .join('');
 
-        // Timing-safe comparison
-        if (hexSig.length !== signature.length) return false;
-        let mismatch = 0;
-        for (let i = 0; i < hexSig.length; i++) {
-            mismatch |= hexSig.charCodeAt(i) ^ signature.charCodeAt(i);
-        }
-        return mismatch === 0;
+        // Timing-safe comparison using shared utility
+        return timingSafeEqual(hexSig, signature);
     }
 
     private async handleEvent(event: SlackMessageEvent): Promise<void> {

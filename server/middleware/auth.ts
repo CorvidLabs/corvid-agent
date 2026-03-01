@@ -32,6 +32,10 @@ export interface AuthConfig {
     previousApiKey?: string | null;
     /** Timestamp (ms since epoch) when the previous API key expires. */
     previousKeyExpiry?: number;
+    /** Epoch ms when the current API key was created. */
+    apiKeyCreatedAt?: number;
+    /** Epoch ms when the current API key expires (0 or undefined = no expiry). */
+    apiKeyExpiresAt?: number;
 }
 
 /**
@@ -51,7 +55,19 @@ export function loadAuthConfig(): AuthConfig {
         }
     }
 
-    return { apiKey, allowedOrigins, bindHost };
+    const config: AuthConfig = { apiKey, allowedOrigins, bindHost };
+
+    // API key expiration: if API_KEY_TTL_DAYS is set and > 0, compute expiry
+    const ttlDaysStr = process.env.API_KEY_TTL_DAYS?.trim();
+    if (ttlDaysStr && apiKey) {
+        const ttlDays = parseInt(ttlDaysStr, 10);
+        if (ttlDays > 0) {
+            config.apiKeyCreatedAt = Date.now();
+            config.apiKeyExpiresAt = Date.now() + ttlDays * 24 * 60 * 60 * 1000;
+        }
+    }
+
+    return config;
 }
 
 /**
@@ -198,6 +214,14 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
         });
     }
 
+    // Check if the key is valid but expired
+    if (isValidApiKey(match[1], config) && isApiKeyExpired(config)) {
+        return new Response(JSON.stringify({ error: 'API key expired, rotation required' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+        });
+    }
+
     if (!isValidApiKey(match[1], config)) {
         const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
         log.warn('Rejected request with invalid API key', { path: url.pathname, ip });
@@ -323,6 +347,39 @@ export function getApiKeyRotationStatus(config: AuthConfig): {
             ? new Date(config.previousKeyExpiry).toISOString()
             : null,
     };
+}
+
+// ---------------------------------------------------------------------------
+// API Key Expiration
+// ---------------------------------------------------------------------------
+
+/** Set API key expiry relative to now. */
+export function setApiKeyExpiry(config: AuthConfig, ttlMs: number): void {
+    config.apiKeyCreatedAt = Date.now();
+    config.apiKeyExpiresAt = Date.now() + ttlMs;
+}
+
+/** Returns true if the API key has an expiry and it has passed. */
+export function isApiKeyExpired(config: AuthConfig): boolean {
+    if (!config.apiKeyExpiresAt) return false;
+    return Date.now() > config.apiKeyExpiresAt;
+}
+
+/** Warn threshold: 7 days in ms. */
+const EXPIRY_WARN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Returns a warning string if the API key expires within 7 days, null otherwise.
+ * Returns null if no expiry is configured or the key is already expired.
+ */
+export function getApiKeyExpiryWarning(config: AuthConfig): string | null {
+    if (!config.apiKeyExpiresAt) return null;
+    const remaining = config.apiKeyExpiresAt - Date.now();
+    if (remaining <= 0) return null; // Already expired — handled separately
+    if (remaining > EXPIRY_WARN_THRESHOLD_MS) return null;
+
+    const daysRemaining = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+    return `API key expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}. Rotate with POST /api/settings/api-key/rotate`;
 }
 
 // ---------------------------------------------------------------------------

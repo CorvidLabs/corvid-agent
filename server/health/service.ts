@@ -1,6 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import type { HealthStatus, DependencyHealth, HealthCheckResult } from './types';
 import { hasClaudeAccess } from '../providers/router';
+import type { AuthConfig } from '../middleware/auth';
+import { isApiKeyExpired, getApiKeyExpiryWarning } from '../middleware/auth';
 
 export interface HealthCheckDeps {
     db: Database;
@@ -12,6 +14,7 @@ export interface HealthCheckDeps {
     getSchedulerStats: () => Record<string, unknown>;
     getMentionPollingStats: () => Record<string, unknown>;
     getWorkflowStats: () => Record<string, unknown>;
+    getAuthConfig?: () => AuthConfig | null;
 }
 
 /** Cached health check result with TTL. */
@@ -97,6 +100,28 @@ async function checkLlmProviders(): Promise<DependencyHealth> {
     };
 }
 
+function checkApiKey(getAuthConfig?: () => AuthConfig | null): DependencyHealth {
+    if (!getAuthConfig) {
+        return { status: 'healthy', configured: false };
+    }
+    const config = getAuthConfig();
+    if (!config || !config.apiKeyExpiresAt) {
+        return { status: 'healthy', configured: true, expiry: 'none' };
+    }
+
+    if (isApiKeyExpired(config)) {
+        return { status: 'unhealthy', error: 'API key expired — rotation required' };
+    }
+
+    const warning = getApiKeyExpiryWarning(config);
+    if (warning) {
+        const daysRemaining = Math.ceil((config.apiKeyExpiresAt - Date.now()) / (24 * 60 * 60 * 1000));
+        return { status: 'degraded', warning, days_remaining: daysRemaining };
+    }
+
+    return { status: 'healthy', configured: true };
+}
+
 function deriveOverallStatus(deps: Record<string, DependencyHealth>): HealthStatus {
     let hasDegraded = false;
     for (const dep of Object.values(deps)) {
@@ -120,11 +145,14 @@ export async function getHealthCheck(deps: HealthCheckDeps): Promise<HealthCheck
         checkLlmProviders(),
     ]);
 
+    const apiKey = checkApiKey(deps.getAuthConfig);
+
     const dependencies: Record<string, DependencyHealth> = {
         database,
         github,
         algorand,
         llm,
+        apiKey,
     };
 
     const derivedStatus = deps.isShuttingDown() ? 'unhealthy' as HealthStatus : deriveOverallStatus(dependencies);

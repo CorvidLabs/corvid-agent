@@ -24,6 +24,12 @@ const MAX_MESSAGE_LENGTH = 2000;
 /**
  * Bidirectional Discord bridge using raw WebSocket gateway.
  * No external Discord library dependencies.
+ *
+ * Security note: This bridge authenticates via the Discord Gateway WebSocket API
+ * using a bot token — it does NOT use the HTTP-based Interactions endpoint.
+ * Therefore, Ed25519 request signature validation (X-Signature-Ed25519) is not
+ * applicable here. If Discord Interactions support is added in the future,
+ * Ed25519 verification must be implemented for that endpoint.
  */
 export class DiscordBridge {
     private db: Database;

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 55;
+const SCHEMA_VERSION = 56;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1105,6 +1105,12 @@ const MIGRATIONS: Record<number, string[]> = {
             updated_at TEXT DEFAULT (datetime('now')),
             PRIMARY KEY (tenant_id, key_hash)
         )`,
+    ],
+
+    // Migration 56: API key expiration and usage tracking (#380)
+    56: [
+        `ALTER TABLE api_keys ADD COLUMN expires_at TEXT DEFAULT NULL`,
+        `ALTER TABLE api_keys ADD COLUMN last_used_at TEXT DEFAULT NULL`,
     ],
 };
 

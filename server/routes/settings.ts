@@ -1,14 +1,23 @@
 /**
  * Settings API routes — provides read/write access to system configuration
- * including credit config, operational mode info, and AlgoChat status.
+ * including credit config, operational mode info, AlgoChat status, and API key management.
  */
 
 import type { Database } from 'bun:sqlite';
 import { json } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, UpdateCreditConfigSchema } from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
+import {
+    rotateApiKey,
+    getApiKeyRotationStatus,
+    setApiKeyExpiry,
+    isApiKeyExpired,
+    getApiKeyExpiryWarning,
+    type AuthConfig,
+} from '../middleware/auth';
+import { recordAudit } from '../db/audit';
 
-export function handleSettingsRoutes(req: Request, url: URL, db: Database, context?: RequestContext): Response | Promise<Response> | null {
+export function handleSettingsRoutes(req: Request, url: URL, db: Database, context?: RequestContext, authConfig?: AuthConfig | null): Response | Promise<Response> | null {
     // GET /api/settings — all settings (system metadata is admin-only)
     if (url.pathname === '/api/settings' && req.method === 'GET') {
         return handleGetSettings(db, context?.role === 'admin');
@@ -17,6 +26,16 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
     // PUT /api/settings/credits — update credit config
     if (url.pathname === '/api/settings/credits' && req.method === 'PUT') {
         return handleUpdateCreditConfig(req, db);
+    }
+
+    // POST /api/settings/api-key/rotate — rotate the API key (admin-only, guarded by ADMIN_PATHS)
+    if (url.pathname === '/api/settings/api-key/rotate' && req.method === 'POST') {
+        return handleApiKeyRotate(req, db, authConfig ?? null);
+    }
+
+    // GET /api/settings/api-key/status — get API key rotation + expiry status (admin-only)
+    if (url.pathname === '/api/settings/api-key/status' && req.method === 'GET') {
+        return handleApiKeyStatus(authConfig ?? null);
     }
 
     return null;
@@ -72,4 +91,65 @@ async function handleUpdateCreditConfig(req: Request, db: Database): Promise<Res
     })();
 
     return json({ ok: true, updated: updates.length });
+}
+
+async function handleApiKeyRotate(req: Request, db: Database, authConfig: AuthConfig | null): Promise<Response> {
+    if (!authConfig) {
+        return json({ error: 'Auth not configured' }, 503);
+    }
+    if (!authConfig.apiKey) {
+        return json({ error: 'No API key configured (localhost mode)' }, 400);
+    }
+
+    // Parse optional body for ttlDays
+    let ttlDays = 0;
+    try {
+        const body = await req.json() as { ttlDays?: number };
+        if (body.ttlDays !== undefined) {
+            ttlDays = typeof body.ttlDays === 'number' ? body.ttlDays : 0;
+        }
+    } catch {
+        // Empty body is fine — use defaults
+    }
+
+    const newKey = rotateApiKey(authConfig);
+
+    // Set expiry if ttlDays provided
+    if (ttlDays > 0) {
+        setApiKeyExpiry(authConfig, ttlDays * 24 * 60 * 60 * 1000);
+    }
+
+    // Audit log
+    recordAudit(db, 'api_key_rotation', 'admin', 'api_key', null, JSON.stringify({
+        ttlDays: ttlDays || null,
+        expiresAt: authConfig.apiKeyExpiresAt ? new Date(authConfig.apiKeyExpiresAt).toISOString() : null,
+    }));
+
+    return json({
+        ok: true,
+        apiKey: newKey,
+        expiresAt: authConfig.apiKeyExpiresAt ? new Date(authConfig.apiKeyExpiresAt).toISOString() : null,
+        gracePeriodExpiry: authConfig.previousKeyExpiry
+            ? new Date(authConfig.previousKeyExpiry).toISOString()
+            : null,
+    });
+}
+
+function handleApiKeyStatus(authConfig: AuthConfig | null): Response {
+    if (!authConfig) {
+        return json({ error: 'Auth not configured' }, 503);
+    }
+
+    const rotationStatus = getApiKeyRotationStatus(authConfig);
+    const expired = isApiKeyExpired(authConfig);
+    const warning = getApiKeyExpiryWarning(authConfig);
+
+    return json({
+        ...rotationStatus,
+        expired,
+        expiresAt: authConfig.apiKeyExpiresAt
+            ? new Date(authConfig.apiKeyExpiresAt).toISOString()
+            : null,
+        warning,
+    });
 }
