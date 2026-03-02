@@ -1,6 +1,8 @@
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import type { McpServerConfig, CreateMcpServerConfigInput, UpdateMcpServerConfigInput } from '../../shared/types';
 import { NotFoundError } from '../lib/errors';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface McpServerConfigRow {
     id: string;
@@ -31,22 +33,18 @@ function rowToConfig(row: McpServerConfigRow): McpServerConfig {
 }
 
 /** List all MCP server configs, optionally filtered by agent. */
-export function listMcpServerConfigs(db: Database, agentId?: string): McpServerConfig[] {
-    let rows: McpServerConfigRow[];
+export function listMcpServerConfigs(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig[] {
     if (agentId) {
-        rows = db.query(
-            'SELECT * FROM mcp_server_configs WHERE agent_id = ? ORDER BY name',
-        ).all(agentId) as McpServerConfigRow[];
-    } else {
-        rows = db.query(
-            'SELECT * FROM mcp_server_configs ORDER BY name',
-        ).all() as McpServerConfigRow[];
+        const { query, bindings } = withTenantFilter('SELECT * FROM mcp_server_configs WHERE agent_id = ? ORDER BY name', tenantId);
+        return (db.query(query).all(agentId, ...bindings) as McpServerConfigRow[]).map(rowToConfig);
     }
-    return rows.map(rowToConfig);
+    const { query, bindings } = withTenantFilter('SELECT * FROM mcp_server_configs ORDER BY name', tenantId);
+    return (db.query(query).all(...bindings) as McpServerConfigRow[]).map(rowToConfig);
 }
 
 /** Get a single MCP server config by ID. */
-export function getMcpServerConfig(db: Database, id: string): McpServerConfig | null {
+export function getMcpServerConfig(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'mcp_server_configs', id, tenantId)) return null;
     const row = db.query(
         'SELECT * FROM mcp_server_configs WHERE id = ?',
     ).get(id) as McpServerConfigRow | null;
@@ -65,11 +63,11 @@ export function getActiveServersForAgent(db: Database, agentId: string): McpServ
 }
 
 /** Create a new MCP server config. */
-export function createMcpServerConfig(db: Database, input: CreateMcpServerConfigInput): McpServerConfig {
+export function createMcpServerConfig(db: Database, input: CreateMcpServerConfigInput, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig {
     const id = crypto.randomUUID();
     db.query(
-        `INSERT INTO mcp_server_configs (id, agent_id, name, command, args, env_vars, cwd, enabled)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO mcp_server_configs (id, agent_id, name, command, args, env_vars, cwd, enabled, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
         id,
         input.agentId ?? null,
@@ -79,6 +77,7 @@ export function createMcpServerConfig(db: Database, input: CreateMcpServerConfig
         JSON.stringify(input.envVars ?? {}),
         input.cwd ?? null,
         input.enabled !== false ? 1 : 0,
+        tenantId,
     );
 
     const created = getMcpServerConfig(db, id);
@@ -87,8 +86,8 @@ export function createMcpServerConfig(db: Database, input: CreateMcpServerConfig
 }
 
 /** Update an existing MCP server config. Returns null if not found. */
-export function updateMcpServerConfig(db: Database, id: string, input: UpdateMcpServerConfigInput): McpServerConfig | null {
-    const existing = getMcpServerConfig(db, id);
+export function updateMcpServerConfig(db: Database, id: string, input: UpdateMcpServerConfigInput, tenantId: string = DEFAULT_TENANT_ID): McpServerConfig | null {
+    const existing = getMcpServerConfig(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -129,8 +128,8 @@ export function updateMcpServerConfig(db: Database, id: string, input: UpdateMcp
 }
 
 /** Delete an MCP server config. Returns true if deleted, false if not found. */
-export function deleteMcpServerConfig(db: Database, id: string): boolean {
-    const existing = getMcpServerConfig(db, id);
+export function deleteMcpServerConfig(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    const existing = getMcpServerConfig(db, id, tenantId);
     if (!existing) return false;
     db.query('DELETE FROM mcp_server_configs WHERE id = ?').run(id);
     return true;

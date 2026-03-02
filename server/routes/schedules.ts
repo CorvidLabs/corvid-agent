@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { SchedulerService } from '../scheduler/service';
+import type { RequestContext } from '../middleware/guards';
 import { validateScheduleFrequency } from '../scheduler/service';
 import {
     listSchedules,
@@ -26,35 +27,38 @@ export function handleScheduleRoutes(
     url: URL,
     db: Database,
     schedulerService: SchedulerService | null,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
+    const tenantId = context?.tenantId ?? 'default';
+
     // List schedules
     if (url.pathname === '/api/schedules' && req.method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;
-        const schedules = listSchedules(db, agentId);
+        const schedules = listSchedules(db, agentId, tenantId);
         return json(schedules);
     }
 
     // Create schedule
     if (url.pathname === '/api/schedules' && req.method === 'POST') {
-        return handleCreateSchedule(req, db);
+        return handleCreateSchedule(req, db, tenantId);
     }
 
     // Get single schedule
     const scheduleMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)$/);
     if (scheduleMatch && req.method === 'GET') {
-        const schedule = getSchedule(db, scheduleMatch[1]);
+        const schedule = getSchedule(db, scheduleMatch[1], tenantId);
         if (!schedule) return json({ error: 'Schedule not found' }, 404);
         return json(schedule);
     }
 
     // Update schedule
     if (scheduleMatch && req.method === 'PUT') {
-        return handleUpdateSchedule(req, db, scheduleMatch[1]);
+        return handleUpdateSchedule(req, db, scheduleMatch[1], tenantId);
     }
 
     // Delete schedule
     if (scheduleMatch && req.method === 'DELETE') {
-        const deleted = deleteSchedule(db, scheduleMatch[1]);
+        const deleted = deleteSchedule(db, scheduleMatch[1], tenantId);
         if (!deleted) return json({ error: 'Schedule not found' }, 404);
         return json({ ok: true });
     }
@@ -63,7 +67,7 @@ export function handleScheduleRoutes(
     const execsMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/executions$/);
     if (execsMatch && req.method === 'GET') {
         const limit = safeNumParam(url.searchParams.get('limit'), 50);
-        const executions = listExecutions(db, execsMatch[1], limit);
+        const executions = listExecutions(db, execsMatch[1], limit, tenantId);
         return json(executions);
     }
 
@@ -82,7 +86,7 @@ export function handleScheduleRoutes(
             return json(result);
         }
         // Backwards-compatible: plain array when no filters
-        const executions = listExecutions(db, undefined, limit);
+        const executions = listExecutions(db, undefined, limit, tenantId);
         return json(executions);
     }
 
@@ -170,7 +174,7 @@ function scanScheduleActions(actions: Array<{ prompt?: string; description?: str
     return null;
 }
 
-async function handleCreateSchedule(req: Request, db: Database): Promise<Response> {
+async function handleCreateSchedule(req: Request, db: Database, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateScheduleSchema);
 
@@ -183,7 +187,7 @@ async function handleCreateSchedule(req: Request, db: Database): Promise<Respons
         const injectionError = scanScheduleActions(data.actions);
         if (injectionError) return badRequest(injectionError);
 
-        const schedule = createSchedule(db, data);
+        const schedule = createSchedule(db, data, tenantId);
 
         // Compute and persist next_run_at so the scheduler picks it up (null for event-only)
         const nextRun = computeNextRun(schedule.cronExpression, schedule.intervalMs);
@@ -207,13 +211,13 @@ function isScheduleFrequencyError(err: unknown): boolean {
     return msg.includes('Minimum interval') || msg.includes('fires every') || msg.includes('too short');
 }
 
-async function handleUpdateSchedule(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdateSchedule(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateScheduleSchema);
 
         // Validate frequency constraints if cron/interval is being updated
         if (data.cronExpression !== undefined || data.intervalMs !== undefined) {
-            const existing = getSchedule(db, id);
+            const existing = getSchedule(db, id, tenantId);
             if (!existing) return json({ error: 'Schedule not found' }, 404);
             const effectiveCron = data.cronExpression ?? existing.cronExpression;
             const effectiveInterval = data.intervalMs ?? existing.intervalMs;
@@ -225,7 +229,7 @@ async function handleUpdateSchedule(req: Request, db: Database, id: string): Pro
             if (injectionError) return badRequest(injectionError);
         }
 
-        const schedule = updateSchedule(db, id, data);
+        const schedule = updateSchedule(db, id, data, tenantId);
         if (!schedule) return json({ error: 'Schedule not found' }, 404);
 
         // Recompute next_run_at if cron/interval changed

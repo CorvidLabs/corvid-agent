@@ -63,12 +63,14 @@ export function createWorkTask(
         source?: string;
         sourceId?: string;
         requesterInfo?: Record<string, unknown>;
+        tenantId?: string;
     },
 ): WorkTask {
     const id = crypto.randomUUID();
+    const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
     db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         params.agentId,
@@ -77,6 +79,7 @@ export function createWorkTask(
         params.source ?? 'web',
         params.sourceId ?? null,
         JSON.stringify(params.requesterInfo ?? {}),
+        tenantId,
     );
 
     return getWorkTask(db, id) as WorkTask;
@@ -95,16 +98,18 @@ export function createWorkTaskAtomic(
         source?: string;
         sourceId?: string;
         requesterInfo?: Record<string, unknown>;
+        tenantId?: string;
     },
 ): WorkTask | null {
     const id = crypto.randomUUID();
     const source = params.source ?? 'web';
     const sourceId = params.sourceId ?? null;
     const requesterInfo = JSON.stringify(params.requesterInfo ?? {});
+    const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
 
     const result = db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info)
-         SELECT ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, tenant_id)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?
          WHERE NOT EXISTS (
              SELECT 1 FROM work_tasks
              WHERE project_id = ? AND status IN ('branching', 'running', 'validating')
@@ -117,6 +122,7 @@ export function createWorkTaskAtomic(
         source,
         sourceId,
         requesterInfo,
+        tenantId,
         params.projectId,
     );
 

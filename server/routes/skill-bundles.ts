@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { RequestContext } from '../middleware/guards';
 import {
     listBundles, getBundle, createBundle, updateBundle, deleteBundle,
     getAgentBundles, assignBundle, unassignBundle,
@@ -13,9 +14,11 @@ export function handleSkillBundleRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
+    const tenantId = context?.tenantId ?? 'default';
 
     // ─── Bundle CRUD ──────────────────────────────────────────────────────
 
@@ -56,14 +59,14 @@ export function handleSkillBundleRoutes(
     const agentSkillsGet = path.match(/^\/api\/agents\/([^/]+)\/skills$/);
     if (agentSkillsGet && method === 'GET') {
         const agentId = agentSkillsGet[1];
-        const agent = getAgent(db, agentId);
+        const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
         return json(getAgentBundles(db, agentId));
     }
 
     // POST /api/agents/:id/skills
     if (agentSkillsGet && method === 'POST') {
-        return handleAssignBundle(req, db, agentSkillsGet[1]);
+        return handleAssignBundle(req, db, agentSkillsGet[1], tenantId);
     }
 
     // DELETE /api/agents/:id/skills/:bundleId
@@ -71,7 +74,7 @@ export function handleSkillBundleRoutes(
     if (agentSkillDelete && method === 'DELETE') {
         const agentId = agentSkillDelete[1];
         const bundleId = agentSkillDelete[2];
-        const agent = getAgent(db, agentId);
+        const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
 
         const removed = unassignBundle(db, agentId, bundleId);
@@ -85,14 +88,14 @@ export function handleSkillBundleRoutes(
     const projectSkillsGet = path.match(/^\/api\/projects\/([^/]+)\/skills$/);
     if (projectSkillsGet && method === 'GET') {
         const projectId = projectSkillsGet[1];
-        const project = getProject(db, projectId);
+        const project = getProject(db, projectId, tenantId);
         if (!project) return json({ error: 'Project not found' }, 404);
         return json(getProjectBundles(db, projectId));
     }
 
     // POST /api/projects/:id/skills
     if (projectSkillsGet && method === 'POST') {
-        return handleAssignProjectBundle(req, db, projectSkillsGet[1]);
+        return handleAssignProjectBundle(req, db, projectSkillsGet[1], tenantId);
     }
 
     // DELETE /api/projects/:id/skills/:bundleId
@@ -100,7 +103,7 @@ export function handleSkillBundleRoutes(
     if (projectSkillDelete && method === 'DELETE') {
         const projectId = projectSkillDelete[1];
         const bundleId = projectSkillDelete[2];
-        const project = getProject(db, projectId);
+        const project = getProject(db, projectId, tenantId);
         if (!project) return json({ error: 'Project not found' }, 404);
 
         const removed = unassignProjectBundle(db, projectId, bundleId);
@@ -134,9 +137,9 @@ async function handleUpdateBundle(req: Request, db: Database, id: string): Promi
     }
 }
 
-async function handleAssignBundle(req: Request, db: Database, agentId: string): Promise<Response> {
+async function handleAssignBundle(req: Request, db: Database, agentId: string, tenantId: string): Promise<Response> {
     try {
-        const agent = getAgent(db, agentId);
+        const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
 
         const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);
@@ -149,9 +152,9 @@ async function handleAssignBundle(req: Request, db: Database, agentId: string): 
     }
 }
 
-async function handleAssignProjectBundle(req: Request, db: Database, projectId: string): Promise<Response> {
+async function handleAssignProjectBundle(req: Request, db: Database, projectId: string, tenantId: string): Promise<Response> {
     try {
-        const project = getProject(db, projectId);
+        const project = getProject(db, projectId, tenantId);
         if (!project) return json({ error: 'Project not found' }, 404);
 
         const data = await parseBodyOrThrow(req, AssignSkillBundleSchema);

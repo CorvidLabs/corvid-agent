@@ -12,6 +12,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { MentionPollingService } from '../polling/service';
+import type { RequestContext } from '../middleware/guards';
 import {
     listMentionPollingConfigs,
     getMentionPollingConfig,
@@ -93,11 +94,13 @@ export function handleMentionPollingRoutes(
     url: URL,
     db: Database,
     pollingService: MentionPollingService | null,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
+    const tenantId = context?.tenantId ?? 'default';
     // ── List all polling configs ────────────────────────────────────────────
     if (url.pathname === '/api/mention-polling' && req.method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;
-        const configs = listMentionPollingConfigs(db, agentId);
+        const configs = listMentionPollingConfigs(db, agentId, tenantId);
         return json({ configs });
     }
 
@@ -106,7 +109,7 @@ export function handleMentionPollingRoutes(
         return (async () => {
             try {
                 const data = await parseBodyOrThrow(req, CreateMentionPollingSchema);
-                const config = createMentionPollingConfig(db, data);
+                const config = createMentionPollingConfig(db, data, tenantId);
                 log.info('Mention polling config created', { id: config.id, repo: config.repo });
                 return json(config, 201);
             } catch (err) {
@@ -125,7 +128,7 @@ export function handleMentionPollingRoutes(
     const activityMatch = url.pathname.match(/^\/api\/mention-polling\/([^/]+)\/activity$/);
     if (activityMatch && req.method === 'GET') {
         const id = activityMatch[1];
-        const config = getMentionPollingConfig(db, id);
+        const config = getMentionPollingConfig(db, id, tenantId);
         if (!config) return json({ error: 'Polling config not found' }, 404);
 
         const sessions = listPollingActivity(db, config.repo);
@@ -160,7 +163,7 @@ export function handleMentionPollingRoutes(
         if (id === 'stats') return null;
 
         if (req.method === 'GET') {
-            const config = getMentionPollingConfig(db, id);
+            const config = getMentionPollingConfig(db, id, tenantId);
             if (!config) return json({ error: 'Polling config not found' }, 404);
             return json(config);
         }
@@ -169,7 +172,7 @@ export function handleMentionPollingRoutes(
             return (async () => {
                 try {
                     const data = await parseBodyOrThrow(req, UpdateMentionPollingSchema);
-                    const updated = updateMentionPollingConfig(db, id, data);
+                    const updated = updateMentionPollingConfig(db, id, data, tenantId);
                     if (!updated) return json({ error: 'Polling config not found' }, 404);
                     return json(updated);
                 } catch (err) {
@@ -179,7 +182,7 @@ export function handleMentionPollingRoutes(
         }
 
         if (req.method === 'DELETE') {
-            const deleted = deleteMentionPollingConfig(db, id);
+            const deleted = deleteMentionPollingConfig(db, id, tenantId);
             if (!deleted) return json({ error: 'Polling config not found' }, 404);
             return json({ ok: true });
         }

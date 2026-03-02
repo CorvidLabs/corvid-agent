@@ -4,6 +4,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import type { RequestContext } from '../middleware/guards';
 import { json, safeNumParam } from '../lib/response';
 
 interface DailySpendingRow {
@@ -40,57 +41,70 @@ interface MessageCountRow {
     count: number;
 }
 
-export function handleAnalyticsRoutes(req: Request, url: URL, db: Database): Response | null {
+export function handleAnalyticsRoutes(req: Request, url: URL, db: Database, context?: RequestContext): Response | null {
+    const tenantId = context?.tenantId ?? 'default';
+
     // GET /api/analytics/overview — summary stats
     if (url.pathname === '/api/analytics/overview' && req.method === 'GET') {
-        return handleOverview(db);
+        return handleOverview(db, tenantId);
     }
 
     // GET /api/analytics/spending — daily spending over time
     if (url.pathname === '/api/analytics/spending' && req.method === 'GET') {
         const days = safeNumParam(url.searchParams.get('days'), 30);
-        return handleSpending(db, days);
+        return handleSpending(db, days, tenantId);
     }
 
     // GET /api/analytics/sessions — session stats
     if (url.pathname === '/api/analytics/sessions' && req.method === 'GET') {
-        return handleSessionStats(db);
+        return handleSessionStats(db, tenantId);
     }
 
     return null;
 }
 
-function handleOverview(db: Database): Response {
-    // Total sessions & costs
+function handleOverview(db: Database, tenantId: string): Response {
+    const isDefault = tenantId === 'default';
+    const tenantFilter = isDefault ? '' : ' AND a.tenant_id = ?';
+    const tenantBinding = isDefault ? [] : [tenantId];
+
+    // Total sessions & costs (filtered by tenant's agents)
     const sessionStats = db.query(`
         SELECT
             COUNT(*) as total_sessions,
-            SUM(total_cost_usd) as total_cost_usd,
-            SUM(total_algo_spent) as total_algo_spent,
-            SUM(total_turns) as total_turns,
-            SUM(credits_consumed) as total_credits
-        FROM sessions
-    `).get() as Record<string, number | null>;
+            SUM(s.total_cost_usd) as total_cost_usd,
+            SUM(s.total_algo_spent) as total_algo_spent,
+            SUM(s.total_turns) as total_turns,
+            SUM(s.credits_consumed) as total_credits
+        FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE 1=1${isDefault ? '' : tenantFilter}
+    `).get(...tenantBinding) as Record<string, number | null>;
 
     // Active sessions
     const activeCount = db.query(`
-        SELECT COUNT(*) as count FROM sessions WHERE status = 'running'
-    `).get() as MessageCountRow;
+        SELECT COUNT(*) as count FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE s.status = 'running'${isDefault ? '' : tenantFilter}
+    `).get(...tenantBinding) as MessageCountRow;
 
     // Total agents
     const agentCount = db.query(`
-        SELECT COUNT(*) as count FROM agents
-    `).get() as MessageCountRow;
+        SELECT COUNT(*) as count FROM agents a WHERE 1=1${tenantFilter}
+    `).get(...tenantBinding) as MessageCountRow;
 
     // Total projects
     const projectCount = db.query(`
-        SELECT COUNT(*) as count FROM projects
-    `).get() as MessageCountRow;
+        SELECT COUNT(*) as count FROM projects p
+        ${isDefault ? '' : 'WHERE p.tenant_id = ?'}
+    `).get(...tenantBinding) as MessageCountRow;
 
     // Work task breakdown
     const workTasks = db.query(`
-        SELECT status, COUNT(*) as count FROM work_tasks GROUP BY status
-    `).all() as WorkTaskRow[];
+        SELECT wt.status, COUNT(*) as count FROM work_tasks wt
+        ${isDefault ? '' : 'WHERE wt.tenant_id = ?'}
+        GROUP BY wt.status
+    `).all(...tenantBinding) as WorkTaskRow[];
 
     const workTaskMap: Record<string, number> = {};
     for (const row of workTasks) {
@@ -132,10 +146,12 @@ function handleOverview(db: Database): Response {
     });
 }
 
-function handleSpending(db: Database, days: number): Response {
+function handleSpending(db: Database, days: number, tenantId: string): Response {
     const clampedDays = Math.min(Math.max(days, 1), 365);
+    const isDefault = tenantId === 'default';
+    const tenantBinding = isDefault ? [] : [tenantId];
 
-    // Get daily spending data
+    // Get daily spending data (global — not tenant-scoped since daily_spending is an aggregate table)
     const spending = db.query(`
         SELECT date, algo_micro, api_cost_usd
         FROM daily_spending
@@ -146,15 +162,16 @@ function handleSpending(db: Database, days: number): Response {
     // Get session costs by day
     const sessionCosts = db.query(`
         SELECT
-            date(created_at) as date,
+            date(s.created_at) as date,
             COUNT(*) as session_count,
-            SUM(total_cost_usd) as cost_usd,
-            SUM(total_turns) as turns
-        FROM sessions
-        WHERE created_at >= datetime('now', '-' || ? || ' days')
-        GROUP BY date(created_at)
+            SUM(s.total_cost_usd) as cost_usd,
+            SUM(s.total_turns) as turns
+        FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE s.created_at >= datetime('now', '-' || ? || ' days')${isDefault ? '' : ' AND a.tenant_id = ?'}
+        GROUP BY date(s.created_at)
         ORDER BY date ASC
-    `).all(clampedDays) as { date: string; session_count: number; cost_usd: number; turns: number }[];
+    `).all(clampedDays, ...tenantBinding) as { date: string; session_count: number; cost_usd: number; turns: number }[];
 
     return json({
         spending,
@@ -163,7 +180,11 @@ function handleSpending(db: Database, days: number): Response {
     });
 }
 
-function handleSessionStats(db: Database): Response {
+function handleSessionStats(db: Database, tenantId: string): Response {
+    const isDefault = tenantId === 'default';
+    const tenantFilter = isDefault ? '' : ' AND a.tenant_id = ?';
+    const tenantBinding = isDefault ? [] : [tenantId];
+
     // Sessions by agent
     const byAgent = db.query(`
         SELECT
@@ -174,32 +195,38 @@ function handleSessionStats(db: Database): Response {
             SUM(s.total_turns) as total_turns
         FROM sessions s
         LEFT JOIN agents a ON s.agent_id = a.id
-        WHERE s.agent_id IS NOT NULL
+        WHERE s.agent_id IS NOT NULL${tenantFilter}
         GROUP BY s.agent_id
         ORDER BY session_count DESC
-    `).all() as (SessionByAgentRow & { agent_name: string })[];
+    `).all(...tenantBinding) as (SessionByAgentRow & { agent_name: string })[];
 
     // Sessions by source
     const bySource = db.query(`
-        SELECT source, COUNT(*) as count
-        FROM sessions
-        GROUP BY source
-    `).all() as { source: string; count: number }[];
+        SELECT s.source, COUNT(*) as count
+        FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE 1=1${isDefault ? '' : tenantFilter}
+        GROUP BY s.source
+    `).all(...tenantBinding) as { source: string; count: number }[];
 
     // Sessions by status
     const byStatus = db.query(`
-        SELECT status, COUNT(*) as count
-        FROM sessions
-        GROUP BY status
-    `).all() as { status: string; count: number }[];
+        SELECT s.status, COUNT(*) as count
+        FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE 1=1${isDefault ? '' : tenantFilter}
+        GROUP BY s.status
+    `).all(...tenantBinding) as { status: string; count: number }[];
 
     // Recent sessions (last 20)
     const recent = db.query(`
-        SELECT id, agent_id, status, source, total_cost_usd, total_turns, created_at
-        FROM sessions
-        ORDER BY created_at DESC
+        SELECT s.id, s.agent_id, s.status, s.source, s.total_cost_usd, s.total_turns, s.created_at
+        FROM sessions s
+        ${isDefault ? '' : 'JOIN agents a ON s.agent_id = a.id'}
+        WHERE 1=1${isDefault ? '' : tenantFilter}
+        ORDER BY s.created_at DESC
         LIMIT 20
-    `).all() as SessionRow[];
+    `).all(...tenantBinding) as SessionRow[];
 
     return json({
         byAgent,

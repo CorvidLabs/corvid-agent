@@ -57,7 +57,7 @@ describe('Work Task Routes', () => {
         const svc = createMockWorkTaskService();
         const { req, url } = fakeReq('GET', '/api/work-tasks?agentId=agent-1');
         handleWorkTaskRoutes(req, url, svc);
-        expect(svc.listTasks).toHaveBeenCalledWith('agent-1');
+        expect(svc.listTasks).toHaveBeenCalledWith('agent-1', 'default');
     });
 
     it('POST /api/work-tasks rejects empty body', async () => {

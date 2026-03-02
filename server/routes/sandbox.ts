@@ -3,6 +3,8 @@
  */
 import type { Database } from 'bun:sqlite';
 import type { SandboxManager } from '../sandbox/manager';
+import type { RequestContext } from '../middleware/guards';
+import { getAgent } from '../db/agents';
 import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
 import { json, notFound, handleRouteError } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, SetSandboxPolicySchema, AssignSandboxSchema } from '../lib/validation';
@@ -12,9 +14,11 @@ export function handleSandboxRoutes(
     url: URL,
     db: Database,
     sandboxManager?: SandboxManager | null,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
+    const tenantId = context?.tenantId ?? 'default';
 
     // Pool stats
     if (path === '/api/sandbox/stats' && method === 'GET') {
@@ -33,6 +37,8 @@ export function handleSandboxRoutes(
     const policyMatch = path.match(/^\/api\/sandbox\/policies\/([^/]+)$/);
     if (policyMatch) {
         const agentId = policyMatch[1];
+        const agent = getAgent(db, agentId, tenantId);
+        if (!agent) return json({ error: 'Agent not found' }, 404);
 
         if (method === 'GET') {
             const policy = getAgentPolicy(db, agentId);

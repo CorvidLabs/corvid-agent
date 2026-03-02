@@ -4,6 +4,7 @@
 import type { Database } from 'bun:sqlite';
 import { type MarketplaceService, VerificationGateError } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
+import type { RequestContext } from '../middleware/guards';
 import type {
     ListingCategory,
     PricingModel,
@@ -17,6 +18,7 @@ export function handleMarketplaceRoutes(
     _db: Database,
     marketplace?: MarketplaceService | null,
     federation?: MarketplaceFederation | null,
+    _context?: RequestContext,
 ): Response | Promise<Response> | null {
     if (!marketplace) {
         // Only match marketplace paths, return null for non-marketplace paths

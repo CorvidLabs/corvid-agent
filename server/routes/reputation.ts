@@ -4,6 +4,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { ReputationAttestation } from '../reputation/attestation';
+import type { RequestContext } from '../middleware/guards';
 import { IdentityVerification, type VerificationTier } from '../reputation/identity-verification';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, RecordReputationEventSchema } from '../lib/validation';
@@ -16,6 +17,7 @@ export function handleReputationRoutes(
     _db: Database,
     scorer?: ReputationScorer | null,
     attestation?: ReputationAttestation | null,
+    _context?: RequestContext,
 ): Response | Promise<Response> | null {
     if (!scorer) {
         if (!url.pathname.startsWith('/api/reputation')) return null;

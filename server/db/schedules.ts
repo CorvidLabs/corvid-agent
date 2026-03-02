@@ -11,6 +11,8 @@ import type {
     ScheduleActionType,
     ScheduleTriggerEvent,
 } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -58,14 +60,14 @@ function rowToExecution(row: Record<string, unknown>): ScheduleExecution {
 
 // ─── Schedule CRUD ───────────────────────────────────────────────────────────
 
-export function createSchedule(db: Database, input: CreateScheduleInput): AgentSchedule {
+export function createSchedule(db: Database, input: CreateScheduleInput, tenantId: string = DEFAULT_TENANT_ID): AgentSchedule {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     db.query(`
         INSERT INTO agent_schedules (id, agent_id, name, description, cron_expression, interval_ms,
-            actions, approval_policy, max_executions, max_budget_per_run, notify_address, trigger_events, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            actions, approval_policy, max_executions, max_budget_per_run, notify_address, trigger_events, tenant_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -79,6 +81,7 @@ export function createSchedule(db: Database, input: CreateScheduleInput): AgentS
         input.maxBudgetPerRun ?? null,
         input.notifyAddress ?? null,
         input.triggerEvents ? JSON.stringify(input.triggerEvents) : null,
+        tenantId,
         now,
         now,
     );
@@ -86,18 +89,21 @@ export function createSchedule(db: Database, input: CreateScheduleInput): AgentS
     return getSchedule(db, id)!;
 }
 
-export function getSchedule(db: Database, id: string): AgentSchedule | null {
+export function getSchedule(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): AgentSchedule | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'agent_schedules', id, tenantId)) return null;
     const row = db.query('SELECT * FROM agent_schedules WHERE id = ?').get(id) as Record<string, unknown> | null;
     return row ? rowToSchedule(row) : null;
 }
 
-export function listSchedules(db: Database, agentId?: string): AgentSchedule[] {
+export function listSchedules(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): AgentSchedule[] {
     const cronHour = `CAST(SUBSTR(cron_expression, INSTR(cron_expression, ' ') + 1, INSTR(SUBSTR(cron_expression, INSTR(cron_expression, ' ') + 1), ' ') - 1) AS INTEGER)`;
     const orderBy = `ORDER BY CASE WHEN cron_expression = '' OR cron_expression IS NULL THEN 1 ELSE 0 END, ${cronHour} ASC`;
-    const rows = agentId
-        ? db.query(`SELECT * FROM agent_schedules WHERE agent_id = ? ${orderBy}`).all(agentId)
-        : db.query(`SELECT * FROM agent_schedules ${orderBy}`).all();
-    return (rows as Record<string, unknown>[]).map(rowToSchedule);
+    if (agentId) {
+        const { query, bindings } = withTenantFilter(`SELECT * FROM agent_schedules WHERE agent_id = ? ${orderBy}`, tenantId);
+        return (db.query(query).all(agentId, ...bindings) as Record<string, unknown>[]).map(rowToSchedule);
+    }
+    const { query, bindings } = withTenantFilter(`SELECT * FROM agent_schedules ${orderBy}`, tenantId);
+    return (db.query(query).all(...bindings) as Record<string, unknown>[]).map(rowToSchedule);
 }
 
 export function listActiveSchedules(db: Database): AgentSchedule[] {
@@ -121,8 +127,8 @@ export function listDueSchedules(db: Database): AgentSchedule[] {
     return (rows as Record<string, unknown>[]).map(rowToSchedule);
 }
 
-export function updateSchedule(db: Database, id: string, input: UpdateScheduleInput): AgentSchedule | null {
-    const existing = getSchedule(db, id);
+export function updateSchedule(db: Database, id: string, input: UpdateScheduleInput, tenantId: string = DEFAULT_TENANT_ID): AgentSchedule | null {
+    const existing = getSchedule(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -163,7 +169,8 @@ export function updateScheduleLastRun(db: Database, id: string): void {
     `).run(id);
 }
 
-export function deleteSchedule(db: Database, id: string): boolean {
+export function deleteSchedule(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'agent_schedules', id, tenantId)) return false;
     const result = db.query('DELETE FROM agent_schedules WHERE id = ?').run(id);
     return result.changes > 0;
 }
@@ -211,16 +218,20 @@ export function createExecution(
     return getExecution(db, id)!;
 }
 
-export function getExecution(db: Database, id: string): ScheduleExecution | null {
+export function getExecution(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): ScheduleExecution | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'schedule_executions', id, tenantId)) return null;
     const row = db.query('SELECT * FROM schedule_executions WHERE id = ?').get(id) as Record<string, unknown> | null;
     return row ? rowToExecution(row) : null;
 }
 
-export function listExecutions(db: Database, scheduleId?: string, limit: number = 50): ScheduleExecution[] {
-    const rows = scheduleId
-        ? db.query('SELECT * FROM schedule_executions WHERE schedule_id = ? ORDER BY started_at DESC LIMIT ?').all(scheduleId, limit)
-        : db.query('SELECT * FROM schedule_executions ORDER BY started_at DESC LIMIT ?').all(limit);
-    return (rows as Record<string, unknown>[]).map(rowToExecution);
+export function listExecutions(db: Database, scheduleId?: string, limit: number = 50, tenantId: string = DEFAULT_TENANT_ID): ScheduleExecution[] {
+    if (scheduleId) {
+        const { query, bindings } = withTenantFilter('SELECT * FROM schedule_executions WHERE schedule_id = ? ORDER BY started_at DESC LIMIT ?', tenantId);
+        // Insert tenant binding before the LIMIT param
+        return (db.query(query).all(scheduleId, ...bindings, limit) as Record<string, unknown>[]).map(rowToExecution);
+    }
+    const { query, bindings } = withTenantFilter('SELECT * FROM schedule_executions ORDER BY started_at DESC LIMIT ?', tenantId);
+    return (db.query(query).all(...bindings, limit) as Record<string, unknown>[]).map(rowToExecution);
 }
 
 export interface ExecutionFilterOpts {

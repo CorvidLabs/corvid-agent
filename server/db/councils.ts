@@ -9,6 +9,8 @@ import type {
     CreateCouncilInput,
     UpdateCouncilInput,
 } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 interface CouncilRow {
     id: string;
@@ -77,25 +79,27 @@ function getMemberAgentIds(db: Database, councilId: string): string[] {
 
 // MARK: - Council CRUD
 
-export function listCouncils(db: Database): Council[] {
-    const rows = db.query('SELECT * FROM councils ORDER BY updated_at DESC').all() as CouncilRow[];
+export function listCouncils(db: Database, tenantId: string = DEFAULT_TENANT_ID): Council[] {
+    const { query, bindings } = withTenantFilter('SELECT * FROM councils ORDER BY updated_at DESC', tenantId);
+    const rows = db.query(query).all(...bindings) as CouncilRow[];
     return rows.map((row) => rowToCouncil(row, getMemberAgentIds(db, row.id)));
 }
 
-export function getCouncil(db: Database, id: string): Council | null {
+export function getCouncil(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Council | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'councils', id, tenantId)) return null;
     const row = db.query('SELECT * FROM councils WHERE id = ?').get(id) as CouncilRow | null;
     if (!row) return null;
     return rowToCouncil(row, getMemberAgentIds(db, row.id));
 }
 
-export function createCouncil(db: Database, input: CreateCouncilInput): Council {
+export function createCouncil(db: Database, input: CreateCouncilInput, tenantId: string = DEFAULT_TENANT_ID): Council {
     const id = crypto.randomUUID();
 
     db.transaction(() => {
         db.query(
-            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds)
-             VALUES (?, ?, ?, ?, ?)`
-        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2);
+            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, tenant_id)
+             VALUES (?, ?, ?, ?, ?, ?)`
+        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, tenantId);
 
         for (let i = 0; i < input.agentIds.length; i++) {
             db.query(
@@ -107,8 +111,8 @@ export function createCouncil(db: Database, input: CreateCouncilInput): Council 
     return getCouncil(db, id) as Council;
 }
 
-export function updateCouncil(db: Database, id: string, input: UpdateCouncilInput): Council | null {
-    const existing = getCouncil(db, id);
+export function updateCouncil(db: Database, id: string, input: UpdateCouncilInput, tenantId: string = DEFAULT_TENANT_ID): Council | null {
+    const existing = getCouncil(db, id, tenantId);
     if (!existing) return null;
 
     db.transaction(() => {
@@ -148,10 +152,11 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
         }
     })();
 
-    return getCouncil(db, id);
+    return getCouncil(db, id, tenantId);
 }
 
-export function deleteCouncil(db: Database, id: string): boolean {
+export function deleteCouncil(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'councils', id, tenantId)) return false;
     const result = db.transaction(() => {
         // council_launch_logs and council_discussion_messages cascade from council_launches
         // Sessions may reference council_launches via council_launch_id
@@ -169,16 +174,18 @@ export function deleteCouncil(db: Database, id: string): boolean {
 export function createCouncilLaunch(
     db: Database,
     params: { id: string; councilId: string; projectId: string; prompt: string },
+    tenantId: string = DEFAULT_TENANT_ID,
 ): CouncilLaunchRow {
     db.query(
-        `INSERT INTO council_launches (id, council_id, project_id, prompt)
-         VALUES (?, ?, ?, ?)`
-    ).run(params.id, params.councilId, params.projectId, params.prompt);
+        `INSERT INTO council_launches (id, council_id, project_id, prompt, tenant_id)
+         VALUES (?, ?, ?, ?, ?)`
+    ).run(params.id, params.councilId, params.projectId, params.prompt, tenantId);
 
     return db.query('SELECT * FROM council_launches WHERE id = ?').get(params.id) as CouncilLaunchRow;
 }
 
-export function getCouncilLaunch(db: Database, id: string): CouncilLaunch | null {
+export function getCouncilLaunch(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): CouncilLaunch | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'council_launches', id, tenantId)) return null;
     const row = db.query('SELECT * FROM council_launches WHERE id = ?').get(id) as CouncilLaunchRow | null;
     if (!row) return null;
 
@@ -190,16 +197,16 @@ export function getCouncilLaunch(db: Database, id: string): CouncilLaunch | null
     return rowToLaunch(row, sessionIds);
 }
 
-export function listCouncilLaunches(db: Database, councilId?: string): CouncilLaunch[] {
+export function listCouncilLaunches(db: Database, councilId?: string, tenantId: string = DEFAULT_TENANT_ID): CouncilLaunch[] {
     let rows: CouncilLaunchRow[];
     if (councilId) {
-        rows = db.query(
-            'SELECT * FROM council_launches WHERE council_id = ? ORDER BY created_at DESC'
-        ).all(councilId) as CouncilLaunchRow[];
+        const { query, bindings } = withTenantFilter(
+            'SELECT * FROM council_launches WHERE council_id = ? ORDER BY created_at DESC', tenantId);
+        rows = db.query(query).all(councilId, ...bindings) as CouncilLaunchRow[];
     } else {
-        rows = db.query(
-            'SELECT * FROM council_launches ORDER BY created_at DESC'
-        ).all() as CouncilLaunchRow[];
+        const { query, bindings } = withTenantFilter(
+            'SELECT * FROM council_launches ORDER BY created_at DESC', tenantId);
+        rows = db.query(query).all(...bindings) as CouncilLaunchRow[];
     }
 
     return rows.map((row) => {

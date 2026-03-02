@@ -12,6 +12,7 @@ import {
 } from '../db/councils';
 import type { ProcessManager } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { RequestContext } from '../middleware/guards';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { NotFoundError } from '../lib/errors';
@@ -40,23 +41,25 @@ export function handleCouncilRoutes(
     db: Database,
     processManager: ProcessManager,
     agentMessenger?: AgentMessenger | null,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
+    const tenantId = context?.tenantId ?? 'default';
 
     // Council CRUD
     if (path === '/api/councils' && method === 'GET') {
-        return json(listCouncils(db));
+        return json(listCouncils(db, tenantId));
     }
 
     if (path === '/api/councils' && method === 'POST') {
-        return handleCreateCouncil(req, db);
+        return handleCreateCouncil(req, db, tenantId);
     }
 
     // Council launches list (optional councilId filter)
     if (path === '/api/council-launches' && method === 'GET') {
         const councilId = url.searchParams.get('councilId') ?? undefined;
-        return json(listCouncilLaunches(db, councilId));
+        return json(listCouncilLaunches(db, councilId, tenantId));
     }
 
     // Council launch by ID
@@ -66,18 +69,18 @@ export function handleCouncilRoutes(
         const action = launchMatch[3];
 
         if (!action && method === 'GET') {
-            const launch = getCouncilLaunch(db, launchId);
+            const launch = getCouncilLaunch(db, launchId, tenantId);
             return launch ? json(launch) : json({ error: 'Not found' }, 404);
         }
 
         if (action === 'logs' && method === 'GET') {
-            const launch = getCouncilLaunch(db, launchId);
+            const launch = getCouncilLaunch(db, launchId, tenantId);
             if (!launch) return json({ error: 'Not found' }, 404);
             return json(getCouncilLaunchLogs(db, launchId));
         }
 
         if (action === 'discussion-messages' && method === 'GET') {
-            const launch = getCouncilLaunch(db, launchId);
+            const launch = getCouncilLaunch(db, launchId, tenantId);
             if (!launch) return json({ error: 'Not found' }, 404);
             return json(getDiscussionMessages(db, launchId));
         }
@@ -108,14 +111,14 @@ export function handleCouncilRoutes(
 
     if (!action) {
         if (method === 'GET') {
-            const council = getCouncil(db, id);
+            const council = getCouncil(db, id, tenantId);
             return council ? json(council) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
-            return handleUpdateCouncil(req, db, id);
+            return handleUpdateCouncil(req, db, id, tenantId);
         }
         if (method === 'DELETE') {
-            const deleted = deleteCouncil(db, id);
+            const deleted = deleteCouncil(db, id, tenantId);
             return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
         }
     }
@@ -125,7 +128,7 @@ export function handleCouncilRoutes(
     }
 
     if (action === 'launches' && method === 'GET') {
-        return json(listCouncilLaunches(db, id));
+        return json(listCouncilLaunches(db, id, tenantId));
     }
 
     return null;
@@ -133,10 +136,10 @@ export function handleCouncilRoutes(
 
 // ─── CRUD handlers ────────────────────────────────────────────────────────────
 
-async function handleCreateCouncil(req: Request, db: Database): Promise<Response> {
+async function handleCreateCouncil(req: Request, db: Database, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateCouncilSchema);
-        const council = createCouncil(db, data);
+        const council = createCouncil(db, data, tenantId);
         return json(council, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
@@ -144,10 +147,10 @@ async function handleCreateCouncil(req: Request, db: Database): Promise<Response
     }
 }
 
-async function handleUpdateCouncil(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdateCouncil(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateCouncilSchema);
-        const council = updateCouncil(db, id, data);
+        const council = updateCouncil(db, id, data, tenantId);
         return council ? json(council) : json({ error: 'Not found' }, 404);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);

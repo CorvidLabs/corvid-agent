@@ -9,7 +9,13 @@ import { extractTenantId, registerApiKey } from '../tenant/middleware';
 import { createAgent, listAgents, getAgent, updateAgent, deleteAgent } from '../db/agents';
 import { createSession, listSessions, getSession, deleteSession, updateSession, getSessionMessages, addSessionMessage } from '../db/sessions';
 import { createProject, listProjects, getProject } from '../db/projects';
-// work-tasks unused in current tests but kept for future expansion
+import { createWorkTask, listWorkTasks, getWorkTask } from '../db/work-tasks';
+import { listCouncils, getCouncil, createCouncil, updateCouncil, deleteCouncil } from '../db/councils';
+import { listSchedules, getSchedule, createSchedule, updateSchedule, deleteSchedule } from '../db/schedules';
+import { listWorkflows, getWorkflow, createWorkflow, updateWorkflow, deleteWorkflow } from '../db/workflows';
+import { listWebhookRegistrations, getWebhookRegistration, createWebhookRegistration, updateWebhookRegistration, deleteWebhookRegistration } from '../db/webhooks';
+import { listMentionPollingConfigs, getMentionPollingConfig, createMentionPollingConfig, updateMentionPollingConfig, deleteMentionPollingConfig } from '../db/mention-polling';
+import { listMcpServerConfigs, getMcpServerConfig, createMcpServerConfig, updateMcpServerConfig, deleteMcpServerConfig } from '../db/mcp-servers';
 import { tenantGuard, tenantRoleGuard, createRequestContext } from '../middleware/guards';
 import { tenantTopic } from '../ws/handler';
 import { validateUrl } from '../a2a/client';
@@ -765,5 +771,457 @@ describe('tenantTopic', () => {
     test('returns scoped topic for real tenant', () => {
         expect(tenantTopic('council', 'tenant-abc')).toBe('council:tenant-abc');
         expect(tenantTopic('algochat', 'tenant-xyz')).toBe('algochat:tenant-xyz');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant council isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant council isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestCouncil(tenantId: string, name: string) {
+        // Councils need agent IDs — create agents in the same tenant
+        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+        return createCouncil(db, { name, agentIds: [agent.id] }, tenantId);
+    }
+
+    test('Tenant A cannot list Tenant B councils', () => {
+        createTestCouncil(TENANT_A, 'Council A');
+        createTestCouncil(TENANT_B, 'Council B');
+
+        const councilsA = listCouncils(db, TENANT_A);
+        const councilsB = listCouncils(db, TENANT_B);
+
+        expect(councilsA).toHaveLength(1);
+        expect(councilsA[0].name).toBe('Council A');
+        expect(councilsB).toHaveLength(1);
+        expect(councilsB[0].name).toBe('Council B');
+    });
+
+    test('Tenant A cannot get Tenant B council by ID', () => {
+        const councilB = createTestCouncil(TENANT_B, 'Council B');
+
+        expect(getCouncil(db, councilB.id, TENANT_A)).toBeNull();
+        expect(getCouncil(db, councilB.id, TENANT_B)).not.toBeNull();
+    });
+
+    test('Tenant A cannot update Tenant B council', () => {
+        const councilB = createTestCouncil(TENANT_B, 'Council B');
+
+        const result = updateCouncil(db, councilB.id, { name: 'Hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        const original = getCouncil(db, councilB.id, TENANT_B);
+        expect(original!.name).toBe('Council B');
+    });
+
+    test('Tenant A cannot delete Tenant B council', () => {
+        const councilB = createTestCouncil(TENANT_B, 'Council B');
+
+        const deleted = deleteCouncil(db, councilB.id, TENANT_A);
+        expect(deleted).toBe(false);
+
+        expect(getCouncil(db, councilB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant schedule isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant schedule isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestSchedule(tenantId: string, name: string) {
+        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+        return createSchedule(db, {
+            agentId: agent.id,
+            name,
+            actions: [{ type: 'prompt', prompt: 'test' }],
+            intervalMs: 3600000,
+        } as any, tenantId);
+    }
+
+    test('Tenant A cannot list Tenant B schedules', () => {
+        createTestSchedule(TENANT_A, 'Schedule A');
+        createTestSchedule(TENANT_B, 'Schedule B');
+
+        const schedulesA = listSchedules(db, undefined, TENANT_A);
+        const schedulesB = listSchedules(db, undefined, TENANT_B);
+
+        expect(schedulesA).toHaveLength(1);
+        expect(schedulesA[0].name).toBe('Schedule A');
+        expect(schedulesB).toHaveLength(1);
+        expect(schedulesB[0].name).toBe('Schedule B');
+    });
+
+    test('Tenant A cannot get Tenant B schedule by ID', () => {
+        const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
+
+        expect(getSchedule(db, scheduleB.id, TENANT_A)).toBeNull();
+        expect(getSchedule(db, scheduleB.id, TENANT_B)).not.toBeNull();
+    });
+
+    test('Tenant A cannot update Tenant B schedule', () => {
+        const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
+
+        const result = updateSchedule(db, scheduleB.id, { name: 'Hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        const original = getSchedule(db, scheduleB.id, TENANT_B);
+        expect(original!.name).toBe('Schedule B');
+    });
+
+    test('Tenant A cannot delete Tenant B schedule', () => {
+        const scheduleB = createTestSchedule(TENANT_B, 'Schedule B');
+
+        const deleted = deleteSchedule(db, scheduleB.id, TENANT_A);
+        expect(deleted).toBe(false);
+
+        expect(getSchedule(db, scheduleB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant workflow isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant workflow isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestWorkflow(tenantId: string, name: string) {
+        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+        return createWorkflow(db, {
+            agentId: agent.id,
+            name,
+            nodes: [],
+            edges: [],
+        }, tenantId);
+    }
+
+    test('Tenant A cannot list Tenant B workflows', () => {
+        createTestWorkflow(TENANT_A, 'Workflow A');
+        createTestWorkflow(TENANT_B, 'Workflow B');
+
+        const workflowsA = listWorkflows(db, undefined, TENANT_A);
+        const workflowsB = listWorkflows(db, undefined, TENANT_B);
+
+        expect(workflowsA).toHaveLength(1);
+        expect(workflowsA[0].name).toBe('Workflow A');
+        expect(workflowsB).toHaveLength(1);
+        expect(workflowsB[0].name).toBe('Workflow B');
+    });
+
+    test('Tenant A cannot get Tenant B workflow by ID', () => {
+        const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
+
+        expect(getWorkflow(db, workflowB.id, TENANT_A)).toBeNull();
+        expect(getWorkflow(db, workflowB.id, TENANT_B)).not.toBeNull();
+    });
+
+    test('Tenant A cannot update Tenant B workflow', () => {
+        const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
+
+        const result = updateWorkflow(db, workflowB.id, { name: 'Hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        const original = getWorkflow(db, workflowB.id, TENANT_B);
+        expect(original!.name).toBe('Workflow B');
+    });
+
+    test('Tenant A cannot delete Tenant B workflow', () => {
+        const workflowB = createTestWorkflow(TENANT_B, 'Workflow B');
+
+        const deleted = deleteWorkflow(db, workflowB.id, TENANT_A);
+        expect(deleted).toBe(false);
+
+        expect(getWorkflow(db, workflowB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant webhook isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant webhook isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestWebhook(tenantId: string, repo: string) {
+        const agent = createAgent(db, { name: `Agent for ${repo}` }, tenantId);
+        const project = createProject(db, { name: `Project for ${repo}`, workingDir: '/tmp/test' }, tenantId);
+        return createWebhookRegistration(db, {
+            agentId: agent.id,
+            repo,
+            events: ['issue_comment'],
+            mentionUsername: 'testbot',
+            projectId: project.id,
+        } as any, tenantId);
+    }
+
+    test('Tenant A cannot list Tenant B webhooks', () => {
+        createTestWebhook(TENANT_A, 'owner/repo-a');
+        createTestWebhook(TENANT_B, 'owner/repo-b');
+
+        const webhooksA = listWebhookRegistrations(db, undefined, TENANT_A);
+        const webhooksB = listWebhookRegistrations(db, undefined, TENANT_B);
+
+        expect(webhooksA).toHaveLength(1);
+        expect(webhooksA[0].repo).toBe('owner/repo-a');
+        expect(webhooksB).toHaveLength(1);
+        expect(webhooksB[0].repo).toBe('owner/repo-b');
+    });
+
+    test('Tenant A cannot get Tenant B webhook by ID', () => {
+        const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
+
+        expect(getWebhookRegistration(db, webhookB.id, TENANT_A)).toBeNull();
+        expect(getWebhookRegistration(db, webhookB.id, TENANT_B)).not.toBeNull();
+    });
+
+    test('Tenant A cannot update Tenant B webhook', () => {
+        const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
+
+        const result = updateWebhookRegistration(db, webhookB.id, { mentionUsername: 'hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        const original = getWebhookRegistration(db, webhookB.id, TENANT_B);
+        expect(original!.mentionUsername).toBe('testbot');
+    });
+
+    test('Tenant A cannot delete Tenant B webhook', () => {
+        const webhookB = createTestWebhook(TENANT_B, 'owner/repo-b');
+
+        const deleted = deleteWebhookRegistration(db, webhookB.id, TENANT_A);
+        expect(deleted).toBe(false);
+
+        expect(getWebhookRegistration(db, webhookB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant mention-polling isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant mention-polling isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestPollingConfig(tenantId: string, repo: string) {
+        const agent = createAgent(db, { name: `Agent for ${repo}` }, tenantId);
+        const project = createProject(db, { name: `Project for ${repo}`, workingDir: '/tmp/test' }, tenantId);
+        return createMentionPollingConfig(db, {
+            agentId: agent.id,
+            repo,
+            mentionUsername: 'testbot',
+            projectId: project.id,
+        }, tenantId);
+    }
+
+    test('Tenant A cannot list Tenant B polling configs', () => {
+        createTestPollingConfig(TENANT_A, 'owner/repo-a');
+        createTestPollingConfig(TENANT_B, 'owner/repo-b');
+
+        const configsA = listMentionPollingConfigs(db, undefined, TENANT_A);
+        const configsB = listMentionPollingConfigs(db, undefined, TENANT_B);
+
+        expect(configsA).toHaveLength(1);
+        expect(configsA[0].repo).toBe('owner/repo-a');
+        expect(configsB).toHaveLength(1);
+        expect(configsB[0].repo).toBe('owner/repo-b');
+    });
+
+    test('Tenant A cannot get Tenant B polling config by ID', () => {
+        const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
+
+        expect(getMentionPollingConfig(db, configB.id, TENANT_A)).toBeNull();
+        expect(getMentionPollingConfig(db, configB.id, TENANT_B)).not.toBeNull();
+    });
+
+    test('Tenant A cannot update Tenant B polling config', () => {
+        const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
+
+        const result = updateMentionPollingConfig(db, configB.id, { mentionUsername: 'hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        const original = getMentionPollingConfig(db, configB.id, TENANT_B);
+        expect(original!.mentionUsername).toBe('testbot');
+    });
+
+    test('Tenant A cannot delete Tenant B polling config', () => {
+        const configB = createTestPollingConfig(TENANT_B, 'owner/repo-b');
+
+        const deleted = deleteMentionPollingConfig(db, configB.id, TENANT_A);
+        expect(deleted).toBe(false);
+
+        expect(getMentionPollingConfig(db, configB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant MCP server config isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant MCP server config isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestMcpConfig(tenantId: string, name: string) {
+        const agent = createAgent(db, { name: `Agent for ${name}` }, tenantId);
+        return createMcpServerConfig(db, {
+            agentId: agent.id,
+            name,
+            command: 'echo',
+            args: [],
+            envVars: {},
+        }, tenantId);
+    }
+
+    test('Tenant A cannot list Tenant B MCP configs', () => {
+        createTestMcpConfig(TENANT_A, 'MCP A');
+        createTestMcpConfig(TENANT_B, 'MCP B');
+
+        const configsA = listMcpServerConfigs(db, undefined, TENANT_A);
+        const configsB = listMcpServerConfigs(db, undefined, TENANT_B);
+
+        expect(configsA).toHaveLength(1);
+        expect(configsA[0].name).toBe('MCP A');
+        expect(configsB).toHaveLength(1);
+        expect(configsB[0].name).toBe('MCP B');
+    });
+
+    test('Tenant A cannot get Tenant B MCP config by ID', () => {
+        const configB = createTestMcpConfig(TENANT_B, 'MCP B');
+
+        expect(getMcpServerConfig(db, configB.id, TENANT_A)).toBeNull();
+        expect(getMcpServerConfig(db, configB.id, TENANT_B)).not.toBeNull();
+    });
+
+    test('Tenant A cannot update Tenant B MCP config', () => {
+        const configB = createTestMcpConfig(TENANT_B, 'MCP B');
+
+        const result = updateMcpServerConfig(db, configB.id, { name: 'Hacked' }, TENANT_A);
+        expect(result).toBeNull();
+
+        const original = getMcpServerConfig(db, configB.id, TENANT_B);
+        expect(original!.name).toBe('MCP B');
+    });
+
+    test('Tenant A cannot delete Tenant B MCP config', () => {
+        const configB = createTestMcpConfig(TENANT_B, 'MCP B');
+
+        const deleted = deleteMcpServerConfig(db, configB.id, TENANT_A);
+        expect(deleted).toBe(false);
+
+        expect(getMcpServerConfig(db, configB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant work task isolation (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant work task isolation', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    function createTestWorkTask(tenantId: string, description: string) {
+        const agent = createAgent(db, { name: `Agent for ${description}` }, tenantId);
+        const project = createProject(db, { name: `Project for ${description}`, workingDir: '/tmp/test' }, tenantId);
+        return createWorkTask(db, {
+            agentId: agent.id,
+            projectId: project.id,
+            description,
+            tenantId,
+        });
+    }
+
+    test('Tenant A cannot list Tenant B work tasks', () => {
+        createTestWorkTask(TENANT_A, 'Task A');
+        createTestWorkTask(TENANT_B, 'Task B');
+
+        const tasksA = listWorkTasks(db, undefined, TENANT_A);
+        const tasksB = listWorkTasks(db, undefined, TENANT_B);
+
+        expect(tasksA).toHaveLength(1);
+        expect(tasksA[0].description).toBe('Task A');
+        expect(tasksB).toHaveLength(1);
+        expect(tasksB[0].description).toBe('Task B');
+    });
+
+    test('Tenant A cannot get Tenant B work task by ID', () => {
+        const taskB = createTestWorkTask(TENANT_B, 'Task B');
+
+        expect(getWorkTask(db, taskB.id, TENANT_A)).toBeNull();
+        expect(getWorkTask(db, taskB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-tenant persona access (#305)
+// ---------------------------------------------------------------------------
+
+describe('Cross-tenant persona access via agent ownership', () => {
+    const TENANT_A = 'tenant-a';
+    const TENANT_B = 'tenant-b';
+
+    test('getAgent with wrong tenant returns null (blocks persona CRUD)', () => {
+        const agentB = createAgent(db, { name: 'Agent B' }, TENANT_B);
+
+        // Tenant A trying to access Tenant B's agent
+        expect(getAgent(db, agentB.id, TENANT_A)).toBeNull();
+        // Tenant B can access their own agent
+        expect(getAgent(db, agentB.id, TENANT_B)).not.toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Default tenant backwards compatibility (#305)
+// ---------------------------------------------------------------------------
+
+describe('Default tenant backwards compatibility', () => {
+    test('Resources created without tenant use DEFAULT_TENANT_ID', () => {
+        const agent = createAgent(db, { name: 'Default Agent' });
+        const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agent.id) as { tenant_id: string };
+        expect(row.tenant_id).toBe(DEFAULT_TENANT_ID);
+    });
+
+    test('Default tenant can access resources with DEFAULT_TENANT_ID', () => {
+        const agent = createAgent(db, { name: 'Default Agent' });
+        expect(getAgent(db, agent.id, DEFAULT_TENANT_ID)).not.toBeNull();
+        expect(getAgent(db, agent.id)).not.toBeNull(); // omit param = default
+    });
+
+    test('Newly-scoped tables have tenant_id column', () => {
+        const newlyScoped = [
+            'councils', 'council_launches',
+            'agent_schedules', 'schedule_executions',
+            'workflows', 'workflow_runs',
+            'mention_polling_configs', 'mcp_server_configs', 'webhook_registrations',
+        ];
+        for (const table of newlyScoped) {
+            const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+            const colNames = cols.map((c) => c.name);
+            expect(colNames).toContain('tenant_id');
+        }
+    });
+
+    test('Newly-scoped tables have tenant_id index', () => {
+        const newlyScoped = [
+            'councils', 'council_launches',
+            'agent_schedules', 'schedule_executions',
+            'workflows', 'workflow_runs',
+            'mention_polling_configs', 'mcp_server_configs', 'webhook_registrations',
+        ];
+        for (const table of newlyScoped) {
+            const indexes = db.query(`PRAGMA index_list(${table})`).all() as { name: string }[];
+            const indexNames = indexes.map((i) => i.name);
+            expect(indexNames.some(n => n.includes('tenant'))).toBe(true);
+        }
     });
 });

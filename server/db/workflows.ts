@@ -12,6 +12,8 @@ import type {
     CreateWorkflowInput,
     UpdateWorkflowInput,
 } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,14 +71,14 @@ function rowToNodeRun(row: Record<string, unknown>): WorkflowNodeRun {
 
 // ─── Workflow CRUD ───────────────────────────────────────────────────────────
 
-export function createWorkflow(db: Database, input: CreateWorkflowInput): Workflow {
+export function createWorkflow(db: Database, input: CreateWorkflowInput, tenantId: string = DEFAULT_TENANT_ID): Workflow {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     db.query(`
         INSERT INTO workflows (id, agent_id, name, description, nodes, edges,
-            status, default_project_id, max_concurrency, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)
+            status, default_project_id, max_concurrency, tenant_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -86,6 +88,7 @@ export function createWorkflow(db: Database, input: CreateWorkflowInput): Workfl
         JSON.stringify(input.edges),
         input.defaultProjectId ?? null,
         input.maxConcurrency ?? 2,
+        tenantId,
         now,
         now,
     );
@@ -93,20 +96,23 @@ export function createWorkflow(db: Database, input: CreateWorkflowInput): Workfl
     return getWorkflow(db, id)!;
 }
 
-export function getWorkflow(db: Database, id: string): Workflow | null {
+export function getWorkflow(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): Workflow | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'workflows', id, tenantId)) return null;
     const row = db.query('SELECT * FROM workflows WHERE id = ?').get(id) as Record<string, unknown> | null;
     return row ? rowToWorkflow(row) : null;
 }
 
-export function listWorkflows(db: Database, agentId?: string): Workflow[] {
-    const rows = agentId
-        ? db.query('SELECT * FROM workflows WHERE agent_id = ? ORDER BY updated_at DESC').all(agentId)
-        : db.query('SELECT * FROM workflows ORDER BY updated_at DESC').all();
-    return (rows as Record<string, unknown>[]).map(rowToWorkflow);
+export function listWorkflows(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): Workflow[] {
+    if (agentId) {
+        const { query, bindings } = withTenantFilter('SELECT * FROM workflows WHERE agent_id = ? ORDER BY updated_at DESC', tenantId);
+        return (db.query(query).all(agentId, ...bindings) as Record<string, unknown>[]).map(rowToWorkflow);
+    }
+    const { query, bindings } = withTenantFilter('SELECT * FROM workflows ORDER BY updated_at DESC', tenantId);
+    return (db.query(query).all(...bindings) as Record<string, unknown>[]).map(rowToWorkflow);
 }
 
-export function updateWorkflow(db: Database, id: string, input: UpdateWorkflowInput): Workflow | null {
-    const existing = getWorkflow(db, id);
+export function updateWorkflow(db: Database, id: string, input: UpdateWorkflowInput, tenantId: string = DEFAULT_TENANT_ID): Workflow | null {
+    const existing = getWorkflow(db, id, tenantId);
     if (!existing) return null;
 
     const sets: string[] = [];
@@ -129,7 +135,8 @@ export function updateWorkflow(db: Database, id: string, input: UpdateWorkflowIn
     return getWorkflow(db, id);
 }
 
-export function deleteWorkflow(db: Database, id: string): boolean {
+export function deleteWorkflow(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'workflows', id, tenantId)) return false;
     const result = db.query('DELETE FROM workflows WHERE id = ?').run(id);
     return result.changes > 0;
 }
@@ -161,7 +168,8 @@ export function createWorkflowRun(
     return getWorkflowRun(db, id)!;
 }
 
-export function getWorkflowRun(db: Database, id: string): WorkflowRun | null {
+export function getWorkflowRun(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): WorkflowRun | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'workflow_runs', id, tenantId)) return null;
     const row = db.query('SELECT * FROM workflow_runs WHERE id = ?').get(id) as Record<string, unknown> | null;
     if (!row) return null;
     const run = rowToRun(row);
@@ -169,15 +177,13 @@ export function getWorkflowRun(db: Database, id: string): WorkflowRun | null {
     return run;
 }
 
-export function listWorkflowRuns(db: Database, workflowId?: string, limit = 50): WorkflowRun[] {
-    const rows = workflowId
-        ? db.query('SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?').all(workflowId, limit)
-        : db.query('SELECT * FROM workflow_runs ORDER BY started_at DESC LIMIT ?').all(limit);
-    return (rows as Record<string, unknown>[]).map((row) => {
-        const run = rowToRun(row);
-        // Don't load node runs for list queries (performance)
-        return run;
-    });
+export function listWorkflowRuns(db: Database, workflowId?: string, limit = 50, tenantId: string = DEFAULT_TENANT_ID): WorkflowRun[] {
+    if (workflowId) {
+        const { query, bindings } = withTenantFilter('SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?', tenantId);
+        return (db.query(query).all(workflowId, ...bindings, limit) as Record<string, unknown>[]).map(rowToRun);
+    }
+    const { query, bindings } = withTenantFilter('SELECT * FROM workflow_runs ORDER BY started_at DESC LIMIT ?', tenantId);
+    return (db.query(query).all(...bindings, limit) as Record<string, unknown>[]).map(rowToRun);
 }
 
 export function listActiveRuns(db: Database): WorkflowRun[] {
