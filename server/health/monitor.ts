@@ -1,7 +1,7 @@
 /**
  * HealthMonitorService — periodic self-check with status-transition alerting.
  *
- * Runs every 5 minutes, stores results in health_snapshots, and fires
+ * Runs every 5 minutes, stores results in server_health_snapshots, and fires
  * notifications via NotificationService when the status transitions
  * (healthy → unhealthy or back).
  */
