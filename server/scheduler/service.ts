@@ -45,6 +45,9 @@ import {
     releaseAllLocks,
     cleanExpiredLocks,
 } from '../db/repo-locks';
+import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
+import { SystemStateDetector, type SystemStateResult, type SystemStateConfig } from './system-state';
+import { evaluateAction } from './priority-rules';
 
 const log = createLogger('Scheduler');
 
@@ -97,21 +100,26 @@ export class SchedulerService {
     private reputationScorer: ReputationScorer | null = null;
     private reputationAttestation: ReputationAttestation | null = null;
     private notificationService: NotificationService | null = null;
+    private outcomeTrackerService: OutcomeTrackerService | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private runningExecutions = new Set<string>();
     private eventCallbacks = new Set<ScheduleEventCallback>();
     private consecutiveFailures = new Map<string, number>();
+    private systemStateDetector: SystemStateDetector;
+    private lastSystemState: SystemStateResult | null = null;
 
     constructor(
         db: Database,
         processManager: ProcessManager,
         workTaskService?: WorkTaskService | null,
         agentMessenger?: AgentMessenger | null,
+        systemStateConfig?: Partial<SystemStateConfig>,
     ) {
         this.db = db;
         this.processManager = processManager;
         this.workTaskService = workTaskService ?? null;
         this.agentMessenger = agentMessenger ?? null;
+        this.systemStateDetector = new SystemStateDetector(db, systemStateConfig);
     }
 
     /** Update the agent messenger (set after async AlgoChat init). */
@@ -130,9 +138,29 @@ export class SchedulerService {
         this.reputationAttestation = attestation;
     }
 
+    /** Set outcome tracker service (for outcome_analysis schedule action). */
+    setOutcomeTrackerService(service: OutcomeTrackerService): void {
+        this.outcomeTrackerService = service;
+    }
+
     /** Set notification service (for approval request notifications). */
     setNotificationService(service: NotificationService): void {
         this.notificationService = service;
+    }
+
+    /** Set health check function for system state detection. */
+    setHealthCheck(fn: () => Promise<{ status: string }>): void {
+        this.systemStateDetector.setHealthCheck(fn);
+    }
+
+    /** Get the current system state (for health endpoint / dashboard). */
+    async getSystemState(): Promise<SystemStateResult> {
+        return this.systemStateDetector.evaluate();
+    }
+
+    /** Get the last cached system state (synchronous, may be null on first call). */
+    getLastSystemState(): SystemStateResult | null {
+        return this.lastSystemState;
     }
 
     /** Start the scheduler polling loop. */
@@ -277,6 +305,15 @@ export class SchedulerService {
             return;
         }
 
+
+        // Evaluate system state (cached with ~60s TTL)
+        try {
+            this.lastSystemState = await this.systemStateDetector.evaluate();
+        } catch (err) {
+            log.warn('System state evaluation failed, proceeding with last known state', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
         const dueSchedules = listDueSchedules(this.db);
         if (dueSchedules.length === 0) return;
 
@@ -346,6 +383,34 @@ export class SchedulerService {
                 execution.id,
                 `Executing action: ${action.type} for schedule "${schedule.name}"`,
             );
+
+            // Health gate: check if system state allows this action
+            if (this.lastSystemState) {
+                const gate = evaluateAction(action.type, this.lastSystemState.states);
+                if (gate.decision === 'skip') {
+                    log.info('Action skipped by health gate', {
+                        scheduleId: schedule.id,
+                        executionId: execution.id,
+                        actionType: action.type,
+                        systemStates: this.lastSystemState.states,
+                        reasons: gate.reasons,
+                    });
+                    updateExecutionStatus(this.db, execution.id, 'cancelled', {
+                        result: `Skipped by health gate: ${gate.reasons.join('; ')}`,
+                    });
+                    const gatedExec = getExecution(this.db, execution.id);
+                    if (gatedExec) this.emit({ type: 'schedule_execution_update', data: gatedExec });
+                    recordAudit(
+                        this.db,
+                        'schedule_execute',
+                        schedule.agentId,
+                        'schedule_execution',
+                        execution.id,
+                        `Action ${action.type} skipped by health gate: ${gate.reasons.join('; ')}`,
+                    );
+                    continue;
+                }
+            }
 
             // Check if this action needs approval
             if (this.needsApproval(schedule, action)) {
@@ -512,6 +577,9 @@ export class SchedulerService {
                     break;
                 case 'reputation_attestation':
                     await this.execReputationAttestation(executionId, schedule);
+                    break;
+                case 'outcome_analysis':
+                    await this.execOutcomeAnalysis(executionId, schedule);
                     break;
                 case 'custom':
                     await this.execCustom(executionId, schedule, action);
@@ -1011,6 +1079,34 @@ export class SchedulerService {
             updateExecutionStatus(this.db, executionId, 'completed', {
                 result: `Attestation created: hash=${hash.slice(0, 16)}... score=${score.overallScore} trust=${score.trustLevel}${txid ? ` txid=${txid}` : ' (off-chain)'}`,
             });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
+    }
+
+
+    private async execOutcomeAnalysis(executionId: string, schedule: AgentSchedule): Promise<void> {
+        if (!this.outcomeTrackerService) {
+            updateExecutionStatus(this.db, executionId, 'failed', {
+                result: 'Outcome tracker service not configured',
+            });
+            return;
+        }
+
+        try {
+            const checkResult = await this.outcomeTrackerService.checkOpenPrs();
+            const analysis = this.outcomeTrackerService.analyzeWeekly(schedule.agentId);
+            this.outcomeTrackerService.saveAnalysisToMemory(schedule.agentId, analysis);
+
+            const summary = [
+                `Checked ${checkResult.checked} open PRs (${checkResult.updated} updated).`,
+                `Merge rate: ${(analysis.overall.mergeRate * 100).toFixed(0)}% (${analysis.overall.merged}/${analysis.overall.total}).`,
+                `Work tasks: ${analysis.workTaskStats.completed}/${analysis.workTaskStats.total} succeeded.`,
+                analysis.topInsights.length > 0 ? `Insights: ${analysis.topInsights[0]}` : '',
+            ].filter(Boolean).join(' ');
+
+            updateExecutionStatus(this.db, executionId, 'completed', { result: summary });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             updateExecutionStatus(this.db, executionId, 'failed', { result: message });

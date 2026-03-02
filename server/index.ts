@@ -58,6 +58,7 @@ import { ReputationAttestation } from './reputation/attestation';
 import { ReputationVerifier } from './reputation/verifier';
 import { MemoryManager } from './memory/index';
 import { AutonomousLoopService } from './improvement/service';
+import { OutcomeTrackerService } from './feedback/outcome-tracker';
 import { TelegramBridge } from './telegram/bridge';
 import { DiscordBridge } from './discord/bridge';
 import { SlackBridge } from './slack/bridge';
@@ -65,6 +66,8 @@ import { TenantService } from './tenant/context';
 import { BillingService } from './billing/service';
 import { UsageMeter } from './billing/meter';
 import { getHealthCheck, getLivenessCheck, getReadinessCheck, type HealthCheckDeps } from './health/service';
+import { HealthMonitorService } from './health/monitor';
+import { listHealthSnapshots, getUptimeStats } from './db/health-snapshots';
 
 const log = createLogger('Server');
 
@@ -220,15 +223,35 @@ const reputationVerifier = new ReputationVerifier();
 // Initialize memory manager (for structured memory with semantic search)
 const memoryManager = new MemoryManager(db);
 
+// Initialize outcome tracker for PR feedback loop
+const outcomeTrackerService = new OutcomeTrackerService(db, memoryManager);
+
 // Initialize autonomous improvement loop service
 const improvementLoopService = new AutonomousLoopService(
     db, processManager, workTaskService, memoryManager, reputationScorer,
 );
+improvementLoopService.setOutcomeTrackerService(outcomeTrackerService);
 schedulerService.setImprovementLoopService(improvementLoopService);
 schedulerService.setReputationServices(reputationScorer, reputationAttestation);
+schedulerService.setOutcomeTrackerService(outcomeTrackerService);
 schedulerService.setNotificationService(notificationService);
 webhookService.setSchedulerService(schedulerService);
 mentionPollingService.setSchedulerService(schedulerService);
+
+// Initialize health monitor (periodic self-check + alerting on status transitions)
+const healthMonitorDeps: HealthCheckDeps = {
+    db,
+    startTime,
+    version: (require('../package.json') as { version: string }).version,
+    getActiveSessions: () => processManager.getActiveSessionIds(),
+    isAlgoChatConnected: () => algochatBridge !== null,
+    isShuttingDown: () => shutdownCoordinator.getStatus().phase !== 'idle',
+    getSchedulerStats: () => schedulerService.getStats(),
+    getMentionPollingStats: () => mentionPollingService.getStats(),
+    getWorkflowStats: () => workflowService.getStats(),
+};
+const healthMonitorService = new HealthMonitorService(db, healthMonitorDeps);
+healthMonitorService.setNotificationService(notificationService);
 
 // Initialize multi-tenant (opt-in via MULTI_TENANT=true)
 const multiTenant = process.env.MULTI_TENANT === 'true';
@@ -290,6 +313,7 @@ shutdownCoordinator.registerService('WorkflowService', workflowService, 0);
 shutdownCoordinator.registerService('SchedulerService', schedulerService, 0);
 shutdownCoordinator.registerService('MentionPollingService', mentionPollingService, 0);
 shutdownCoordinator.registerService('SessionLifecycleManager', sessionLifecycle, 0);
+shutdownCoordinator.registerService('HealthMonitorService', healthMonitorService, 0);
 shutdownCoordinator.registerService('UsageMeter', usageMeter, 5);
 shutdownCoordinator.register({ name: 'MarketplaceFederation', priority: 5, handler: () => marketplaceFederation.stopPeriodicSync() });
 shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
@@ -519,7 +543,7 @@ const server = Bun.serve<WsData>({
         // Run request handler within trace context so all logs include trace ID
         return runWithTraceId(traceId, async () => {
             // Health check endpoints (no auth required)
-            if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname.startsWith('/health'))) {
+            if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname.startsWith('/api/health/') || url.pathname.startsWith('/health'))) {
                 const healthDeps: HealthCheckDeps = {
                     db,
                     startTime,
@@ -552,6 +576,21 @@ const server = Bun.serve<WsData>({
                             headers: { 'Content-Type': 'application/json' },
                         }),
                         '/health/ready',
+                    );
+                }
+
+                // Health history: /api/health/history
+                if (url.pathname === '/api/health/history') {
+                    const hours = Math.min(Math.max(Number(url.searchParams.get('hours') ?? '24'), 1), 720);
+                    const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+                    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? '100'), 1), 1000);
+                    const snapshots = listHealthSnapshots(db, { limit, since });
+                    const uptime = getUptimeStats(db, since);
+                    return instrumentResponse(
+                        new Response(JSON.stringify({ uptime, snapshots }), {
+                            headers: { 'Content-Type': 'application/json' },
+                        }),
+                        '/api/health/history',
                     );
                 }
 
@@ -650,7 +689,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector);
+            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
@@ -800,6 +839,7 @@ initAlgoChat().then(() => {
     mentionPollingService.start();
     workflowService.start();
     usageMeter.start();
+    healthMonitorService.start();
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
     // Start scheduler, polling, workflows, and notifications even if AlgoChat fails — they can still do GitHub ops and work tasks
@@ -809,6 +849,7 @@ initAlgoChat().then(() => {
     mentionPollingService.start();
     workflowService.start();
     usageMeter.start();
+    healthMonitorService.start();
 });
 
 // Start session lifecycle cleanup after server is running

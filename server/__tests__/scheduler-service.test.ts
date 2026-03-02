@@ -159,14 +159,14 @@ describe('SchedulerService', () => {
     describe('getStats', () => {
         it('returns zeroes when no schedules exist', () => {
             const stats = scheduler.getStats();
-            expect(stats).toEqual({
-                running: false,
-                activeSchedules: 0,
-                pausedSchedules: 0,
-                runningExecutions: 0,
-                maxConcurrent: 2,
-                recentFailures: 0,
-            });
+            expect(stats.running).toBe(false);
+            expect(stats.activeSchedules).toBe(0);
+            expect(stats.pausedSchedules).toBe(0);
+            expect(stats.runningExecutions).toBe(0);
+            expect(stats.maxConcurrent).toBe(2);
+            expect(stats.recentFailures).toBe(0);
+            expect(stats.systemState).toBeNull();
+            expect(stats.priorityRules).toBeDefined();
         });
 
         it('counts active and paused schedules', () => {
