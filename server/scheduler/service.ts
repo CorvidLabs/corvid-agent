@@ -575,10 +575,14 @@ export class SchedulerService {
             const prompt = `You are reviewing open pull requests for ${repo}.\n\n` +
                 `## Open PRs\n${prSummary}\n\n` +
                 `## Instructions\n` +
-                `1. For each PR, use \`gh pr diff <number> --repo ${repo}\` to review the changes.\n` +
-                `2. Analyze code quality, potential issues, and improvements.\n` +
-                `3. Leave a helpful review comment using \`gh pr comment <number> --repo ${repo} --body "..."\`\n` +
-                `4. Summarize your review findings at the end.`;
+                `1. BEFORE reviewing each PR, check if you (corvid-agent) have already left a review comment:\n` +
+                `   \`gh pr view <number> --repo ${repo} --json comments --jq '.comments[] | select(.author.login == "corvid-agent") | .createdAt'\`\n` +
+                `   If you already commented AND there are no new commits since your last comment, SKIP that PR.\n` +
+                `   Only re-review if there are new commits since your last review.\n` +
+                `2. For PRs that need review, use \`gh pr diff <number> --repo ${repo}\` to review the changes.\n` +
+                `3. Analyze code quality, potential issues, and improvements.\n` +
+                `4. Leave ONE concise review comment. Do not leave multiple comments on the same PR.\n` +
+                `5. Summarize your review findings at the end.`;
 
             const projectId = action.projectId ?? agent.defaultProjectId;
             if (!projectId) {
