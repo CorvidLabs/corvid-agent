@@ -40,6 +40,11 @@ import { createLogger } from '../lib/logger';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { recordAudit } from '../db/audit';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
+import {
+    acquireRepoLock,
+    releaseAllLocks,
+    cleanExpiredLocks,
+} from '../db/repo-locks';
 
 const log = createLogger('Scheduler');
 
@@ -265,6 +270,8 @@ export class SchedulerService {
     }
 
     private async tick(): Promise<void> {
+        // Clean expired repo locks on each tick
+        cleanExpiredLocks(this.db);
         if (this.runningExecutions.size >= MAX_CONCURRENT_EXECUTIONS) {
             log.debug('Max concurrent executions reached, skipping tick');
             return;
@@ -373,6 +380,31 @@ export class SchedulerService {
                 continue;
             }
 
+            // Repo coordination: acquire locks before executing
+            const lockResult = this.acquireActionLocks(action, execution.id, schedule.id);
+            if (!lockResult.acquired) {
+                log.info('Action skipped — repo locked', {
+                    scheduleId: schedule.id,
+                    executionId: execution.id,
+                    actionType: action.type,
+                    blockedRepo: lockResult.blockedRepo,
+                });
+                updateExecutionStatus(this.db, execution.id, 'cancelled', {
+                    result: `Repo "${lockResult.blockedRepo}" is locked by another schedule execution`,
+                });
+                const skippedExec = getExecution(this.db, execution.id);
+                if (skippedExec) this.emit({ type: 'schedule_execution_update', data: skippedExec });
+                recordAudit(
+                    this.db,
+                    'schedule_execute',
+                    schedule.agentId,
+                    'schedule_execution',
+                    execution.id,
+                    `Action ${action.type} skipped: repo "${lockResult.blockedRepo}" locked`,
+                );
+                continue;
+            }
+
             // Notify start
             this.notifyScheduleEvent(schedule, 'started', `Schedule "${schedule.name}" started: ${action.type}`);
 
@@ -401,6 +433,43 @@ export class SchedulerService {
 
         // council_approve: all actions need approval
         return true;
+    }
+
+
+    /**
+     * Resolve the target repos for an action.
+     */
+    private resolveActionRepos(action: ScheduleAction): string[] {
+        const repos: string[] = [];
+        if (action.repos?.length) {
+            repos.push(...action.repos);
+        }
+        if (action.projectId && !action.repos?.length) {
+            repos.push(`project:${action.projectId}`);
+        }
+        return repos;
+    }
+
+    /**
+     * Attempt to acquire locks on all repos targeted by an action.
+     */
+    private acquireActionLocks(
+        action: ScheduleAction,
+        executionId: string,
+        scheduleId: string,
+    ): { acquired: boolean; blockedRepo?: string } {
+        const repos = this.resolveActionRepos(action);
+        if (repos.length === 0) return { acquired: true };
+        const acquired: string[] = [];
+        for (const repo of repos) {
+            if (acquireRepoLock(this.db, repo, executionId, scheduleId, action.type)) {
+                acquired.push(repo);
+            } else {
+                if (acquired.length > 0) releaseAllLocks(this.db, executionId);
+                return { acquired: false, blockedRepo: repo };
+            }
+        }
+        return { acquired: true };
     }
 
     private async runAction(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
@@ -457,6 +526,9 @@ export class SchedulerService {
             log.error('Schedule action failed', { executionId, actionType: action.type, error: message });
             updateExecutionStatus(this.db, executionId, 'failed', { result: message });
         } finally {
+            // Release any repo locks held by this execution
+            releaseAllLocks(this.db, executionId);
+
             this.runningExecutions.delete(executionId);
             const updated = getExecution(this.db, executionId);
             if (updated) {
@@ -575,10 +647,14 @@ export class SchedulerService {
             const prompt = `You are reviewing open pull requests for ${repo}.\n\n` +
                 `## Open PRs\n${prSummary}\n\n` +
                 `## Instructions\n` +
-                `1. For each PR, use \`gh pr diff <number> --repo ${repo}\` to review the changes.\n` +
-                `2. Analyze code quality, potential issues, and improvements.\n` +
-                `3. Leave a helpful review comment using \`gh pr comment <number> --repo ${repo} --body "..."\`\n` +
-                `4. Summarize your review findings at the end.`;
+                `1. BEFORE reviewing each PR, check if you (corvid-agent) have already left a review comment:\n` +
+                `   \`gh pr view <number> --repo ${repo} --json comments --jq '.comments[] | select(.author.login == "corvid-agent") | .createdAt'\`\n` +
+                `   If you already commented AND there are no new commits since your last comment, SKIP that PR.\n` +
+                `   Only re-review if there are new commits since your last review.\n` +
+                `2. For PRs that need review, use \`gh pr diff <number> --repo ${repo}\` to review the changes.\n` +
+                `3. Analyze code quality, potential issues, and improvements.\n` +
+                `4. Leave ONE concise review comment. Do not leave multiple comments on the same PR.\n` +
+                `5. Summarize your review findings at the end.`;
 
             const projectId = action.projectId ?? agent.defaultProjectId;
             if (!projectId) {

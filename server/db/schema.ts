@@ -1131,6 +1131,20 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_perf_metric_ts ON performance_metrics(metric, timestamp)`,
         `CREATE INDEX IF NOT EXISTS idx_perf_ts ON performance_metrics(timestamp)`,
     ],
+
+    // Migration 59: Repo locks for schedule coordination (#407)
+    59: [
+        `CREATE TABLE IF NOT EXISTS repo_locks (
+            repo         TEXT    NOT NULL PRIMARY KEY,
+            execution_id TEXT    NOT NULL,
+            schedule_id  TEXT    NOT NULL,
+            action_type  TEXT    NOT NULL,
+            locked_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+            expires_at   TEXT    NOT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_repo_locks_expires ON repo_locks(expires_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_repo_locks_schedule ON repo_locks(schedule_id)`,
+    ],
 };
 
 /** Allowlist pattern for valid SQL identifiers (table/column names). */

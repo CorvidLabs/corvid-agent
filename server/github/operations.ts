@@ -271,6 +271,72 @@ export async function listIssues(
     }
 }
 
+/**
+ * Find open issues with similar titles (keyword overlap).
+ */
+export async function findSimilarIssues(
+    repo: string,
+    title: string,
+    threshold: number = 0.5,
+): Promise<{ hasSimilar: boolean; matches: Issue[] }> {
+    const result = await listIssues(repo, 'open', 100);
+    if (!result.ok || result.issues.length === 0) {
+        return { hasSimilar: false, matches: [] };
+    }
+    const titleWords = normalizeWords(title);
+    if (titleWords.size === 0) return { hasSimilar: false, matches: [] };
+    const matches = result.issues.filter(issue => {
+        const issueWords = normalizeWords(issue.title);
+        if (issueWords.size === 0) return false;
+        let intersection = 0;
+        for (const word of titleWords) {
+            if (issueWords.has(word)) intersection++;
+        }
+        const union = new Set([...titleWords, ...issueWords]).size;
+        return (intersection / union) >= threshold;
+    });
+    return { hasSimilar: matches.length > 0, matches };
+}
+
+function normalizeWords(text: string): Set<string> {
+    const stopWords = new Set(['a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been',
+        'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+        'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for', 'on', 'with',
+        'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after',
+        'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either', 'neither',
+        'this', 'that', 'these', 'those', 'it', 'its']);
+    return new Set(
+        text.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, ' ')
+            .split(/\s+/)
+            .filter(w => w.length > 1 && !stopWords.has(w))
+    );
+}
+
+/**
+ * Create an issue with automatic dedup check.
+ */
+export async function createIssueWithDedup(
+    repo: string,
+    title: string,
+    body: string,
+    labels?: string[],
+): Promise<{ ok: boolean; issueUrl?: string; error?: string; deduplicated?: boolean }> {
+    const similar = await findSimilarIssues(repo, title);
+    if (similar.hasSimilar) {
+        const existing = similar.matches[0];
+        log.info('Issue dedup: similar issue already exists', {
+            repo,
+            newTitle: title,
+            existingTitle: existing.title,
+            existingUrl: existing.url,
+        });
+        return { ok: true, issueUrl: existing.url, deduplicated: true };
+    }
+    const result = await createIssue(repo, title, body, labels);
+    return { ...result, deduplicated: false };
+}
+
 // ─── Issue Comments & Lifecycle ──────────────────────────────────────────
 
 export interface IssueComment {
