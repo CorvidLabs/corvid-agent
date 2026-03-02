@@ -203,21 +203,23 @@ CREATE INDEX idx_schedule_runs_status ON schedule_runs(status);
 
 ## REST API
 
-```
-GET    /api/schedules                    -- List all (filter by ?status, ?agentId)
-POST   /api/schedules                    -- Create new schedule
-GET    /api/schedules/:id                -- Get schedule details + recent runs
-PUT    /api/schedules/:id                -- Update config, approval settings
-DELETE /api/schedules/:id                -- Delete (must be paused first)
-POST   /api/schedules/:id/pause          -- Pause schedule
-POST   /api/schedules/:id/resume         -- Resume paused schedule
-POST   /api/schedules/:id/trigger        -- Manually trigger now (for testing)
-GET    /api/schedules/:id/runs           -- List run history
-GET    /api/schedule-runs/:runId         -- Get run details
-POST   /api/schedule-runs/:runId/approve -- Approve/deny: { action: "approve" | "deny" }
+> **Note:** The API evolved during implementation. "runs" was renamed to "executions", individual pause/resume became a bulk action, and global scheduler pause/resume was not implemented.
 
-POST   /api/scheduler/pause              -- Emergency: pause ALL schedules
-POST   /api/scheduler/resume             -- Resume all paused schedules
+```
+GET    /api/schedules                         -- List all (filter by ?status, ?agentId)
+POST   /api/schedules                         -- Create new schedule
+GET    /api/schedules/:id                     -- Get schedule details
+PUT    /api/schedules/:id                     -- Update config, approval settings
+DELETE /api/schedules/:id                     -- Delete schedule
+POST   /api/schedules/:id/trigger             -- Manually trigger now (for testing)
+GET    /api/schedules/:id/executions          -- List execution history
+POST   /api/schedules/bulk                    -- Bulk pause/resume/delete: { ids, action }
+GET    /api/schedule-executions               -- List all executions with filters
+GET    /api/schedule-executions/:id           -- Get execution details
+POST   /api/schedule-executions/:id/resolve   -- Approve/deny: { approved: boolean }
+POST   /api/schedule-executions/:id/cancel    -- Cancel running execution
+GET    /api/scheduler/health                  -- Scheduler service stats
+GET    /api/github/status                     -- GitHub integration status
 ```
 
 ---
