@@ -489,8 +489,8 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     readonly filteredSchedules = computed(() => {
         const filter = this.activeFilter();
         const all = this.scheduleService.schedules();
-        if (filter === 'all') return all;
-        return all.filter((s) => s.status === filter);
+        const filtered = filter === 'all' ? all : all.filter((s) => s.status === filter);
+        return [...filtered].sort((a, b) => this.cronHour(a.cronExpression) - this.cronHour(b.cronExpression));
     });
 
     async ngOnInit(): Promise<void> {
@@ -692,6 +692,14 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
         } catch {
             this.notifications.error('Failed to resolve approval');
         }
+    }
+
+    private cronHour(expr: string | null | undefined): number {
+        if (!expr) return 99;
+        const parts = expr.trim().split(/\s+/);
+        if (parts.length < 2) return 99;
+        const h = parseInt(parts[1], 10);
+        return isNaN(h) ? 99 : h;
     }
 
     private resetForm(): void {
