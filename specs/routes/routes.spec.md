@@ -30,6 +30,12 @@ files:
   - server/routes/mcp-servers.ts
   - server/routes/exam.ts
   - server/routes/ollama.ts
+  - server/routes/audit.ts
+  - server/routes/github-allowlist.ts
+  - server/routes/performance.ts
+  - server/routes/slack.ts
+  - server/routes/tenants.ts
+  - server/routes/usage.ts
 db_tables: []
 depends_on:
   - specs/middleware/auth.spec.md
@@ -40,7 +46,7 @@ depends_on:
 
 ## Purpose
 
-Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 26 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
+Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 32 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
 
 ## Public API
 
@@ -124,6 +130,9 @@ Every request passes through these stages in order:
 | GET | `/api/agents/:id/persona` | personas.ts | Get agent persona |
 | PUT | `/api/agents/:id/persona` | personas.ts | Create/update agent persona |
 | DELETE | `/api/agents/:id/persona` | personas.ts | Delete agent persona |
+| GET | `/api/agents/:id/spending` | agents.ts | Get agent daily spending vs cap |
+| PUT | `/api/agents/:id/spending-cap` | agents.ts | Set agent daily spending cap |
+| DELETE | `/api/agents/:id/spending-cap` | agents.ts | Remove agent spending cap |
 | GET | `/api/agents/:id/skills` | skill-bundles.ts | List skill bundles assigned to agent |
 | POST | `/api/agents/:id/skills` | skill-bundles.ts | Assign skill bundle to agent |
 | DELETE | `/api/agents/:id/skills/:bundleId` | skill-bundles.ts | Unassign skill bundle from agent |
@@ -182,6 +191,9 @@ Every request passes through these stages in order:
 | GET | `/api/schedules/:id/executions` | schedules.ts | List executions for a schedule |
 | GET | `/api/schedule-executions` | schedules.ts | List all schedule executions |
 | GET | `/api/schedule-executions/:id` | schedules.ts | Get single execution |
+| POST | `/api/schedules/:id/trigger` | schedules.ts | Manually trigger a schedule |
+| POST | `/api/schedules/bulk` | schedules.ts | Bulk pause/resume/delete schedules |
+| POST | `/api/schedule-executions/:id/cancel` | schedules.ts | Cancel a running execution |
 | POST | `/api/schedule-executions/:id/resolve` | schedules.ts | Approve/deny scheduled execution |
 | GET | `/api/scheduler/health` | schedules.ts | Get scheduler health/stats |
 | GET | `/api/github/status` | schedules.ts | Get GitHub configuration status |
@@ -270,6 +282,9 @@ Every request passes through these stages in order:
 | POST | `/api/reputation/events` | reputation.ts | Record reputation event |
 | GET | `/api/reputation/events/:agentId` | reputation.ts | Get events for agent |
 | GET | `/api/reputation/attestation/:agentId` | reputation.ts | Get attestation for agent |
+| GET | `/api/reputation/identities` | reputation.ts | List all identity verifications |
+| GET | `/api/reputation/identity/:agentId` | reputation.ts | Get identity verification for agent |
+| PUT | `/api/reputation/identity/:agentId` | reputation.ts | Set identity verification tier |
 | POST | `/api/reputation/attestation/:agentId` | reputation.ts | Create reputation attestation |
 
 ### Billing
@@ -354,6 +369,8 @@ Every request passes through these stages in order:
 |--------|------|---------|-------------|
 | GET | `/api/settings` | settings.ts | Get all settings (credits config, system stats) |
 | PUT | `/api/settings/credits` | settings.ts | Update credit configuration |
+| POST | `/api/settings/api-key/rotate` | settings.ts | Rotate the API key |
+| GET | `/api/settings/api-key/status` | settings.ts | Get API key rotation and expiry status |
 
 ### Ollama
 
@@ -398,6 +415,58 @@ Every request passes through these stages in order:
 | POST | `/api/selftest/run` | Run self-test suite |
 | GET | `/api/wallets/summary` | Get wallet summaries |
 | GET | `/api/wallets/:address/messages` | Get messages for wallet |
+| POST | `/api/wallets/:address/credits` | Grant credits to a wallet (admin) |
+
+### GitHub Allowlist
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/github-allowlist` | github-allowlist.ts | List GitHub username allowlist entries |
+| POST | `/api/github-allowlist` | github-allowlist.ts | Add GitHub username to allowlist |
+| PUT | `/api/github-allowlist/:username` | github-allowlist.ts | Update allowlist entry label |
+| DELETE | `/api/github-allowlist/:username` | github-allowlist.ts | Remove username from allowlist |
+
+### Audit
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/audit-log` | audit.ts | Query immutable audit log (admin-only) |
+
+### Performance
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/performance/snapshot` | performance.ts | Current performance snapshot |
+| GET | `/api/performance/trends` | performance.ts | Time-series performance data |
+| GET | `/api/performance/regressions` | performance.ts | Regression detection |
+| GET | `/api/performance/report` | performance.ts | Full performance report |
+| GET | `/api/performance/metrics` | performance.ts | List available metric names |
+| POST | `/api/performance/collect` | performance.ts | Trigger manual metrics collection |
+
+### Usage
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/usage/summary` | usage.ts | Per-schedule usage aggregates + anomaly flags |
+| GET | `/api/usage/daily` | usage.ts | Per-day usage breakdown |
+| GET | `/api/usage/anomalies` | usage.ts | Current anomaly flags |
+| GET | `/api/usage/schedule/:id` | usage.ts | Detailed usage for a specific schedule |
+
+### Tenants
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| POST | `/api/tenants/register` | tenants.ts | Register a new tenant (public) |
+| GET | `/api/tenants/me` | tenants.ts | Get current tenant info |
+| GET | `/api/tenants/me/members` | tenants.ts | List tenant members |
+| POST | `/api/tenants/me/members` | tenants.ts | Add a tenant member |
+| DELETE | `/api/tenants/me/members/:keyHash` | tenants.ts | Remove a tenant member |
+
+### Slack
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| POST | `/slack/events` | slack.ts | Slack Events API callbacks (HMAC validated) |
 
 ## Invariants
 
