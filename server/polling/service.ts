@@ -31,6 +31,12 @@ import { DedupService } from '../lib/dedup';
 import { buildSafeGhEnv } from '../lib/env';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { isGitHubUserAllowed } from '../db/github-allowlist';
+import {
+    GitHubSearcher,
+    filterNewMentions,
+    resolveFullRepo,
+    type DetectedMention,
+} from './github-searcher';
 
 const log = createLogger('MentionPoller');
 const TRIGGER_DEDUP_NS = 'polling:triggers';
@@ -47,29 +53,7 @@ const MIN_TRIGGER_GAP_MS = 60_000;
 /** Max sessions spawned per config per poll cycle — prevents stampede. */
 const MAX_TRIGGERS_PER_CYCLE = 5;
 
-/**
- * A parsed mention from a GitHub API response.
- */
-interface DetectedMention {
-    /** Unique identifier (e.g. comment ID or issue number + timestamp) */
-    id: string;
-    /** Event type */
-    type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'assignment';
-    /** The comment/issue body containing the @mention */
-    body: string;
-    /** GitHub username of the author */
-    sender: string;
-    /** Issue/PR number */
-    number: number;
-    /** Issue/PR title */
-    title: string;
-    /** Direct URL to the comment/issue */
-    htmlUrl: string;
-    /** When the comment/issue was created */
-    createdAt: string;
-    /** Whether this is on a PR (vs an issue) */
-    isPullRequest: boolean;
-}
+// DetectedMention type imported from ./github-searcher
 
 type PollingEventCallback = (event: {
     type: 'mention_poll_trigger';
@@ -107,6 +91,9 @@ export class MentionPollingService {
     private issueStateCache = new Map<string, { open: boolean; checkedAt: number }>();
     private static readonly ISSUE_STATE_TTL_MS = 5 * 60 * 1000; // 5 min
 
+    /** Extracted GitHub search module — handles mention/assignment/review searches. */
+    private searcher: GitHubSearcher;
+
     constructor(
         db: Database,
         processManager: ProcessManager,
@@ -116,6 +103,7 @@ export class MentionPollingService {
         this.processManager = processManager;
         // Rate limit triggers: 60s TTL matches MIN_TRIGGER_GAP_MS, bounded at 500 entries
         this.dedup.register(TRIGGER_DEDUP_NS, { maxSize: 500, ttlMs: MIN_TRIGGER_GAP_MS });
+        this.searcher = new GitHubSearcher((args) => this.runGh(args));
     }
 
     /** Set scheduler service for triggering event-based schedules. */
@@ -272,7 +260,7 @@ export class MentionPollingService {
         for (const pr of prs) {
             const prNumber = pr.number as number;
             const prUrl = (pr.html_url as string) ?? '';
-            const prRepo = this.resolveFullRepo(repo, prUrl);
+            const prRepo = resolveFullRepo(repo, prUrl);
 
             // Check if all CI checks have passed
             const statusResult = await this.runGh([
@@ -354,7 +342,7 @@ export class MentionPollingService {
             const prNumber = pr.number as number;
             const prTitle = (pr.title as string) ?? '';
             const prUrl = (pr.html_url as string) ?? '';
-            const prRepo = this.resolveFullRepo(repo, prUrl);
+            const prRepo = resolveFullRepo(repo, prUrl);
             const cooldownKey = `${prRepo}#${prNumber}`;
 
             // Enforce cooldown
@@ -617,7 +605,7 @@ export class MentionPollingService {
             }
 
             // Filter out already-processed mentions using the full ID set
-            const newMentions = this.filterNewMentions(mentions, config.processedIds);
+            const newMentions = filterNewMentions(mentions, config.processedIds);
             if (newMentions.length === 0) {
                 updatePollState(this.db, config.id);
                 return;
@@ -699,434 +687,10 @@ export class MentionPollingService {
 
     /**
      * Fetch recent comments/issues that mention the configured username.
-     * Uses `gh api` to search for mentions.
+     * Delegates to the extracted GitHubSearcher module.
      */
     private async fetchMentions(config: MentionPollingConfig): Promise<DetectedMention[]> {
-        const mentions: DetectedMention[] = [];
-
-        // Strategy: Use GitHub search API to find recent mentions in the repo.
-        // We search for comments mentioning @username in the specific repo.
-        // The search API is more efficient than listing all comments.
-        // lastPollAt from SQLite is UTC but lacks the 'Z' suffix — append it so
-        // JavaScript's Date parser treats it as UTC rather than local time.
-        //
-        // GitHub search `updated:` only supports date precision (no time), so we
-        // subtract 1 day from lastPollAt to avoid missing mentions near midnight.
-        // Duplicate prevention is handled by the processedIds set, not the date filter.
-        const lastPollDate = config.lastPollAt
-            ? new Date(config.lastPollAt.endsWith('Z') ? config.lastPollAt : config.lastPollAt + 'Z')
-            : new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const paddedDate = new Date(lastPollDate.getTime() - 24 * 60 * 60 * 1000);
-        const sinceDate = paddedDate.toISOString();
-
-        // Search for issue comments mentioning the user
-        if (this.shouldPollEventType(config, 'issue_comment')) {
-            const commentMentions = await this.searchIssueMentions(config.repo, config.mentionUsername, sinceDate);
-            mentions.push(...commentMentions);
-        }
-
-        // Search for new issues mentioning the user
-        if (this.shouldPollEventType(config, 'issues')) {
-            const issueMentions = await this.searchNewIssueMentions(config.repo, config.mentionUsername, sinceDate);
-            mentions.push(...issueMentions);
-        }
-
-        // Search for issues/PRs assigned to the user
-        const assignedIssues = await this.searchAssignedIssues(config.repo, config.mentionUsername, sinceDate);
-        mentions.push(...assignedIssues);
-
-        // Search for reviews on PRs authored by the user
-        if (this.shouldPollEventType(config, 'pull_request_review_comment')) {
-            const prReviewMentions = await this.searchAuthoredPRReviews(
-                config.repo, config.mentionUsername, sinceDate
-            );
-            mentions.push(...prReviewMentions);
-        }
-
-        // Sort by creation time descending (newest first)
-        mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        // Global GitHub allowlist filter (empty = open mode)
-        const globalFiltered = mentions.filter(m => isGitHubUserAllowed(this.db, m.sender));
-
-        // Per-config allowed users filter (further restricts global list)
-        if (config.allowedUsers.length > 0) {
-            const allowed = new Set(config.allowedUsers.map(u => u.toLowerCase()));
-            return globalFiltered.filter(m => allowed.has(m.sender.toLowerCase()));
-        }
-
-        return globalFiltered;
-    }
-
-    /**
-     * Search for issue/PR comments mentioning the username.
-     */
-    private async searchIssueMentions(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            // Use `involves:` instead of `mentions:` because GitHub's search index
-            // ignores self-mentions (when a user @mentions themselves in a comment).
-            // `involves:` is a superset covering author, assignee, mentions, and commenter.
-            // The downstream `fetchRecentComments` filters to only comments containing @username.
-            const query = `${this.repoQualifier(repo)} involves:${username} updated:>=${since.split('T')[0]}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=30',
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
-
-            for (const item of items) {
-                // For each issue/PR that mentions us, fetch recent comments to find the actual mention
-                const number = item.number as number;
-                const isPR = !!(item.pull_request);
-                // Resolve the actual owner/repo from the item URL (needed when config.repo is an org/user)
-                const itemRepo = this.resolveFullRepo(repo, (item.html_url as string) ?? '');
-                const commentMentions = await this.fetchRecentComments(itemRepo, number, username, since, isPR, item);
-                mentions.push(...commentMentions);
-            }
-
-            return mentions;
-        } catch (err) {
-            log.error('Error searching issue mentions', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
-    }
-
-    /**
-     * Fetch recent comments on a specific issue/PR and find @mentions.
-     */
-    private async fetchRecentComments(
-        repo: string,
-        issueNumber: number,
-        username: string,
-        since: string,
-        isPR: boolean,
-        issueData: Record<string, unknown>,
-    ): Promise<DetectedMention[]> {
-        try {
-            const result = await this.runGh([
-                'api',
-                `repos/${repo}/issues/${issueNumber}/comments`,
-                '-X', 'GET',
-                '-f', `since=${since}`,
-                '-f', 'per_page=50',
-                '-f', 'sort=created',
-                '-f', 'direction=desc',
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-            const mentions: DetectedMention[] = [];
-
-            for (const comment of comments) {
-                const body = (comment.body as string) ?? '';
-                const commentUser = (comment.user as Record<string, unknown>)?.login as string ?? '';
-
-                // Check for @mention
-                if (this.containsMention(body, username)) {
-                    mentions.push({
-                        id: `comment-${comment.id}`,
-                        type: isPR ? 'issue_comment' : 'issue_comment',
-                        body,
-                        sender: commentUser,
-                        number: issueNumber,
-                        title: (issueData.title as string) ?? '',
-                        htmlUrl: (comment.html_url as string) ?? (issueData.html_url as string) ?? '',
-                        createdAt: (comment.created_at as string) ?? '',
-                        isPullRequest: isPR,
-                    });
-                }
-            }
-
-            return mentions;
-        } catch (err) {
-            log.debug('Error fetching comments', { repo, issueNumber, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
-    }
-
-    /**
-     * Search for newly opened issues that mention the username in their body.
-     * Uses `involves:` instead of `mentions:` to catch self-mentions (see searchIssueMentions).
-     */
-    private async searchNewIssueMentions(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `${this.repoQualifier(repo)} involves:${username} is:issue created:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=created',
-                '-f', 'order=desc',
-                '-f', 'per_page=20',
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
-
-            for (const item of items) {
-                const body = (item.body as string) ?? '';
-                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
-
-                if (this.containsMention(body, username)) {
-                    const htmlUrl = (item.html_url as string) ?? '';
-                    const itemRepo = this.resolveFullRepo(repo, htmlUrl);
-                    mentions.push({
-                        id: `issue-${itemRepo}-${item.number}`,
-                        type: 'issues',
-                        body,
-                        sender,
-                        number: item.number as number,
-                        title: (item.title as string) ?? '',
-                        htmlUrl,
-                        createdAt: (item.created_at as string) ?? '',
-                        isPullRequest: false,
-                    });
-                }
-            }
-
-            return mentions;
-        } catch (err) {
-            log.error('Error searching new issue mentions', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
-    }
-
-    /**
-     * Search for issues/PRs recently assigned to the username.
-     */
-    private async searchAssignedIssues(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `${this.repoQualifier(repo)} assignee:${username} is:open updated:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=20',
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
-
-            for (const item of items) {
-                const body = (item.body as string) ?? '';
-                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
-                const isPR = !!(item.pull_request);
-
-                // Don't skip self-authored for assignments — if someone assigns
-                // the agent to its own issue, it should still act on it.
-
-                const htmlUrl = (item.html_url as string) ?? '';
-                const itemRepo = this.resolveFullRepo(repo, htmlUrl);
-                mentions.push({
-                    id: `assigned-${itemRepo}-${item.number}`,
-                    type: 'assignment',
-                    body,
-                    sender,
-                    number: item.number as number,
-                    title: (item.title as string) ?? '',
-                    htmlUrl,
-                    createdAt: (item.created_at as string) ?? '',
-                    isPullRequest: isPR,
-                });
-            }
-
-            return mentions;
-        } catch (err) {
-            log.error('Error searching assigned issues', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
-    }
-
-    /**
-     * Search for open PRs authored by the user and fetch new reviews/review comments on each.
-     */
-    private async searchAuthoredPRReviews(
-        repo: string,
-        username: string,
-        since: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const sinceDate = since.split('T')[0];
-            const query = `${this.repoQualifier(repo)} is:pr is:open author:${username} updated:>=${sinceDate}`;
-            const result = await this.runGh([
-                'api', 'search/issues',
-                '-X', 'GET',
-                '-f', `q=${query}`,
-                '-f', 'sort=updated',
-                '-f', 'order=desc',
-                '-f', 'per_page=10',
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
-            const items = parsed.items ?? [];
-            const mentions: DetectedMention[] = [];
-
-            for (const item of items) {
-                const prNumber = item.number as number;
-                const prTitle = (item.title as string) ?? '';
-                const prHtmlUrl = (item.html_url as string) ?? '';
-                const fullRepo = this.resolveFullRepo(repo, prHtmlUrl);
-
-                const [reviews, reviewComments] = await Promise.all([
-                    this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
-                    this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
-                ]);
-
-                mentions.push(...reviews, ...reviewComments);
-            }
-
-            return mentions;
-        } catch (err) {
-            log.error('Error searching authored PR reviews', { repo, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
-    }
-
-    /**
-     * Fetch review submissions (approve/changes_requested/comment) on a specific PR.
-     */
-    private async fetchPRReviews(
-        repo: string,
-        prNumber: number,
-        username: string,
-        since: string,
-        prTitle: string,
-        prHtmlUrl: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const result = await this.runGh([
-                'api',
-                `repos/${repo}/pulls/${prNumber}/reviews`,
-                '-X', 'GET',
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const reviews = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-            const sinceTime = new Date(since).getTime();
-            const mentions: DetectedMention[] = [];
-
-            for (const review of reviews) {
-                const reviewer = ((review.user as Record<string, unknown>)?.login as string) ?? '';
-                const state = (review.state as string) ?? '';
-                const body = (review.body as string) ?? '';
-                const submittedAt = (review.submitted_at as string) ?? '';
-
-                // Skip self-reviews
-                if (reviewer.toLowerCase() === username.toLowerCase()) continue;
-
-                // Skip reviews before the since window
-                if (submittedAt && new Date(submittedAt).getTime() < sinceTime) continue;
-
-                // Skip dismissed reviews
-                if (state === 'DISMISSED') continue;
-
-                // Skip empty COMMENTED reviews (phantom top-level for inline comments)
-                if (state === 'COMMENTED' && !body.trim()) continue;
-
-                mentions.push({
-                    id: `review-${review.id}`,
-                    type: 'pull_request_review_comment',
-                    body: body || `[${state} review with no body]`,
-                    sender: reviewer,
-                    number: prNumber,
-                    title: prTitle,
-                    htmlUrl: (review.html_url as string) ?? prHtmlUrl,
-                    createdAt: submittedAt,
-                    isPullRequest: true,
-                });
-            }
-
-            return mentions;
-        } catch (err) {
-            log.debug('Error fetching PR reviews', { repo, prNumber, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
-    }
-
-    /**
-     * Fetch inline code review comments on a specific PR.
-     */
-    private async fetchPRReviewComments(
-        repo: string,
-        prNumber: number,
-        username: string,
-        since: string,
-        prTitle: string,
-        prHtmlUrl: string,
-    ): Promise<DetectedMention[]> {
-        try {
-            const result = await this.runGh([
-                'api',
-                `repos/${repo}/pulls/${prNumber}/comments`,
-                '-X', 'GET',
-                '-f', `since=${since}`,
-            ]);
-
-            if (!result.ok || !result.stdout.trim()) return [];
-
-            const comments = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-            const mentions: DetectedMention[] = [];
-
-            for (const comment of comments) {
-                const commenter = ((comment.user as Record<string, unknown>)?.login as string) ?? '';
-                const body = (comment.body as string) ?? '';
-
-                // Skip self-comments
-                if (commenter.toLowerCase() === username.toLowerCase()) continue;
-
-                mentions.push({
-                    id: `reviewcomment-${comment.id}`,
-                    type: 'pull_request_review_comment',
-                    body,
-                    sender: commenter,
-                    number: prNumber,
-                    title: prTitle,
-                    htmlUrl: (comment.html_url as string) ?? prHtmlUrl,
-                    createdAt: (comment.created_at as string) ?? '',
-                    isPullRequest: true,
-                });
-            }
-
-            return mentions;
-        } catch (err) {
-            log.debug('Error fetching PR review comments', { repo, prNumber, error: err instanceof Error ? err.message : String(err) });
-            return [];
-        }
+        return this.searcher.fetchMentions(config, (sender) => isGitHubUserAllowed(this.db, sender));
     }
 
     // ─── Dependency Checking ─────────────────────────────────────────────────
@@ -1207,7 +771,7 @@ export class MentionPollingService {
         }
 
         // Resolve the actual owner/repo from the mention URL
-        const fullRepo = this.resolveFullRepo(config.repo, mention.htmlUrl);
+        const fullRepo = resolveFullRepo(config.repo, mention.htmlUrl);
 
         // Guard: skip only if there's a currently *running* session for the same issue.
         // Idle sessions have finished — follow-up comments are legitimate new work.
@@ -1272,59 +836,13 @@ export class MentionPollingService {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
-
-    /**
-     * Build the GitHub search qualifier for the repo field.
-     * If it contains a '/' it's a specific repo (repo:owner/name).
-     * Otherwise it's an org or user — use org: which covers both.
-     */
-    private repoQualifier(repo: string): string {
-        if (repo.includes('/')) return `repo:${repo}`;
-        return `org:${repo}`;
-    }
-
-    /**
-     * Resolve the full owner/repo from the mention's HTML URL when the config
-     * repo is just an org/user name (no '/').
-     * e.g. config.repo="CorvidLabs", htmlUrl="https://github.com/CorvidLabs/site/..."
-     *  → "CorvidLabs/site"
-     */
-    private resolveFullRepo(configRepo: string, htmlUrl: string): string {
-        if (configRepo.includes('/')) return configRepo;
-        try {
-            const url = new URL(htmlUrl);
-            const parts = url.pathname.split('/').filter(Boolean);
-            if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
-        } catch { /* ignore */ }
-        return configRepo;
-    }
-
-    private shouldPollEventType(config: MentionPollingConfig, type: string): boolean {
-        // If no filter set, poll all types
-        if (config.eventFilter.length === 0) return true;
-        return config.eventFilter.includes(type as MentionPollingConfig['eventFilter'][number]);
-    }
-
-    private containsMention(body: string, username: string): boolean {
-        const regex = new RegExp(`(?:^|\\s|[^\\w])@${escapeRegex(username)}(?:\\s|$|[^\\w])`, 'i');
-        return regex.test(body);
-    }
-
-    private filterNewMentions(mentions: DetectedMention[], processedIds: string[]): DetectedMention[] {
-        if (processedIds.length === 0) return mentions;
-
-        // Filter out any mention whose ID is in the processed set.
-        // This handles assignments correctly: even old issues that get newly
-        // assigned will be processed, because their ID (assigned-N) won't be
-        // in the set until we actually process them.
-        const seen = new Set(processedIds);
-        return mentions.filter(m => !seen.has(m.id));
-    }
+    // repoQualifier, resolveFullRepo, shouldPollEventType, containsMention,
+    // filterNewMentions, and escapeRegex are now in ./github-searcher.ts
 
     private buildPrompt(config: MentionPollingConfig, mention: DetectedMention): string {
         // Resolve the actual owner/repo from the mention URL when config.repo is an org/user name.
         // e.g. htmlUrl "https://github.com/CorvidLabs/site/pull/22#..." → "CorvidLabs/site"
-        const repo = this.resolveFullRepo(config.repo, mention.htmlUrl);
+        const repo = resolveFullRepo(config.repo, mention.htmlUrl);
 
         // ── Review feedback prompt (PRs authored by the agent) ────────────────
         const isReviewFeedback = mention.id.startsWith('review-') || mention.id.startsWith('reviewcomment-');
@@ -1530,9 +1048,4 @@ export class MentionPollingService {
             }
         }
     }
-}
-
-/** Escape special regex characters in a string. */
-function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
