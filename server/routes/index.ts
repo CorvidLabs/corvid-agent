@@ -29,6 +29,7 @@ import { handleSlackRoutes } from './slack';
 import { handleTenantRoutes } from './tenants';
 import { handlePerformanceRoutes } from './performance';
 import { handleUsageRoutes } from './usage';
+import { handleFeedbackRoutes } from './feedback';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -74,6 +75,7 @@ import type { ReputationAttestation } from '../reputation/attestation';
 import type { BillingService } from '../billing/service';
 import type { UsageMeter } from '../billing/meter';
 import type { PerformanceCollector } from '../performance/collector';
+import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
 
 // Load auth config once at module level
 let authConfig: AuthConfig | null = null;
@@ -138,6 +140,7 @@ export interface RouteServices {
     usageMeter?: UsageMeter | null;
     tenantService?: TenantService | null;
     performanceCollector?: PerformanceCollector | null;
+    outcomeTracker?: OutcomeTrackerService | null;
 }
 
 export async function handleRequest(
@@ -164,6 +167,7 @@ export async function handleRequest(
     usageMeter?: UsageMeter | null,
     tenantService?: TenantService | null,
     performanceCollector?: PerformanceCollector | null,
+    outcomeTracker?: OutcomeTrackerService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
     const config = getAuthConfig();
@@ -216,7 +220,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -258,6 +262,7 @@ async function handleRoutes(
     usageMeter?: UsageMeter | null,
     tenantService?: TenantService | null,
     performanceCollector?: PerformanceCollector | null,
+    outcomeTracker?: OutcomeTrackerService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -300,6 +305,9 @@ async function handleRoutes(
 
     const usageResponse = handleUsageRoutes(req, url, db);
     if (usageResponse) return usageResponse;
+
+    const feedbackResponse = handleFeedbackRoutes(req, url, db, outcomeTracker ?? null);
+    if (feedbackResponse) return feedbackResponse;
 
     const systemLogResponse = handleSystemLogRoutes(req, url, db);
     if (systemLogResponse) return systemLogResponse;
