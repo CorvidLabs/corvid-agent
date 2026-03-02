@@ -718,6 +718,20 @@ export class MentionPollingService {
         return open;
     }
 
+    /** Fetch the assignee logins for a GitHub issue/PR. */
+    private async getIssueAssignees(repo: string, issueNumber: number): Promise<string[]> {
+        const result = await this.runGh([
+            'api', `repos/${repo}/issues/${issueNumber}`, '--jq', '[.assignees[].login]',
+        ]);
+        if (!result.ok) return [];
+        try {
+            const parsed = JSON.parse(result.stdout);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
     /** Fetch the body of a GitHub issue (needed when mention.body is a comment, not the issue). */
     private async getIssueBody(repo: string, issueNumber: number): Promise<string> {
         const result = await this.runGh([
@@ -793,6 +807,22 @@ export class MentionPollingService {
                 number: mention.number, blockers: openBlockers,
             });
             return false;
+        }
+
+        // Human-assignment guard: skip if the issue/PR is assigned to someone
+        // other than the bot. Respect human ownership — only work on things
+        // assigned to us, mentioned on, or explicitly requested.
+        const isAssignment = mention.type === 'assignment';
+        if (!isAssignment) {
+            const assignees = await this.getIssueAssignees(fullRepo, mention.number);
+            const botUsername = config.mentionUsername;
+            const assignedToOthers = assignees.filter(a => a !== botUsername);
+            if (assignedToOthers.length > 0 && !assignees.includes(botUsername)) {
+                log.info('Skipping mention — issue assigned to human(s)', {
+                    number: mention.number, assignees: assignedToOthers,
+                });
+                return false;
+            }
         }
 
         // Block mentions with HIGH/CRITICAL injection confidence before creating a session

@@ -140,6 +140,16 @@ Agents can create work tasks via `corvid_create_work_task` to propose codebase i
 
 Protected files cannot be modified even in full-auto mode.
 
+## Community & Collaboration Rules
+
+### Respecting Human Contributors
+
+1. **Never assign issues to humans** without the repo owner's explicit instruction. If you create issues, leave them unassigned.
+2. **Never work on issues assigned to someone else.** If an issue or PR has a human assignee, that work belongs to them — do not create PRs that close their issues, even if you could do it faster.
+3. **Never self-merge PRs** on repos with human contributors without requesting review. Always request a review from at least one relevant human (the assignee, a maintainer, or the repo owner).
+4. **Respect blocked-by markers.** If an issue has `<!-- blocked-by: #N -->` in its body or comments, do not work on it until the blocking issue is closed.
+5. **When reviewing human PRs,** be constructive and help get the PR merged. Don't nag about timeline — offer to help fix issues instead.
+
 ## Security Rules
 
 ### External Network Calls
