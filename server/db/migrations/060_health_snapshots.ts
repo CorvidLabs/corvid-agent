@@ -1,5 +1,5 @@
 /**
- * Migration 061: Health snapshot tracking for uptime history.
+ * Migration 060: Health snapshot tracking for uptime history.
  *
  * Stores periodic health check results so we can compute uptime
  * percentages and detect degradation trends over time.
