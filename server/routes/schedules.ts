@@ -124,9 +124,17 @@ export function handleScheduleRoutes(
     // Scheduler health
     if (url.pathname === '/api/scheduler/health' && req.method === 'GET') {
         if (!schedulerService) {
-            return json({ running: false, activeSchedules: 0, pausedSchedules: 0, runningExecutions: 0, maxConcurrent: 0, recentFailures: 0 });
+            return json({ running: false, activeSchedules: 0, pausedSchedules: 0, runningExecutions: 0, maxConcurrent: 0, recentFailures: 0, systemState: null, priorityRules: {} });
         }
         return json(schedulerService.getStats());
+    }
+
+    // System state (live evaluation)
+    if (url.pathname === '/api/scheduler/system-state' && req.method === 'GET') {
+        if (!schedulerService) {
+            return json({ states: ['healthy'], details: {}, evaluatedAt: new Date().toISOString(), cached: false });
+        }
+        return schedulerService.getSystemState().then(state => json(state));
     }
 
     // GitHub status
