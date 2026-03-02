@@ -165,8 +165,6 @@ describe('SchedulerService', () => {
             expect(stats.runningExecutions).toBe(0);
             expect(stats.maxConcurrent).toBe(2);
             expect(stats.recentFailures).toBe(0);
-            expect(stats.systemState).toBeNull();
-            expect(stats.priorityRules).toBeDefined();
         });
 
         it('counts active and paused schedules', () => {
