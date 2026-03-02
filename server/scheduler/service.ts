@@ -193,7 +193,6 @@ export class SchedulerService {
         maxConcurrent: number;
         recentFailures: number;
         systemState: SystemStateResult | null;
-<<<<<<< HEAD
         priorityRules: ReturnType<typeof getAllRules>;
     } {
         const activeRow = this.db.query(
