@@ -394,6 +394,42 @@ export async function addIssueComment(
     return result.ok ? { ok: true } : { ok: false, error: result.stderr };
 }
 
+export interface PrViewResult {
+    state: 'OPEN' | 'CLOSED' | 'MERGED';
+    mergedAt: string | null;
+    closedAt: string | null;
+    statusCheckRollup: string | null;
+    reviewDecision: string | null;
+}
+
+export async function getPrState(
+    repo: string,
+    prNumber: number,
+): Promise<{ ok: boolean; pr?: PrViewResult; error?: string }> {
+    const result = await runGh([
+        'pr', 'view', String(prNumber), '--repo', repo,
+        '--json', 'state,mergedAt,closedAt,statusCheckRollup,reviewDecision',
+    ]);
+
+    if (!result.ok) return { ok: false, error: result.stderr };
+
+    try {
+        const raw = JSON.parse(result.stdout) as Record<string, unknown>;
+        return {
+            ok: true,
+            pr: {
+                state: raw.state as PrViewResult['state'],
+                mergedAt: (raw.mergedAt as string) ?? null,
+                closedAt: (raw.closedAt as string) ?? null,
+                statusCheckRollup: raw.statusCheckRollup ? String(raw.statusCheckRollup) : null,
+                reviewDecision: (raw.reviewDecision as string) ?? null,
+            },
+        };
+    } catch {
+        return { ok: false, error: 'Failed to parse PR view output' };
+    }
+}
+
 export function isGitHubConfigured(): boolean {
     return hasGhToken();
 }

@@ -47,7 +47,7 @@ import {
 } from '../db/repo-locks';
 import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
 import { SystemStateDetector, type SystemStateResult, type SystemStateConfig } from './system-state';
-import { evaluateAction, getAllRules } from './priority-rules';
+import { evaluateAction } from './priority-rules';
 
 const log = createLogger('Scheduler');
 
@@ -211,8 +211,6 @@ export class SchedulerService {
             runningExecutions: this.runningExecutions.size,
             maxConcurrent: MAX_CONCURRENT_EXECUTIONS,
             recentFailures: failureRow.count,
-            systemState: this.lastSystemState,
-            priorityRules: getAllRules(),
         };
     }
 

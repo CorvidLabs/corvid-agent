@@ -59,6 +59,7 @@ export function buildImprovementPrompt(
     reputation: ReputationScore,
     options: PromptOptions,
     trendSummary?: string,
+    outcomeContext?: string,
 ): string {
     const sections: string[] = [];
 
@@ -120,6 +121,11 @@ export function buildImprovementPrompt(
         `Review these to avoid repeating failed approaches:\n\n` +
         formatPastAttempts(pastAttempts),
     );
+
+    // PR outcome feedback
+    if (outcomeContext) {
+        sections.push(outcomeContext);
+    }
 
     // Instructions
     sections.push(
