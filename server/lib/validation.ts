@@ -390,6 +390,7 @@ const PollingEventFilterSchema = z.enum([
     'issue_comment',
     'issues',
     'pull_request_review_comment',
+    'pull_request',
 ]);
 
 export const CreateMentionPollingSchema = z.object({

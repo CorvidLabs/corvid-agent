@@ -852,12 +852,17 @@ export class MentionPollingService {
 
         const contextType = mention.isPullRequest ? 'PR' : 'Issue';
         const isAssignment = mention.type === 'assignment';
+        const isPullRequestReview = mention.type === 'pull_request';
         // corvid_create_work_task only works for the platform's own repo
         const isHomeRepo = repo === 'CorvidLabs/corvid-agent';
 
-        const triggerLabel = isAssignment ? 'assigned to you' : '@mention detected';
+        const triggerLabel = isAssignment ? 'assigned to you'
+            : isPullRequestReview ? 'review requested'
+            : '@mention detected';
         const commentType = mention.type === 'issues' ? 'issue body'
-            : isAssignment ? 'assignment' : 'comment';
+            : isAssignment ? 'assignment'
+            : isPullRequestReview ? 'PR description'
+            : 'comment';
 
         const context = [
             `## GitHub ${contextType} — ${triggerLabel} via polling`,
@@ -902,8 +907,8 @@ export class MentionPollingService {
         ];
 
         // Detect review requests so we can give the model explicit steps
-        const isReviewRequest = mention.isPullRequest &&
-            /\breview\b/i.test(mention.body);
+        const isReviewRequest = isPullRequestReview || (mention.isPullRequest &&
+            /\breview\b/i.test(mention.body));
 
         const reviewSteps = [
             `1. Run this EXACT command to get the diff:\n   \`run_command({"command": "gh pr diff ${mention.number} --repo ${repo}"})\``,

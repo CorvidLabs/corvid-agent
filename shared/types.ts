@@ -558,7 +558,7 @@ export interface MentionPollingConfig {
     /** Set of all processed mention IDs to avoid re-triggering */
     processedIds: string[];
     /** Optional: only poll specific event types */
-    eventFilter: ('issue_comment' | 'issues' | 'pull_request_review_comment')[];
+    eventFilter: ('issue_comment' | 'issues' | 'pull_request_review_comment' | 'pull_request')[];
     /** Optional: only respond to mentions from specific users (empty = all users) */
     allowedUsers: string[];
     createdAt: string;

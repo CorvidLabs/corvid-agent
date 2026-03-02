@@ -647,9 +647,9 @@ describe('GitHubSearcher', () => {
 
             await searcher.fetchMentions(config, () => true);
 
-            // Should make 4 search/issues calls: issue_comment, issues, assigned, PR reviews
+            // Should make 5 search/issues calls: issue_comment, issues, assigned, PR reviews, pull_request
             const searchCalls = capturedArgs.filter(a => a.includes('search/issues'));
-            expect(searchCalls).toHaveLength(4);
+            expect(searchCalls).toHaveLength(5);
         });
 
         test('skips issue_comment search when filtered out', async () => {

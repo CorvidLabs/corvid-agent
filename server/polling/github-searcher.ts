@@ -16,7 +16,7 @@ export interface DetectedMention {
     /** Unique identifier (e.g. comment ID or issue number + timestamp) */
     id: string;
     /** Event type */
-    type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'assignment';
+    type: 'issue_comment' | 'issues' | 'pull_request_review_comment' | 'pull_request' | 'assignment';
     /** The comment/issue body containing the @mention */
     body: string;
     /** GitHub username of the author */
@@ -93,6 +93,13 @@ export class GitHubSearcher {
                 config.repo, config.mentionUsername, sinceDate,
             );
             mentions.push(...prReviewMentions);
+        }
+
+        if (shouldPollEventType(config, 'pull_request')) {
+            const prMentions = await this.searchPullRequestMentions(
+                config.repo, config.mentionUsername, sinceDate,
+            );
+            mentions.push(...prMentions);
         }
 
         // Sort by creation time descending (newest first)
@@ -308,6 +315,60 @@ export class GitHubSearcher {
             return mentions;
         } catch (err) {
             log.error('Error searching assigned issues', { repo, error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
+    /**
+     * Search for open PRs that mention, request review from, or are assigned to the user.
+     * This catches PRs (including dependabot) that need attention.
+     */
+    async searchPullRequestMentions(
+        repo: string,
+        username: string,
+        since: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const sinceDate = since.split('T')[0];
+            // Search for PRs that involve this user (review-requested, mentioned, assigned)
+            const query = `${repoQualifier(repo)} is:pr is:open review-requested:${username} updated:>=${sinceDate}`;
+            const result = await this.runGh([
+                'api', 'search/issues',
+                '-X', 'GET',
+                '-f', `q=${query}`,
+                '-f', 'sort=updated',
+                '-f', 'order=desc',
+                '-f', 'per_page=20',
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
+            const mentions: DetectedMention[] = [];
+
+            for (const item of items) {
+                const body = (item.body as string) ?? '';
+                const sender = ((item.user as Record<string, unknown>)?.login as string) ?? '';
+                const htmlUrl = (item.html_url as string) ?? '';
+                const itemRepo = resolveFullRepo(repo, htmlUrl);
+
+                mentions.push({
+                    id: `pr-${itemRepo}-${item.number}`,
+                    type: 'pull_request',
+                    body,
+                    sender,
+                    number: item.number as number,
+                    title: (item.title as string) ?? '',
+                    htmlUrl,
+                    createdAt: (item.created_at as string) ?? '',
+                    isPullRequest: true,
+                });
+            }
+
+            return mentions;
+        } catch (err) {
+            log.error('Error searching PR mentions', { repo, error: err instanceof Error ? err.message : String(err) });
             return [];
         }
     }
