@@ -234,7 +234,6 @@ const improvementLoopService = new AutonomousLoopService(
 improvementLoopService.setOutcomeTrackerService(outcomeTrackerService);
 schedulerService.setImprovementLoopService(improvementLoopService);
 schedulerService.setReputationServices(reputationScorer, reputationAttestation);
-schedulerService.setOutcomeTrackerService(outcomeTrackerService);
 schedulerService.setNotificationService(notificationService);
 webhookService.setSchedulerService(schedulerService);
 mentionPollingService.setSchedulerService(schedulerService);

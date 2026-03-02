@@ -45,7 +45,6 @@ import {
     releaseAllLocks,
     cleanExpiredLocks,
 } from '../db/repo-locks';
-import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
 import { SystemStateDetector, type SystemStateResult, type SystemStateConfig } from './system-state';
 import { evaluateAction, getAllRules } from './priority-rules';
 
