@@ -44,7 +44,6 @@ import {
     acquireRepoLock,
     releaseAllLocks,
     cleanExpiredLocks,
-    getRecentRepoActivity,
 } from '../db/repo-locks';
 
 const log = createLogger('Scheduler');
@@ -338,24 +337,6 @@ export class SchedulerService {
 
             this.emit({ type: 'schedule_execution_update', data: execution });
 
-            // Pre-execution health gate: check if this action should be skipped
-            const decision = this.systemState.decideAction(action.type, sysState);
-            if (decision.disposition === 'skip') {
-                log.info('Action skipped by health gate', {
-                    scheduleId: schedule.id, actionType: action.type,
-                    reason: decision.reason, conditions: decision.conditions,
-                });
-                updateExecutionStatus(this.db, execution.id, 'skipped', {
-                    result: `Skipped by health gate: ${decision.reason}`,
-                });
-                const skippedExec = getExecution(this.db, execution.id);
-                if (skippedExec) this.emit({ type: 'schedule_execution_update', data: skippedExec });
-                recordAudit(this.db, 'schedule_skip', schedule.agentId,
-                    'schedule_execution', execution.id,
-                    `Action ${action.type} skipped: ${decision.reason}`);
-                continue;
-            }
-
             // Audit log the schedule execution
             recordAudit(
                 this.db,
@@ -363,7 +344,7 @@ export class SchedulerService {
                 schedule.agentId,
                 'schedule_execution',
                 execution.id,
-                `Executing action: ${action.type} for schedule "${schedule.name}"${decision.disposition === 'boost' ? ' (boosted)' : ''}`,
+                `Executing action: ${action.type} for schedule "${schedule.name}"`,
             );
 
             // Check if this action needs approval
@@ -408,14 +389,14 @@ export class SchedulerService {
                     actionType: action.type,
                     blockedRepo: lockResult.blockedRepo,
                 });
-                updateExecutionStatus(this.db, execution.id, 'skipped', {
+                updateExecutionStatus(this.db, execution.id, 'cancelled', {
                     result: `Repo "${lockResult.blockedRepo}" is locked by another schedule execution`,
                 });
                 const skippedExec = getExecution(this.db, execution.id);
                 if (skippedExec) this.emit({ type: 'schedule_execution_update', data: skippedExec });
                 recordAudit(
                     this.db,
-                    'schedule_skip',
+                    'schedule_execute',
                     schedule.agentId,
                     'schedule_execution',
                     execution.id,
