@@ -1,4 +1,5 @@
 import { getDb, closeDb, initDb } from './db/connection';
+import { PerformanceCollector } from './performance/collector';
 import { handleRequest, initRateLimiterDb } from './routes/index';
 import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
@@ -90,6 +91,10 @@ initDb().then(() => {
 // Initialize centralized dedup service (TTL + LRU + optional SQLite persistence)
 const dedupService = DedupService.init(db);
 dedupService.start();
+
+// Initialize performance collector (periodic system snapshots)
+const performanceCollector = new PerformanceCollector(db, 'corvid-agent.db', startTime);
+performanceCollector.start();
 
 // Initialize shutdown coordinator (30s grace period, configurable via env)
 const SHUTDOWN_GRACE_MS = parseInt(process.env.SHUTDOWN_GRACE_MS ?? '30000', 10);
@@ -292,6 +297,7 @@ if (sandboxManager) {
     shutdownCoordinator.register({ name: 'SandboxManager', priority: 15, handler: () => sandboxManager.shutdown(), timeoutMs: 10_000 });
 }
 shutdownCoordinator.register({ name: 'ProcessManager', priority: 30, handler: () => processManager.shutdown(), timeoutMs: 15_000 });
+shutdownCoordinator.register({ name: 'PerformanceCollector', priority: 0, handler: () => performanceCollector.stop() });
 shutdownCoordinator.registerService('DedupService', dedupService, 40);
 shutdownCoordinator.register({ name: 'Database', priority: 50, handler: () => closeDb() });
 
@@ -644,7 +650,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService);
+            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
