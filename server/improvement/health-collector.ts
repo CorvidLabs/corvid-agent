@@ -11,6 +11,7 @@ import { createLogger } from '../lib/logger';
 const log = createLogger('HealthCollector');
 
 const SPAWN_TIMEOUT_MS = 60_000;
+const TEST_TIMEOUT_MS = 180_000;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -102,15 +103,16 @@ export function parseTscOutput(output: string): TscError[] {
 
 export function parseTestOutput(output: string, exitCode: number): { passed: boolean; summary: string; failureCount: number } {
     const lines = output.split('\n');
-    const last30 = lines.slice(-30).join('\n');
+    const last50 = lines.slice(-50).join('\n');
 
-    // Look for bun test summary lines like "42 pass" / "3 fail"
-    const failMatch = last30.match(/(\d+)\s+fail/i);
+    // Search entire output for bun test summary line (stdout may not be at the end
+    // when stderr is appended after it)
+    const failMatch = output.match(/^\s*(\d+)\s+fail\b/im);
     const failureCount = failMatch ? parseInt(failMatch[1], 10) : 0;
 
     return {
-        passed: exitCode === 0,
-        summary: last30.trim(),
+        passed: exitCode === 0 && failureCount === 0,
+        summary: last50.trim(),
         failureCount: exitCode !== 0 ? Math.max(failureCount, 1) : failureCount,
     };
 }
@@ -244,6 +246,7 @@ export class CodebaseHealthCollector {
         const { stdout, exitCode } = await spawnAndCapture(
             ['bun', 'test'],
             cwd,
+            TEST_TIMEOUT_MS,
         );
         return parseTestOutput(stdout, exitCode);
     }
