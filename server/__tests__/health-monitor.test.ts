@@ -157,15 +157,23 @@ describe('health-snapshots DB module', () => {
 describe('HealthMonitorService', () => {
     let db: Database;
     let monitor: HealthMonitorService;
+    let savedAnthropicKey: string | undefined;
 
     beforeEach(() => {
         db = createTestDb();
         resetHealthCache();
+        savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+        process.env.ANTHROPIC_API_KEY = 'test-key-for-health-check';
     });
 
     afterEach(() => {
         monitor?.stop();
         db.close();
+        if (savedAnthropicKey === undefined) {
+            delete process.env.ANTHROPIC_API_KEY;
+        } else {
+            process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        }
     });
 
     test('check() stores a health snapshot in the database', async () => {
