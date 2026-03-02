@@ -193,6 +193,8 @@ export class SchedulerService {
         runningExecutions: number;
         maxConcurrent: number;
         recentFailures: number;
+        systemState: SystemStateResult | null;
+        priorityRules: ReturnType<typeof getAllRules>;
     } {
         const activeRow = this.db.query(
             `SELECT COUNT(*) as count FROM agent_schedules WHERE status = 'active'`

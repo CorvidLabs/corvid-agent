@@ -894,6 +894,18 @@ export function up(db: Database): void {
     safeAlter(db, `ALTER TABLE agent_messages ADD COLUMN fire_and_forget INTEGER DEFAULT 0`);
     safeAlter(db, `ALTER TABLE agent_messages ADD COLUMN message_version INTEGER DEFAULT 1`);
     safeAlter(db, `ALTER TABLE agent_messages ADD COLUMN error_code TEXT DEFAULT NULL`);
+
+    // ── v61: Server health snapshots (uptime monitoring) ─────────────────
+    db.exec(`CREATE TABLE IF NOT EXISTS server_health_snapshots (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp       TEXT    NOT NULL DEFAULT (datetime('now')),
+        status          TEXT    NOT NULL,
+        response_time_ms INTEGER DEFAULT NULL,
+        dependencies    TEXT    DEFAULT NULL,
+        source          TEXT    NOT NULL DEFAULT 'internal'
+    )`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_server_health_snap_ts ON server_health_snapshots(timestamp)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_server_health_snap_status ON server_health_snapshots(status)`);
 }
 
 /**
@@ -911,6 +923,7 @@ export function down(db: Database): void {
 
     // Drop tables in reverse dependency order
     const tables = [
+        'server_health_snapshots',
         'performance_metrics',
         'project_skills',
         'agent_skills',

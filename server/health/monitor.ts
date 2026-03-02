@@ -27,6 +27,7 @@ export class HealthMonitorService {
     private notificationService: NotificationService | null = null;
     private checkTimer: ReturnType<typeof setInterval> | null = null;
     private pruneTimer: ReturnType<typeof setInterval> | null = null;
+    private initialCheckTimer: ReturnType<typeof setTimeout> | null = null;
     private lastStatus: HealthStatus | null = null;
     private consecutiveFailures = 0;
     private static readonly ALERT_THRESHOLD = 2; // alert after 2 consecutive unhealthy checks
@@ -48,10 +49,14 @@ export class HealthMonitorService {
         this.pruneTimer = setInterval(() => this.prune(), PRUNE_INTERVAL_MS);
 
         // Run first check after a short delay (let services finish starting)
-        setTimeout(() => this.check(), 30_000);
+        this.initialCheckTimer = setTimeout(() => this.check(), 30_000);
     }
 
     stop(): void {
+        if (this.initialCheckTimer) {
+            clearTimeout(this.initialCheckTimer);
+            this.initialCheckTimer = null;
+        }
         if (this.checkTimer) {
             clearInterval(this.checkTimer);
             this.checkTimer = null;
@@ -130,12 +135,12 @@ export class HealthMonitorService {
         to: HealthStatus,
         dependencies: Record<string, unknown>,
     ): Promise<void> {
-        if (to === 'healthy' && from === 'unhealthy') {
-            // Recovery — notify that the system is back
+        if (to !== 'unhealthy' && from === 'unhealthy') {
+            // Recovery — notify that the system is back (full or partial)
             log.info('Health recovered', { from, to });
             await this.sendNotification(
                 'Server recovered',
-                `Server status changed from **${from}** to **${to}**. All systems operational.`,
+                `Server status changed from **${from}** to **${to}**.${to === 'healthy' ? ' All systems operational.' : ' Some dependencies may still be degraded.'}`,
                 'info',
             );
         } else if (to === 'unhealthy' && from !== 'unhealthy') {

@@ -19,6 +19,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
     council_launch: 'communication',
     send_message: 'communication',
     reputation_attestation: 'lightweight',
+    outcome_analysis: 'lightweight',
     star_repo: 'lightweight',
     custom: 'feature_work',
 };
