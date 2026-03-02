@@ -911,6 +911,7 @@ export function down(db: Database): void {
 
     // Drop tables in reverse dependency order
     const tables = [
+        'performance_metrics',
         'project_skills',
         'agent_skills',
         'skill_bundles',
