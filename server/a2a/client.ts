@@ -235,8 +235,6 @@ export async function invokeRemoteAgent(
     const pollIntervalMs = 3000;
 
     while (Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-
         try {
             const pollResponse = await fetch(`${normalizedUrl}/a2a/tasks/${taskId}`, {
                 headers: { 'User-Agent': 'CorvidAgent/A2A-Client' },
@@ -267,6 +265,8 @@ export async function invokeRemoteAgent(
         } catch {
             // Poll failed — retry
         }
+
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
 
     return {

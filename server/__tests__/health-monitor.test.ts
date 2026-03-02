@@ -162,7 +162,6 @@ describe('HealthMonitorService', () => {
     beforeEach(() => {
         db = createTestDb();
         resetHealthCache();
-        // Set a dummy key so checkLlmProviders() returns "healthy" in CI
         savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
         process.env.ANTHROPIC_API_KEY = 'test-key-for-health-check';
     });
@@ -170,7 +169,6 @@ describe('HealthMonitorService', () => {
     afterEach(() => {
         monitor?.stop();
         db.close();
-        // Restore original env
         if (savedAnthropicKey === undefined) {
             delete process.env.ANTHROPIC_API_KEY;
         } else {
