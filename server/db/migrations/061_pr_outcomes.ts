@@ -1,5 +1,5 @@
 /**
- * Migration 060: PR outcome tracking for feedback loop.
+ * Migration 061: PR outcome tracking for feedback loop.
  *
  * Tracks the lifecycle of PRs created by work tasks — whether they
  * were merged, closed, or went stale — so the agent can learn from outcomes.

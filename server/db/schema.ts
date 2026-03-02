@@ -1157,6 +1157,23 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_timestamp ON server_health_snapshots(timestamp)`,
         `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_status ON server_health_snapshots(status)`,
     ],
+    61: [
+        `CREATE TABLE IF NOT EXISTS pr_outcomes (
+            id              TEXT    PRIMARY KEY,
+            work_task_id    TEXT    NOT NULL,
+            pr_url          TEXT    NOT NULL,
+            repo            TEXT    NOT NULL,
+            pr_number       INTEGER NOT NULL,
+            pr_state        TEXT    NOT NULL DEFAULT 'open',
+            failure_reason  TEXT    DEFAULT NULL,
+            checked_at      TEXT    DEFAULT NULL,
+            resolved_at     TEXT    DEFAULT NULL,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_state ON pr_outcomes(pr_state)`,
+        `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_repo ON pr_outcomes(repo)`,
+        `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_work_task ON pr_outcomes(work_task_id)`,
+    ],
 };
 
 /** Allowlist pattern for valid SQL identifiers (table/column names). */
