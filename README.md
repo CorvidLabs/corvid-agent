@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.14.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.15.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.2-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-1757%20unit%20%7C%20348%20E2E-brightgreen" alt="1757 Unit | 348 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-4371%20unit%20%7C%20360%20E2E-brightgreen" alt="4371 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -182,7 +182,40 @@ OPENAI_API_KEY=sk-...
 ### Mention Polling
 - GitHub `@mention` polling for automated issue and PR responses
 - Configurable per-agent poll intervals with centralized deduplication
-- Filters by event type (issue comments, issues, PR review comments)
+- Filters by event type (issue comments, issues, PR review comments, pull requests)
+- Pull request review detection via GitHub search API
+
+### Health Monitoring & Incident Runbook
+- Heartbeat monitoring with automatic health history tracking
+- Health collector aggregates metrics from sessions, schedules, work tasks, and system resources
+- Configurable incident detection with auto-generated runbook suggestions
+- API: `/api/health` for live status, plus health trend analysis via MCP tools
+
+### Feedback Loop
+- Track PR outcomes (merged, closed, changes-requested) from scheduled work
+- Learn from results to improve future schedule effectiveness
+- Automatic correlation between schedule executions and PR dispositions
+
+### Performance Metrics & Regression Detection
+- Collect performance snapshots across API routes and agent sessions
+- Trend detection with rolling window analysis
+- Automatic regression alerts when metrics degrade beyond thresholds
+- API: `/api/performance` for snapshots, trends, and regression queries
+
+### Usage Monitoring & Anomaly Detection
+- Track schedule execution frequency, cost, and token usage over time
+- Anomaly detection for cost spikes and unusual execution patterns
+- Per-schedule and aggregate usage analytics
+- API: `/api/usage` for monitoring and alerting
+
+### Smart Prioritization
+- Health-gated scheduling: suppress non-critical work when system health is degraded
+- Priority rules engine for scheduling decisions based on agent state and workload
+- Automatic backoff when health checks indicate resource pressure
+
+### Schedule Coordination
+- Repository-level locking to prevent concurrent work task conflicts
+- Issue deduplication to avoid filing duplicate issues across scheduled runs
 
 ### Centralized Deduplication
 - Bounded LRU caches with configurable TTL per namespace
@@ -228,8 +261,11 @@ OPENAI_API_KEY=sk-...
 |  | Mention  |  | Exam     |  | Improvement |  | Notifications |  |
 |  | Polling  |  | System   |  | Pipeline    |  | (multi-chan)  |  |
 |  +----------+  +----------+  +-------------+  +---------------+  |
-|  | Reputation |  | Tenants |  | Observability (OTEL)          |  |
-|  | + Trust    |  | + Billing|  | Tracing + Metrics + Audit    |  |
+|  | Reputation |  | Tenants |  | Health      |  | Feedback     |  |
+|  | + Trust    |  | + Billing|  | Monitoring  |  | Loop         |  |
+|  +------------+  +---------+  +-------------+  +--------------+  |
+|  | Performance|  | Usage   |  | Observability (OTEL)          |  |
+|  | Metrics    |  | Monitor |  | Tracing + Metrics + Audit    |  |
 |  +------------+  +---------+  +-------------------------------+  |
 |       |              |              |                |           |
 |  +----+-----+  +----+-----+  +-----+-----+  +------+--------+  |
@@ -239,7 +275,7 @@ OPENAI_API_KEY=sk-...
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  57 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  60 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -254,12 +290,13 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (57 migrations) and query modules
+  db/            SQLite schema (60 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   exam/          Model exam system with 18 test cases across 6 categories
   github/        GitHub API operations (PRs, issues, reviews)
-  health/        Health check service and types
+  feedback/      PR outcome tracking and schedule effectiveness learning
+  health/        Health monitoring, heartbeat, incident detection, and runbook
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
@@ -321,7 +358,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 32 route modules:
+~200 REST endpoints and a WebSocket interface across 34 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
@@ -354,6 +391,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Settings | `/api/settings` | Application settings and operational mode |
 | Performance | `/api/performance` | Performance snapshots, trends, and regression detection |
 | Usage | `/api/usage` | Schedule usage monitoring and anomaly detection |
+| Feedback | `/api/feedback` | PR outcome tracking and schedule learning |
 | System Logs | `/api/system-logs` | System log queries and credit history |
 | Health | `GET /api/health` | Health check (public, no auth) |
 | A2A | `/.well-known/agent-card.json` | Google A2A protocol Agent Card |
@@ -364,15 +402,15 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 1757 server tests (~30s)
+bun test              # 4371 server tests (~105s)
 cd client && npx vitest run   # Angular component tests (~2s)
-bun run test:e2e      # 31 Playwright spec files, 348 tests
+bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**1757+ unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, GitHub tools, marketplace, MCP tool handlers, notifications, multi-model routing, observability, owner communication, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**4371 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
-**348 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
+**360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
 **38 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
@@ -384,7 +422,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 57 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 60 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
@@ -408,6 +446,9 @@ bun run spec:check    # Validate all module specs in specs/
 - **Audit logging** — immutable, insert-only log with trace IDs
 - **Startup validation** — server refuses to start without API key on non-localhost bind
 - **Prompt injection detection** — multi-layer scanner with encoding attack detection
+- **Multi-tenant isolation** — DB filter runtime guards, API key authority over headers, tenant-scoped WebSocket broadcasts
+- **Social engineering protection** — detects manipulation attempts in issue/PR comments
+- **Malicious code scanning** — unified CI security gate with `bun run security:scan`
 
 See [SECURITY.md](SECURITY.md) for the full security model and responsible disclosure.
 
