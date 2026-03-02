@@ -28,6 +28,7 @@ import { handleExamRoutes } from './exam';
 import { handleSlackRoutes } from './slack';
 import { handleTenantRoutes } from './tenants';
 import { handlePerformanceRoutes } from './performance';
+import { handleUsageRoutes } from './usage';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -296,6 +297,9 @@ async function handleRoutes(
 
     const performanceResponse = handlePerformanceRoutes(req, url, db, performanceCollector ?? null);
     if (performanceResponse) return performanceResponse;
+
+    const usageResponse = handleUsageRoutes(req, url, db);
+    if (usageResponse) return usageResponse;
 
     const systemLogResponse = handleSystemLogRoutes(req, url, db);
     if (systemLogResponse) return systemLogResponse;

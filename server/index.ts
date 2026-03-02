@@ -15,6 +15,7 @@ import { WorkCommandRouter } from './algochat/work-command-router';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
 import { SchedulerService } from './scheduler/service';
+import { UsageMonitor } from './usage/monitor';
 import { WebhookService } from './webhooks/service';
 import { MentionPollingService } from './polling/service';
 import { WorkflowService } from './workflow/service';
@@ -230,6 +231,12 @@ schedulerService.setNotificationService(notificationService);
 webhookService.setSchedulerService(schedulerService);
 mentionPollingService.setSchedulerService(schedulerService);
 
+// Initialize usage monitor (scheduled session cost tracking + anomaly detection)
+const usageMonitor = new UsageMonitor(db, processManager);
+usageMonitor.setNotificationService(notificationService);
+usageMonitor.backfillCosts();
+usageMonitor.start();
+
 // Initialize multi-tenant (opt-in via MULTI_TENANT=true)
 const multiTenant = process.env.MULTI_TENANT === 'true';
 const tenantService = new TenantService(db, multiTenant);
@@ -290,6 +297,7 @@ shutdownCoordinator.registerService('WorkflowService', workflowService, 0);
 shutdownCoordinator.registerService('SchedulerService', schedulerService, 0);
 shutdownCoordinator.registerService('MentionPollingService', mentionPollingService, 0);
 shutdownCoordinator.registerService('SessionLifecycleManager', sessionLifecycle, 0);
+shutdownCoordinator.register({ name: 'UsageMonitor', priority: 0, handler: () => usageMonitor.stop() });
 shutdownCoordinator.registerService('UsageMeter', usageMeter, 5);
 shutdownCoordinator.register({ name: 'MarketplaceFederation', priority: 5, handler: () => marketplaceFederation.stopPeriodicSync() });
 shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
