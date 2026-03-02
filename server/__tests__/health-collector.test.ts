@@ -90,11 +90,27 @@ describe('parseTestOutput', () => {
         expect(result.failureCount).toBeGreaterThanOrEqual(1);
     });
 
-    test('captures last 30 lines as summary', () => {
-        const lines = Array.from({ length: 50 }, (_, i) => `line ${i + 1}`).join('\n');
+    test('captures last 50 lines as summary', () => {
+        const lines = Array.from({ length: 80 }, (_, i) => `line ${i + 1}`).join('\n');
         const result = parseTestOutput(lines, 0);
-        expect(result.summary).toContain('line 50');
-        expect(result.summary).not.toContain('line 10');
+        expect(result.summary).toContain('line 80');
+        expect(result.summary).not.toContain('line 20');
+    });
+
+    test('finds fail count when summary is buried by stderr', () => {
+        // Simulates stdout (test results) + stderr (log output) concatenation
+        const stdout = `bun test v1.0.0\n\n100 pass\n2 fail\n`;
+        const stderr = Array.from({ length: 60 }, (_, i) => `2026-03-02 WARN [Test] log line ${i}`).join('\n');
+        const result = parseTestOutput(stdout + stderr, 1);
+        expect(result.failureCount).toBe(2);
+        expect(result.passed).toBe(false);
+    });
+
+    test('reports passed=false when failureCount > 0 even with exit 0', () => {
+        const output = `bun test v1.0.0\n\n98 pass\n1 fail\n`;
+        const result = parseTestOutput(output, 0);
+        expect(result.passed).toBe(false);
+        expect(result.failureCount).toBe(1);
     });
 });
 
