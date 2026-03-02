@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 57;
+const SCHEMA_VERSION = 58;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1116,6 +1116,20 @@ const MIGRATIONS: Record<number, string[]> = {
     // Migration 57: Schedule trigger events (event-based schedule activation)
     57: [
         `ALTER TABLE agent_schedules ADD COLUMN trigger_events TEXT DEFAULT NULL`,
+    ],
+
+    // Migration 58: Performance metrics table
+    58: [
+        `CREATE TABLE IF NOT EXISTS performance_metrics (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp  TEXT    NOT NULL DEFAULT (datetime('now')),
+            metric     TEXT    NOT NULL,
+            labels     TEXT    DEFAULT NULL,
+            value      REAL    NOT NULL,
+            unit       TEXT    DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_perf_metric_ts ON performance_metrics(metric, timestamp)`,
+        `CREATE INDEX IF NOT EXISTS idx_perf_ts ON performance_metrics(timestamp)`,
     ],
 };
 
