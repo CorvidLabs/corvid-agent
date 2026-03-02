@@ -74,7 +74,6 @@ import type { ReputationAttestation } from '../reputation/attestation';
 import type { BillingService } from '../billing/service';
 import type { UsageMeter } from '../billing/meter';
 import type { PerformanceCollector } from '../performance/collector';
-import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
 
 // Load auth config once at module level
 let authConfig: AuthConfig | null = null;
@@ -259,7 +258,6 @@ async function handleRoutes(
     usageMeter?: UsageMeter | null,
     tenantService?: TenantService | null,
     performanceCollector?: PerformanceCollector | null,
-    outcomeTracker?: OutcomeTrackerService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
