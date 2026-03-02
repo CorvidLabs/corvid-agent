@@ -21,6 +21,7 @@ import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { NotFoundError, ValidationError, AuthorizationError } from '../lib/errors';
+import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
 
 const log = createLogger('ImprovementLoop');
 
@@ -65,6 +66,7 @@ export class AutonomousLoopService {
     private memoryManager: MemoryManager;
     private reputationScorer: ReputationScorer;
     private healthCollector: CodebaseHealthCollector;
+    private outcomeTrackerService: OutcomeTrackerService | null = null;
 
     constructor(
         db: Database,
@@ -79,6 +81,10 @@ export class AutonomousLoopService {
         this.memoryManager = memoryManager;
         this.reputationScorer = reputationScorer;
         this.healthCollector = new CodebaseHealthCollector();
+    }
+
+    setOutcomeTrackerService(service: OutcomeTrackerService): void {
+        this.outcomeTrackerService = service;
     }
 
     async run(
@@ -149,11 +155,12 @@ export class AutonomousLoopService {
             throw new AuthorizationError('Agent is untrusted', { agentId, score: reputation.overallScore });
         }
 
-        // 6. Build enriched prompt
+        // 6. Build enriched prompt (with PR outcome feedback if available)
+        const outcomeContext = this.outcomeTrackerService?.getOutcomeContext();
         const prompt = buildImprovementPrompt(health, pastAttempts, reputation, {
             maxTasks: maxTasksAllowed,
             focusArea: options.focusArea,
-        }, trendSummary);
+        }, trendSummary, outcomeContext);
 
         // 7. Create session and start agent
         const session = createSession(this.db, {
@@ -259,6 +266,11 @@ export class AutonomousLoopService {
                         `${task.prUrl ? `PR: ${task.prUrl}` : 'No PR created.'}` +
                         `${task.description ? ` Description: ${task.description.slice(0, 200)}` : ''}`,
                 });
+
+                // Record PR outcome for feedback tracking
+                if (task.prUrl && this.outcomeTrackerService) {
+                    this.outcomeTrackerService.recordPrFromWorkTask(task.id, task.prUrl);
+                }
             } else {
                 this.reputationScorer.recordEvent({
                     agentId,

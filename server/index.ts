@@ -59,6 +59,7 @@ import { ReputationAttestation } from './reputation/attestation';
 import { ReputationVerifier } from './reputation/verifier';
 import { MemoryManager } from './memory/index';
 import { AutonomousLoopService } from './improvement/service';
+import { OutcomeTrackerService } from './feedback/outcome-tracker';
 import { TelegramBridge } from './telegram/bridge';
 import { DiscordBridge } from './discord/bridge';
 import { SlackBridge } from './slack/bridge';
@@ -223,10 +224,14 @@ const reputationVerifier = new ReputationVerifier();
 // Initialize memory manager (for structured memory with semantic search)
 const memoryManager = new MemoryManager(db);
 
+// Initialize outcome tracker for PR feedback loop
+const outcomeTrackerService = new OutcomeTrackerService(db, memoryManager);
+
 // Initialize autonomous improvement loop service
 const improvementLoopService = new AutonomousLoopService(
     db, processManager, workTaskService, memoryManager, reputationScorer,
 );
+improvementLoopService.setOutcomeTrackerService(outcomeTrackerService);
 schedulerService.setImprovementLoopService(improvementLoopService);
 schedulerService.setReputationServices(reputationScorer, reputationAttestation);
 schedulerService.setNotificationService(notificationService);
@@ -691,7 +696,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector);
+            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
