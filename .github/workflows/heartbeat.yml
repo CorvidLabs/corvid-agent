@@ -1,0 +1,96 @@
+name: Heartbeat
+
+on:
+  schedule:
+    # Every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping health endpoint
+        id: health
+        run: |
+          HEALTH_URL="${{ secrets.HEALTH_URL }}"
+          if [ -z "$HEALTH_URL" ]; then
+            echo "HEALTH_URL secret not set — skipping"
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          HTTP_CODE=$(curl -s -o /tmp/health_response.json -w "%{http_code}" \
+            --max-time 10 --retry 2 --retry-delay 5 \
+            "$HEALTH_URL")
+
+          echo "http_code=$HTTP_CODE" >> "$GITHUB_OUTPUT"
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "status=healthy" >> "$GITHUB_OUTPUT"
+            echo "Health check passed (HTTP $HTTP_CODE)"
+            cat /tmp/health_response.json | jq -r '.status // "unknown"'
+          else
+            echo "status=unhealthy" >> "$GITHUB_OUTPUT"
+            echo "Health check FAILED (HTTP $HTTP_CODE)"
+            cat /tmp/health_response.json 2>/dev/null || echo "No response body"
+          fi
+
+      - name: Record failure
+        if: steps.health.outputs.status == 'unhealthy'
+        run: |
+          # Write failure to a file that persists via cache for consecutive-check tracking
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) HTTP=${{ steps.health.outputs.http_code }}" >> /tmp/heartbeat_failures.txt
+          echo "::warning::Health check failed with HTTP ${{ steps.health.outputs.http_code }}"
+
+      - name: Create incident issue on failure
+        if: steps.health.outputs.status == 'unhealthy'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if there's already an open incident issue
+          EXISTING=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "P0,incident" \
+            --state open \
+            --limit 1 \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "Open incident issue #$EXISTING already exists — adding comment"
+            gh issue comment "$EXISTING" \
+              --repo "${{ github.repository }}" \
+              --body "Heartbeat check failed again at $(date -u +%Y-%m-%dT%H:%M:%SZ). HTTP status: ${{ steps.health.outputs.http_code }}"
+            exit 0
+          fi
+
+          # Create new incident issue
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "[P0] Server health check failing" \
+            --label "P0,incident" \
+            --body "$(cat <<'EOF'
+          ## Incident: Server Health Check Failure
+
+          **Detected at:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          **HTTP Status:** ${{ steps.health.outputs.http_code }}
+          **Source:** GitHub Actions heartbeat workflow
+
+          ### Recovery Steps
+
+          See `docs/incident-response.md` for the full runbook.
+
+          1. Check if the server process is running
+          2. Check the server logs for errors
+          3. Verify database connectivity
+          4. Restart the server if needed: `bun run start`
+          5. Verify recovery via `/api/health`
+
+          ---
+          *Automatically created by the heartbeat workflow.*
+          EOF
+          )"
