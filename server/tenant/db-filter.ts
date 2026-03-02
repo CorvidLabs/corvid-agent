@@ -54,6 +54,15 @@ export const TENANT_SCOPED_TABLES = [
     'agent_reputation',
     'sandbox_configs',
     'notification_channels',
+    'councils',
+    'council_launches',
+    'agent_schedules',
+    'schedule_executions',
+    'workflows',
+    'workflow_runs',
+    'mention_polling_configs',
+    'mcp_server_configs',
+    'webhook_registrations',
 ] as const;
 
 /**

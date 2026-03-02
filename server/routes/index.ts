@@ -280,15 +280,15 @@ async function handleRoutes(
     if (agentResponse) return agentResponse;
 
     // Persona routes (agent identity/personality)
-    const personaResponse = handlePersonaRoutes(req, url, db);
+    const personaResponse = handlePersonaRoutes(req, url, db, context);
     if (personaResponse) return personaResponse;
 
     // Skill bundle routes (composable tool + prompt packages)
-    const skillBundleResponse = handleSkillBundleRoutes(req, url, db);
+    const skillBundleResponse = handleSkillBundleRoutes(req, url, db, context);
     if (skillBundleResponse) return skillBundleResponse;
 
     // External MCP server config routes
-    const mcpServerResponse = handleMcpServerRoutes(req, url, db);
+    const mcpServerResponse = handleMcpServerRoutes(req, url, db, context);
     if (mcpServerResponse) return mcpServerResponse;
 
     const allowlistResponse = handleAllowlistRoutes(req, url, db);
@@ -297,19 +297,19 @@ async function handleRoutes(
     const githubAllowlistResponse = handleGitHubAllowlistRoutes(req, url, db);
     if (githubAllowlistResponse) return githubAllowlistResponse;
 
-    const analyticsResponse = handleAnalyticsRoutes(req, url, db);
+    const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
     if (analyticsResponse) return analyticsResponse;
 
     const performanceResponse = handlePerformanceRoutes(req, url, db, performanceCollector ?? null);
     if (performanceResponse) return performanceResponse;
 
-    const usageResponse = handleUsageRoutes(req, url, db);
+    const usageResponse = handleUsageRoutes(req, url, db, context);
     if (usageResponse) return usageResponse;
 
-    const feedbackResponse = handleFeedbackRoutes(req, url, db, outcomeTracker ?? null);
+    const feedbackResponse = handleFeedbackRoutes(req, url, db, outcomeTracker ?? null, context);
     if (feedbackResponse) return feedbackResponse;
 
-    const systemLogResponse = handleSystemLogRoutes(req, url, db);
+    const systemLogResponse = handleSystemLogRoutes(req, url, db, context);
     if (systemLogResponse) return systemLogResponse;
 
     const settingsResponse = await handleSettingsRoutes(req, url, db, context, getAuthConfig());
@@ -318,44 +318,44 @@ async function handleRoutes(
     const sessionResponse = await handleSessionRoutes(req, url, db, processManager, context);
     if (sessionResponse) return sessionResponse;
 
-    const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger);
+    const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger, context);
     if (councilResponse) return councilResponse;
 
     if (workTaskService) {
-        const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService);
+        const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService, context);
         if (workTaskResponse) return workTaskResponse;
     }
 
     // Schedule routes (automation)
-    const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService ?? null);
+    const scheduleResponse = handleScheduleRoutes(req, url, db, schedulerService ?? null, context);
     if (scheduleResponse) return scheduleResponse;
 
     // Webhook routes (GitHub event-driven automation)
-    const webhookResponse = handleWebhookRoutes(req, url, db, webhookService ?? null);
+    const webhookResponse = handleWebhookRoutes(req, url, db, webhookService ?? null, context);
     if (webhookResponse) return webhookResponse;
 
     // Mention polling routes (local-first GitHub @mention detection)
-    const pollingResponse = handleMentionPollingRoutes(req, url, db, mentionPollingService ?? null);
+    const pollingResponse = handleMentionPollingRoutes(req, url, db, mentionPollingService ?? null, context);
     if (pollingResponse) return pollingResponse;
 
     // Workflow routes (graph-based orchestration)
-    const workflowResponse = handleWorkflowRoutes(req, url, db, workflowService ?? null);
+    const workflowResponse = handleWorkflowRoutes(req, url, db, workflowService ?? null, context);
     if (workflowResponse) return workflowResponse;
 
     // Sandbox routes (container management)
-    const sandboxResponse = handleSandboxRoutes(req, url, db, sandboxManager);
+    const sandboxResponse = handleSandboxRoutes(req, url, db, sandboxManager, context);
     if (sandboxResponse) return sandboxResponse;
 
     // Marketplace routes
-    const marketplaceResponse = handleMarketplaceRoutes(req, url, db, marketplace, marketplaceFederation);
+    const marketplaceResponse = handleMarketplaceRoutes(req, url, db, marketplace, marketplaceFederation, context);
     if (marketplaceResponse) return marketplaceResponse;
 
     // Reputation routes
-    const reputationResponse = handleReputationRoutes(req, url, db, reputationScorer, reputationAttestation);
+    const reputationResponse = handleReputationRoutes(req, url, db, reputationScorer, reputationAttestation, context);
     if (reputationResponse) return reputationResponse;
 
     // Billing routes
-    const billingResponse = await handleBillingRoutes(req, url, db, billing, usageMeter);
+    const billingResponse = await handleBillingRoutes(req, url, db, billing, usageMeter, context);
     if (billingResponse) return billingResponse;
 
     // Auth flow routes (device authorization for CLI login)

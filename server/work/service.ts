@@ -87,9 +87,9 @@ export class WorkTaskService {
             ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
     }
 
-    async create(input: CreateWorkTaskInput): Promise<WorkTask> {
+    async create(input: CreateWorkTaskInput, tenantId?: string): Promise<WorkTask> {
         // Validate agent exists
-        const agent = getAgent(this.db, input.agentId);
+        const agent = getAgent(this.db, input.agentId, tenantId);
         if (!agent) {
             throw new NotFoundError('Agent', input.agentId);
         }
@@ -101,7 +101,7 @@ export class WorkTaskService {
         }
 
         // Validate project exists with a workingDir
-        const project = getProject(this.db, projectId);
+        const project = getProject(this.db, projectId, tenantId);
         if (!project) {
             throw new NotFoundError('Project', projectId);
         }
@@ -117,6 +117,7 @@ export class WorkTaskService {
             source: input.source,
             sourceId: input.sourceId,
             requesterInfo: input.requesterInfo,
+            tenantId,
         });
         if (!task) {
             throw new ConflictError('Another task is already active on project', { projectId });
@@ -252,12 +253,12 @@ export class WorkTaskService {
         return updated ?? task;
     }
 
-    getTask(id: string): WorkTask | null {
-        return getWorkTask(this.db, id);
+    getTask(id: string, tenantId?: string): WorkTask | null {
+        return getWorkTask(this.db, id, tenantId);
     }
 
-    listTasks(agentId?: string): WorkTask[] {
-        return dbListWorkTasks(this.db, agentId);
+    listTasks(agentId?: string, tenantId?: string): WorkTask[] {
+        return dbListWorkTasks(this.db, agentId, tenantId);
     }
 
     async cancelTask(id: string): Promise<WorkTask | null> {

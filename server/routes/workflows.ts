@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { WorkflowService } from '../workflow/service';
+import type { RequestContext } from '../middleware/guards';
 import {
     listWorkflows,
     getWorkflow,
@@ -25,35 +26,38 @@ export function handleWorkflowRoutes(
     url: URL,
     db: Database,
     workflowService: WorkflowService | null,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
+    const tenantId = context?.tenantId ?? 'default';
+
     // List workflows
     if (url.pathname === '/api/workflows' && req.method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;
-        const workflows = listWorkflows(db, agentId);
+        const workflows = listWorkflows(db, agentId, tenantId);
         return json(workflows);
     }
 
     // Create workflow
     if (url.pathname === '/api/workflows' && req.method === 'POST') {
-        return handleCreateWorkflow(req, db);
+        return handleCreateWorkflow(req, db, tenantId);
     }
 
     // Get single workflow
     const workflowMatch = url.pathname.match(/^\/api\/workflows\/([^/]+)$/);
     if (workflowMatch && req.method === 'GET') {
-        const workflow = getWorkflow(db, workflowMatch[1]);
+        const workflow = getWorkflow(db, workflowMatch[1], tenantId);
         if (!workflow) return json({ error: 'Workflow not found' }, 404);
         return json(workflow);
     }
 
     // Update workflow
     if (workflowMatch && req.method === 'PUT') {
-        return handleUpdateWorkflow(req, db, workflowMatch[1]);
+        return handleUpdateWorkflow(req, db, workflowMatch[1], tenantId);
     }
 
     // Delete workflow
     if (workflowMatch && req.method === 'DELETE') {
-        const deleted = deleteWorkflow(db, workflowMatch[1]);
+        const deleted = deleteWorkflow(db, workflowMatch[1], tenantId);
         if (!deleted) return json({ error: 'Workflow not found' }, 404);
         return json({ ok: true });
     }
@@ -68,21 +72,21 @@ export function handleWorkflowRoutes(
     const runsMatch = url.pathname.match(/^\/api\/workflows\/([^/]+)\/runs$/);
     if (runsMatch && req.method === 'GET') {
         const limit = safeNumParam(url.searchParams.get('limit'), 50);
-        const runs = listWorkflowRuns(db, runsMatch[1], limit);
+        const runs = listWorkflowRuns(db, runsMatch[1], limit, tenantId);
         return json(runs);
     }
 
     // List all workflow runs
     if (url.pathname === '/api/workflow-runs' && req.method === 'GET') {
         const limit = safeNumParam(url.searchParams.get('limit'), 50);
-        const runs = listWorkflowRuns(db, undefined, limit);
+        const runs = listWorkflowRuns(db, undefined, limit, tenantId);
         return json(runs);
     }
 
     // Get single run (with node runs)
     const runMatch = url.pathname.match(/^\/api\/workflow-runs\/([^/]+)$/);
     if (runMatch && req.method === 'GET') {
-        const run = getWorkflowRun(db, runMatch[1]);
+        const run = getWorkflowRun(db, runMatch[1], tenantId);
         if (!run) return json({ error: 'Workflow run not found' }, 404);
         return json(run);
     }
@@ -111,10 +115,10 @@ export function handleWorkflowRoutes(
     return null;
 }
 
-async function handleCreateWorkflow(req: Request, db: Database): Promise<Response> {
+async function handleCreateWorkflow(req: Request, db: Database, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateWorkflowSchema);
-        const workflow = createWorkflow(db, data);
+        const workflow = createWorkflow(db, data, tenantId);
         return json(workflow, 201);
     } catch (err) {
         if (err instanceof ValidationError) return badRequest(err.detail);
@@ -122,10 +126,10 @@ async function handleCreateWorkflow(req: Request, db: Database): Promise<Respons
     }
 }
 
-async function handleUpdateWorkflow(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdateWorkflow(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateWorkflowSchema);
-        const workflow = updateWorkflow(db, id, data);
+        const workflow = updateWorkflow(db, id, data, tenantId);
         if (!workflow) return json({ error: 'Workflow not found' }, 404);
         return json(workflow);
     } catch (err) {

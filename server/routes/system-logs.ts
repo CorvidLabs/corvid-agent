@@ -4,9 +4,10 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import type { RequestContext } from '../middleware/guards';
 import { json, safeNumParam } from '../lib/response';
 
-export function handleSystemLogRoutes(req: Request, url: URL, db: Database): Response | null {
+export function handleSystemLogRoutes(req: Request, url: URL, db: Database, _context?: RequestContext): Response | null {
     // GET /api/system-logs — aggregated system logs
     if (url.pathname === '/api/system-logs' && req.method === 'GET') {
         const limit = safeNumParam(url.searchParams.get('limit'), 100);

@@ -9,6 +9,8 @@ import type {
     UpdateMentionPollingInput,
     MentionPollingStatus,
 } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,13 +36,13 @@ function rowToConfig(row: Record<string, unknown>): MentionPollingConfig {
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 
-export function createMentionPollingConfig(db: Database, input: CreateMentionPollingInput): MentionPollingConfig {
+export function createMentionPollingConfig(db: Database, input: CreateMentionPollingInput, tenantId: string = DEFAULT_TENANT_ID): MentionPollingConfig {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     db.query(`
-        INSERT INTO mention_polling_configs (id, agent_id, repo, mention_username, project_id, interval_seconds, event_filter, allowed_users, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO mention_polling_configs (id, agent_id, repo, mention_username, project_id, interval_seconds, event_filter, allowed_users, tenant_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -50,6 +52,7 @@ export function createMentionPollingConfig(db: Database, input: CreateMentionPol
         input.intervalSeconds ?? 60,
         JSON.stringify(input.eventFilter ?? []),
         JSON.stringify(input.allowedUsers ?? []),
+        tenantId,
         now,
         now,
     );
@@ -57,16 +60,19 @@ export function createMentionPollingConfig(db: Database, input: CreateMentionPol
     return getMentionPollingConfig(db, id)!;
 }
 
-export function getMentionPollingConfig(db: Database, id: string): MentionPollingConfig | null {
+export function getMentionPollingConfig(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): MentionPollingConfig | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'mention_polling_configs', id, tenantId)) return null;
     const row = db.query('SELECT * FROM mention_polling_configs WHERE id = ?').get(id) as Record<string, unknown> | null;
     return row ? rowToConfig(row) : null;
 }
 
-export function listMentionPollingConfigs(db: Database, agentId?: string): MentionPollingConfig[] {
-    const rows = agentId
-        ? db.query('SELECT * FROM mention_polling_configs WHERE agent_id = ? ORDER BY created_at DESC').all(agentId)
-        : db.query('SELECT * FROM mention_polling_configs ORDER BY created_at DESC').all();
-    return (rows as Record<string, unknown>[]).map(rowToConfig);
+export function listMentionPollingConfigs(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): MentionPollingConfig[] {
+    if (agentId) {
+        const { query, bindings } = withTenantFilter('SELECT * FROM mention_polling_configs WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
+        return (db.query(query).all(agentId, ...bindings) as Record<string, unknown>[]).map(rowToConfig);
+    }
+    const { query, bindings } = withTenantFilter('SELECT * FROM mention_polling_configs ORDER BY created_at DESC', tenantId);
+    return (db.query(query).all(...bindings) as Record<string, unknown>[]).map(rowToConfig);
 }
 
 /**
@@ -86,8 +92,8 @@ export function findDuePollingConfigs(db: Database): MentionPollingConfig[] {
     return (rows as Record<string, unknown>[]).map(rowToConfig);
 }
 
-export function updateMentionPollingConfig(db: Database, id: string, input: UpdateMentionPollingInput): MentionPollingConfig | null {
-    const existing = getMentionPollingConfig(db, id);
+export function updateMentionPollingConfig(db: Database, id: string, input: UpdateMentionPollingInput, tenantId: string = DEFAULT_TENANT_ID): MentionPollingConfig | null {
+    const existing = getMentionPollingConfig(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -109,7 +115,8 @@ export function updateMentionPollingConfig(db: Database, id: string, input: Upda
     return getMentionPollingConfig(db, id);
 }
 
-export function deleteMentionPollingConfig(db: Database, id: string): boolean {
+export function deleteMentionPollingConfig(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'mention_polling_configs', id, tenantId)) return false;
     const result = db.query('DELETE FROM mention_polling_configs WHERE id = ?').run(id);
     return result.changes > 0;
 }

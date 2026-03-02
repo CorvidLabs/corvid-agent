@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { RequestContext } from '../middleware/guards';
 import { getPersona, upsertPersona, deletePersona } from '../db/personas';
 import { getAgent } from '../db/agents';
 import { parseBodyOrThrow, ValidationError, UpsertPersonaSchema } from '../lib/validation';
@@ -8,12 +9,15 @@ export function handlePersonaRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
+    const tenantId = context?.tenantId ?? 'default';
+
     // GET /api/agents/:id/persona
     const getMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/persona$/);
     if (getMatch && req.method === 'GET') {
         const agentId = getMatch[1];
-        const agent = getAgent(db, agentId);
+        const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
 
         const persona = getPersona(db, agentId);
@@ -24,14 +28,14 @@ export function handlePersonaRoutes(
     // PUT /api/agents/:id/persona
     const putMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/persona$/);
     if (putMatch && req.method === 'PUT') {
-        return handleUpsert(req, db, putMatch[1]);
+        return handleUpsert(req, db, putMatch[1], tenantId);
     }
 
     // DELETE /api/agents/:id/persona
     const deleteMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/persona$/);
     if (deleteMatch && req.method === 'DELETE') {
         const agentId = deleteMatch[1];
-        const agent = getAgent(db, agentId);
+        const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
 
         const deleted = deletePersona(db, agentId);
@@ -42,9 +46,9 @@ export function handlePersonaRoutes(
     return null;
 }
 
-async function handleUpsert(req: Request, db: Database, agentId: string): Promise<Response> {
+async function handleUpsert(req: Request, db: Database, agentId: string, tenantId: string): Promise<Response> {
     try {
-        const agent = getAgent(db, agentId);
+        const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
 
         const data = await parseBodyOrThrow(req, UpsertPersonaSchema);

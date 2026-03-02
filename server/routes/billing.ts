@@ -4,6 +4,7 @@
 import type { Database } from 'bun:sqlite';
 import type { BillingService } from '../billing/service';
 import type { UsageMeter } from '../billing/meter';
+import type { RequestContext } from '../middleware/guards';
 import { verifyWebhookSignature } from '../billing/stripe';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, CreateSubscriptionSchema } from '../lib/validation';
@@ -17,6 +18,7 @@ export function handleBillingRoutes(
     _db: Database,
     billing?: BillingService | null,
     meter?: UsageMeter | null,
+    _context?: RequestContext,
 ): Response | Promise<Response> | null {
     if (!billing) {
         if (!url.pathname.startsWith('/api/billing')) return null;

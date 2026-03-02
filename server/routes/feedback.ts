@@ -7,6 +7,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
+import type { RequestContext } from '../middleware/guards';
 import { json, handleRouteError } from '../lib/response';
 
 export function handleFeedbackRoutes(
@@ -14,6 +15,7 @@ export function handleFeedbackRoutes(
     url: URL,
     _db: Database,
     outcomeTracker: OutcomeTrackerService | null,
+    _context?: RequestContext,
 ): Response | null {
     if (!url.pathname.startsWith('/api/feedback')) return null;
     if (!outcomeTracker) return json({ error: 'Feedback service not available' }, 503);

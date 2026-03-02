@@ -1174,6 +1174,27 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_repo ON pr_outcomes(repo)`,
         `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_work_task ON pr_outcomes(work_task_id)`,
     ],
+    62: [
+        // Tenant resource isolation — add tenant_id to tables created after migration 055
+        `ALTER TABLE councils ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_councils_tenant ON councils(tenant_id)`,
+        `ALTER TABLE council_launches ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_council_launches_tenant ON council_launches(tenant_id)`,
+        `ALTER TABLE agent_schedules ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_schedules_tenant ON agent_schedules(tenant_id)`,
+        `ALTER TABLE schedule_executions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_executions_tenant ON schedule_executions(tenant_id)`,
+        `ALTER TABLE workflows ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
+        `ALTER TABLE workflow_runs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_runs_tenant ON workflow_runs(tenant_id)`,
+        `ALTER TABLE mention_polling_configs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_mention_polling_configs_tenant ON mention_polling_configs(tenant_id)`,
+        `ALTER TABLE mcp_server_configs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_tenant ON mcp_server_configs(tenant_id)`,
+        `ALTER TABLE webhook_registrations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
+        `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_tenant ON webhook_registrations(tenant_id)`,
+    ],
 };
 
 /** Allowlist pattern for valid SQL identifiers (table/column names). */

@@ -6,6 +6,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import type { RequestContext } from '../middleware/guards';
 import { json, safeNumParam } from '../lib/response';
 
 interface ScheduleUsageRow {
@@ -47,7 +48,7 @@ interface ExecutionAnomalyRow {
     anomaly_type: string;
 }
 
-export function handleUsageRoutes(req: Request, url: URL, db: Database): Response | null {
+export function handleUsageRoutes(req: Request, url: URL, db: Database, _context?: RequestContext): Response | null {
     // GET /api/usage/summary — per-schedule aggregates + anomaly flags
     if (url.pathname === '/api/usage/summary' && req.method === 'GET') {
         const days = safeNumParam(url.searchParams.get('days'), 30);

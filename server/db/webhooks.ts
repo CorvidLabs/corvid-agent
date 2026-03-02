@@ -11,6 +11,8 @@ import type {
     WebhookEventType,
     WebhookRegistrationStatus,
 } from '../../shared/types';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -49,13 +51,13 @@ function rowToDelivery(row: Record<string, unknown>): WebhookDelivery {
 
 // ─── Registration CRUD ──────────────────────────────────────────────────────
 
-export function createWebhookRegistration(db: Database, input: CreateWebhookRegistrationInput): WebhookRegistration {
+export function createWebhookRegistration(db: Database, input: CreateWebhookRegistrationInput, tenantId: string = DEFAULT_TENANT_ID): WebhookRegistration {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
     db.query(`
-        INSERT INTO webhook_registrations (id, agent_id, repo, events, mention_username, project_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO webhook_registrations (id, agent_id, repo, events, mention_username, project_id, tenant_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         id,
         input.agentId,
@@ -63,6 +65,7 @@ export function createWebhookRegistration(db: Database, input: CreateWebhookRegi
         JSON.stringify(input.events),
         input.mentionUsername,
         input.projectId ?? null,
+        tenantId,
         now,
         now,
     );
@@ -70,16 +73,19 @@ export function createWebhookRegistration(db: Database, input: CreateWebhookRegi
     return getWebhookRegistration(db, id)!;
 }
 
-export function getWebhookRegistration(db: Database, id: string): WebhookRegistration | null {
+export function getWebhookRegistration(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): WebhookRegistration | null {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'webhook_registrations', id, tenantId)) return null;
     const row = db.query('SELECT * FROM webhook_registrations WHERE id = ?').get(id) as Record<string, unknown> | null;
     return row ? rowToRegistration(row) : null;
 }
 
-export function listWebhookRegistrations(db: Database, agentId?: string): WebhookRegistration[] {
-    const rows = agentId
-        ? db.query('SELECT * FROM webhook_registrations WHERE agent_id = ? ORDER BY created_at DESC').all(agentId)
-        : db.query('SELECT * FROM webhook_registrations ORDER BY created_at DESC').all();
-    return (rows as Record<string, unknown>[]).map(rowToRegistration);
+export function listWebhookRegistrations(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WebhookRegistration[] {
+    if (agentId) {
+        const { query, bindings } = withTenantFilter('SELECT * FROM webhook_registrations WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
+        return (db.query(query).all(agentId, ...bindings) as Record<string, unknown>[]).map(rowToRegistration);
+    }
+    const { query, bindings } = withTenantFilter('SELECT * FROM webhook_registrations ORDER BY created_at DESC', tenantId);
+    return (db.query(query).all(...bindings) as Record<string, unknown>[]).map(rowToRegistration);
 }
 
 /**
@@ -93,8 +99,8 @@ export function findRegistrationsForRepo(db: Database, repo: string): WebhookReg
     return (rows as Record<string, unknown>[]).map(rowToRegistration);
 }
 
-export function updateWebhookRegistration(db: Database, id: string, input: UpdateWebhookRegistrationInput): WebhookRegistration | null {
-    const existing = getWebhookRegistration(db, id);
+export function updateWebhookRegistration(db: Database, id: string, input: UpdateWebhookRegistrationInput, tenantId: string = DEFAULT_TENANT_ID): WebhookRegistration | null {
+    const existing = getWebhookRegistration(db, id, tenantId);
     if (!existing) return null;
 
     const fields: string[] = [];
@@ -114,7 +120,8 @@ export function updateWebhookRegistration(db: Database, id: string, input: Updat
     return getWebhookRegistration(db, id);
 }
 
-export function deleteWebhookRegistration(db: Database, id: string): boolean {
+export function deleteWebhookRegistration(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
+    if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'webhook_registrations', id, tenantId)) return false;
     const result = db.query('DELETE FROM webhook_registrations WHERE id = ?').run(id);
     return result.changes > 0;
 }

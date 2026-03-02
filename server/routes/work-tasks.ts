@@ -1,4 +1,5 @@
 import type { WorkTaskService } from '../work/service';
+import type { RequestContext } from '../middleware/guards';
 import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 
@@ -6,19 +7,21 @@ export function handleWorkTaskRoutes(
     req: Request,
     url: URL,
     workTaskService: WorkTaskService,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
+    const tenantId = context?.tenantId ?? 'default';
 
     // GET /api/work-tasks — list (optional ?agentId= filter)
     if (path === '/api/work-tasks' && method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;
-        return json(workTaskService.listTasks(agentId));
+        return json(workTaskService.listTasks(agentId, tenantId));
     }
 
     // POST /api/work-tasks — create
     if (path === '/api/work-tasks' && method === 'POST') {
-        return handleCreate(req, workTaskService);
+        return handleCreate(req, workTaskService, tenantId);
     }
 
     // POST /api/work-tasks/:id/cancel — cancel a running task
@@ -30,7 +33,7 @@ export function handleWorkTaskRoutes(
     // GET /api/work-tasks/:id — get single
     const idMatch = path.match(/^\/api\/work-tasks\/([^/]+)$/);
     if (idMatch && method === 'GET') {
-        const task = workTaskService.getTask(idMatch[1]);
+        const task = workTaskService.getTask(idMatch[1], tenantId);
         if (!task) return json({ error: 'Work task not found' }, 404);
         return json(task);
     }
@@ -44,7 +47,7 @@ async function handleCancel(taskId: string, workTaskService: WorkTaskService): P
     return json(task);
 }
 
-async function handleCreate(req: Request, workTaskService: WorkTaskService): Promise<Response> {
+async function handleCreate(req: Request, workTaskService: WorkTaskService, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateWorkTaskSchema);
 
@@ -55,7 +58,7 @@ async function handleCreate(req: Request, workTaskService: WorkTaskService): Pro
             source: data.source,
             sourceId: data.sourceId,
             requesterInfo: data.requesterInfo,
-        });
+        }, tenantId);
 
         return json(task, 201);
     } catch (err) {

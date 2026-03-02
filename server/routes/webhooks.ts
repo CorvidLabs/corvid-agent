@@ -14,6 +14,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { WebhookService, GitHubWebhookPayload } from '../webhooks/service';
+import type { RequestContext } from '../middleware/guards';
 import {
     listWebhookRegistrations,
     getWebhookRegistration,
@@ -168,7 +169,9 @@ export function handleWebhookRoutes(
     url: URL,
     db: Database,
     webhookService: WebhookService | null,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
+    const tenantId = context?.tenantId ?? 'default';
     // ── GitHub webhook receiver ─────────────────────────────────────────────
     if (url.pathname === '/webhooks/github' && req.method === 'POST') {
         if (!webhookService) {
@@ -180,7 +183,7 @@ export function handleWebhookRoutes(
     // ── List all registrations ──────────────────────────────────────────────
     if (url.pathname === '/api/webhooks' && req.method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;
-        const registrations = listWebhookRegistrations(db, agentId);
+        const registrations = listWebhookRegistrations(db, agentId, tenantId);
         return json({ registrations });
     }
 
@@ -189,7 +192,7 @@ export function handleWebhookRoutes(
         return (async () => {
             try {
                 const data = await parseBodyOrThrow(req, CreateWebhookRegistrationSchema);
-                const registration = createWebhookRegistration(db, data);
+                const registration = createWebhookRegistration(db, data, tenantId);
                 const ip = getClientIp(req);
                 recordAudit(db, 'webhook_register', ip, 'webhook', registration.id, `repo=${registration.repo}`, null, ip);
                 log.info('Webhook registration created', { id: registration.id, repo: registration.repo });
@@ -216,7 +219,7 @@ export function handleWebhookRoutes(
         if (id === 'deliveries') return null;
 
         if (req.method === 'GET') {
-            const registration = getWebhookRegistration(db, id);
+            const registration = getWebhookRegistration(db, id, tenantId);
             if (!registration) return json({ error: 'Webhook registration not found' }, 404);
             return json(registration);
         }
@@ -225,7 +228,7 @@ export function handleWebhookRoutes(
             return (async () => {
                 try {
                     const data = await parseBodyOrThrow(req, UpdateWebhookRegistrationSchema);
-                    const updated = updateWebhookRegistration(db, id, data);
+                    const updated = updateWebhookRegistration(db, id, data, tenantId);
                     if (!updated) return json({ error: 'Webhook registration not found' }, 404);
                     return json(updated);
                 } catch (err) {
@@ -235,7 +238,7 @@ export function handleWebhookRoutes(
         }
 
         if (req.method === 'DELETE') {
-            const deleted = deleteWebhookRegistration(db, id);
+            const deleted = deleteWebhookRegistration(db, id, tenantId);
             if (!deleted) return json({ error: 'Webhook registration not found' }, 404);
             const ip = getClientIp(req);
             recordAudit(db, 'webhook_delete', ip, 'webhook', id, null, null, ip);

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { RequestContext } from '../middleware/guards';
 import {
     listMcpServerConfigs,
     getMcpServerConfig,
@@ -14,30 +15,33 @@ export function handleMcpServerRoutes(
     req: Request,
     url: URL,
     db: Database,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
+    const tenantId = context?.tenantId ?? 'default';
+
     // GET /api/mcp-servers — list configs (optional ?agentId=xxx filter)
     if (url.pathname === '/api/mcp-servers' && req.method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;
-        const configs = listMcpServerConfigs(db, agentId);
+        const configs = listMcpServerConfigs(db, agentId, tenantId);
         return json(configs);
     }
 
     // POST /api/mcp-servers — create config
     if (url.pathname === '/api/mcp-servers' && req.method === 'POST') {
-        return handleCreate(req, db);
+        return handleCreate(req, db, tenantId);
     }
 
     // PUT /api/mcp-servers/:id — update config
     const putMatch = url.pathname.match(/^\/api\/mcp-servers\/([^/]+)$/);
     if (putMatch && req.method === 'PUT') {
-        return handleUpdate(req, db, putMatch[1]);
+        return handleUpdate(req, db, putMatch[1], tenantId);
     }
 
     // DELETE /api/mcp-servers/:id — delete config
     const deleteMatch = url.pathname.match(/^\/api\/mcp-servers\/([^/]+)$/);
     if (deleteMatch && req.method === 'DELETE') {
         const id = deleteMatch[1];
-        const deleted = deleteMcpServerConfig(db, id);
+        const deleted = deleteMcpServerConfig(db, id, tenantId);
         if (!deleted) return json({ error: 'MCP server config not found' }, 404);
         return json({ ok: true });
     }
@@ -45,16 +49,16 @@ export function handleMcpServerRoutes(
     // POST /api/mcp-servers/:id/test — test connection
     const testMatch = url.pathname.match(/^\/api\/mcp-servers\/([^/]+)\/test$/);
     if (testMatch && req.method === 'POST') {
-        return handleTest(db, testMatch[1]);
+        return handleTest(db, testMatch[1], tenantId);
     }
 
     return null;
 }
 
-async function handleCreate(req: Request, db: Database): Promise<Response> {
+async function handleCreate(req: Request, db: Database, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, CreateMcpServerConfigSchema);
-        const config = createMcpServerConfig(db, data);
+        const config = createMcpServerConfig(db, data, tenantId);
         return json(config, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
@@ -62,10 +66,10 @@ async function handleCreate(req: Request, db: Database): Promise<Response> {
     }
 }
 
-async function handleUpdate(req: Request, db: Database, id: string): Promise<Response> {
+async function handleUpdate(req: Request, db: Database, id: string, tenantId: string): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, UpdateMcpServerConfigSchema);
-        const config = updateMcpServerConfig(db, id, data);
+        const config = updateMcpServerConfig(db, id, data, tenantId);
         if (!config) return json({ error: 'MCP server config not found' }, 404);
         return json(config);
     } catch (err) {
@@ -74,8 +78,8 @@ async function handleUpdate(req: Request, db: Database, id: string): Promise<Res
     }
 }
 
-async function handleTest(db: Database, id: string): Promise<Response> {
-    const config = getMcpServerConfig(db, id);
+async function handleTest(db: Database, id: string, tenantId: string): Promise<Response> {
+    const config = getMcpServerConfig(db, id, tenantId);
     if (!config) return json({ error: 'MCP server config not found' }, 404);
 
     const manager = new ExternalMcpClientManager();
