@@ -16,7 +16,7 @@
 - [ ] Deploy behind a reverse proxy (Caddy or nginx, see `deploy/`)
 - [ ] Enable TLS (Let's Encrypt via Caddy, or cert-manager in K8s)
 - [ ] Restrict API access to known IP ranges if possible
-- [ ] Use `CORS_ORIGINS` to allowlist specific frontend domains
+- [ ] Use `ALLOWED_ORIGINS` to allowlist specific frontend domains
 - [ ] Do NOT expose port 3578 directly to the internet
 - [ ] Ensure WebSocket connections use WSS (not WS)
 

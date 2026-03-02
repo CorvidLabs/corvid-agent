@@ -269,19 +269,21 @@ server/          Bun HTTP + WebSocket server
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
   observability/ OpenTelemetry tracing, Prometheus metrics
   openapi/       OpenAPI spec generator and route registry
+  performance/   Performance metrics collection and regression detection
   plugins/       Plugin SDK and dynamic tool registration
   polling/       GitHub mention polling for @mention-driven automation
   process/       Agent lifecycle (SDK + Ollama, approval, event bus, persona/skill injection)
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (30 route modules)
+  routes/        REST API routes (32 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
   slack/         Bidirectional Slack bridge (channel adapter, notifications, questions)
   telegram/      Bidirectional Telegram bridge (long-polling, voice)
   tenant/        Multi-tenant isolation and access control
+  usage/         Schedule usage monitoring and anomaly detection
   voice/         TTS (OpenAI) and STT (Whisper) with caching
   webhooks/      GitHub webhook and mention polling
   work/          Work task service (worktree, branch, validate, PR)
@@ -319,7 +321,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 30 route modules:
+~200 REST endpoints and a WebSocket interface across 32 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
@@ -350,6 +352,8 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Tenants | `/api/tenants` | Multi-tenant registration and member management |
 | Auth Flow | `/api/auth` | Device authorization for CLI login |
 | Settings | `/api/settings` | Application settings and operational mode |
+| Performance | `/api/performance` | Performance snapshots, trends, and regression detection |
+| Usage | `/api/usage` | Schedule usage monitoring and anomaly detection |
 | System Logs | `/api/system-logs` | System log queries and credit history |
 | Health | `GET /api/health` | Health check (public, no auth) |
 | A2A | `/.well-known/agent-card.json` | Google A2A protocol Agent Card |

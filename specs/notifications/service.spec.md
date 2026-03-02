@@ -226,7 +226,7 @@ Multi-channel notification service that persists notifications to the database a
 | Module | What is used |
 |--------|-------------|
 | `server/index.ts` | Lifecycle: construction, `start()`, `stop()`, `setAgentMessenger()`, `setBroadcast()` |
-| `server/routes/notifications.ts` | `notify()` via API endpoints |
+| `server/scheduler/service.ts` | `notify()` for schedule execution alerts |
 | `server/mcp/tool-handlers/notifications.ts` | `notify()` via MCP tools |
 
 ## Database Tables
