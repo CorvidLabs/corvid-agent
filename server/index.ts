@@ -2,7 +2,7 @@ import { getDb, closeDb, initDb } from './db/connection';
 import { PerformanceCollector } from './performance/collector';
 import { handleRequest, initRateLimiterDb } from './routes/index';
 import { ProcessManager } from './process/manager';
-import { createWebSocketHandler, broadcastAlgoChatMessage } from './ws/handler';
+import { createWebSocketHandler, broadcastAlgoChatMessage, tenantTopic } from './ws/handler';
 import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from './routes/councils';
 import { loadAlgoChatConfig } from './algochat/config';
 import { initAlgoChatService } from './algochat/service';
@@ -64,6 +64,9 @@ import { TelegramBridge } from './telegram/bridge';
 import { DiscordBridge } from './discord/bridge';
 import { SlackBridge } from './slack/bridge';
 import { TenantService } from './tenant/context';
+import { enableMultiTenantGuard } from './tenant/db-filter';
+import { extractTenantId } from './tenant/middleware';
+import { DEFAULT_TENANT_ID } from './tenant/types';
 import { BillingService } from './billing/service';
 import { UsageMeter } from './billing/meter';
 import { getHealthCheck, getLivenessCheck, getReadinessCheck, type HealthCheckDeps } from './health/service';
@@ -262,6 +265,10 @@ healthMonitorService.setNotificationService(notificationService);
 // Initialize multi-tenant (opt-in via MULTI_TENANT=true)
 const multiTenant = process.env.MULTI_TENANT === 'true';
 const tenantService = new TenantService(db, multiTenant);
+if (multiTenant) {
+    enableMultiTenantGuard();
+    log.info('Multi-tenant guard enabled — DEFAULT_TENANT_ID calls will throw');
+}
 
 // Initialize billing
 const billingService = new BillingService(db);
@@ -434,6 +441,7 @@ interface WsData {
     subscriptions: Map<string, unknown>;
     walletAddress?: string;
     authenticated: boolean;
+    tenantId?: string;
 }
 
 /**
@@ -540,8 +548,18 @@ const server = Bun.serve<WsData>({
                 log.info('WebSocket connection with wallet identity', { wallet: walletAddress.slice(0, 8) + '...' });
             }
 
+            // Resolve tenant for WS connection scoping
+            let wsTenantId: string | undefined;
+            if (multiTenant) {
+                const tenantResult = extractTenantId(req, db, tenantService);
+                if (tenantResult instanceof Response) {
+                    return tenantResult; // 403 mismatch
+                }
+                wsTenantId = tenantResult.tenantId !== DEFAULT_TENANT_ID ? tenantResult.tenantId : undefined;
+            }
+
             const upgraded = server.upgrade(req, {
-                data: { subscriptions: new Map(), walletAddress, authenticated: preAuthenticated },
+                data: { subscriptions: new Map(), walletAddress, authenticated: preAuthenticated, tenantId: wsTenantId },
             });
             if (upgraded) return undefined as unknown as Response;
             return new Response('WebSocket upgrade failed', { status: 400 });
@@ -691,7 +709,7 @@ const server = Bun.serve<WsData>({
             // Ollama model management routes
             const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
                 const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
-                server.publish('ollama', msg);
+                publishToTenant('ollama', msg); // Ollama is system-wide, no tenant scoping
             });
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
@@ -744,32 +762,69 @@ const server = Bun.serve<WsData>({
     websocket: wsHandler,
 });
 
+/**
+ * Resolve the tenant for an agent (used by event broadcasts).
+ * Returns undefined in single-tenant mode (flat topics).
+ */
+function resolveAgentTenantForBroadcast(agentId: string): string | undefined {
+    if (!multiTenant) return undefined;
+    const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agentId) as { tenant_id: string } | null;
+    const tid = row?.tenant_id;
+    return tid && tid !== DEFAULT_TENANT_ID ? tid : undefined;
+}
+
+/**
+ * Resolve the tenant for a council launch (used by council event broadcasts).
+ * Looks up any agent in the council's sessions.
+ */
+function resolveCouncilTenantForBroadcast(launchId: string): string | undefined {
+    if (!multiTenant) return undefined;
+    const row = db.query(
+        `SELECT a.tenant_id FROM sessions s
+         JOIN agents a ON s.agent_id = a.id
+         WHERE s.council_launch_id = ? LIMIT 1`,
+    ).get(launchId) as { tenant_id: string } | null;
+    const tid = row?.tenant_id;
+    return tid && tid !== DEFAULT_TENANT_ID ? tid : undefined;
+}
+
+/**
+ * Publish a message to a tenant-scoped topic.
+ * In single-tenant mode, publishes to the flat topic.
+ */
+function publishToTenant(baseTopic: string, data: string, tid?: string): void {
+    server.publish(tenantTopic(baseTopic, tid), data);
+}
+
 // Wire broadcast function so MCP tools can publish to WS clients
 processManager.setBroadcast((topic, data) => server.publish(topic, data));
 
 // Wire notification service broadcast (publishes to 'owner' topic)
-notificationService.setBroadcast((msg) => server.publish('owner', JSON.stringify(msg)));
+notificationService.setBroadcast((msg) => server.publish(tenantTopic('owner'), JSON.stringify(msg)));
 
-// Broadcast council events to all WebSocket clients
+// Broadcast council events to tenant-scoped WS topics
 onCouncilStageChange((launchId, stage, sessionIds) => {
     const msg = JSON.stringify({ type: 'council_stage_change', launchId, stage, sessionIds });
-    server.publish('council', msg);
+    publishToTenant('council', msg, resolveCouncilTenantForBroadcast(launchId));
 });
 
 onCouncilLog((logEntry) => {
     const msg = JSON.stringify({ type: 'council_log', log: logEntry });
-    server.publish('council', msg);
+    publishToTenant('council', msg, resolveCouncilTenantForBroadcast(logEntry.launchId));
 });
 
 onCouncilDiscussionMessage((message) => {
     const msg = JSON.stringify({ type: 'council_discussion_message', message });
-    server.publish('council', msg);
+    publishToTenant('council', msg, resolveAgentTenantForBroadcast(message.agentId));
 });
 
-// Broadcast schedule events to all WebSocket clients
+// Broadcast schedule events to tenant-scoped WS topics
 schedulerService.onEvent((event) => {
     const msg = JSON.stringify({ type: event.type, ...spreadScheduleEvent(event) });
-    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+    // Resolve tenant from schedule/execution agentId if available
+    const eventData = event.data as Record<string, unknown> | undefined;
+    const agentId = (eventData as { agentId?: string } | undefined)?.agentId;
+    publishToTenant('council', msg, agentId ? resolveAgentTenantForBroadcast(agentId) : undefined);
 });
 
 function spreadScheduleEvent(event: { type: string; data: unknown }): Record<string, unknown> {
@@ -785,22 +840,26 @@ function spreadScheduleEvent(event: { type: string; data: unknown }): Record<str
     }
 }
 
-// Broadcast webhook events to all WebSocket clients
+// Broadcast webhook events to tenant-scoped WS topics
 webhookService.onEvent((event) => {
     const msg = JSON.stringify({ type: event.type, delivery: event.data });
-    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+    const delivery = event.data as Record<string, unknown> | undefined;
+    const agentId = (delivery as { agentId?: string } | undefined)?.agentId;
+    publishToTenant('council', msg, agentId ? resolveAgentTenantForBroadcast(agentId) : undefined);
 });
 
-// Broadcast mention polling events to all WebSocket clients
+// Broadcast mention polling events to tenant-scoped WS topics
 mentionPollingService.onEvent((event) => {
-    const msg = JSON.stringify({ type: event.type, ...event.data as Record<string, unknown> });
-    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+    const eventData = event.data as Record<string, unknown>;
+    const msg = JSON.stringify({ type: event.type, ...eventData });
+    const agentId = (eventData as { agentId?: string }).agentId;
+    publishToTenant('council', msg, agentId ? resolveAgentTenantForBroadcast(agentId) : undefined);
 });
 
-// Broadcast workflow events to all WebSocket clients
+// Broadcast workflow events to tenant-scoped WS topics
 workflowService.onEvent((event) => {
     const msg = JSON.stringify({ type: event.type, ...spreadWorkflowEvent(event) });
-    server.publish('council', msg); // Use 'council' topic since all clients subscribe to it
+    publishToTenant('council', msg); // Workflows don't carry agentId in events yet
 });
 
 function spreadWorkflowEvent(event: { type: string; data: unknown }): Record<string, unknown> {
@@ -822,7 +881,8 @@ initAlgoChat().then(() => {
     if (agentMessenger) {
         agentMessenger.onMessageUpdate((message) => {
             const msg = JSON.stringify({ type: 'agent_message_update', message });
-            server.publish('algochat', msg);
+            const fromTid = message.fromAgentId ? resolveAgentTenantForBroadcast(message.fromAgentId) : undefined;
+            publishToTenant('algochat', msg, fromTid);
         });
     }
 

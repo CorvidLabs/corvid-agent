@@ -33,6 +33,7 @@ import {
 } from '../db/schedules';
 import { getAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
+import { DEFAULT_TENANT_ID } from '../tenant/types';
 import * as github from '../github/operations';
 import { launchCouncil } from '../routes/councils';
 import { getNextCronDate } from './cron-parser';
@@ -147,6 +148,18 @@ export class SchedulerService {
     /** Set notification service (for approval request notifications). */
     setNotificationService(service: NotificationService): void {
         this.notificationService = service;
+    }
+
+    /**
+     * Resolve the tenant ID for a scheduled agent.
+     * Queries the agents table for the tenant_id column.
+     * Returns DEFAULT_TENANT_ID if the agent is not found.
+     */
+    private resolveScheduleTenantId(agentId: string): string {
+        const row = this.db.query(
+            'SELECT tenant_id FROM agents WHERE id = ?',
+        ).get(agentId) as { tenant_id: string } | null;
+        return row?.tenant_id ?? DEFAULT_TENANT_ID;
     }
 
     /** Set health check function for system state detection. */
@@ -346,7 +359,8 @@ export class SchedulerService {
     private async executeSchedule(schedule: AgentSchedule): Promise<void> {
         const ctx = createEventContext('scheduler');
         return runWithEventContext(ctx, async () => {
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             log.warn('Schedule agent not found', { scheduleId: schedule.id, agentId: schedule.agentId });
             return;
@@ -695,7 +709,8 @@ export class SchedulerService {
             return;
         }
 
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
             return;
@@ -745,7 +760,7 @@ export class SchedulerService {
                 name: `Scheduled PR Review: ${repo}`,
                 initialPrompt: prompt,
                 source: 'agent',
-            });
+            }, tenantId);
 
             updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
             this.processManager.startProcess(session, prompt, { schedulerMode: true });
@@ -849,7 +864,8 @@ export class SchedulerService {
             return;
         }
 
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
             return;
@@ -880,7 +896,7 @@ export class SchedulerService {
             name: `Scheduled Suggestions: ${repoList.slice(0, 50)}`,
             initialPrompt: prompt,
             source: 'agent',
-        });
+        }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
         this.processManager.startProcess(session, prompt, { schedulerMode: true });
@@ -892,7 +908,8 @@ export class SchedulerService {
     }
 
     private async execCodebaseReview(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
             return;
@@ -922,7 +939,7 @@ export class SchedulerService {
             name: `Scheduled Codebase Review`,
             initialPrompt: prompt,
             source: 'agent',
-        });
+        }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
         this.processManager.startProcess(session, prompt, { schedulerMode: true });
@@ -934,7 +951,8 @@ export class SchedulerService {
     }
 
     private async execDependencyAudit(executionId: string, schedule: AgentSchedule, action: ScheduleAction): Promise<void> {
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
             return;
@@ -963,7 +981,7 @@ export class SchedulerService {
             name: `Scheduled Dependency Audit`,
             initialPrompt: prompt,
             source: 'agent',
-        });
+        }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
         this.processManager.startProcess(session, prompt, { schedulerMode: true });
@@ -980,7 +998,8 @@ export class SchedulerService {
             return;
         }
 
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
             return;
@@ -1014,7 +1033,8 @@ export class SchedulerService {
             return;
         }
 
-        const agent = getAgent(this.db, schedule.agentId);
+        const tenantId = this.resolveScheduleTenantId(schedule.agentId);
+        const agent = getAgent(this.db, schedule.agentId, tenantId);
         if (!agent) {
             updateExecutionStatus(this.db, executionId, 'failed', { result: 'Agent not found' });
             return;
@@ -1032,7 +1052,7 @@ export class SchedulerService {
             name: `Scheduled Custom: ${action.prompt.slice(0, 50)}`,
             initialPrompt: action.prompt,
             source: 'agent',
-        });
+        }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
         this.processManager.startProcess(session, action.prompt, { schedulerMode: true });

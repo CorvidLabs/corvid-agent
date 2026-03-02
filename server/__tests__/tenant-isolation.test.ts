@@ -1,16 +1,17 @@
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { TENANT_SCOPED_TABLES } from '../tenant/db-filter';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { TenantService } from '../tenant/context';
-import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
-import { registerApiKey } from '../tenant/middleware';
+import { withTenantFilter, validateTenantOwnership, enableMultiTenantGuard, resetMultiTenantGuard } from '../tenant/db-filter';
+import { extractTenantId, registerApiKey } from '../tenant/middleware';
 import { createAgent, listAgents, getAgent, updateAgent, deleteAgent } from '../db/agents';
 import { createSession, listSessions, getSession, deleteSession, updateSession, getSessionMessages, addSessionMessage } from '../db/sessions';
 import { createProject, listProjects, getProject } from '../db/projects';
 // work-tasks unused in current tests but kept for future expansion
 import { tenantGuard, tenantRoleGuard, createRequestContext } from '../middleware/guards';
+import { tenantTopic } from '../ws/handler';
 import { validateUrl } from '../a2a/client';
 
 // ---------------------------------------------------------------------------
@@ -615,5 +616,154 @@ describe('withTenantFilter robustness', () => {
         // Should append AND tenant_id = ? before ORDER BY, not replace first WHERE
         expect(query).toContain("WHERE project_id = ? AND status = 'running' AND tenant_id = ?");
         expect(query).toContain('ORDER BY created_at');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-tenant runtime guard (#417, Finding 1)
+// ---------------------------------------------------------------------------
+
+describe('Multi-tenant runtime guard', () => {
+    afterEach(() => {
+        resetMultiTenantGuard();
+    });
+
+    test('withTenantFilter throws for DEFAULT_TENANT_ID when guard is enabled', () => {
+        enableMultiTenantGuard();
+        expect(() =>
+            withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID),
+        ).toThrow('DEFAULT_TENANT_ID is not allowed');
+    });
+
+    test('withTenantFilter works for real tenant when guard is enabled', () => {
+        enableMultiTenantGuard();
+        const result = withTenantFilter('SELECT * FROM agents', 'tenant-abc');
+        expect(result.query).toContain('tenant_id = ?');
+        expect(result.bindings).toEqual(['tenant-abc']);
+    });
+
+    test('validateTenantOwnership throws for DEFAULT_TENANT_ID when guard is enabled', () => {
+        enableMultiTenantGuard();
+        expect(() =>
+            validateTenantOwnership(
+                null as never,
+                'agents',
+                'some-id',
+                DEFAULT_TENANT_ID,
+            ),
+        ).toThrow('DEFAULT_TENANT_ID is not allowed');
+    });
+
+    test('resetMultiTenantGuard restores permissive behavior', () => {
+        enableMultiTenantGuard();
+        expect(() =>
+            withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID),
+        ).toThrow();
+
+        resetMultiTenantGuard();
+        const result = withTenantFilter('SELECT * FROM agents', DEFAULT_TENANT_ID);
+        expect(result.query).toBe('SELECT * FROM agents');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Tenant header override fix (#417, Finding 2)
+// ---------------------------------------------------------------------------
+
+describe('extractTenantId priority', () => {
+    test('returns 403 when header and API key tenants mismatch', () => {
+        const tenantService = new TenantService(db, true);
+        tenantService.createTenant({
+            name: 'Key Tenant',
+            slug: 'key-tenant',
+            ownerEmail: 'key@test.com',
+        });
+        const tenant = tenantService.getTenantBySlug('key-tenant')!;
+        const apiKey = 'mismatch-test-key';
+        registerApiKey(db, tenant.id, apiKey);
+
+        const req = new Request('http://localhost:3000/api/agents', {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'X-Tenant-ID': 'wrong-tenant-id',
+            },
+        });
+
+        const result = extractTenantId(req, db, tenantService);
+        expect(result).toBeInstanceOf(Response);
+        expect((result as Response).status).toBe(403);
+    });
+
+    test('API key takes precedence over header (matching case succeeds)', () => {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Precedence Tenant',
+            slug: 'precedence-test',
+            ownerEmail: 'prec@test.com',
+        });
+        const apiKey = 'precedence-test-key';
+        registerApiKey(db, tenant.id, apiKey);
+
+        const req = new Request('http://localhost:3000/api/agents', {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'X-Tenant-ID': tenant.id,
+            },
+        });
+
+        const result = extractTenantId(req, db, tenantService);
+        expect(result).not.toBeInstanceOf(Response);
+        expect((result as { tenantId: string }).tenantId).toBe(tenant.id);
+    });
+
+    test('falls through to header when no API key match', () => {
+        const tenantService = new TenantService(db, true);
+        const tenant = tenantService.createTenant({
+            name: 'Header Fallback',
+            slug: 'header-fallback',
+            ownerEmail: 'hf@test.com',
+        });
+
+        const req = new Request('http://localhost:3000/api/agents', {
+            headers: {
+                'Authorization': 'Bearer unknown-key',
+                'X-Tenant-ID': tenant.id,
+            },
+        });
+
+        const result = extractTenantId(req, db, tenantService);
+        expect(result).not.toBeInstanceOf(Response);
+        expect((result as { tenantId: string }).tenantId).toBe(tenant.id);
+    });
+
+    test('returns default context in single-tenant mode', () => {
+        const tenantService = new TenantService(db, false);
+        const req = new Request('http://localhost:3000/api/agents', {
+            headers: { 'X-Tenant-ID': 'anything' },
+        });
+
+        const result = extractTenantId(req, db, tenantService);
+        expect(result).not.toBeInstanceOf(Response);
+        expect((result as { tenantId: string }).tenantId).toBe(DEFAULT_TENANT_ID);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// WebSocket tenant-scoped topics (#417, Finding 4)
+// ---------------------------------------------------------------------------
+
+describe('tenantTopic', () => {
+    test('returns flat topic when no tenantId', () => {
+        expect(tenantTopic('council')).toBe('council');
+        expect(tenantTopic('council', undefined)).toBe('council');
+    });
+
+    test('returns flat topic for default tenant', () => {
+        expect(tenantTopic('council', 'default')).toBe('council');
+    });
+
+    test('returns scoped topic for real tenant', () => {
+        expect(tenantTopic('council', 'tenant-abc')).toBe('council:tenant-abc');
+        expect(tenantTopic('algochat', 'tenant-xyz')).toBe('algochat:tenant-xyz');
     });
 });

@@ -10,6 +10,35 @@
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import { DEFAULT_TENANT_ID } from './types';
 
+// ─── Multi-Tenant Runtime Guard ──────────────────────────────────────────────
+
+let _multiTenantGuard = false;
+
+/**
+ * Enable the multi-tenant guard. When active, withTenantFilter() and
+ * validateTenantOwnership() throw if called with DEFAULT_TENANT_ID,
+ * preventing silent cross-tenant data access.
+ */
+export function enableMultiTenantGuard(): void {
+    _multiTenantGuard = true;
+}
+
+/**
+ * Reset the multi-tenant guard (for tests only).
+ */
+export function resetMultiTenantGuard(): void {
+    _multiTenantGuard = false;
+}
+
+function assertNotDefaultTenant(tenantId: string, caller: string): void {
+    if (_multiTenantGuard && tenantId === DEFAULT_TENANT_ID) {
+        throw new Error(
+            `${caller}: DEFAULT_TENANT_ID is not allowed when multi-tenant guard is enabled. ` +
+            `Pass an explicit tenantId.`,
+        );
+    }
+}
+
 /**
  * Tables that have a tenant_id column in multi-tenant mode.
  * When adding multi-tenant support, these tables get a tenant_id column
@@ -38,6 +67,7 @@ export function withTenantFilter(
     query: string,
     tenantId: string,
 ): { query: string; bindings: SQLQueryBindings[] } {
+    assertNotDefaultTenant(tenantId, 'withTenantFilter');
     if (tenantId === DEFAULT_TENANT_ID) {
         return { query, bindings: [] };
     }
@@ -105,6 +135,7 @@ export function validateTenantOwnership(
     tenantId: string,
     idColumn: string = 'id',
 ): boolean {
+    assertNotDefaultTenant(tenantId, 'validateTenantOwnership');
     if (tenantId === DEFAULT_TENANT_ID) return true;
 
     // Validate identifiers against allowlist to prevent SQL injection
