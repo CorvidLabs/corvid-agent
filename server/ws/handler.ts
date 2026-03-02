@@ -17,6 +17,17 @@ export interface WsData {
     subscriptions: Map<string, EventCallback>;
     walletAddress?: string;
     authenticated: boolean;
+    tenantId?: string;
+}
+
+/**
+ * Build a tenant-namespaced topic name.
+ * In single-tenant mode (no tenantId), returns the base topic for backwards compat.
+ * In multi-tenant mode, returns `base:tenantId`.
+ */
+export function tenantTopic(base: string, tenantId?: string): string {
+    if (!tenantId || tenantId === 'default') return base;
+    return `${base}:${tenantId}`;
 }
 
 export function createWebSocketHandler(
@@ -32,15 +43,12 @@ export function createWebSocketHandler(
         open(ws: ServerWebSocket<WsData>) {
             // authenticated flag is set during upgrade in index.ts
             const isAuthenticated = ws.data?.authenticated ?? false;
-            ws.data = { subscriptions: new Map(), walletAddress: ws.data?.walletAddress, authenticated: isAuthenticated };
+            const tid = ws.data?.tenantId;
+            ws.data = { subscriptions: new Map(), walletAddress: ws.data?.walletAddress, authenticated: isAuthenticated, tenantId: tid };
 
             if (isAuthenticated) {
                 // Pre-authenticated at upgrade — subscribe to broadcast topics immediately
-                ws.subscribe('council');
-                ws.subscribe('algochat');
-                ws.subscribe('scheduler');
-                ws.subscribe('ollama');
-                ws.subscribe('owner');
+                subscribeToTopics(ws);
                 log.info('WebSocket connection opened (pre-authenticated)');
             } else {
                 log.info('WebSocket connection opened (awaiting auth)');
@@ -114,11 +122,12 @@ export function createWebSocketHandler(
 }
 
 function subscribeToTopics(ws: ServerWebSocket<WsData>): void {
-    ws.subscribe('council');
-    ws.subscribe('algochat');
-    ws.subscribe('scheduler');
-    ws.subscribe('ollama');
-    ws.subscribe('owner');
+    const tid = ws.data?.tenantId;
+    ws.subscribe(tenantTopic('council', tid));
+    ws.subscribe(tenantTopic('algochat', tid));
+    ws.subscribe(tenantTopic('scheduler', tid));
+    ws.subscribe(tenantTopic('ollama', tid));
+    ws.subscribe(tenantTopic('owner', tid));
 }
 
 function handleClientMessage(
@@ -409,6 +418,7 @@ export function broadcastAlgoChatMessage(
     participant: string,
     content: string,
     direction: 'inbound' | 'outbound' | 'status',
+    tenantId?: string,
 ): void {
     const msg: ServerMessage = {
         type: 'algochat_message',
@@ -416,5 +426,5 @@ export function broadcastAlgoChatMessage(
         content,
         direction,
     };
-    server.publish('algochat', JSON.stringify(msg));
+    server.publish(tenantTopic('algochat', tenantId), JSON.stringify(msg));
 }

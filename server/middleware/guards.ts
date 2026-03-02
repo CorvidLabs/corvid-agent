@@ -141,7 +141,14 @@ export function tenantGuard(db: Database, tenantService: TenantService | null): 
             return null;
         }
 
-        const tenantCtx = extractTenantId(req, db, tenantService);
+        const result = extractTenantId(req, db, tenantService);
+
+        // extractTenantId returns a Response on tenant mismatch (403)
+        if (result instanceof Response) {
+            return result;
+        }
+
+        const tenantCtx = result;
         context.tenantId = tenantCtx.tenantId;
         context.tenantContext = tenantCtx;
 

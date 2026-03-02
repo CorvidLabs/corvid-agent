@@ -17,23 +17,21 @@ const log = createLogger('TenantMiddleware');
 
 /**
  * Extract tenant ID from a request.
+ *
+ * Priority: API key → X-Tenant-ID header → default.
+ * If both API key and header are present and disagree, returns a 403 Response.
  */
 export function extractTenantId(
     req: Request,
     db: Database,
     tenantService: TenantService,
-): TenantContext {
+): TenantContext | Response {
     if (!tenantService.isMultiTenant()) {
         return tenantService.resolveContext();
     }
 
-    // 1. Check X-Tenant-ID header
-    const headerTenantId = req.headers.get('x-tenant-id');
-    if (headerTenantId) {
-        return tenantService.resolveContext(headerTenantId);
-    }
-
-    // 2. Check API key → tenant mapping
+    // 1. Resolve tenant from API key (authoritative source)
+    let apiKeyTenantId: string | null = null;
     const authHeader = req.headers.get('authorization');
     if (authHeader?.startsWith('Bearer ')) {
         const token = authHeader.slice(7);
@@ -42,12 +40,30 @@ export function extractTenantId(
         ).get(hashKey(token)) as { tenant_id: string } | null;
 
         if (row) {
-            return tenantService.resolveContext(row.tenant_id);
+            apiKeyTenantId = row.tenant_id;
         }
     }
 
-    // 3. Default tenant
-    return tenantService.resolveContext();
+    // 2. Check X-Tenant-ID header
+    const headerTenantId = req.headers.get('x-tenant-id');
+
+    // 3. If both present and mismatch → 403
+    if (apiKeyTenantId && headerTenantId && apiKeyTenantId !== headerTenantId) {
+        log.warn('Tenant ID mismatch: API key vs header', {
+            apiKeyTenant: apiKeyTenantId,
+            headerTenant: headerTenantId,
+        });
+        return new Response(JSON.stringify({
+            error: 'Forbidden: X-Tenant-ID header does not match API key tenant',
+        }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
+    // 4. API key takes precedence, then header, then default
+    const resolvedTenantId = apiKeyTenantId ?? headerTenantId ?? undefined;
+    return tenantService.resolveContext(resolvedTenantId);
 }
 
 /**
