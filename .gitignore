@@ -19,3 +19,11 @@ coverage/
 blob-report/
 backups/
 git-focus/
+
+# Cloned repos (scheduled tasks may clone these into the working directory)
+arbor/
+emitter/
+signal/
+corvid-agent-chat/
+corvid-reputation/
+client/package-lock.json
