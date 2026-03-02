@@ -241,7 +241,10 @@ export async function invokeRemoteAgent(
                 signal: AbortSignal.timeout(10_000),
             });
 
-            if (!pollResponse.ok) continue;
+            if (!pollResponse.ok) {
+                await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+                continue;
+            }
 
             const pollResult = await pollResponse.json() as {
                 id: string;
