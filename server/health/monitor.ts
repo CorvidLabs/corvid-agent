@@ -53,6 +53,10 @@ export class HealthMonitorService {
     }
 
     stop(): void {
+        if (this.initialCheckTimer) {
+            clearTimeout(this.initialCheckTimer);
+            this.initialCheckTimer = null;
+        }
         if (this.checkTimer) {
             clearInterval(this.checkTimer);
             this.checkTimer = null;
@@ -135,12 +139,12 @@ export class HealthMonitorService {
         to: HealthStatus,
         dependencies: Record<string, unknown>,
     ): Promise<void> {
-        if (to === 'healthy' && from === 'unhealthy') {
-            // Recovery — notify that the system is back
+        if (to !== 'unhealthy' && from === 'unhealthy') {
+            // Recovery — notify that the system is back (full or partial)
             log.info('Health recovered', { from, to });
             await this.sendNotification(
                 'Server recovered',
-                `Server status changed from **${from}** to **${to}**. All systems operational.`,
+                `Server status changed from **${from}** to **${to}**.${to === 'healthy' ? ' All systems operational.' : ' Some dependencies may still be degraded.'}`,
                 'info',
             );
         } else if (to === 'unhealthy' && from !== 'unhealthy') {
