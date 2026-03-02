@@ -157,15 +157,23 @@ describe('health-snapshots DB module', () => {
 describe('HealthMonitorService', () => {
     let db: Database;
     let monitor: HealthMonitorService;
+    let savedAnthropicKey: string | undefined;
 
     beforeEach(() => {
         db = createTestDb();
         resetHealthCache();
+        savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+        process.env.ANTHROPIC_API_KEY = 'test-key-for-health-check';
     });
 
     afterEach(() => {
         monitor?.stop();
         db.close();
+        if (savedAnthropicKey === undefined) {
+            delete process.env.ANTHROPIC_API_KEY;
+        } else {
+            process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        }
     });
 
     test('check() stores a health snapshot in the database', async () => {
@@ -176,9 +184,7 @@ describe('HealthMonitorService', () => {
 
         const snapshots = listHealthSnapshots(db);
         expect(snapshots).toHaveLength(1);
-        // Status may be 'healthy' or 'degraded' depending on whether LLM
-        // providers are available in the test environment (CI has no Ollama/Anthropic).
-        expect(['healthy', 'degraded']).toContain(snapshots[0].status);
+        expect(snapshots[0].status).toBe('healthy');
         expect(snapshots[0].responseTimeMs).toBeGreaterThanOrEqual(0);
         expect(snapshots[0].source).toBe('internal');
     });

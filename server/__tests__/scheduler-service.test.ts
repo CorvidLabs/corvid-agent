@@ -149,8 +149,8 @@ describe('SchedulerService', () => {
         scheduler = new SchedulerService(db, mockPM);
     });
 
-    afterEach(() => {
-        scheduler.stop();
+    afterEach(async () => {
+        await scheduler.stop();
         db.close();
     });
 

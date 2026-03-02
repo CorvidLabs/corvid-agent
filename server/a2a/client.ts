@@ -235,15 +235,16 @@ export async function invokeRemoteAgent(
     const pollIntervalMs = 3000;
 
     while (Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-
         try {
             const pollResponse = await fetch(`${normalizedUrl}/a2a/tasks/${taskId}`, {
                 headers: { 'User-Agent': 'CorvidAgent/A2A-Client' },
                 signal: AbortSignal.timeout(10_000),
             });
 
-            if (!pollResponse.ok) continue;
+            if (!pollResponse.ok) {
+                await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+                continue;
+            }
 
             const pollResult = await pollResponse.json() as {
                 id: string;
@@ -267,6 +268,8 @@ export async function invokeRemoteAgent(
         } catch {
             // Poll failed — retry
         }
+
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
 
     return {

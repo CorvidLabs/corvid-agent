@@ -100,6 +100,7 @@ export class SchedulerService {
     private reputationAttestation: ReputationAttestation | null = null;
     private notificationService: NotificationService | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
+    private tickPromise: Promise<void> | null = null;
     private runningExecutions = new Set<string>();
     private eventCallbacks = new Set<ScheduleEventCallback>();
     private consecutiveFailures = new Map<string, number>();
@@ -164,16 +165,20 @@ export class SchedulerService {
         // Initialize next_run_at for schedules that don't have one yet
         this.initializeNextRuns();
 
-        this.pollTimer = setInterval(() => this.tick(), POLL_INTERVAL_MS);
+        this.pollTimer = setInterval(() => { this.tickPromise = this.tick(); }, POLL_INTERVAL_MS);
         // Run once immediately
-        this.tick();
+        this.tickPromise = this.tick();
     }
 
-    /** Stop the scheduler. */
-    stop(): void {
+    /** Stop the scheduler and wait for any in-flight tick to finish. */
+    async stop(): Promise<void> {
         if (this.pollTimer) {
             clearInterval(this.pollTimer);
             this.pollTimer = null;
+        }
+        if (this.tickPromise) {
+            await this.tickPromise.catch(() => {});
+            this.tickPromise = null;
         }
         log.info('Scheduler stopped');
     }

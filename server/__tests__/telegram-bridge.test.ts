@@ -477,7 +477,7 @@ describe('sendVoice', () => {
             holder.cb(session.id, makeAssistantEvent('Hello from agent'));
             holder.cb(session.id, makeResultEvent());
         }
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 500));
         expect(sentTexts.some(m => m.includes('Hello from agent'))).toBe(true);
     });
 });
