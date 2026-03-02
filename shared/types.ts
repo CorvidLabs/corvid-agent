@@ -358,6 +358,7 @@ export type ScheduleActionType =
     | 'improvement_loop'
     | 'memory_maintenance'
     | 'reputation_attestation'
+    | 'outcome_analysis'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
