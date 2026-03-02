@@ -12,9 +12,9 @@ import {
 function createTestDb(): Database {
     const db = new Database(':memory:');
     db.exec('PRAGMA journal_mode = WAL');
-    // Create the health_snapshots table
+    // Create the system_health_snapshots table
     db.exec(`
-        CREATE TABLE IF NOT EXISTS health_snapshots (
+        CREATE TABLE IF NOT EXISTS system_health_snapshots (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp       TEXT    NOT NULL DEFAULT (datetime('now')),
             status          TEXT    NOT NULL,
@@ -23,8 +23,8 @@ function createTestDb(): Database {
             source          TEXT    NOT NULL DEFAULT 'internal'
         )
     `);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_health_snapshots_timestamp ON health_snapshots(timestamp)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_health_snapshots_status ON health_snapshots(status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_timestamp ON system_health_snapshots(timestamp)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_system_health_snapshots_status ON system_health_snapshots(status)`);
     return db;
 }
 
@@ -103,7 +103,7 @@ describe('health-snapshots DB module', () => {
 
     test('listHealthSnapshots filters by since', () => {
         // Insert a snapshot with explicit old timestamp
-        db.exec(`INSERT INTO health_snapshots (timestamp, status, source) VALUES ('2020-01-01T00:00:00Z', 'unhealthy', 'internal')`);
+        db.exec(`INSERT INTO system_health_snapshots (timestamp, status, source) VALUES ('2020-01-01T00:00:00Z', 'unhealthy', 'internal')`);
         insertHealthSnapshot(db, { status: 'healthy' });
 
         const allSnapshots = listHealthSnapshots(db);
@@ -139,7 +139,7 @@ describe('health-snapshots DB module', () => {
 
     test('pruneHealthSnapshots deletes old records', () => {
         // Insert an old snapshot
-        db.exec(`INSERT INTO health_snapshots (timestamp, status, source) VALUES ('2020-01-01T00:00:00Z', 'healthy', 'internal')`);
+        db.exec(`INSERT INTO system_health_snapshots (timestamp, status, source) VALUES ('2020-01-01T00:00:00Z', 'healthy', 'internal')`);
         // Insert a recent snapshot
         insertHealthSnapshot(db, { status: 'healthy' });
 
@@ -186,7 +186,7 @@ describe('HealthMonitorService', () => {
         brokenDb.exec('PRAGMA journal_mode = WAL');
         // Create tables in the working db but not in the health check deps db
         brokenDb.exec(`
-            CREATE TABLE IF NOT EXISTS health_snapshots (
+            CREATE TABLE IF NOT EXISTS system_health_snapshots (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp       TEXT    NOT NULL DEFAULT (datetime('now')),
                 status          TEXT    NOT NULL,

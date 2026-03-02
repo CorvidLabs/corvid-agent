@@ -39,7 +39,7 @@ export function insertHealthSnapshot(
     },
 ): HealthSnapshot {
     const stmt = db.prepare(`
-        INSERT INTO health_snapshots (status, response_time_ms, dependencies, source)
+        INSERT INTO system_health_snapshots (status, response_time_ms, dependencies, source)
         VALUES (?, ?, ?, ?)
     `);
     stmt.run(
@@ -49,7 +49,7 @@ export function insertHealthSnapshot(
         snapshot.source ?? 'internal',
     );
     const row = db.query(
-        `SELECT * FROM health_snapshots ORDER BY id DESC LIMIT 1`,
+        `SELECT * FROM system_health_snapshots ORDER BY id DESC LIMIT 1`,
     ).get() as SnapshotRow;
     return rowToSnapshot(row);
 }
@@ -61,12 +61,12 @@ export function listHealthSnapshots(
     const limit = opts?.limit ?? 100;
     if (opts?.since) {
         const rows = db.query(
-            `SELECT * FROM health_snapshots WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT ?`,
+            `SELECT * FROM system_health_snapshots WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT ?`,
         ).all(opts.since, limit) as SnapshotRow[];
         return rows.map(rowToSnapshot);
     }
     const rows = db.query(
-        `SELECT * FROM health_snapshots ORDER BY timestamp DESC LIMIT ?`,
+        `SELECT * FROM system_health_snapshots ORDER BY timestamp DESC LIMIT ?`,
     ).all(limit) as SnapshotRow[];
     return rows.map(rowToSnapshot);
 }
@@ -90,7 +90,7 @@ export function getUptimeStats(db: Database, since: string): UptimeStats {
             SUM(CASE WHEN status = 'unhealthy' THEN 1 ELSE 0 END) as unhealthy,
             MIN(timestamp) as period_start,
             MAX(timestamp) as period_end
-        FROM health_snapshots
+        FROM system_health_snapshots
         WHERE timestamp >= ?
     `).get(since) as {
         total: number;
@@ -120,6 +120,6 @@ export function getUptimeStats(db: Database, since: string): UptimeStats {
 /** Delete snapshots older than the given number of days. */
 export function pruneHealthSnapshots(db: Database, olderThanDays: number): number {
     const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
-    const result = db.query(`DELETE FROM health_snapshots WHERE timestamp < ?`).run(cutoff);
+    const result = db.query(`DELETE FROM system_health_snapshots WHERE timestamp < ?`).run(cutoff);
     return result.changes;
 }

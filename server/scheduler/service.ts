@@ -46,8 +46,8 @@ import {
     cleanExpiredLocks,
 } from '../db/repo-locks';
 import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
-import { SystemStateDetector, type SystemStateResult, type SystemStateConfig } from './system-state';
-import { evaluateAction } from './priority-rules';
+import { SystemStateDetector, type SystemState, type SystemStateResult, type SystemStateConfig } from './system-state';
+import { evaluateAction, getAllRules, type PriorityRule } from './priority-rules';
 
 const log = createLogger('Scheduler');
 
@@ -193,6 +193,8 @@ export class SchedulerService {
         runningExecutions: number;
         maxConcurrent: number;
         recentFailures: number;
+        systemState: SystemStateResult | null;
+        priorityRules: Record<SystemState, PriorityRule>;
     } {
         const activeRow = this.db.query(
             `SELECT COUNT(*) as count FROM agent_schedules WHERE status = 'active'`
@@ -211,6 +213,8 @@ export class SchedulerService {
             runningExecutions: this.runningExecutions.size,
             maxConcurrent: MAX_CONCURRENT_EXECUTIONS,
             recentFailures: failureRow.count,
+            systemState: this.lastSystemState,
+            priorityRules: getAllRules(),
         };
     }
 
