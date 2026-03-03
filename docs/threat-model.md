@@ -6,7 +6,7 @@ corvid-agent is an agent orchestration platform that manages AI agent sessions, 
 
 ## Trust Boundaries
 
-1. **External Network <-> Server**: HTTP/WebSocket API exposed on port 3578
+1. **External Network <-> Server**: HTTP/WebSocket API exposed on port 3000 (configurable via `PORT`)
 2. **Server <-> Agent SDK**: Agent subprocess communicates via MCP protocol
 3. **Server <-> Database**: SQLite on local filesystem
 4. **Server <-> Algorand**: On-chain transactions via AlgoChat

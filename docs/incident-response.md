@@ -83,7 +83,7 @@ Backups should be taken regularly. The backup endpoint:
 ```bash
 # Trigger a backup via API
 curl -X POST http://localhost:3000/api/backup \
-  -H "X-API-Key: $API_KEY"
+  -H "Authorization: Bearer $API_KEY"
 ```
 
 ## Step 4: Verify All Services
@@ -113,14 +113,14 @@ If schedules were missed during downtime:
 curl -s http://localhost:3000/api/schedules | jq '.[] | select(.status == "paused") | {id, name, lastRunAt}'
 
 # Re-activate a paused schedule
-curl -X PATCH "http://localhost:3000/api/schedules/$SCHEDULE_ID" \
+curl -X PUT "http://localhost:3000/api/schedules/$SCHEDULE_ID" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: $API_KEY" \
+  -H "Authorization: Bearer $API_KEY" \
   -d '{"status": "active"}'
 
 # Manually trigger a schedule to run now
 curl -X POST "http://localhost:3000/api/schedules/$SCHEDULE_ID/trigger" \
-  -H "X-API-Key: $API_KEY"
+  -H "Authorization: Bearer $API_KEY"
 ```
 
 ## Step 6: Close the Incident

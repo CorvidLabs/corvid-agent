@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.2-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-4401%20unit%20%7C%20348%20E2E-brightgreen" alt="4401 Unit | 348 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-4417%20unit%20%7C%20348%20E2E-brightgreen" alt="4417 Unit | 348 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -275,7 +275,7 @@ OPENAI_API_KEY=sk-...
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  61 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  58 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -290,7 +290,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (61 migrations) and query modules
+  db/            SQLite schema (58 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   exam/          Model exam system with 18 test cases across 6 categories
@@ -402,13 +402,13 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 4401 server tests (~105s)
+bun test              # 4417 server tests (~115s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 348 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**4401 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**4417 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **348 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
@@ -422,7 +422,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 61 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 58 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
