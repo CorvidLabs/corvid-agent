@@ -20,6 +20,7 @@ export type AuditAction =
     | 'schedule_create'
     | 'schedule_modify'
     | 'schedule_execute'
+    | 'schedule_skip'
     | 'schedule_delete'
     | 'work_task_create'
     | 'work_task_complete'
