@@ -23,7 +23,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 
 | Type | Description |
 |------|-------------|
-| `WsData` | Per-connection data: `{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }` |
+| `WsData` | Per-connection data: `{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean; tenantId?: string; heartbeatTimer?: ...; pongTimeoutTimer?: ... }` |
 
 ### Exported Functions
 
@@ -32,11 +32,19 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `createWebSocketHandler` | `(processManager, getBridge, authConfig, getMessenger?, getWorkTaskService?, getSchedulerService?, getOwnerQuestionManager?)` | `{ open, message, close }` | Factory returning Bun WebSocket handler callbacks |
 | `broadcastAlgoChatMessage` | `(server, participant, content, direction)` | `void` | Publish an AlgoChat message to all WebSocket clients subscribed to the `algochat` topic |
 
+### Exported Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `HEARTBEAT_INTERVAL_MS` | `30000` | Server-initiated ping interval (ms) |
+| `PONG_TIMEOUT_MS` | `10000` | Time to wait for pong before closing (ms) |
+
 ## Client -> Server Messages (ClientMessage)
 
 | Type | Fields | Description |
 |------|--------|-------------|
 | `auth` | `key: string` | First-message authentication with API key |
+| `pong` | _(none)_ | Response to server heartbeat ping |
 | `subscribe` | `sessionId: string` | Subscribe to session events for a given session |
 | `unsubscribe` | `sessionId: string` | Unsubscribe from session events |
 | `send_message` | `sessionId: string, content: string` | Send user input to a running session |
@@ -63,6 +71,8 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `agent_message_update` | `message: AgentMessage` | Agent invocation status update |
 | `work_task_update` | `task: WorkTask` | Work task creation or completion update |
 | `schedule_execution_update` | `execution: ScheduleExecution` | Schedule execution after approval |
+| `ping` | `serverTime: string` | Server heartbeat ping with ISO timestamp for clock sync |
+| `welcome` | `serverTime: string` | Sent on connection open after authentication, provides initial clock sync |
 | `error` | `message: string` | Error message |
 
 ## Invariants
@@ -78,6 +88,11 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 9. **Safe send**: All outbound messages use `safeSend` which catches and ignores errors from already-closed connections
 10. **Agent reward bounds**: `agent_reward` validates `microAlgos` is between 1,000 and 100,000,000 (1 mAlgo to 100 ALGO)
 11. **Message validation**: Incoming messages are validated via `isClientMessage` from `shared/ws-protocol.ts`. Invalid JSON or unknown message types are rejected with an error
+12. **Heartbeat on authentication**: When a connection becomes authenticated (either pre-auth at upgrade or first-message auth), a `welcome` message with `serverTime` is sent and a heartbeat interval timer starts
+13. **Server-initiated ping**: Every 30 seconds, a `ping` message with `serverTime` (ISO string) is sent to authenticated connections
+14. **Pong timeout**: After each `ping`, a 10-second timeout is set. If no `pong` is received within that window, the connection is closed with code 4002
+15. **Pong clears timeout**: Receiving a `pong` message clears the pending pong timeout timer. `pong` is handled before the authentication gate so it cannot be blocked
+16. **Heartbeat cleanup on close**: All heartbeat and pong timeout timers are cleared when a connection closes
 
 ## Behavioral Examples
 
@@ -126,6 +141,26 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 - **When** client sends `{ type: "approval_response", requestId: "r1", behavior: "allow" }`
 - **Then** `processManager.approvalManager.resolveRequest` is called with the response
 
+### Scenario: Heartbeat ping-pong cycle
+
+- **Given** an authenticated WebSocket connection
+- **When** 30 seconds elapse after connection
+- **Then** the server sends `{ type: "ping", serverTime: "<ISO>" }`
+- **When** the client responds with `{ type: "pong" }`
+- **Then** the pong timeout timer is cleared
+
+### Scenario: Stale connection detected via pong timeout
+
+- **Given** an authenticated WebSocket connection
+- **When** the server sends a `ping` and no `pong` is received within 10 seconds
+- **Then** the connection is closed with code 4002
+
+### Scenario: Welcome message on connect
+
+- **Given** a WebSocket upgrade with pre-authentication
+- **When** the connection opens
+- **Then** the server sends `{ type: "welcome", serverTime: "<ISO>" }` for clock sync
+
 ### Scenario: WebSocket disconnects with active subscriptions
 
 - **Given** a WebSocket with subscriptions to sessions "s1" and "s2"
@@ -151,6 +186,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `schedule_approval` for unknown execution | Error message: `"Execution not found or not awaiting approval"` |
 | `question_response` when manager is null | Error message: `"Owner question service not available"` |
 | `question_response` for unknown question | Error message: `"Question not found or already answered"` |
+| Pong not received within 10s of ping | Connection closed with code 4002 `"Pong timeout"` |
 
 ## Dependencies
 

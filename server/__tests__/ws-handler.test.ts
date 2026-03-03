@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { createWebSocketHandler, broadcastAlgoChatMessage } from '../ws/handler';
+import { createWebSocketHandler, broadcastAlgoChatMessage, HEARTBEAT_INTERVAL_MS, PONG_TIMEOUT_MS, type WsData } from '../ws/handler';
 import { isClientMessage } from '../../shared/ws-protocol';
-import type { ProcessManager, EventCallback } from '../process/manager';
+import type { ProcessManager } from '../process/manager';
 import type { AuthConfig } from '../middleware/auth';
 
 /**
@@ -29,12 +29,12 @@ function createMockWs(authenticated = true) {
     let closed = false;
     return {
         ws: {
-            data: { subscriptions: new Map(), authenticated } as { subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean },
+            data: { subscriptions: new Map(), authenticated } as WsData,
             send: mock((msg: string) => { sent.push(msg); }),
             subscribe: mock((topic: string) => { subscribed.push(topic); }),
             unsubscribe: mock((topic: string) => { unsubscribed.push(topic); }),
             close: mock((_code?: number, _reason?: string) => { closed = true; }),
-        } as unknown as import('bun').ServerWebSocket<{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }>,
+        } as unknown as import('bun').ServerWebSocket<WsData>,
         sent,
         subscribed,
         unsubscribed,
@@ -140,6 +140,10 @@ describe('isClientMessage', () => {
         expect(isClientMessage({ type: 'question_response', questionId: 'q1', answer: 'yes' })).toBe(true);
         expect(isClientMessage({ type: 'question_response', questionId: 'q1' })).toBe(false);
     });
+
+    it('validates pong', () => {
+        expect(isClientMessage({ type: 'pong' })).toBe(true);
+    });
 });
 
 // ─── WebSocket handler ─────────────────────────────────────────────────────
@@ -165,6 +169,30 @@ describe('createWebSocketHandler', () => {
             expect(subscribed).toContain('scheduler');
             expect(subscribed).toContain('ollama');
             expect(subscribed).toContain('owner');
+        });
+
+        it('sends welcome message with server timestamp on pre-authenticated open', () => {
+            const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+            const { ws, sent } = createMockWs(true);
+
+            handler.open(ws);
+
+            // welcome message should be sent
+            const welcomeMsgs = sent.map(s => JSON.parse(s)).filter((m: { type: string }) => m.type === 'welcome');
+            expect(welcomeMsgs.length).toBe(1);
+            expect(welcomeMsgs[0].serverTime).toBeDefined();
+            // serverTime should be a valid ISO string
+            expect(new Date(welcomeMsgs[0].serverTime).toISOString()).toBe(welcomeMsgs[0].serverTime);
+        });
+
+        it('does not send welcome message for unauthenticated connections', () => {
+            const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+            const { ws, sent } = createMockWs(false);
+
+            handler.open(ws);
+
+            const welcomeMsgs = sent.map(s => JSON.parse(s)).filter((m: { type: string }) => m.type === 'welcome');
+            expect(welcomeMsgs.length).toBe(0);
         });
     });
 
@@ -210,6 +238,7 @@ describe('createWebSocketHandler', () => {
             const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
             handler.open(ws);
+            sent.length = 0; // Clear welcome message
 
             handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-1' }));
 
@@ -230,6 +259,7 @@ describe('createWebSocketHandler', () => {
             const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
             const { ws, sent } = createMockWs();
             handler.open(ws);
+            sent.length = 0; // Clear welcome message
 
             handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-1' }));
 
@@ -302,7 +332,7 @@ describe('createWebSocketHandler', () => {
 
         it('handles close with no data gracefully', () => {
             const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
-            const ws = { data: undefined } as unknown as import('bun').ServerWebSocket<{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean }>;
+            const ws = { data: undefined } as unknown as import('bun').ServerWebSocket<WsData>;
 
             // Should not throw
             handler.close(ws);
@@ -505,8 +535,10 @@ describe('createWebSocketHandler', () => {
 
             expect(ws.data.authenticated).toBe(true);
             expect(subscribed).toContain('council');
-            expect(sent.length).toBe(1);
-            expect(JSON.parse(sent[0]).message).toContain('Authenticated');
+            // welcome + auth response
+            expect(sent.length).toBe(2);
+            const authMsg = sent.map(s => JSON.parse(s)).find((m: { type: string; message?: string }) => m.type === 'error');
+            expect(authMsg.message).toContain('Authenticated');
         });
 
         it('rejects first-message auth with invalid key and closes', () => {
@@ -541,6 +573,7 @@ describe('createWebSocketHandler', () => {
             const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
             const { ws, sent } = createMockWs(true);
             handler.open(ws);
+            sent.length = 0; // Clear welcome message
 
             handler.message(ws, JSON.stringify({ type: 'auth', key: 'test-secret-key-1234' }));
 
@@ -562,6 +595,184 @@ describe('createWebSocketHandler', () => {
             expect(ws.data.authenticated).toBe(true);
             expect(subscribed).toContain('council');
         });
+    });
+});
+
+// ─── Heartbeat / ping-pong ─────────────────────────────────────────────────
+
+describe('heartbeat', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('sends welcome message with valid ISO serverTime on pre-authenticated open', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs(true);
+
+        handler.open(ws);
+
+        const welcomes = sent.map(s => JSON.parse(s)).filter((m: { type: string }) => m.type === 'welcome');
+        expect(welcomes.length).toBe(1);
+        expect(welcomes[0].serverTime).toBeDefined();
+        expect(typeof welcomes[0].serverTime).toBe('string');
+        // Verify it's a valid ISO date string
+        expect(new Date(welcomes[0].serverTime).toISOString()).toBe(welcomes[0].serverTime);
+
+        handler.close(ws);
+    });
+
+    it('starts heartbeat timer on pre-authenticated open', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws } = createMockWs(true);
+
+        handler.open(ws);
+
+        expect(ws.data.heartbeatTimer).toBeDefined();
+        expect(ws.data.heartbeatTimer).not.toBeNull();
+
+        handler.close(ws);
+    });
+
+    it('does not start heartbeat for unauthenticated connections', () => {
+        const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+        const { ws, sent } = createMockWs(false);
+
+        handler.open(ws);
+
+        // No welcome message, no heartbeat timer
+        expect(sent.length).toBe(0);
+        expect(ws.data.heartbeatTimer).toBeUndefined();
+
+        handler.close(ws);
+    });
+
+    it('sends welcome and starts heartbeat after first-message auth', () => {
+        const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+        const { ws, sent } = createMockWs(false);
+        handler.open(ws);
+
+        // No welcome yet
+        expect(sent.length).toBe(0);
+
+        // Authenticate
+        handler.message(ws, JSON.stringify({ type: 'auth', key: 'test-secret-key-1234' }));
+
+        // Should have welcome + auth response
+        const welcomes = sent.map(s => JSON.parse(s)).filter((m: { type: string }) => m.type === 'welcome');
+        expect(welcomes.length).toBe(1);
+        expect(welcomes[0].serverTime).toBeDefined();
+        expect(ws.data.heartbeatTimer).not.toBeNull();
+
+        handler.close(ws);
+    });
+
+    it('sends welcome and starts heartbeat on auto-auth (no API key)', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs(false);
+        handler.open(ws);
+
+        // Auto-auth
+        handler.message(ws, JSON.stringify({ type: 'auth', key: 'anything' }));
+
+        const welcomes = sent.map(s => JSON.parse(s)).filter((m: { type: string }) => m.type === 'welcome');
+        expect(welcomes.length).toBe(1);
+        expect(ws.data.heartbeatTimer).not.toBeNull();
+
+        handler.close(ws);
+    });
+
+    it('pong clears pong timeout timer', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws } = createMockWs(true);
+        handler.open(ws);
+
+        // Manually set a pong timeout (simulates state after ping was sent)
+        ws.data.pongTimeoutTimer = setTimeout(() => {}, 99999);
+
+        // Send pong
+        handler.message(ws, JSON.stringify({ type: 'pong' }));
+
+        expect(ws.data.pongTimeoutTimer).toBeNull();
+
+        handler.close(ws);
+    });
+
+    it('pong without pending timeout is safe no-op', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs(true);
+        handler.open(ws);
+        sent.length = 0;
+
+        // pongTimeoutTimer should be null/undefined initially
+        expect(ws.data.pongTimeoutTimer).toBeFalsy();
+
+        // Send pong before any ping
+        handler.message(ws, JSON.stringify({ type: 'pong' }));
+
+        // No errors sent
+        const errors = sent.filter(s => JSON.parse(s).type === 'error');
+        expect(errors.length).toBe(0);
+
+        handler.close(ws);
+    });
+
+    it('pong does not require authentication', () => {
+        // pong messages are handled before the auth gate
+        const handler = createWebSocketHandler(pm, () => null, withAuthConfig);
+        const { ws, sent } = createMockWs(false);
+        handler.open(ws);
+
+        // Send pong without authenticating
+        handler.message(ws, JSON.stringify({ type: 'pong' }));
+
+        // Should not get "Authentication required" error
+        const errors = sent.filter(s => {
+            const m = JSON.parse(s);
+            return m.type === 'error' && m.message.includes('Authentication required');
+        });
+        expect(errors.length).toBe(0);
+
+        handler.close(ws);
+    });
+
+    it('close clears heartbeat timer', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws } = createMockWs(true);
+        handler.open(ws);
+
+        expect(ws.data.heartbeatTimer).not.toBeNull();
+
+        handler.close(ws);
+
+        expect(ws.data.heartbeatTimer).toBeNull();
+    });
+
+    it('close clears pong timeout timer', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws } = createMockWs(true);
+        handler.open(ws);
+
+        // Manually set a pong timeout
+        ws.data.pongTimeoutTimer = setTimeout(() => {}, 99999);
+
+        handler.close(ws);
+
+        expect(ws.data.pongTimeoutTimer).toBeNull();
+    });
+
+    it('close with no heartbeat data is safe', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const ws = { data: undefined } as unknown as import('bun').ServerWebSocket<WsData>;
+
+        // Should not throw
+        handler.close(ws);
+    });
+
+    it('exported constants have expected values', () => {
+        expect(HEARTBEAT_INTERVAL_MS).toBe(30_000);
+        expect(PONG_TIMEOUT_MS).toBe(10_000);
     });
 });
 
