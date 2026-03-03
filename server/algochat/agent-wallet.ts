@@ -200,6 +200,7 @@ export class AgentWalletService {
         const agents = listAgents(this.db);
         for (const agent of agents) {
             if (!agent.walletAddress) continue;
+            await this.checkAndRefill(agent.id);
             const chatAccount = await this.getAgentChatAccount(agent.id);
             if (chatAccount) {
                 await this.publishKeyForAccount(chatAccount.account, agent.name);
