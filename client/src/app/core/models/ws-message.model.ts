@@ -1,4 +1,5 @@
 export type ClientWsMessage =
+    | { type: 'pong' }
     | { type: 'subscribe'; sessionId: string }
     | { type: 'unsubscribe'; sessionId: string }
     | { type: 'send_message'; sessionId: string; content: string }
@@ -41,6 +42,8 @@ export type ServerWsMessage =
     | { type: 'workflow_node_update'; nodeExecution: import('./workflow.model').WorkflowNodeRun }
     | { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
     | { type: 'agent_question'; question: OwnerQuestionWire }
+    | { type: 'ping'; serverTime: string }
+    | { type: 'welcome'; serverTime: string }
     | { type: 'error'; message: string };
 
 export interface ApprovalRequestWire {

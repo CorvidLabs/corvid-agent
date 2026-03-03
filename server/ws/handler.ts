@@ -13,11 +13,19 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
 
+/** Server-initiated ping interval (ms). */
+export const HEARTBEAT_INTERVAL_MS = 30_000;
+
+/** Time to wait for a pong response before closing the connection (ms). */
+export const PONG_TIMEOUT_MS = 10_000;
+
 export interface WsData {
     subscriptions: Map<string, EventCallback>;
     walletAddress?: string;
     authenticated: boolean;
     tenantId?: string;
+    heartbeatTimer?: ReturnType<typeof setInterval> | null;
+    pongTimeoutTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -28,6 +36,37 @@ export interface WsData {
 export function tenantTopic(base: string, tenantId?: string): string {
     if (!tenantId || tenantId === 'default') return base;
     return `${base}:${tenantId}`;
+}
+
+/** Start the heartbeat ping interval for a connection. Sends welcome on first call. */
+function startHeartbeat(ws: ServerWebSocket<WsData>): void {
+    stopHeartbeat(ws);
+
+    // Send welcome message with server timestamp for clock sync
+    safeSend(ws, { type: 'welcome', serverTime: new Date().toISOString() });
+
+    ws.data.heartbeatTimer = setInterval(() => {
+        // Send ping with server timestamp
+        safeSend(ws, { type: 'ping', serverTime: new Date().toISOString() });
+
+        // Start pong timeout — if no pong within PONG_TIMEOUT_MS, close
+        ws.data.pongTimeoutTimer = setTimeout(() => {
+            log.warn('WebSocket pong timeout — closing stale connection');
+            try { ws.close(4002, 'Pong timeout'); } catch { /* already closed */ }
+        }, PONG_TIMEOUT_MS);
+    }, HEARTBEAT_INTERVAL_MS);
+}
+
+/** Stop heartbeat and pong timeout timers for a connection. */
+function stopHeartbeat(ws: ServerWebSocket<WsData>): void {
+    if (ws.data?.heartbeatTimer) {
+        clearInterval(ws.data.heartbeatTimer);
+        ws.data.heartbeatTimer = null;
+    }
+    if (ws.data?.pongTimeoutTimer) {
+        clearTimeout(ws.data.pongTimeoutTimer);
+        ws.data.pongTimeoutTimer = null;
+    }
 }
 
 export function createWebSocketHandler(
@@ -49,6 +88,7 @@ export function createWebSocketHandler(
             if (isAuthenticated) {
                 // Pre-authenticated at upgrade — subscribe to broadcast topics immediately
                 subscribeToTopics(ws);
+                startHeartbeat(ws);
                 log.info('WebSocket connection opened (pre-authenticated)');
             } else {
                 log.info('WebSocket connection opened (awaiting auth)');
@@ -74,6 +114,15 @@ export function createWebSocketHandler(
                 return;
             }
 
+            // Handle pong response — clear the pong timeout timer
+            if (parsed.type === 'pong') {
+                if (ws.data.pongTimeoutTimer) {
+                    clearTimeout(ws.data.pongTimeoutTimer);
+                    ws.data.pongTimeoutTimer = null;
+                }
+                return;
+            }
+
             // Handle first-message authentication
             if (parsed.type === 'auth') {
                 if (ws.data.authenticated) {
@@ -84,12 +133,14 @@ export function createWebSocketHandler(
                     // No API key configured — auto-authenticate
                     ws.data.authenticated = true;
                     subscribeToTopics(ws);
+                    startHeartbeat(ws);
                     safeSend(ws, { type: 'error', message: 'Authenticated (no key required)' });
                     return;
                 }
                 if (timingSafeEqual(parsed.key, authConfig.apiKey)) {
                     ws.data.authenticated = true;
                     subscribeToTopics(ws);
+                    startHeartbeat(ws);
                     log.info('WebSocket authenticated via first-message auth');
                     safeSend(ws, { type: 'error', message: 'Authenticated' });
                     return;
@@ -110,6 +161,9 @@ export function createWebSocketHandler(
         },
 
         close(ws: ServerWebSocket<WsData>) {
+            // Stop heartbeat timers
+            stopHeartbeat(ws);
+
             // Clean up all subscriptions
             if (ws.data?.subscriptions) {
                 for (const [sessionId, callback] of ws.data.subscriptions) {

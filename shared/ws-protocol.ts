@@ -1,5 +1,6 @@
 export type ClientMessage =
     | { type: 'auth'; key: string }
+    | { type: 'pong' }
     | { type: 'subscribe'; sessionId: string }
     | { type: 'unsubscribe'; sessionId: string }
     | { type: 'send_message'; sessionId: string; content: string }
@@ -32,6 +33,8 @@ export type ServerMessage =
     | { type: 'ollama_pull_progress'; model: string; status: string; progress: number; downloadedBytes: number; totalBytes: number; currentLayer: string; error?: string }
     | { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
     | { type: 'agent_question'; question: { id: string; sessionId: string; agentId: string; question: string; options: string[] | null; context: string | null; createdAt: string; timeoutMs: number } }
+    | { type: 'ping'; serverTime: string }
+    | { type: 'welcome'; serverTime: string }
     | { type: 'error'; message: string };
 
 export interface StreamEvent {
@@ -69,6 +72,8 @@ export function isClientMessage(data: unknown): data is ClientMessage {
                 && (msg.projectId === undefined || typeof msg.projectId === 'string');
         case 'schedule_approval':
             return typeof msg.executionId === 'string' && typeof msg.approved === 'boolean';
+        case 'pong':
+            return true;
         case 'question_response':
             return typeof msg.questionId === 'string' && typeof msg.answer === 'string';
         default:

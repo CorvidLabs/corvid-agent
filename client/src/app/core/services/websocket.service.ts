@@ -17,6 +17,8 @@ export class WebSocketService {
 
     readonly connected = signal(false);
     readonly connectionStatus = computed(() => this.connected() ? 'connected' : 'disconnected');
+    /** Last server timestamp received via welcome/ping (ISO string). Enables clock drift compensation. */
+    readonly lastServerTime = signal<string | null>(null);
 
     connect(): void {
         if (this.ws?.readyState === WebSocket.OPEN) return;
@@ -38,6 +40,16 @@ export class WebSocketService {
         this.ws.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data) as ServerWsMessage;
+                // Auto-respond to server heartbeat pings
+                if (msg.type === 'ping') {
+                    this.lastServerTime.set(msg.serverTime);
+                    this.send({ type: 'pong' });
+                    return;
+                }
+                // Track server time from welcome message
+                if (msg.type === 'welcome') {
+                    this.lastServerTime.set(msg.serverTime);
+                }
                 // Surface server-side error messages as notifications
                 if (msg.type === 'error') {
                     this.notifications.error(msg.message);
