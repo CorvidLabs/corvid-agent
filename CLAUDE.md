@@ -150,6 +150,26 @@ Protected files cannot be modified even in full-auto mode.
 4. **Respect blocked-by markers.** If an issue has `<!-- blocked-by: #N -->` in its body or comments, do not work on it until the blocking issue is closed.
 5. **When reviewing human PRs,** be constructive and help get the PR merged. Don't nag about timeline — offer to help fix issues instead.
 
+### Off-Limits Repositories
+
+Do **not** create issues, PRs, commits, or any code contributions on these repos unless explicitly asked by the repo owner or assigned maintainer:
+
+- `CorvidLabs/rust-server` — 0xGaspar's project
+- `CorvidLabs/rust-game` — 0xGaspar's project
+- `CorvidLabs/rust-ui` — 0xGaspar's project
+- `CorvidLabs/rust-learning` — 0xGaspar's project
+
+These repos belong to human contributors. Helping is welcome **only when asked**. Filing issues, planning roadmaps, or submitting unsolicited PRs on these repos is not allowed.
+
+### Focus Priorities
+
+When scheduling autonomous work, follow this allocation:
+
+- **80%+** — `CorvidLabs/corvid-agent` (core product)
+- **10-15%** — AlgoChat SDKs (`protocol-algochat`, `swift-algochat`, `ts-algochat`, `kt-algochat`, `go-algochat`) and `corvid-agent/*` utility repos
+- **5-10%** — External OSS contributions (claude-code, MCP ecosystem, A2A)
+- **0%** — Off-limits repos listed above
+
 ## Security Rules
 
 ### External Network Calls
