@@ -425,7 +425,7 @@ export class SchedulerService {
                     if (gatedExec) this.emit({ type: 'schedule_execution_update', data: gatedExec });
                     recordAudit(
                         this.db,
-                        'schedule_execute',
+                        'schedule_skip',
                         schedule.agentId,
                         'schedule_execution',
                         execution.id,
@@ -484,7 +484,7 @@ export class SchedulerService {
                 if (skippedExec) this.emit({ type: 'schedule_execution_update', data: skippedExec });
                 recordAudit(
                     this.db,
-                    'schedule_execute',
+                    'schedule_skip',
                     schedule.agentId,
                     'schedule_execution',
                     execution.id,
