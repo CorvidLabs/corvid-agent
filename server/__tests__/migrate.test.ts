@@ -288,6 +288,17 @@ describe('baseline migration (001_baseline.ts)', () => {
             expect(getCols(db1)).toEqual(getCols(db2));
         }
 
+        // Compare indexes (catches name mismatches like idx_foo_ts vs idx_foo_timestamp)
+        const getIndexes = (d: Database) =>
+            (d.query("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[])
+                .map((i) => i.name);
+        expect(getIndexes(db1)).toEqual(getIndexes(db2));
+
+        // Compare schema versions
+        const getVersion = (d: Database) =>
+            (d.query('SELECT version FROM schema_version LIMIT 1').get() as { version: number })?.version;
+        expect(getVersion(db1)).toEqual(getVersion(db2));
+
         db1.close();
         db2.close();
     });
