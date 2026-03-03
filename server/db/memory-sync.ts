@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { AgentWalletService } from '../algochat/agent-wallet';
 import { getPendingMemories, updateMemoryTxid, updateMemoryStatus, countPendingMemories } from './agent-memories';
 import { encryptMemoryContent } from '../lib/crypto';
 import { createLogger } from '../lib/logger';
@@ -13,6 +14,7 @@ const FAILED_BACKOFF_MS = 5 * 60 * 1000; // 5 minutes
 export class MemorySyncService {
     private db: Database;
     private agentMessenger: AgentMessenger | null = null;
+    private walletService: AgentWalletService | null = null;
     private serverMnemonic: string | undefined = undefined;
     private network: string | undefined = undefined;
     private timer: ReturnType<typeof setInterval> | null = null;
@@ -30,6 +32,10 @@ export class MemorySyncService {
         this.agentMessenger = agentMessenger;
         this.serverMnemonic = serverMnemonic ?? undefined;
         this.network = network;
+    }
+
+    setWalletService(walletService: AgentWalletService): void {
+        this.walletService = walletService;
     }
 
     start(): void {
@@ -85,6 +91,11 @@ export class MemorySyncService {
                 }
 
                 try {
+                    // Ensure agent wallet has sufficient balance before on-chain send
+                    if (this.walletService) {
+                        await this.walletService.checkAndRefill(memory.agentId);
+                    }
+
                     const encrypted = await encryptMemoryContent(
                         memory.content,
                         this.serverMnemonic,
