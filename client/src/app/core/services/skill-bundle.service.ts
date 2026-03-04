@@ -1,5 +1,5 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { ApiService } from './api.service';
+import { Injectable } from '@angular/core';
+import { EntityStore } from './entity-store';
 import type {
     SkillBundle,
     CreateSkillBundleInput,
@@ -9,41 +9,26 @@ import type {
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
-export class SkillBundleService {
-    private readonly api = inject(ApiService);
+export class SkillBundleService extends EntityStore<SkillBundle> {
+    protected readonly apiPath = '/skill-bundles';
 
-    readonly bundles = signal<SkillBundle[]>([]);
-    readonly loading = signal(false);
+    /** Alias for backward compatibility. */
+    readonly bundles = this.entities;
 
     async loadBundles(): Promise<void> {
-        this.loading.set(true);
-        try {
-            const bundles = await firstValueFrom(this.api.get<SkillBundle[]>('/skill-bundles'));
-            this.bundles.set(bundles);
-        } finally {
-            this.loading.set(false);
-        }
+        return this.load();
     }
 
     async createBundle(data: CreateSkillBundleInput): Promise<SkillBundle> {
-        const bundle = await firstValueFrom(
-            this.api.post<SkillBundle>('/skill-bundles', data),
-        );
-        this.bundles.update((current) => [...current, bundle]);
-        return bundle;
+        return this.create(data);
     }
 
     async updateBundle(id: string, data: UpdateSkillBundleInput): Promise<SkillBundle> {
-        const bundle = await firstValueFrom(
-            this.api.put<SkillBundle>(`/skill-bundles/${id}`, data),
-        );
-        this.bundles.update((current) => current.map((b) => (b.id === id ? bundle : b)));
-        return bundle;
+        return this.update(id, data);
     }
 
     async deleteBundle(id: string): Promise<void> {
-        await firstValueFrom(this.api.delete(`/skill-bundles/${id}`));
-        this.bundles.update((current) => current.filter((b) => b.id !== id));
+        return this.remove(id);
     }
 
     async getAgentBundles(agentId: string): Promise<AgentSkillAssignment[]> {

@@ -1,45 +1,34 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { ApiService } from './api.service';
+import { Injectable } from '@angular/core';
+import { EntityStore } from './entity-store';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../models/agent.model';
 import type { AgentMessage } from '../models/agent-message.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
-export class AgentService {
-    private readonly api = inject(ApiService);
+export class AgentService extends EntityStore<Agent> {
+    protected readonly apiPath = '/agents';
 
-    readonly agents = signal<Agent[]>([]);
-    readonly loading = signal(false);
+    /** Alias for backward compatibility. */
+    readonly agents = this.entities;
 
     async loadAgents(): Promise<void> {
-        this.loading.set(true);
-        try {
-            const agents = await firstValueFrom(this.api.get<Agent[]>('/agents'));
-            this.agents.set(agents);
-        } finally {
-            this.loading.set(false);
-        }
+        return this.load();
     }
 
     async getAgent(id: string): Promise<Agent> {
-        return firstValueFrom(this.api.get<Agent>(`/agents/${id}`));
+        return this.getById(id);
     }
 
     async createAgent(input: CreateAgentInput): Promise<Agent> {
-        const agent = await firstValueFrom(this.api.post<Agent>('/agents', input));
-        this.agents.update((current) => [...current, agent]);
-        return agent;
+        return this.create(input);
     }
 
     async updateAgent(id: string, input: UpdateAgentInput): Promise<Agent> {
-        const agent = await firstValueFrom(this.api.put<Agent>(`/agents/${id}`, input));
-        this.agents.update((current) => current.map((a) => (a.id === id ? agent : a)));
-        return agent;
+        return this.update(id, input);
     }
 
     async deleteAgent(id: string): Promise<void> {
-        await firstValueFrom(this.api.delete(`/agents/${id}`));
-        this.agents.update((current) => current.filter((a) => a.id !== id));
+        return this.remove(id);
     }
 
     async getBalance(id: string): Promise<{ balance: number; address: string | null }> {
