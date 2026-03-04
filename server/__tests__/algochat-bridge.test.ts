@@ -16,6 +16,7 @@
 import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
+import { queryCount } from '../db/types';
 import { parseGroupPrefix, reassembleGroupMessage, splitMessage } from '../algochat/group-sender';
 import { formatApprovalForChain, parseApprovalResponse } from '../algochat/approval-format';
 
@@ -268,11 +269,8 @@ describe('psk_contacts DB operations', () => {
         insertContact('c2', 'Bob', NETWORK, 'ALGO_ADDR', 1);  // matched, active
         insertContact('c3', 'Carol', NETWORK, null, 0);        // unmatched, inactive
 
-        const row = db.prepare(
-            'SELECT COUNT(*) as count FROM psk_contacts WHERE network = ? AND active = 1 AND mobile_address IS NULL'
-        ).get(NETWORK) as { count: number };
-
-        expect(row.count).toBe(1); // only Alice
+        const count = queryCount(db, 'SELECT COUNT(*) as cnt FROM psk_contacts WHERE network = ? AND active = 1 AND mobile_address IS NULL', NETWORK);
+        expect(count).toBe(1); // only Alice
     });
 
     test('list contacts ordered by created_at ASC', () => {

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { queryCount } from './types';
 import type {
     AgentSchedule,
     ScheduleExecution,
@@ -261,14 +262,14 @@ export function listExecutionsFiltered(
     const limit = opts.limit ?? 50;
     const offset = opts.offset ?? 0;
 
-    const countRow = db.query(`SELECT COUNT(*) as total FROM schedule_executions ${where}`).get(...params) as { total: number };
+    const total = queryCount(db, `SELECT COUNT(*) as cnt FROM schedule_executions ${where}`, ...params);
     const rows = db.query(
         `SELECT * FROM schedule_executions ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`
     ).all(...params, limit, offset);
 
     return {
         executions: (rows as Record<string, unknown>[]).map(rowToExecution),
-        total: countRow.total,
+        total,
     };
 }
 

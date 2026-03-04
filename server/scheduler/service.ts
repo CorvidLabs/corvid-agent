@@ -6,6 +6,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { queryCount } from '../db/types';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import type { AutonomousLoopService } from '../improvement/service';
@@ -214,23 +215,17 @@ export class SchedulerService {
         systemState: SystemStateResult | null;
         priorityRules: ReturnType<typeof getAllRules>;
     } {
-        const activeRow = this.db.query(
-            `SELECT COUNT(*) as count FROM agent_schedules WHERE status = 'active'`
-        ).get() as { count: number };
-        const pausedRow = this.db.query(
-            `SELECT COUNT(*) as count FROM agent_schedules WHERE status = 'paused'`
-        ).get() as { count: number };
-        const failureRow = this.db.query(
-            `SELECT COUNT(*) as count FROM schedule_executions WHERE status = 'failed' AND started_at >= datetime('now', '-24 hours')`
-        ).get() as { count: number };
+        const activeSchedules = queryCount(this.db, "SELECT COUNT(*) as cnt FROM agent_schedules WHERE status = 'active'");
+        const pausedSchedules = queryCount(this.db, "SELECT COUNT(*) as cnt FROM agent_schedules WHERE status = 'paused'");
+        const recentFailures = queryCount(this.db, "SELECT COUNT(*) as cnt FROM schedule_executions WHERE status = 'failed' AND started_at >= datetime('now', '-24 hours')");
 
         return {
             running: this.pollTimer !== null,
-            activeSchedules: activeRow.count,
-            pausedSchedules: pausedRow.count,
+            activeSchedules,
+            pausedSchedules,
             runningExecutions: this.runningExecutions.size,
             maxConcurrent: MAX_CONCURRENT_EXECUTIONS,
-            recentFailures: failureRow.count,
+            recentFailures,
             systemState: this.lastSystemState,
             priorityRules: getAllRules(),
         };

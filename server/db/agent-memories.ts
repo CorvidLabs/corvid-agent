@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { AgentMemory, MemoryStatus } from '../../shared/types';
+import { queryCount } from './types';
 
 interface AgentMemoryRow {
     id: string;
@@ -173,8 +174,5 @@ export function getPendingMemories(
 }
 
 export function countPendingMemories(db: Database): number {
-    const row = db.query(
-        "SELECT COUNT(*) as count FROM agent_memories WHERE status IN ('pending', 'failed')"
-    ).get() as { count: number };
-    return row.count;
+    return queryCount(db, "SELECT COUNT(*) as cnt FROM agent_memories WHERE status IN ('pending', 'failed')");
 }

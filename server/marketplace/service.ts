@@ -5,6 +5,7 @@
  * capabilities for discovery and invocation by other agents.
  */
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
+import { queryCount } from '../db/types';
 import type {
     MarketplaceListing,
     MarketplaceReview,
@@ -260,9 +261,7 @@ export class MarketplaceService {
             : '';
 
         // Count total
-        const countRow = this.db.query(
-            `SELECT COUNT(*) as total FROM marketplace_listings ml${joinClause} ${where}`,
-        ).get(...values) as { total: number };
+        const total = queryCount(this.db, `SELECT COUNT(*) as cnt FROM marketplace_listings ml${joinClause} ${where}`, ...values);
 
         // Fetch page
         const rows = this.db.query(
@@ -273,7 +272,7 @@ export class MarketplaceService {
 
         return {
             listings: rows.map(recordToListing),
-            total: countRow.total,
+            total,
             limit,
             offset,
         };
