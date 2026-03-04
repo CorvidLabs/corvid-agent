@@ -19,8 +19,9 @@ jobs:
     steps:
       - name: Ping health endpoint
         id: health
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_URL }}
         run: |
-          HEALTH_URL="${{ secrets.HEALTH_URL }}"
           if [ -z "$HEALTH_URL" ]; then
             echo "HEALTH_URL secret not set — skipping"
             echo "status=skipped" >> "$GITHUB_OUTPUT"
@@ -45,19 +46,23 @@ jobs:
 
       - name: Record failure
         if: steps.health.outputs.status == 'unhealthy'
+        env:
+          HTTP_CODE: ${{ steps.health.outputs.http_code }}
         run: |
           # Write failure to a file that persists via cache for consecutive-check tracking
-          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) HTTP=${{ steps.health.outputs.http_code }}" >> /tmp/heartbeat_failures.txt
-          echo "::warning::Health check failed with HTTP ${{ steps.health.outputs.http_code }}"
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) HTTP=$HTTP_CODE" >> /tmp/heartbeat_failures.txt
+          echo "::warning::Health check failed with HTTP $HTTP_CODE"
 
       - name: Create incident issue on failure
         if: steps.health.outputs.status == 'unhealthy'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HTTP_CODE: ${{ steps.health.outputs.http_code }}
         run: |
           # Check if there's already an open incident issue
           EXISTING=$(gh issue list \
-            --repo "${{ github.repository }}" \
+            --repo "$REPO" \
             --label "P0,incident" \
             --state open \
             --limit 1 \
@@ -67,21 +72,21 @@ jobs:
           if [ -n "$EXISTING" ]; then
             echo "Open incident issue #$EXISTING already exists — adding comment"
             gh issue comment "$EXISTING" \
-              --repo "${{ github.repository }}" \
-              --body "Heartbeat check failed again at $(date -u +%Y-%m-%dT%H:%M:%SZ). HTTP status: ${{ steps.health.outputs.http_code }}"
+              --repo "$REPO" \
+              --body "Heartbeat check failed again at $(date -u +%Y-%m-%dT%H:%M:%SZ). HTTP status: $HTTP_CODE"
             exit 0
           fi
 
           # Create new incident issue
           gh issue create \
-            --repo "${{ github.repository }}" \
+            --repo "$REPO" \
             --title "[P0] Server health check failing" \
             --label "P0,incident" \
-            --body "$(cat <<'EOF'
+            --body "$(cat <<EOF
           ## Incident: Server Health Check Failure
 
           **Detected at:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
-          **HTTP Status:** ${{ steps.health.outputs.http_code }}
+          **HTTP Status:** $HTTP_CODE
           **Source:** GitHub Actions heartbeat workflow
 
           ### Recovery Steps
