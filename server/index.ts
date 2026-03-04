@@ -740,7 +740,17 @@ const server = Bun.serve<WsData>({
 
                 // Check if path exists as a file
                 if (existsSync(filePath) && !filePath.endsWith('/')) {
-                    return instrumentResponse(new Response(Bun.file(filePath)), '/static');
+                    const headers: Record<string, string> = {};
+                    const basename = url.pathname.split('/').pop() ?? '';
+                    // Angular outputHashing:"all" produces files like main.abc1234f.js
+                    if (/\.[a-f0-9]{8,}\.\w+$/.test(basename)) {
+                        headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+                    } else if (basename === 'index.html') {
+                        headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+                    } else {
+                        headers['Cache-Control'] = 'public, max-age=3600';
+                    }
+                    return instrumentResponse(new Response(Bun.file(filePath), { headers }), '/static');
                 }
 
                 // SPA fallback - serve index.html for unmatched routes
@@ -748,7 +758,10 @@ const server = Bun.serve<WsData>({
                 if (existsSync(indexPath)) {
                     return instrumentResponse(
                         new Response(Bun.file(indexPath), {
-                            headers: { 'Content-Type': 'text/html' },
+                            headers: {
+                                'Content-Type': 'text/html',
+                                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            },
                         }),
                         '/static',
                     );
