@@ -2,6 +2,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import * as github from '../../github/operations';
+import { assertRepoAllowed } from '../../github/off-limits';
 
 export async function handleGitHubStarRepo(
     _ctx: McpToolContext,
@@ -34,6 +35,7 @@ export async function handleGitHubForkRepo(
     args: { repo: string; org?: string },
 ): Promise<CallToolResult> {
     try {
+        assertRepoAllowed(args.repo);
         const result = await github.forkRepo(args.repo, args.org);
         if (!result.ok) return errorResult(result.message);
         const extra = result.forkUrl ? ` (${result.forkUrl})` : '';
@@ -68,6 +70,7 @@ export async function handleGitHubCreatePr(
     args: { repo: string; title: string; body: string; head: string; base?: string },
 ): Promise<CallToolResult> {
     try {
+        assertRepoAllowed(args.repo);
         const result = await github.createPr(args.repo, args.title, args.body, args.head, args.base ?? 'main');
         if (!result.ok) return errorResult(result.error ?? 'Failed to create PR');
         return textResult(`PR created: ${result.prUrl ?? 'success'}`);
@@ -82,6 +85,7 @@ export async function handleGitHubReviewPr(
     args: { repo: string; pr_number: number; event: string; body: string },
 ): Promise<CallToolResult> {
     try {
+        assertRepoAllowed(args.repo);
         const event = args.event.toUpperCase() as 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
         if (!['APPROVE', 'REQUEST_CHANGES', 'COMMENT'].includes(event)) {
             return errorResult(`Invalid review event: ${args.event}. Use APPROVE, REQUEST_CHANGES, or COMMENT.`);
@@ -100,6 +104,7 @@ export async function handleGitHubCreateIssue(
     args: { repo: string; title: string; body: string; labels?: string[] },
 ): Promise<CallToolResult> {
     try {
+        assertRepoAllowed(args.repo);
         const result = await github.createIssue(args.repo, args.title, args.body, args.labels);
         if (!result.ok) return errorResult(result.error ?? 'Failed to create issue');
         return textResult(`Issue created: ${result.issueUrl ?? 'success'}`);
@@ -164,6 +169,7 @@ export async function handleGitHubCommentOnPr(
     args: { repo: string; pr_number: number; body: string },
 ): Promise<CallToolResult> {
     try {
+        assertRepoAllowed(args.repo);
         const result = await github.addPrComment(args.repo, args.pr_number, args.body);
         if (!result.ok) return errorResult(result.error ?? 'Failed to comment on PR');
         return textResult(`Comment added to PR #${args.pr_number} in ${args.repo}.`);

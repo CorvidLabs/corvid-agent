@@ -19,6 +19,7 @@ import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
+import { isRepoOffLimits } from '../github/off-limits';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
@@ -107,6 +108,25 @@ export class WorkTaskService {
         }
         if (!project.workingDir) {
             throw new ValidationError('Project has no workingDir', { projectId });
+        }
+
+        // Check if the project's repo is off-limits
+        try {
+            const proc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
+                cwd: project.workingDir, stdout: 'pipe', stderr: 'pipe',
+            });
+            const remoteUrl = (await new Response(proc.stdout).text()).trim();
+            // Extract owner/repo from GitHub URLs (https or ssh)
+            const match = remoteUrl.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+            if (match && isRepoOffLimits(match[1])) {
+                throw new ValidationError(
+                    `Repository ${match[1]} is off-limits — contributions are not allowed`,
+                    { projectId, repo: match[1] },
+                );
+            }
+        } catch (err) {
+            if (err instanceof ValidationError) throw err;
+            // Non-git directories or missing remote — allow (local-only projects)
         }
 
         // Atomic insert — fails if a concurrent active task exists on this project
