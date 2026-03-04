@@ -414,7 +414,8 @@ describe('bun install retry logic', () => {
 
     test('failed frozen-lockfile install triggers retry without --frozen-lockfile', async () => {
         const { agent, project } = createTestAgentAndProject();
-        // Queue: git worktree add (success), bun install --frozen-lockfile (FAIL), bun install (success)
+        // Queue: git remote check (success), git worktree add (success), bun install --frozen-lockfile (FAIL), bun install (success)
+        queueSpawn(0);  // git remote get-url origin (off-limits check)
         queueSpawn(0);  // git worktree add
         queueSpawn(1, '', 'lockfile mismatch');  // bun install --frozen-lockfile FAILS
         queueSpawn(0);  // bun install retry (success)
@@ -433,7 +434,8 @@ describe('bun install retry logic', () => {
 
     test('retry exit code is NOT checked (known issue — documented)', async () => {
         const { agent, project } = createTestAgentAndProject();
-        // Queue: worktree (ok), frozen-lockfile (fail), retry (also fail)
+        // Queue: git remote check (ok), worktree (ok), frozen-lockfile (fail), retry (also fail)
+        queueSpawn(0);  // git remote get-url origin (off-limits check)
         queueSpawn(0);  // git worktree add
         queueSpawn(1, '', 'lockfile error');  // frozen-lockfile fails
         queueSpawn(1, '', 'retry also fails'); // retry also fails
@@ -1103,7 +1105,8 @@ describe('Validation install retry during runValidation', () => {
 describe('Git worktree creation failure', () => {
     test('worktree creation failure marks task as failed', async () => {
         const { agent, project } = createTestAgentAndProject();
-        // Queue: git worktree add FAILS
+        // Queue: git remote check (ok), git worktree add FAILS
+        queueSpawn(0);  // git remote get-url origin (off-limits check)
         queueSpawn(128, '', 'fatal: branch already exists');
 
         const task = await service.create({
@@ -1119,12 +1122,13 @@ describe('Git worktree creation failure', () => {
     test('worktree creation exception marks task as failed', async () => {
         const { agent, project } = createTestAgentAndProject();
 
-        // Make spawn throw for the first call (worktree creation)
+        // Make spawn throw for the second call (worktree creation)
+        // First call is git remote get-url origin (off-limits check)
         let callIdx = 0;
         (Bun.spawn as unknown as { mockImplementation: (fn: (...args: unknown[]) => unknown) => void }).mockImplementation((...args: unknown[]) => {
             callIdx++;
-            if (callIdx === 1) {
-                // First call is the worktree creation — throw
+            if (callIdx === 2) {
+                // Second call is the worktree creation — throw
                 throw new Error('git not found');
             }
             const cmd = args[0] as string[];
