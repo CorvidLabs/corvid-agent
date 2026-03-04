@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { mkdirSync, rmSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runMigrations } from '../db/schema';
@@ -9,17 +9,18 @@ import { backupDatabase, pruneBackups } from '../db/backup';
 let db: Database;
 let dbPath: string;
 let backupDir: string;
+let baseDir: string;
 
 beforeEach(() => {
-    // Create a temp directory for each test
-    const base = join(tmpdir(), `corvid-backup-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(base, { recursive: true });
+    // Create a secure temp directory for each test
+    baseDir = mkdtempSync(join(tmpdir(), 'corvid-backup-test-'));
 
-    dbPath = join(base, 'test.db');
-    backupDir = join(base, 'backups');
+    dbPath = join(baseDir, 'test.db');
+    backupDir = join(baseDir, 'backups');
 
     // Create a real DB file (not :memory:) so backup can copy it
     db = new Database(dbPath);
+    db.exec('PRAGMA journal_mode = DELETE');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
 
@@ -31,10 +32,13 @@ afterEach(() => {
     db.close();
     delete process.env.BACKUP_DIR;
 
-    // Clean up temp files
-    const base = join(dbPath, '..');
-    if (existsSync(base)) {
-        rmSync(base, { recursive: true, force: true });
+    // Clean up temp files — try-catch for Windows where SQLite files may still be locked
+    try {
+        if (existsSync(baseDir)) {
+            rmSync(baseDir, { recursive: true, force: true });
+        }
+    } catch {
+        // On Windows, SQLite WAL/SHM files may still be locked; OS will clean up temp dir
     }
 });
 
