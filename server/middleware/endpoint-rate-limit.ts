@@ -130,6 +130,15 @@ export function loadEndpointRateLimitConfig(): EndpointRateLimitConfig {
                     admin: { max: 5, windowMs: ONE_MINUTE },
                 },
             },
+            // Tenant registration is public — strict rate limit to prevent abuse
+            {
+                pattern: 'POST /api/tenants/register',
+                tiers: {
+                    public: { max: 3, windowMs: ONE_MINUTE * 5 },
+                    user: { max: 3, windowMs: ONE_MINUTE * 5 },
+                    admin: { max: 10, windowMs: ONE_MINUTE * 5 },
+                },
+            },
         ],
         exemptPaths: ['/api/health', '/webhooks/github', '/ws', '/.well-known/agent-card.json'],
     };

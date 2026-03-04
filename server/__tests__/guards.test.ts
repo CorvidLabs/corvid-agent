@@ -469,6 +469,32 @@ describe('requiresAdminRole', () => {
         expect(requiresAdminRole('/api/wallets')).toBe(false);
         expect(requiresAdminRole('/api/wallets/ABCD1234')).toBe(false);
     });
+
+    it('returns true for /api/system-logs', () => {
+        expect(requiresAdminRole('/api/system-logs')).toBe(true);
+    });
+
+    it('returns true for /api/system-logs/credit-transactions', () => {
+        expect(requiresAdminRole('/api/system-logs/credit-transactions')).toBe(true);
+    });
+
+    it('returns true for /api/wallets/summary', () => {
+        expect(requiresAdminRole('/api/wallets/summary')).toBe(true);
+    });
+
+    it('returns true for /api/github-allowlist paths', () => {
+        expect(requiresAdminRole('/api/github-allowlist')).toBe(true);
+        expect(requiresAdminRole('/api/github-allowlist/someuser')).toBe(true);
+    });
+
+    it('returns true for /api/performance paths', () => {
+        expect(requiresAdminRole('/api/performance/snapshot')).toBe(true);
+        expect(requiresAdminRole('/api/performance/trends')).toBe(true);
+        expect(requiresAdminRole('/api/performance/regressions')).toBe(true);
+        expect(requiresAdminRole('/api/performance/report')).toBe(true);
+        expect(requiresAdminRole('/api/performance/metrics')).toBe(true);
+        expect(requiresAdminRole('/api/performance/collect')).toBe(true);
+    });
 });
 
 // --- expired API key rejection -----------------------------------------------

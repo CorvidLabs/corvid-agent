@@ -404,3 +404,40 @@ describe('endpointRateLimitGuard integration', () => {
         expect(limiter.check('client', 'GET', '/api/agents', 'public').allowed).toBe(true);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Tenant registration rate limiting
+// ---------------------------------------------------------------------------
+
+describe('tenant registration rate limiting (default config)', () => {
+    let limiter: EndpointRateLimiter;
+
+    beforeEach(() => {
+        limiter = new EndpointRateLimiter(loadEndpointRateLimitConfig());
+    });
+
+    afterEach(() => {
+        limiter.stop();
+    });
+
+    it('blocks public tenant registration after 3 requests', () => {
+        for (let i = 0; i < 3; i++) {
+            const result = limiter.check('attacker', 'POST', '/api/tenants/register', 'public');
+            expect(result.allowed).toBe(true);
+        }
+        const blocked = limiter.check('attacker', 'POST', '/api/tenants/register', 'public');
+        expect(blocked.allowed).toBe(false);
+        expect(blocked.response).not.toBeNull();
+        expect(blocked.response!.status).toBe(429);
+    });
+
+    it('allows different IPs to register independently', () => {
+        for (let i = 0; i < 3; i++) {
+            limiter.check('ip1', 'POST', '/api/tenants/register', 'public');
+        }
+        // ip1 is blocked
+        expect(limiter.check('ip1', 'POST', '/api/tenants/register', 'public').allowed).toBe(false);
+        // ip2 still has budget
+        expect(limiter.check('ip2', 'POST', '/api/tenants/register', 'public').allowed).toBe(true);
+    });
+});

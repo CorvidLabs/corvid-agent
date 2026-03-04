@@ -216,6 +216,11 @@ export const ADMIN_PATHS = new Set([
     '/api/settings/credits',
     '/api/settings/api-key/rotate',
     '/api/settings/api-key/status',
+    // System logs expose escalation queue, work task details, and credit transactions
+    '/api/system-logs',
+    '/api/system-logs/credit-transactions',
+    // Wallet summary exposes all external wallets across tenants
+    '/api/wallets/summary',
 ]);
 
 export function requiresAdminRole(pathname: string): boolean {
@@ -225,5 +230,9 @@ export function requiresAdminRole(pathname: string): boolean {
     if (/^\/api\/wallets\/[^/]+\/credits$/.test(pathname)) return true;
     // Allowlist controls which addresses can interact — admin-only to prevent tenant escalation
     if (pathname.startsWith('/api/allowlist')) return true;
+    // GitHub allowlist controls which GitHub users can trigger work — admin-only
+    if (pathname.startsWith('/api/github-allowlist')) return true;
+    // Performance metrics expose system internals (memory, heap, DB latency, regressions)
+    if (pathname.startsWith('/api/performance')) return true;
     return false;
 }
