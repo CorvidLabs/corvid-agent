@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write  # Required for keyless Cosign signing via Sigstore/Fulcio
 
 env:
   REGISTRY: ghcr.io
@@ -53,6 +54,7 @@ jobs:
             type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
@@ -63,3 +65,32 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@3454372be43b31757badb472a6eb1a218938bcbf  # v3
+
+      - name: Sign Docker image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@fc46e51fd3cb168ffb36c6d1915723c47db58abb  # v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: Attest SBOM to image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          cosign attest --yes --predicate sbom-spdx.json --type spdxjson "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6db9a8b7a0d7c1b4e6bac2e267a29  # v4
+        with:
+          name: sbom
+          path: sbom-spdx.json
+          retention-days: 90
