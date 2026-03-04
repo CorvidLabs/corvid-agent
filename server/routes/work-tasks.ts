@@ -1,5 +1,6 @@
 import type { WorkTaskService } from '../work/service';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 
@@ -21,12 +22,20 @@ export function handleWorkTaskRoutes(
 
     // POST /api/work-tasks — create
     if (path === '/api/work-tasks' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreate(req, workTaskService, tenantId);
     }
 
     // POST /api/work-tasks/:id/cancel — cancel a running task
     const cancelMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/cancel$/);
     if (cancelMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCancel(cancelMatch[1], workTaskService);
     }
 

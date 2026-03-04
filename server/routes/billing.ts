@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import type { BillingService } from '../billing/service';
 import type { UsageMeter } from '../billing/meter';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { verifyWebhookSignature } from '../billing/stripe';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, CreateSubscriptionSchema } from '../lib/validation';
@@ -18,7 +19,7 @@ export function handleBillingRoutes(
     _db: Database,
     billing?: BillingService | null,
     meter?: UsageMeter | null,
-    _context?: RequestContext,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     if (!billing) {
         if (!url.pathname.startsWith('/api/billing')) return null;
@@ -37,11 +38,19 @@ export function handleBillingRoutes(
     }
 
     if (path === '/api/billing/subscription' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreateSubscription(req, billing);
     }
 
     const cancelMatch = path.match(/^\/api\/billing\/subscription\/([^/]+)\/cancel$/);
     if (cancelMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
         billing.cancelSubscription(cancelMatch[1]);
         return json({ ok: true });
     }

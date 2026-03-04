@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { ReputationAttestation } from '../reputation/attestation';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { IdentityVerification, type VerificationTier } from '../reputation/identity-verification';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, RecordReputationEventSchema } from '../lib/validation';
@@ -17,7 +18,7 @@ export function handleReputationRoutes(
     _db: Database,
     scorer?: ReputationScorer | null,
     attestation?: ReputationAttestation | null,
-    _context?: RequestContext,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     if (!scorer) {
         if (!url.pathname.startsWith('/api/reputation')) return null;
@@ -63,6 +64,10 @@ export function handleReputationRoutes(
 
     // Record event
     if (path === '/api/reputation/events' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleRecordEvent(req, scorer);
     }
 
@@ -94,6 +99,10 @@ export function handleReputationRoutes(
         }
 
         if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleSetIdentityTier(req, agentId, iv);
         }
     }
@@ -109,6 +118,10 @@ export function handleReputationRoutes(
         }
 
         if (method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleCreateAttestation(agentId, scorer, attestation);
         }
     }

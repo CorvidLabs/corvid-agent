@@ -5,6 +5,7 @@ import type { Database } from 'bun:sqlite';
 import { type MarketplaceService, VerificationGateError } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import type {
     ListingCategory,
     PricingModel,
@@ -18,7 +19,7 @@ export function handleMarketplaceRoutes(
     _db: Database,
     marketplace?: MarketplaceService | null,
     federation?: MarketplaceFederation | null,
-    _context?: RequestContext,
+    context?: RequestContext,
 ): Response | Promise<Response> | null {
     if (!marketplace) {
         // Only match marketplace paths, return null for non-marketplace paths
@@ -59,6 +60,10 @@ export function handleMarketplaceRoutes(
     }
 
     if (path === '/api/marketplace/listings' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreateListing(req, marketplace);
     }
 
@@ -72,10 +77,18 @@ export function handleMarketplaceRoutes(
         }
 
         if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleUpdateListing(req, id, marketplace);
         }
 
         if (method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             const deleted = marketplace.deleteListing(id);
             return deleted ? json({ ok: true }) : notFound('Listing not found');
         }
@@ -105,6 +118,10 @@ export function handleMarketplaceRoutes(
 
     const reviewDeleteMatch = path.match(/^\/api\/marketplace\/reviews\/([^/]+)$/);
     if (reviewDeleteMatch && method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const deleted = marketplace.deleteReview(reviewDeleteMatch[1]);
         return deleted ? json({ ok: true }) : notFound('Review not found');
     }
@@ -116,15 +133,27 @@ export function handleMarketplaceRoutes(
     }
 
     if (path === '/api/marketplace/federation/instances' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleRegisterInstance(req, federation);
     }
 
     if (path === '/api/marketplace/federation/sync' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleSyncAll(federation);
     }
 
     const instanceMatch = path.match(/^\/api\/marketplace\/federation\/instances\/(.+)$/);
     if (instanceMatch && method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
         const removed = federation?.removeInstance(decodeURIComponent(instanceMatch[1]));
         return removed ? json({ ok: true }) : notFound('Instance not found');
     }
