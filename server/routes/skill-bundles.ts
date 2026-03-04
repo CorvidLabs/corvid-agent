@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import {
     listBundles, getBundle, createBundle, updateBundle, deleteBundle,
     getAgentBundles, assignBundle, unassignBundle,
@@ -29,6 +30,10 @@ export function handleSkillBundleRoutes(
 
     // POST /api/skill-bundles
     if (path === '/api/skill-bundles' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreateBundle(req, db);
     }
 
@@ -43,10 +48,18 @@ export function handleSkillBundleRoutes(
         }
 
         if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleUpdateBundle(req, db, id);
         }
 
         if (method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             const deleted = deleteBundle(db, id);
             if (!deleted) return json({ error: 'Not found or is a preset bundle' }, 404);
             return json({ ok: true });
@@ -66,12 +79,20 @@ export function handleSkillBundleRoutes(
 
     // POST /api/agents/:id/skills
     if (agentSkillsGet && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleAssignBundle(req, db, agentSkillsGet[1], tenantId);
     }
 
     // DELETE /api/agents/:id/skills/:bundleId
     const agentSkillDelete = path.match(/^\/api\/agents\/([^/]+)\/skills\/([^/]+)$/);
     if (agentSkillDelete && method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const agentId = agentSkillDelete[1];
         const bundleId = agentSkillDelete[2];
         const agent = getAgent(db, agentId, tenantId);
@@ -95,12 +116,20 @@ export function handleSkillBundleRoutes(
 
     // POST /api/projects/:id/skills
     if (projectSkillsGet && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleAssignProjectBundle(req, db, projectSkillsGet[1], tenantId);
     }
 
     // DELETE /api/projects/:id/skills/:bundleId
     const projectSkillDelete = path.match(/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/);
     if (projectSkillDelete && method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const projectId = projectSkillDelete[1];
         const bundleId = projectSkillDelete[2];
         const project = getProject(db, projectId, tenantId);

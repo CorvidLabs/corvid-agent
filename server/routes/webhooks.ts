@@ -15,6 +15,7 @@
 import type { Database } from 'bun:sqlite';
 import type { WebhookService, GitHubWebhookPayload } from '../webhooks/service';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import {
     listWebhookRegistrations,
     getWebhookRegistration,
@@ -189,6 +190,10 @@ export function handleWebhookRoutes(
 
     // ── Create registration ─────────────────────────────────────────────────
     if (url.pathname === '/api/webhooks' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return (async () => {
             try {
                 const data = await parseBodyOrThrow(req, CreateWebhookRegistrationSchema);
@@ -225,6 +230,10 @@ export function handleWebhookRoutes(
         }
 
         if (req.method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return (async () => {
                 try {
                     const data = await parseBodyOrThrow(req, UpdateWebhookRegistrationSchema);
@@ -238,6 +247,10 @@ export function handleWebhookRoutes(
         }
 
         if (req.method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             const deleted = deleteWebhookRegistration(db, id, tenantId);
             if (!deleted) return json({ error: 'Webhook registration not found' }, 404);
             const ip = getClientIp(req);

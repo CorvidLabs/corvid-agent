@@ -13,6 +13,7 @@
 import type { Database } from 'bun:sqlite';
 import type { MentionPollingService } from '../polling/service';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import {
     listMentionPollingConfigs,
     getMentionPollingConfig,
@@ -106,6 +107,10 @@ export function handleMentionPollingRoutes(
 
     // ── Create polling config ──────────────────────────────────────────────
     if (url.pathname === '/api/mention-polling' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return (async () => {
             try {
                 const data = await parseBodyOrThrow(req, CreateMentionPollingSchema);
@@ -169,6 +174,10 @@ export function handleMentionPollingRoutes(
         }
 
         if (req.method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return (async () => {
                 try {
                     const data = await parseBodyOrThrow(req, UpdateMentionPollingSchema);
@@ -182,6 +191,10 @@ export function handleMentionPollingRoutes(
         }
 
         if (req.method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             const deleted = deleteMentionPollingConfig(db, id, tenantId);
             if (!deleted) return json({ error: 'Polling config not found' }, 404);
             return json({ ok: true });

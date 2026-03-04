@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import {
     listMcpServerConfigs,
     getMcpServerConfig,
@@ -28,18 +29,30 @@ export function handleMcpServerRoutes(
 
     // POST /api/mcp-servers — create config
     if (url.pathname === '/api/mcp-servers' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreate(req, db, tenantId);
     }
 
     // PUT /api/mcp-servers/:id — update config
     const putMatch = url.pathname.match(/^\/api\/mcp-servers\/([^/]+)$/);
     if (putMatch && req.method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleUpdate(req, db, putMatch[1], tenantId);
     }
 
     // DELETE /api/mcp-servers/:id — delete config
     const deleteMatch = url.pathname.match(/^\/api\/mcp-servers\/([^/]+)$/);
     if (deleteMatch && req.method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const id = deleteMatch[1];
         const deleted = deleteMcpServerConfig(db, id, tenantId);
         if (!deleted) return json({ error: 'MCP server config not found' }, 404);
@@ -49,6 +62,10 @@ export function handleMcpServerRoutes(
     // POST /api/mcp-servers/:id/test — test connection
     const testMatch = url.pathname.match(/^\/api\/mcp-servers\/([^/]+)\/test$/);
     if (testMatch && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleTest(db, testMatch[1], tenantId);
     }
 
