@@ -27,7 +27,7 @@ The setup script checks prerequisites, copies `.env.example`, installs dependenc
 ### Required Environment Variables
 
 At minimum you need:
-- `ANTHROPIC_API_KEY` — for Claude agent sessions (optional if using Ollama-only mode)
+- `ANTHROPIC_API_KEY` — for Claude agent sessions (not needed if Claude Code CLI is installed; omit for Ollama-only mode)
 
 Optional but recommended:
 - `GH_TOKEN` — for GitHub integration (PRs, issues, webhooks)

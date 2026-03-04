@@ -54,7 +54,7 @@ Or manually:
 
 ```bash
 bun install
-cp .env.example .env   # add your ANTHROPIC_API_KEY
+cp .env.example .env   # add API key, or leave blank if using Claude Code CLI
 bun run build:client
 bun run dev
 ```
@@ -64,7 +64,9 @@ Server starts at `http://localhost:3000`. See `.env.example` for all configurati
 ### Minimum `.env`
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...          # Required — Claude agent sessions
+# Claude access — pick one (or skip both for Ollama-only mode):
+ANTHROPIC_API_KEY=sk-ant-...          # Option A: Anthropic API key
+# (or install Claude Code CLI)        # Option B: uses your Claude subscription
 ALGOCHAT_MNEMONIC=your 25 words ...   # Optional — on-chain identity & messaging
 OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 ```
@@ -480,7 +482,7 @@ The `deploy/` directory includes production configurations:
 
 | Variable | Description | Default |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude agents | required |
+| `ANTHROPIC_API_KEY` | Anthropic API key (not needed if Claude Code CLI is installed) | — |
 | `ALGOCHAT_MNEMONIC` | 25-word Algorand account mnemonic | — |
 | `ALGORAND_NETWORK` | Network: `localnet`, `testnet`, `mainnet` | `localnet` |
 | `PORT` | HTTP server port | `3000` |
