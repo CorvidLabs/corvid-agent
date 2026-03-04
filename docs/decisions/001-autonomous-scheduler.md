@@ -219,6 +219,7 @@ GET    /api/schedule-executions/:id           -- Get execution details
 POST   /api/schedule-executions/:id/resolve   -- Approve/deny: { approved: boolean }
 POST   /api/schedule-executions/:id/cancel    -- Cancel running execution
 GET    /api/scheduler/health                  -- Scheduler service stats
+GET    /api/scheduler/system-state            -- Full system state (added post-ADR)
 GET    /api/github/status                     -- GitHub integration status
 ```
 
