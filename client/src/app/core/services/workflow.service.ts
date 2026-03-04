@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { ApiService } from './api.service';
+import { EntityStore } from './entity-store';
 import { WebSocketService } from './websocket.service';
 import type {
     Workflow,
@@ -12,14 +12,17 @@ import type { ServerWsMessage } from '../models/ws-message.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
-export class WorkflowService {
-    private readonly api = inject(ApiService);
+export class WorkflowService extends EntityStore<Workflow> {
+    protected readonly apiPath = '/workflows';
+
     private readonly ws = inject(WebSocketService);
 
-    readonly workflows = signal<Workflow[]>([]);
+    // Backward-compatible alias
+    readonly workflows = this.entities;
+
+    // Domain-specific signals for run tracking
     readonly runs = signal<WorkflowRun[]>([]);
     readonly nodeRuns = signal<WorkflowNodeRun[]>([]);
-    readonly loading = signal(false);
 
     private unsubscribeWs: (() => void) | null = null;
 
@@ -65,32 +68,29 @@ export class WorkflowService {
         try {
             const path = agentId ? `/workflows?agentId=${agentId}` : '/workflows';
             const workflows = await firstValueFrom(this.api.get<Workflow[]>(path));
-            this.workflows.set(workflows);
+            this.entities.set(workflows);
         } finally {
             this.loading.set(false);
         }
     }
 
     async getWorkflow(id: string): Promise<Workflow> {
-        return firstValueFrom(this.api.get<Workflow>(`/workflows/${id}`));
+        return this.getById(id);
     }
 
     async createWorkflow(input: CreateWorkflowInput): Promise<Workflow> {
-        const workflow = await firstValueFrom(this.api.post<Workflow>('/workflows', input));
-        this.workflows.update((list) => [workflow, ...list]);
-        return workflow;
+        return this.create(input);
     }
 
     async updateWorkflow(id: string, input: UpdateWorkflowInput): Promise<Workflow> {
-        const workflow = await firstValueFrom(this.api.put<Workflow>(`/workflows/${id}`, input));
-        this.workflows.update((list) => list.map((w) => (w.id === id ? workflow : w)));
-        return workflow;
+        return this.update(id, input);
     }
 
     async deleteWorkflow(id: string): Promise<void> {
-        await firstValueFrom(this.api.delete(`/workflows/${id}`));
-        this.workflows.update((list) => list.filter((w) => w.id !== id));
+        return this.remove(id);
     }
+
+    // ─── Run Operations ──────────────────────────────────────────────────
 
     async triggerWorkflow(id: string, input: Record<string, unknown> = {}): Promise<WorkflowRun> {
         const run = await firstValueFrom(this.api.post<WorkflowRun>(`/workflows/${id}/trigger`, { input }));
