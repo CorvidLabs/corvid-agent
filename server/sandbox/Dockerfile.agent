@@ -4,7 +4,7 @@
 # Build:  docker build -t corvid-agent-sandbox:latest -f server/sandbox/Dockerfile.agent .
 # Usage:  Managed by SandboxManager — not invoked directly.
 
-FROM oven/bun:1-slim
+FROM oven/bun:1-slim@sha256:5d5863f35ad9b3acceee8dc134fb2b89f07831129eaeec81af2b19a23dabe3e0
 
 # Install git (needed for agent work tasks) and basic tools
 RUN apt-get update && \

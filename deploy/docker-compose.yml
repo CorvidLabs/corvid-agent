@@ -25,6 +25,14 @@ services:
       - LOCALNET_ALGOD_URL=${LOCALNET_ALGOD_URL:-}
       - LOCALNET_KMD_URL=${LOCALNET_KMD_URL:-}
       - LOCALNET_INDEXER_URL=${LOCALNET_INDEXER_URL:-}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "bun", "-e", "const r = await fetch('http://localhost:3000/health/ready'); process.exit(r.ok ? 0 : 1)"]
