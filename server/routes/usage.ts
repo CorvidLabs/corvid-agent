@@ -48,37 +48,41 @@ interface ExecutionAnomalyRow {
     anomaly_type: string;
 }
 
-export function handleUsageRoutes(req: Request, url: URL, db: Database, _context?: RequestContext): Response | null {
+export function handleUsageRoutes(req: Request, url: URL, db: Database, context?: RequestContext): Response | null {
+    const tenantId = context?.tenantId;
+
     // GET /api/usage/summary — per-schedule aggregates + anomaly flags
     if (url.pathname === '/api/usage/summary' && req.method === 'GET') {
         const days = safeNumParam(url.searchParams.get('days'), 30);
-        return handleUsageSummary(db, days);
+        return handleUsageSummary(db, days, tenantId);
     }
 
     // GET /api/usage/daily — per-day breakdown
     if (url.pathname === '/api/usage/daily' && req.method === 'GET') {
         const days = safeNumParam(url.searchParams.get('days'), 30);
-        return handleDailyUsage(db, days);
+        return handleDailyUsage(db, days, tenantId);
     }
 
     // GET /api/usage/anomalies — current anomaly flags
     if (url.pathname === '/api/usage/anomalies' && req.method === 'GET') {
         const days = safeNumParam(url.searchParams.get('days'), 7);
-        return handleAnomalies(db, days);
+        return handleAnomalies(db, days, tenantId);
     }
 
     // GET /api/usage/schedule/:id — detailed usage for a specific schedule
     if (url.pathname.startsWith('/api/usage/schedule/') && req.method === 'GET') {
         const scheduleId = url.pathname.slice('/api/usage/schedule/'.length);
         const days = safeNumParam(url.searchParams.get('days'), 30);
-        return handleScheduleUsage(db, scheduleId, days);
+        return handleScheduleUsage(db, scheduleId, days, tenantId);
     }
 
     return null;
 }
 
-function handleUsageSummary(db: Database, days: number): Response {
+function handleUsageSummary(db: Database, days: number, tenantId?: string): Response {
     const clampedDays = Math.min(Math.max(days, 1), 365);
+    const tenantFilter = tenantId ? ' AND se.tenant_id = ?' : '';
+    const tenantParams = tenantId ? [clampedDays, tenantId] : [clampedDays];
 
     // Per-schedule aggregates with session data joined
     const scheduleUsage = db.query(`
@@ -123,10 +127,10 @@ function handleUsageSummary(db: Database, days: number): Response {
         FROM schedule_executions se
         JOIN agent_schedules s ON se.schedule_id = s.id
         LEFT JOIN sessions sess ON se.session_id = sess.id
-        WHERE se.started_at >= datetime('now', '-' || ? || ' days')
+        WHERE se.started_at >= datetime('now', '-' || ? || ' days')${tenantFilter}
         GROUP BY se.schedule_id
         ORDER BY total_cost_usd DESC
-    `).all(clampedDays) as ScheduleUsageRow[];
+    `).all(...tenantParams) as ScheduleUsageRow[];
 
     // Totals
     const totals = db.query(`
@@ -146,8 +150,8 @@ function handleUsageSummary(db: Database, days: number): Response {
             ), 0) as total_turns
         FROM schedule_executions se
         LEFT JOIN sessions sess ON se.session_id = sess.id
-        WHERE se.started_at >= datetime('now', '-' || ? || ' days')
-    `).get(clampedDays) as Record<string, number>;
+        WHERE se.started_at >= datetime('now', '-' || ? || ' days')${tenantFilter}
+    `).get(...tenantParams) as Record<string, number>;
 
     return json({
         days: clampedDays,
@@ -177,8 +181,10 @@ function handleUsageSummary(db: Database, days: number): Response {
     });
 }
 
-function handleDailyUsage(db: Database, days: number): Response {
+function handleDailyUsage(db: Database, days: number, tenantId?: string): Response {
     const clampedDays = Math.min(Math.max(days, 1), 365);
+    const tenantFilter = tenantId ? ' AND se.tenant_id = ?' : '';
+    const tenantParams = tenantId ? [clampedDays, tenantId] : [clampedDays];
 
     const daily = db.query(`
         SELECT
@@ -204,10 +210,10 @@ function handleDailyUsage(db: Database, days: number): Response {
             COUNT(DISTINCT se.schedule_id) as unique_schedules
         FROM schedule_executions se
         LEFT JOIN sessions sess ON se.session_id = sess.id
-        WHERE se.started_at >= datetime('now', '-' || ? || ' days')
+        WHERE se.started_at >= datetime('now', '-' || ? || ' days')${tenantFilter}
         GROUP BY date(se.started_at)
         ORDER BY date ASC
-    `).all(clampedDays) as DailyUsageRow[];
+    `).all(...tenantParams) as DailyUsageRow[];
 
     return json({
         days: clampedDays,
@@ -224,8 +230,9 @@ function handleDailyUsage(db: Database, days: number): Response {
     });
 }
 
-function handleAnomalies(db: Database, days: number): Response {
+function handleAnomalies(db: Database, days: number, tenantId?: string): Response {
     const clampedDays = Math.min(Math.max(days, 1), 30);
+    const tenantFilter = tenantId ? ' AND se.tenant_id = ?' : '';
     const anomalies: Array<{
         executionId: string;
         scheduleId: string;
@@ -237,6 +244,8 @@ function handleAnomalies(db: Database, days: number): Response {
         completedAt: string | null;
         anomalyType: string;
     }> = [];
+
+    const tenantParams = tenantId ? [clampedDays, tenantId] : [clampedDays];
 
     // 1. Sessions running >30 minutes (including still-running ones)
     const longRunning = db.query(`
@@ -259,14 +268,14 @@ function handleAnomalies(db: Database, days: number): Response {
         FROM schedule_executions se
         JOIN agent_schedules s ON se.schedule_id = s.id
         LEFT JOIN sessions sess ON se.session_id = sess.id
-        WHERE se.started_at >= datetime('now', '-' || ? || ' days')
+        WHERE se.started_at >= datetime('now', '-' || ? || ' days')${tenantFilter}
           AND (
               (se.status = 'running' AND (julianday('now') - julianday(se.started_at)) * 86400 > 1800)
               OR
               (se.completed_at IS NOT NULL AND (julianday(se.completed_at) - julianday(se.started_at)) * 86400 > 1800)
           )
         ORDER BY duration_sec DESC
-    `).all(clampedDays) as ExecutionAnomalyRow[];
+    `).all(...tenantParams) as ExecutionAnomalyRow[];
 
     for (const row of longRunning) {
         anomalies.push({
@@ -283,6 +292,7 @@ function handleAnomalies(db: Database, days: number): Response {
     }
 
     // 2. Schedules where latest execution cost >2x their rolling average
+    const costSpikeParams = tenantId ? [tenantId, clampedDays, tenantId] : [clampedDays];
     const costSpikes = db.query(`
         WITH schedule_avg AS (
             SELECT
@@ -296,7 +306,7 @@ function handleAnomalies(db: Database, days: number): Response {
             FROM schedule_executions se
             LEFT JOIN sessions sess ON se.session_id = sess.id
             WHERE se.started_at >= datetime('now', '-30 days')
-              AND se.status = 'completed'
+              AND se.status = 'completed'${tenantFilter}
             GROUP BY se.schedule_id
             HAVING COUNT(*) >= 3
         ),
@@ -319,7 +329,7 @@ function handleAnomalies(db: Database, days: number): Response {
             FROM schedule_executions se
             LEFT JOIN sessions sess ON se.session_id = sess.id
             WHERE se.started_at >= datetime('now', '-' || ? || ' days')
-              AND se.status = 'completed'
+              AND se.status = 'completed'${tenantFilter}
         )
         SELECT
             l.execution_id,
@@ -337,7 +347,7 @@ function handleAnomalies(db: Database, days: number): Response {
         WHERE l.rn = 1
           AND l.cost_usd > sa.avg_cost * 2
           AND sa.avg_cost > 0
-    `).all(clampedDays) as (ExecutionAnomalyRow & { avg_cost: number })[];
+    `).all(...costSpikeParams) as (ExecutionAnomalyRow & { avg_cost: number })[];
 
     for (const row of costSpikes) {
         anomalies.push({
@@ -364,13 +374,15 @@ function handleAnomalies(db: Database, days: number): Response {
     });
 }
 
-function handleScheduleUsage(db: Database, scheduleId: string, days: number): Response {
+function handleScheduleUsage(db: Database, scheduleId: string, days: number, tenantId?: string): Response {
     const clampedDays = Math.min(Math.max(days, 1), 365);
 
-    // Schedule info
-    const schedule = db.query(
-        'SELECT id, name, agent_id, status, cron_expression, max_budget_per_run FROM agent_schedules WHERE id = ?'
-    ).get(scheduleId) as Record<string, unknown> | null;
+    // Schedule info (tenant-scoped)
+    const scheduleQuery = tenantId
+        ? 'SELECT id, name, agent_id, status, cron_expression, max_budget_per_run FROM agent_schedules WHERE id = ? AND tenant_id = ?'
+        : 'SELECT id, name, agent_id, status, cron_expression, max_budget_per_run FROM agent_schedules WHERE id = ?';
+    const scheduleParams = tenantId ? [scheduleId, tenantId] : [scheduleId];
+    const schedule = db.query(scheduleQuery).get(...scheduleParams) as Record<string, unknown> | null;
 
     if (!schedule) {
         return json({ error: 'Schedule not found' }, 404);

@@ -223,5 +223,7 @@ export function requiresAdminRole(pathname: string): boolean {
     if (pathname.startsWith('/api/escalation-queue')) return true;
     // Credit grant endpoint requires admin — prevents any authenticated user from granting themselves credits
     if (/^\/api\/wallets\/[^/]+\/credits$/.test(pathname)) return true;
+    // Allowlist controls which addresses can interact — admin-only to prevent tenant escalation
+    if (pathname.startsWith('/api/allowlist')) return true;
     return false;
 }
