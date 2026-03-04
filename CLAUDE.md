@@ -150,16 +150,10 @@ Protected files cannot be modified even in full-auto mode.
 4. **Respect blocked-by markers.** If an issue has `<!-- blocked-by: #N -->` in its body or comments, do not work on it until the blocking issue is closed.
 5. **When reviewing human PRs,** be constructive and help get the PR merged. Don't nag about timeline — offer to help fix issues instead.
 
-### Off-Limits Repositories
+### Contributor-Owned Repositories
 
-Do **not** create issues, PRs, commits, or any code contributions on these repos unless explicitly asked by the repo owner or assigned maintainer:
-
-- `CorvidLabs/rust-server` — 0xGaspar's project
-- `CorvidLabs/rust-game` — 0xGaspar's project
-- `CorvidLabs/rust-ui` — 0xGaspar's project
-- `CorvidLabs/rust-learning` — 0xGaspar's project
-
-These repos belong to human contributors. Helping is welcome **only when asked**. Filing issues, planning roadmaps, or submitting unsolicited PRs on these repos is not allowed.
+Some repos are owned by human contributors and are off-limits for autonomous agent work.
+See `.claude/off-limits-repos.txt` for the list. Do **not** create issues, PRs, commits, or any code contributions on those repos unless explicitly asked by the repo owner or assigned maintainer. Helping is welcome **only when asked**.
 
 ### Focus Priorities
 
