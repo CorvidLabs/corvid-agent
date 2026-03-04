@@ -286,8 +286,10 @@ When specific origins are configured, only matching request origins receive CORS
 
 WebSocket connections authenticate via:
 
-1. `Authorization: Bearer <key>` header (standard path)
-2. `?key=<key>` query parameter (for browsers that cannot set headers on WebSocket upgrade)
+1. `Authorization: Bearer <key>` header (**preferred** -- use for SDKs, A2A, and programmatic clients)
+2. `?key=<key>` query parameter (**deprecated** -- for browsers that cannot set headers on WebSocket upgrade)
+
+The query-string method logs a deprecation warning on each connection. Use the `Authorization` header whenever your client supports setting headers on WebSocket upgrade requests. For browser-based clients where headers cannot be set, the query parameter remains available but should be used only over HTTPS to prevent token leakage via server logs and network intermediaries.
 
 ### Rate Limiting
 

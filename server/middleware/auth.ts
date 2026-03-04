@@ -5,8 +5,9 @@
  * - If API_KEY is set, all non-OPTIONS routes require `Authorization: Bearer <key>`.
  * - If BIND_HOST !== 127.0.0.1 and no API_KEY is set, a random key is generated
  *   on first run and persisted to .env (admin bootstrap).
- * - WebSocket connections authenticate via `?key=<key>` query param. When API_KEY
- *   is set, unauthenticated upgrade requests are rejected with 401.
+ * - WebSocket connections authenticate via `Authorization: Bearer <key>` header
+ *   (preferred) or `?key=<key>` query param (deprecated, for browsers). When
+ *   API_KEY is set, unauthenticated upgrade requests are rejected with 401.
  * - Health endpoint (/api/health) is always public (monitoring probes need it).
  */
 
@@ -248,23 +249,29 @@ export function checkHttpAuth(req: Request, url: URL, config: AuthConfig): Respo
 
 /**
  * Check whether a WebSocket upgrade request is authenticated.
- * Supports `?key=<key>` query parameter.
+ * Supports both `Authorization: Bearer <key>` header (preferred)
+ * and `?key=<key>` query parameter (deprecated).
  * Returns true if authenticated, false if not.
  */
 export function checkWsAuth(req: Request, url: URL, config: AuthConfig): boolean {
     // No API key configured = auth disabled
     if (!config.apiKey) return true;
 
-    // Check Authorization header first (standard path)
+    // Check Authorization header first (preferred path)
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
         const match = authHeader.match(/^Bearer\s+(.+)$/i);
         if (match && isValidApiKey(match[1], config)) return true;
     }
 
-    // Check query parameter (browsers can't set headers on WebSocket upgrade)
+    // Check query parameter (deprecated — tokens in URLs leak via logs and referrers)
     const key = url.searchParams.get('key');
-    if (key && isValidApiKey(key, config)) return true;
+    if (key && isValidApiKey(key, config)) {
+        log.warn('WebSocket auth via query string is deprecated — use Authorization: Bearer header instead', {
+            ip: req.headers.get('x-forwarded-for') ?? 'unknown',
+        });
+        return true;
+    }
 
     log.warn('Rejected WebSocket connection: invalid or missing auth', { ip: req.headers.get('x-forwarded-for') ?? 'unknown' });
     return false;
