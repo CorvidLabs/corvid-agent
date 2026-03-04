@@ -393,3 +393,52 @@ curl http://localhost:3000/health/ready
 ```
 
 Both return HTTP 200 when healthy. The Docker healthcheck uses `/health/live` with a 30-second interval.
+
+## Operational Mode
+
+The server supports three operational modes that control how agents behave:
+
+```bash
+# Get current mode
+curl http://localhost:3000/api/operational-mode \
+  -H "Authorization: Bearer $API_KEY"
+
+# Set mode (autonomous, supervised, or paused)
+curl -X POST http://localhost:3000/api/operational-mode \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "supervised"}'
+```
+
+- **autonomous** — agents execute without human approval (default)
+- **supervised** — agents queue actions for approval via the escalation queue
+- **paused** — no new agent sessions are started
+
+### Escalation Queue
+
+When in supervised mode, pending approvals accumulate in the escalation queue:
+
+```bash
+# List pending escalations
+curl http://localhost:3000/api/escalation-queue \
+  -H "Authorization: Bearer $API_KEY"
+
+# Approve or deny an escalation
+curl -X POST http://localhost:3000/api/escalation-queue/{id}/resolve \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"approved": true}'
+```
+
+## Self-Test
+
+Run the built-in self-test suite to verify server health:
+
+```bash
+curl -X POST http://localhost:3000/api/selftest/run \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"scope": "all"}'
+```
+
+Scope options: `unit`, `e2e`, `all`.

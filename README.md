@@ -393,7 +393,13 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Usage | `/api/usage` | Schedule usage monitoring and anomaly detection |
 | Feedback | `/api/feedback` | PR outcome tracking and schedule learning |
 | System Logs | `/api/system-logs` | System log queries and credit history |
-| Health | `GET /api/health` | Health check (public, no auth) |
+| AlgoChat | `/api/algochat/status`, `/api/algochat/network`, `/api/algochat/psk-*` | Bridge status, network switching, PSK contacts and QR codes |
+| Wallets | `/api/wallets/summary`, `/api/wallets/:address/*` | External wallet summaries, messages, and credit grants |
+| Feed | `GET /api/feed/history` | Combined agent + AlgoChat message history |
+| Escalation | `/api/escalation-queue`, `/api/operational-mode` | Approval queue management and operational mode control |
+| Backup | `POST /api/backup` | Trigger database backup |
+| Self-Test | `POST /api/selftest/run` | Run self-test suite (unit/e2e/all) |
+| Health | `GET /api/health`, `/health/live`, `/health/ready` | Health check, liveness and readiness probes |
 | A2A | `/.well-known/agent-card.json` | Google A2A protocol Agent Card |
 | WebSocket | `WS /ws` | Real-time streaming and event subscriptions |
 
@@ -402,7 +408,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 4417 server tests (~115s)
+bun test              # 4470+ server tests (~118s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 348 tests
 bun run spec:check    # Validate all module specs in specs/
