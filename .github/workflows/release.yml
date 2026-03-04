@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write  # Required for cosign keyless signing in docker job
 
 jobs:
   # ── Run the full CI suite before releasing ──────────────────────
@@ -28,6 +29,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write  # Cosign keyless signing via Sigstore OIDC
 
   # ── Create GitHub Release ───────────────────────────────────────
   release:
@@ -39,6 +41,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
+
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: sbom-cyclonedx
 
       - name: Determine tag
         id: tag
@@ -79,6 +86,11 @@ jobs:
             echo ""
             echo ""
             echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...$TAG"
+            echo ""
+            echo "## Supply Chain Security"
+            echo ""
+            echo "This release includes a CycloneDX SBOM (\`sbom.cyclonedx.json\`) attached as a release asset."
+            echo "The Docker image is signed with [Sigstore cosign](https://docs.sigstore.dev/). See [docs/supply-chain-verification.md](docs/supply-chain-verification.md) for verification instructions."
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -90,3 +102,4 @@ jobs:
           body: ${{ steps.changelog.outputs.changelog }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: false
+          files: sbom.cyclonedx.json

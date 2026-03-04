@@ -81,6 +81,12 @@
 - [ ] Consider lower limits for public-facing instances
 - [ ] Exempt trusted IPs via reverse proxy configuration
 
+### Supply Chain Verification
+
+- [ ] Verify Docker image signatures before deploying: `cosign verify`
+- [ ] Verify SBOM attestation: `cosign verify-attestation --type cyclonedx`
+- [ ] See [supply-chain-verification.md](supply-chain-verification.md) for full instructions
+
 ## Security Testing
 
 Run the automated security audit tests:
