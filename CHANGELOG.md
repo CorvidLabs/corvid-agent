@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.0] - 2026-03-04
+
+### Added
+- **RBAC enforcement across all routes** — `tenantRoleGuard` on 75+ write endpoints across 17 route files; owner-only guards on settings and billing (#529, #530, #531)
+- **Admin role enforcement** — system-logs, performance, github-allowlist, wallet-summary endpoints restricted to admin (#505)
+- **Tenant isolation on usage endpoints** — usage and allowlist routes scoped per-tenant (#494)
+- **EntityStore signal store pattern** — extracted reusable `EntityStore<T>` for Angular services; migrated ProjectService, CouncilService, WorkflowService (#499, #501)
+- **WebSocket heartbeat** — server-sent timestamps for connection health monitoring (#461)
+- **Cache-Control headers** for static assets (#493)
+- **Retention policies** for append-only tables (#481)
+- **SSRF private IP range blocking** (#479)
+- **SBOM generation and Docker image signing** via Cosign (#495)
+- **Multi-tenant route isolation** across all 14 previously unscoped handlers (#439)
+- **Test coverage expansion** — 15 new test suites covering DB modules (agents, sessions, projects, councils, spending, allowlist, work-tasks, pr-outcomes, health-snapshots, notifications, webhooks, reputation, backup, algochat-messages, github-allowlist, mcp-servers, plugins), polling service, scheduler cron-parser, priority-rules, auto-merge, and ci-retry (#489, #502–#504, #512–#514, #516–#519, #532, #533)
+
+### Changed
+- **WebSocket auth** — query-string `?key=` deprecated in favor of `Authorization: Bearer` header (#496)
+- **Polling service decomposed** into 3 focused services (#498)
+- **shared/types.ts split** into domain-specific modules (#497)
+- **DB count queries** consolidated into `queryCount()` helper (#511)
+- Bumped `@anthropic-ai/claude-agent-sdk` to 0.2.68 (#518)
+- Bumped `actions/github-script` from 7 to 8 (#434)
+- CI workspace setup extracted into composite action (#482)
+- GH Actions pinned to SHA with explicit permissions (#478)
+
+### Fixed
+- Condenser tries all providers before truncation fallback (#484)
+- Missing `subscription_items` table for UsageMeter (#483)
+- Auto-refill agent wallets before on-chain sends (#476)
+- Git author identity in LaunchAgent plist (#515)
+- `schedule_skip` added to AuditAction type (#470)
+- Baseline migration schema drift (#469)
+- Respect human issue assignments and fix log rotation (#440)
+- Script injection in GitHub Actions workflows (#492)
+- 5 npm audit vulnerabilities resolved via overrides (#488)
+
+### Docs
+- Clarified Claude auth — API key not required when Claude Code CLI is installed (#543)
+- Updated stale stats across README, docs site, and CLAUDE.md (#534)
+- Documented inline API endpoints (#490)
+- Security review of API key authentication (#460)
+
 ## [0.15.0] - 2026-03-04
 
 ### Added
