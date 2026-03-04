@@ -85,15 +85,15 @@ test.describe('Schedules', () => {
         await gotoWithRetry(page, '/schedules', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
         await expect(page.locator(`text=${schedule.name}`).first()).toBeVisible({ timeout: 10000 });
 
+        // Set up dialog handler BEFORE any interaction that may trigger it
+        page.once('dialog', (dialog) => dialog.accept());
+
         // Expand the card
-        const card = page.locator(`.schedule-card:has-text("${schedule.name}")`).first();
-        await card.click();
+        const cardSelector = `.schedule-card:has-text("${schedule.name}")`;
+        await page.locator(cardSelector).first().click();
 
-        // Set up dialog handler for confirm()
-        page.on('dialog', (dialog) => dialog.accept());
-
-        // Click Delete within the target card
-        await card.locator('.action-btn--danger, button:text("Delete")').first().click();
+        // Click Delete — re-query to avoid stale element after expand re-render
+        await page.locator(`${cardSelector} .action-btn--danger, ${cardSelector} button:text("Delete")`).first().click();
 
         // Verify name is gone
         await expect(page.locator(`text=${schedule.name}`)).toHaveCount(0, { timeout: 10000 });
