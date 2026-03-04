@@ -1,5 +1,5 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { ApiService } from './api.service';
+import { Injectable } from '@angular/core';
+import { EntityStore } from './entity-store';
 import type {
     Council,
     CreateCouncilInput,
@@ -11,42 +11,33 @@ import type {
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
-export class CouncilService {
-    private readonly api = inject(ApiService);
+export class CouncilService extends EntityStore<Council> {
+    protected readonly apiPath = '/councils';
 
-    readonly councils = signal<Council[]>([]);
-    readonly loading = signal(false);
+    // Backward-compatible alias
+    readonly councils = this.entities;
 
     async loadCouncils(): Promise<void> {
-        this.loading.set(true);
-        try {
-            const councils = await firstValueFrom(this.api.get<Council[]>('/councils'));
-            this.councils.set(councils);
-        } finally {
-            this.loading.set(false);
-        }
+        return this.load();
     }
 
     async getCouncil(id: string): Promise<Council> {
-        return firstValueFrom(this.api.get<Council>(`/councils/${id}`));
+        return this.getById(id);
     }
 
     async createCouncil(input: CreateCouncilInput): Promise<Council> {
-        const council = await firstValueFrom(this.api.post<Council>('/councils', input));
-        await this.loadCouncils();
-        return council;
+        return this.create(input);
     }
 
     async updateCouncil(id: string, input: UpdateCouncilInput): Promise<Council> {
-        const council = await firstValueFrom(this.api.put<Council>(`/councils/${id}`, input));
-        await this.loadCouncils();
-        return council;
+        return this.update(id, input);
     }
 
     async deleteCouncil(id: string): Promise<void> {
-        await firstValueFrom(this.api.delete(`/councils/${id}`));
-        await this.loadCouncils();
+        return this.remove(id);
     }
+
+    // ─── Council Launch Operations ───────────────────────────────────────
 
     async launchCouncil(
         councilId: string,
