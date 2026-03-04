@@ -241,7 +241,7 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 
 ## Roadmap
 
-### Shipped (v0.1.0 -> v0.15.0)
+### Shipped (v0.1.0 -> v0.16.0)
 
 - Agent orchestration with Claude SDK
 - Council deliberation with structured voting and follow-up chat
