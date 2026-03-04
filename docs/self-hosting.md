@@ -54,7 +54,7 @@ The most important variables are documented below. See `.env.example` for the fu
 
 | Variable | Default | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | (none) | Anthropic API key for Claude models |
+| `ANTHROPIC_API_KEY` | (none) | Anthropic API key for Claude models (not needed if Claude Code CLI is installed) |
 | `OPENAI_API_KEY` | (none) | OpenAI API key (used for voice TTS/STT) |
 | `ENABLED_PROVIDERS` | `anthropic,ollama` | Comma-separated list. Use `ollama` for 100% local mode |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama API endpoint |
@@ -87,7 +87,7 @@ This is the recommended mode for personal or team deployments where you do not n
 # .env -- single-tenant (default)
 # MULTI_TENANT=false   # or simply omit this line
 API_KEY=your-secret-key
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=sk-ant-...   # or omit if Claude Code CLI is installed
 ```
 
 ## Multi-Tenant Mode
@@ -105,7 +105,7 @@ Set `MULTI_TENANT=true` to enable tenant isolation. This activates:
 # .env -- multi-tenant
 MULTI_TENANT=true
 API_KEY=your-admin-api-key
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=sk-ant-...   # or omit if Claude Code CLI is installed
 # Optional Stripe billing
 # STRIPE_SECRET_KEY=sk_...
 # STRIPE_WEBHOOK_SECRET=whsec_...
@@ -148,7 +148,7 @@ Pass environment variables through your shell or a `.env` file. The compose file
 
 ```bash
 # Export variables before running compose, or set them in .env
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=sk-ant-...  # or omit if Claude Code CLI is installed
 export API_KEY=your-secret-key
 export LOG_LEVEL=info
 export ALGORAND_NETWORK=testnet

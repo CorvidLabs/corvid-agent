@@ -5,7 +5,7 @@
 ### Authentication & Secrets
 
 - [ ] Set a strong, unique `API_KEY` (min 32 characters, cryptographically random)
-- [ ] Set `ANTHROPIC_API_KEY` with minimal required permissions
+- [ ] Set `ANTHROPIC_API_KEY` with minimal permissions (or ensure Claude Code CLI is installed)
 - [ ] Set `WALLET_ENCRYPTION_KEY` (32+ characters) — do NOT use the default
 - [ ] If using Stripe: set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
 - [ ] Store all secrets in a secrets manager (not `.env` files in production)

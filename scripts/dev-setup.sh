@@ -94,7 +94,10 @@ else
         echo ""
 
         # Anthropic API Key
-        read -rp "ANTHROPIC_API_KEY (for Claude agent sessions, or leave blank for Ollama-only mode): " ANTHROPIC_KEY
+        if command -v claude &>/dev/null; then
+            info "Claude Code CLI detected — you can skip ANTHROPIC_API_KEY and use your subscription"
+        fi
+        read -rp "ANTHROPIC_API_KEY (or leave blank to use Claude Code CLI / Ollama-only): " ANTHROPIC_KEY
         if [[ -n "$ANTHROPIC_KEY" ]]; then
             if [[ "$(uname)" == "Darwin" ]]; then
                 sed -i '' "s|^# ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$ANTHROPIC_KEY|" .env
@@ -103,7 +106,11 @@ else
             fi
             info "Set ANTHROPIC_API_KEY"
         else
-            warn "No ANTHROPIC_API_KEY set — system will default to Ollama-only mode"
+            if command -v claude &>/dev/null; then
+                info "No ANTHROPIC_API_KEY set — will use Claude Code CLI subscription"
+            else
+                warn "No ANTHROPIC_API_KEY set — system will default to Ollama-only mode"
+            fi
         fi
 
         # GitHub Token
