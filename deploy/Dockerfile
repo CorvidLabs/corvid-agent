@@ -1,5 +1,5 @@
 # ── Stage 1: Build Angular client ────────────────────────────────
-FROM oven/bun:1.3.8 AS client-build
+FROM oven/bun:1.3.8@sha256:371d30538b69303ced927bb5915697ac7e2fa8cb409ee332c66009de64de5aa3 AS client-build
 WORKDIR /app/client
 
 # Install client dependencies
@@ -14,7 +14,7 @@ COPY client/ .
 RUN bun run build
 
 # ── Stage 2: Production image ───────────────────────────────────
-FROM oven/bun:1.3.8 AS production
+FROM oven/bun:1.3.8@sha256:371d30538b69303ced927bb5915697ac7e2fa8cb409ee332c66009de64de5aa3 AS production
 WORKDIR /app
 
 # Install server dependencies only
