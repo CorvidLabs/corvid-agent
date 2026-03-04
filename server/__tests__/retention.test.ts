@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { pruneTable, runRetentionCleanup, RETENTION_POLICIES } from '../db/retention';
 import { runMigrations } from '../db/schema';
+import { queryCount } from '../db/types';
 
 let db: Database;
 
@@ -34,8 +35,7 @@ describe('pruneTable', () => {
         expect(deleted).toBe(1);
 
         // New record should still exist
-        const remaining = db.query(`SELECT COUNT(*) as count FROM audit_log`).get() as { count: number };
-        expect(remaining.count).toBe(1);
+        expect(queryCount(db, 'SELECT COUNT(*) as cnt FROM audit_log')).toBe(1);
     });
 
     test('returns 0 when no records to prune', () => {
@@ -58,8 +58,7 @@ describe('pruneTable', () => {
         const deleted = pruneTable(db, { table: 'daily_spending', timestampColumn: 'date', retentionDays: 90 });
         expect(deleted).toBe(1);
 
-        const remaining = db.query(`SELECT COUNT(*) as count FROM daily_spending`).get() as { count: number };
-        expect(remaining.count).toBe(1);
+        expect(queryCount(db, 'SELECT COUNT(*) as cnt FROM daily_spending')).toBe(1);
     });
 
     test('handles empty table', () => {
@@ -88,11 +87,8 @@ describe('runRetentionCleanup', () => {
 
         runRetentionCleanup(db);
 
-        const spending = db.query(`SELECT COUNT(*) as count FROM daily_spending`).get() as { count: number };
-        expect(spending.count).toBe(0);
-
-        const audit = db.query(`SELECT COUNT(*) as count FROM audit_log`).get() as { count: number };
-        expect(audit.count).toBe(0);
+        expect(queryCount(db, 'SELECT COUNT(*) as cnt FROM daily_spending')).toBe(0);
+        expect(queryCount(db, 'SELECT COUNT(*) as cnt FROM audit_log')).toBe(0);
     });
 
     test('preserves recent records', () => {
@@ -101,8 +97,7 @@ describe('runRetentionCleanup', () => {
 
         runRetentionCleanup(db);
 
-        const spending = db.query(`SELECT COUNT(*) as count FROM daily_spending`).get() as { count: number };
-        expect(spending.count).toBe(1);
+        expect(queryCount(db, 'SELECT COUNT(*) as cnt FROM daily_spending')).toBe(1);
     });
 });
 

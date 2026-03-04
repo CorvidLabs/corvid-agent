@@ -7,6 +7,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { queryCount } from '../db/types';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
 import type { AgentMessenger } from '../algochat/agent-messenger';
@@ -183,18 +184,14 @@ export class WorkflowService {
         totalWorkflows: number;
         hasMessenger: boolean;
     } {
-        const activeRow = this.db.query(
-            `SELECT COUNT(*) as count FROM workflow_runs WHERE status IN ('running', 'paused')`
-        ).get() as { count: number };
-        const totalRow = this.db.query(
-            `SELECT COUNT(*) as count FROM workflows`
-        ).get() as { count: number };
+        const activeRuns = queryCount(this.db, "SELECT COUNT(*) as cnt FROM workflow_runs WHERE status IN ('running', 'paused')");
+        const totalWorkflows = queryCount(this.db, 'SELECT COUNT(*) as cnt FROM workflows');
 
         return {
             running: this.pollTimer !== null,
-            activeRuns: activeRow.count,
+            activeRuns,
             runningNodes: this.runningNodes.size,
-            totalWorkflows: totalRow.count,
+            totalWorkflows,
             hasMessenger: this.agentMessenger !== null,
         };
     }

@@ -1,6 +1,7 @@
 import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
+import { queryCount } from '../db/types';
 import {
     getCreditConfig,
     updateCreditConfig,
@@ -78,8 +79,7 @@ describe('Balance', () => {
     test('getBalance is idempotent (creates ledger row once)', () => {
         getBalance(db, WALLET);
         getBalance(db, WALLET);
-        const rows = db.query('SELECT COUNT(*) as count FROM credit_ledger WHERE wallet_address = ?').get(WALLET) as { count: number };
-        expect(rows.count).toBe(1);
+        expect(queryCount(db, 'SELECT COUNT(*) as cnt FROM credit_ledger WHERE wallet_address = ?', WALLET)).toBe(1);
     });
 
     test('available = credits - reserved', () => {

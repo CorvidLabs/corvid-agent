@@ -13,6 +13,7 @@ import type { AlgoChatService } from './service';
 import { PSKManager } from './psk';
 import type { PSKMessage } from './psk';
 import { createLogger } from '../lib/logger';
+import { queryCount } from '../db/types';
 
 const log = createLogger('PSKContactManager');
 
@@ -280,10 +281,7 @@ export class PSKContactManager {
 
     /** Check whether there are unmatched contacts (no mobile_address yet). */
     hasUnmatchedContacts(): boolean {
-        const row = this.db.prepare(
-            'SELECT COUNT(*) as count FROM psk_contacts WHERE network = ? AND active = 1 AND mobile_address IS NULL'
-        ).get(this.config.network) as { count: number };
-        return row.count > 0;
+        return queryCount(this.db, 'SELECT COUNT(*) as cnt FROM psk_contacts WHERE network = ? AND active = 1 AND mobile_address IS NULL', this.config.network) > 0;
     }
 
     /**
