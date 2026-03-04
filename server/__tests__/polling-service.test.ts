@@ -10,6 +10,7 @@ import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { createMentionPollingConfig, findDuePollingConfigs } from '../db/mention-polling';
 import { MentionPollingService } from '../polling/service';
+import { CIRetryService } from '../polling/ci-retry';
 
 // ─── Test Setup ─────────────────────────────────────────────────────────────
 
@@ -375,13 +376,14 @@ describe('buildPrompt', () => {
 
 // ─── CI fix session prompt ──────────────────────────────────────────────────
 
-describe('spawnCIFixSession', () => {
+describe('spawnCIFixSession (via CIRetryService)', () => {
     test('creates a session with CI fix instructions', async () => {
-        const service = new MentionPollingService(db, mockProcessManager);
+        const mockRunGh = mock(async () => ({ ok: true, stdout: '', stderr: '' }));
+        const ciRetry = new CIRetryService(db, mockProcessManager as any, mockRunGh);
         const spawn = (repo: string, prNumber: number, prTitle: string, failedChecks: string[], aId: string, pId: string) =>
-            (service as unknown as {
-                spawnCIFixSession: (r: string, n: number, t: string, f: string[], a: string, p: string) => Promise<void>;
-            }).spawnCIFixSession(repo, prNumber, prTitle, failedChecks, aId, pId);
+            (ciRetry as unknown as {
+                spawnFixSession: (r: string, n: number, t: string, f: string[], a: string, p: string) => Promise<void>;
+            }).spawnFixSession(repo, prNumber, prTitle, failedChecks, aId, pId);
 
         await spawn('CorvidLabs/corvid-agent', 42, 'Fix bug', ['Build & Test', 'Lint'], agentId, projectId);
 
@@ -397,11 +399,12 @@ describe('spawnCIFixSession', () => {
     });
 
     test('uses corvid_create_work_task instruction for home repo', async () => {
-        const service = new MentionPollingService(db, mockProcessManager);
+        const mockRunGh = mock(async () => ({ ok: true, stdout: '', stderr: '' }));
+        const ciRetry = new CIRetryService(db, mockProcessManager as any, mockRunGh);
         const spawn = (repo: string, prNumber: number, prTitle: string, failedChecks: string[], aId: string, pId: string) =>
-            (service as unknown as {
-                spawnCIFixSession: (r: string, n: number, t: string, f: string[], a: string, p: string) => Promise<void>;
-            }).spawnCIFixSession(repo, prNumber, prTitle, failedChecks, aId, pId);
+            (ciRetry as unknown as {
+                spawnFixSession: (r: string, n: number, t: string, f: string[], a: string, p: string) => Promise<void>;
+            }).spawnFixSession(repo, prNumber, prTitle, failedChecks, aId, pId);
 
         await spawn('CorvidLabs/corvid-agent', 10, 'Test PR', ['tests'], agentId, projectId);
 
@@ -445,12 +448,13 @@ describe('dedup integration', () => {
 
 // ─── CI retry cooldown ──────────────────────────────────────────────────────
 
-describe('CI retry cooldown', () => {
+describe('CI retry cooldown (via CIRetryService)', () => {
     test('cooldown map tracks last spawn time per PR', () => {
-        const service = new MentionPollingService(db, mockProcessManager);
-        const cooldownMap = (service as unknown as {
-            ciRetryLastSpawn: Map<string, number>;
-        }).ciRetryLastSpawn;
+        const mockRunGh = mock(async () => ({ ok: true, stdout: '', stderr: '' }));
+        const ciRetry = new CIRetryService(db, mockProcessManager as any, mockRunGh);
+        const cooldownMap = (ciRetry as unknown as {
+            lastSpawn: Map<string, number>;
+        }).lastSpawn;
 
         const key = 'CorvidLabs/corvid-agent#42';
         cooldownMap.set(key, Date.now());
