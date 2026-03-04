@@ -4,6 +4,7 @@
 import type { Database } from 'bun:sqlite';
 import type { SandboxManager } from '../sandbox/manager';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { getAgent } from '../db/agents';
 import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
 import { json, notFound, handleRouteError } from '../lib/response';
@@ -46,10 +47,18 @@ export function handleSandboxRoutes(
         }
 
         if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleSetPolicy(req, db, agentId);
         }
 
         if (method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             const removed = removeAgentPolicy(db, agentId);
             return removed ? json({ ok: true }) : notFound('No policy found for agent');
         }
@@ -58,12 +67,20 @@ export function handleSandboxRoutes(
     // Assign container to session
     const assignMatch = path.match(/^\/api\/sandbox\/assign$/);
     if (assignMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleAssign(req, sandboxManager);
     }
 
     // Release container
     const releaseMatch = path.match(/^\/api\/sandbox\/release\/([^/]+)$/);
     if (releaseMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleRelease(releaseMatch[1], sandboxManager);
     }
 

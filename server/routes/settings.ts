@@ -7,6 +7,7 @@ import type { Database } from 'bun:sqlite';
 import { json } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, UpdateCreditConfigSchema } from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import {
     rotateApiKey,
     getApiKeyRotationStatus,
@@ -25,11 +26,19 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
 
     // PUT /api/settings/credits — update credit config
     if (url.pathname === '/api/settings/credits' && req.method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleUpdateCreditConfig(req, db);
     }
 
     // POST /api/settings/api-key/rotate — rotate the API key (admin-only, guarded by ADMIN_PATHS)
     if (url.pathname === '/api/settings/api-key/rotate' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleApiKeyRotate(req, db, authConfig ?? null);
     }
 
