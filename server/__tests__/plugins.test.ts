@@ -106,7 +106,7 @@ describe('getPluginCapabilities', () => {
         const granted = caps.find(c => c.capability === 'db:read');
         expect(granted!.granted).toBeTruthy();
         // Raw SQLite returns snake_case column names
-        expect((granted as Record<string, unknown>).granted_at).toBeTruthy();
+        expect((granted as unknown as Record<string, unknown>).granted_at).toBeTruthy();
 
         const denied = caps.find(c => c.capability === 'network:outbound');
         expect(denied!.granted).toBeFalsy();

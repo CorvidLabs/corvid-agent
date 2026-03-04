@@ -14,6 +14,7 @@ import { json } from '../lib/response';
 import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 
 const log = createLogger('SessionRoutes');
 
@@ -35,6 +36,10 @@ export async function handleSessionRoutes(
     }
 
     if (path === '/api/sessions' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreate(req, db, processManager, tenantId);
     }
 
@@ -50,9 +55,17 @@ export async function handleSessionRoutes(
             return session ? json(session) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleUpdate(req, db, id, tenantId);
         }
         if (method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             processManager.stopProcess(id);
             const deleted = deleteSession(db, id, tenantId);
             return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
@@ -64,10 +77,18 @@ export async function handleSessionRoutes(
     }
 
     if (action === 'stop' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleStop(req, db, processManager, id, tenantId);
     }
 
     if (action === 'resume' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleResume(req, db, processManager, id, tenantId);
     }
 
