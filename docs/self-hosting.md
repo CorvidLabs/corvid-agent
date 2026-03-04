@@ -170,6 +170,29 @@ Key defaults baked into the image:
 - `NODE_ENV=production`
 - Healthcheck on `/health/live` every 30 seconds
 
+### Image Verification
+
+Released Docker images are signed with [Cosign](https://github.com/sigstore/cosign) (keyless, via Sigstore/Fulcio) and include an SPDX SBOM attestation.
+
+Verify the image signature:
+
+```bash
+cosign verify \
+  --certificate-identity-regexp "https://github.com/CorvidLabs/corvid-agent" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/corvidlabs/corvid-agent:latest
+```
+
+Verify and extract the SBOM attestation:
+
+```bash
+cosign verify-attestation \
+  --type spdxjson \
+  --certificate-identity-regexp "https://github.com/CorvidLabs/corvid-agent" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/corvidlabs/corvid-agent:latest | jq -r '.payload' | base64 -d | jq .
+```
+
 ### Reverse Proxy
 
 When `BIND_HOST=0.0.0.0`, the API is exposed on all interfaces. In production, always place the server behind a reverse proxy with TLS. The `deploy/` directory includes configurations for both Nginx and Caddy:
