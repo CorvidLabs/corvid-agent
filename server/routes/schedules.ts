@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { SchedulerService } from '../scheduler/service';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { validateScheduleFrequency } from '../scheduler/service';
 import {
     listSchedules,
@@ -40,6 +41,10 @@ export function handleScheduleRoutes(
 
     // Create schedule
     if (url.pathname === '/api/schedules' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreateSchedule(req, db, tenantId);
     }
 
@@ -53,11 +58,19 @@ export function handleScheduleRoutes(
 
     // Update schedule
     if (scheduleMatch && req.method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleUpdateSchedule(req, db, scheduleMatch[1], tenantId);
     }
 
     // Delete schedule
     if (scheduleMatch && req.method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const deleted = deleteSchedule(db, scheduleMatch[1], tenantId);
         if (!deleted) return json({ error: 'Schedule not found' }, 404);
         return json({ ok: true });
@@ -93,6 +106,10 @@ export function handleScheduleRoutes(
     // Cancel a running execution
     const cancelMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/cancel$/);
     if (cancelMatch && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
         const execution = schedulerService.cancelExecution(cancelMatch[1]);
         if (!execution) return json({ error: 'Execution not found or not running' }, 404);
@@ -109,12 +126,20 @@ export function handleScheduleRoutes(
 
     // Bulk schedule actions (pause/resume/delete)
     if (url.pathname === '/api/schedules/bulk' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleBulkAction(req, db);
     }
 
     // Trigger schedule now
     const triggerMatch = url.pathname.match(/^\/api\/schedules\/([^/]+)\/trigger$/);
     if (triggerMatch && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         if (!schedulerService) return json({ error: 'Scheduler not available' }, 503);
         return handleTriggerNow(triggerMatch[1], schedulerService);
     }
@@ -122,6 +147,10 @@ export function handleScheduleRoutes(
     // Approve/deny execution
     const approvalMatch = url.pathname.match(/^\/api\/schedule-executions\/([^/]+)\/resolve$/);
     if (approvalMatch && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleResolveApproval(req, db, approvalMatch[1], schedulerService);
     }
 

@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { WorkflowService } from '../workflow/service';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import {
     listWorkflows,
     getWorkflow,
@@ -39,6 +40,10 @@ export function handleWorkflowRoutes(
 
     // Create workflow
     if (url.pathname === '/api/workflows' && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreateWorkflow(req, db, tenantId);
     }
 
@@ -52,11 +57,19 @@ export function handleWorkflowRoutes(
 
     // Update workflow
     if (workflowMatch && req.method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleUpdateWorkflow(req, db, workflowMatch[1], tenantId);
     }
 
     // Delete workflow
     if (workflowMatch && req.method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const deleted = deleteWorkflow(db, workflowMatch[1], tenantId);
         if (!deleted) return json({ error: 'Workflow not found' }, 404);
         return json({ ok: true });
@@ -65,6 +78,10 @@ export function handleWorkflowRoutes(
     // Trigger workflow execution
     const triggerMatch = url.pathname.match(/^\/api\/workflows\/([^/]+)\/trigger$/);
     if (triggerMatch && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleTriggerWorkflow(req, db, triggerMatch[1], workflowService);
     }
 
@@ -94,6 +111,10 @@ export function handleWorkflowRoutes(
     // Pause/resume/cancel a run
     const runActionMatch = url.pathname.match(/^\/api\/workflow-runs\/([^/]+)\/action$/);
     if (runActionMatch && req.method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleRunAction(req, runActionMatch[1], workflowService);
     }
 

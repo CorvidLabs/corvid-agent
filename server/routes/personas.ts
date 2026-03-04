@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { getPersona, upsertPersona, deletePersona } from '../db/personas';
 import { getAgent } from '../db/agents';
 import { parseBodyOrThrow, ValidationError, UpsertPersonaSchema } from '../lib/validation';
@@ -28,12 +29,20 @@ export function handlePersonaRoutes(
     // PUT /api/agents/:id/persona
     const putMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/persona$/);
     if (putMatch && req.method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleUpsert(req, db, putMatch[1], tenantId);
     }
 
     // DELETE /api/agents/:id/persona
     const deleteMatch = url.pathname.match(/^\/api\/agents\/([^/]+)\/persona$/);
     if (deleteMatch && req.method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const agentId = deleteMatch[1];
         const agent = getAgent(db, agentId, tenantId);
         if (!agent) return json({ error: 'Agent not found' }, 404);
