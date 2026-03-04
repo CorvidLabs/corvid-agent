@@ -24,6 +24,14 @@
         <string>production</string>
         <key>PATH</key>
         <string>__PATH__</string>
+        <key>GIT_AUTHOR_NAME</key>
+        <string>Corvid Agent</string>
+        <key>GIT_AUTHOR_EMAIL</key>
+        <string>95454608+corvid-agent@users.noreply.github.com</string>
+        <key>GIT_COMMITTER_NAME</key>
+        <string>Corvid Agent</string>
+        <key>GIT_COMMITTER_EMAIL</key>
+        <string>95454608+corvid-agent@users.noreply.github.com</string>
     </dict>
 
     <key>RunAtLoad</key>
