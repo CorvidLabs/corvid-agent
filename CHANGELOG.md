@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0] - 2026-03-04
+
+### Added
+- **RBAC enforcement across all routes** — `tenantRoleGuard` added to all write endpoints across 17 route files (75 endpoints), with owner-only guards on settings and billing (#520, #526, #527, #528)
+- **Test coverage: scheduler** — 70 new tests for cron-parser (37 tests) and priority-rules (33 tests) (#524, #532)
+- **Test coverage: polling** — 28 new tests for auto-merge (14 tests) and ci-retry (14 tests) (#525, #533)
+
+### Fixed
+- TypeScript strict mode errors in plugins.test.ts (double cast for PluginCapabilityRecord)
+- Unused `@ts-expect-error` directives in polling test files
+
+## [0.14.0] - 2026-02-28
+
+### Added
+- **Slack notification integration** — schedule approval notifications, work task results, and agent questions routed to Slack channels
+- **Health-gated scheduling** — priority rules engine suppresses non-critical work when system health is degraded
+- **Auto-merge polling** — automatically merges agent PRs when all CI checks pass
+- **CI retry service** — detects failed CI on agent PRs and spawns fix sessions
+- **Performance metrics** — collection, trend detection, and regression alerts
+- **Usage monitoring** — schedule execution frequency tracking and anomaly detection
+- **Feedback loop** — PR outcome tracking for schedule effectiveness learning
+
+### Changed
+- Database schema version bumped to 62 (15 new migrations since v0.13.0)
+- Route modules expanded from 28 to 34
+- Module specs expanded from 33 to 38
+
 ## [0.13.0] - 2026-02-25
 
 ### Added

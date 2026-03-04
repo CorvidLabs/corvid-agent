@@ -241,7 +241,7 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 
 ## Roadmap
 
-### Shipped (v0.1.0 -> v0.13.0)
+### Shipped (v0.1.0 -> v0.15.0)
 
 - Agent orchestration with Claude SDK
 - Council deliberation with structured voting and follow-up chat
@@ -250,13 +250,13 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - Angular 21 web UI with real-time WebSocket updates
 - Discord bridge (raw WebSocket gateway, bidirectional)
 - Telegram bridge
-- MCP tool system (36+ corvid_* handlers)
+- MCP tool system (27 corvid_* handlers, 34 total tools)
 - GitHub integration (PRs, issues, reviews)
 - Google A2A protocol (inbound task handling, agent card)
 - AST code analysis via Tree-sitter
 - Model exam system (18 tests, 6 categories)
 - Structured memory with vector embeddings
-- SQLite persistence (47 migrations)
+- SQLite persistence (62 migrations)
 - Billing/metering infrastructure
 - Agent marketplace foundations
 - Notification system (Discord, Telegram, GitHub, AlgoChat)
