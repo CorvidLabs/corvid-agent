@@ -37,6 +37,7 @@ import {
     resolveFullRepo,
     type DetectedMention,
 } from './github-searcher';
+import { queryCount } from '../db/types';
 
 const log = createLogger('MentionPoller');
 const TRIGGER_DEDUP_NS = 'polling:triggers';
@@ -499,11 +500,7 @@ export class MentionPollingService {
             log.info('New commits detected on origin/main', { local: localHash.slice(0, 8), remote: remoteHash.slice(0, 8) });
 
             // Check for running sessions — wait for them to finish
-            const running = this.db.query(
-                `SELECT COUNT(*) as count FROM sessions WHERE status = 'running' AND pid IS NOT NULL`
-            ).get() as { count: number } | null;
-
-            const activeCount = running?.count ?? 0;
+            const activeCount = queryCount(this.db, "SELECT COUNT(*) as cnt FROM sessions WHERE status = 'running' AND pid IS NOT NULL");
             if (activeCount > 0) {
                 log.info('Deferring auto-update — waiting for active sessions to finish', { activeCount });
                 return;

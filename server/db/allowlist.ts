@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { queryCount } from './types';
 
 export interface AllowlistEntry {
     address: string;
@@ -54,6 +55,5 @@ export function removeFromAllowlist(db: Database, address: string): boolean {
 export function isAllowed(db: Database, address: string): boolean {
     const row = db.query('SELECT 1 FROM algochat_allowlist WHERE address = ? LIMIT 1').get(address);
     if (row != null) return true;
-    const count = db.query('SELECT COUNT(*) as cnt FROM algochat_allowlist').get() as { cnt: number };
-    return count.cnt === 0;
+    return queryCount(db, 'SELECT COUNT(*) as cnt FROM algochat_allowlist') === 0;
 }

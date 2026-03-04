@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { queryCount } from './types';
 
 export interface GitHubAllowlistEntry {
     username: string;
@@ -63,8 +64,7 @@ export function removeFromGitHubAllowlist(db: Database, username: string): boole
 export function isGitHubUserAllowed(db: Database, username: string): boolean {
     const row = db.query('SELECT 1 FROM github_allowlist WHERE username = ? LIMIT 1').get(username.toLowerCase());
     if (row != null) return true;
-    const count = db.query('SELECT COUNT(*) as cnt FROM github_allowlist').get() as { cnt: number };
-    if (count.cnt === 0) {
+    if (queryCount(db, 'SELECT COUNT(*) as cnt FROM github_allowlist') === 0) {
         return process.env.GITHUB_ALLOWLIST_OPEN_MODE === 'true';
     }
     return false;

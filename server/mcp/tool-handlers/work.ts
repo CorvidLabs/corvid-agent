@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import { createLogger } from '../../lib/logger';
+import { queryCount } from '../../db/types';
 
 const log = createLogger('McpToolHandlers');
 
@@ -10,10 +11,7 @@ const log = createLogger('McpToolHandlers');
 const WORK_TASK_MAX_PER_DAY = parseInt(process.env.WORK_TASK_MAX_PER_DAY ?? '100', 10);
 
 function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
-    const row = db.query(
-        `SELECT COUNT(*) as count FROM work_tasks WHERE agent_id = ? AND date(created_at) = date('now')`
-    ).get(agentId) as { count: number } | null;
-    return (row?.count ?? 0) < WORK_TASK_MAX_PER_DAY;
+    return queryCount(db, "SELECT COUNT(*) as cnt FROM work_tasks WHERE agent_id = ? AND date(created_at) = date('now')", agentId) < WORK_TASK_MAX_PER_DAY;
 }
 
 export async function handleCreateWorkTask(

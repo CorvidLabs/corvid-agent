@@ -6,6 +6,7 @@
 import type { Database } from 'bun:sqlite';
 import type { RequestContext } from '../middleware/guards';
 import { json, safeNumParam } from '../lib/response';
+import { queryCount } from '../db/types';
 
 export function handleSystemLogRoutes(req: Request, url: URL, db: Database, _context?: RequestContext): Response | null {
     // GET /api/system-logs — aggregated system logs
@@ -159,11 +160,11 @@ function handleCreditTransactions(db: Database, limit: number, offset: number): 
         session_id: string | null; created_at: string;
     }[];
 
-    const countRow = db.query(`SELECT COUNT(*) as count FROM credit_transactions`).get() as { count: number };
+    const total = queryCount(db, 'SELECT COUNT(*) as cnt FROM credit_transactions');
 
     return json({
         transactions,
-        total: countRow.count,
+        total,
         limit: clampedLimit,
         offset,
     });

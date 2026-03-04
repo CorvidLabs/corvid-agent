@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { AgentMessage, AgentMessageStatus, MessageErrorCode } from '../../shared/types';
 import { MESSAGE_PROTOCOL_VERSION } from '../../shared/types';
+import { queryCount } from './types';
 
 interface AgentMessageRow {
     id: string;
@@ -174,8 +175,7 @@ export function searchAgentMessages(
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const countRow = db.query(`SELECT COUNT(*) as cnt FROM agent_messages ${where}`).get(...(params as string[])) as { cnt: number };
-    const total = countRow.cnt;
+    const total = queryCount(db, `SELECT COUNT(*) as cnt FROM agent_messages ${where}`, ...(params as string[]));
 
     const limit = Math.min(options.limit ?? 50, 100);
     const offset = options.offset ?? 0;

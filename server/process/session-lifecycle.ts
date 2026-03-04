@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
+import { queryCount } from '../db/types';
 
 const log = createLogger('SessionLifecycle');
 
@@ -277,11 +278,7 @@ export class SessionLifecycleManager {
      * Update the active session count for monitoring
      */
     private updateActiveSessionCount(): void {
-        const result = this.db.query(`
-            SELECT COUNT(*) as count FROM sessions WHERE status IN ('running', 'paused')
-        `).get() as { count: number };
-
-        this.activeSessionCount = result.count;
+        this.activeSessionCount = queryCount(this.db, "SELECT COUNT(*) as cnt FROM sessions WHERE status IN ('running', 'paused')");
     }
 
     /**
@@ -293,7 +290,7 @@ export class SessionLifecycleManager {
         sessionsByStatus: Record<string, number>;
         oldestSessionAge: number;
     } {
-        const totalResult = this.db.query(`SELECT COUNT(*) as count FROM sessions`).get() as { count: number };
+        const totalSessions = queryCount(this.db, 'SELECT COUNT(*) as cnt FROM sessions');
 
         const statusResults = this.db.query(`
             SELECT status, COUNT(*) as count
@@ -312,7 +309,7 @@ export class SessionLifecycleManager {
 
         return {
             activeSessions: this.activeSessionCount,
-            totalSessions: totalResult.count,
+            totalSessions,
             sessionsByStatus,
             oldestSessionAge: oldestResult.oldest ? Date.now() - new Date(oldestResult.oldest + 'Z').getTime() : 0,
         };
@@ -322,13 +319,7 @@ export class SessionLifecycleManager {
      * Check if a new session can be created for a project
      */
     canCreateSession(projectId: string): boolean {
-        const result = this.db.query(`
-            SELECT COUNT(*) as count
-            FROM sessions
-            WHERE project_id = ?
-        `).get(projectId) as { count: number };
-
-        return result.count < this.config.maxSessionsPerProject;
+        return queryCount(this.db, 'SELECT COUNT(*) as cnt FROM sessions WHERE project_id = ?', projectId) < this.config.maxSessionsPerProject;
     }
 
     /**

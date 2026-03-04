@@ -1,6 +1,7 @@
 import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { DedupService } from '../lib/dedup';
+import { queryCount } from '../db/types';
 
 describe('DedupService', () => {
     let service: DedupService;
@@ -302,10 +303,10 @@ describe('DedupService', () => {
             svc2.stop();
 
             // Verify the dedup_state table is clean
-            const rows = db.query(`SELECT COUNT(*) as cnt FROM dedup_state`).get() as { cnt: number };
+            const dedupCount = queryCount(db, 'SELECT COUNT(*) as cnt FROM dedup_state');
             // After stop(), any keys that were restored and then stopped should be persisted
             // but the expired ones from svc1 were cleaned on svc2 startup
-            expect(rows.cnt).toBeLessThanOrEqual(1);
+            expect(dedupCount).toBeLessThanOrEqual(1);
         });
 
         test('creates dedup_state table automatically', () => {

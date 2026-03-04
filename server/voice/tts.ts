@@ -3,6 +3,7 @@ import type { VoicePreset } from '../../shared/types';
 import type { TTSOptions, TTSResult } from './types';
 import { createLogger } from '../lib/logger';
 import { ValidationError, ExternalServiceError } from '../lib/errors';
+import { queryCount } from '../db/types';
 
 const log = createLogger('TTS');
 
@@ -105,9 +106,9 @@ export async function synthesizeWithCache(
     ).run(id, textHash, voice, result.audio, result.format, result.durationMs);
 
     // Evict oldest entries if cache exceeds max size
-    const countRow = db.query('SELECT COUNT(*) as cnt FROM voice_cache').get() as { cnt: number };
-    if (countRow.cnt > MAX_VOICE_CACHE_ENTRIES) {
-        const excess = countRow.cnt - MAX_VOICE_CACHE_ENTRIES;
+    const cacheCount = queryCount(db, 'SELECT COUNT(*) as cnt FROM voice_cache');
+    if (cacheCount > MAX_VOICE_CACHE_ENTRIES) {
+        const excess = cacheCount - MAX_VOICE_CACHE_ENTRIES;
         db.query('DELETE FROM voice_cache WHERE id IN (SELECT id FROM voice_cache ORDER BY created_at ASC LIMIT ?)').run(excess);
         log.info('Voice cache evicted old entries', { evicted: excess });
     }

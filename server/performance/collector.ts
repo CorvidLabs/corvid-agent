@@ -8,6 +8,7 @@
 import type { Database } from 'bun:sqlite';
 import { statSync } from 'node:fs';
 import { createLogger } from '../lib/logger';
+import { queryCount } from '../db/types';
 
 const log = createLogger('PerfCollector');
 
@@ -206,26 +207,16 @@ export class PerformanceCollector {
         }
 
         // Slow query count regression
-        const slowThisWeek = this.db.query(`
-            SELECT COUNT(*) as count FROM performance_metrics
-            WHERE metric = 'db_slow_query'
-              AND timestamp >= datetime('now', '-7 days')
-        `).get() as { count: number };
+        const slowThisWeekCount = queryCount(this.db, `SELECT COUNT(*) as cnt FROM performance_metrics WHERE metric = 'db_slow_query' AND timestamp >= datetime('now', '-7 days')`);
+        const slowLastWeekCount = queryCount(this.db, `SELECT COUNT(*) as cnt FROM performance_metrics WHERE metric = 'db_slow_query' AND timestamp >= datetime('now', '-14 days') AND timestamp < datetime('now', '-7 days')`);
 
-        const slowLastWeek = this.db.query(`
-            SELECT COUNT(*) as count FROM performance_metrics
-            WHERE metric = 'db_slow_query'
-              AND timestamp >= datetime('now', '-14 days')
-              AND timestamp < datetime('now', '-7 days')
-        `).get() as { count: number };
-
-        if (slowLastWeek.count > 0 && slowThisWeek.count > 0) {
-            const changePercent = ((slowThisWeek.count - slowLastWeek.count) / slowLastWeek.count) * 100;
+        if (slowLastWeekCount > 0 && slowThisWeekCount > 0) {
+            const changePercent = ((slowThisWeekCount - slowLastWeekCount) / slowLastWeekCount) * 100;
             if (changePercent > thresholdPercent) {
                 regressions.push({
                     metric: 'db_slow_query_count',
-                    thisWeekAvg: slowThisWeek.count,
-                    lastWeekAvg: slowLastWeek.count,
+                    thisWeekAvg: slowThisWeekCount,
+                    lastWeekAvg: slowLastWeekCount,
                     changePercent: Math.round(changePercent * 10) / 10,
                     severity: changePercent > 50 ? 'critical' : 'warning',
                 });
@@ -241,22 +232,16 @@ export class PerformanceCollector {
         const regressions = this.detectRegressions();
 
         // Get slow query count for today
-        const slowToday = this.db.query(`
-            SELECT COUNT(*) as count FROM performance_metrics
-            WHERE metric = 'db_slow_query'
-              AND timestamp >= datetime('now', 'start of day')
-        `).get() as { count: number };
+        const slowToday = queryCount(this.db, "SELECT COUNT(*) as cnt FROM performance_metrics WHERE metric = 'db_slow_query' AND timestamp >= datetime('now', 'start of day')");
 
         // Get total metrics count for storage info
-        const totalRows = this.db.query(`
-            SELECT COUNT(*) as count FROM performance_metrics
-        `).get() as { count: number };
+        const metricsTotal = queryCount(this.db, 'SELECT COUNT(*) as cnt FROM performance_metrics');
 
         return {
             snapshot,
             regressions,
-            slowQueriestoday: slowToday.count,
-            metricsStoredTotal: totalRows.count,
+            slowQueriestoday: slowToday,
+            metricsStoredTotal: metricsTotal,
         };
     }
 

@@ -9,6 +9,7 @@
 import type { Database } from 'bun:sqlite';
 import { getTraceId } from '../observability/trace-context';
 import { createLogger } from '../lib/logger';
+import { queryCount } from './types';
 
 const log = createLogger('Audit');
 
@@ -143,9 +144,7 @@ export function queryAuditLog(db: Database, options: AuditQueryOptions = {}): { 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Count total matching rows
-    const countRow = db.query(
-        `SELECT COUNT(*) as total FROM audit_log ${whereClause}`
-    ).get(...params) as { total: number };
+    const total = queryCount(db, `SELECT COUNT(*) as cnt FROM audit_log ${whereClause}`, ...params);
 
     // Fetch paginated results
     const limit = Math.min(options.limit ?? 50, 500);
@@ -180,6 +179,6 @@ export function queryAuditLog(db: Database, options: AuditQueryOptions = {}): { 
             traceId: r.trace_id,
             ipAddress: r.ip_address,
         })),
-        total: countRow.total,
+        total,
     };
 }

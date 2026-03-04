@@ -32,6 +32,7 @@ import { createSession, getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
+import { queryCount } from '../db/types';
 
 const log = createLogger('Workflow');
 
@@ -183,18 +184,14 @@ export class WorkflowService {
         totalWorkflows: number;
         hasMessenger: boolean;
     } {
-        const activeRow = this.db.query(
-            `SELECT COUNT(*) as count FROM workflow_runs WHERE status IN ('running', 'paused')`
-        ).get() as { count: number };
-        const totalRow = this.db.query(
-            `SELECT COUNT(*) as count FROM workflows`
-        ).get() as { count: number };
+        const activeRuns = queryCount(this.db, "SELECT COUNT(*) as cnt FROM workflow_runs WHERE status IN ('running', 'paused')");
+        const totalWorkflows = queryCount(this.db, 'SELECT COUNT(*) as cnt FROM workflows');
 
         return {
             running: this.pollTimer !== null,
-            activeRuns: activeRow.count,
+            activeRuns,
             runningNodes: this.runningNodes.size,
-            totalWorkflows: totalRow.count,
+            totalWorkflows,
             hasMessenger: this.agentMessenger !== null,
         };
     }

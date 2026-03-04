@@ -8,6 +8,7 @@ import type { Database } from 'bun:sqlite';
 import type { TenantContext, Tenant, TenantRecord, TenantPlan } from './types';
 import { DEFAULT_TENANT_ID, PLAN_LIMITS } from './types';
 import { createLogger } from '../lib/logger';
+import { queryCount } from '../db/types';
 
 const log = createLogger('TenantContext');
 
@@ -182,11 +183,7 @@ export class TenantService {
         if (!tenant) return false;
         if (tenant.maxAgents === -1) return true; // unlimited
 
-        const row = this.db.query(
-            'SELECT COUNT(*) as count FROM agents WHERE tenant_id = ?',
-        ).get(tenantId) as { count: number } | null;
-
-        return (row?.count ?? 0) < tenant.maxAgents;
+        return queryCount(this.db, 'SELECT COUNT(*) as cnt FROM agents WHERE tenant_id = ?', tenantId) < tenant.maxAgents;
     }
 
     /**
@@ -197,10 +194,6 @@ export class TenantService {
         if (!tenant) return false;
         if (tenant.maxConcurrentSessions === -1) return true;
 
-        const row = this.db.query(
-            "SELECT COUNT(*) as count FROM sessions WHERE tenant_id = ? AND status IN ('running', 'idle')",
-        ).get(tenantId) as { count: number } | null;
-
-        return (row?.count ?? 0) < tenant.maxConcurrentSessions;
+        return queryCount(this.db, "SELECT COUNT(*) as cnt FROM sessions WHERE tenant_id = ? AND status IN ('running', 'idle')", tenantId) < tenant.maxConcurrentSessions;
     }
 }

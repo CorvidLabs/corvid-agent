@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { queryCount } from './types';
 
 export interface AlgoChatMessage {
     id: number;
@@ -62,12 +63,12 @@ export function listRecentAlgoChatMessages(
     limit: number = 50,
     offset: number = 0,
 ): { messages: AlgoChatMessage[]; total: number } {
-    const countRow = db.query('SELECT COUNT(*) as cnt FROM algochat_messages').get() as { cnt: number };
+    const total = queryCount(db, 'SELECT COUNT(*) as cnt FROM algochat_messages');
     const rows = db.query(
         `SELECT * FROM algochat_messages ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     ).all(limit, offset) as AlgoChatMessageRow[];
 
-    return { messages: rows.map(rowToMessage), total: countRow.cnt };
+    return { messages: rows.map(rowToMessage), total };
 }
 
 export function searchAlgoChatMessages(
@@ -92,7 +93,7 @@ export function searchAlgoChatMessages(
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const countRow = db.query(`SELECT COUNT(*) as cnt FROM algochat_messages ${where}`).get(...(params as string[])) as { cnt: number };
+    const total = queryCount(db, `SELECT COUNT(*) as cnt FROM algochat_messages ${where}`, ...(params as string[]));
     const limit = Math.min(options.limit ?? 50, 100);
     const offset = options.offset ?? 0;
 
@@ -100,7 +101,7 @@ export function searchAlgoChatMessages(
         `SELECT * FROM algochat_messages ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     ).all(...(params as string[]), limit, offset) as AlgoChatMessageRow[];
 
-    return { messages: rows.map(rowToMessage), total: countRow.cnt };
+    return { messages: rows.map(rowToMessage), total };
 }
 
 // ─── Wallet Summaries ────────────────────────────────────────────────────
@@ -187,13 +188,11 @@ export function getWalletMessages(
     limit: number = 50,
     offset: number = 0,
 ): { messages: AlgoChatMessage[]; total: number } {
-    const countRow = db.query(
-        'SELECT COUNT(*) as cnt FROM algochat_messages WHERE participant = ?'
-    ).get(address) as { cnt: number };
+    const total = queryCount(db, 'SELECT COUNT(*) as cnt FROM algochat_messages WHERE participant = ?', address);
 
     const rows = db.query(
         `SELECT * FROM algochat_messages WHERE participant = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     ).all(address, limit, offset) as AlgoChatMessageRow[];
 
-    return { messages: rows.map(rowToMessage), total: countRow.cnt };
+    return { messages: rows.map(rowToMessage), total };
 }
