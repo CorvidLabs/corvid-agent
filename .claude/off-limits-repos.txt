@@ -1,0 +1,6 @@
+# Contributor-owned repos — do not create issues, PRs, or commits
+# unless explicitly asked by the repo owner.
+CorvidLabs/rust-server
+CorvidLabs/rust-game
+CorvidLabs/rust-ui
+CorvidLabs/rust-learning
