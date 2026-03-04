@@ -77,13 +77,15 @@ jobs:
       - name: Approve or request changes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BUILD_RESULT: ${{ needs.build.result }}
         run: |
-          if [ "${{ needs.build.result }}" = "success" ]; then
-            gh pr review ${{ github.event.pull_request.number }} \
+          if [ "$BUILD_RESULT" = "success" ]; then
+            gh pr review "$PR_NUMBER" \
               --approve \
               --body "All CI checks passed (tsc, tests, spec:check, client build) across ubuntu, macos, and windows."
           else
-            gh pr review ${{ github.event.pull_request.number }} \
+            gh pr review "$PR_NUMBER" \
               --request-changes \
               --body "CI checks failed. Please review the build logs and fix the issues before merging."
           fi

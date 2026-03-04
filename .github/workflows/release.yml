@@ -42,17 +42,21 @@ jobs:
 
       - name: Determine tag
         id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "version=$INPUT_TAG" >> "$GITHUB_OUTPUT"
           else
             echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check if pre-release
         id: prerelease
+        env:
+          TAG: ${{ steps.tag.outputs.version }}
         run: |
-          TAG="${{ steps.tag.outputs.version }}"
           if echo "$TAG" | grep -qE '-(alpha|beta|rc)'; then
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
@@ -61,8 +65,10 @@ jobs:
 
       - name: Generate changelog
         id: changelog
+        env:
+          TAG: ${{ steps.tag.outputs.version }}
+          REPO: ${{ github.repository }}
         run: |
-          TAG="${{ steps.tag.outputs.version }}"
           # Find the previous tag
           PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v' | grep -v "^${TAG}$" | head -n1)
           if [ -z "$PREV_TAG" ]; then
@@ -78,7 +84,7 @@ jobs:
             git log "$RANGE" --pretty=format:"* %s (%h)" --no-merges
             echo ""
             echo ""
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...$TAG"
+            echo "**Full Changelog**: https://github.com/${REPO}/compare/${PREV_TAG:-$(git rev-list --max-parents=0 HEAD | head -1)}...$TAG"
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
