@@ -60,7 +60,7 @@ See `.env.example` for the full list of 50+ configuration options with descripti
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  52 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  62 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -83,14 +83,14 @@ server/           Bun HTTP + WebSocket server
   algochat/       On-chain messaging (bridge, wallet, directory)
   ast/            Tree-sitter AST parser for code understanding
   billing/        Usage metering and Stripe billing
-  db/             SQLite schema (52 migrations) and query modules
+  db/             SQLite schema (62 migrations) and query modules
   discord/        Bidirectional Discord bridge (raw WebSocket)
   github/         GitHub API operations (PRs, issues, reviews)
   lib/            Shared utilities (logger, crypto, validation, dedup)
-  mcp/            MCP tool server and 36 corvid_* tool handlers
+  mcp/            MCP tool server and 27 corvid_* tool handlers
   middleware/     Auth, CORS, rate limiting, startup validation
   process/        Agent lifecycle (SDK + Ollama, persona/skill injection)
-  routes/         REST API route handlers (28 modules)
+  routes/         REST API route handlers (34 modules)
   scheduler/      Cron/interval execution engine
   telegram/       Bidirectional Telegram bridge (long-polling, voice)
   voice/          TTS (OpenAI) and STT (Whisper) with caching
@@ -99,11 +99,11 @@ server/           Bun HTTP + WebSocket server
   ws/             WebSocket handlers with pub/sub
 client/           Angular 21 SPA (standalone components, signals)
 shared/           TypeScript types shared between server and client
-e2e/              Playwright end-to-end tests (30 spec files)
+e2e/              Playwright end-to-end tests (31 spec files)
 deploy/           Docker, docker-compose, systemd, launchd, nginx, caddy
 packages/         Workspace packages (env, result utilities)
 scripts/          Developer tooling and automation scripts
-specs/            Module specification documents (33 specs)
+specs/            Module specification documents (38 specs)
 ```
 
 ### Tech Stack
@@ -121,7 +121,7 @@ specs/            Module specification documents (33 specs)
 
 ### Database
 
-SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 52 with 47+ tables.
+SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 62 with 60+ tables.
 
 Key patterns:
 - All queries use parameterized statements (no string interpolation)
@@ -186,7 +186,7 @@ bun run lint:sql
 
 ## Testing
 
-### Unit Tests (1757+)
+### Unit Tests (4931+)
 
 ```bash
 bun test                              # Run all tests (~30s)
@@ -194,9 +194,9 @@ bun test server/__tests__/db.test.ts  # Run a specific file
 bun test --watch                      # Watch mode
 ```
 
-Tests live in `server/__tests__/` (119 test files) and cover API routes, authentication, billing, database, bridges (Discord/Telegram/Slack), GitHub tools, MCP handlers, scheduling, workflows, and more.
+Tests live in `server/__tests__/` (194 test files) and cover API routes, authentication, billing, database, bridges (Discord/Telegram/Slack), GitHub tools, MCP handlers, scheduling, workflows, and more.
 
-### E2E Tests (348)
+### E2E Tests (360)
 
 ```bash
 npx playwright install                # One-time: install browsers
@@ -204,7 +204,7 @@ bun run test:e2e                      # Run all E2E tests
 bun run test:e2e:ui                   # Interactive UI mode
 ```
 
-E2E tests are in `e2e/` (30 spec files) and cover 198/202 testable API endpoints plus all Angular UI routes. The test config starts a dev server on port 3001 automatically.
+E2E tests are in `e2e/` (31 spec files) and cover 198/202 testable API endpoints plus all Angular UI routes. The test config starts a dev server on port 3001 automatically.
 
 ### Client Tests
 
@@ -216,7 +216,7 @@ cd client && npx vitest               # Watch mode
 ### Module Spec Validation
 
 ```bash
-bun run spec:check                    # Validate 33 module specs in specs/
+bun run spec:check                    # Validate 38 module specs in specs/
 ```
 
 Checks YAML frontmatter, required sections, API surface coverage, file existence, and dependency graph integrity.
