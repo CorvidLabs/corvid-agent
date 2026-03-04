@@ -96,4 +96,4 @@ corvid-agent is an agent orchestration platform that manages AI agent sessions, 
 4. **Add Content Security Policy** headers to web dashboard
 5. **Consider separate SQLite files** per tenant in Cloud mode
 6. **Implement webhook URL validation** (allowlist domains)
-7. **Add automated dependency scanning** (npm audit in CI)
+7. **Add automated dependency scanning** (npm audit in CI) — ✅ Implemented: `security.yml` workflow runs `npm-audit-ci`, CodeQL, gitleaks, and fetch-detector scans
