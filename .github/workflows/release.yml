@@ -28,6 +28,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
   # ── Create GitHub Release ───────────────────────────────────────
   release:
