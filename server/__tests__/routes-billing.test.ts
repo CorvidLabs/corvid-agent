@@ -152,4 +152,61 @@ describe('Billing Routes', () => {
         expect(data[0].tenantId).toBe(tenantId);
         expect(data[0].amountCents).toBe(5000);
     });
+
+    // ─── Subscription Items ───────────────────────────────────────────────────
+
+    it('POST /api/billing/subscription creates with stripeItems', async () => {
+        const itemTenantId = crypto.randomUUID();
+        db.query(
+            "INSERT INTO tenants (id, name, slug, owner_email) VALUES (?, 'Items Tenant', ?, 'items@example.com')",
+        ).run(itemTenantId, `items-tenant-${Date.now()}`);
+
+        const { req, url } = fakeReq('POST', '/api/billing/subscription', {
+            tenantId: itemTenantId,
+            stripeSubscriptionId: 'sub_items_123',
+            plan: 'pro',
+            periodStart: '2026-03-01T00:00:00Z',
+            periodEnd: '2026-04-01T00:00:00Z',
+            stripeItems: [{ id: 'si_metered_001', priceId: 'price_metered_001' }],
+        });
+        const res = await handleBillingRoutes(req, url, db, billing, meter)!;
+        expect(res!.status).toBe(201);
+
+        // Verify subscription_items table has the item
+        const items = db.query(
+            'SELECT * FROM subscription_items WHERE stripe_item_id = ?',
+        ).all('si_metered_001') as Array<{ stripe_item_id: string; stripe_price_id: string }>;
+        expect(items.length).toBe(1);
+        expect(items[0].stripe_price_id).toBe('price_metered_001');
+    });
+
+    // ─── UsageMeter.reportAll() ───────────────────────────────────────────────
+
+    it('reportAll() runs without error on subscription_items table', async () => {
+        // reportAll should query successfully now that subscription_items exists
+        const result = await meter.reportAll();
+        expect(typeof result.reported).toBe('number');
+        expect(typeof result.failed).toBe('number');
+    });
+
+    it('reportAll() skips records without subscription items', async () => {
+        // Create a tenant with subscription and usage but no subscription items
+        const noItemTenantId = crypto.randomUUID();
+        db.query(
+            "INSERT INTO tenants (id, name, slug, owner_email) VALUES (?, 'NoItem Tenant', ?, 'noitem@example.com')",
+        ).run(noItemTenantId, `noitem-tenant-${Date.now()}`);
+
+        billing.createSubscription(
+            noItemTenantId,
+            'sub_noitem_123',
+            'pro',
+            '2026-03-01T00:00:00Z',
+            '2026-04-01T00:00:00Z',
+        );
+        billing.recordUsage(noItemTenantId, 100, 5, 1);
+
+        const result = await meter.reportAll();
+        // Should succeed but report 0 — skips records without stripe_item_id
+        expect(result.reported).toBe(0);
+    });
 });
