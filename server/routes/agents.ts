@@ -13,6 +13,7 @@ import { buildAgentCardForAgent } from '../a2a/agent-card';
 import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 
 export function handleAgentRoutes(
     req: Request,
@@ -30,6 +31,8 @@ export function handleAgentRoutes(
     }
 
     if (path === '/api/agents' && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleCreate(req, db, context, agentWalletService);
     }
 
@@ -42,12 +45,16 @@ export function handleAgentRoutes(
     // Agent fund endpoint
     const fundMatch = path.match(/^\/api\/agents\/([^/]+)\/fund$/);
     if (fundMatch && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleFund(req, fundMatch[1], db, context, agentWalletService);
     }
 
     // Agent invoke endpoint
     const invokeMatch = path.match(/^\/api\/agents\/([^/]+)\/invoke$/);
     if (invokeMatch && method === 'POST') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleInvoke(req, invokeMatch[1], db, context, agentMessenger);
     }
 
@@ -65,9 +72,13 @@ export function handleAgentRoutes(
 
     const spendingCapMatch = path.match(/^\/api\/agents\/([^/]+)\/spending-cap$/);
     if (spendingCapMatch && method === 'PUT') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleSetSpendingCap(req, spendingCapMatch[1], db, context);
     }
     if (spendingCapMatch && method === 'DELETE') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleDeleteSpendingCap(spendingCapMatch[1], db, context);
     }
 
@@ -92,10 +103,14 @@ export function handleAgentRoutes(
     }
 
     if (method === 'PUT') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         return handleUpdate(req, db, id, context);
     }
 
     if (method === 'DELETE') {
+        const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+        if (denied) return denied;
         const deleted = deleteAgent(db, id, context.tenantId);
         if (deleted) {
             const actor = context.walletAddress ?? getClientIp(req);

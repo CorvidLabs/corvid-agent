@@ -13,6 +13,7 @@ import {
 import type { ProcessManager } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { NotFoundError } from '../lib/errors';
@@ -53,6 +54,10 @@ export function handleCouncilRoutes(
     }
 
     if (path === '/api/councils' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreateCouncil(req, db, tenantId);
     }
 
@@ -86,18 +91,34 @@ export function handleCouncilRoutes(
         }
 
         if (action === 'abort' && method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleAbort(db, processManager, launchId);
         }
 
         if (action === 'review' && method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleReview(db, processManager, launchId);
         }
 
         if (action === 'synthesize' && method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleSynthesize(db, processManager, launchId);
         }
 
         if (action === 'chat' && method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleCouncilChat(req, db, processManager, launchId);
         }
     }
@@ -115,15 +136,27 @@ export function handleCouncilRoutes(
             return council ? json(council) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             return handleUpdateCouncil(req, db, id, tenantId);
         }
         if (method === 'DELETE') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
             const deleted = deleteCouncil(db, id, tenantId);
             return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
         }
     }
 
     if (action === 'launch' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleLaunch(req, db, processManager, id, agentMessenger ?? null);
     }
 

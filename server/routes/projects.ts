@@ -7,6 +7,7 @@ import { parseBodyOrThrow, ValidationError, CreateProjectSchema, UpdateProjectSc
 import { createLogger } from '../lib/logger';
 import { json } from '../lib/response';
 import type { RequestContext } from '../middleware/guards';
+import { tenantRoleGuard } from '../middleware/guards';
 
 const log = createLogger('BrowseDirs');
 
@@ -25,6 +26,10 @@ export function handleProjectRoutes(
     }
 
     if (path === '/api/projects' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleCreate(req, db, tenantId);
     }
 
@@ -39,10 +44,18 @@ export function handleProjectRoutes(
     }
 
     if (method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         return handleUpdate(req, db, id, tenantId);
     }
 
     if (method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
         const deleted = deleteProject(db, id, tenantId);
         return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
     }
