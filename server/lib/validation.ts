@@ -550,6 +550,10 @@ export const CreateSubscriptionSchema = z.object({
     plan: z.string().min(1, 'plan is required'),
     periodStart: z.string().min(1, 'periodStart is required'),
     periodEnd: z.string().min(1, 'periodEnd is required'),
+    stripeItems: z.array(z.object({
+        id: z.string().min(1),
+        priceId: z.string().optional(),
+    })).optional(),
 });
 
 // ─── Personas ───────────────────────────────────────────────────────────────

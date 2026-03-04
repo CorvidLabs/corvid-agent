@@ -94,6 +94,7 @@ async function handleCreateSubscription(
             body.plan,
             body.periodStart,
             body.periodEnd,
+            body.stripeItems,
         );
 
         return json(sub, 201);

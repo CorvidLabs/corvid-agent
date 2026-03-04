@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 62;
+const SCHEMA_VERSION = 63;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1194,6 +1194,19 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_mcp_server_configs_tenant ON mcp_server_configs(tenant_id)`,
         `ALTER TABLE webhook_registrations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'`,
         `CREATE INDEX IF NOT EXISTS idx_webhook_registrations_tenant ON webhook_registrations(tenant_id)`,
+    ],
+    63: [
+        // Subscription items — links Stripe subscription item IDs to local subscriptions
+        // Required by UsageMeter to report metered usage to Stripe
+        `CREATE TABLE IF NOT EXISTS subscription_items (
+            id TEXT PRIMARY KEY,
+            subscription_id TEXT NOT NULL,
+            stripe_item_id TEXT NOT NULL,
+            stripe_price_id TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_subscription_items_sub ON subscription_items(subscription_id)`,
     ],
 };
 

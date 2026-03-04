@@ -79,6 +79,7 @@ export class BillingService {
         plan: string,
         periodStart: string,
         periodEnd: string,
+        stripeItems?: Array<{ id: string; priceId?: string }>,
     ): Subscription {
         const id = crypto.randomUUID();
         this.db.query(`
@@ -87,6 +88,13 @@ export class BillingService {
                  current_period_start, current_period_end)
             VALUES (?, ?, ?, ?, 'active', ?, ?)
         `).run(id, tenantId, stripeSubscriptionId, plan, periodStart, periodEnd);
+
+        // Persist Stripe subscription item IDs for metered billing
+        if (stripeItems) {
+            for (const item of stripeItems) {
+                this.addSubscriptionItem(id, item.id, item.priceId);
+            }
+        }
 
         log.info('Created subscription', { tenantId, plan, stripeSubscriptionId });
         return this.getSubscription(tenantId)!;
@@ -105,6 +113,21 @@ export class BillingService {
             SET status = ?, updated_at = datetime('now')
             WHERE tenant_id = ? AND status != 'canceled'
         `).run(status, tenantId);
+    }
+
+    /**
+     * Add a Stripe subscription item to a local subscription.
+     */
+    addSubscriptionItem(
+        subscriptionId: string,
+        stripeItemId: string,
+        stripePriceId?: string,
+    ): void {
+        const id = crypto.randomUUID();
+        this.db.query(`
+            INSERT INTO subscription_items (id, subscription_id, stripe_item_id, stripe_price_id)
+            VALUES (?, ?, ?, ?)
+        `).run(id, subscriptionId, stripeItemId, stripePriceId ?? null);
     }
 
     cancelSubscription(tenantId: string, atPeriodEnd: boolean = true): void {

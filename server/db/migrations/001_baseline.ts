@@ -753,6 +753,15 @@ export function up(db: Database): void {
         updated_at TEXT DEFAULT (datetime('now'))
     )`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id)`);
+    db.exec(`CREATE TABLE IF NOT EXISTS subscription_items (
+        id TEXT PRIMARY KEY,
+        subscription_id TEXT NOT NULL,
+        stripe_item_id TEXT NOT NULL,
+        stripe_price_id TEXT DEFAULT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+    )`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_subscription_items_sub ON subscription_items(subscription_id)`);
     db.exec(`CREATE TABLE IF NOT EXISTS usage_records (
         id TEXT PRIMARY KEY,
         tenant_id TEXT NOT NULL,
@@ -920,6 +929,7 @@ export function down(db: Database): void {
         'health_snapshots',
         'invoices',
         'usage_records',
+        'subscription_items',
         'subscriptions',
         'api_keys',
         'tenants',
