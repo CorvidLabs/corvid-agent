@@ -23,7 +23,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 
 | Type | Description |
 |------|-------------|
-| `WsData` | Per-connection data: `{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean; tenantId?: string; heartbeatTimer?: ...; pongTimeoutTimer?: ... }` |
+| `WsData` | Per-connection data: `{ subscriptions: Map<string, EventCallback>; walletAddress?: string; authenticated: boolean; tenantId?: string; heartbeatTimer?: ...; pongTimeoutTimer?: ...; authTimeoutTimer?: ... }` |
 
 ### Exported Functions
 
@@ -38,6 +38,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 |----------|-------|-------------|
 | `HEARTBEAT_INTERVAL_MS` | `30000` | Server-initiated ping interval (ms) |
 | `PONG_TIMEOUT_MS` | `10000` | Time to wait for pong before closing (ms) |
+| `AUTH_TIMEOUT_MS` | `5000` | Time to wait for post-connect authentication before closing (ms) |
 
 ## Client -> Server Messages (ClientMessage)
 
@@ -93,6 +94,8 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 14. **Pong timeout**: After each `ping`, a 10-second timeout is set. If no `pong` is received within that window, the connection is closed with code 4002
 15. **Pong clears timeout**: Receiving a `pong` message clears the pending pong timeout timer. `pong` is handled before the authentication gate so it cannot be blocked
 16. **Heartbeat cleanup on close**: All heartbeat and pong timeout timers are cleared when a connection closes
+17. **Auth timeout**: Unauthenticated connections must authenticate within 5 seconds (`AUTH_TIMEOUT_MS`). If not, the connection is closed with code 4001 (`"Authentication timeout"`)
+18. **Auth timeout cleanup**: The auth timeout timer is cleared on successful authentication or connection close
 
 ## Behavioral Examples
 
@@ -161,6 +164,12 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 - **When** the connection opens
 - **Then** the server sends `{ type: "welcome", serverTime: "<ISO>" }` for clock sync
 
+### Scenario: Auth timeout closes idle unauthenticated connection
+
+- **Given** an unauthenticated WebSocket connection (not pre-authenticated at upgrade)
+- **When** the client does not send `{ "type": "auth", "key": "..." }` within 5 seconds
+- **Then** the server closes the connection with code 4001 and reason `"Authentication timeout"`
+
 ### Scenario: WebSocket disconnects with active subscriptions
 
 - **Given** a WebSocket with subscriptions to sessions "s1" and "s2"
@@ -187,6 +196,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `question_response` when manager is null | Error message: `"Owner question service not available"` |
 | `question_response` for unknown question | Error message: `"Question not found or already answered"` |
 | Pong not received within 10s of ping | Connection closed with code 4002 `"Pong timeout"` |
+| Auth not completed within 5s of connect | Connection closed with code 4001 `"Authentication timeout"` |
 
 ## Dependencies
 
