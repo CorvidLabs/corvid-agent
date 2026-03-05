@@ -1147,9 +1147,7 @@ export class SchedulerService {
         }
     }
 
-
-
-    private async execDailyReview(executionId: string, schedule: AgentSchedule): Promise<void> {
+    private execDailyReview(executionId: string, schedule: AgentSchedule): void {
         if (!this.dailyReviewService) {
             updateExecutionStatus(this.db, executionId, 'failed', {
                 result: 'Daily review service not configured',
@@ -1163,7 +1161,7 @@ export class SchedulerService {
                 `Executions: ${result.executions.completed} completed, ${result.executions.failed} failed (${result.executions.total} total).`,
                 `PRs: ${result.prs.opened} opened, ${result.prs.merged} merged, ${result.prs.closed} closed.`,
                 `Health: ${result.health.uptimePercent}% uptime (${result.health.snapshotCount} snapshots).`,
-                result.observations.length > 0 ? `Observations: ${result.observations[0]}` : '',
+                result.observations.length > 0 ? `Observations: ${result.observations.join('; ')}` : '',
             ].filter(Boolean).join(' ');
 
             updateExecutionStatus(this.db, executionId, 'completed', { result: summary });
