@@ -463,7 +463,16 @@ const server = Bun.serve<WsData>({
     port: PORT,
     hostname: BIND_HOST,
 
-    async fetch(req, server) {
+    async fetch(rawReq, server) {
+        // Inject socket-level IP so getClientIp() can detect loopback connections
+        // (Bun doesn't set X-Forwarded-For for direct connections)
+        const socketAddr = server.requestIP(rawReq);
+        let req = rawReq;
+        if (socketAddr && !rawReq.headers.has('x-forwarded-for') && !rawReq.headers.has('x-real-ip')) {
+            const headers = new Headers(rawReq.headers);
+            headers.set('x-real-ip', socketAddr.address);
+            req = new Request(rawReq.url, { method: rawReq.method, headers, body: rawReq.body } as RequestInit);
+        }
         const url = new URL(req.url);
         const requestStart = performance.now();
 
