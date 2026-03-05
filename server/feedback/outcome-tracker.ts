@@ -19,6 +19,7 @@ import {
     listPrOutcomes,
     getPrOutcomeByWorkTask,
 } from '../db/pr-outcomes';
+import { addToRepoBlocklist, isRepoBlocked } from '../db/repo-blocklist';
 import type { PrOutcome, FailureReason, OutcomeStats } from '../db/pr-outcomes';
 import { getPrState } from '../github/operations';
 import { listWorkTasks } from '../db/work-tasks';
@@ -115,6 +116,11 @@ export class OutcomeTrackerService {
                     updatePrOutcomeState(this.db, pr.id, 'closed', reason);
                     updated++;
                     log.info('PR closed', { repo: pr.repo, prNumber: pr.prNumber, reason });
+
+                    // Auto-block: if this repo has >=2 closed PRs and <30% merge rate, block it
+                    if (reason === 'review_rejection') {
+                        this.checkAutoBlock(pr.repo, pr.prUrl);
+                    }
                 } else {
                     // Still open — check if stale (>14 days without merge)
                     const ageMs = Date.now() - new Date(pr.createdAt).getTime();
@@ -257,6 +263,32 @@ export class OutcomeTrackerService {
     }
 
     // ─── Private ────────────────────────────────────────────────────────────
+
+    /**
+     * Auto-block a repo if it has >=2 closed PRs and <30% merge rate.
+     * Only blocks if not already blocked.
+     */
+    private checkAutoBlock(repo: string, prUrl: string): void {
+        if (isRepoBlocked(this.db, repo)) return;
+
+        const statsByRepo = getOutcomeStatsByRepo(this.db);
+        const stats = statsByRepo[repo];
+        if (!stats) return;
+
+        const closedCount = stats.closed;
+        if (closedCount >= 2 && stats.mergeRate < 0.3) {
+            addToRepoBlocklist(this.db, repo, {
+                reason: `Auto-blocked: ${closedCount} closed PRs, ${(stats.mergeRate * 100).toFixed(0)}% merge rate`,
+                source: 'pr_rejection',
+                prUrl,
+            });
+            log.info('Auto-blocked repo due to repeated PR rejections', {
+                repo,
+                closedCount,
+                mergeRate: stats.mergeRate,
+            });
+        }
+    }
 
     private inferFailureReason(pr: { statusCheckRollup: string | null; reviewDecision: string | null }): FailureReason {
         if (pr.statusCheckRollup && pr.statusCheckRollup.includes('FAILURE')) {

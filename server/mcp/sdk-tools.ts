@@ -2,6 +2,7 @@ import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences } from './tool-handlers';
+import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -40,6 +41,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_invoke_remote_agent',
     'corvid_code_symbols',
     'corvid_find_references',
+    'corvid_repo_blocklist',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -467,6 +469,21 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 async (args) => handleFindReferences(ctx, args),
             ),
         ] : []),
+
+        // ─── Repo Blocklist ──────────────────────────────────────────────
+        tool(
+            'corvid_repo_blocklist',
+            'Manage the repo blocklist — repos the agent should not contribute to. ' +
+            'Use action="list" to view blocked repos, "add" to block a repo, "remove" to unblock, "check" to test if blocked. ' +
+            'Supports exact repos (owner/name) and org wildcards (owner/*).',
+            {
+                action: z.enum(['list', 'add', 'remove', 'check']).describe('What to do'),
+                repo: z.string().optional().describe('Repository in owner/name format, or owner/* for org wildcard'),
+                reason: z.string().optional().describe('Why this repo is blocked (for add)'),
+                source: z.enum(['manual', 'pr_rejection', 'daily_review']).optional().describe('Block source (default: manual)'),
+            },
+            async (args) => handleManageRepoBlocklist(ctx, args),
+        ),
     ];
 
     // Merge plugin tools if provided

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 63;
+const SCHEMA_VERSION = 64;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1207,6 +1207,19 @@ const MIGRATIONS: Record<number, string[]> = {
             FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
         )`,
         `CREATE INDEX IF NOT EXISTS idx_subscription_items_sub ON subscription_items(subscription_id)`,
+    ],
+    64: [
+        // Repo blocklist — prevents agent from contributing to repos that reject its help
+        `CREATE TABLE IF NOT EXISTS repo_blocklist (
+            repo       TEXT NOT NULL,
+            reason     TEXT DEFAULT '',
+            source     TEXT NOT NULL DEFAULT 'manual',
+            pr_url     TEXT DEFAULT '',
+            tenant_id  TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (repo, tenant_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_repo_blocklist_tenant ON repo_blocklist(tenant_id)`,
     ],
 };
 

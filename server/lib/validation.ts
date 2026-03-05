@@ -249,6 +249,15 @@ export const UpdateGitHubAllowlistSchema = z.object({
     label: z.string({ message: 'label is required' }),
 });
 
+// ─── Repo Blocklist ─────────────────────────────────────────────────────────
+
+export const AddRepoBlocklistSchema = z.object({
+    repo: z.string().min(1, 'repo is required'),
+    reason: z.string().optional(),
+    source: z.enum(['manual', 'pr_rejection', 'daily_review']).optional(),
+    prUrl: z.string().optional(),
+});
+
 // ─── MCP API ──────────────────────────────────────────────────────────────────
 
 export const McpSendMessageSchema = z.object({

@@ -88,6 +88,11 @@ export const routes: Routes = [
             import('./features/github-allowlist/github-allowlist.component').then((m) => m.GitHubAllowlistComponent),
     },
     {
+        path: 'repo-blocklist',
+        loadComponent: () =>
+            import('./features/repo-blocklist/repo-blocklist.component').then((m) => m.RepoBlocklistComponent),
+    },
+    {
         path: 'wallets',
         loadComponent: () =>
             import('./features/wallets/wallet-viewer.component').then((m) => m.WalletViewerComponent),
