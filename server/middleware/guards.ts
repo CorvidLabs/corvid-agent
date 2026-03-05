@@ -77,19 +77,25 @@ export function roleGuard(...allowedRoles: string[]): Guard {
     };
 }
 
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
+
 export function rateLimitGuard(limiter: RateLimiter): Guard {
     const EXEMPT_PATHS = new Set(['/api/health', '/webhooks/github']);
     return (req: Request, url: URL, context: RequestContext): Response | null => {
         if (EXEMPT_PATHS.has(url.pathname)) return null;
         if (url.pathname === '/ws') return null;
-        const key = context.walletAddress || getClientIp(req);
+        const ip = getClientIp(req);
+        if (!context.walletAddress && LOOPBACK_IPS.has(ip)) return null;
+        const key = context.walletAddress || ip;
         return limiter.check(key, req.method);
     };
 }
 
 export function endpointRateLimitGuard(limiter: EndpointRateLimiter): Guard {
     return (req: Request, url: URL, context: RequestContext): Response | null => {
-        const key = context.walletAddress || getClientIp(req);
+        const ip = getClientIp(req);
+        if (!context.walletAddress && LOOPBACK_IPS.has(ip)) return null;
+        const key = context.walletAddress || ip;
         const tier = resolveTier(context.authenticated, context.role);
         const result: RateLimitResult = limiter.check(key, req.method, url.pathname, tier);
         context.rateLimitHeaders = result.headers;

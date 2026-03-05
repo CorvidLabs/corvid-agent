@@ -280,6 +280,9 @@ export class RateLimiter {
 /** Paths that bypass rate limiting (monitoring probes, webhooks, etc.). */
 const EXEMPT_PATHS = new Set(['/api/health', '/webhooks/github']);
 
+/** Loopback IPs exempt from rate limiting (local dashboard, CLI tools). */
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
+
 /**
  * Extract the client IP from a Request.
  * Checks X-Forwarded-For first (reverse proxy), then X-Real-IP, falls back to 'unknown'.
@@ -315,8 +318,12 @@ export function checkRateLimit(req: Request, url: URL, limiter: RateLimiter, wal
     // Don't rate-limit WebSocket upgrades
     if (url.pathname === '/ws') return null;
 
+    // Exempt loopback IPs (local dashboard, CLI tools)
+    const ip = getClientIp(req);
+    if (!walletAddress && LOOPBACK_IPS.has(ip)) return null;
+
     // Prefer wallet address as the rate limit key (trust boundary),
     // fall back to IP when no wallet is available
-    const key = walletAddress || getClientIp(req);
+    const key = walletAddress || ip;
     return limiter.check(key, req.method);
 }
