@@ -36,6 +36,7 @@ import {
     handleCodeSymbols,
     handleFindReferences,
 } from './tool-handlers';
+import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
 import type { LlmToolDefinition } from '../providers/types';
@@ -80,6 +81,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'search_files',
     'corvid_code_symbols',
     'corvid_find_references',
+    'corvid_repo_blocklist',
 ]);
 
 /** Tools blocked during scheduler-initiated sessions. */
@@ -621,6 +623,27 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 },
             },
         );
+
+        // ─── Repo Blocklist ──────────────────────────────────────────────
+        tools.push({
+            name: 'corvid_repo_blocklist',
+            description: 'Manage the repo blocklist — repos the agent should not contribute to. Use action="list" to view, "add" to block, "remove" to unblock, "check" to test.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    action: { type: 'string', enum: ['list', 'add', 'remove', 'check'], description: 'What to do' },
+                    repo: { type: 'string', description: 'Repository in owner/name format, or owner/* for org wildcard' },
+                    reason: { type: 'string', description: 'Why this repo is blocked (for add)' },
+                    source: { type: 'string', enum: ['manual', 'pr_rejection', 'daily_review'], description: 'Block source (default: manual)' },
+                },
+                required: ['action'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_repo_blocklist', args, ['action']);
+                if (err) return err;
+                return unwrapResult(await handleManageRepoBlocklist(ctx, args as Parameters<typeof handleManageRepoBlocklist>[1]));
+            },
+        });
     }
     } // end if (ctx)
 

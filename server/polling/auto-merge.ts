@@ -8,6 +8,7 @@
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
 import { resolveFullRepo } from './github-searcher';
+import { isRepoBlocked } from '../db/repo-blocklist';
 
 const log = createLogger('AutoMerge');
 
@@ -66,6 +67,10 @@ export class AutoMergeService {
             }
 
             for (const { repo, username } of targets) {
+                if (isRepoBlocked(this.db, repo)) {
+                    log.debug('Skipping auto-merge — repo is blocklisted', { repo });
+                    continue;
+                }
                 await this.mergeForRepo(repo, username);
             }
         } catch (err) {

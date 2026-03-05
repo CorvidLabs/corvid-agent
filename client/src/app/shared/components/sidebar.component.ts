@@ -179,6 +179,12 @@ import { filter, Subscription } from 'rxjs';
                     </a>
                 </li>
                 <li>
+                    <a class="sidebar__link" routerLink="/repo-blocklist" routerLinkActive="sidebar__link--active" title="Repo Blocklist">
+                        <span class="sidebar__label">Repo Blocklist</span>
+                        <span class="sidebar__abbr">Bl</span>
+                    </a>
+                </li>
+                <li>
                     <a class="sidebar__link" routerLink="/wallets" routerLinkActive="sidebar__link--active" title="Wallets">
                         <span class="sidebar__label">Wallets</span>
                         <span class="sidebar__abbr">W</span>
