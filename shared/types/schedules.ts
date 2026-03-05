@@ -14,6 +14,7 @@ export type ScheduleActionType =
     | 'memory_maintenance'
     | 'reputation_attestation'
     | 'outcome_analysis'
+    | 'daily_review'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';

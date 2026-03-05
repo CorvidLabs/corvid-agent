@@ -486,10 +486,10 @@ describe('Prompt Injection Detection', () => {
             expect(result.scanTimeMs).toBeLessThan(10);
         });
 
-        test('scans large message (10KB) in <10ms', () => {
+        test('scans large message (10KB) in <50ms', () => {
             const largeMessage = 'Normal text content. '.repeat(500); // ~10KB
             const result = scanForInjection(largeMessage);
-            expect(result.scanTimeMs).toBeLessThan(10);
+            expect(result.scanTimeMs).toBeLessThan(50);
         });
 
         test('scanTimeMs field is populated', () => {

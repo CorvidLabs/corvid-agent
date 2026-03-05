@@ -48,6 +48,7 @@ import {
     cleanExpiredLocks,
 } from '../db/repo-locks';
 import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
+import type { DailyReviewService } from '../improvement/daily-review';
 import { SystemStateDetector, type SystemStateResult, type SystemStateConfig } from './system-state';
 import { evaluateAction, getAllRules } from './priority-rules';
 
@@ -103,6 +104,7 @@ export class SchedulerService {
     private reputationAttestation: ReputationAttestation | null = null;
     private notificationService: NotificationService | null = null;
     private outcomeTrackerService: OutcomeTrackerService | null = null;
+    private dailyReviewService: DailyReviewService | null = null;
     private pollTimer: ReturnType<typeof setInterval> | null = null;
     private tickPromise: Promise<void> | null = null;
     private runningExecutions = new Set<string>();
@@ -144,6 +146,11 @@ export class SchedulerService {
     /** Set outcome tracker service (for outcome_analysis schedule action). */
     setOutcomeTrackerService(service: OutcomeTrackerService): void {
         this.outcomeTrackerService = service;
+    }
+
+    /** Set daily review service (for daily_review schedule action). */
+    setDailyReviewService(service: DailyReviewService): void {
+        this.dailyReviewService = service;
     }
 
     /** Set notification service (for approval request notifications). */
@@ -598,6 +605,9 @@ export class SchedulerService {
                     break;
                 case 'outcome_analysis':
                     await this.execOutcomeAnalysis(executionId, schedule);
+                    break;
+                case 'daily_review':
+                    await this.execDailyReview(executionId, schedule);
                     break;
                 case 'custom':
                     await this.execCustom(executionId, schedule, action);
@@ -1137,6 +1147,29 @@ export class SchedulerService {
         }
     }
 
+    private execDailyReview(executionId: string, schedule: AgentSchedule): void {
+        if (!this.dailyReviewService) {
+            updateExecutionStatus(this.db, executionId, 'failed', {
+                result: 'Daily review service not configured',
+            });
+            return;
+        }
+
+        try {
+            const result = this.dailyReviewService.run(schedule.agentId);
+            const summary = [
+                `Executions: ${result.executions.completed} completed, ${result.executions.failed} failed (${result.executions.total} total).`,
+                `PRs: ${result.prs.opened} opened, ${result.prs.merged} merged, ${result.prs.closed} closed.`,
+                `Health: ${result.health.uptimePercent}% uptime (${result.health.snapshotCount} snapshots).`,
+                result.observations.length > 0 ? `Observations: ${result.observations.join('; ')}` : '',
+            ].filter(Boolean).join(' ');
+
+            updateExecutionStatus(this.db, executionId, 'completed', { result: summary });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
+    }
 
     // ─── Cron helpers ────────────────────────────────────────────────────────
 
