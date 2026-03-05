@@ -72,8 +72,7 @@
                   "maximumError": "10kB"
                 }
               ],
-              "outputHashing": "all",
-              "inlineCriticalCss": false
+              "outputHashing": "all"
             },
             "development": {
               "optimization": false,
