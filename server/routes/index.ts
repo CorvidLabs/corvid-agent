@@ -9,6 +9,7 @@ import { handleAllowlistRoutes } from './allowlist';
 import { handleGitHubAllowlistRoutes } from './github-allowlist';
 import { handleRepoBlocklistRoutes } from './repo-blocklist';
 import { handleAnalyticsRoutes } from './analytics';
+import { handleDashboardRoutes } from './dashboard';
 import { handleSystemLogRoutes } from './system-logs';
 import { handleSettingsRoutes } from './settings';
 import { handleScheduleRoutes } from './schedules';
@@ -300,6 +301,9 @@ async function handleRoutes(
 
     const repoBlocklistResponse = handleRepoBlocklistRoutes(req, url, db);
     if (repoBlocklistResponse) return repoBlocklistResponse;
+
+    const dashboardResponse = handleDashboardRoutes(req, url, db, context);
+    if (dashboardResponse) return dashboardResponse;
 
     const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
     if (analyticsResponse) return analyticsResponse;
