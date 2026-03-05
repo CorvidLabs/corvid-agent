@@ -19,6 +19,9 @@ export const HEARTBEAT_INTERVAL_MS = 30_000;
 /** Time to wait for a pong response before closing the connection (ms). */
 export const PONG_TIMEOUT_MS = 10_000;
 
+/** Time to wait for post-connect authentication before closing (ms). */
+export const AUTH_TIMEOUT_MS = 5_000;
+
 export interface WsData {
     subscriptions: Map<string, EventCallback>;
     walletAddress?: string;
@@ -26,6 +29,7 @@ export interface WsData {
     tenantId?: string;
     heartbeatTimer?: ReturnType<typeof setInterval> | null;
     pongTimeoutTimer?: ReturnType<typeof setTimeout> | null;
+    authTimeoutTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -69,6 +73,14 @@ function stopHeartbeat(ws: ServerWebSocket<WsData>): void {
     }
 }
 
+/** Clear the post-connect authentication timeout timer. */
+function clearAuthTimeout(ws: ServerWebSocket<WsData>): void {
+    if (ws.data?.authTimeoutTimer) {
+        clearTimeout(ws.data.authTimeoutTimer);
+        ws.data.authTimeoutTimer = null;
+    }
+}
+
 export function createWebSocketHandler(
     processManager: ProcessManager,
     getBridge: () => AlgoChatBridge | null,
@@ -91,6 +103,11 @@ export function createWebSocketHandler(
                 startHeartbeat(ws);
                 log.info('WebSocket connection opened (pre-authenticated)');
             } else {
+                // Start auth timeout — client must authenticate within AUTH_TIMEOUT_MS
+                ws.data.authTimeoutTimer = setTimeout(() => {
+                    log.warn('WebSocket auth timeout — closing unauthenticated connection');
+                    try { ws.close(4001, 'Authentication timeout'); } catch { /* already closed */ }
+                }, AUTH_TIMEOUT_MS);
                 log.info('WebSocket connection opened (awaiting auth)');
             }
         },
@@ -131,18 +148,18 @@ export function createWebSocketHandler(
                 }
                 if (!authConfig.apiKey) {
                     // No API key configured — auto-authenticate
+                    clearAuthTimeout(ws);
                     ws.data.authenticated = true;
                     subscribeToTopics(ws);
                     startHeartbeat(ws);
-                    safeSend(ws, { type: 'error', message: 'Authenticated (no key required)' });
                     return;
                 }
                 if (timingSafeEqual(parsed.key, authConfig.apiKey)) {
+                    clearAuthTimeout(ws);
                     ws.data.authenticated = true;
                     subscribeToTopics(ws);
                     startHeartbeat(ws);
                     log.info('WebSocket authenticated via first-message auth');
-                    safeSend(ws, { type: 'error', message: 'Authenticated' });
                     return;
                 }
                 log.warn('WebSocket auth failed: invalid key');
@@ -161,8 +178,9 @@ export function createWebSocketHandler(
         },
 
         close(ws: ServerWebSocket<WsData>) {
-            // Stop heartbeat timers
+            // Stop all timers
             stopHeartbeat(ws);
+            clearAuthTimeout(ws);
 
             // Clean up all subscriptions
             if (ws.data?.subscriptions) {
