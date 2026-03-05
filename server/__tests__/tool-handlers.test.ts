@@ -366,6 +366,94 @@ describe('handleManageSchedule', () => {
         expect((resumeResult.content[0] as { text: string }).text).toContain('resumed');
     });
 
+    test('update requires schedule_id', async () => {
+        const ctx = createMockContext();
+        const result = await handleManageSchedule(ctx, { action: 'update', name: 'New Name' });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('schedule_id');
+    });
+
+    test('update requires at least one field to change', async () => {
+        const ctx = createMockContext();
+        const result = await handleManageSchedule(ctx, { action: 'update', schedule_id: 'fake-id' });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('No fields to update');
+    });
+
+    test('update returns error for nonexistent schedule', async () => {
+        const ctx = createMockContext();
+        const result = await handleManageSchedule(ctx, { action: 'update', schedule_id: 'nonexistent', name: 'X' });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('not found');
+    });
+
+    test('update modifies name and description', async () => {
+        const ctx = createMockContext();
+        // Create first
+        const createResult = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'Original',
+            description: 'Old desc',
+            schedule_actions: [{ type: 'star_repo' }],
+            cron_expression: '@daily',
+        });
+        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+        const scheduleId = idMatch![1];
+
+        // Update
+        const result = await handleManageSchedule(ctx, {
+            action: 'update',
+            schedule_id: scheduleId,
+            name: 'Renamed',
+            description: 'New desc',
+        });
+        expect(result.isError).toBeUndefined();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('updated');
+        expect(text).toContain('name');
+        expect(text).toContain('description');
+    });
+
+    test('update validates frequency when timing changes', async () => {
+        const ctx = createMockContext();
+        const createResult = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'FreqTest',
+            schedule_actions: [{ type: 'star_repo' }],
+            cron_expression: '@daily',
+        });
+        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+        const scheduleId = idMatch![1];
+
+        const result = await handleManageSchedule(ctx, {
+            action: 'update',
+            schedule_id: scheduleId,
+            interval_minutes: 1,
+        });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('too short');
+    });
+
+    test('update modifies schedule_actions', async () => {
+        const ctx = createMockContext();
+        const createResult = await handleManageSchedule(ctx, {
+            action: 'create',
+            name: 'ActionTest',
+            schedule_actions: [{ type: 'star_repo', repos: ['old/repo'] }],
+            cron_expression: '@daily',
+        });
+        const idMatch = (createResult.content[0] as { text: string }).text.match(/ID:\s*([a-f0-9-]+)/);
+        const scheduleId = idMatch![1];
+
+        const result = await handleManageSchedule(ctx, {
+            action: 'update',
+            schedule_id: scheduleId,
+            schedule_actions: [{ type: 'review_prs', repos: ['new/repo'] }],
+        });
+        expect(result.isError).toBeUndefined();
+        expect((result.content[0] as { text: string }).text).toContain('schedule_actions');
+    });
+
     test('history returns empty when no executions', async () => {
         const ctx = createMockContext();
         const result = await handleManageSchedule(ctx, { action: 'history' });
