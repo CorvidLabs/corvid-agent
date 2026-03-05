@@ -567,7 +567,7 @@ const server = Bun.serve<WsData>({
                 wsTenantId = tenantResult.tenantId !== DEFAULT_TENANT_ID ? tenantResult.tenantId : undefined;
             }
 
-            const upgraded = server.upgrade(req, {
+            const upgraded = server.upgrade(rawReq, {
                 data: { subscriptions: new Map(), walletAddress, authenticated: preAuthenticated, tenantId: wsTenantId },
             });
             if (upgraded) return undefined as unknown as Response;
