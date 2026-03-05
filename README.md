@@ -292,7 +292,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (62 migrations) and query modules
+  db/            SQLite schema (64 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   exam/          Model exam system with 18 test cases across 6 categories
@@ -302,7 +302,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 27 corvid_* tool handlers
+  mcp/           MCP tool server and 37 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -337,7 +337,7 @@ e2e/             Playwright end-to-end tests (31 spec files, 360 E2E tests)
 
 ---
 
-## MCP Tools (34)
+## MCP Tools (37)
 
 Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
 
@@ -353,6 +353,7 @@ Extensible tool system via [Model Context Protocol](https://github.com/modelcont
 | **Owner Comms** | `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications` |
 | **Reputation** | `corvid_check_reputation`, `corvid_check_health_trends`, `corvid_publish_attestation`, `corvid_verify_agent_reputation` |
 | **Code** | `corvid_code_symbols` (AST symbols), `corvid_find_references` (cross-file refs) |
+| **Admin** | `corvid_repo_blocklist` (manage off-limits repos) |
 | **Session** | `corvid_extend_timeout` |
 
 Tools are permission-scoped per agent via skill bundles and agent-level allowlists. Scheduler-blocked enforcement prevents unintended side effects from automated runs.
@@ -421,7 +422,7 @@ bun run spec:check    # Validate all module specs in specs/
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**38 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**107 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
@@ -431,7 +432,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 62 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 64 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |

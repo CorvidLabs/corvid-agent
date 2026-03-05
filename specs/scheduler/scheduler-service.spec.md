@@ -51,6 +51,8 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Late-inject messenger after AlgoChat init |
 | `setImprovementLoopService` | `(service: AutonomousLoopService)` | `void` | Late-inject improvement loop service |
 | `setReputationServices` | `(scorer: ReputationScorer, attestation: ReputationAttestation)` | `void` | Late-inject reputation services |
+| `setOutcomeTrackerService` | `(service: OutcomeTrackerService)` | `void` | Late-inject outcome tracker for `outcome_analysis` action |
+| `setDailyReviewService` | `(service: DailyReviewService)` | `void` | Late-inject daily review for `daily_review` action |
 | `start` | `()` | `void` | Start polling loop. Initializes next_run_at for schedules missing it. Runs first tick immediately |
 | `stop` | `()` | `void` | Stop polling loop |
 | `getStats` | `()` | `{ running, activeSchedules, pausedSchedules, runningExecutions, maxConcurrent, recentFailures }` | Health check stats |
@@ -206,6 +208,8 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 | `improvement_loop` | Run autonomous improvement loop | optional `maxImprovementTasks`, `focusArea` |
 | `memory_maintenance` | Summarize and archive old memories | (none) |
 | `reputation_attestation` | Compute score and publish on-chain attestation | (none) |
+| `outcome_analysis` | Analyze PR outcomes and schedule effectiveness | (none) |
+| `daily_review` | Generate daily activity summary (PRs, executions, health) | (none) |
 | `custom` | Freeform prompt (owner-only creation) | `prompt` |
 
 ## Change Log
@@ -213,3 +217,4 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-03-05 | corvid-agent | Add `daily_review`, `outcome_analysis` action types; add `setDailyReviewService`, `setOutcomeTrackerService` methods |
