@@ -29,6 +29,8 @@ import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import { parseBodyOrThrow, CreateWebhookRegistrationSchema, UpdateWebhookRegistrationSchema } from '../lib/validation';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
+import { isRepoBlocked } from '../db/repo-blocklist';
+import { isRepoOffLimits } from '../github/off-limits';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebhookRoutes');
@@ -197,6 +199,9 @@ export function handleWebhookRoutes(
         return (async () => {
             try {
                 const data = await parseBodyOrThrow(req, CreateWebhookRegistrationSchema);
+                if (isRepoBlocked(db, data.repo) || isRepoOffLimits(data.repo)) {
+                    return json({ error: `Repository ${data.repo} is blocked — cannot create webhook` }, 403);
+                }
                 const registration = createWebhookRegistration(db, data, tenantId);
                 const ip = getClientIp(req);
                 recordAudit(db, 'webhook_register', ip, 'webhook', registration.id, `repo=${registration.repo}`, null, ip);
