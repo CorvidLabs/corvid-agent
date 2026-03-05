@@ -31,8 +31,15 @@ describe('off-limits repos', () => {
         expect(() => assertRepoAllowed('CorvidLabs/corvid-agent')).not.toThrow();
     });
 
-    test('blocks contributor-owned repos', () => {
-        expect(isRepoOffLimits('CorvidLabs/rust-server')).toBe(true);
-        expect(isRepoOffLimits('CorvidLabs/rust-game')).toBe(true);
+    test('blocks all repos under a wildcard org', () => {
+        expect(isRepoOffLimits('vapor/vapor')).toBe(true);
+        expect(isRepoOffLimits('vapor/fluent')).toBe(true);
+        expect(isRepoOffLimits('vapor/async-kit')).toBe(true);
+        expect(isRepoOffLimits('Vapor/Vapor')).toBe(true);
+    });
+
+    test('wildcard org does not match unrelated repos', () => {
+        expect(isRepoOffLimits('CorvidLabs/corvid-agent')).toBe(false);
+        expect(isRepoOffLimits('vaporware/something')).toBe(false);
     });
 });

@@ -10,32 +10,46 @@ import { resolve } from 'node:path';
 
 const OFF_LIMITS_FILE = resolve(import.meta.dir, '../../.claude/off-limits-repos.txt');
 
-let cachedRepos: Set<string> | null = null;
+interface OffLimitsEntries {
+    exact: Set<string>;
+    orgWildcards: Set<string>;
+}
 
-/** Parse the off-limits file and return lowercased owner/repo entries. */
-function loadOffLimitsRepos(): Set<string> {
-    if (cachedRepos) return cachedRepos;
+let cached: OffLimitsEntries | null = null;
+
+/** Parse the off-limits file, separating exact repos from org/* wildcards. */
+function loadOffLimitsRepos(): OffLimitsEntries {
+    if (cached) return cached;
     try {
         const content = readFileSync(OFF_LIMITS_FILE, 'utf-8');
-        const repos = new Set<string>();
+        const exact = new Set<string>();
+        const orgWildcards = new Set<string>();
         for (const line of content.split('\n')) {
             const trimmed = line.trim();
             if (trimmed && !trimmed.startsWith('#')) {
-                repos.add(trimmed.toLowerCase());
+                const lower = trimmed.toLowerCase();
+                if (lower.endsWith('/*')) {
+                    orgWildcards.add(lower.slice(0, -2));
+                } else {
+                    exact.add(lower);
+                }
             }
         }
-        cachedRepos = repos;
-        return repos;
+        cached = { exact, orgWildcards };
+        return cached;
     } catch {
-        cachedRepos = new Set();
-        return cachedRepos;
+        cached = { exact: new Set(), orgWildcards: new Set() };
+        return cached;
     }
 }
 
 /** Returns true if the repo is on the off-limits blocklist. */
 export function isRepoOffLimits(repo: string): boolean {
-    const repos = loadOffLimitsRepos();
-    return repos.has(repo.toLowerCase());
+    const { exact, orgWildcards } = loadOffLimitsRepos();
+    const lower = repo.toLowerCase();
+    if (exact.has(lower)) return true;
+    const org = lower.split('/')[0];
+    return orgWildcards.has(org);
 }
 
 /**
@@ -50,5 +64,5 @@ export function assertRepoAllowed(repo: string): void {
 
 /** Reset the cache (for testing). */
 export function _resetCache(): void {
-    cachedRepos = null;
+    cached = null;
 }
