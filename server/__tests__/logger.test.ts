@@ -284,6 +284,14 @@ describe('edge cases', () => {
         startCapture();
         log.info('hello "world" <>&');
         stopCapture();
-        expect(capturedStdout[0]).toContain('hello "world" <>&');
+        const output = capturedStdout[0];
+        // Handle both text format (contains literal string) and JSON format
+        // (LOG_FORMAT is set at module load time; in production it's JSON)
+        try {
+            const parsed = JSON.parse(output);
+            expect(parsed.message).toBe('hello "world" <>&');
+        } catch {
+            expect(output).toContain('hello "world" <>&');
+        }
     });
 });
