@@ -31,8 +31,16 @@ describe('off-limits repos', () => {
         expect(() => assertRepoAllowed('CorvidLabs/corvid-agent')).not.toThrow();
     });
 
-    test('blocks contributor-owned repos', () => {
-        expect(isRepoOffLimits('CorvidLabs/rust-server')).toBe(true);
-        expect(isRepoOffLimits('CorvidLabs/rust-game')).toBe(true);
+    test('blocks AI-rejecting projects', () => {
+        expect(isRepoOffLimits('apple/swift-configuration')).toBe(true);
+    });
+
+    test('blocks repos matching org wildcard', () => {
+        expect(isRepoOffLimits('vapor/vapor')).toBe(true);
+        expect(isRepoOffLimits('vapor/fluent')).toBe(true);
+    });
+
+    test('allows removed repos that are no longer blocked', () => {
+        expect(isRepoOffLimits('CorvidLabs/rust-server')).toBe(false);
     });
 });
