@@ -290,6 +290,7 @@ describe('Security Response Headers', () => {
             'X-Frame-Options': 'DENY',
             'X-XSS-Protection': '0',
             'Referrer-Policy': 'strict-origin-when-cross-origin',
+            'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()',
         };
         // Verify that these are valid header values (no injection)
         for (const [name, value] of Object.entries(expectedHeaders)) {
