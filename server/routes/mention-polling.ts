@@ -24,6 +24,8 @@ import {
 import { listPollingActivity } from '../db/sessions';
 import { parseBodyOrThrow, CreateMentionPollingSchema, UpdateMentionPollingSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
+import { isRepoBlocked } from '../db/repo-blocklist';
+import { isRepoOffLimits } from '../github/off-limits';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('PollingRoutes');
@@ -114,6 +116,9 @@ export function handleMentionPollingRoutes(
         return (async () => {
             try {
                 const data = await parseBodyOrThrow(req, CreateMentionPollingSchema);
+                if (isRepoBlocked(db, data.repo) || isRepoOffLimits(data.repo)) {
+                    return json({ error: `Repository ${data.repo} is blocked — cannot create polling config` }, 403);
+                }
                 const config = createMentionPollingConfig(db, data, tenantId);
                 log.info('Mention polling config created', { id: config.id, repo: config.repo });
                 return json(config, 201);

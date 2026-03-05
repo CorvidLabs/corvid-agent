@@ -36,6 +36,7 @@ import { buildSafeGhEnv } from '../lib/env';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { isGitHubUserAllowed } from '../db/github-allowlist';
 import { isRepoBlocked } from '../db/repo-blocklist';
+import { isRepoOffLimits } from '../github/off-limits';
 import {
     GitHubSearcher,
     filterNewMentions,
@@ -406,8 +407,8 @@ export class MentionPollingService {
         const fullRepo = resolveFullRepo(config.repo, mention.htmlUrl);
 
         // Repo blocklist guard: skip mentions from repos that don't want our contributions
-        if (isRepoBlocked(this.db, fullRepo)) {
-            log.info('Skipping mention — repo is blocklisted', { repo: fullRepo, number: mention.number });
+        if (isRepoBlocked(this.db, fullRepo) || isRepoOffLimits(fullRepo)) {
+            log.info('Skipping mention — repo is blocklisted or off-limits', { repo: fullRepo, number: mention.number });
             return false;
         }
 
