@@ -10,13 +10,14 @@ const log = createLogger('McpToolHandlers');
 export async function handleManageSchedule(
     ctx: McpToolContext,
     args: {
-        action: 'list' | 'create' | 'pause' | 'resume' | 'history';
+        action: 'list' | 'create' | 'update' | 'pause' | 'resume' | 'history';
         name?: string;
         description?: string;
         cron_expression?: string;
         interval_minutes?: number;
         schedule_actions?: Array<{ type: string; repos?: string[]; description?: string; project_id?: string; to_agent_id?: string; message?: string; prompt?: string }>;
         approval_policy?: string;
+        max_executions?: number;
         schedule_id?: string;
     },
 ): Promise<CallToolResult> {
@@ -71,6 +72,62 @@ export async function handleManageSchedule(
                 );
             }
 
+            case 'update': {
+                if (!args.schedule_id) return errorResult('schedule_id is required for update');
+
+                const updateInput: import('../../../shared/types').UpdateScheduleInput = {};
+                const changedFields: string[] = [];
+
+                if (args.name !== undefined) { updateInput.name = args.name; changedFields.push('name'); }
+                if (args.description !== undefined) { updateInput.description = args.description; changedFields.push('description'); }
+                if (args.cron_expression !== undefined) { updateInput.cronExpression = args.cron_expression; changedFields.push('cron_expression'); }
+                if (args.interval_minutes !== undefined) {
+                    updateInput.intervalMs = args.interval_minutes * 60 * 1000;
+                    changedFields.push('interval_minutes');
+                }
+                if (args.schedule_actions !== undefined) {
+                    updateInput.actions = args.schedule_actions.map((a) => ({
+                        type: a.type as import('../../../shared/types').ScheduleActionType,
+                        repos: a.repos,
+                        description: a.description,
+                        projectId: a.project_id,
+                        toAgentId: a.to_agent_id,
+                        message: a.message,
+                        prompt: a.prompt,
+                    }));
+                    changedFields.push('schedule_actions');
+                }
+                if (args.approval_policy !== undefined) {
+                    updateInput.approvalPolicy = args.approval_policy as 'auto' | 'owner_approve' | 'council_approve';
+                    changedFields.push('approval_policy');
+                }
+                if (args.max_executions !== undefined) {
+                    updateInput.maxExecutions = args.max_executions;
+                    changedFields.push('max_executions');
+                }
+
+                if (changedFields.length === 0) {
+                    return errorResult('No fields to update. Provide at least one of: name, description, cron_expression, interval_minutes, schedule_actions, approval_policy, max_executions');
+                }
+
+                // Validate frequency if timing changed
+                if (updateInput.cronExpression !== undefined || updateInput.intervalMs !== undefined) {
+                    const existing = updateSchedule(ctx.db, args.schedule_id, {});
+                    if (!existing) return errorResult('Schedule not found');
+                    const cron = updateInput.cronExpression ?? existing.cronExpression;
+                    const interval = updateInput.intervalMs ?? existing.intervalMs ?? undefined;
+                    validateScheduleFrequency(cron || undefined, interval);
+                }
+
+                const updated = updateSchedule(ctx.db, args.schedule_id, updateInput);
+                if (!updated) return errorResult('Schedule not found');
+
+                return textResult(
+                    `Schedule "${updated.name}" [${updated.id}] updated.\n` +
+                    `  Changed: ${changedFields.join(', ')}`,
+                );
+            }
+
             case 'pause': {
                 if (!args.schedule_id) return errorResult('schedule_id is required');
                 const updated = updateSchedule(ctx.db, args.schedule_id, { status: 'paused' });
@@ -96,7 +153,7 @@ export async function handleManageSchedule(
             }
 
             default:
-                return errorResult(`Unknown action: ${args.action}. Use list, create, pause, resume, or history.`);
+                return errorResult(`Unknown action: ${args.action}. Use list, create, update, pause, resume, or history.`);
         }
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

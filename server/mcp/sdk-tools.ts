@@ -159,13 +159,13 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             'corvid_manage_schedule',
             'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
             'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, custom. ' +
-            'Use action="list" to view schedules, "create" to make one, "pause"/"resume" to control, "history" for logs.',
+            'Use action="list" to view schedules, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
             {
-                action: z.enum(['list', 'create', 'pause', 'resume', 'history']).describe('What to do'),
-                name: z.string().optional().describe('Schedule name (for create)'),
-                description: z.string().optional().describe('Schedule description (for create)'),
-                cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create)'),
-                interval_minutes: z.number().optional().describe('Run every N minutes as alternative to cron (for create)'),
+                action: z.enum(['list', 'create', 'update', 'pause', 'resume', 'history']).describe('What to do'),
+                name: z.string().optional().describe('Schedule name (for create/update)'),
+                description: z.string().optional().describe('Schedule description (for create/update)'),
+                cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create/update)'),
+                interval_minutes: z.number().optional().describe('Run every N minutes as alternative to cron (for create/update)'),
                 schedule_actions: z.array(z.object({
                     type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, codebase_review, dependency_audit, custom'),
                     repos: z.array(z.string()).optional().describe('Target repo(s) in owner/name format'),
@@ -174,9 +174,10 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                     to_agent_id: z.string().optional().describe('Target agent ID (for send_message)'),
                     message: z.string().optional().describe('Message content (for send_message)'),
                     prompt: z.string().optional().describe('Arbitrary prompt (for custom action type)'),
-                })).optional().describe('Actions to perform (for create)'),
-                approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create)'),
-                schedule_id: z.string().optional().describe('Schedule ID (for pause/resume/history)'),
+                })).optional().describe('Actions to perform (for create/update)'),
+                approval_policy: z.string().optional().describe('auto, owner_approve, or council_approve (for create/update)'),
+                max_executions: z.number().optional().describe('Maximum number of executions (for create/update)'),
+                schedule_id: z.string().optional().describe('Schedule ID (for update/pause/resume/history)'),
             },
             async (args) => handleManageSchedule(ctx, args),
         ),

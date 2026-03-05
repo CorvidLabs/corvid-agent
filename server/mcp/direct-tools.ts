@@ -267,15 +267,15 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
 
     tools.push({
         name: 'corvid_manage_schedule',
-        description: 'Manage automated schedules for this agent. Use action="list" to view, "create" to make, "pause"/"resume" to control, "history" for logs.',
+        description: 'Manage automated schedules for this agent. Use action="list" to view, "create" to make, "update" to modify, "pause"/"resume" to control, "history" for logs.',
         parameters: {
             type: 'object',
             properties: {
-                action: { type: 'string', enum: ['list', 'create', 'pause', 'resume', 'history'], description: 'What to do' },
-                name: { type: 'string', description: 'Schedule name (for create)' },
-                description: { type: 'string', description: 'Schedule description (for create)' },
-                cron_expression: { type: 'string', description: 'Cron expression (for create)' },
-                interval_minutes: { type: 'number', description: 'Run every N minutes (for create)' },
+                action: { type: 'string', enum: ['list', 'create', 'update', 'pause', 'resume', 'history'], description: 'What to do' },
+                name: { type: 'string', description: 'Schedule name (for create/update)' },
+                description: { type: 'string', description: 'Schedule description (for create/update)' },
+                cron_expression: { type: 'string', description: 'Cron expression (for create/update)' },
+                interval_minutes: { type: 'number', description: 'Run every N minutes (for create/update)' },
                 schedule_actions: {
                     type: 'array',
                     items: {
@@ -291,10 +291,11 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                         },
                         required: ['type'],
                     },
-                    description: 'Actions to perform (for create)',
+                    description: 'Actions to perform (for create/update)',
                 },
-                approval_policy: { type: 'string', description: 'auto, owner_approve, or council_approve' },
-                schedule_id: { type: 'string', description: 'Schedule ID (for pause/resume/history)' },
+                approval_policy: { type: 'string', description: 'auto, owner_approve, or council_approve (for create/update)' },
+                max_executions: { type: 'number', description: 'Maximum number of executions (for create/update)' },
+                schedule_id: { type: 'string', description: 'Schedule ID (for update/pause/resume/history)' },
             },
             required: ['action'],
         },
