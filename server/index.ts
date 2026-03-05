@@ -61,6 +61,7 @@ import { ReputationVerifier } from './reputation/verifier';
 import { MemoryManager } from './memory/index';
 import { AutonomousLoopService } from './improvement/service';
 import { OutcomeTrackerService } from './feedback/outcome-tracker';
+import { DailyReviewService } from './improvement/daily-review';
 import { TelegramBridge } from './telegram/bridge';
 import { DiscordBridge } from './discord/bridge';
 import { SlackBridge } from './slack/bridge';
@@ -239,6 +240,8 @@ improvementLoopService.setOutcomeTrackerService(outcomeTrackerService);
 schedulerService.setImprovementLoopService(improvementLoopService);
 schedulerService.setReputationServices(reputationScorer, reputationAttestation);
 schedulerService.setNotificationService(notificationService);
+const dailyReviewService = new DailyReviewService(db, memoryManager);
+schedulerService.setDailyReviewService(dailyReviewService);
 webhookService.setSchedulerService(schedulerService);
 mentionPollingService.setSchedulerService(schedulerService);
 

@@ -158,7 +158,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         tool(
             'corvid_manage_schedule',
             'Manage automated schedules for this agent. Schedules run actions on a cron or interval basis. ' +
-            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, custom. ' +
+            'Actions include: star_repo, fork_repo, review_prs, work_task, council_launch, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom. ' +
             'Use action="list" to view schedules, "create" to make one, "update" to modify, "pause"/"resume" to control, "history" for logs.',
             {
                 action: z.enum(['list', 'create', 'update', 'pause', 'resume', 'history']).describe('What to do'),
@@ -167,7 +167,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 cron_expression: z.string().optional().describe('Cron expression e.g. "0 9 * * 1-5" for weekdays at 9am (for create/update)'),
                 interval_minutes: z.number().optional().describe('Run every N minutes as alternative to cron (for create/update)'),
                 schedule_actions: z.array(z.object({
-                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, codebase_review, dependency_audit, custom'),
+                    type: z.string().describe('Action type: star_repo, fork_repo, review_prs, work_task, send_message, github_suggest, codebase_review, dependency_audit, daily_review, custom'),
                     repos: z.array(z.string()).optional().describe('Target repo(s) in owner/name format'),
                     description: z.string().optional().describe('Work task description'),
                     project_id: z.string().optional().describe('Project ID'),
