@@ -82,7 +82,11 @@ The council approved building a **SQLite-backed, prompt-driven autonomous schedu
 
 ---
 
-## Final Schema (Migration 24)
+## Original Schema (Migration 24)
+
+> **Note:** The schema has evolved significantly since this ADR. The current
+> schema version is 64. The SQL below reflects the original design; see
+> `server/db/schema.ts` for the current schema.
 
 ```sql
 -- Scheduled automation definitions (templates)
@@ -90,9 +94,9 @@ CREATE TABLE schedules (
     id                   TEXT PRIMARY KEY,
     name                 TEXT NOT NULL,
     description          TEXT DEFAULT '',
-    action_type          TEXT NOT NULL,        -- star_repos|fork_repos|review_prs|
-                                               -- work_on_repo|suggest_improvements|
-                                               -- council_review|custom
+    action_type          TEXT NOT NULL,        -- star_repo|fork_repo|review_prs|
+                                               -- work_task|github_suggest|
+                                               -- council_launch|custom|...
     cron_expression      TEXT NOT NULL,        -- Standard 5-field cron OR aliases (@daily, @every_6h)
     agent_id             TEXT DEFAULT NULL,    -- Which agent executes (NULL if council-owned)
     council_id           TEXT DEFAULT NULL,    -- Which council owns this (NULL if agent-owned)
@@ -150,16 +154,27 @@ CREATE INDEX idx_schedule_runs_status ON schedule_runs(status);
 
 ---
 
-## Seven Action Types
+## Action Types
+
+> **Note:** Action types evolved during implementation. Names were singularized
+> (`star_repos` → `star_repo`) and 8 new types were added post-ADR.
 
 | Action Type | Description | Default Approval | Session Timeout |
 |-------------|-------------|-------------------|-----------------|
-| `star_repos` | Discover + star repos by topic/criteria | `auto` | 10 min |
-| `fork_repos` | Fork repos for analysis/contribution | `auto` | 10 min |
+| `star_repo` | Discover + star repos by topic/criteria | `auto` | 10 min |
+| `fork_repo` | Fork repos for analysis/contribution | `auto` | 10 min |
 | `review_prs` | Review open PRs, post review comments | `auto` (read-only) | 30 min |
-| `work_on_repo` | Create improvement PRs on core repos | Configurable | 60 min |
-| `suggest_improvements` | Analyze forked repos, propose upstream contributions | `owner_approve` | 30 min |
-| `council_review` | Launch council deliberation on a topic | `auto` (advisory) | 60 min |
+| `work_task` | Create improvement PRs on core repos | Configurable | 60 min |
+| `github_suggest` | Analyze forked repos, propose upstream contributions | `owner_approve` | 30 min |
+| `council_launch` | Launch council deliberation on a topic | `auto` (advisory) | 60 min |
+| `send_message` | Send AlgoChat message | Configurable | 10 min |
+| `codebase_review` | Full codebase review and analysis | `auto` | 60 min |
+| `dependency_audit` | Audit dependencies for updates and vulnerabilities | `auto` | 30 min |
+| `improvement_loop` | Iterative improvement cycle on a repo | Configurable | 60 min |
+| `memory_maintenance` | Maintain and consolidate agent memories | `auto` | 30 min |
+| `reputation_attestation` | Compute and attest reputation scores on-chain | `auto` | 10 min |
+| `outcome_analysis` | Analyze PR and task outcomes | `auto` | 30 min |
+| `daily_review` | Daily self-review with PR outcome analysis | `auto` | 30 min |
 | `custom` | Freeform prompt -- **owner-only creation** | Configurable | 30 min |
 
 ---

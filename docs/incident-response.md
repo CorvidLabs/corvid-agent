@@ -81,9 +81,9 @@ curl -s http://localhost:3000/api/health | jq .dependencies.database
 Backups should be taken regularly. The backup endpoint:
 
 ```bash
-# Trigger a backup via API
+# Trigger a backup via API (requires ADMIN_API_KEY, not regular API_KEY)
 curl -X POST http://localhost:3000/api/backup \
-  -H "Authorization: Bearer $API_KEY"
+  -H "Authorization: Bearer $ADMIN_API_KEY"
 ```
 
 ## Step 4: Verify All Services
