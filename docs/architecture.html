@@ -203,6 +203,26 @@
             <code class="api-path">/api/agents/:id/messages</code>
             <span class="api-desc">Agent-to-agent message history</span>
           </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id/spending</code>
+            <span class="api-desc">Agent spending info</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/agents/:id/spending-cap</code>
+            <span class="api-desc">Set spending cap</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/agents/:id/spending-cap</code>
+            <span class="api-desc">Remove spending cap</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id/agent-card</code>
+            <span class="api-desc">Get A2A agent card</span>
+          </div>
         </div>
       </div>
 
@@ -423,6 +443,36 @@
             <code class="api-path">/api/scheduler/health</code>
             <span class="api-desc">Scheduler health &amp; stats</span>
           </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/schedule-executions/:id</code>
+            <span class="api-desc">Get single execution</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedule-executions/:id/cancel</code>
+            <span class="api-desc">Cancel running execution</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedules/bulk</code>
+            <span class="api-desc">Bulk pause/resume/delete</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/schedules/:id/trigger</code>
+            <span class="api-desc">Trigger schedule immediately</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/scheduler/system-state</code>
+            <span class="api-desc">Live system state evaluation</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/github/status</code>
+            <span class="api-desc">GitHub configuration status</span>
+          </div>
         </div>
       </div>
 
@@ -466,6 +516,11 @@
             <span class="api-method api-method--get">GET</span>
             <code class="api-path">/api/wallets/:address/messages</code>
             <span class="api-desc">Messages for wallet (?limit, ?offset)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/wallets/:address/credits</code>
+            <span class="api-desc">Grant credits to wallet</span>
           </div>
         </div>
       </div>
@@ -546,6 +601,11 @@
             <code class="api-path">/api/selftest/run</code>
             <span class="api-desc">Run self-tests (unit/e2e/all)</span>
           </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/memories/backfill</code>
+            <span class="api-desc">Re-send memories with NULL txids on-chain</span>
+          </div>
         </div>
       </div>
 
@@ -567,6 +627,41 @@
             <span class="api-method api-method--post">POST</span>
             <code class="api-path">/api/algochat/conversations</code>
             <span class="api-desc">List conversations</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/algochat/psk-exchange</code>
+            <span class="api-desc">Get PSK exchange URI</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/algochat/psk-exchange</code>
+            <span class="api-desc">Generate new PSK exchange URI</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/algochat/psk-contacts</code>
+            <span class="api-desc">List PSK contacts</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/algochat/psk-contacts</code>
+            <span class="api-desc">Create PSK contact</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--patch">PATCH</span>
+            <code class="api-path">/api/algochat/psk-contacts/:id</code>
+            <span class="api-desc">Rename PSK contact</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/algochat/psk-contacts/:id</code>
+            <span class="api-desc">Delete PSK contact</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/algochat/psk-contacts/:id/qr</code>
+            <span class="api-desc">Get QR URI for contact</span>
           </div>
         </div>
       </div>
@@ -606,6 +701,869 @@
             <span class="api-method api-method--get">GET</span>
             <code class="api-path">/api/mcp/list-agents</code>
             <span class="api-desc">List agents via MCP</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Personas -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Personas</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id/persona</code>
+            <span class="api-desc">Get agent persona</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/agents/:id/persona</code>
+            <span class="api-desc">Create or update persona</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/agents/:id/persona</code>
+            <span class="api-desc">Delete persona</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skill Bundles -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Skill Bundles</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/skill-bundles</code>
+            <span class="api-desc">List skill bundles</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/skill-bundles</code>
+            <span class="api-desc">Create skill bundle</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/skill-bundles/:id</code>
+            <span class="api-desc">Get skill bundle</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/skill-bundles/:id</code>
+            <span class="api-desc">Update skill bundle</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/skill-bundles/:id</code>
+            <span class="api-desc">Delete skill bundle</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/agents/:id/skills</code>
+            <span class="api-desc">List agent skill assignments</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/agents/:id/skills</code>
+            <span class="api-desc">Set agent skill assignments</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/projects/:id/skills</code>
+            <span class="api-desc">List project skill assignments</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/projects/:id/skills</code>
+            <span class="api-desc">Set project skill assignments</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/skill-bundles/presets</code>
+            <span class="api-desc">List preset bundles</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/skill-bundles/presets/:name/clone</code>
+            <span class="api-desc">Clone a preset bundle</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Analytics</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/analytics/overview</code>
+            <span class="api-desc">Summary stats</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/analytics/spending</code>
+            <span class="api-desc">Daily spending over time</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/analytics/sessions</code>
+            <span class="api-desc">Session stats by agent/source/status</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Performance -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Performance</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/performance/snapshot</code>
+            <span class="api-desc">Current performance snapshot</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/performance/trends</code>
+            <span class="api-desc">Time-series data for charts</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/performance/regressions</code>
+            <span class="api-desc">Regression detection</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/performance/report</code>
+            <span class="api-desc">Full performance report</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/performance/metrics</code>
+            <span class="api-desc">List available metric names</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/performance/collect</code>
+            <span class="api-desc">Trigger manual collection</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Settings</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/settings</code>
+            <span class="api-desc">Get all settings</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/settings/credits</code>
+            <span class="api-desc">Update credit config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/settings/api-key/rotate</code>
+            <span class="api-desc">Rotate API key (owner only)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/settings/api-key/status</code>
+            <span class="api-desc">API key rotation &amp; expiry status</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Webhooks -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Webhooks</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/webhooks/github</code>
+            <span class="api-desc">GitHub webhook receiver (HMAC validated)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/webhooks</code>
+            <span class="api-desc">List webhook registrations</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/webhooks</code>
+            <span class="api-desc">Create webhook registration</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/webhooks/:id</code>
+            <span class="api-desc">Get webhook registration</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/webhooks/:id</code>
+            <span class="api-desc">Update webhook registration</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/webhooks/:id</code>
+            <span class="api-desc">Delete webhook registration</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/webhooks/:id/deliveries</code>
+            <span class="api-desc">List deliveries for registration</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/webhooks/deliveries</code>
+            <span class="api-desc">List all recent deliveries</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mention Polling -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Mention Polling</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mention-polling</code>
+            <span class="api-desc">List polling configs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mention-polling</code>
+            <span class="api-desc">Create polling config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mention-polling/:id</code>
+            <span class="api-desc">Get polling config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/mention-polling/:id</code>
+            <span class="api-desc">Update polling config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/mention-polling/:id</code>
+            <span class="api-desc">Delete polling config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mention-polling/stats</code>
+            <span class="api-desc">Polling service stats</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mention-polling/:id/activity</code>
+            <span class="api-desc">Polling activity &amp; sessions</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workflows -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Workflows</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflows</code>
+            <span class="api-desc">List workflows</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/workflows</code>
+            <span class="api-desc">Create workflow</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflows/:id</code>
+            <span class="api-desc">Get workflow</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/workflows/:id</code>
+            <span class="api-desc">Update workflow</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/workflows/:id</code>
+            <span class="api-desc">Delete workflow</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/workflows/:id/trigger</code>
+            <span class="api-desc">Trigger workflow execution</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflows/:id/runs</code>
+            <span class="api-desc">List runs for workflow</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflow-runs</code>
+            <span class="api-desc">List all workflow runs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflow-runs/:id</code>
+            <span class="api-desc">Get run with node runs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/workflow-runs/:id/action</code>
+            <span class="api-desc">Pause/resume/cancel run</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflow-runs/:id/nodes</code>
+            <span class="api-desc">List node runs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/workflows/health</code>
+            <span class="api-desc">Workflow service health</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sandbox -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Sandbox</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/sandbox/stats</code>
+            <span class="api-desc">Container pool stats</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/sandbox/policies</code>
+            <span class="api-desc">List all sandbox policies</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/sandbox/policies/:agentId</code>
+            <span class="api-desc">Get agent sandbox policy</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/sandbox/policies/:agentId</code>
+            <span class="api-desc">Set agent sandbox policy</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/sandbox/policies/:agentId</code>
+            <span class="api-desc">Delete agent sandbox policy</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/sandbox/assign</code>
+            <span class="api-desc">Assign container to session</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/sandbox/release/:sessionId</code>
+            <span class="api-desc">Release container</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Marketplace -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Marketplace</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/marketplace/search</code>
+            <span class="api-desc">Search marketplace</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/marketplace/listings</code>
+            <span class="api-desc">List marketplace listings</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/marketplace/listings</code>
+            <span class="api-desc">Create listing</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/marketplace/listings/:id</code>
+            <span class="api-desc">Get listing</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/marketplace/listings/:id</code>
+            <span class="api-desc">Update listing</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/marketplace/listings/:id</code>
+            <span class="api-desc">Delete listing</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/marketplace/listings/:id/use</code>
+            <span class="api-desc">Record a use</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/marketplace/listings/:id/reviews</code>
+            <span class="api-desc">Get reviews for listing</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/marketplace/listings/:id/reviews</code>
+            <span class="api-desc">Create review</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/marketplace/reviews/:id</code>
+            <span class="api-desc">Delete review</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/marketplace/federation/instances</code>
+            <span class="api-desc">List federation instances</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/marketplace/federation/instances</code>
+            <span class="api-desc">Register federation instance</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/marketplace/federation/sync</code>
+            <span class="api-desc">Sync all federation instances</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/marketplace/federation/instances/:url</code>
+            <span class="api-desc">Remove federation instance</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/marketplace/federated</code>
+            <span class="api-desc">Get federated listings</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reputation -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Reputation</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/reputation/scores</code>
+            <span class="api-desc">All scores (auto-computes if stale)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/reputation/scores</code>
+            <span class="api-desc">Force-recompute all scores</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/reputation/scores/:agentId</code>
+            <span class="api-desc">Get score for agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/reputation/scores/:agentId</code>
+            <span class="api-desc">Force recompute agent score</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/reputation/events</code>
+            <span class="api-desc">Record reputation event</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/reputation/events/:agentId</code>
+            <span class="api-desc">Get events for agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/reputation/identities</code>
+            <span class="api-desc">Get all identities</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/reputation/identity/:agentId</code>
+            <span class="api-desc">Get identity for agent</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/reputation/identity/:agentId</code>
+            <span class="api-desc">Set identity verification tier</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/reputation/attestation/:agentId</code>
+            <span class="api-desc">Get attestation</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/reputation/attestation/:agentId</code>
+            <span class="api-desc">Create attestation</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Billing</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/billing/subscription/:tenantId</code>
+            <span class="api-desc">Get subscription</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/billing/subscription</code>
+            <span class="api-desc">Create subscription</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/billing/subscription/:tenantId/cancel</code>
+            <span class="api-desc">Cancel subscription</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/billing/usage/:tenantId</code>
+            <span class="api-desc">Get usage and history</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/billing/invoices/:tenantId</code>
+            <span class="api-desc">Get invoices</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/billing/calculate</code>
+            <span class="api-desc">Calculate cost from credits</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/webhooks/stripe</code>
+            <span class="api-desc">Stripe webhook receiver</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auth Flow -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Auth Flow</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/auth/device</code>
+            <span class="api-desc">Initiate device authorization</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/auth/device/token</code>
+            <span class="api-desc">Poll for token</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/auth/device/authorize</code>
+            <span class="api-desc">Authorize device (from web UI)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/auth/verify</code>
+            <span class="api-desc">Verification page</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tenants -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Tenants</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/tenants/register</code>
+            <span class="api-desc">Register new tenant (public)</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/tenants/me</code>
+            <span class="api-desc">Get current tenant info</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/tenants/me/members</code>
+            <span class="api-desc">List tenant members</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/tenants/me/members</code>
+            <span class="api-desc">Add tenant member</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/tenants/me/members/:keyHash</code>
+            <span class="api-desc">Remove tenant member</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- A2A Tasks -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">A2A Tasks</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/a2a/tasks/send</code>
+            <span class="api-desc">Create and start A2A task</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/a2a/tasks/:id</code>
+            <span class="api-desc">Poll task status/result</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plugins -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Plugins</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/plugins</code>
+            <span class="api-desc">List all plugins</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/plugins/load</code>
+            <span class="api-desc">Load a plugin</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/plugins/:name/unload</code>
+            <span class="api-desc">Unload a plugin</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/plugins/:name/grant</code>
+            <span class="api-desc">Grant capability</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/plugins/:name/revoke</code>
+            <span class="api-desc">Revoke capability</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exam -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Exam</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/exam/run</code>
+            <span class="api-desc">Trigger a live exam</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/exam/categories</code>
+            <span class="api-desc">List exam categories</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Usage -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Usage</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/usage/summary</code>
+            <span class="api-desc">Per-schedule aggregates with anomaly flags</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/usage/daily</code>
+            <span class="api-desc">Per-day breakdown</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/usage/anomalies</code>
+            <span class="api-desc">Current anomaly flags</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/usage/schedule/:id</code>
+            <span class="api-desc">Detailed usage for schedule</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">Feedback</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/feedback/metrics</code>
+            <span class="api-desc">Current outcome metrics</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/feedback/analysis</code>
+            <span class="api-desc">Weekly analysis</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/feedback/context</code>
+            <span class="api-desc">Outcome context for prompts</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Log -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Audit Log</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/audit-log</code>
+            <span class="api-desc">Query immutable audit log</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ollama -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">Ollama</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/ollama/status</code>
+            <span class="api-desc">Ollama server status</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/ollama/models</code>
+            <span class="api-desc">List all models</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/ollama/models/running</code>
+            <span class="api-desc">List loaded models</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/ollama/models/pull</code>
+            <span class="api-desc">Pull (download) a model</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/ollama/models</code>
+            <span class="api-desc">Delete a model</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/ollama/models/pull/status</code>
+            <span class="api-desc">Active pull statuses</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/ollama/library</code>
+            <span class="api-desc">Search available models</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GitHub Allowlist -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-cyan">GitHub Allowlist</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/github-allowlist</code>
+            <span class="api-desc">List GitHub users on allowlist</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/github-allowlist</code>
+            <span class="api-desc">Add GitHub user</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/github-allowlist/:username</code>
+            <span class="api-desc">Update allowlist entry</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/github-allowlist/:username</code>
+            <span class="api-desc">Remove from allowlist</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Repo Blocklist -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-magenta">Repo Blocklist</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/repo-blocklist</code>
+            <span class="api-desc">List blocked repos</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/repo-blocklist</code>
+            <span class="api-desc">Add repo to blocklist</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/repo-blocklist/:repo</code>
+            <span class="api-desc">Remove from blocklist</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP Servers -->
+      <div class="api-group">
+        <h3 class="api-group__title accent-green">MCP Servers</h3>
+        <div class="api-table">
+          <div class="api-row">
+            <span class="api-method api-method--get">GET</span>
+            <code class="api-path">/api/mcp-servers</code>
+            <span class="api-desc">List MCP server configs</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp-servers</code>
+            <span class="api-desc">Create MCP server config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--put">PUT</span>
+            <code class="api-path">/api/mcp-servers/:id</code>
+            <span class="api-desc">Update MCP server config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--delete">DEL</span>
+            <code class="api-path">/api/mcp-servers/:id</code>
+            <span class="api-desc">Delete MCP server config</span>
+          </div>
+          <div class="api-row">
+            <span class="api-method api-method--post">POST</span>
+            <code class="api-path">/api/mcp-servers/:id/test</code>
+            <span class="api-desc">Test MCP server connection</span>
           </div>
         </div>
       </div>
@@ -895,33 +1853,43 @@
   <section class="section" id="database">
     <div class="container">
       <h2 class="section__title">Database Schema</h2>
-      <p class="section__subtitle">SQLite via <code class="accent-cyan">bun:sqlite</code>. Schema version 63. Auto-migrates on startup.</p>
+      <p class="section__subtitle">SQLite via <code class="accent-cyan">bun:sqlite</code>. Schema version 64. Auto-migrates on startup.</p>
 
       <div class="grid grid--3">
         <div class="card card--cyan">
-          <h3 class="card__title">Core</h3>
+          <h3 class="card__title">Core (14 tables)</h3>
           <div class="schema-list">
             <div class="schema-item"><code>projects</code> <span class="t-comment">&mdash; workingDir, env_vars</span></div>
-            <div class="schema-item"><code>agents</code> <span class="t-comment">&mdash; name, model, wallet</span></div>
+            <div class="schema-item"><code>agents</code> <span class="t-comment">&mdash; name, model, wallet, tenant</span></div>
             <div class="schema-item"><code>sessions</code> <span class="t-comment">&mdash; status, cost, source</span></div>
             <div class="schema-item"><code>session_messages</code> <span class="t-comment">&mdash; role, content</span></div>
             <div class="schema-item"><code>daily_spending</code> <span class="t-comment">&mdash; date, total</span></div>
+            <div class="schema-item"><code>agent_spending_caps</code> <span class="t-comment">&mdash; daily limits</span></div>
+            <div class="schema-item"><code>agent_daily_spending</code> <span class="t-comment">&mdash; per-agent daily</span></div>
             <div class="schema-item"><code>escalation_queue</code> <span class="t-comment">&mdash; pending approvals</span></div>
+            <div class="schema-item"><code>work_tasks</code> <span class="t-comment">&mdash; status, branch, PR</span></div>
+            <div class="schema-item"><code>pr_outcomes</code> <span class="t-comment">&mdash; PR state, failure reason</span></div>
+            <div class="schema-item"><code>agent_personas</code> <span class="t-comment">&mdash; archetype, traits</span></div>
+            <div class="schema-item"><code>skill_bundles</code> <span class="t-comment">&mdash; tools, prompts</span></div>
+            <div class="schema-item"><code>agent_skills</code> <span class="t-comment">&mdash; agent assignments</span></div>
+            <div class="schema-item"><code>project_skills</code> <span class="t-comment">&mdash; project assignments</span></div>
           </div>
         </div>
         <div class="card card--magenta">
-          <h3 class="card__title">Messaging</h3>
+          <h3 class="card__title">Messaging &amp; Memory (8 tables)</h3>
           <div class="schema-list">
             <div class="schema-item"><code>algochat_conversations</code></div>
             <div class="schema-item"><code>algochat_messages</code> <span class="t-comment">&mdash; content, txid</span></div>
-            <div class="schema-item"><code>algochat_psk_state_v2</code> <span class="t-comment">&mdash; PSK handshake</span></div>
+            <div class="schema-item"><code>algochat_psk_state</code> <span class="t-comment">&mdash; PSK handshake</span></div>
             <div class="schema-item"><code>algochat_allowlist</code> <span class="t-comment">&mdash; address, label</span></div>
+            <div class="schema-item"><code>psk_contacts</code> <span class="t-comment">&mdash; multi-contact PSK</span></div>
             <div class="schema-item"><code>agent_messages</code> <span class="t-comment">&mdash; from, to, txid</span></div>
             <div class="schema-item"><code>agent_memories</code> <span class="t-comment">&mdash; encrypted</span></div>
+            <div class="schema-item"><code>agent_memories_fts</code> <span class="t-comment">&mdash; FTS5 index</span></div>
           </div>
         </div>
         <div class="card card--green">
-          <h3 class="card__title">Advanced</h3>
+          <h3 class="card__title">Councils &amp; Scheduling (12 tables)</h3>
           <div class="schema-list">
             <div class="schema-item"><code>councils</code> <span class="t-comment">&mdash; members, rounds</span></div>
             <div class="schema-item"><code>council_members</code></div>
@@ -930,10 +1898,65 @@
             <div class="schema-item"><code>council_discussion_messages</code></div>
             <div class="schema-item"><code>schedules</code> <span class="t-comment">&mdash; cron, interval, actions</span></div>
             <div class="schema-item"><code>schedule_executions</code> <span class="t-comment">&mdash; status, result</span></div>
+            <div class="schema-item"><code>workflows</code> <span class="t-comment">&mdash; nodes, edges</span></div>
+            <div class="schema-item"><code>workflow_runs</code> <span class="t-comment">&mdash; status, I/O</span></div>
+            <div class="schema-item"><code>workflow_node_runs</code></div>
+            <div class="schema-item"><code>repo_locks</code> <span class="t-comment">&mdash; coordination</span></div>
+            <div class="schema-item"><code>repo_blocklist</code> <span class="t-comment">&mdash; off-limits repos</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid--3" style="margin-top: 24px;">
+        <div class="card card--cyan">
+          <h3 class="card__title">Credits &amp; Billing (9 tables)</h3>
+          <div class="schema-list">
             <div class="schema-item"><code>credit_ledger</code> <span class="t-comment">&mdash; wallet, balance</span></div>
             <div class="schema-item"><code>credit_transactions</code></div>
             <div class="schema-item"><code>credit_config</code></div>
-            <div class="schema-item"><code>work_tasks</code> <span class="t-comment">&mdash; status, branch</span></div>
+            <div class="schema-item"><code>tenants</code> <span class="t-comment">&mdash; org, plan, limits</span></div>
+            <div class="schema-item"><code>tenant_members</code> <span class="t-comment">&mdash; RBAC</span></div>
+            <div class="schema-item"><code>api_keys</code> <span class="t-comment">&mdash; hash, expiry</span></div>
+            <div class="schema-item"><code>subscriptions</code> <span class="t-comment">&mdash; Stripe</span></div>
+            <div class="schema-item"><code>usage_records</code> <span class="t-comment">&mdash; billing usage</span></div>
+            <div class="schema-item"><code>invoices</code> <span class="t-comment">&mdash; Stripe invoices</span></div>
+          </div>
+        </div>
+        <div class="card card--magenta">
+          <h3 class="card__title">GitHub &amp; Notifications (10 tables)</h3>
+          <div class="schema-list">
+            <div class="schema-item"><code>webhook_registrations</code> <span class="t-comment">&mdash; repo, events</span></div>
+            <div class="schema-item"><code>webhook_deliveries</code></div>
+            <div class="schema-item"><code>mention_polling_configs</code></div>
+            <div class="schema-item"><code>github_allowlist</code> <span class="t-comment">&mdash; username</span></div>
+            <div class="schema-item"><code>notification_channels</code></div>
+            <div class="schema-item"><code>owner_notifications</code></div>
+            <div class="schema-item"><code>notification_deliveries</code></div>
+            <div class="schema-item"><code>owner_questions</code> <span class="t-comment">&mdash; blocking Q&amp;A</span></div>
+            <div class="schema-item"><code>owner_question_dispatches</code></div>
+            <div class="schema-item"><code>audit_log</code> <span class="t-comment">&mdash; immutable</span></div>
+          </div>
+        </div>
+        <div class="card card--green">
+          <h3 class="card__title">Marketplace &amp; Infra (17 tables)</h3>
+          <div class="schema-list">
+            <div class="schema-item"><code>marketplace_listings</code></div>
+            <div class="schema-item"><code>marketplace_reviews</code></div>
+            <div class="schema-item"><code>federated_instances</code></div>
+            <div class="schema-item"><code>escrow_transactions</code></div>
+            <div class="schema-item"><code>agent_reputation</code> <span class="t-comment">&mdash; scores</span></div>
+            <div class="schema-item"><code>reputation_events</code></div>
+            <div class="schema-item"><code>reputation_attestations</code></div>
+            <div class="schema-item"><code>agent_identity</code> <span class="t-comment">&mdash; verification</span></div>
+            <div class="schema-item"><code>plugins</code> <span class="t-comment">&mdash; registry</span></div>
+            <div class="schema-item"><code>plugin_capabilities</code></div>
+            <div class="schema-item"><code>sandbox_configs</code></div>
+            <div class="schema-item"><code>mcp_server_configs</code></div>
+            <div class="schema-item"><code>voice_cache</code> <span class="t-comment">&mdash; TTS audio</span></div>
+            <div class="schema-item"><code>health_snapshots</code></div>
+            <div class="schema-item"><code>server_health_snapshots</code></div>
+            <div class="schema-item"><code>performance_metrics</code></div>
+            <div class="schema-item"><code>rate_limit_state</code></div>
           </div>
         </div>
       </div>
