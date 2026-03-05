@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
+import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { getAgent } from '../db/agents';
 
 /** Tools available to all agents by default (when mcp_tool_permissions is NULL). */
@@ -47,17 +48,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
 /** Tools that require an explicit grant in mcp_tool_permissions. */
 // corvid_grant_credits, corvid_credit_config
 
-/** Tools blocked during scheduler-initiated sessions to prevent financial/messaging side effects. */
-const SCHEDULER_BLOCKED_TOOLS = new Set([
-    'corvid_send_message',
-    'corvid_grant_credits',
-    'corvid_credit_config',
-    'corvid_github_fork_repo',
-    'corvid_github_create_pr',
-    'corvid_github_create_issue',
-    'corvid_github_comment_on_pr',
-    'corvid_ask_owner',
-]);
+// Scheduler tool gating is handled by isToolBlockedForScheduler() — see scheduler-tool-gating.ts
 
 export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnType<typeof tool>[]) {
     const tools = [
@@ -504,9 +495,9 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         filteredTools = tools.filter((t) => allowedSet.has(t.name));
     }
 
-    // Scheduler-initiated sessions: block tools that could cause financial or messaging side effects
+    // Scheduler-initiated sessions: tiered tool gating based on action type
     if (ctx.schedulerMode) {
-        filteredTools = filteredTools.filter((t) => !SCHEDULER_BLOCKED_TOOLS.has(t.name));
+        filteredTools = filteredTools.filter((t) => !isToolBlockedForScheduler(t.name, ctx.schedulerActionType));
     }
 
     return createSdkMcpServer({

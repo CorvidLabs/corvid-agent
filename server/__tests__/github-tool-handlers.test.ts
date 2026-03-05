@@ -607,3 +607,159 @@ describe('handleGitHubFollowUser', () => {
         expect(getText(result)).toContain('Failed to follow user');
     });
 });
+
+// ── Scheduler Tool Gating (handler-level enforcement) ─────────────────
+
+describe('scheduler tool gating', () => {
+    function makeSchedulerCtx(actionType?: string) {
+        return makeCtx({
+            schedulerMode: true,
+            schedulerActionType: actionType as McpToolContext['schedulerActionType'],
+            schedulerToolUsage: new Map(),
+        });
+    }
+
+    describe('handleGitHubCreateIssue — scheduler mode', () => {
+        test('blocks issues in non-allowed orgs', async () => {
+            const ctx = makeSchedulerCtx('daily_review');
+            const result = await handleGitHubCreateIssue(ctx, {
+                repo: 'external/repo', title: 'test', body: 'test',
+            });
+            expect(result.isError).toBe(true);
+            expect(getText(result)).toContain('not permitted');
+            expect(mockCreateIssue).not.toHaveBeenCalled();
+        });
+
+        test('allows issues in CorvidLabs repos', async () => {
+            const ctx = makeSchedulerCtx('daily_review');
+            const result = await handleGitHubCreateIssue(ctx, {
+                repo: 'CorvidLabs/corvid-agent', title: 'test', body: 'test',
+            });
+            expect(result.isError).toBeUndefined();
+            expect(mockCreateIssue).toHaveBeenCalled();
+        });
+
+        test('auto-labels with agent-escalation', async () => {
+            const ctx = makeSchedulerCtx('daily_review');
+            await handleGitHubCreateIssue(ctx, {
+                repo: 'CorvidLabs/corvid-agent', title: 'test', body: 'test',
+            });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const callArgs = (mockCreateIssue.mock.calls as any[][])[0];
+            expect(callArgs[3]).toContain('agent-escalation');
+        });
+
+        test('preserves existing labels and adds agent-escalation', async () => {
+            const ctx = makeSchedulerCtx('daily_review');
+            await handleGitHubCreateIssue(ctx, {
+                repo: 'CorvidLabs/corvid-agent', title: 'test', body: 'test', labels: ['bug'],
+            });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const callArgs = (mockCreateIssue.mock.calls as any[][])[0];
+            expect(callArgs[3]).toContain('bug');
+            expect(callArgs[3]).toContain('agent-escalation');
+        });
+
+        test('rate-limits issues to 3 per session', async () => {
+            const ctx = makeSchedulerCtx('daily_review');
+            // First 3 should succeed
+            for (let i = 0; i < 3; i++) {
+                const r = await handleGitHubCreateIssue(ctx, {
+                    repo: 'CorvidLabs/corvid-agent', title: `test ${i}`, body: 'test',
+                });
+                expect(r.isError).toBeUndefined();
+            }
+            // 4th should be rate-limited
+            const r4 = await handleGitHubCreateIssue(ctx, {
+                repo: 'CorvidLabs/corvid-agent', title: 'test 4', body: 'test',
+            });
+            expect(r4.isError).toBe(true);
+            expect(getText(r4)).toContain('rate limit');
+            expect(mockCreateIssue).toHaveBeenCalledTimes(3);
+        });
+    });
+
+    describe('handleGitHubCreatePr — scheduler mode', () => {
+        test('blocks PRs in non-allowed orgs', async () => {
+            const ctx = makeSchedulerCtx('work_task');
+            const result = await handleGitHubCreatePr(ctx, {
+                repo: 'external/repo', title: 'test', body: 'test', head: 'feat',
+            });
+            expect(result.isError).toBe(true);
+            expect(getText(result)).toContain('not permitted');
+        });
+
+        test('allows PRs in CorvidLabs repos', async () => {
+            const ctx = makeSchedulerCtx('work_task');
+            const result = await handleGitHubCreatePr(ctx, {
+                repo: 'CorvidLabs/corvid-agent', title: 'test', body: 'test', head: 'feat',
+            });
+            expect(result.isError).toBeUndefined();
+        });
+
+        test('rate-limits PRs to 3 per session', async () => {
+            const ctx = makeSchedulerCtx('work_task');
+            for (let i = 0; i < 3; i++) {
+                await handleGitHubCreatePr(ctx, {
+                    repo: 'CorvidLabs/corvid-agent', title: `pr ${i}`, body: 'test', head: `feat-${i}`,
+                });
+            }
+            const r4 = await handleGitHubCreatePr(ctx, {
+                repo: 'CorvidLabs/corvid-agent', title: 'pr 4', body: 'test', head: 'feat-4',
+            });
+            expect(r4.isError).toBe(true);
+            expect(getText(r4)).toContain('rate limit');
+        });
+    });
+
+    describe('handleGitHubCommentOnPr — scheduler mode', () => {
+        test('blocks comments in non-allowed orgs', async () => {
+            const ctx = makeSchedulerCtx('review_prs');
+            const result = await handleGitHubCommentOnPr(ctx, {
+                repo: 'external/repo', pr_number: 1, body: 'test',
+            });
+            expect(result.isError).toBe(true);
+            expect(getText(result)).toContain('not permitted');
+        });
+
+        test('allows comments in CorvidLabs repos', async () => {
+            const ctx = makeSchedulerCtx('review_prs');
+            const result = await handleGitHubCommentOnPr(ctx, {
+                repo: 'CorvidLabs/corvid-agent', pr_number: 1, body: 'LGTM',
+            });
+            expect(result.isError).toBeUndefined();
+        });
+
+        test('rate-limits comments to 5 per session', async () => {
+            const ctx = makeSchedulerCtx('review_prs');
+            for (let i = 0; i < 5; i++) {
+                await handleGitHubCommentOnPr(ctx, {
+                    repo: 'CorvidLabs/corvid-agent', pr_number: i + 1, body: `comment ${i}`,
+                });
+            }
+            const r6 = await handleGitHubCommentOnPr(ctx, {
+                repo: 'CorvidLabs/corvid-agent', pr_number: 6, body: 'too many',
+            });
+            expect(r6.isError).toBe(true);
+            expect(getText(r6)).toContain('rate limit');
+        });
+    });
+
+    describe('non-scheduler mode', () => {
+        test('issue creation works without restrictions', async () => {
+            const ctx = makeCtx(); // no schedulerMode
+            const result = await handleGitHubCreateIssue(ctx, {
+                repo: 'external/repo', title: 'test', body: 'test',
+            });
+            expect(result.isError).toBeUndefined();
+        });
+
+        test('PR creation works without restrictions', async () => {
+            const ctx = makeCtx();
+            const result = await handleGitHubCreatePr(ctx, {
+                repo: 'external/repo', title: 'test', body: 'test', head: 'feat',
+            });
+            expect(result.isError).toBeUndefined();
+        });
+    });
+});

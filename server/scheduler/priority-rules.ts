@@ -22,6 +22,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
     outcome_analysis: 'lightweight',
     daily_review: 'lightweight',
     star_repo: 'lightweight',
+    daily_review: 'review',
     custom: 'feature_work',
 };
 

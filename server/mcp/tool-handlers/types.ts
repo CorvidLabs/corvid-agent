@@ -12,6 +12,7 @@ import type { ReputationScorer } from '../../reputation/scorer';
 import type { ReputationAttestation } from '../../reputation/attestation';
 import type { ReputationVerifier } from '../../reputation/verifier';
 import type { AstParserService } from '../../ast/service';
+import type { ScheduleActionType } from '../../../shared/types/schedules';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export interface McpToolContext {
@@ -39,6 +40,10 @@ export interface McpToolContext {
     extendTimeout?: (additionalMs: number) => boolean;
     /** True when the session was started by the scheduler — restricts certain tools. */
     schedulerMode?: boolean;
+    /** The action type that triggered this scheduler session (enables tiered tool gating). */
+    schedulerActionType?: ScheduleActionType;
+    /** Mutable counters for rate-limiting gated tools in scheduler sessions. */
+    schedulerToolUsage?: Map<string, number>;
     /** Broadcast a message to all connected WS clients on the 'owner' topic. */
     broadcastOwnerMessage?: (message: unknown) => void;
     /** Owner question manager for blocking agent→owner questions. */
