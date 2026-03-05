@@ -90,6 +90,8 @@ async function fetchWithRetry(
 
 export const test = base.extend<{ api: ApiHelpers }>({
     api: async ({}, use) => {
+        const createdAgentIds: string[] = [];
+
         const helpers: ApiHelpers = {
             async seedProject(name = 'E2E Test Project') {
                 const res = await fetchWithRetry(`${BASE_URL}/api/projects`, {
@@ -118,7 +120,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedAgent failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const agent = await res.json();
+                createdAgentIds.push(agent.id);
+                return agent;
             },
 
             async seedCouncil(agentIds: string[], name = 'E2E Test Council', chairmanAgentId?: string) {
@@ -482,6 +486,14 @@ export const test = base.extend<{ api: ApiHelpers }>({
         };
 
         await use(helpers);
+
+        // Cleanup: delete agents created during the test
+        for (const id of createdAgentIds) {
+            await fetch(`${BASE_URL}/api/agents/${id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${E2E_API_KEY}` },
+            }).catch(() => {});
+        }
     },
 });
 
