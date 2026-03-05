@@ -35,10 +35,10 @@ export class PersonaService {
      */
     async checkPersonaExists(agentId: string): Promise<boolean> {
         try {
-            await firstValueFrom(
-                this.api.get<AgentPersona>(`/agents/${agentId}/persona`),
+            const persona = await firstValueFrom(
+                this.api.get<AgentPersona | null>(`/agents/${agentId}/persona`),
             );
-            return true;
+            return persona != null;
         } catch {
             return false;
         }

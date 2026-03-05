@@ -27,13 +27,15 @@ afterEach(() => {
 });
 
 describe('Persona Routes', () => {
-    test('GET persona returns 404 for agent without persona', async () => {
+    test('GET persona returns 200 with null for agent without persona', async () => {
         const agent = createAgent(db, { name: 'TestAgent' });
         const { req, url } = fakeReq('GET', `/api/agents/${agent.id}/persona`);
         const res = handlePersonaRoutes(req, url, db);
         expect(res).not.toBeNull();
         const resolved = await res!;
-        expect(resolved.status).toBe(404);
+        expect(resolved.status).toBe(200);
+        const body = await resolved.json();
+        expect(body).toBeNull();
     });
 
     test('PUT creates persona and GET returns it', async () => {
@@ -93,10 +95,12 @@ describe('Persona Routes', () => {
         expect(delRes).not.toBeNull();
         expect(delRes!.status).toBe(200);
 
-        // Verify deleted
+        // Verify deleted — returns 200 with null body
         const { req: getReq, url: getUrl } = fakeReq('GET', `/api/agents/${agent.id}/persona`);
         const getRes = await handlePersonaRoutes(getReq, getUrl, db);
-        expect(getRes!.status).toBe(404);
+        expect(getRes!.status).toBe(200);
+        const body = await getRes!.json();
+        expect(body).toBeNull();
     });
 
     test('returns 404 for non-existent agent', async () => {

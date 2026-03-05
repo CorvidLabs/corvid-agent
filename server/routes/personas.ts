@@ -22,8 +22,7 @@ export function handlePersonaRoutes(
         if (!agent) return json({ error: 'Agent not found' }, 404);
 
         const persona = getPersona(db, agentId);
-        if (!persona) return json({ error: 'No persona set' }, 404);
-        return json(persona);
+        return json(persona ?? null);
     }
 
     // PUT /api/agents/:id/persona
