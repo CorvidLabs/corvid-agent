@@ -115,7 +115,9 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
     });
 
     test('GET /api/browse-dirs returns directory listing', async ({}) => {
-        const res = await authedFetch(`${BASE_URL}/api/browse-dirs?path=/tmp`);
+        // Use home dir — always in the allowlist regardless of environment
+        const home = process.env.HOME ?? process.env.USERPROFILE ?? '/tmp';
+        const res = await authedFetch(`${BASE_URL}/api/browse-dirs?path=${encodeURIComponent(home)}`);
         expect(res.ok).toBe(true);
         const data = await res.json();
         expect(data.current).toBeTruthy();
