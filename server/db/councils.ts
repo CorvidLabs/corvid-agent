@@ -5,6 +5,7 @@ import type {
     CouncilLaunch,
     CouncilLaunchLog,
     CouncilLogLevel,
+    CouncilOnChainMode,
     CouncilStage,
     CreateCouncilInput,
     UpdateCouncilInput,
@@ -18,6 +19,7 @@ interface CouncilRow {
     description: string;
     chairman_agent_id: string | null;
     discussion_rounds: number;
+    on_chain_mode: string;
     created_at: string;
     updated_at: string;
 }
@@ -40,6 +42,7 @@ interface CouncilLaunchRow {
     chat_session_id: string | null;
     vote_type: string;
     governance_tier: number | null;
+    synthesis_txid: string | null;
     created_at: string;
 }
 
@@ -51,6 +54,7 @@ function rowToCouncil(row: CouncilRow, agentIds: string[]): Council {
         chairmanAgentId: row.chairman_agent_id,
         agentIds,
         discussionRounds: row.discussion_rounds ?? 2,
+        onChainMode: (row.on_chain_mode as CouncilOnChainMode) ?? 'off',
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -70,6 +74,7 @@ function rowToLaunch(row: CouncilLaunchRow, sessionIds: string[]): CouncilLaunch
         chatSessionId: row.chat_session_id ?? null,
         voteType: (row.vote_type as CouncilLaunch['voteType']) ?? 'standard',
         governanceTier: row.governance_tier ?? null,
+        synthesisTxid: row.synthesis_txid ?? null,
         createdAt: row.created_at,
     };
 }
@@ -101,9 +106,9 @@ export function createCouncil(db: Database, input: CreateCouncilInput, tenantId:
 
     db.transaction(() => {
         db.query(
-            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, tenant_id)
-             VALUES (?, ?, ?, ?, ?, ?)`
-        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, tenantId);
+            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, tenant_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, input.onChainMode ?? 'off', tenantId);
 
         for (let i = 0; i < input.agentIds.length; i++) {
             db.query(
@@ -138,6 +143,10 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
         if (input.discussionRounds !== undefined) {
             fields.push('discussion_rounds = ?');
             values.push(input.discussionRounds);
+        }
+        if (input.onChainMode !== undefined) {
+            fields.push('on_chain_mode = ?');
+            values.push(input.onChainMode);
         }
 
         if (fields.length > 0) {
@@ -384,6 +393,14 @@ export function updateDiscussionMessageTxid(
     txid: string,
 ): void {
     db.query('UPDATE council_discussion_messages SET txid = ? WHERE id = ?').run(txid, messageId);
+}
+
+export function updateCouncilLaunchSynthesisTxid(
+    db: Database,
+    launchId: string,
+    synthesisTxid: string,
+): void {
+    db.query('UPDATE council_launches SET synthesis_txid = ? WHERE id = ?').run(synthesisTxid, launchId);
 }
 
 export function updateCouncilLaunchChatSession(

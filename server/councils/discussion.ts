@@ -244,11 +244,17 @@ export function triggerSynthesis(
     processManager: ProcessManager,
     launchId: string,
     chairmanOverride?: string,
+    agentMessenger?: AgentMessenger | null,
 ): { ok: true; synthesisSessionId: string } | { ok: false; error: string; status: number } {
+    // Resolve on-chain mode from the council configuration
+    const launch = getCouncilLaunch(db, launchId);
+    const council = launch ? getCouncil(db, launch.councilId) : null;
+    const onChainMode = council?.onChainMode ?? 'off';
+
     return triggerSynthesisImpl(
         db, processManager, launchId,
         emitLog, broadcastStageChange, formatDiscussionMessages,
-        chairmanOverride,
+        chairmanOverride, agentMessenger, onChainMode,
     );
 }
 
@@ -572,9 +578,11 @@ async function runDiscussionRounds(
 
             broadcastDiscussionMessage(discMsg);
 
-            // Best-effort on-chain send (fire-and-forget, but log failures)
-            if (agentMessenger) {
-                sendDiscussionOnChain(agentMessenger, agentId, council.agentIds, content, discMsg.id, db).catch((err) => {
+            // Best-effort on-chain send — only when council is configured for full on-chain mode
+            const councilOnChainMode = council.onChainMode ?? 'off';
+            if (agentMessenger && councilOnChainMode === 'full') {
+                const threadPrefix = `[council:${launchId.slice(0, 8)}:R${round}] `;
+                sendDiscussionOnChain(agentMessenger, agentId, council.agentIds, threadPrefix + content, discMsg.id, db).catch((err) => {
                     log.error('Failed to send discussion message on-chain', {
                         launchId,
                         agentId,
@@ -799,7 +807,7 @@ function watchSessionsForAutoAdvance(
             const council = getCouncil(db, launch.councilId);
             if (council?.chairmanAgentId) {
                 emitLog(db, launchId, 'info', 'All reviewer sessions complete, auto-advancing to synthesis');
-                const result = triggerSynthesis(db, processManager, launchId);
+                const result = triggerSynthesis(db, processManager, launchId, undefined, agentMessenger);
                 if (!result.ok) {
                     emitLog(db, launchId, 'warn', `Auto-synthesis failed: ${result.error}`);
                 }
@@ -808,7 +816,7 @@ function watchSessionsForAutoAdvance(
                 emitLog(db, launchId, 'info', 'No chairman set — using first agent as synthesizer');
                 const firstAgentId = council?.agentIds[0];
                 if (firstAgentId) {
-                    const result = triggerSynthesis(db, processManager, launchId, firstAgentId);
+                    const result = triggerSynthesis(db, processManager, launchId, firstAgentId, agentMessenger);
                     if (!result.ok) {
                         emitLog(db, launchId, 'warn', `Auto-synthesis failed: ${result.error}`);
                         finishWithAggregatedSynthesis(db, launchId);

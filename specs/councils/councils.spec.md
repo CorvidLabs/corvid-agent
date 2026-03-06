@@ -76,6 +76,8 @@ _(none)_
 12. All stage changes, logs, and discussion messages are broadcast to registered listeners (used by WebSocket layer).
 13. If discussion rounds fail, the system falls through to trigger review anyway as a recovery mechanism.
 14. `waitForSessions` resolves with partial results on timeout rather than rejecting, reporting which sessions completed and which timed out.
+15. On-chain discussion messages are only sent when council `onChainMode` is `'full'`.
+16. Synthesis attestation (SHA-256 hash) is published on-chain when `onChainMode` is `'attestation'`.
 
 ## Behavioral Examples
 
@@ -111,6 +113,16 @@ _(none)_
 - **Given** a council with an existing `chatSessionId`
 - **When** `startCouncilChat` is called again
 - **Then** `processManager.resumeProcess` is called on the existing session instead of creating a new one
+
+### Scenario: Council with onChainMode 'attestation'
+- **Given** a council with `onChainMode` set to `'attestation'`
+- **When** the synthesis session completes
+- **Then** a SHA-256 hash of the synthesis text is published on-chain via `sendOnChainToSelf`, and the txid is stored in `council_launches.synthesis_txid`
+
+### Scenario: Council with onChainMode 'off' (default)
+- **Given** a council with default `onChainMode` (`'off'`)
+- **When** discussion rounds run
+- **Then** no on-chain messages are sent (`sendDiscussionOnChain` is not called)
 
 ### Scenario: Session timeout during discussion round
 - **Given** a discussion round with 3 agents, one of which hangs
@@ -148,7 +160,7 @@ _(none)_
 | `lib` | `createLogger` from `lib/logger`; `NotFoundError` from `lib/errors` |
 | `providers` | `getModelPricing` from `providers/cost-table` for detecting local Ollama models |
 | `observability` | `createEventContext`, `runWithEventContext` from `observability/event-context` |
-| `shared` | `CouncilLogLevel`, `CouncilLaunchLog`, `CouncilDiscussionMessage`, `Council` types from `shared/types` |
+| `shared` | `CouncilLogLevel`, `CouncilLaunchLog`, `CouncilDiscussionMessage`, `Council`, `CouncilOnChainMode` types from `shared/types` |
 
 ### Consumed By
 
@@ -163,3 +175,4 @@ _(none)_
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Added on-chain mode (off/attestation/full) for council communication |

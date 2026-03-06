@@ -4,7 +4,10 @@ version: 1
 status: draft
 files:
   - server/billing/usdc.ts
-db_tables: []
+  - server/billing/usdc-revenue.ts
+  - server/db/usdc-revenue.ts
+db_tables:
+  - agent_usdc_revenue
 depends_on:
   - specs/db/credits.spec.md
   - specs/lib/infra.spec.md
@@ -40,6 +43,24 @@ Monitors an Algorand wallet for incoming USDC ASA transfers via the Algorand ind
 | `stop` | none | `void` | Stops polling by clearing the interval timer and setting the running flag to false. |
 | `poll` | none | `Promise<number>` | Queries the indexer for new ASA transfers to the watched wallet since the last processed round. Returns the number of newly processed deposits. |
 
+## Revenue Mode
+
+### `UsdcRevenueService` (in `server/billing/usdc-revenue.ts`)
+
+Monitors all agent wallets for incoming USDC ASA transfers, records revenue per agent, and auto-forwards collected USDC to the owner wallet.
+
+**Configuration:**
+- Requires `OWNER_WALLET_ADDRESS`, `USDC_ASA_ID`, and indexer URL environment variables.
+
+**Behavior:**
+- Polls all agent wallets for incoming USDC ASA transfers every 30 seconds.
+- Records revenue entries in the `agent_usdc_revenue` database table (via `server/db/usdc-revenue.ts`).
+- Auto-forwards accumulated USDC to the owner wallet every 60 seconds.
+- Skips transfers originating from the owner wallet (these are fundings, not revenue).
+
+### `agent_usdc_revenue` Table
+Stores per-agent revenue records with full transaction audit trail. Each row links an inbound USDC transfer to the agent that received it, along with forwarding status and the outbound forwarding transaction ID.
+
 ## Invariants
 1. A transaction ID is never processed more than once — idempotency is enforced by `depositUsdc` in db/credits.
 2. Only incoming transfers (receiver matches the watched wallet) with a positive amount and the correct ASA ID are processed.
@@ -47,6 +68,10 @@ Monitors an Algorand wallet for incoming USDC ASA transfers via the Algorand ind
 4. The watcher returns `null` from `createUsdcWatcher` rather than starting with incomplete configuration.
 5. On mainnet, if no explicit `USDC_ASA_ID` is set, the hardcoded mainnet USDC ASA ID (31566704) is used.
 6. The poll timer is unref'd so the watcher does not prevent process exit.
+7. USDC received by agent wallets is auto-forwarded to owner wallet.
+8. Agent revenue is tracked per-agent with full txid audit trail.
+9. Forward failures are retried on next cycle (status goes to 'failed', then 'pending' entries retry).
+10. Revenue recording is idempotent via UNIQUE txid constraint.
 
 ## Behavioral Examples
 ### Scenario: Successful USDC deposit detection
@@ -96,4 +121,5 @@ Monitors an Algorand wallet for incoming USDC ASA transfers via the Algorand ind
 ## Change Log
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-06 | corvid-agent | Added USDC revenue tracking and auto-forwarding |
 | 2026-03-04 | corvid-agent | Initial spec |

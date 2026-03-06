@@ -1,3 +1,5 @@
+export type CouncilOnChainMode = 'off' | 'attestation' | 'full';
+
 export interface Council {
     id: string;
     name: string;
@@ -5,6 +7,7 @@ export interface Council {
     chairmanAgentId: string | null;
     agentIds: string[];
     discussionRounds: number;
+    onChainMode: CouncilOnChainMode;
     createdAt: string;
     updatedAt: string;
 }
@@ -15,6 +18,7 @@ export interface CreateCouncilInput {
     agentIds: string[];
     chairmanAgentId?: string;
     discussionRounds?: number;
+    onChainMode?: CouncilOnChainMode;
 }
 
 export interface UpdateCouncilInput {
@@ -23,6 +27,7 @@ export interface UpdateCouncilInput {
     agentIds?: string[];
     chairmanAgentId?: string | null;
     discussionRounds?: number;
+    onChainMode?: CouncilOnChainMode;
 }
 
 export type CouncilStage = 'responding' | 'discussing' | 'reviewing' | 'synthesizing' | 'complete';
@@ -76,6 +81,8 @@ export interface CouncilLaunch {
     voteType: GovernanceVoteType;
     /** Governance tier of the vote (0, 1, or 2). Null for standard launches. */
     governanceTier: number | null;
+    /** On-chain txid for synthesis attestation (set when onChainMode is 'attestation'). */
+    synthesisTxid: string | null;
     createdAt: string;
 }
 

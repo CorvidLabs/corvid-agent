@@ -25,7 +25,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 | Module specs | **108** with automated validation |
 | MCP tools | **37** corvid_* tool handlers |
 | API endpoints | **~200** across 37 route modules |
-| DB migrations | **67** (82 tables) |
+| DB migrations | **69** (83 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.
@@ -165,6 +165,7 @@ OPENAI_API_KEY=sk-...
 - Structured deliberation with multiple agents and a chairman
 - Pipeline: responding → discussing (N rounds) → reviewing → synthesizing
 - Chairman synthesizes a final decision from independent agent responses
+- Configurable on-chain mode: `off` (default), `attestation` (SHA-256 hash on-chain), `full` (all messages on-chain)
 
 ### Self-Improvement Pipeline
 - Agents call `corvid_create_work_task` to propose code changes
@@ -186,6 +187,9 @@ OPENAI_API_KEY=sk-...
 - X25519 PSK encrypted messaging channels
 - Owner commands: `/stop`, `/approve`, `/deny`, `/mode`, `/work`, `/council`
 - Credit system with ALGO-based purchasing
+- Work task lifecycle notifications broadcast via AlgoChat
+- Schedule result broadcasts to AlgoChat-enabled peers
+- USDC revenue tracking with auto-forwarding to owner wallet
 
 ### Multi-Channel Notifications
 - Delivery via Discord, Telegram, GitHub Issues, and AlgoChat
@@ -298,7 +302,7 @@ OPENAI_API_KEY=sk-...
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  67 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  69 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -313,7 +317,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (67 migrations) and query modules
+  db/            SQLite schema (69 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -458,7 +462,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 67 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 69 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |

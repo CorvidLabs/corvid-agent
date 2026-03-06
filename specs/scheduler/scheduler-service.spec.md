@@ -59,6 +59,12 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 | `onEvent` | `(callback)` | `() => void` | Subscribe to schedule events (returns unsubscribe function) |
 | `resolveApproval` | `(executionId: string, approved: boolean)` | `ScheduleExecution \| null` | Approve or deny a pending execution. If approved, executes the action |
 
+#### SchedulerService Private Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `broadcastScheduleResult` | `(execution: ScheduleExecution, schedule: AgentSchedule)` | `Promise<void>` | Broadcasts completed execution results to AlgoChat-enabled peers for non-trivial action types |
+
 ## Invariants
 
 1. **Minimum schedule interval**: No schedule may fire more often than every 5 minutes (`MIN_SCHEDULE_INTERVAL_MS = 300,000`). Validated at schedule creation by `validateScheduleFrequency`
@@ -71,6 +77,7 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 8. **No missed-run catch-up**: On startup, `next_run_at` is computed from now, not from `last_run_at`. Prevents thundering herd after restart
 9. **Idempotent start**: Calling `start()` when already running is a no-op
 10. **Notification best-effort**: On-chain notifications to `notifyAddress` are fire-and-forget; failures are logged but don't affect execution status
+11. **Schedule result broadcasting**: Completed executions for non-trivial action types (`work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`) broadcast results to AlgoChat via `sendOnChainToSelf`
 
 ## Behavioral Examples
 
@@ -94,6 +101,12 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 - **Given** a schedule that has failed 4 consecutive times
 - **When** the 5th execution also fails
 - **Then** the schedule status is set to `paused` and `consecutiveFailures` is reset
+
+### Scenario: Status check-in execution
+
+- **Given** a schedule with action type `status_checkin` and `agentMessenger` set
+- **When** the schedule fires
+- **Then** system state is evaluated via `SystemStateDetector`, and a `[STATUS_CHECKIN]` summary is sent via `sendOnChainToSelf`
 
 ### Scenario: Cron expression too frequent
 
@@ -210,6 +223,7 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 | `reputation_attestation` | Compute score and publish on-chain attestation | (none) |
 | `outcome_analysis` | Analyze PR outcomes and schedule effectiveness | (none) |
 | `daily_review` | Generate daily activity summary (PRs, executions, health) | (none) |
+| `status_checkin` | Evaluates system state and broadcasts agent status summary to AlgoChat | (none) |
 | `custom` | Freeform prompt (owner-only creation) | `prompt` |
 
 ## Change Log
@@ -218,3 +232,4 @@ See ADR-001 (`docs/decisions/001-autonomous-scheduler.md`) for full architectura
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-03-05 | corvid-agent | Add `daily_review`, `outcome_analysis` action types; add `setDailyReviewService`, `setOutcomeTrackerService` methods |
+| 2026-03-06 | corvid-agent | Added `status_checkin` action type and schedule result AlgoChat broadcasting |

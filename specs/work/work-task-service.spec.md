@@ -32,6 +32,12 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `db` | `Database` | SQLite database handle |
 | `processManager` | `ProcessManager` | For spawning agent sessions |
 
+#### WorkTaskService Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `agentMessenger` | `AgentMessenger \| null` | Optional AlgoChat messenger for broadcasting lifecycle events; set via `setAgentMessenger` |
+
 #### WorkTaskService Methods
 
 | Method | Parameters | Returns | Description |
@@ -41,6 +47,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `getTask` | `(id: string)` | `WorkTask \| null` | Fetch a task by ID |
 | `listTasks` | `(agentId?: string)` | `WorkTask[]` | List tasks, optionally filtered by agent |
 | `cancelTask` | `(id: string)` | `Promise<WorkTask \| null>` | Stop the session, fail the task, clean up worktree |
+| `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the AgentMessenger instance for lifecycle notifications |
 | `onComplete` | `(taskId: string, callback: (task: WorkTask) => void)` | `void` | Register a completion callback |
 
 ## Invariants
@@ -54,6 +61,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 7. **Status state machine**: `pending` -> `branching` -> `running` -> `validating` -> (`completed` | `failed`) or (`running` for next iteration). No backward transitions
 8. **Dependency installation**: `bun install --frozen-lockfile --ignore-scripts` is run in the worktree before execution and before each validation. Falls back to non-frozen if frozen fails. `--ignore-scripts` prevents postinstall hooks from bypassing protected-file checks
 9. **Session linkage**: Each running iteration creates a new session with `workDir` pointing to the worktree
+10. **AlgoChat lifecycle notifications**: Work task lifecycle events (created, completed, failed) are broadcast via AlgoChat `sendOnChainToSelf` when `agentMessenger` is available
 
 ## Behavioral Examples
 
@@ -99,6 +107,18 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 - **When** the session output does not contain a GitHub PR URL
 - **And** the fallback `gh pr create` also fails
 - **Then** status becomes `failed` with error "Session completed but no PR URL was found in output and service-level PR creation failed"
+
+### Scenario: Work task creation notification
+
+- **Given** a `WorkTaskService` with `agentMessenger` set via `setAgentMessenger`
+- **When** a new work task is created
+- **Then** `sendOnChainToSelf` is called fire-and-forget with `"[WORK_TASK:created] <description snippet>"`
+
+### Scenario: Work task completion notification
+
+- **Given** a work task completes (with or without PR URL)
+- **When** `notifyCallbacks` is called
+- **Then** `sendOnChainToSelf` is called fire-and-forget with `"[WORK_TASK:completed] PR: <url>"` or `"[WORK_TASK:failed] <error>"`
 
 ### Scenario: Cancel a running task
 
@@ -178,3 +198,4 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-02-20 | corvid-agent | Updated invariant #6 and behavioral example: PR creation now falls back to service-level `createPrFallback()` (fixes #182) |
+| 2026-03-06 | corvid-agent | Added AlgoChat notifications for work task lifecycle events |

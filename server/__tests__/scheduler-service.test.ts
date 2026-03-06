@@ -1073,6 +1073,7 @@ describe('SchedulerService', () => {
         it('does not send notification when notifyAddress is not set', async () => {
             const mockMessenger = {
                 sendNotificationToAddress: mock(() => Promise.resolve()),
+                sendOnChainToSelf: mock(() => Promise.resolve(null)),
             };
             scheduler.setAgentMessenger(mockMessenger as never);
 

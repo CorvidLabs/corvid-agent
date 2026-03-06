@@ -32,29 +32,76 @@
   --border:        #1e2035;
   --border-bright: #2a2d48;
 
-  /* Text */
+  /* Text — AAA contrast (7:1+ on --bg-deep) */
   --text-primary:   #e0e0ec;
-  --text-secondary: #7a7d98;
-  --text-tertiary:  #4a4d68;
+  --text-secondary: #a8abbd;
+  --text-tertiary:  #9a9cb6;
 
   /* Accents */
   --cyan:    #00e5ff;
-  --magenta: #ff00aa;
+  --magenta: #ff66c4;
   --green:   #00ff88;
   --red:     #ff3355;
   --amber:   #ffaa00;
 
   --cyan-dim:    rgba(0, 229, 255, 0.12);
-  --magenta-dim: rgba(255, 0, 170, 0.12);
+  --magenta-dim: rgba(255, 102, 196, 0.12);
   --green-dim:   rgba(0, 255, 136, 0.12);
 
   /* Glows */
   --glow-cyan:    0 0 12px rgba(0, 229, 255, 0.3);
-  --glow-magenta: 0 0 12px rgba(255, 0, 170, 0.3);
+  --glow-magenta: 0 0 12px rgba(255, 102, 196, 0.3);
   --glow-green:   0 0 12px rgba(0, 255, 136, 0.3);
 
   /* Spacing */
   --section-pad: 80px;
+}
+
+/* ─── Skip Navigation (WCAG AAA) ─── */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 200;
+  padding: 12px 24px;
+  background: var(--bg-deep);
+  color: var(--cyan);
+  border: 2px solid var(--cyan);
+  border-radius: 4px;
+  font-family: 'Dogica Pixel', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-decoration: none;
+}
+
+.skip-nav:focus {
+  top: 12px;
+  outline: none;
+  box-shadow: var(--glow-cyan);
+}
+
+/* ─── Focus Styles (WCAG AAA) ─── */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  box-shadow: var(--glow-cyan);
+}
+
+/* ─── Reduced Motion (WCAG AAA) ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ─── Reset ─── */
@@ -107,7 +154,7 @@ a {
   overflow: hidden;
   background:
     radial-gradient(ellipse at 30% 20%, rgba(0, 229, 255, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 70% 80%, rgba(255, 0, 170, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(255, 102, 196, 0.04) 0%, transparent 50%),
     var(--bg-deep);
 }
 
@@ -138,7 +185,7 @@ a {
 
 .glow-magenta {
   color: var(--magenta);
-  text-shadow: 0 0 20px rgba(255, 0, 170, 0.5), 0 0 40px rgba(255, 0, 170, 0.2);
+  text-shadow: 0 0 20px rgba(255, 102, 196, 0.5), 0 0 40px rgba(255, 102, 196, 0.2);
 }
 
 .hero__tagline {
@@ -204,7 +251,7 @@ a {
 }
 
 .btn--magenta:hover {
-  background: rgba(255, 0, 170, 0.25);
+  background: rgba(255, 102, 196, 0.25);
   box-shadow: var(--glow-magenta);
 }
 
@@ -413,7 +460,8 @@ a {
   color: var(--cyan);
 }
 
-.nav__link--active {
+.nav__link--active,
+.nav__link[aria-current="page"] {
   color: var(--cyan);
   background: var(--cyan-dim);
   border: 1px solid rgba(0, 229, 255, 0.2);
@@ -450,7 +498,7 @@ a {
   overflow: hidden;
   background:
     radial-gradient(ellipse at 30% 20%, rgba(0, 229, 255, 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 70% 80%, rgba(255, 0, 170, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(255, 102, 196, 0.04) 0%, transparent 50%),
     var(--bg-deep);
 }
 
@@ -614,6 +662,7 @@ a {
 .api-method--get    { color: var(--cyan);    background: var(--cyan-dim);    border: 1px solid rgba(0, 229, 255, 0.2); }
 .api-method--post   { color: var(--green);   background: var(--green-dim);   border: 1px solid rgba(0, 255, 136, 0.2); }
 .api-method--put    { color: var(--amber);   background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.2); }
+.api-method--patch  { color: var(--magenta); background: var(--magenta-dim);  border: 1px solid rgba(255, 102, 196, 0.2); }
 .api-method--delete { color: var(--red);     background: rgba(255, 51, 85, 0.12);  border: 1px solid rgba(255, 51, 85, 0.2); }
 
 .api-path {
@@ -1330,7 +1379,7 @@ a:hover .ext-icon {
 }
 
 .arch-box--cyan    { border-color: rgba(0, 229, 255, 0.3); }
-.arch-box--magenta { border-color: rgba(255, 0, 170, 0.3); }
+.arch-box--magenta { border-color: rgba(255, 102, 196, 0.3); }
 .arch-box--green   { border-color: rgba(0, 255, 136, 0.3); }
 
 .arch-box--cyan:hover    { border-color: var(--cyan);    box-shadow: var(--glow-cyan); }

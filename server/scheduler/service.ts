@@ -609,6 +609,9 @@ export class SchedulerService {
                 case 'daily_review':
                     await this.execDailyReview(executionId, schedule);
                     break;
+                case 'status_checkin':
+                    await this.execStatusCheckin(executionId, schedule);
+                    break;
                 case 'custom':
                     await this.execCustom(executionId, schedule, action);
                     break;
@@ -635,6 +638,8 @@ export class SchedulerService {
                 if (updated.status === 'completed') {
                     this.notifyScheduleEvent(schedule, 'completed',
                         `Schedule "${schedule.name}" completed (${action.type}): ${resultSnippet}`);
+                    // Broadcast to AlgoChat-enabled peers for non-trivial action types
+                    this.broadcastScheduleResult(schedule.agentId, action.type, resultSnippet);
                 } else if (updated.status === 'failed') {
                     this.notifyScheduleEvent(schedule, 'failed',
                         `Schedule "${schedule.name}" FAILED (${action.type}): ${resultSnippet}`);
@@ -1171,6 +1176,33 @@ export class SchedulerService {
         }
     }
 
+    private async execStatusCheckin(executionId: string, schedule: AgentSchedule): Promise<void> {
+        try {
+            const state = await this.systemStateDetector.evaluate();
+            const agent = getAgent(this.db, schedule.agentId);
+            const agentName = agent?.name ?? schedule.agentId.slice(0, 8);
+
+            const summary = [
+                `Agent: ${agentName}`,
+                `System: ${state.states.join(', ') || 'nominal'}`,
+                `Schedules running: ${this.runningExecutions.size}`,
+            ].join(' | ');
+
+            // Broadcast status to AlgoChat
+            if (this.agentMessenger) {
+                await this.agentMessenger.sendOnChainToSelf(
+                    schedule.agentId,
+                    `[STATUS_CHECKIN] ${summary}`,
+                );
+            }
+
+            updateExecutionStatus(this.db, executionId, 'completed', { result: summary });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            updateExecutionStatus(this.db, executionId, 'failed', { result: message });
+        }
+    }
+
     // ─── Cron helpers ────────────────────────────────────────────────────────
 
     private calculateNextRun(cronExpression: string | null, intervalMs: number | null): string | null {
@@ -1199,6 +1231,22 @@ export class SchedulerService {
                 log.error('Schedule event callback error', { error: err instanceof Error ? err.message : String(err) });
             }
         }
+    }
+
+    /** Broadcast schedule result to AlgoChat-enabled peer agents (fire-and-forget). */
+    private broadcastScheduleResult(agentId: string, actionType: ScheduleActionType, summary: string): void {
+        if (!this.agentMessenger) return;
+
+        // Only broadcast for meaningful action types
+        const broadcastTypes: ScheduleActionType[] = [
+            'work_task', 'council_launch', 'daily_review', 'review_prs',
+            'github_suggest', 'codebase_review', 'dependency_audit',
+            'improvement_loop', 'custom', 'status_checkin',
+        ];
+        if (!broadcastTypes.includes(actionType)) return;
+
+        const msg = `[SCHEDULE:${actionType}] ${summary.slice(0, 200)}`;
+        this.agentMessenger.sendOnChainToSelf(agentId, msg).catch(() => {});
     }
 
     /** Send best-effort on-chain notification to the schedule's notifyAddress. */

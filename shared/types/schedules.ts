@@ -15,6 +15,7 @@ export type ScheduleActionType =
     | 'reputation_attestation'
     | 'outcome_analysis'
     | 'daily_review'
+    | 'status_checkin'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';

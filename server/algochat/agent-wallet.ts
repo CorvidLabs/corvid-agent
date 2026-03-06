@@ -92,6 +92,9 @@ export class AgentWalletService {
 
             // Publish encryption key on-chain so other agents can discover us
             await this.publishKeyForAccount(generated.account, agent.name);
+
+            // Opt into USDC ASA if configured
+            await this.ensureUsdcOptIn(agentId);
         } catch (err) {
             log.error('Failed to create agent wallet', {
                 agentId,
@@ -205,6 +208,77 @@ export class AgentWalletService {
             if (chatAccount) {
                 await this.publishKeyForAccount(chatAccount.account, agent.name);
             }
+        }
+    }
+
+    /**
+     * Ensure an agent's wallet is opted into the USDC ASA.
+     * Required for receiving USDC on Algorand (ASAs require opt-in).
+     * No-op if USDC_ASA_ID is not configured.
+     */
+    async ensureUsdcOptIn(agentId: string): Promise<void> {
+        const asaId = parseInt(process.env.USDC_ASA_ID ?? '', 10);
+        if (!Number.isFinite(asaId) || asaId <= 0) {
+            // On mainnet, use the well-known USDC ASA ID
+            const network = process.env.ALGORAND_NETWORK ?? 'localnet';
+            if (network !== 'mainnet') return;
+            return this.optInToAsa(agentId, 31566704);
+        }
+        return this.optInToAsa(agentId, asaId);
+    }
+
+    /**
+     * Opt an agent's wallet into a specific ASA.
+     * An ASA opt-in is a zero-amount asset transfer to oneself.
+     */
+    private async optInToAsa(agentId: string, asaId: number): Promise<void> {
+        const chatAccount = await this.getAgentChatAccount(agentId);
+        if (!chatAccount) return;
+
+        try {
+            // Check if already opted in by querying account assets
+            const info = await this.service.algodClient.accountInformation(chatAccount.address).do();
+            const assets = (info as unknown as { assets?: { 'asset-id': number }[] }).assets ?? [];
+            if (assets.some((a) => a['asset-id'] === asaId)) {
+                return; // Already opted in
+            }
+
+            const algosdk = (await import('algosdk')).default;
+            const params = await this.service.algodClient.getTransactionParams().do();
+            const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+                sender: chatAccount.address,
+                receiver: chatAccount.address,
+                amount: 0,
+                assetIndex: asaId,
+                suggestedParams: params,
+            });
+
+            const signedTxn = txn.signTxn(chatAccount.account.account.sk);
+            await this.service.algodClient.sendRawTransaction(signedTxn).do();
+
+            const agent = getAgent(this.db, agentId);
+            log.info(`Agent ${agent?.name ?? agentId} opted into ASA ${asaId}`);
+        } catch (err) {
+            log.warn(`Failed to opt agent into ASA ${asaId}`, {
+                agentId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    /**
+     * Ensure all existing agents with wallets are opted into USDC.
+     * Called at startup alongside publishAllKeys.
+     */
+    async ensureAllUsdcOptIns(): Promise<void> {
+        const asaId = parseInt(process.env.USDC_ASA_ID ?? '', 10);
+        const network = process.env.ALGORAND_NETWORK ?? 'localnet';
+        if (!Number.isFinite(asaId) && network !== 'mainnet') return;
+
+        const agents = listAgents(this.db);
+        for (const agent of agents) {
+            if (!agent.walletAddress) continue;
+            await this.ensureUsdcOptIn(agent.id);
         }
     }
 

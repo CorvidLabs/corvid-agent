@@ -36,6 +36,7 @@ import { WorkCommandRouter } from './work-command-router';
 import { broadcastAlgoChatMessage } from '../ws/handler';
 import { publishToTenant } from '../events/broadcasting';
 import { resolveAgentTenant } from '../tenant/resolve';
+import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -156,8 +157,18 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     // Publish encryption keys for all existing agent wallets
     await algochatState.walletService.publishAllKeys();
 
+    // Ensure all agent wallets are opted into USDC ASA (required for receiving USDC)
+    await algochatState.walletService.ensureAllUsdcOptIns();
+
     algochatState.bridge.start();
     shutdownCoordinator.register({ name: 'AlgoChatBridge', priority: 25, handler: () => algochatState.bridge?.stop() });
+
+    // Start USDC revenue service if OWNER_WALLET_ADDRESS is configured
+    const usdcRevenueService = createUsdcRevenueService(db, algochatState.walletService);
+    if (usdcRevenueService) {
+        usdcRevenueService.start();
+        shutdownCoordinator.register({ name: 'UsdcRevenue', priority: 20, handler: () => usdcRevenueService.stop() });
+    }
 }
 
 /**
@@ -218,6 +229,7 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
         workflowService.setAgentMessenger(algochatState.messenger);
         notificationService.setAgentMessenger(algochatState.messenger);
         questionDispatcher.setAgentMessenger(algochatState.messenger);
+        deps.workTaskService.setAgentMessenger(algochatState.messenger);
     }
     notificationService.start();
     responsePollingService.start();
