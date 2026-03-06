@@ -69,6 +69,19 @@
     --radius-sm: 3px;
     --radius: 6px;
     --radius-lg: 8px;
+
+    /* Typography scale (rem based on 8-10px root) */
+    --text-2xl: 2rem;
+    --text-xl: 1.5rem;
+    --text-lg: 1.125rem;
+    --text-base: 1rem;
+    --text-sm: 0.85rem;
+    --text-xs: 0.7rem;
+
+    /* Transitions */
+    --transition-fast: 0.1s ease;
+    --transition-base: 0.15s ease;
+    --transition-slow: 0.25s ease;
 }
 
 *,
@@ -132,4 +145,75 @@ select:focus-visible {
 ::selection {
     background: var(--accent-cyan-dim);
     color: var(--accent-cyan);
+}
+
+/* ── Typography utilities ── */
+
+.mono {
+    font-family: 'Courier New', 'Consolas', monospace;
+    letter-spacing: 0.02em;
+}
+
+.truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.page-title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.section-header {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.card-title {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.caption {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Micro-interactions ── */
+
+.card-hover {
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+}
+.card-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-bright);
+}
+
+button:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+    animation: fadeIn var(--transition-slow) ease-out;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
 }

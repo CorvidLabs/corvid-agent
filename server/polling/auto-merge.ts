@@ -25,6 +25,8 @@ export class AutoMergeService {
     private runGh: RunGhFn;
     private timer: ReturnType<typeof setInterval> | null = null;
     private running = false;
+    /** Track PRs we've already flagged to avoid spamming comments. */
+    private flaggedPRs = new Set<string>();
 
     constructor(db: Database, runGh: RunGhFn) {
         this.db = db;
@@ -173,17 +175,21 @@ export class AutoMergeService {
             }
 
             // All checks pass — run security validation on the diff before merging
+            const prKey = `${prRepo}#${prNumber}`;
             const rejection = await this.validateDiff(prRepo, prNumber);
             if (rejection) {
                 log.warn('Auto-merge blocked by security scan', {
                     repo: prRepo, number: prNumber, reason: rejection,
                 });
-                // Post a review comment explaining why it was blocked
-                await this.runGh([
-                    'pr', 'comment', String(prNumber),
-                    '--repo', prRepo,
-                    '--body', `⚠️ **Auto-merge blocked — security scan failed**\n\n${rejection}\n\nThis PR requires manual review before merging.`,
-                ]);
+                // Only post the comment once per PR to avoid spam
+                if (!this.flaggedPRs.has(prKey)) {
+                    this.flaggedPRs.add(prKey);
+                    await this.runGh([
+                        'pr', 'comment', String(prNumber),
+                        '--repo', prRepo,
+                        '--body', `⚠️ **Auto-merge blocked — security scan failed**\n\n${rejection}\n\nThis PR requires manual review before merging.`,
+                    ]);
+                }
                 continue;
             }
 
