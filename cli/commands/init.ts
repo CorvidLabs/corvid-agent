@@ -1,5 +1,5 @@
 import { createInterface } from 'readline';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { c, printError, printSuccess, printWarning, printHeader, Spinner } from '../render';
 
@@ -211,9 +211,11 @@ ${c.gray('Interactive setup — creates .env, installs deps, and gets you runnin
         const network = await prompt(rl, 'Network (localnet/testnet/mainnet)', 'localnet');
         envLines.push(`ALGORAND_NETWORK=${network}`);
 
-        // Write .env
+        // Write .env atomically via temp file to avoid TOCTOU race
         envLines.push('');
-        writeFileSync(envPath, envLines.join('\n'), { mode: 0o600 });
+        const tmpEnvPath = `${envPath}.${process.pid}.tmp`;
+        writeFileSync(tmpEnvPath, envLines.join('\n'), { mode: 0o600 });
+        renameSync(tmpEnvPath, envPath);
         printSuccess('.env created');
 
         await runRemainingSteps(rl, projectRoot);
