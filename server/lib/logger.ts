@@ -1,4 +1,5 @@
 import { hostname } from 'node:os';
+import { sanitizeLogMessage } from './secure-mnemonic';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -55,9 +56,27 @@ function getMinLevel(): LogLevel {
     return 'info';
 }
 
+/**
+ * Recursively sanitize structured context values to redact anything
+ * that looks like a mnemonic or private key material.
+ */
+function sanitizeContext(ctx: Record<string, unknown>): Record<string, unknown> {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(ctx)) {
+        if (typeof value === 'string') {
+            cleaned[key] = sanitizeLogMessage(value);
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+            cleaned[key] = sanitizeContext(value as Record<string, unknown>);
+        } else {
+            cleaned[key] = value;
+        }
+    }
+    return cleaned;
+}
+
 function formatContext(ctx?: Record<string, unknown>): string {
     if (!ctx || Object.keys(ctx).length === 0) return '';
-    return ' ' + JSON.stringify(ctx);
+    return ' ' + JSON.stringify(sanitizeContext(ctx));
 }
 
 /**
@@ -93,27 +112,29 @@ function getTraceContext(): { traceId?: string; requestId?: string } {
 
 function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<string, unknown>): string {
     const traceCtx = getTraceContext();
+    // Defense-in-depth: sanitize the message to redact mnemonics and private keys
+    const safeMsg = sanitizeLogMessage(msg);
 
     if (LOG_FORMAT === 'json') {
         const entry: Record<string, unknown> = {
             timestamp: new Date().toISOString(),
             level,
             module,
-            message: msg,
+            message: safeMsg,
             pid: PID,
             hostname: HOST,
         };
         if (traceCtx.traceId) entry.traceId = traceCtx.traceId;
         if (traceCtx.requestId) entry.requestId = traceCtx.requestId;
         if (ctx && Object.keys(ctx).length > 0) {
-            Object.assign(entry, ctx);
+            Object.assign(entry, sanitizeContext(ctx));
         }
         return JSON.stringify(entry);
     }
 
     const ts = new Date().toISOString();
     const tracePrefix = traceCtx.traceId ? ` trace=${traceCtx.traceId.slice(0, 8)}` : '';
-    return `${ts} ${LEVEL_LABELS[level]} [${module}]${tracePrefix} ${msg}${formatContext(ctx)}`;
+    return `${ts} ${LEVEL_LABELS[level]} [${module}]${tracePrefix} ${safeMsg}${formatContext(ctx)}`;
 }
 
 export interface Logger {
