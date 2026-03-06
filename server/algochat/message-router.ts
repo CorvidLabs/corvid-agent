@@ -51,9 +51,10 @@ const log = createLogger('MessageRouter');
 /** Maximum reassembled group message size (16 KB). Prevents memory exhaustion. */
 const MAX_GROUP_MESSAGE_BYTES = 16 * 1024;
 
-// On-chain txid dedup namespace (10 min TTL, bounded at 500 entries)
+// On-chain txid dedup namespace (24h TTL, persisted to SQLite for crash recovery)
 const ALGOCHAT_TXID_DEDUP_NS = 'algochat:txids';
-DedupService.global().register(ALGOCHAT_TXID_DEDUP_NS, { maxSize: 500, ttlMs: 600_000 });
+const ALGOCHAT_DEDUP_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+DedupService.global().register(ALGOCHAT_TXID_DEDUP_NS, { maxSize: 5000, ttlMs: ALGOCHAT_DEDUP_TTL_MS, persist: true });
 
 export class MessageRouter {
     readonly channelType = 'algochat' as const;
