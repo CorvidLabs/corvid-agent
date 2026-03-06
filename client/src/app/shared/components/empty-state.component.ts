@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 @Component({
@@ -6,16 +6,27 @@ import { RouterLink } from '@angular/router';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterLink],
     template: `
-        <div class="empty-state" role="status">
-            <span class="empty-state__icon" aria-hidden="true">{{ icon() }}</span>
-            <p class="empty-state__title">{{ title() }}</p>
-            @if (description()) {
-                <p class="empty-state__desc">{{ description() }}</p>
+        <div class="empty-state" role="status" [attr.aria-label]="description">
+            <pre class="empty-state__icon" aria-hidden="true">{{ icon }}</pre>
+            <p class="empty-state__title">{{ title }}</p>
+            <p class="empty-state__desc">{{ description }}</p>
+            @if (actionRoute) {
+                <a
+                    class="empty-state__action"
+                    [routerLink]="actionRoute"
+                    [attr.aria-label]="actionAriaLabel || actionLabel">
+                    {{ actionLabel }}
+                </a>
+            } @else if (actionLabel) {
+                <button
+                    class="empty-state__action"
+                    (click)="onAction()"
+                    [attr.aria-label]="actionAriaLabel || actionLabel">
+                    {{ actionLabel }}
+                </button>
             }
-            @if (actionLabel() && actionRoute()) {
-                <a class="empty-state__cta" [routerLink]="actionRoute()" [attr.aria-label]="actionAriaLabel() || null">{{ actionLabel() }}</a>
-            } @else if (actionLabel()) {
-                <button class="empty-state__cta" (click)="actionClick.emit()" [attr.aria-label]="actionAriaLabel() || null">{{ actionLabel() }}</button>
+            @if (docsHint) {
+                <p class="empty-state__docs">{{ docsHint }}</p>
             }
         </div>
     `,
@@ -25,41 +36,46 @@ import { RouterLink } from '@angular/router';
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 3rem 1.5rem;
             text-align: center;
-            border: 1px dashed var(--border-bright);
-            border-radius: var(--radius-lg);
-            background: var(--bg-surface);
+            padding: 4rem 2rem;
+            min-height: 280px;
+            position: relative;
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 3px,
+                    rgba(30, 32, 53, 0.15) 3px,
+                    rgba(30, 32, 53, 0.15) 4px
+                );
         }
         .empty-state__icon {
-            font-size: 2.5rem;
-            line-height: 1;
-            margin-bottom: 1rem;
-            color: var(--accent-cyan);
-            text-shadow: var(--glow-cyan);
-            white-space: pre;
+            margin: 0 0 1.25rem;
             font-family: monospace;
+            font-size: 0.7rem;
+            line-height: 1.4;
+            color: var(--text-secondary);
+            user-select: none;
         }
         .empty-state__title {
-            margin: 0 0 0.35rem;
-            font-size: 0.9rem;
+            margin: 0 0 0.5rem;
+            font-size: 1rem;
             font-weight: 700;
             color: var(--text-primary);
-            line-height: 1.4;
         }
         .empty-state__desc {
-            margin: 0 0 1rem;
-            font-size: 0.75rem;
+            margin: 0 0 1.5rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            line-height: 1.5;
-            max-width: 36ch;
+            max-width: 360px;
+            line-height: 1.6;
         }
-        .empty-state__cta {
+        .empty-state__action {
             display: inline-block;
-            padding: 0.5rem 1.25rem;
+            padding: 0.6rem 1.25rem;
             border: 1px solid var(--accent-cyan);
             border-radius: var(--radius);
-            background: var(--accent-cyan-dim);
+            background: transparent;
             color: var(--accent-cyan);
             font-size: 0.8rem;
             font-weight: 600;
@@ -68,24 +84,42 @@ import { RouterLink } from '@angular/router';
             text-transform: uppercase;
             letter-spacing: 0.05em;
             cursor: pointer;
-            transition: background 0.15s, box-shadow 0.15s;
+            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
         }
-        .empty-state__cta:hover {
-            background: rgba(0, 229, 255, 0.2);
+        .empty-state__action:hover {
+            background: var(--accent-cyan);
+            color: var(--bg-deep);
             box-shadow: var(--glow-cyan);
         }
-        .empty-state__cta:focus-visible {
+        .empty-state__action:focus-visible {
             outline: 2px solid var(--accent-cyan);
             outline-offset: 2px;
+            box-shadow: var(--glow-cyan);
+        }
+        .empty-state__docs {
+            margin: 1rem 0 0;
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+        }
+        @media (max-width: 768px) {
+            .empty-state {
+                padding: 2.5rem 1.5rem;
+                min-height: 200px;
+            }
         }
     `,
 })
 export class EmptyStateComponent {
-    readonly icon = input.required<string>();
-    readonly title = input.required<string>();
-    readonly description = input<string>('');
-    readonly actionLabel = input<string>('');
-    readonly actionRoute = input<string>('');
-    readonly actionAriaLabel = input<string>('');
-    readonly actionClick = output<void>();
+    @Input({ required: true }) icon!: string;
+    @Input({ required: true }) title!: string;
+    @Input({ required: true }) description!: string;
+    @Input() actionLabel?: string;
+    @Input() actionRoute?: string;
+    @Input() actionAriaLabel?: string;
+    @Input() docsHint?: string;
+    @Input() actionClick?: () => void;
+
+    onAction(): void {
+        this.actionClick?.();
+    }
 }

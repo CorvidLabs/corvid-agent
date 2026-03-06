@@ -14,24 +14,10 @@ import type { LlmProviderType } from '../providers/types';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, updateSessionAgent, addSessionMessage } from '../db/sessions';
-import type { AgentMessenger } from '../algochat/agent-messenger';
-import type { AgentDirectory } from '../algochat/agent-directory';
-import type { AgentWalletService } from '../algochat/agent-wallet';
-import type { WorkTaskService } from '../work/service';
-import type { SchedulerService } from '../scheduler/service';
-import type { WorkflowService } from '../workflow/service';
-import type { NotificationService } from '../notifications/service';
-import type { QuestionDispatcher } from '../notifications/question-dispatcher';
-import type { ReputationScorer } from '../reputation/scorer';
-import type { ReputationAttestation } from '../reputation/attestation';
-import type { ReputationVerifier } from '../reputation/verifier';
-import type { AstParserService } from '../ast/service';
-import type { PermissionBroker } from '../permissions/broker';
+import { McpServiceContainer, type McpServices } from './mcp-service-container';
+import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
-import type { McpToolContext } from '../mcp/tool-handlers';
 import { recordApiCost } from '../db/spending';
-import { getPersona, composePersonaPrompt } from '../db/personas';
-import { resolveAgentPromptAdditions, resolveProjectPromptAdditions, resolveAgentTools, resolveProjectTools } from '../db/skill-bundles';
 import { getActiveServersForAgent } from '../db/mcp-servers';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
@@ -105,21 +91,8 @@ export class ProcessManager {
     // Owner check — injected by AlgoChatBridge so credit deduction can be skipped for owners
     private isOwnerAddress: ((address: string) => boolean) | null = null;
 
-    // MCP services — set after AlgoChat init
-    private mcpMessenger: AgentMessenger | null = null;
-    private mcpDirectory: AgentDirectory | null = null;
-    private mcpWalletService: AgentWalletService | null = null;
-    private mcpEncryptionConfig: { serverMnemonic?: string | null; network?: string } = {};
-    private mcpWorkTaskService: WorkTaskService | null = null;
-    private mcpSchedulerService: SchedulerService | null = null;
-    private mcpWorkflowService: WorkflowService | null = null;
-    private mcpNotificationService: NotificationService | null = null;
-    private mcpQuestionDispatcher: QuestionDispatcher | null = null;
-    private mcpReputationScorer: ReputationScorer | null = null;
-    private mcpReputationAttestation: ReputationAttestation | null = null;
-    private mcpReputationVerifier: ReputationVerifier | null = null;
-    private mcpAstParserService: AstParserService | null = null;
-    private mcpPermissionBroker: PermissionBroker | null = null;
+    // MCP services — composed container set after AlgoChat init
+    private readonly mcpServices = new McpServiceContainer();
 
     constructor(db: Database) {
         this.db = db;
@@ -144,58 +117,21 @@ export class ProcessManager {
     }
 
     /** Register MCP-related services so agent sessions get corvid_* tools. */
-    setMcpServices(
-        messenger: AgentMessenger,
-        directory: AgentDirectory,
-        walletService: AgentWalletService,
-        encryptionConfig?: { serverMnemonic?: string | null; network?: string },
-        workTaskService?: WorkTaskService,
-        schedulerService?: SchedulerService,
-        workflowService?: WorkflowService,
-        notificationService?: NotificationService,
-        questionDispatcher?: QuestionDispatcher,
-        reputationScorer?: ReputationScorer,
-        reputationAttestation?: ReputationAttestation,
-        reputationVerifier?: ReputationVerifier,
-        astParserService?: AstParserService,
-        permissionBroker?: PermissionBroker,
-    ): void {
-        this.mcpMessenger = messenger;
-        this.mcpDirectory = directory;
-        this.mcpWalletService = walletService;
-        this.mcpEncryptionConfig = encryptionConfig ?? {};
-        this.mcpWorkTaskService = workTaskService ?? null;
-        this.mcpSchedulerService = schedulerService ?? null;
-        this.mcpWorkflowService = workflowService ?? null;
-        this.mcpNotificationService = notificationService ?? null;
-        this.mcpQuestionDispatcher = questionDispatcher ?? null;
-        this.mcpReputationScorer = reputationScorer ?? null;
-        this.mcpReputationAttestation = reputationAttestation ?? null;
-        this.mcpReputationVerifier = reputationVerifier ?? null;
-        this.mcpAstParserService = astParserService ?? null;
-        this.mcpPermissionBroker = permissionBroker ?? null;
-        log.info('MCP services registered — agent sessions will receive corvid_* tools');
+    setMcpServices(services: McpServices): void {
+        this.mcpServices.setServices(services);
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
-    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number, schedulerMode?: boolean, resolvedToolPermissions?: string[] | null, schedulerActionType?: ScheduleActionType): McpToolContext | null {
-        if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
-        return {
+    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number, schedulerMode?: boolean, resolvedToolPermissions?: string[] | null, schedulerActionType?: ScheduleActionType) {
+        return this.mcpServices.buildContext({
             agentId,
             db: this.db,
-            agentMessenger: this.mcpMessenger,
-            agentDirectory: this.mcpDirectory,
-            agentWalletService: this.mcpWalletService,
-            depth,
             sessionSource,
-            serverMnemonic: this.mcpEncryptionConfig.serverMnemonic,
-            network: this.mcpEncryptionConfig.network,
-            workTaskService: this.mcpWorkTaskService ?? undefined,
-            schedulerService: this.mcpSchedulerService ?? undefined,
-            workflowService: this.mcpWorkflowService ?? undefined,
+            sessionId,
+            depth,
             schedulerMode,
             schedulerActionType,
-            schedulerToolUsage: schedulerMode ? new Map() : undefined,
+            resolvedToolPermissions,
             emitStatus: sessionId
                 ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', statusMessage: message })
                 : undefined,
@@ -206,34 +142,7 @@ export class ProcessManager {
                 ? (message: unknown) => this.broadcastFn!('owner', JSON.stringify(message))
                 : undefined,
             ownerQuestionManager: this.ownerQuestionManager,
-            sessionId,
-            notificationService: this.mcpNotificationService ?? undefined,
-            questionDispatcher: this.mcpQuestionDispatcher ?? undefined,
-            reputationScorer: this.mcpReputationScorer ?? undefined,
-            reputationAttestation: this.mcpReputationAttestation ?? undefined,
-            reputationVerifier: this.mcpReputationVerifier ?? undefined,
-            resolvedToolPermissions,
-            astParserService: this.mcpAstParserService ?? undefined,
-            permissionBroker: this.mcpPermissionBroker ?? undefined,
-        };
-    }
-
-    /** Compute effective tool permissions by merging agent base + agent bundles + project bundles. */
-    private resolveToolPermissions(agentId: string, projectId: string | null): string[] | null {
-        const agent = getAgent(this.db, agentId);
-        const basePermissions = agent?.mcpToolPermissions ?? null;
-
-        // Merge agent-level skill bundle tools (explicitly assigned by owner)
-        let merged = resolveAgentTools(this.db, agentId, basePermissions);
-
-        // Merge project-level skill bundle tools ONLY if agent has no explicit tool permissions.
-        // Agents with explicit mcp_tool_permissions have been deliberately scoped — project bundles
-        // contribute prompt additions but should not expand the tool set.
-        if (projectId && basePermissions === null) {
-            merged = resolveProjectTools(this.db, projectId, merged);
-        }
-
-        return merged;
+        });
     }
 
     /**
@@ -310,38 +219,16 @@ export class ProcessManager {
             ? { ...project, workingDir: session.workDir }
             : project;
 
-        // Resolve tool permissions (agent base + agent bundles + project bundles)
-        const resolvedToolPerms = session.agentId
-            ? this.resolveToolPermissions(session.agentId, session.projectId)
-            : null;
+        // Resolve prompts + tool permissions in one call
+        const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, resolvedToolPerms, schedulerActionType);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;
-
-        // Resolve persona and skill bundle prompts for this agent
-        let personaPrompt: string | undefined;
-        let skillPrompt: string | undefined;
-        if (agent) {
-            const persona = getPersona(this.db, agent.id);
-            const pp = composePersonaPrompt(persona);
-            if (pp) personaPrompt = pp;
-
-            const sp2 = resolveAgentPromptAdditions(this.db, agent.id);
-            if (sp2) skillPrompt = sp2;
-        }
-
-        // Resolve project-level skill prompt additions
-        if (session.projectId) {
-            const projectSkillPrompt = resolveProjectPromptAdditions(this.db, session.projectId);
-            if (projectSkillPrompt) {
-                skillPrompt = skillPrompt ? `${skillPrompt}\n\n${projectSkillPrompt}` : projectSkillPrompt;
-            }
-        }
 
         let sp: SdkProcess;
         try {
@@ -356,8 +243,8 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 onApiOutage: () => this.handleApiOutage(session.id),
                 mcpServers,
-                personaPrompt,
-                skillPrompt,
+                personaPrompt: config.personaPrompt,
+                skillPrompt: config.skillPrompt,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -387,34 +274,12 @@ export class ProcessManager {
             ? { ...project, workingDir: session.workDir }
             : project;
 
-        // Resolve tool permissions (agent base + agent bundles + project bundles)
-        const resolvedToolPerms = session.agentId
-            ? this.resolveToolPermissions(session.agentId, session.projectId)
-            : null;
+        // Resolve prompts + tool permissions in one call
+        const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
         const mcpToolContext = session.agentId
-            ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, resolvedToolPerms, schedulerActionType)
+            ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType)
             : null;
-
-        // Resolve persona and skill bundle prompts for this agent
-        let personaPrompt: string | undefined;
-        let skillPrompt: string | undefined;
-        if (agent) {
-            const persona = getPersona(this.db, agent.id);
-            const pp = composePersonaPrompt(persona);
-            if (pp) personaPrompt = pp;
-
-            const sp2 = resolveAgentPromptAdditions(this.db, agent.id);
-            if (sp2) skillPrompt = sp2;
-        }
-
-        // Resolve project-level skill prompt additions
-        if (session.projectId) {
-            const projectSkillPrompt = resolveProjectPromptAdditions(this.db, session.projectId);
-            if (projectSkillPrompt) {
-                skillPrompt = skillPrompt ? `${skillPrompt}\n\n${projectSkillPrompt}` : projectSkillPrompt;
-            }
-        }
 
         // Query external MCP server configs for this agent
         const externalMcpConfigs = session.agentId
@@ -444,8 +309,8 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 mcpToolContext,
                 extendTimeout: (ms) => this.extendTimeout(session.id, ms),
-                personaPrompt,
-                skillPrompt,
+                personaPrompt: config.personaPrompt,
+                skillPrompt: config.skillPrompt,
                 modelOverride,
                 externalMcpConfigs,
                 toolAllowList: isPollSession ? ['run_command'] : undefined,
@@ -576,36 +441,14 @@ export class ProcessManager {
             }
         }
 
-        // Resolve persona and skill bundle prompts for resumed sessions
-        let personaPrompt: string | undefined;
-        let skillPrompt: string | undefined;
-        if (effectiveAgent) {
-            const persona = getPersona(this.db, effectiveAgent.id);
-            const pp = composePersonaPrompt(persona);
-            if (pp) personaPrompt = pp;
-
-            const sp2 = resolveAgentPromptAdditions(this.db, effectiveAgent.id);
-            if (sp2) skillPrompt = sp2;
-        }
-
-        // Resolve project-level skill prompt additions
-        if (session.projectId) {
-            const projectSkillPrompt = resolveProjectPromptAdditions(this.db, session.projectId);
-            if (projectSkillPrompt) {
-                skillPrompt = skillPrompt ? `${skillPrompt}\n\n${projectSkillPrompt}` : projectSkillPrompt;
-            }
-        }
-
-        // Resolve tool permissions for resumed sessions
-        const resolvedToolPerms = session.agentId
-            ? this.resolveToolPermissions(session.agentId, session.projectId)
-            : null;
+        // Resolve prompts + tool permissions in one call
+        const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
         let sp: SdkProcess;
         try {
             if (providerInstance && providerInstance.executionMode === 'direct') {
                 const mcpToolContext = session.agentId
-                    ? this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resolvedToolPerms)
+                    ? this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions)
                     : null;
                 // COUNCIL_MODEL override for resumed sessions
                 const councilModelResume = process.env.COUNCIL_MODEL;
@@ -624,14 +467,14 @@ export class ProcessManager {
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     mcpToolContext,
                     extendTimeout: (ms) => this.extendTimeout(session.id, ms),
-                    personaPrompt,
-                    skillPrompt,
+                    personaPrompt: resumeConfig.personaPrompt,
+                    skillPrompt: resumeConfig.skillPrompt,
                     modelOverride: modelOverrideResume,
                 });
             } else {
                 const mcpServers = session.agentId
                     ? (() => {
-                        const ctx = this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resolvedToolPerms);
+                        const ctx = this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions);
                         return ctx ? [createCorvidMcpServer(ctx)] : undefined;
                     })()
                     : undefined;
@@ -646,8 +489,8 @@ export class ProcessManager {
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     onApiOutage: () => this.handleApiOutage(session.id),
                     mcpServers,
-                    personaPrompt,
-                    skillPrompt,
+                    personaPrompt: resumeConfig.personaPrompt,
+                    skillPrompt: resumeConfig.skillPrompt,
                 });
             }
         } catch (err) {

@@ -6,12 +6,14 @@ import { ScheduleService } from '../../core/services/schedule.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy, ScheduleTriggerEvent } from '../../core/models/schedule.model';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 @Component({
     selector: 'app-schedule-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="schedules">
             <div class="schedules__header">
@@ -147,11 +149,18 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
             }
 
             @if (scheduleService.loading()) {
-                <p class="loading">Loading schedules...</p>
+                <app-skeleton variant="table" [count]="5" />
             } @else if (scheduleService.schedules().length === 0) {
+                <app-empty-state
+                    icon="  _____\n |     |\n | :00 |\n |_____|\n   ||"
+                    title="No schedules yet."
+                    description="Schedules run agent tasks automatically on a cron or interval."
+                    actionLabel="+ Create a schedule"
+                    actionAriaLabel="Create your first automation schedule"
+                    [actionClick]="toggleCreateForm" />
+            } @else if (noFilteredSchedules()) {
                 <div class="empty">
-                    <p>No schedules found.</p>
-                    <p class="empty-hint">Create a schedule to automate agent tasks like PR reviews, repo starring, and more.</p>
+                    <p>No matching schedules found.</p>
                 </div>
             } @else {
                 @for (group of statusGroups(); track group.status) {
@@ -326,6 +335,7 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     protected readonly agentService = inject(AgentService);
     private readonly notifications = inject(NotificationService);
     readonly showCreateForm = signal(false);
+    readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
     readonly formScheduleType = signal<'cron' | 'interval'>('cron');
     readonly triggering = signal<string | null>(null);
@@ -371,6 +381,9 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
             { status: 'completed', label: 'Completed', schedules: sorted.filter((s) => s.status === 'completed') },
         ];
     });
+    readonly noFilteredSchedules = computed(() =>
+        this.statusGroups().every(g => g.schedules.length === 0),
+    );
     async ngOnInit(): Promise<void> {
         this.scheduleService.loadSchedules(); this.scheduleService.loadExecutions(); this.scheduleService.startListening();
         await this.agentService.loadAgents();

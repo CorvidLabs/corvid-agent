@@ -6,6 +6,7 @@ import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { Session, SessionStatus } from '../../core/models/session.model';
 
 interface SessionGroup {
@@ -16,7 +17,7 @@ interface SessionGroup {
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -77,6 +78,14 @@ interface SessionGroup {
                         </div>
                     }
                 </div>
+            } @else if (sessionService.sessions().length === 0) {
+                <app-empty-state
+                    icon="  ____\n |    |\n | >> |\n |____|\n  \\__/"
+                    title="No conversations yet."
+                    description="Start a conversation with an agent to see it here."
+                    actionLabel="+ New Conversation"
+                    actionRoute="/sessions/new"
+                    actionAriaLabel="Start your first agent conversation" />
             } @else if (filteredSessions().length === 0) {
                 <p class="empty">No conversations match your filters.</p>
             } @else {

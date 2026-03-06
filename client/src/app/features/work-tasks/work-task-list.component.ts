@@ -6,12 +6,13 @@ import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { WorkTask } from '../../core/models/work-task.model';
 
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="tasks">
             <div class="tasks__header">
@@ -64,19 +65,15 @@ import { WorkTask } from '../../core/models/work-task.model';
             </div>
 
             @if (taskService.loading()) {
-                <p class="loading">Loading work tasks...</p>
+                <app-skeleton variant="table" [count]="5" />
             } @else if (taskService.tasks().length === 0) {
                 <app-empty-state
-                    icon="  ____
- |    |
- | /\ |
- |/  \|
- |____|"
+                    icon="  ____\n |    |\n | /\\ |\n |/  \\|\n |____|"
                     title="No work tasks yet."
                     description="Work tasks are agent-driven code changes — branch, implement, validate, PR."
                     actionLabel="+ Create a work task"
                     actionAriaLabel="Create your first agent work task"
-                    (actionClick)="showCreateForm.set(true)" />
+                    [actionClick]="toggleCreateForm" />
             } @else if (filteredTasks().length === 0) {
                 <div class="empty">
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
@@ -289,8 +286,8 @@ import { WorkTask } from '../../core/models/work-task.model';
         .task-status[data-status="interrupted"] { color: var(--accent-orange); background: var(--accent-orange-dim); border-color: var(--accent-orange); }
 
         .status-icon { font-style: normal; }
-        .status-icon--ok::before { content: '\u2713'; }
-        .status-icon--fail::before { content: '\u2717'; }
+        .status-icon--ok::before { content: '\\2713'; }
+        .status-icon--fail::before { content: '\\2717'; }
 
         .task-time {
             font-size: 0.65rem;
@@ -420,6 +417,7 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     readonly activeFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
     readonly showCreateForm = signal(false);
+    readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
     protected createAgentId = '';
     protected createDescription = '';
