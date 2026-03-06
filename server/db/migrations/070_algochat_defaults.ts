@@ -12,6 +12,6 @@ export function up(db: Database): void {
     db.exec(`UPDATE councils SET on_chain_mode = 'full' WHERE on_chain_mode = 'off'`);
 }
 
-export function down(db: Database): void {
+export function down(_db: Database): void {
     // No-op: cannot reliably revert user intent
 }
