@@ -2,14 +2,14 @@ import { Injectable, signal, computed } from '@angular/core';
 import type { Notification, NotificationType } from '../models/notification.model';
 
 /** Maximum notifications visible at once */
-const MAX_VISIBLE = 5;
+const MAX_VISIBLE = 3;
 
 /** Default auto-dismiss durations by type (ms) */
 const DEFAULT_DURATION: Record<NotificationType, number> = {
-    success: 5000,
-    info: 5000,
+    success: 4000,
+    info: 4000,
     warning: 8000,
-    error: 0, // persistent — user must dismiss
+    error: 8000,
 };
 
 let nextId = 0;

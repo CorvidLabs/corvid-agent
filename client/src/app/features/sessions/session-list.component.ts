@@ -8,6 +8,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
+import { NotificationService } from '../../core/services/notification.service';
 import type { Session, SessionStatus } from '../../core/models/session.model';
 
 interface SessionGroup {
@@ -227,6 +228,7 @@ interface SessionGroup {
 export class SessionListComponent implements OnInit {
     protected readonly sessionService = inject(SessionService);
     private readonly agentService = inject(AgentService);
+    private readonly notify = inject(NotificationService);
 
     protected searchQuery = '';
     protected sourceFilter = '';
@@ -344,8 +346,17 @@ export class SessionListComponent implements OnInit {
 
     protected async stopAllRunning(): Promise<void> {
         const running = this.sessionService.sessions().filter((s) => s.status === 'running');
+        let stopped = 0;
         for (const s of running) {
-            try { await this.sessionService.stopSession(s.id); } catch {}
+            try {
+                await this.sessionService.stopSession(s.id);
+                stopped++;
+            } catch {
+                this.notify.error(`Failed to stop session ${s.name || s.id.slice(0, 8)}`);
+            }
+        }
+        if (stopped > 0) {
+            this.notify.success(`${stopped} session${stopped > 1 ? 's' : ''} stopped`);
         }
     }
 }

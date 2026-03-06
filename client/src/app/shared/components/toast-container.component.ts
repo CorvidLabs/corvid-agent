@@ -38,7 +38,7 @@ import type { NotificationType } from '../../core/models/notification.model';
     styles: `
         .toast-container {
             position: fixed;
-            top: 1rem;
+            bottom: 5rem;
             right: 1rem;
             z-index: 10000;
             display: flex;
