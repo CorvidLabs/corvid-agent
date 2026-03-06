@@ -11,6 +11,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { ApiService } from '../../core/services/api.service';
+import { WelcomeWizardComponent } from './welcome-wizard.component';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
 import type { Agent } from '../../core/models/agent.model';
 import type { Session } from '../../core/models/session.model';
@@ -50,8 +51,11 @@ interface ActivityEvent {
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, WelcomeWizardComponent],
     template: `
+        @if (showWelcome()) {
+            <app-welcome-wizard (agentCreated)="onWizardComplete()" />
+        } @else {
         <div class="dashboard">
             <!-- Top Metrics Row -->
             <div class="metrics-row">
@@ -247,6 +251,7 @@ interface ActivityEvent {
                 </div>
             </div>
         </div>
+        }
     `,
     styles: `
         .dashboard {
@@ -451,6 +456,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private readonly router = inject(Router);
 
     protected readonly algochatStatus = this.sessionService.algochatStatus;
+    protected readonly showWelcome = computed(() =>
+        this.agentService.agents().length === 0 && !this.wizardDismissed(),
+    );
+    private readonly wizardDismissed = signal(false);
     protected readonly runningSessions = computed(() =>
         this.sessionService.sessions().filter((s) => s.status === 'running'),
     );
@@ -559,6 +568,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.unsubscribeWs?.();
+    }
+
+    protected onWizardComplete(): void {
+        this.wizardDismissed.set(true);
+        this.agentService.loadAgents().then(() => this.loadAgentSummaries());
+        this.loadOverview();
     }
 
     protected navigateTo(path: string): void {
