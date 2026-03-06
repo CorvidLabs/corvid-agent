@@ -1,9 +1,13 @@
 /**
  * Centralized deduplication service with TTL, bounded LRU cache,
- * and optional SQLite persistence for crash recovery.
+ * and SQLite write-through persistence for crash recovery.
  *
  * Replaces per-module Map/Set dedup patterns with a single service
  * that prevents unbounded memory growth and survives restarts.
+ *
+ * Persistent namespaces use write-through (immediate SQLite INSERT on
+ * isDuplicate/markSeen) and read-through (SQLite fallback on cache miss)
+ * so dedup state is never lost on crash.
  */
 
 import { Database } from 'bun:sqlite';
@@ -80,8 +84,14 @@ class DedupCache {
                 this._evictions++;
             }
         }
-        this.map.set(key, Date.now() + this.ttlMs);
+        const expiresAt = Date.now() + this.ttlMs;
+        this.map.set(key, expiresAt);
         return existing;
+    }
+
+    /** Get the expiration timestamp for a key (for write-through persistence). */
+    getExpiresAt(key: string): number | undefined {
+        return this.map.get(key);
     }
 
     /** Remove a specific key. */
@@ -243,30 +253,64 @@ export class DedupService {
     /**
      * Check if a key has been seen in the given namespace.
      * Auto-registers the namespace with defaults if not already registered.
+     *
+     * For persistent namespaces, falls back to SQLite on cache miss (read-through).
      */
     has(namespace: string, key: string): boolean {
         const ns = this.getOrRegister(namespace);
-        return ns.cache.has(key);
+        const inCache = ns.cache.has(key);
+        if (inCache) return true;
+
+        // Read-through: check SQLite for persistent namespaces on cache miss
+        if (ns.config.persist && this.db) {
+            const found = this.readThrough(namespace, key);
+            if (found) {
+                ns.cache.add(key);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
      * Mark a key as seen. Returns true if it was already present (duplicate).
      * This is the primary dedup API — equivalent to "check-and-set".
+     *
+     * For persistent namespaces, writes through to SQLite immediately.
      */
     isDuplicate(namespace: string, key: string): boolean {
         const ns = this.getOrRegister(namespace);
-        const wasDuplicate = ns.cache.add(key);
-        if (!wasDuplicate) ns.dirty = true;
+
+        // For persistent namespaces, check SQLite on cache miss before declaring "new"
+        let wasDuplicate = ns.cache.add(key);
+        if (!wasDuplicate && ns.config.persist && this.db) {
+            wasDuplicate = this.readThrough(namespace, key);
+        }
+
+        if (!wasDuplicate) {
+            ns.dirty = true;
+            // Write-through: persist immediately for durable dedup
+            if (ns.config.persist && this.db) {
+                this.writeThrough(namespace, key, ns.cache.getExpiresAt(key)!);
+            }
+        }
         return wasDuplicate;
     }
 
     /**
      * Mark a key as seen without checking for duplicates.
+     *
+     * For persistent namespaces, writes through to SQLite immediately.
      */
     markSeen(namespace: string, key: string): void {
         const ns = this.getOrRegister(namespace);
         ns.cache.add(key);
         ns.dirty = true;
+
+        // Write-through for persistent namespaces
+        if (ns.config.persist && this.db) {
+            this.writeThrough(namespace, key, ns.cache.getExpiresAt(key)!);
+        }
     }
 
     /**
@@ -314,6 +358,37 @@ export class DedupService {
     // Private helpers
     // -----------------------------------------------------------------------
 
+    /**
+     * Write-through: immediately persist a key to SQLite.
+     */
+    private writeThrough(namespace: string, key: string, expiresAt: number): void {
+        if (!this.db) return;
+        try {
+            this.db.run(
+                `INSERT OR REPLACE INTO dedup_state (namespace, key, expires_at) VALUES (?, ?, ?)`,
+                [namespace, key, expiresAt],
+            );
+        } catch (err) {
+            log.error('Write-through failed', { namespace, error: String(err) });
+        }
+    }
+
+    /**
+     * Read-through: check SQLite for a key not found in the cache.
+     */
+    private readThrough(namespace: string, key: string): boolean {
+        if (!this.db) return false;
+        try {
+            const row = this.db.query(
+                `SELECT 1 FROM dedup_state WHERE namespace = ? AND key = ? AND expires_at > ?`
+            ).get(namespace, key, Date.now());
+            return row !== null;
+        } catch (err) {
+            log.error('Read-through failed', { namespace, error: String(err) });
+            return false;
+        }
+    }
+
     private getOrRegister(namespace: string): { cache: DedupCache; config: Required<DedupNamespaceConfig>; dirty: boolean } {
         let ns = this.namespaces.get(namespace);
         if (!ns) {
@@ -326,6 +401,14 @@ export class DedupService {
     private pruneAll(): void {
         for (const [, ns] of this.namespaces) {
             ns.cache.prune();
+        }
+        // Also prune expired rows from SQLite
+        if (this.db) {
+            try {
+                this.db.run(`DELETE FROM dedup_state WHERE expires_at < ?`, [Date.now()]);
+            } catch (err) {
+                log.error('Failed to prune expired dedup rows', { error: String(err) });
+            }
         }
     }
 
