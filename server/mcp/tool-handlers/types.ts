@@ -12,6 +12,7 @@ import type { ReputationScorer } from '../../reputation/scorer';
 import type { ReputationAttestation } from '../../reputation/attestation';
 import type { ReputationVerifier } from '../../reputation/verifier';
 import type { AstParserService } from '../../ast/service';
+import type { PermissionBroker } from '../../permissions/broker';
 import type { ScheduleActionType } from '../../../shared/types/schedules';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
@@ -65,6 +66,8 @@ export interface McpToolContext {
     resolvedToolPermissions?: string[] | null;
     /** AST parser service for structural code navigation (corvid_code_symbols, corvid_find_references). */
     astParserService?: AstParserService;
+    /** Permission Broker for capability-based action authorization. */
+    permissionBroker?: PermissionBroker;
 }
 
 export function textResult(text: string): CallToolResult {

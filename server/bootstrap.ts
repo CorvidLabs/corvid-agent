@@ -51,6 +51,7 @@ import { LlmProviderRegistry } from './providers/registry';
 import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { AstParserService } from './ast/service';
+import { PermissionBroker } from './permissions/broker';
 import { listProjects, createProject } from './db/projects';
 import { initObservability } from './observability/index';
 
@@ -124,6 +125,9 @@ export interface ServiceContainer {
     telegramBridge: TelegramBridge | null;
     discordBridge: DiscordBridge | null;
     slackBridge: SlackBridge | null;
+
+    // Security
+    permissionBroker: PermissionBroker;
 }
 
 /**
@@ -152,6 +156,8 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     astParserService.init().catch((err) => {
         log.warn('AST parser service failed to initialize', { error: err instanceof Error ? err.message : String(err) });
     });
+
+    const permissionBroker = new PermissionBroker(db);
 
     // ── LLM providers ────────────────────────────────────────────────────
     const providerRegistry = LlmProviderRegistry.getInstance();
@@ -397,5 +403,6 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         telegramBridge,
         discordBridge,
         slackBridge,
+        permissionBroker,
     };
 }
