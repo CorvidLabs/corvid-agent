@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-5040%20unit%20%7C%20360%20E2E-brightgreen" alt="5040 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-5080%20unit%20%7C%20360%20E2E-brightgreen" alt="5080 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -20,12 +20,12 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 
 | Metric | Count |
 |--------|-------|
-| Unit tests | **5,040** across 202 files (14,118 assertions) |
+| Unit tests | **5,080** across 203 files (14,330 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **109** with automated validation |
+| Module specs | **107** with automated validation |
 | MCP tools | **37** corvid_* tool handlers |
 | API endpoints | **~200** across 36 route modules |
-| DB migrations | **64** (82 tables) |
+| DB migrations | **64** (74 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.
@@ -76,6 +76,8 @@ bun run dev
 ```
 
 Server starts at `http://localhost:3000`. See `.env.example` for all configuration options.
+
+**New here?** Follow the **[5-minute quickstart](docs/quickstart.md)** to create your first agent and have it open a PR.
 
 ### Minimum `.env`
 
@@ -428,13 +430,13 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 4978+ server tests (~120s)
+bun test              # 5080+ server tests (~120s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**4978 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**5080 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
