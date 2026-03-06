@@ -9,6 +9,9 @@ import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
 import { resolveFullRepo } from './github-searcher';
 import { isRepoBlocked } from '../db/repo-blocklist';
+import { isProtectedPath } from '../process/protected-paths';
+import { scanDiff as scanFetchDiff } from '../lib/fetch-detector';
+import { scanDiff as scanCodeDiff } from '../lib/code-scanner';
 
 const log = createLogger('AutoMerge');
 
@@ -79,6 +82,61 @@ export class AutoMergeService {
     }
 
     /**
+     * Validate a PR's diff for security issues before auto-merging.
+     * Returns a rejection reason string if blocked, or null if safe.
+     */
+    async validateDiff(repo: string, prNumber: number): Promise<string | null> {
+        // Get the PR diff
+        const diffResult = await this.runGh([
+            'api', `repos/${repo}/pulls/${prNumber}`,
+            '-H', 'Accept: application/vnd.github.diff',
+        ]);
+
+        if (!diffResult.ok || !diffResult.stdout.trim()) {
+            return 'Could not retrieve PR diff for security validation';
+        }
+
+        const diff = diffResult.stdout;
+        const issues: string[] = [];
+
+        // 1. Check for protected file modifications
+        const protectedFiles: string[] = [];
+        for (const line of diff.split('\n')) {
+            if (line.startsWith('+++ b/')) {
+                const filePath = line.slice(6);
+                if (isProtectedPath(filePath)) {
+                    protectedFiles.push(filePath);
+                }
+            }
+        }
+        if (protectedFiles.length > 0) {
+            issues.push(`**Protected files modified:** ${protectedFiles.join(', ')}`);
+        }
+
+        // 2. Check for unapproved external fetch calls
+        const fetchResult = scanFetchDiff(diff);
+        if (fetchResult.hasUnapprovedFetches) {
+            const domains = fetchResult.findings.map((f) => `${f.domain} (${f.pattern})`);
+            issues.push(`**Unapproved external domains:** ${domains.join(', ')}`);
+        }
+
+        // 3. Check for malicious code patterns
+        const codeResult = scanCodeDiff(diff);
+        if (codeResult.hasCriticalFindings) {
+            const patterns = codeResult.findings
+                .filter((f) => f.severity === 'critical')
+                .map((f) => `${f.pattern}${f.file ? ` in ${f.file}` : ''}`);
+            issues.push(`**Suspicious code patterns:** ${patterns.join(', ')}`);
+        }
+
+        if (issues.length > 0) {
+            return issues.join('\n');
+        }
+
+        return null;
+    }
+
+    /**
      * Auto-merge passing PRs for a specific repo authored by the given username.
      */
     private async mergeForRepo(repo: string, username: string): Promise<void> {
@@ -114,7 +172,22 @@ export class AutoMergeService {
                 continue;
             }
 
-            // All checks pass — merge it
+            // All checks pass — run security validation on the diff before merging
+            const rejection = await this.validateDiff(prRepo, prNumber);
+            if (rejection) {
+                log.warn('Auto-merge blocked by security scan', {
+                    repo: prRepo, number: prNumber, reason: rejection,
+                });
+                // Post a review comment explaining why it was blocked
+                await this.runGh([
+                    'pr', 'comment', String(prNumber),
+                    '--repo', prRepo,
+                    '--body', `⚠️ **Auto-merge blocked — security scan failed**\n\n${rejection}\n\nThis PR requires manual review before merging.`,
+                ]);
+                continue;
+            }
+
+            // Security scan passed — merge it
             const mergeResult = await this.runGh([
                 'pr', 'merge', String(prNumber),
                 '--repo', prRepo,
