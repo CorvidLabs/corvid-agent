@@ -76,7 +76,7 @@ import { WorkTask } from '../../core/models/work-task.model';
                     description="Work tasks are agent-driven code changes — branch, implement, validate, PR."
                     actionLabel="+ Create a work task"
                     actionAriaLabel="Create your first agent work task"
-                    [actionClick]="openCreateForm" />
+                    (actionClick)="showCreateForm.set(true)" />
             } @else if (filteredTasks().length === 0) {
                 <div class="empty">
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
@@ -289,8 +289,8 @@ import { WorkTask } from '../../core/models/work-task.model';
         .task-status[data-status="interrupted"] { color: var(--accent-orange); background: var(--accent-orange-dim); border-color: var(--accent-orange); }
 
         .status-icon { font-style: normal; }
-        .status-icon--ok::before { content: '\2713'; }
-        .status-icon--fail::before { content: '\2717'; }
+        .status-icon--ok::before { content: '\u2713'; }
+        .status-icon--fail::before { content: '\u2717'; }
 
         .task-time {
             font-size: 0.65rem;
