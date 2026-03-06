@@ -1,5 +1,5 @@
 /**
- * Migration 066: Governance tier architecture for council jurisdiction.
+ * Migration 067: Governance tier architecture for council jurisdiction.
  *
  * Three-layer governance model (#590):
  * - Adds vote_type and governance_tier to council_launches

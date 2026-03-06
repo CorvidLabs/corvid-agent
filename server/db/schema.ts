@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 66;
+const SCHEMA_VERSION = 67;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1351,7 +1351,7 @@ export function runMigrations(db: Database): void {
 }
 
 const IDEMPOTENT_CREATE_TABLE = /^\s*CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\w+)/i;
-const IDEMPOTENT_CREATE_INDEX = /^\s*CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/i;
+const IDEMPOTENT_CREATE_INDEX = /^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS/i;
 const ALTER_ADD_COLUMN = /^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i;
 const DROP_TABLE_RE = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)/i;
 const RENAME_TABLE_RE = /ALTER\s+TABLE\s+(\w+)\s+RENAME\s+TO\s+(\w+)/i;
