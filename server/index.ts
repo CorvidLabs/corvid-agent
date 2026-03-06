@@ -171,11 +171,25 @@ async function initAlgoChat(): Promise<void> {
     algochatState.bridge.setAgentMessenger(algochatState.messenger);
 
     // Register MCP services so agent sessions get corvid_* tools
-    processManager.setMcpServices(algochatState.messenger, algochatState.directory, algochatState.walletService, {
-        serverMnemonic: algochatConfig.mnemonic,
-        network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher,
-    reputationScorer, reputationAttestation, reputationVerifier, astParserService, permissionBroker);
+    processManager.setMcpServices({
+        messenger: algochatState.messenger,
+        directory: algochatState.directory,
+        walletService: algochatState.walletService,
+        encryptionConfig: {
+            serverMnemonic: algochatConfig.mnemonic,
+            network: agentNetworkConfig.network,
+        },
+        workTaskService,
+        schedulerService,
+        workflowService,
+        notificationService,
+        questionDispatcher,
+        reputationScorer,
+        reputationAttestation,
+        reputationVerifier,
+        astParserService,
+        permissionBroker,
+    });
 
     // Forward AlgoChat events to WebSocket clients
     algochatState.bridge.onEvent((participant, content, direction) => {
