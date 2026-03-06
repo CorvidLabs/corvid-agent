@@ -38,7 +38,11 @@ function getPositional(index: number): string | undefined {
 
 // ─── Version ────────────────────────────────────────────────────────────────
 
-const VERSION = '0.9.0';
+// Read version from package.json so it stays in sync automatically
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+const pkgPath = join(dirname(new URL(import.meta.url).pathname), '..', 'package.json');
+const VERSION = JSON.parse(readFileSync(pkgPath, 'utf-8')).version as string;
 
 // ─── Help ───────────────────────────────────────────────────────────────────
 
