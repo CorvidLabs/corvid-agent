@@ -1,17 +1,22 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DecimalPipe, SlicePipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { Session, SessionStatus, SessionSource } from '../../core/models/session.model';
+import type { Session, SessionStatus } from '../../core/models/session.model';
+
+interface SessionGroup {
+    label: string;
+    sessions: Session[];
+}
 
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe, SlicePipe],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe],
     template: `
         <div class="page">
             <div class="page__header">
@@ -60,30 +65,47 @@ import type { Session, SessionStatus, SessionSource } from '../../core/models/se
             }
 
             @if (sessionService.loading()) {
-                <p class="loading">Loading...</p>
+                <div class="skeleton-list">
+                    @for (_ of [1,2,3,4,5]; track _) {
+                        <div class="skeleton-row">
+                            <div class="skeleton skeleton--name"></div>
+                            <div class="skeleton skeleton--agent"></div>
+                            <div class="skeleton skeleton--status"></div>
+                            <div class="skeleton skeleton--cost"></div>
+                            <div class="skeleton skeleton--source"></div>
+                            <div class="skeleton skeleton--time"></div>
+                        </div>
+                    }
+                </div>
             } @else if (filteredSessions().length === 0) {
                 <p class="empty">No conversations match your filters.</p>
             } @else {
-                <div class="session-table">
-                    <div class="session-table__header">
-                        <span>Name</span>
-                        <span>Agent</span>
-                        <span>Status</span>
-                        <span>Cost</span>
-                        <span>Source</span>
-                        <span>Time</span>
+                @for (group of groupedSessions(); track group.label) {
+                    <div class="session-group">
+                        <div class="session-group__label">{{ group.label }}</div>
+                        <div class="session-table">
+                            <div class="session-table__header">
+                                <span>Name</span>
+                                <span>Agent</span>
+                                <span>Status</span>
+                                <span>Cost</span>
+                                <span>Source</span>
+                                <span>Time</span>
+                            </div>
+                            @for (session of group.sessions; track session.id) {
+                                <a class="session-table__row" [routerLink]="['/sessions', session.id]"
+                                   [class.session-table__row--running]="session.status === 'running' || session.status === 'loading'">
+                                    <span class="session-table__name" [title]="sessionDisplayName(session)">{{ sessionDisplayName(session) }}</span>
+                                    <span class="session-table__agent" [title]="getAgentName(session.agentId)">{{ getAgentName(session.agentId) }}</span>
+                                    <span><app-status-badge [status]="session.status" /></span>
+                                    <span class="session-table__cost">${{ session.totalCostUsd | number:'1.2-4' }}</span>
+                                    <span class="session-table__source">{{ session.source }}</span>
+                                    <span class="session-table__time">{{ session.updatedAt | relativeTime }}</span>
+                                </a>
+                            }
+                        </div>
                     </div>
-                    @for (session of filteredSessions(); track session.id) {
-                        <a class="session-table__row" [routerLink]="['/sessions', session.id]">
-                            <span class="session-table__name">{{ session.name || session.initialPrompt?.slice(0, 40) || session.id.slice(0, 8) }}</span>
-                            <span class="session-table__agent">{{ getAgentName(session.agentId) }}</span>
-                            <span><app-status-badge [status]="session.status" /></span>
-                            <span class="session-table__cost">\${{ session.totalCostUsd | number:'1.2-4' }}</span>
-                            <span class="session-table__source">{{ session.source }}</span>
-                            <span class="session-table__time">{{ session.updatedAt | relativeTime }}</span>
-                        </a>
-                    }
-                </div>
+                }
             }
         </div>
     `,
@@ -93,7 +115,7 @@ import type { Session, SessionStatus, SessionSource } from '../../core/models/se
         .page__header h2 { margin: 0; color: var(--text-primary); }
         .btn { padding: 0.5rem 1rem; border-radius: var(--radius); text-decoration: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid; font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s; }
         .btn--primary { background: transparent; color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .btn--primary:hover { background: var(--accent-cyan-dim); }
+        .btn--primary:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
         .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
         .btn--danger { background: transparent; color: var(--accent-red); border-color: var(--accent-red); }
         .btn--danger:hover { background: var(--accent-red-dim); }
@@ -122,6 +144,34 @@ import type { Session, SessionStatus, SessionSource } from '../../core/models/se
 
         .bulk-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 
+        /* Loading skeleton */
+        .skeleton-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .skeleton-row {
+            display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
+            padding: 0.75rem 1rem; border-top: 1px solid var(--border); gap: 0.5rem;
+        }
+        .skeleton-row:first-child { border-top: none; }
+        .skeleton {
+            height: 1rem; border-radius: var(--radius-sm);
+            background: linear-gradient(90deg, var(--bg-raised) 25%, var(--bg-hover) 50%, var(--bg-raised) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        .skeleton--name { width: 80%; }
+        .skeleton--agent { width: 60%; }
+        .skeleton--status { width: 50%; }
+        .skeleton--cost { width: 40%; }
+        .skeleton--source { width: 45%; }
+        .skeleton--time { width: 55%; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Session groups */
+        .session-group { margin-bottom: 1.5rem; }
+        .session-group__label {
+            font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--text-tertiary); margin-bottom: 0.5rem; padding-left: 0.25rem;
+        }
+
         .session-table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
         .session-table__header {
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
@@ -132,18 +182,21 @@ import type { Session, SessionStatus, SessionSource } from '../../core/models/se
             display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 0.8fr 1fr;
             padding: 0.5rem 1rem; border-top: 1px solid var(--border);
             font-size: 0.8rem; color: var(--text-primary); text-decoration: none;
-            transition: background 0.1s; align-items: center;
+            transition: background 0.15s, border-color 0.15s; align-items: center;
         }
         .session-table__row:hover { background: var(--bg-hover); }
+        .session-table__row--running { border-left: 2px solid var(--accent-green); }
         .session-table__name { font-weight: 600; color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .session-table__agent { color: var(--text-secondary); font-size: 0.75rem; }
-        .session-table__cost { color: var(--accent-green); }
+        .session-table__agent { color: var(--text-secondary); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .session-table__cost { color: var(--accent-green); font-family: monospace; }
         .session-table__source { font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase; }
         .session-table__time { font-size: 0.7rem; color: var(--text-tertiary); }
 
         @media (max-width: 768px) {
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
+            .skeleton-row { grid-template-columns: 2fr 1fr 1fr; }
+            .skeleton-row > :nth-child(n+4) { display: none; }
         }
     `,
 })
@@ -190,7 +243,40 @@ export class SessionListComponent implements OnInit {
             sessions = sessions.filter((s) => s.source === source);
         }
 
-        return sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        // Sort: running first, then by most recent
+        return [...sessions].sort((a, b) => {
+            const aRunning = a.status === 'running' || a.status === 'loading' ? 1 : 0;
+            const bRunning = b.status === 'running' || b.status === 'loading' ? 1 : 0;
+            if (aRunning !== bRunning) return bRunning - aRunning;
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        });
+    });
+
+    protected readonly groupedSessions = computed<SessionGroup[]>(() => {
+        const sessions = this.filteredSessions();
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today.getTime() - 86400000);
+        const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+        const groups: Record<string, Session[]> = {
+            'Today': [],
+            'Yesterday': [],
+            'This Week': [],
+            'Older': [],
+        };
+
+        for (const s of sessions) {
+            const d = new Date(s.updatedAt);
+            if (d >= today) groups['Today'].push(s);
+            else if (d >= yesterday) groups['Yesterday'].push(s);
+            else if (d >= weekAgo) groups['This Week'].push(s);
+            else groups['Older'].push(s);
+        }
+
+        return Object.entries(groups)
+            .filter(([, arr]) => arr.length > 0)
+            .map(([label, arr]) => ({ label, sessions: arr }));
     });
 
     async ngOnInit(): Promise<void> {
@@ -201,6 +287,12 @@ export class SessionListComponent implements OnInit {
         for (const a of this.agentService.agents()) {
             this.agentNameCache[a.id] = a.name;
         }
+    }
+
+    protected sessionDisplayName(session: Session): string {
+        if (session.name) return session.name;
+        if (session.initialPrompt) return session.initialPrompt.slice(0, 60) + (session.initialPrompt.length > 60 ? '...' : '');
+        return session.id.slice(0, 8);
     }
 
     protected countByStatus(status: SessionStatus): number {
