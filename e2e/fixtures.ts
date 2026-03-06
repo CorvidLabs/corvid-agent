@@ -103,7 +103,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedProject failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const project = await res.json();
+                createdProjectIds.push(project.id);
+                return project;
             },
 
             async seedAgent(name = 'E2E Test Agent') {
@@ -135,7 +137,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedCouncil failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const council = await res.json();
+                createdCouncilIds.push(council.id);
+                return council;
             },
 
             async seedPersona(agentId: string, data: Record<string, unknown> = {}) {
@@ -174,7 +178,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedSkillBundle failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const bundle = await res.json();
+                createdSkillBundleIds.push(bundle.id);
+                return bundle;
             },
 
             async seedMarketplaceListing(agentId: string, data: Record<string, unknown> = {}) {
@@ -215,7 +221,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     throw new Error(`publishListing failed: ${pubRes.status} ${pubRes.statusText} — ${body}`);
                 }
 
-                return pubRes.json();
+                const listing = await pubRes.json();
+                createdListingIds.push(listing.id);
+                return listing;
             },
 
             async seedMcpServer(data: Record<string, unknown> = {}) {
@@ -234,7 +242,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedMcpServer failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const server = await res.json();
+                createdMcpServerIds.push(server.id);
+                return server;
             },
 
             async seedReputationEvent(agentId: string, eventType = 'task_completed', scoreImpact = 5) {
@@ -262,6 +272,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     if (projRes.ok) {
                         const proj = await projRes.json();
                         pid = proj.id;
+                        createdProjectIds.push(proj.id);
                     }
                 }
                 const res = await fetchWithRetry(`${BASE_URL}/api/work-tasks`, {
@@ -293,7 +304,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedSchedule failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const schedule = await res.json();
+                createdScheduleIds.push(schedule.id);
+                return schedule;
             },
 
             async seedWorkflow(agentId: string, data: Record<string, unknown> = {}) {
@@ -320,7 +333,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedWorkflow failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const workflow = await res.json();
+                createdWorkflowIds.push(workflow.id);
+                return workflow;
             },
 
             async seedWebhook(agentId: string, data: Record<string, unknown> = {}) {
@@ -335,6 +350,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     if (projRes.ok) {
                         const proj = await projRes.json();
                         projectId = proj.id;
+                        createdProjectIds.push(proj.id);
                     }
                 }
                 const res = await fetchWithRetry(`${BASE_URL}/api/webhooks`, {
@@ -353,7 +369,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedWebhook failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const webhook = await res.json();
+                createdWebhookIds.push(webhook.id);
+                return webhook;
             },
 
             async seedMentionPolling(agentId: string, data: Record<string, unknown> = {}) {
@@ -368,6 +386,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     if (projRes.ok) {
                         const proj = await projRes.json();
                         projectId = proj.id;
+                        createdProjectIds.push(proj.id);
                     }
                 }
                 const res = await fetchWithRetry(`${BASE_URL}/api/mention-polling`, {
@@ -387,7 +406,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedMentionPolling failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const polling = await res.json();
+                createdPollingIds.push(polling.id);
+                return polling;
             },
 
             async seedSession(projectId: string, agentId?: string, data: Record<string, unknown> = {}) {
@@ -405,7 +426,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     const body = await res.text().catch(() => '');
                     throw new Error(`seedSession failed: ${res.status} ${res.statusText} — ${body}`);
                 }
-                return res.json();
+                const session = await res.json();
+                createdSessionIds.push(session.id);
+                return session;
             },
 
             async getSettings() {
@@ -487,13 +510,24 @@ export const test = base.extend<{ api: ApiHelpers }>({
 
         await use(helpers);
 
-        // Cleanup: delete agents created during the test
-        for (const id of createdAgentIds) {
-            await fetch(`${BASE_URL}/api/agents/${id}`, {
+        // Cleanup: delete all entities created during the test (reverse dependency order)
+        const del = (path: string) =>
+            fetch(`${BASE_URL}${path}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${E2E_API_KEY}` },
             }).catch(() => {});
-        }
+
+        for (const id of createdSessionIds) await del(`/api/sessions/${id}`);
+        for (const id of createdCouncilIds) await del(`/api/councils/${id}`);
+        for (const id of createdScheduleIds) await del(`/api/schedules/${id}`);
+        for (const id of createdWorkflowIds) await del(`/api/workflows/${id}`);
+        for (const id of createdWebhookIds) await del(`/api/webhooks/${id}`);
+        for (const id of createdPollingIds) await del(`/api/mention-polling/${id}`);
+        for (const id of createdSkillBundleIds) await del(`/api/skill-bundles/${id}`);
+        for (const id of createdMcpServerIds) await del(`/api/mcp-servers/${id}`);
+        for (const id of createdListingIds) await del(`/api/marketplace/listings/${id}`);
+        for (const id of createdAgentIds) await del(`/api/agents/${id}`);
+        for (const id of createdProjectIds) await del(`/api/projects/${id}`);
     },
 });
 
