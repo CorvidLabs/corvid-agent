@@ -23,6 +23,21 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `createCorvidMcpServer` | `(ctx: McpToolContext, pluginTools?: ReturnType<typeof tool>[])` | MCP server instance | Creates an MCP server with all corvid_* tools, filtered by agent permissions |
+| `isToolBlockedForScheduler` | `(toolName: string, actionType?: ScheduleActionType)` | `boolean` | Returns true if the tool should be removed in scheduler mode. Always-blocked tools return true unconditionally; gated tools are allowed only when actionType is in the tool's allowed set |
+| `isRepoAllowedForScheduler` | `(repo: string)` | `boolean` | Checks whether a repo's owner org is in `SCHEDULER_ALLOWED_ORGS`. Format: `"owner/repo"` |
+| `checkSchedulerRateLimit` | `(toolName: string, usage: Map<string, number>)` | `string \| null` | Check and increment rate-limit counter for a gated tool. Returns null if allowed, or an error string if the per-session limit has been reached |
+
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `SCHEDULER_ALWAYS_BLOCKED` | `Set<string>` | 5 tool names never available in scheduler mode: `corvid_send_message`, `corvid_grant_credits`, `corvid_credit_config`, `corvid_github_fork_repo`, `corvid_ask_owner` |
+| `SCHEDULER_GATED_TOOLS` | `ReadonlyMap<string, ReadonlySet<ScheduleActionType>>` | Tools blocked by default in scheduler mode but allowed for specific action types (3 entries) |
+| `SCHEDULER_MAX_ISSUES_PER_SESSION` | `number` | Max issues a single scheduler session may create (3) |
+| `SCHEDULER_MAX_PRS_PER_SESSION` | `number` | Max PRs a single scheduler session may create (3) |
+| `SCHEDULER_MAX_PR_COMMENTS_PER_SESSION` | `number` | Max PR comments a single scheduler session may create (5) |
+| `SCHEDULER_ALLOWED_ORGS` | `Set<string>` | Orgs that scheduled sessions may create issues/PRs in: `CorvidLabs`, `corvid-agent` |
+| `SCHEDULER_ESCALATION_LABEL` | `string` | Label automatically applied to issues created by scheduled sessions: `'agent-escalation'` |
 
 ## Invariants
 
@@ -96,3 +111,4 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-02-24 | corvid-agent | Updated dependency path after tool-handlers refactor (#233) |
+| 2026-03-05 | corvid-agent | Document scheduler-tool-gating exports: 3 functions, 7 constants (#591) |
