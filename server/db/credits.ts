@@ -197,6 +197,10 @@ export function grantCredits(
     amount: number,
     reference?: string,
 ): void {
+    if (amount <= 0) {
+        throw new Error(`Cannot grant non-positive credit amount: ${amount}`);
+    }
+
     ensureLedgerRow(db, walletAddress);
 
     db.query(
@@ -225,44 +229,55 @@ export function deductTurnCredits(
     sessionId?: string,
 ): { success: boolean; creditsRemaining: number; isLow: boolean; isExhausted: boolean } {
     const config = getCreditConfig(db);
-    const balance = getBalance(db, walletAddress);
 
-    if (balance.available < config.creditsPerTurn) {
+    // Atomic check-and-deduct in a single transaction to prevent race conditions
+    // where concurrent handlers both read the same balance and both deduct.
+    const result = db.transaction(() => {
+        ensureLedgerRow(db, walletAddress);
+
+        // Atomic deduct with WHERE guard — returns 0 rows if balance insufficient
+        const updated = db.query(
+            `UPDATE credit_ledger
+             SET credits = credits - ?,
+                 total_consumed = total_consumed + ?,
+                 updated_at = datetime('now')
+             WHERE wallet_address = ? AND (credits - reserved) >= ?`
+        ).run(config.creditsPerTurn, config.creditsPerTurn, walletAddress, config.creditsPerTurn);
+
+        if (updated.changes === 0) {
+            const balance = getBalance(db, walletAddress);
+            return {
+                success: false,
+                creditsRemaining: balance.available,
+                isLow: true,
+                isExhausted: true,
+            };
+        }
+
+        // Update session credits_consumed if we have a session
+        if (sessionId) {
+            db.query(
+                `UPDATE sessions SET credits_consumed = credits_consumed + ? WHERE id = ?`
+            ).run(config.creditsPerTurn, sessionId);
+        }
+
+        const newBalance = getBalance(db, walletAddress);
+        recordTransaction(db, walletAddress, 'deduction', config.creditsPerTurn, newBalance.credits, 'turn', null, sessionId);
+
         return {
-            success: false,
-            creditsRemaining: balance.available,
-            isLow: true,
-            isExhausted: true,
+            success: true,
+            creditsRemaining: newBalance.available,
+            isLow: newBalance.available <= config.lowCreditThreshold,
+            isExhausted: newBalance.available <= 0,
         };
+    })();
+
+    if (result.success) {
+        creditsConsumedTotal.inc({}, config.creditsPerTurn);
+        recordAudit(db, 'credit_deduction', walletAddress, 'credit_ledger', walletAddress, `Deducted ${config.creditsPerTurn} credits (turn), remaining: ${result.creditsRemaining}`);
     }
 
-    db.query(
-        `UPDATE credit_ledger
-         SET credits = credits - ?,
-             total_consumed = total_consumed + ?,
-             updated_at = datetime('now')
-         WHERE wallet_address = ?`
-    ).run(config.creditsPerTurn, config.creditsPerTurn, walletAddress);
-
-    // Update session credits_consumed if we have a session
-    if (sessionId) {
-        db.query(
-            `UPDATE sessions SET credits_consumed = credits_consumed + ? WHERE id = ?`
-        ).run(config.creditsPerTurn, sessionId);
-    }
-
-    const newBalance = getBalance(db, walletAddress);
-    recordTransaction(db, walletAddress, 'deduction', config.creditsPerTurn, newBalance.credits, 'turn', null, sessionId);
-
-    creditsConsumedTotal.inc({}, config.creditsPerTurn);
-    recordAudit(db, 'credit_deduction', walletAddress, 'credit_ledger', walletAddress, `Deducted ${config.creditsPerTurn} credits (turn), remaining: ${newBalance.available}`);
-
-    return {
-        success: true,
-        creditsRemaining: newBalance.available,
-        isLow: newBalance.available <= config.lowCreditThreshold,
-        isExhausted: newBalance.available <= 0,
-    };
+    return result;
 }
 
 /**
@@ -275,27 +290,32 @@ export function deductAgentMessageCredits(
     sessionId?: string,
 ): { success: boolean; creditsRemaining: number } {
     const config = getCreditConfig(db);
-    const balance = getBalance(db, walletAddress);
 
-    if (balance.available < config.creditsPerAgentMessage) {
-        return { success: false, creditsRemaining: balance.available };
-    }
+    // Atomic check-and-deduct to prevent race conditions
+    return db.transaction(() => {
+        ensureLedgerRow(db, walletAddress);
 
-    db.query(
-        `UPDATE credit_ledger
-         SET credits = credits - ?,
-             total_consumed = total_consumed + ?,
-             updated_at = datetime('now')
-         WHERE wallet_address = ?`
-    ).run(config.creditsPerAgentMessage, config.creditsPerAgentMessage, walletAddress);
+        const updated = db.query(
+            `UPDATE credit_ledger
+             SET credits = credits - ?,
+                 total_consumed = total_consumed + ?,
+                 updated_at = datetime('now')
+             WHERE wallet_address = ? AND (credits - reserved) >= ?`
+        ).run(config.creditsPerAgentMessage, config.creditsPerAgentMessage, walletAddress, config.creditsPerAgentMessage);
 
-    const newBalance = getBalance(db, walletAddress);
-    recordTransaction(
-        db, walletAddress, 'agent_message', config.creditsPerAgentMessage,
-        newBalance.credits, `to:${toAgent}`, null, sessionId,
-    );
+        if (updated.changes === 0) {
+            const balance = getBalance(db, walletAddress);
+            return { success: false, creditsRemaining: balance.available };
+        }
 
-    return { success: true, creditsRemaining: newBalance.available };
+        const newBalance = getBalance(db, walletAddress);
+        recordTransaction(
+            db, walletAddress, 'agent_message', config.creditsPerAgentMessage,
+            newBalance.credits, `to:${toAgent}`, null, sessionId,
+        );
+
+        return { success: true, creditsRemaining: newBalance.available };
+    })();
 }
 
 // ─── Reserve system (for group messages) ──────────────────────────────────

@@ -1,4 +1,6 @@
 import type { Database } from 'bun:sqlite';
+import { statSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import type { HealthStatus, DependencyHealth, HealthCheckResult } from './types';
 import { hasClaudeAccess } from '../providers/router';
 import type { AuthConfig } from '../middleware/auth';
@@ -100,6 +102,42 @@ async function checkLlmProviders(): Promise<DependencyHealth> {
     };
 }
 
+function checkDiskAndWal(db: Database): DependencyHealth {
+    try {
+        // Get WAL file size
+        let walSizeBytes = 0;
+        try {
+            const dbPath = (db.query("PRAGMA database_list").all() as Array<{ file: string }>)[0]?.file;
+            if (dbPath) {
+                try { walSizeBytes = statSync(dbPath + '-wal').size; } catch { /* no WAL file */ }
+            }
+        } catch { /* ignore */ }
+
+        // Get free disk space
+        let freeBytes = 0;
+        try {
+            const dfOutput = execSync('df -k . 2>/dev/null | tail -1', { encoding: 'utf-8', timeout: 3000 });
+            const parts = dfOutput.trim().split(/\s+/);
+            // df -k output: filesystem blocks used available ...
+            freeBytes = parseInt(parts[3] ?? '0', 10) * 1024;
+        } catch { /* ignore */ }
+
+        const freeMB = Math.round(freeBytes / (1024 * 1024));
+        const walMB = Math.round(walSizeBytes / (1024 * 1024) * 100) / 100;
+
+        // Warn at 500MB free, unhealthy at 100MB
+        if (freeMB < 100) {
+            return { status: 'unhealthy', error: `Critical: only ${freeMB}MB disk free`, free_mb: freeMB, wal_mb: walMB };
+        }
+        if (freeMB < 500 || walMB > 100) {
+            return { status: 'degraded', warning: `Low disk (${freeMB}MB free) or large WAL (${walMB}MB)`, free_mb: freeMB, wal_mb: walMB };
+        }
+        return { status: 'healthy', free_mb: freeMB, wal_mb: walMB };
+    } catch (err) {
+        return { status: 'degraded', error: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 function checkApiKey(getAuthConfig?: () => AuthConfig | null): DependencyHealth {
     if (!getAuthConfig) {
         return { status: 'healthy', configured: false };
@@ -146,6 +184,7 @@ export async function getHealthCheck(deps: HealthCheckDeps): Promise<HealthCheck
     ]);
 
     const apiKey = checkApiKey(deps.getAuthConfig);
+    const diskWal = checkDiskAndWal(deps.db);
 
     const dependencies: Record<string, DependencyHealth> = {
         database,
@@ -153,6 +192,7 @@ export async function getHealthCheck(deps: HealthCheckDeps): Promise<HealthCheck
         algorand,
         llm,
         apiKey,
+        diskWal,
     };
 
     const derivedStatus = deps.isShuttingDown() ? 'unhealthy' as HealthStatus : deriveOverallStatus(dependencies);

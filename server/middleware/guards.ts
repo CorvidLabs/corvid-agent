@@ -38,7 +38,7 @@ export function authGuard(config: AuthConfig): Guard {
             const adminKey = process.env.ADMIN_API_KEY;
             const authHeader = req.headers.get('Authorization');
             const token = authHeader?.replace(/^Bearer\s+/i, '') ?? '';
-            if (adminKey && token === adminKey) {
+            if (adminKey && timingSafeEqual(token, adminKey)) {
                 context.role = 'admin';
             } else {
                 context.role = 'user';
@@ -299,5 +299,7 @@ export function requiresAdminRole(pathname: string): boolean {
     if (pathname.startsWith('/api/github-allowlist')) return true;
     // Performance metrics expose system internals (memory, heap, DB latency, regressions)
     if (pathname.startsWith('/api/performance')) return true;
+    // Network switch can activate mainnet — admin-only to prevent accidental ALGO expenditure
+    if (pathname === '/api/algochat/network') return true;
     return false;
 }

@@ -112,7 +112,7 @@ export class ShutdownCoordinator {
      */
     registerSignals(
         logDiagnostics?: (signal: string) => void,
-        exitCodeMap: Record<string, number> = { SIGINT: 0, SIGTERM: 1 },
+        exitCodeMap: Record<string, number> = { SIGINT: 0, SIGTERM: 0 },
     ): void {
         if (this.signalsRegistered) return;
         this.signalsRegistered = true;
