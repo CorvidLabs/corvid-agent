@@ -20,7 +20,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
     send_message: 'communication',
     reputation_attestation: 'lightweight',
     outcome_analysis: 'lightweight',
-    daily_review: 'lightweight',
+    daily_review: 'review',
     star_repo: 'lightweight',
     custom: 'feature_work',
 };

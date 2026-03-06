@@ -37,6 +37,7 @@ import {
     handleFindReferences,
 } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
+import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { buildCodingTools, type CodingToolContext } from './coding-tools';
 import { getAgent } from '../db/agents';
 import type { LlmToolDefinition } from '../providers/types';
@@ -84,16 +85,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_repo_blocklist',
 ]);
 
-/** Tools blocked during scheduler-initiated sessions. */
-const SCHEDULER_BLOCKED_TOOLS = new Set([
-    'corvid_send_message',
-    'corvid_grant_credits',
-    'corvid_credit_config',
-    'corvid_github_fork_repo',
-    'corvid_github_create_pr',
-    'corvid_github_create_issue',
-    'corvid_github_comment_on_pr',
-]);
+// Scheduler tool gating is now handled by scheduler-tool-gating.ts (tiered by action type).
 
 /** Validate that required fields exist and are non-empty strings/numbers in the args object. */
 function validateRequired(
@@ -675,7 +667,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         }
 
         if (ctx.schedulerMode) {
-            filtered = filtered.filter((t) => !SCHEDULER_BLOCKED_TOOLS.has(t.name));
+            filtered = filtered.filter((t) => !isToolBlockedForScheduler(t.name, ctx.schedulerActionType));
         }
     }
 

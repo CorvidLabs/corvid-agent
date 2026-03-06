@@ -11,6 +11,7 @@ import { getProject } from '../db/projects';
 import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
 import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
+import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, updateSessionAgent, addSessionMessage } from '../db/sessions';
 import type { AgentMessenger } from '../algochat/agent-messenger';
@@ -173,7 +174,7 @@ export class ProcessManager {
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
-    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number, schedulerMode?: boolean, resolvedToolPermissions?: string[] | null): McpToolContext | null {
+    private buildMcpContext(agentId: string, sessionSource?: string, sessionId?: string, depth?: number, schedulerMode?: boolean, resolvedToolPermissions?: string[] | null, schedulerActionType?: ScheduleActionType): McpToolContext | null {
         if (!this.mcpMessenger || !this.mcpDirectory || !this.mcpWalletService) return null;
         return {
             agentId,
@@ -189,6 +190,8 @@ export class ProcessManager {
             schedulerService: this.mcpSchedulerService ?? undefined,
             workflowService: this.mcpWorkflowService ?? undefined,
             schedulerMode,
+            schedulerActionType,
+            schedulerToolUsage: schedulerMode ? new Map() : undefined,
             emitStatus: sessionId
                 ? (message: string) => this.eventBus.emit(sessionId, { type: 'tool_status', statusMessage: message })
                 : undefined,
@@ -241,7 +244,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -290,13 +293,13 @@ export class ProcessManager {
         };
 
         if (provider && provider.executionMode === 'direct') {
-            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode);
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType);
         } else {
-            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode);
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType);
         }
     }
 
-    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean): void {
+    private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType): void {
         // Use session-level workDir override (e.g. git worktree for work tasks)
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -310,7 +313,7 @@ export class ProcessManager {
         // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
-                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, resolvedToolPerms);
+                const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, resolvedToolPerms, schedulerActionType);
                 return ctx ? [createCorvidMcpServer(ctx)] : undefined;
             })()
             : undefined;
@@ -373,6 +376,7 @@ export class ProcessManager {
         provider: import('../providers/types').LlmProvider,
         depth?: number,
         schedulerMode?: boolean,
+        schedulerActionType?: ScheduleActionType,
     ): void {
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
@@ -384,7 +388,7 @@ export class ProcessManager {
             : null;
 
         const mcpToolContext = session.agentId
-            ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, resolvedToolPerms)
+            ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, resolvedToolPerms, schedulerActionType)
             : null;
 
         // Resolve persona and skill bundle prompts for this agent

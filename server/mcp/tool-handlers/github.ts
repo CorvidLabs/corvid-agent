@@ -3,6 +3,21 @@ import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import * as github from '../../github/operations';
 import { assertRepoAllowed } from '../../github/off-limits';
+import { isRepoAllowedForScheduler, checkSchedulerRateLimit, SCHEDULER_ESCALATION_LABEL } from '../scheduler-tool-gating';
+
+/** Enforce scheduler org restriction + rate limit for a gated tool. Returns error result or null. */
+function enforceSchedulerGuards(ctx: McpToolContext, toolName: string, repo: string): CallToolResult | null {
+    if (!ctx.schedulerMode) return null;
+    if (!isRepoAllowedForScheduler(repo)) {
+        return errorResult(`Scheduler sessions can only target allowed orgs. Repo "${repo}" is not permitted.`);
+    }
+    if (ctx.schedulerToolUsage) {
+        const err = checkSchedulerRateLimit(toolName, ctx.schedulerToolUsage);
+        if (err) return errorResult(err);
+    }
+    return null;
+}
+
 
 export async function handleGitHubStarRepo(
     _ctx: McpToolContext,
@@ -66,11 +81,13 @@ export async function handleGitHubListPrs(
 }
 
 export async function handleGitHubCreatePr(
-    _ctx: McpToolContext,
+    ctx: McpToolContext,
     args: { repo: string; title: string; body: string; head: string; base?: string },
 ): Promise<CallToolResult> {
     try {
         assertRepoAllowed(args.repo);
+        const guard = enforceSchedulerGuards(ctx, 'corvid_github_create_pr', args.repo);
+        if (guard) return guard;
         const result = await github.createPr(args.repo, args.title, args.body, args.head, args.base ?? 'main');
         if (!result.ok) return errorResult(result.error ?? 'Failed to create PR');
         return textResult(`PR created: ${result.prUrl ?? 'success'}`);
@@ -100,12 +117,22 @@ export async function handleGitHubReviewPr(
 }
 
 export async function handleGitHubCreateIssue(
-    _ctx: McpToolContext,
+    ctx: McpToolContext,
     args: { repo: string; title: string; body: string; labels?: string[] },
 ): Promise<CallToolResult> {
     try {
         assertRepoAllowed(args.repo);
-        const result = await github.createIssue(args.repo, args.title, args.body, args.labels);
+        const guard = enforceSchedulerGuards(ctx, 'corvid_github_create_issue', args.repo);
+        if (guard) return guard;
+        // Auto-label issues created by scheduler sessions
+        let effectiveLabels = args.labels;
+        if (ctx.schedulerMode) {
+            effectiveLabels = effectiveLabels ? [...effectiveLabels] : [];
+            if (!effectiveLabels.includes(SCHEDULER_ESCALATION_LABEL)) {
+                effectiveLabels.push(SCHEDULER_ESCALATION_LABEL);
+            }
+        }
+        const result = await github.createIssue(args.repo, args.title, args.body, effectiveLabels);
         if (!result.ok) return errorResult(result.error ?? 'Failed to create issue');
         return textResult(`Issue created: ${result.issueUrl ?? 'success'}`);
     } catch (err) {
@@ -165,11 +192,13 @@ export async function handleGitHubGetPrDiff(
 }
 
 export async function handleGitHubCommentOnPr(
-    _ctx: McpToolContext,
+    ctx: McpToolContext,
     args: { repo: string; pr_number: number; body: string },
 ): Promise<CallToolResult> {
     try {
         assertRepoAllowed(args.repo);
+        const guard = enforceSchedulerGuards(ctx, 'corvid_github_comment_on_pr', args.repo);
+        if (guard) return guard;
         const result = await github.addPrComment(args.repo, args.pr_number, args.body);
         if (!result.ok) return errorResult(result.error ?? 'Failed to comment on PR');
         return textResult(`Comment added to PR #${args.pr_number} in ${args.repo}.`);

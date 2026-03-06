@@ -768,7 +768,7 @@ export class SchedulerService {
             }, tenantId);
 
             updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
-            this.processManager.startProcess(session, prompt, { schedulerMode: true });
+            this.processManager.startProcess(session, prompt, { schedulerMode: true, schedulerActionType: action.type });
             results.push(`${repo}: Reviewing ${prList.prs.length} PR(s) in session ${session.id}`);
         }
 
@@ -904,7 +904,7 @@ export class SchedulerService {
         }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
-        this.processManager.startProcess(session, prompt, { schedulerMode: true });
+        this.processManager.startProcess(session, prompt, { schedulerMode: true, schedulerActionType: action.type });
 
         updateExecutionStatus(this.db, executionId, 'completed', {
             result: `Analysis session started: ${session.id}`,
@@ -947,7 +947,7 @@ export class SchedulerService {
         }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
-        this.processManager.startProcess(session, prompt, { schedulerMode: true });
+        this.processManager.startProcess(session, prompt, { schedulerMode: true, schedulerActionType: action.type });
 
         updateExecutionStatus(this.db, executionId, 'completed', {
             result: `Codebase review session started: ${session.id}`,
@@ -989,7 +989,7 @@ export class SchedulerService {
         }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
-        this.processManager.startProcess(session, prompt, { schedulerMode: true });
+        this.processManager.startProcess(session, prompt, { schedulerMode: true, schedulerActionType: action.type });
 
         updateExecutionStatus(this.db, executionId, 'completed', {
             result: `Dependency audit session started: ${session.id}`,
@@ -1060,7 +1060,7 @@ export class SchedulerService {
         }, tenantId);
 
         updateExecutionStatus(this.db, executionId, 'running', { sessionId: session.id });
-        this.processManager.startProcess(session, action.prompt, { schedulerMode: true });
+        this.processManager.startProcess(session, action.prompt, { schedulerMode: true, schedulerActionType: action.type });
 
         updateExecutionStatus(this.db, executionId, 'completed', {
             result: `Custom action session started: ${session.id}`,

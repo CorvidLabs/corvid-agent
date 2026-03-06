@@ -92,7 +92,7 @@ These are tool name strings returned by `buildCodingTools` and `buildDirectTools
 7. Output from `read_file`, `run_command`, `list_files`, and `search_files` is middle-truncated at 8000 characters to protect small context windows.
 8. `run_command` timeout is capped at 120 seconds regardless of what the caller requests.
 9. `DEFAULT_ALLOWED_TOOLS` gates which tools non-web sessions receive when no explicit permissions are set.
-10. `SCHEDULER_BLOCKED_TOOLS` removes destructive/external-facing tools (send_message, grant_credits, credit_config, fork_repo, create_pr, create_issue, comment_on_pr) during scheduler-initiated sessions.
+10. Tiered scheduler tool gating via `isToolBlockedForScheduler()` removes always-blocked tools (send_message, grant_credits, credit_config, fork_repo, ask_owner) and conditionally allows gated tools (create_issue, create_pr, comment_on_pr) based on `ctx.schedulerActionType`.
 11. When `resolvedToolPermissions` is set on `McpToolContext`, it takes precedence over the agent's raw `mcpToolPermissions` database field.
 12. `toProviderTools` strips handler functions -- the returned objects contain only `name`, `description`, and `parameters`.
 
@@ -114,9 +114,9 @@ These are tool name strings returned by `buildCodingTools` and `buildDirectTools
 - **Then** the command is blocked and an error is returned matching the "sudo" pattern
 
 ### Scenario: Scheduler session filters dangerous tools
-- **Given** `McpToolContext` with `schedulerMode: true` and no explicit tool permissions
+- **Given** `McpToolContext` with `schedulerMode: true`, `schedulerActionType: 'review_prs'`, and no explicit tool permissions
 - **When** `buildDirectTools` assembles the tool set
-- **Then** tools in `SCHEDULER_BLOCKED_TOOLS` (corvid_send_message, corvid_grant_credits, etc.) are excluded from the returned array
+- **Then** always-blocked tools (corvid_send_message, corvid_grant_credits, etc.) are excluded; gated tools allowed for review_prs (e.g. corvid_github_comment_on_pr) are included
 
 ### Scenario: Agent with explicit tool permissions
 - **Given** `McpToolContext` with `resolvedToolPermissions: ["corvid_web_search", "read_file"]`
