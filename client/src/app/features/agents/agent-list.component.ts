@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { AgentService } from '../../core/services/agent.service';
@@ -16,6 +16,17 @@ interface AgentCard {
     lastActive: string | null;
     hasPersona: boolean;
 }
+
+const PROVIDER_COLORS: Record<string, { color: string; border: string; bg: string }> = {
+    anthropic: { color: '#d4a574', border: 'rgba(212, 165, 116, 0.4)', bg: 'rgba(212, 165, 116, 0.08)' },
+    openai: { color: '#74d4a5', border: 'rgba(116, 212, 165, 0.4)', bg: 'rgba(116, 212, 165, 0.08)' },
+    ollama: { color: '#a5a5ff', border: 'rgba(165, 165, 255, 0.4)', bg: 'rgba(165, 165, 255, 0.08)' },
+};
+
+const DEFAULT_PROVIDER_COLOR = { color: '#7a7d98', border: 'rgba(122, 125, 152, 0.4)', bg: 'rgba(122, 125, 152, 0.08)' };
+
+/** 7 days in milliseconds — agents with no session activity within this window are considered inactive */
+const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Component({
     selector: 'app-agent-list',
@@ -63,6 +74,14 @@ interface AgentCard {
                         </button>
                     }
                 </div>
+                <label class="toggle-label">
+                    <input
+                        type="checkbox"
+                        class="toggle-input"
+                        [checked]="hideInactive()"
+                        (change)="hideInactive.set($any($event.target).checked)" />
+                    <span class="toggle-text">Hide inactive</span>
+                </label>
                 <div class="sort-group">
                     <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event">
                         <option value="name">Sort: Name</option>
@@ -91,6 +110,15 @@ interface AgentCard {
                                     }
                                 </div>
                                 <div class="agent-card__badges">
+                                    @if (card.agent.provider || card.agent.model) {
+                                        <span
+                                            class="badge badge--provider"
+                                            [style.color]="getProviderColor(card.agent.provider).color"
+                                            [style.border-color]="getProviderColor(card.agent.provider).border"
+                                            [style.background]="getProviderColor(card.agent.provider).bg">
+                                            {{ card.agent.provider || 'anthropic' }}{{ card.agent.model ? ' / ' + card.agent.model : '' }}
+                                        </span>
+                                    }
                                     @if (card.agent.algochatEnabled) {
                                         <span class="badge badge--algochat">AlgoChat</span>
                                     }
@@ -117,8 +145,8 @@ interface AgentCard {
                                 </div>
                             </div>
                             <div class="agent-card__footer">
-                                <span class="agent-card__model">{{ card.agent.model || 'default' }}</span>
                                 <span class="agent-card__perm">{{ card.agent.permissionMode }}</span>
+                                <button class="agent-card__start-btn" (click)="startSession(card.agent.id, $event)">Start Session</button>
                             </div>
                         </a>
                     }
@@ -164,6 +192,11 @@ interface AgentCard {
         }
         .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
 
+        /* Hide-inactive toggle */
+        .toggle-label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; user-select: none; }
+        .toggle-input { accent-color: var(--accent-cyan); cursor: pointer; }
+        .toggle-text { font-size: 0.7rem; color: var(--text-secondary); }
+
         /* Agent Grid */
         .agent-grid {
             display: grid;
@@ -181,8 +214,9 @@ interface AgentCard {
         .agent-card__name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .status-dot--active { background: var(--accent-green); box-shadow: 0 0 6px rgba(0, 255, 136, 0.4); }
-        .agent-card__badges { display: flex; gap: 0.25rem; }
+        .agent-card__badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
         .badge { font-size: 0.6rem; padding: 1px 6px; border-radius: var(--radius-sm); font-weight: 600; border: 1px solid; letter-spacing: 0.05em; text-transform: uppercase; }
+        .badge--provider { font-family: var(--font-mono, monospace); }
         .badge--algochat { color: var(--accent-magenta); border-color: rgba(255, 0, 170, 0.3); }
         .badge--persona { color: var(--accent-amber, #ffc107); border-color: rgba(255, 193, 7, 0.3); }
         .agent-card__desc { margin: 0 0 0.5rem; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -192,9 +226,15 @@ interface AgentCard {
         .agent-card__stat-value--cost { color: var(--accent-green); font-size: 0.85rem; }
         .agent-card__stat-value--time { font-size: 0.75rem; color: var(--text-secondary); }
         .agent-card__stat-label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
-        .agent-card__footer { display: flex; justify-content: space-between; padding-top: 0.4rem; border-top: 1px solid var(--border); }
-        .agent-card__model { font-size: 0.65rem; color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
+        .agent-card__footer { display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid var(--border); }
         .agent-card__perm { font-size: 0.65rem; color: var(--text-tertiary); text-transform: capitalize; }
+        .agent-card__start-btn {
+            padding: 0.25rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+            background: transparent; border: 1px solid var(--accent-cyan); border-radius: var(--radius-sm);
+            color: var(--accent-cyan); transition: all 0.15s;
+        }
+        .agent-card__start-btn:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
 
         @media (max-width: 768px) {
             .agent-grid { grid-template-columns: 1fr; }
@@ -207,11 +247,13 @@ export class AgentListComponent implements OnInit {
     protected readonly agentService = inject(AgentService);
     private readonly sessionService = inject(SessionService);
     private readonly personaService = inject(PersonaService);
+    private readonly router = inject(Router);
 
     protected searchQuery = '';
     protected sortBy: 'name' | 'created' | 'lastActive' | 'sessions' = 'name';
     protected readonly filterAlgoChat = signal<boolean | null>(null);
     protected readonly filterPermission = signal<string | null>(null);
+    protected readonly hideInactive = signal(true);
     protected readonly agentCards = signal<AgentCard[]>([]);
     protected readonly permissionModes = ['default', 'plan', 'auto-edit', 'full-auto'];
 
@@ -220,6 +262,7 @@ export class AgentListComponent implements OnInit {
         const query = this.searchQuery.toLowerCase();
         const algochatFilter = this.filterAlgoChat();
         const permFilter = this.filterPermission();
+        const shouldHideInactive = this.hideInactive();
 
         if (query) {
             cards = cards.filter((c) =>
@@ -232,6 +275,13 @@ export class AgentListComponent implements OnInit {
         }
         if (permFilter) {
             cards = cards.filter((c) => c.agent.permissionMode === permFilter);
+        }
+        if (shouldHideInactive) {
+            const cutoff = Date.now() - INACTIVE_THRESHOLD_MS;
+            cards = cards.filter((c) =>
+                c.runningSessions > 0 ||
+                (c.lastActive && new Date(c.lastActive).getTime() > cutoff),
+            );
         }
 
         const sorted = [...cards];
@@ -262,6 +312,16 @@ export class AgentListComponent implements OnInit {
             this.sessionService.loadSessions(),
         ]);
         await this.buildCards();
+    }
+
+    protected getProviderColor(provider?: string): { color: string; border: string; bg: string } {
+        return PROVIDER_COLORS[provider ?? 'anthropic'] ?? DEFAULT_PROVIDER_COLOR;
+    }
+
+    protected startSession(agentId: string, event: Event): void {
+        event.preventDefault();
+        event.stopPropagation();
+        this.router.navigate(['/sessions/new'], { queryParams: { agentId } });
     }
 
     private async buildCards(): Promise<void> {
