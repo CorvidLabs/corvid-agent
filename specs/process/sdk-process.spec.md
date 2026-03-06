@@ -56,6 +56,7 @@ This is the execution boundary between the corvid-agent system and the Claude Ag
 8. **Abort-safe exit**: AbortError (from `kill()`) results in `onExit(0)`, not an error event
 9. **MCP stream timeout**: `CLAUDE_CODE_STREAM_CLOSE_TIMEOUT` is hardcoded to 7,200,000ms (2 hours) to prevent tools from dying during long autonomous sessions
 10. **Tool permissions vs allowed tools**: `sdkOptions.tools` defines which tools are available. `allowedTools` (auto-approve) is NOT set — all tools go through `canUseTool` for approval
+11. **Symlink resolution for protected paths**: `isProtectedPath()` resolves symlinks via `realpathSync()` before matching, preventing bypass via symlink creation targeting protected files
 
 ## Behavioral Examples
 
@@ -131,3 +132,4 @@ Internal constants (not env-configurable):
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Added realpathSync() symlink resolution to prevent protected-path bypass attacks. |

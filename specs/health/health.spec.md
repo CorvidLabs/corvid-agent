@@ -69,6 +69,7 @@ Provides system health checking (liveness, readiness, and deep dependency checks
 6. `getLivenessCheck` and `getReadinessCheck` never throw; they always return a result.
 7. `HealthMonitorService.start()` is idempotent; calling it when already running is a no-op.
 8. Individual dependency check failures (GitHub, Algorand, LLM) result in `'degraded'` status, not `'unhealthy'`, except for the database which is critical.
+9. The `diskWal` dependency check reports `free_mb` (free disk space) and `wal_mb` (SQLite WAL file size). Thresholds: `'unhealthy'` when free disk space is below 100 MB; `'degraded'` when free disk space is below 500 MB or WAL file size exceeds 100 MB.
 
 ## Behavioral Examples
 
@@ -132,3 +133,4 @@ Provides system health checking (liveness, readiness, and deep dependency checks
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Added diskWal dependency check reporting free disk space and WAL file size. |

@@ -32,7 +32,7 @@ All notable changes to this project will be documented in this file.
 - **5,192** unit tests across 206 files (14,598 assertions)
 - **360** E2E tests across 31 Playwright specs
 - **108** module specs with automated validation
-- **37** MCP tools, **~200** API endpoints, **67** migrations, **82** tables
+- **37** MCP tools, **~200** API endpoints, **70** migrations, **81** tables
 
 ## [0.17.0] - 2026-03-06
 

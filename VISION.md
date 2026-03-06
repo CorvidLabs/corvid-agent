@@ -256,7 +256,7 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - AST code analysis via Tree-sitter
 - Model exam system (18 tests, 6 categories)
 - Structured memory with vector embeddings
-- SQLite persistence (67 migrations, 82 tables)
+- SQLite persistence (70 migrations, 81 tables)
 - Billing/metering infrastructure
 - Agent marketplace foundations
 - Notification system (Discord, Telegram, GitHub, AlgoChat)
@@ -268,8 +268,8 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - Governance tier architecture with structured voting
 - Slack bridge (bidirectional messaging, notifications, question routing)
 - RBAC and multi-tenant isolation
-- 108 module specs with automated validation
-- 5,192 unit tests + 360 E2E tests
+- 109 module specs with automated validation
+- 5,215 unit tests + 360 E2E tests
 
 ### Next
 

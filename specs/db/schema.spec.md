@@ -64,6 +64,7 @@ db_tables:
   - psk_contacts
   - mcp_server_configs
   - project_skills
+  - agent_usdc_revenue
 depends_on: []
 ---
 
@@ -83,7 +84,7 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 ## Invariants
 
-1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 51) is the target. Versions must never be renumbered (version 11 was intentionally skipped)
+1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 70) is the target. Versions must never be renumbered (version 11 was intentionally skipped)
 2. **Single-transaction atomicity**: All pending migrations run inside a single `db.transaction()` call. Either all succeed or none apply
 3. **Idempotent ALTER TABLE**: Before executing `ALTER TABLE ADD COLUMN`, `hasColumn()` checks if the column already exists. This prevents errors on re-runs
 4. **CREATE TABLE IF NOT EXISTS**: All table creation statements use `IF NOT EXISTS` for safety
@@ -100,17 +101,17 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 - **Given** a new empty database
 - **When** `runMigrations(db)` is called
-- **Then** `schema_version` table is created, all 51 migrations run, version is set to 51
+- **Then** `schema_version` table is created, all 70 migrations run, version is set to 70
 
 ### Scenario: Incremental migration
 
-- **Given** a database at version 48
+- **Given** a database at version 67
 - **When** `runMigrations(db)` is called
-- **Then** only migrations 49, 50, 51 are applied, version is updated to 51
+- **Then** only migrations 68, 69, 70 are applied, version is updated to 70
 
 ### Scenario: Already at current version
 
-- **Given** a database at version 51
+- **Given** a database at version 70
 - **When** `runMigrations(db)` is called
 - **Then** returns immediately (no-op)
 
@@ -156,7 +157,7 @@ Note: This module defines all other database tables in the system. Individual ta
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `SCHEMA_VERSION` | `51` | Target schema version |
+| `SCHEMA_VERSION` | `70` | Target schema version |
 
 ## Migration Summary
 
@@ -212,9 +213,13 @@ Note: This module defines all other database tables in the system. Individual ta
 | 49 | `mcp_server_configs` |
 | 50 | `owner_question_dispatches.answered_at` |
 | 51 | `project_skills` + new preset skill bundles |
+| 68 | `councils.on_chain_mode`, `council_launches.synthesis_txid` |
+| 69 | `agent_usdc_revenue` table |
+| 70 | AlgoChat defaults: update existing agents to `algochat_enabled=1`, councils to `on_chain_mode='full'` |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Added migrations 68-70: council on-chain mode, USDC revenue tracking, AlgoChat defaults. |

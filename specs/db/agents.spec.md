@@ -49,6 +49,7 @@ Pure data-access layer for agent CRUD operations, wallet management, and funding
 8. **JSON serialization**: `customFlags` and `mcpToolPermissions` are stored as JSON strings and parsed on read
 9. **No-op update**: If `updateAgent` receives no changed fields, it returns the existing agent without issuing an UPDATE query
 10. **Null FK cleanup**: `deleteAgent` nullifies optional foreign keys (councils.chairman_agent_id, algochat_conversations.agent_id) rather than deleting those rows
+11. **AlgoChat defaults**: `createAgent()` defaults `algochatEnabled` and `algochatAuto` to `true` when not specified in the input. Agents are AlgoChat-enabled by default
 
 ## Behavioral Examples
 
@@ -56,7 +57,7 @@ Pure data-access layer for agent CRUD operations, wallet management, and funding
 
 - **Given** a valid `CreateAgentInput` with name "TestBot"
 - **When** `createAgent(db, { name: 'TestBot' })` is called
-- **Then** a new agent is returned with a UUID `id`, default empty fields, and `algochatEnabled: false`
+- **Then** a new agent is returned with a UUID `id`, default empty fields, and `algochatEnabled: true`, `algochatAuto: true`
 
 ### Scenario: Delete agent cascades all dependents
 
@@ -149,8 +150,8 @@ Pure data-access layer for agent CRUD operations, wallet management, and funding
 | disallowed_tools | TEXT | DEFAULT '' | Comma-separated list of disallowed tool names |
 | permission_mode | TEXT | DEFAULT 'default' | Permission mode (default, full-auto, etc.) |
 | max_budget_usd | REAL | DEFAULT NULL | Maximum budget in USD, null for unlimited |
-| algochat_enabled | INTEGER | DEFAULT 0 | Whether agent participates in AlgoChat (boolean) |
-| algochat_auto | INTEGER | DEFAULT 0 | Whether agent auto-responds in AlgoChat (boolean) |
+| algochat_enabled | INTEGER | DEFAULT 1 | Whether agent participates in AlgoChat (boolean) |
+| algochat_auto | INTEGER | DEFAULT 1 | Whether agent auto-responds in AlgoChat (boolean) |
 | custom_flags | TEXT | DEFAULT '{}' | JSON object of custom feature flags |
 | default_project_id | TEXT | DEFAULT NULL | Default project for new sessions |
 | mcp_tool_permissions | TEXT | DEFAULT NULL | JSON object of MCP tool permission overrides |
@@ -168,3 +169,4 @@ Pure data-access layer for agent CRUD operations, wallet management, and funding
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Agents now default to algochat_enabled=1, algochat_auto=1. createAgent() defaults both to true. |

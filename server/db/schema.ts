@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 69;
+const SCHEMA_VERSION = 70;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [

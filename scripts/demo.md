@@ -11,7 +11,7 @@ Structured walkthrough for demonstrating the full corvid-agent platform.
 **Architecture:**
 ```
 Bun server → MCP tools (37) → Claude Agent SDK / Ollama
-SQLite (67 migrations) → sessions, agents, councils, personas, skills, wallets
+SQLite (70 migrations) → sessions, agents, councils, personas, skills, wallets
 Angular 21 dashboard → mobile-first, 9 deployed apps
 Algorand testnet → AlgoChat, encrypted memory, audit trail
 ```
@@ -278,7 +278,7 @@ Mobile-first dashboard built with Angular 21 (standalone components, signals).
 
 ## 11. Module Specs
 
-Spec-driven development with 108 `.spec.md` files.
+Spec-driven development with 109 `.spec.md` files.
 
 **Covered modules:** Full server coverage — all route, service, and infrastructure modules
 
@@ -305,24 +305,24 @@ cat specs/providers/ollama-provider.spec.md
 ## 12. Test Suite
 
 **Stats:**
-- 5192+ tests passing
-- 206 test files
+- 5215+ tests passing
+- 210+ test files
 - 14598+ expect() calls
-- 108 spec files validated
+- 109 spec files validated
 - CI on 3 platforms (macOS, Ubuntu, Windows)
 
 **Demo flow:**
 ```bash
 # Full suite
 bun test
-# → 5192 pass, 0 fail
+# → 5215 pass, 0 fail
 
 # TypeScript strict
 bunx tsc --noEmit --skipLibCheck
 
 # Spec validation
 bun run spec:check
-# → 108 specs checked: 108 passed
+# → 109 specs checked: 109 passed
 
 # All three must pass before any commit
 ```
