@@ -7,6 +7,7 @@ wallet-keystore.json
 .env
 dist/
 test-results/
+corvid-screenshots/
 *.log
 .DS_Store
 *.swp
