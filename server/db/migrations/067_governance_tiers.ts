@@ -9,10 +9,17 @@
 
 import { Database } from 'bun:sqlite';
 
+function safeAlter(db: Database, sql: string): void {
+    try { db.exec(sql); } catch (e: unknown) {
+        if (e instanceof Error && e.message.includes('duplicate column')) return;
+        throw e;
+    }
+}
+
 export function up(db: Database): void {
     // Add governance columns to council_launches
-    db.exec(`ALTER TABLE council_launches ADD COLUMN vote_type TEXT NOT NULL DEFAULT 'standard'`);
-    db.exec(`ALTER TABLE council_launches ADD COLUMN governance_tier INTEGER DEFAULT NULL`);
+    safeAlter(db, `ALTER TABLE council_launches ADD COLUMN vote_type TEXT NOT NULL DEFAULT 'standard'`);
+    safeAlter(db, `ALTER TABLE council_launches ADD COLUMN governance_tier INTEGER DEFAULT NULL`);
 
     // Governance votes — formal vote records for tier-aware decisions
     db.exec(`
@@ -42,7 +49,8 @@ export function up(db: Database): void {
             agent_id            TEXT NOT NULL,
             vote                TEXT NOT NULL CHECK(vote IN ('approve', 'reject', 'abstain')),
             reason              TEXT NOT NULL DEFAULT '',
-            created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+            created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(governance_vote_id, agent_id)
         )
     `);
     db.exec('CREATE INDEX IF NOT EXISTS idx_gov_member_votes_vote ON governance_member_votes(governance_vote_id)');
