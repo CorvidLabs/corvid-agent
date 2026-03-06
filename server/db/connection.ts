@@ -26,17 +26,20 @@ function setDbFilePermissions(path: string): void {
  * ensure the v1–52 schema is present. Call `await initDb()` early
  * in your startup to also apply any newer file-based migrations.
  */
-export function getDb(path: string = 'corvid-agent.db'): Database {
+export function getDb(path?: string): Database {
     if (db) return db;
 
-    db = new Database(path, { create: true });
+    const dbPath = path ?? (process.env.TRY_MODE === 'true' ? ':memory:' : 'corvid-agent.db');
+    db = new Database(dbPath, { create: true });
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA busy_timeout = 5000');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
     initCreditConfigFromEnv(db);
 
-    setDbFilePermissions(path);
+    if (dbPath !== ':memory:') {
+        setDbFilePermissions(dbPath);
+    }
 
     return db;
 }
