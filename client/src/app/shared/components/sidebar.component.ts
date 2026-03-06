@@ -12,6 +12,27 @@ import {
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 
+/** Section definition with routes for auto-expand */
+interface SidebarSection {
+    key: string;
+    label: string;
+    collapsible: boolean;
+    defaultCollapsed: boolean;
+    routes: string[];
+}
+
+const SECTIONS: SidebarSection[] = [
+    { key: 'core', label: 'Core', collapsible: false, defaultCollapsed: false, routes: ['/dashboard', '/agents', '/projects', '/models', '/personas', '/skill-bundles'] },
+    { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions', '/work-tasks', '/councils'] },
+    { key: 'automation', label: 'Automation', collapsible: true, defaultCollapsed: true, routes: ['/schedules', '/workflows', '/webhooks', '/mention-polling'] },
+    { key: 'integrations', label: 'Integrations', collapsible: true, defaultCollapsed: true, routes: ['/mcp-servers'] },
+    { key: 'monitoring', label: 'Monitoring', collapsible: true, defaultCollapsed: false, routes: ['/feed', '/analytics', '/logs'] },
+    { key: 'community', label: 'Community', collapsible: true, defaultCollapsed: true, routes: ['/reputation', '/marketplace'] },
+    { key: 'config', label: 'Config', collapsible: true, defaultCollapsed: true, routes: ['/allowlist', '/github-allowlist', '/repo-blocklist', '/wallets', '/spending', '/settings'] },
+];
+
+const STORAGE_KEY = 'sidebar_sections_collapsed';
+
 @Component({
     selector: 'app-sidebar',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,6 +53,10 @@ import { filter, Subscription } from 'rxjs';
             aria-label="Main navigation"
             #sidebarEl>
             <ul class="sidebar__list">
+                <!-- Core (always visible) -->
+                <li class="sidebar__section">
+                    <span class="sidebar__section-label">Core</span>
+                </li>
                 <li>
                     <a
                         class="sidebar__link"
@@ -44,8 +69,6 @@ import { filter, Subscription } from 'rxjs';
                         <span class="sidebar__abbr">D</span>
                     </a>
                 </li>
-
-                <li class="sidebar__section"><span class="sidebar__section-label">Core</span></li>
                 <li>
                     <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
                         <span class="sidebar__label">Agents</span>
@@ -77,130 +100,250 @@ import { filter, Subscription } from 'rxjs';
                     </a>
                 </li>
 
-                <li class="sidebar__section"><span class="sidebar__section-label">Sessions</span></li>
-                <li>
-                    <a class="sidebar__link" routerLink="/sessions" routerLinkActive="sidebar__link--active" title="Conversations">
-                        <span class="sidebar__label">Conversations</span>
-                        <span class="sidebar__abbr">Ch</span>
-                    </a>
+                <!-- Sessions (collapsible) -->
+                <li class="sidebar__section sidebar__section--collapsible">
+                    <button
+                        class="sidebar__section-toggle"
+                        (click)="toggleSection('sessions')"
+                        (keydown.space)="$event.preventDefault(); toggleSection('sessions')"
+                        [attr.aria-expanded]="!isSectionCollapsed('sessions')"
+                        aria-controls="sidebar-section-sessions"
+                        type="button">
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('sessions')">&#x25B8;</span>
+                        <span class="sidebar__section-label">Sessions</span>
+                    </button>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/work-tasks" routerLinkActive="sidebar__link--active" title="Work Tasks">
-                        <span class="sidebar__label">Work Tasks</span>
-                        <span class="sidebar__abbr">Wt</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/councils" routerLinkActive="sidebar__link--active" title="Councils">
-                        <span class="sidebar__label">Councils</span>
-                        <span class="sidebar__abbr">Co</span>
-                    </a>
-                </li>
-
-                <li class="sidebar__section"><span class="sidebar__section-label">Automation</span></li>
-                <li>
-                    <a class="sidebar__link" routerLink="/schedules" routerLinkActive="sidebar__link--active" title="Schedules">
-                        <span class="sidebar__label">Schedules</span>
-                        <span class="sidebar__abbr">Sc</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/workflows" routerLinkActive="sidebar__link--active" title="Workflows">
-                        <span class="sidebar__label">Workflows</span>
-                        <span class="sidebar__abbr">Wf</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/webhooks" routerLinkActive="sidebar__link--active" title="Webhooks">
-                        <span class="sidebar__label">Webhooks</span>
-                        <span class="sidebar__abbr">Wh</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/mention-polling" routerLinkActive="sidebar__link--active" title="Mention Polling">
-                        <span class="sidebar__label">Polling</span>
-                        <span class="sidebar__abbr">Mp</span>
-                    </a>
+                <li class="sidebar__section-items"
+                    [class.sidebar__section-items--collapsed]="isSectionCollapsed('sessions')"
+                    id="sidebar-section-sessions"
+                    role="group"
+                    aria-label="Sessions navigation">
+                    <ul class="sidebar__section-list">
+                        <li>
+                            <a class="sidebar__link" routerLink="/sessions" routerLinkActive="sidebar__link--active" title="Conversations">
+                                <span class="sidebar__label">Conversations</span>
+                                <span class="sidebar__abbr">Ch</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/work-tasks" routerLinkActive="sidebar__link--active" title="Work Tasks">
+                                <span class="sidebar__label">Work Tasks</span>
+                                <span class="sidebar__abbr">Wt</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/councils" routerLinkActive="sidebar__link--active" title="Councils">
+                                <span class="sidebar__label">Councils</span>
+                                <span class="sidebar__abbr">Co</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
 
-                <li class="sidebar__section"><span class="sidebar__section-label">Integrations</span></li>
-                <li>
-                    <a class="sidebar__link" routerLink="/mcp-servers" routerLinkActive="sidebar__link--active" title="MCP Servers">
-                        <span class="sidebar__label">MCP Servers</span>
-                        <span class="sidebar__abbr">Mc</span>
-                    </a>
+                <!-- Automation (collapsible, collapsed by default) -->
+                <li class="sidebar__section sidebar__section--collapsible">
+                    <button
+                        class="sidebar__section-toggle"
+                        (click)="toggleSection('automation')"
+                        (keydown.space)="$event.preventDefault(); toggleSection('automation')"
+                        [attr.aria-expanded]="!isSectionCollapsed('automation')"
+                        aria-controls="sidebar-section-automation"
+                        type="button">
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('automation')">&#x25B8;</span>
+                        <span class="sidebar__section-label">Automation</span>
+                    </button>
+                </li>
+                <li class="sidebar__section-items"
+                    [class.sidebar__section-items--collapsed]="isSectionCollapsed('automation')"
+                    id="sidebar-section-automation"
+                    role="group"
+                    aria-label="Automation navigation">
+                    <ul class="sidebar__section-list">
+                        <li>
+                            <a class="sidebar__link" routerLink="/schedules" routerLinkActive="sidebar__link--active" title="Schedules">
+                                <span class="sidebar__label">Schedules</span>
+                                <span class="sidebar__abbr">Sc</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/workflows" routerLinkActive="sidebar__link--active" title="Workflows">
+                                <span class="sidebar__label">Workflows</span>
+                                <span class="sidebar__abbr">Wf</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/webhooks" routerLinkActive="sidebar__link--active" title="Webhooks">
+                                <span class="sidebar__label">Webhooks</span>
+                                <span class="sidebar__abbr">Wh</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/mention-polling" routerLinkActive="sidebar__link--active" title="Mention Polling">
+                                <span class="sidebar__label">Polling</span>
+                                <span class="sidebar__abbr">Mp</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
 
-                <li class="sidebar__section"><span class="sidebar__section-label">Monitoring</span></li>
-                <li>
-                    <a class="sidebar__link" routerLink="/feed" routerLinkActive="sidebar__link--active" title="Feed">
-                        <span class="sidebar__label">Feed</span>
-                        <span class="sidebar__abbr">F</span>
-                    </a>
+                <!-- Integrations (collapsible, collapsed by default) -->
+                <li class="sidebar__section sidebar__section--collapsible">
+                    <button
+                        class="sidebar__section-toggle"
+                        (click)="toggleSection('integrations')"
+                        (keydown.space)="$event.preventDefault(); toggleSection('integrations')"
+                        [attr.aria-expanded]="!isSectionCollapsed('integrations')"
+                        aria-controls="sidebar-section-integrations"
+                        type="button">
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('integrations')">&#x25B8;</span>
+                        <span class="sidebar__section-label">Integrations</span>
+                    </button>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/analytics" routerLinkActive="sidebar__link--active" title="Analytics">
-                        <span class="sidebar__label">Analytics</span>
-                        <span class="sidebar__abbr">An</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/logs" routerLinkActive="sidebar__link--active" title="Logs">
-                        <span class="sidebar__label">Logs</span>
-                        <span class="sidebar__abbr">L</span>
-                    </a>
-                </li>
-
-                <li class="sidebar__section"><span class="sidebar__section-label">Community</span></li>
-                <li>
-                    <a class="sidebar__link" routerLink="/reputation" routerLinkActive="sidebar__link--active" title="Reputation">
-                        <span class="sidebar__label">Reputation</span>
-                        <span class="sidebar__abbr">R</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/marketplace" routerLinkActive="sidebar__link--active" title="Marketplace">
-                        <span class="sidebar__label">Marketplace</span>
-                        <span class="sidebar__abbr">Mk</span>
-                    </a>
+                <li class="sidebar__section-items"
+                    [class.sidebar__section-items--collapsed]="isSectionCollapsed('integrations')"
+                    id="sidebar-section-integrations"
+                    role="group"
+                    aria-label="Integrations navigation">
+                    <ul class="sidebar__section-list">
+                        <li>
+                            <a class="sidebar__link" routerLink="/mcp-servers" routerLinkActive="sidebar__link--active" title="MCP Servers">
+                                <span class="sidebar__label">MCP Servers</span>
+                                <span class="sidebar__abbr">Mc</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
 
-                <li class="sidebar__section"><span class="sidebar__section-label">Config</span></li>
-                <li>
-                    <a class="sidebar__link" routerLink="/allowlist" routerLinkActive="sidebar__link--active" title="AlgoChat Allowlist">
-                        <span class="sidebar__label">Allowlist</span>
-                        <span class="sidebar__abbr">Al</span>
-                    </a>
+                <!-- Monitoring (collapsible) -->
+                <li class="sidebar__section sidebar__section--collapsible">
+                    <button
+                        class="sidebar__section-toggle"
+                        (click)="toggleSection('monitoring')"
+                        (keydown.space)="$event.preventDefault(); toggleSection('monitoring')"
+                        [attr.aria-expanded]="!isSectionCollapsed('monitoring')"
+                        aria-controls="sidebar-section-monitoring"
+                        type="button">
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('monitoring')">&#x25B8;</span>
+                        <span class="sidebar__section-label">Monitoring</span>
+                    </button>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/github-allowlist" routerLinkActive="sidebar__link--active" title="GitHub Allowlist">
-                        <span class="sidebar__label">GH Allowlist</span>
-                        <span class="sidebar__abbr">Gh</span>
-                    </a>
+                <li class="sidebar__section-items"
+                    [class.sidebar__section-items--collapsed]="isSectionCollapsed('monitoring')"
+                    id="sidebar-section-monitoring"
+                    role="group"
+                    aria-label="Monitoring navigation">
+                    <ul class="sidebar__section-list">
+                        <li>
+                            <a class="sidebar__link" routerLink="/feed" routerLinkActive="sidebar__link--active" title="Feed">
+                                <span class="sidebar__label">Feed</span>
+                                <span class="sidebar__abbr">F</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/analytics" routerLinkActive="sidebar__link--active" title="Analytics">
+                                <span class="sidebar__label">Analytics</span>
+                                <span class="sidebar__abbr">An</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/logs" routerLinkActive="sidebar__link--active" title="Logs">
+                                <span class="sidebar__label">Logs</span>
+                                <span class="sidebar__abbr">L</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/repo-blocklist" routerLinkActive="sidebar__link--active" title="Repo Blocklist">
-                        <span class="sidebar__label">Repo Blocklist</span>
-                        <span class="sidebar__abbr">Bl</span>
-                    </a>
+
+                <!-- Community (collapsible, collapsed by default) -->
+                <li class="sidebar__section sidebar__section--collapsible">
+                    <button
+                        class="sidebar__section-toggle"
+                        (click)="toggleSection('community')"
+                        (keydown.space)="$event.preventDefault(); toggleSection('community')"
+                        [attr.aria-expanded]="!isSectionCollapsed('community')"
+                        aria-controls="sidebar-section-community"
+                        type="button">
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('community')">&#x25B8;</span>
+                        <span class="sidebar__section-label">Community</span>
+                    </button>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/wallets" routerLinkActive="sidebar__link--active" title="Wallets">
-                        <span class="sidebar__label">Wallets</span>
-                        <span class="sidebar__abbr">W</span>
-                    </a>
+                <li class="sidebar__section-items"
+                    [class.sidebar__section-items--collapsed]="isSectionCollapsed('community')"
+                    id="sidebar-section-community"
+                    role="group"
+                    aria-label="Community navigation">
+                    <ul class="sidebar__section-list">
+                        <li>
+                            <a class="sidebar__link" routerLink="/reputation" routerLinkActive="sidebar__link--active" title="Reputation">
+                                <span class="sidebar__label">Reputation</span>
+                                <span class="sidebar__abbr">R</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/marketplace" routerLinkActive="sidebar__link--active" title="Marketplace">
+                                <span class="sidebar__label">Marketplace</span>
+                                <span class="sidebar__abbr">Mk</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/spending" routerLinkActive="sidebar__link--active" title="Spending">
-                        <span class="sidebar__label">Spending</span>
-                        <span class="sidebar__abbr">$</span>
-                    </a>
+
+                <!-- Config (collapsible, collapsed by default) -->
+                <li class="sidebar__section sidebar__section--collapsible">
+                    <button
+                        class="sidebar__section-toggle"
+                        (click)="toggleSection('config')"
+                        (keydown.space)="$event.preventDefault(); toggleSection('config')"
+                        [attr.aria-expanded]="!isSectionCollapsed('config')"
+                        aria-controls="sidebar-section-config"
+                        type="button">
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('config')">&#x25B8;</span>
+                        <span class="sidebar__section-label">Config</span>
+                    </button>
                 </li>
-                <li>
-                    <a class="sidebar__link" routerLink="/settings" routerLinkActive="sidebar__link--active" title="Settings">
-                        <span class="sidebar__label">Settings</span>
-                        <span class="sidebar__abbr">S</span>
-                    </a>
+                <li class="sidebar__section-items"
+                    [class.sidebar__section-items--collapsed]="isSectionCollapsed('config')"
+                    id="sidebar-section-config"
+                    role="group"
+                    aria-label="Config navigation">
+                    <ul class="sidebar__section-list">
+                        <li>
+                            <a class="sidebar__link" routerLink="/allowlist" routerLinkActive="sidebar__link--active" title="AlgoChat Allowlist">
+                                <span class="sidebar__label">Allowlist</span>
+                                <span class="sidebar__abbr">Al</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/github-allowlist" routerLinkActive="sidebar__link--active" title="GitHub Allowlist">
+                                <span class="sidebar__label">GH Allowlist</span>
+                                <span class="sidebar__abbr">Gh</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/repo-blocklist" routerLinkActive="sidebar__link--active" title="Repo Blocklist">
+                                <span class="sidebar__label">Repo Blocklist</span>
+                                <span class="sidebar__abbr">Bl</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/wallets" routerLinkActive="sidebar__link--active" title="Wallets">
+                                <span class="sidebar__label">Wallets</span>
+                                <span class="sidebar__abbr">W</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/spending" routerLinkActive="sidebar__link--active" title="Spending">
+                                <span class="sidebar__label">Spending</span>
+                                <span class="sidebar__abbr">$</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/settings" routerLinkActive="sidebar__link--active" title="Settings">
+                                <span class="sidebar__label">Settings</span>
+                                <span class="sidebar__abbr">S</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
             </ul>
             <button
@@ -213,7 +356,7 @@ import { filter, Subscription } from 'rxjs';
         </nav>
     `,
     styles: `
-        /* ── Desktop (default) ── */
+        /* Desktop (default) */
         .sidebar-backdrop {
             display: none;
         }
@@ -242,7 +385,6 @@ import { filter, Subscription } from 'rxjs';
             transition: background 0.15s, color 0.15s, border-color 0.15s;
             border-left: 3px solid transparent;
         }
-        /* Guard hover effects for pointer devices only */
         @media (hover: hover) {
             .sidebar__link:hover {
                 background: var(--bg-hover);
@@ -262,7 +404,7 @@ import { filter, Subscription } from 'rxjs';
             list-style: none;
         }
 
-        /* ── Section headers ── */
+        /* Section headers */
         .sidebar__section {
             list-style: none;
             padding: 0.5rem 1.5rem 0.2rem;
@@ -281,12 +423,67 @@ import { filter, Subscription } from 'rxjs';
             font-weight: 600;
         }
 
-        /* ── Abbreviation labels (hidden by default) ── */
+        /* Collapsible section toggle button */
+        .sidebar__section-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            color: inherit;
+            border-radius: 3px;
+        }
+        .sidebar__section-toggle:hover .sidebar__section-label {
+            color: var(--text-secondary);
+        }
+        .sidebar__section-toggle:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
+        }
+
+        /* Chevron indicator */
+        .sidebar__chevron {
+            font-size: 0.55rem;
+            color: var(--text-tertiary);
+            transition: transform 150ms ease;
+            display: inline-block;
+            line-height: 1;
+        }
+        .sidebar__chevron--open {
+            transform: rotate(90deg);
+        }
+
+        /* Section items container (CSS-animated collapse) */
+        .sidebar__section-items {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            max-height: 500px;
+            opacity: 1;
+            transition: max-height 150ms ease, opacity 150ms ease;
+        }
+        .sidebar__section-items--collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+        .sidebar__section-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Abbreviation labels (hidden by default) */
         .sidebar__abbr {
             display: none;
         }
 
-        /* ── Collapse toggle button ── */
+        /* Collapse toggle button */
         .sidebar__collapse-btn {
             margin-top: auto;
             padding: 0.6rem;
@@ -304,7 +501,7 @@ import { filter, Subscription } from 'rxjs';
             background: var(--bg-hover);
         }
 
-        /* ── Collapsed state (desktop) ── */
+        /* Collapsed state (desktop) */
         .sidebar--collapsed {
             width: 48px;
         }
@@ -328,8 +525,14 @@ import { filter, Subscription } from 'rxjs';
         .sidebar--collapsed .sidebar__section-label {
             display: none;
         }
+        .sidebar--collapsed .sidebar__chevron {
+            display: none;
+        }
+        .sidebar--collapsed .sidebar__section-toggle {
+            justify-content: center;
+        }
 
-        /* ── Mobile (<768px): slide-out overlay ── */
+        /* Mobile (<768px): slide-out overlay */
         @media (max-width: 767px) {
             .sidebar-backdrop {
                 display: block;
@@ -355,7 +558,6 @@ import { filter, Subscription } from 'rxjs';
             .sidebar--open {
                 transform: translateX(0);
             }
-            /* Ignore collapsed state on mobile — full overlay always */
             .sidebar--collapsed {
                 width: 280px;
             }
@@ -376,6 +578,9 @@ import { filter, Subscription } from 'rxjs';
             .sidebar--collapsed .sidebar__section-label {
                 display: inline;
             }
+            .sidebar--collapsed .sidebar__chevron {
+                display: inline-block;
+            }
             .sidebar__collapse-btn {
                 display: none;
             }
@@ -394,6 +599,9 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
         typeof localStorage !== 'undefined' && localStorage.getItem('sidebar_collapsed') === 'true',
     );
 
+    /** Section collapsed states — persisted in localStorage */
+    readonly sectionStates = signal<Record<string, boolean>>(this.loadSectionStates());
+
     private readonly router = inject(Router);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
     private routerSub: Subscription | null = null;
@@ -402,12 +610,16 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     private hamburgerRef: HTMLElement | null = null;
 
     ngAfterViewInit(): void {
-        // Close sidebar on navigation (route change)
+        // Close sidebar on navigation (route change) + auto-expand active section
         this.routerSub = this.router.events
             .pipe(filter((e) => e instanceof NavigationEnd))
-            .subscribe(() => {
+            .subscribe((e) => {
                 this.closeSidebar();
+                this.autoExpandActiveSection((e as NavigationEnd).urlAfterRedirects);
             });
+
+        // Auto-expand for current route on init
+        this.autoExpandActiveSection(this.router.url);
     }
 
     ngOnDestroy(): void {
@@ -422,14 +634,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     closeSidebar(): void {
         if (this.sidebarOpen()) {
             this.sidebarOpen.set(false);
-            // Return focus to hamburger button
             this.hamburgerRef?.focus();
         }
     }
 
     openSidebar(): void {
         this.sidebarOpen.set(true);
-        // Focus first nav link when sidebar opens
         setTimeout(() => {
             this.firstLink()?.nativeElement.focus();
         });
@@ -441,7 +651,67 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
         localStorage.setItem('sidebar_collapsed', String(next));
     }
 
+    /** Toggle a collapsible section */
+    toggleSection(sectionKey: string): void {
+        const current = this.sectionStates();
+        const next = { ...current, [sectionKey]: !current[sectionKey] };
+        this.sectionStates.set(next);
+        this.saveSectionStates(next);
+    }
+
+    /** Check if a section is collapsed */
+    isSectionCollapsed(sectionKey: string): boolean {
+        return this.sectionStates()[sectionKey] ?? false;
+    }
+
     protected onEscape(): void {
         this.closeSidebar();
+    }
+
+    /** Load section states from localStorage, falling back to defaults */
+    private loadSectionStates(): Record<string, boolean> {
+        const defaults: Record<string, boolean> = {};
+        for (const section of SECTIONS) {
+            if (section.collapsible) {
+                defaults[section.key] = section.defaultCollapsed;
+            }
+        }
+
+        if (typeof localStorage === 'undefined') return defaults;
+
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored) as Record<string, boolean>;
+                return { ...defaults, ...parsed };
+            }
+        } catch {
+            // Ignore malformed JSON
+        }
+
+        return defaults;
+    }
+
+    /** Save section states to localStorage */
+    private saveSectionStates(states: Record<string, boolean>): void {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(states));
+        }
+    }
+
+    /** Auto-expand the section containing the active route */
+    private autoExpandActiveSection(url: string): void {
+        for (const section of SECTIONS) {
+            if (!section.collapsible) continue;
+            if (section.routes.some((route) => url.startsWith(route))) {
+                if (this.isSectionCollapsed(section.key)) {
+                    const current = this.sectionStates();
+                    const next = { ...current, [section.key]: false };
+                    this.sectionStates.set(next);
+                    this.saveSectionStates(next);
+                }
+                break;
+            }
+        }
     }
 }
