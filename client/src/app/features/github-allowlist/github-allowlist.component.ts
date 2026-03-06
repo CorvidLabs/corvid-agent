@@ -1,15 +1,17 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal } from '@angular/core';
 import { GitHubAllowlistService } from '../../core/services/github-allowlist.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 
 @Component({
     selector: 'app-github-allowlist',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RelativeTimePipe],
+    imports: [RelativeTimePipe, SkeletonComponent, TooltipDirective],
     template: `
         <div class="page">
             <div class="page__header">
-                <h2>
+                <h2 class="page-title">
                     GitHub Allowlist
                     @if (service.entries().length > 0) {
                         <span class="count">({{ service.entries().length }})</span>
@@ -41,7 +43,7 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
             }
 
             @if (service.loading()) {
-                <p>Loading...</p>
+                <app-skeleton variant="line" [count]="4" />
             } @else if (service.entries().length === 0) {
                 <p class="empty">No GitHub users in allowlist. All GitHub users are currently allowed.</p>
             } @else {

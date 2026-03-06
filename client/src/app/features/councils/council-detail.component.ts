@@ -5,18 +5,20 @@ import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import type { Council, CouncilLaunch } from '../../core/models/council.model';
 
 @Component({
     selector: 'app-council-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, SkeletonComponent, TooltipDirective],
     template: `
         @if (council(); as c) {
             <div class="page">
                 <div class="page__header">
                     <div>
-                        <h2>{{ c.name }}</h2>
+                        <h2 class="page-title">{{ c.name }}</h2>
                         <p class="page__desc">{{ c.description }}</p>
                     </div>
                     <div class="page__actions">
@@ -88,7 +90,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                                         <span class="launch-card__meta">{{ launch.sessionIds.length }} sessions · round {{ launch.currentDiscussionRound }}/{{ launch.totalDiscussionRounds }}</span>
                                         <span class="launch-card__time">{{ launch.createdAt | relativeTime }}</span>
                                     </div>
-                                    <p class="launch-card__prompt">{{ launch.prompt }}</p>
+                                    <p class="launch-card__prompt" appTooltip>{{ launch.prompt }}</p>
                                     @if (launch.synthesis) {
                                         <div class="launch-card__synthesis">
                                             <span class="synthesis-label">Synthesis</span>
@@ -102,7 +104,7 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                 </div>
             </div>
         } @else {
-            <div class="page"><p>Loading...</p></div>
+            <div class="page"><app-skeleton variant="card" [count]="2" /></div>
         }
     `,
     styles: `
