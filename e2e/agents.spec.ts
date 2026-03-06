@@ -7,8 +7,8 @@ test.describe('Agents', () => {
         const agentName = `Playwright Agent ${Date.now()}`;
         await gotoWithRetry(page, '/agents');
 
-        // Click "New Agent" link
-        await page.locator('a[href="/agents/new"]').click();
+        // Click "New Agent" link (header button, not the empty-state CTA)
+        await page.locator('.page__header a[href="/agents/new"]').click();
         await page.waitForURL('/agents/new');
 
         // Fill in the agent form

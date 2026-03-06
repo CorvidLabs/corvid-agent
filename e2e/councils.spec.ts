@@ -17,7 +17,7 @@ test.describe('Councils', () => {
         await expect(page.locator('h2')).toBeVisible({ timeout: 10_000 });
         // Wait for either council cards or empty state to render
         await expect(
-            page.locator('.council-card, .empty').first()
+            page.locator('.council-card, .empty, .empty-state').first()
         ).toBeVisible({ timeout: 10_000 });
     });
 
