@@ -28,6 +28,7 @@ import {
 } from './observability/index';
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
+import { handlePermissionRoutes } from './routes/permissions';
 import { buildAgentCard } from './a2a/agent-card';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
@@ -90,6 +91,7 @@ const {
     healthMonitorService,
     reputationVerifier,
     astParserService,
+    permissionBroker,
 } = await bootstrapServices(db, startTime);
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
@@ -173,7 +175,7 @@ async function initAlgoChat(): Promise<void> {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
     }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher,
-    reputationScorer, reputationAttestation, reputationVerifier, astParserService);
+    reputationScorer, reputationAttestation, reputationVerifier, astParserService, permissionBroker);
 
     // Forward AlgoChat events to WebSocket clients
     algochatState.bridge.onEvent((participant, content, direction) => {
@@ -283,6 +285,12 @@ const server = Bun.serve<WsData>({
             }
             const auditResponse = handleAuditRoutes(req, url, db);
             if (auditResponse) return instrumentResponse(auditResponse, '/api/audit-log');
+
+            const permResponse = handlePermissionRoutes(req, url, db);
+            if (permResponse) {
+                const resolved = permResponse instanceof Promise ? await permResponse : permResponse;
+                return instrumentResponse(resolved, '/api/permissions');
+            }
         }
 
         // WebSocket upgrade
