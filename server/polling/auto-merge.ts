@@ -85,9 +85,11 @@ export class AutoMergeService {
 
     /**
      * Validate a PR's diff for security issues before auto-merging.
-     * Returns a rejection reason string if blocked, or null if safe.
+     * Returns: 'skip' if diff couldn't be fetched (retry next cycle),
+     *          a rejection reason string if blocked,
+     *          or null if safe to merge.
      */
-    async validateDiff(repo: string, prNumber: number): Promise<string | null> {
+    async validateDiff(repo: string, prNumber: number): Promise<string | 'skip' | null> {
         // Get the PR diff
         const diffResult = await this.runGh([
             'api', `repos/${repo}/pulls/${prNumber}`,
@@ -95,7 +97,12 @@ export class AutoMergeService {
         ]);
 
         if (!diffResult.ok || !diffResult.stdout.trim()) {
-            return 'Could not retrieve PR diff for security validation';
+            // Transient failure (rate limit, network) — skip this cycle rather than
+            // flagging the PR with a scary comment. We'll retry next cycle.
+            log.debug('Could not retrieve PR diff — skipping security check this cycle', {
+                repo, prNumber, stderr: diffResult.stderr?.slice(0, 200),
+            });
+            return 'skip';
         }
 
         const diff = diffResult.stdout;
@@ -139,6 +146,21 @@ export class AutoMergeService {
     }
 
     /**
+     * Check if we've already posted a security-scan comment on this PR.
+     * Prevents duplicate comments across server restarts.
+     */
+    private async hasSecurityComment(repo: string, prNumber: number): Promise<boolean> {
+        const result = await this.runGh([
+            'pr', 'view', String(prNumber),
+            '--repo', repo,
+            '--json', 'comments',
+            '--jq', '.comments[].body',
+        ]);
+        if (!result.ok) return false;
+        return result.stdout.includes('Auto-merge blocked — security scan failed');
+    }
+
+    /**
      * Auto-merge passing PRs for a specific repo authored by the given username.
      */
     private async mergeForRepo(repo: string, username: string): Promise<void> {
@@ -177,18 +199,26 @@ export class AutoMergeService {
             // All checks pass — run security validation on the diff before merging
             const prKey = `${prRepo}#${prNumber}`;
             const rejection = await this.validateDiff(prRepo, prNumber);
+            if (rejection === 'skip') {
+                log.debug('Skipping PR — diff unavailable this cycle', { repo: prRepo, number: prNumber });
+                continue;
+            }
             if (rejection) {
                 log.warn('Auto-merge blocked by security scan', {
                     repo: prRepo, number: prNumber, reason: rejection,
                 });
-                // Only post the comment once per PR to avoid spam
+                // Only post the comment once per PR — check in-memory set first,
+                // then fall back to checking existing comments on the PR (survives restarts)
                 if (!this.flaggedPRs.has(prKey)) {
+                    const alreadyCommented = await this.hasSecurityComment(prRepo, prNumber);
+                    if (!alreadyCommented) {
+                        await this.runGh([
+                            'pr', 'comment', String(prNumber),
+                            '--repo', prRepo,
+                            '--body', `⚠️ **Auto-merge blocked — security scan failed**\n\n${rejection}\n\nThis PR requires manual review before merging.`,
+                        ]);
+                    }
                     this.flaggedPRs.add(prKey);
-                    await this.runGh([
-                        'pr', 'comment', String(prNumber),
-                        '--repo', prRepo,
-                        '--body', `⚠️ **Auto-merge blocked — security scan failed**\n\n${rejection}\n\nThis PR requires manual review before merging.`,
-                    ]);
                 }
                 continue;
             }

@@ -317,6 +317,10 @@ describe('AutoMergeService.checkAll', () => {
                 // Diff that modifies a protected file
                 return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// malicious change', stderr: '' };
             }
+            if (key.includes('pr view')) {
+                // No existing security comment
+                return { ok: true, stdout: '', stderr: '' };
+            }
             if (key.includes('pr comment')) {
                 return { ok: true, stdout: '', stderr: '' };
             }
@@ -360,6 +364,9 @@ describe('AutoMergeService.checkAll', () => {
                     stderr: '',
                 };
             }
+            if (key.includes('pr view')) {
+                return { ok: true, stdout: '', stderr: '' };
+            }
             if (key.includes('pr comment')) {
                 return { ok: true, stdout: '', stderr: '' };
             }
@@ -395,6 +402,9 @@ describe('AutoMergeService.checkAll', () => {
             if (key.includes('repos/') && key.includes('/pulls/')) {
                 return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// protected file', stderr: '' };
             }
+            if (key.includes('pr view')) {
+                return { ok: true, stdout: '', stderr: '' };
+            }
             if (key.includes('pr comment')) {
                 commentCalls.push(args);
                 return { ok: true, stdout: '', stderr: '' };
@@ -411,6 +421,83 @@ describe('AutoMergeService.checkAll', () => {
         await service.checkAll();
 
         expect(commentCalls.length).toBe(1);
+    });
+
+    test('skips PR when diff fetch fails (transient error)', async () => {
+        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
+
+        const calls: string[][] = [];
+        const runGh: RunGhFn = async (args) => {
+            calls.push(args);
+            const key = args.join(' ');
+            if (key.includes('search/issues')) {
+                return {
+                    ok: true,
+                    stdout: JSON.stringify({
+                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
+                    }),
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr checks')) {
+                return { ok: true, stdout: 'pass', stderr: '' };
+            }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                // Diff fetch fails (rate limit, network error, etc.)
+                return { ok: false, stdout: '', stderr: 'API rate limit exceeded' };
+            }
+            return { ok: false, stdout: '', stderr: '' };
+        };
+
+        const service = new AutoMergeService(db, runGh);
+        (service as any).running = true;
+        await service.checkAll();
+
+        // Should NOT merge and should NOT comment — just skip
+        const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
+        expect(mergeCall).toBeUndefined();
+        const commentCall = calls.find((c) => c.join(' ').includes('pr comment'));
+        expect(commentCall).toBeUndefined();
+    });
+
+    test('does not post duplicate comment if one already exists on the PR', async () => {
+        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
+
+        const commentCalls: string[][] = [];
+        const runGh: RunGhFn = async (args) => {
+            const key = args.join(' ');
+            if (key.includes('search/issues')) {
+                return {
+                    ok: true,
+                    stdout: JSON.stringify({
+                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
+                    }),
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr checks')) {
+                return { ok: true, stdout: 'pass', stderr: '' };
+            }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// protected file', stderr: '' };
+            }
+            if (key.includes('pr view')) {
+                // Simulate an existing security comment from a previous server run
+                return { ok: true, stdout: '⚠️ **Auto-merge blocked — security scan failed**\n\nProtected files', stderr: '' };
+            }
+            if (key.includes('pr comment')) {
+                commentCalls.push(args);
+                return { ok: true, stdout: '', stderr: '' };
+            }
+            return { ok: false, stdout: '', stderr: '' };
+        };
+
+        const service = new AutoMergeService(db, runGh);
+        (service as any).running = true;
+        await service.checkAll();
+
+        // Should NOT post a new comment since one already exists
+        expect(commentCalls.length).toBe(0);
     });
 
     test('blocks merge when diff has malicious code patterns', async () => {
@@ -438,6 +525,9 @@ describe('AutoMergeService.checkAll', () => {
                     stdout: '+++ b/server/routes/new.ts\n+eval("malicious code")',
                     stderr: '',
                 };
+            }
+            if (key.includes('pr view')) {
+                return { ok: true, stdout: '', stderr: '' };
             }
             if (key.includes('pr comment')) {
                 return { ok: true, stdout: '', stderr: '' };
@@ -518,7 +608,7 @@ describe('AutoMergeService.validateDiff', () => {
         expect(result).toContain('Unapproved external domains');
     });
 
-    test('returns error when diff cannot be fetched', async () => {
+    test('returns skip when diff cannot be fetched (transient failure)', async () => {
         const runGh: RunGhFn = async () => ({
             ok: false,
             stdout: '',
@@ -527,7 +617,7 @@ describe('AutoMergeService.validateDiff', () => {
 
         const service = new AutoMergeService(db, runGh);
         const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
-        expect(result).toContain('Could not retrieve PR diff');
+        expect(result).toBe('skip');
     });
 
     test('catches multiple issues in one diff', async () => {
