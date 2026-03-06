@@ -110,6 +110,19 @@ Multi-channel notification service that persists notifications to the database a
 | `sendSignalQuestion` | `channels/signal-question.ts` | Sends the question via Signal REST API |
 | `sendSlackQuestion` | `channels/slack-question.ts` | Sends the question via Slack with interactive blocks |
 
+### Exported Functions (from channel files)
+
+| Function | File | Description |
+|----------|------|-------------|
+| `sendWebSocket` | `channels/websocket.ts` | Send notification via WebSocket broadcast |
+| `sendDiscord` | `channels/discord.ts` | Send notification via Discord webhook |
+| `sendTelegram` | `channels/telegram.ts` | Send notification via Telegram bot API |
+| `sendGitHub` | `channels/github.ts` | Send notification via GitHub issue/comment |
+| `sendAlgoChat` | `channels/algochat.ts` | Send notification via AlgoChat bridge |
+| `sendWhatsApp` | `channels/whatsapp.ts` | Send notification via WhatsApp Business API |
+| `sendSignal` | `channels/signal.ts` | Send notification via Signal REST API |
+| `sendSlack` | `channels/slack.ts` | Send notification via Slack bot API |
+
 ### Exported Types (from types.ts)
 
 | Type | Description |

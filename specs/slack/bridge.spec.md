@@ -52,6 +52,7 @@ Bidirectional Slack bridge using the Events API (webhook-based). Receives messag
 | `SlackEventPayload` | `{ token: string; type: 'url_verification' \| 'event_callback'; challenge?: string; event?: SlackEvent }` |
 | `SlackEvent` | Base event with optional `type`, `user`, `text`, `channel`, `ts`, `thread_ts`, `bot_id`, `subtype` |
 | `SlackMessageEvent` | Extends `SlackEvent` with required `type: 'message' \| 'app_mention'`, `user`, `text`, `channel`, `ts` |
+| `SlackChallenge` | Slack URL verification challenge response structure |
 
 ## Invariants
 

@@ -40,6 +40,13 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 |------|-------------|
 | `McpToolContext` | Context object passed to every handler: agentId, db, services, session metadata |
 
+### Exported Helpers (from types.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `textResult` | `(text: string)` | `CallToolResult` | Wrap text in standard MCP `CallToolResult` format |
+| `errorResult` | `(text: string)` | `CallToolResult` | Wrap error message in MCP `CallToolResult` error format |
+
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |

@@ -27,11 +27,22 @@ This is the execution boundary between the corvid-agent system and the Claude Ag
 | `SdkProcessOptions` | Full configuration for starting an SDK process: session, project, agent, prompt, callbacks, MCP servers, persona/skill prompts |
 | `SdkProcess` | Running process handle: `{ pid, sendMessage, kill }` |
 
+### Exported Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `ENV_ALLOWLIST` | `Set<string>` (24 entries) | Allowlisted environment variable names safe to pass to subprocesses |
+| `API_FAILURE_THRESHOLD` | `3` | Consecutive API errors before triggering outage handler |
+| `API_ERROR_PATTERNS` | `string[]` | Regex/string patterns that identify API-level errors vs application errors |
+
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `startSdkProcess` | `(options: SdkProcessOptions)` | `SdkProcess` | Start a Claude Agent SDK query with full configuration, returns process handle |
+| `buildSafeEnv` | `(projectEnvVars?: Record<string, string>)` | `Record<string, string>` | Build sandboxed environment from allowlist + project env vars |
+| `isApiError` | `(error: string)` | `boolean` | Check if an error string matches known API error patterns |
+| `mapSdkMessageToEvent` | `(message: SDKMessage, sessionId: string)` | `ClaudeStreamEvent \| null` | Convert an SDK message to a stream event for the event bus |
 
 ## Invariants
 

@@ -47,7 +47,11 @@ Provides unified observability for the corvid-agent server: distributed tracing 
 | `EventContext` | Correlation context with `traceId` (32 hex chars), optional `parentId`, `timestamp` (epoch ms), and `source` (EventSource). |
 | `TraceContextData` | AsyncLocalStorage store shape with optional `traceId` and `requestId` fields. |
 
-Note: `Span` is re-exported as `type Span` from `@opentelemetry/api` via `tracing.ts`.
+### Exported Types (from tracing.ts)
+
+| Type | Description |
+|------|-------------|
+| `Span` | Re-exported from `@opentelemetry/api` — represents a single operation within a trace |
 
 ### Exported Constants
 

@@ -22,6 +22,7 @@ Combined circuit breaker and per-agent rate limiter for agent-to-agent messaging
 | Class | Description |
 |-------|-------------|
 | `MessagingGuard` | Combined circuit breaker + per-agent rate limiter |
+| `CircuitOpenError` | Exception thrown when a circuit breaker is OPEN, preventing further calls to a failing agent |
 
 #### MessagingGuard Constructor
 

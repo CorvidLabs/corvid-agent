@@ -117,9 +117,15 @@ function getSchemaTableNames(): Set<string> {
 
 // ─── Export Extraction ───────────────────────────────────────────────────
 
+function stripComments(src: string): string {
+    // Remove single-line comments (// ...) and multi-line comments (/* ... */)
+    // Preserve strings to avoid stripping inside them
+    return src.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
 function getExportedSymbols(filePath: string): string[] {
     if (!existsSync(filePath)) return [];
-    const content = readFileSync(filePath, 'utf-8');
+    const content = stripComments(readFileSync(filePath, 'utf-8'));
     const symbols: string[] = [];
 
     // Match: export function name, export class name, export interface name,
@@ -143,7 +149,12 @@ function getExportedSymbols(filePath: string): string[] {
         // Skip if it's "export type { ... }" — already handled above
         const full = match[0];
         if (full.includes('export type')) continue;
-        const names = match[1].split(',').map((n) => n.trim().split(/\s+as\s+/).pop()!.trim());
+        const names = match[1].split(',').map((n) => {
+            let name = n.trim().split(/\s+as\s+/).pop()!.trim();
+            // Strip inline `type` modifier (e.g. `export { type Foo }`)
+            if (name.startsWith('type ')) name = name.slice(5).trim();
+            return name;
+        });
         symbols.push(...names.filter(Boolean));
     }
 

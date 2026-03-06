@@ -39,6 +39,9 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | Class | Description |
 |-------|-------------|
 | `AlgoChatBridge` | Central orchestrator composing ResponseFormatter, CommandHandler, SubscriptionManager, DiscoveryService |
+| `PSKContactManager` | Manages PSK (pre-shared key) encrypted contacts for agent-to-mobile communication |
+| `PSKDiscoveryPoller` | Polls blockchain for undiscovered PSK contact addresses via trial decryption |
+| `MessageRouter` | Routes incoming messages to appropriate handlers based on source and content |
 
 #### AlgoChatBridge Constructor
 

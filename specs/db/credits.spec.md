@@ -51,6 +51,8 @@ This module must be correct -- bugs mean real money lost. All balance mutations 
 | `getTransactionHistory` | `(db: Database, walletAddress: string, limit?: number)` | `CreditTransaction[]` | Recent transactions, newest first. Default limit 20 |
 | `isFirstTimeWallet` | `(db: Database, walletAddress: string)` | `boolean` | True if wallet has never purchased credits |
 | `maybeGrantFirstTimeCredits` | `(db: Database, walletAddress: string)` | `number` | Grant first-time bonus if eligible. Returns amount granted (0 if not eligible) |
+| `depositUsdc` | `(db: Database, walletAddress: string, amountUsdc: number, txid?: string)` | `void` | Record a USDC deposit and convert to credits |
+| `getUsdcDepositHistory` | `(db: Database, walletAddress: string, limit?: number)` | `UsdcDeposit[]` | Get USDC deposit history for a wallet, newest first |
 
 ## Invariants
 
