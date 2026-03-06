@@ -86,8 +86,11 @@ Server starts at `http://localhost:3000`. See `.env.example` for all configurati
 ANTHROPIC_API_KEY=sk-ant-...          # Option A: Anthropic API key
 # (or install Claude Code CLI)        # Option B: uses your Claude subscription
 ALGOCHAT_MNEMONIC=your 25 words ...   # Optional — on-chain identity & messaging
+ALGORAND_NETWORK=localnet             # Localnet for local agents (default)
 OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
 ```
+
+> **Algorand network topology:** `localnet` is always used for agents on the same machine (requires Docker + `algokit localnet start`). `testnet` and `mainnet` are for communicating with external users or other corvid-agent instances.
 
 ### Optional: Enable Messaging Bridges
 
