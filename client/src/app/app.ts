@@ -11,6 +11,7 @@ import {
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './shared/components/header.component';
 import { SidebarComponent } from './shared/components/sidebar.component';
+import { BreadcrumbComponent } from './shared/components/breadcrumb.component';
 import { ToastContainerComponent } from './shared/components/toast-container.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
@@ -18,7 +19,7 @@ import { SessionService } from './core/services/session.service';
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, HeaderComponent, SidebarComponent, ToastContainerComponent],
+    imports: [RouterOutlet, HeaderComponent, SidebarComponent, BreadcrumbComponent, ToastContainerComponent],
     template: `
         <div class="app-layout">
             <app-header
@@ -32,7 +33,10 @@ import { SessionService } from './core/services/session.service';
             <div class="app-layout__body">
                 <app-sidebar [(sidebarOpen)]="sidebarOpen" />
                 <main class="app-layout__content" role="main">
-                    <router-outlet />
+                    <app-breadcrumb />
+                    <div class="app-layout__page page-enter">
+                        <router-outlet />
+                    </div>
                 </main>
             </div>
         </div>
@@ -53,10 +57,15 @@ import { SessionService } from './core/services/session.service';
         }
         .app-layout__content {
             flex: 1;
-            overflow-y: auto;
             min-height: 0;
             position: relative;
             background: var(--bg-deep);
+            display: flex;
+            flex-direction: column;
+        }
+        .app-layout__page {
+            flex: 1;
+            overflow-y: auto;
         }
         .app-layout__banner {
             padding: 0.375rem 1rem;
