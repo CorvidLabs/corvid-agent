@@ -48,6 +48,13 @@ File-based database migration system for managing SQLite schema evolution. Migra
 | `bun run migrate down --to <ver>` | Revert migrations down to a specific version |
 | `bun run migrate status` | Display all migrations with applied/pending status |
 
+### Exported Functions (migrate-create.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Template up-migration function (placeholder for scaffolded migrations) |
+| `down` | `(db: Database)` | `void` | Template down-migration function (placeholder for scaffolded migrations) |
+
 ### CLI Script (migrate-create.ts)
 
 | Command | Description |

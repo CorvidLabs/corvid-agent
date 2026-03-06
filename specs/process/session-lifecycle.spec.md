@@ -31,6 +31,8 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 | `isProtectedPath` | `filePath: string` | `boolean` | Returns `true` if the given file path matches a protected basename or contains a protected substring. Normalizes backslashes for cross-platform support. |
 | `extractFilePathsFromInput` | `input: Record<string, unknown>` | `string[]` | Extracts file paths from tool input objects, supporting `file_path` (Write/Edit) and `files` array (MultiEdit) patterns. |
 | `isProtectedBashCommand` | `command: string` | `ProtectedBashResult` | Analyzes a bash command for protected-path violations using quote-aware tokenization. Blocks commands that target protected paths or combine dangerous patterns with write operators. |
+| `isBlockedByGovernance` | `filePaths: string[]` | `AutomationCheckResult` | Checks if any file paths are blocked by governance policy |
+| `getGovernanceTier` | `filePath: string` | `GovernanceTier` | Classifies a file path into a governance tier (unrestricted, critical, protected) |
 
 ### Exported Types
 
@@ -39,6 +41,8 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 | `SessionLifecycleConfig` | Configuration interface: `sessionTtlMs` (default 7 days), `cleanupIntervalMs` (default 1 hour), `maxSessionsPerProject` (default 100). |
 | `SessionCleanupStats` | Cleanup result stats: `expiredSessions`, `orphanedProcesses`, `staleSubscriptions`, `memoryFreedMB`. |
 | `ProtectedBashResult` | Result of bash command analysis: `blocked: boolean`, optional `path` and `reason`. |
+| `GovernanceTier` | Union: `'unrestricted' \| 'critical' \| 'protected'` — governance classification for file paths |
+| `AutomationCheckResult` | Result of governance check: `blocked: boolean`, optional `paths` and `reason` fields |
 
 ### Exported Constants
 

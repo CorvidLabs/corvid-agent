@@ -132,6 +132,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `CreateSkillBundleSchema` | Skill Bundles | Validates skill bundle creation: `name` (required), optional `description`, `tools` (max 50), `promptAdditions`. |
 | `UpdateSkillBundleSchema` | Skill Bundles | Validates skill bundle update. All fields optional. |
 | `AssignSkillBundleSchema` | Skill Bundles | Validates skill bundle assignment: `bundleId` (required), optional `sortOrder`. |
+| `AddRepoBlocklistSchema` | Repo Blocklist | Validates repo blocklist add: `repo` (required, `owner/name` format). |
 | `CreateMcpServerConfigSchema` | MCP Server Configs | Validates MCP server config creation: `name`, `command` (required), optional `agentId`, `args`, `envVars`, `cwd`, `enabled`. |
 | `UpdateMcpServerConfigSchema` | MCP Server Configs | Validates MCP server config update. All fields optional. |
 | `SendA2ATaskSchema` | A2A | Validates A2A task: `message` required at top-level or inside `params`. |

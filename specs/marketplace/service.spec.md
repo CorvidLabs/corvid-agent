@@ -25,6 +25,7 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | Class | Description |
 |-------|-------------|
 | `MarketplaceService` | Listing CRUD, search, and review management |
+| `VerificationGateError` | Exception thrown when marketplace listing verification gate check fails |
 
 #### MarketplaceService Methods
 

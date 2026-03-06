@@ -55,6 +55,8 @@ Unified HTTP route dispatch layer for the CorvidAgent server. The central `handl
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleRequest` | `(req, db, processManager, algochatBridge, ...services)` | `Promise<Response \| null>` | Main entry point — pipeline of CORS, rate limit, auth, route dispatch |
+| `resetAuthConfigForTest` | `()` | `void` | Reset cached auth config (test-only) |
+| `initRateLimiterDb` | `(db: Database)` | `void` | Initialize rate limiter with a database handle |
 
 ### Exported Types (index.ts)
 
@@ -63,15 +65,82 @@ Unified HTTP route dispatch layer for the CorvidAgent server. The central `handl
 | `RouteServices` | Interface bundling all injectable service dependencies for route handlers |
 | `NetworkSwitchFn` | `(network: 'testnet' \| 'mainnet') => Promise<void>` — callback for AlgoChat network switching |
 
-### Route Handler Pattern
+### Route Handler Functions
 
-Each route module exports a function with the signature:
+Each route module exports a handler function with the signature `(req, url, db, ...deps) => Response | null`. Handlers return `Response` for matched routes or `null` to pass to the next handler.
 
-```typescript
-function handleXxxRoutes(req: Request, url: URL, db: Database, ...deps): Response | null
-```
+| Function | Source File | Description |
+|----------|------------|-------------|
+| `handleProjectRoutes` | projects.ts | Project CRUD and directory browsing |
+| `handleAgentRoutes` | agents.ts | Agent CRUD, balance, invocation |
+| `handleSessionRoutes` | sessions.ts | Session CRUD, messages, start/stop |
+| `handleCouncilRoutes` | councils.ts | Council CRUD, launch, deliberation |
+| `handleWorkTaskRoutes` | work-tasks.ts | Work task CRUD and cancellation |
+| `handleMcpApiRoutes` | mcp-api.ts | Agent-to-agent MCP messaging |
+| `handleAllowlistRoutes` | allowlist.ts | Address allowlist management |
+| `handleAnalyticsRoutes` | analytics.ts | Overview, spending, session stats |
+| `handleSystemLogRoutes` | system-logs.ts | System logs and credit transactions |
+| `handleSettingsRoutes` | settings.ts | Settings, credits config, API key |
+| `handleScheduleRoutes` | schedules.ts | Schedule CRUD, executions, triggers |
+| `handleWebhookRoutes` | webhooks.ts | Webhook registration and deliveries |
+| `handleMentionPollingRoutes` | mention-polling.ts | Mention polling config and stats |
+| `handleWorkflowRoutes` | workflows.ts | Workflow CRUD, runs, actions |
+| `handleSandboxRoutes` | sandbox.ts | Sandbox pool and policy management |
+| `handleMarketplaceRoutes` | marketplace.ts | Marketplace listings and federation |
+| `handleReputationRoutes` | reputation.ts | Reputation scores, events, attestations |
+| `handleBillingRoutes` | billing.ts | Billing subscriptions and usage |
+| `handleAuthFlowRoutes` | auth-flow.ts | Device authorization flow |
+| `handleA2ARoutes` | a2a.ts | Agent-to-agent task protocol |
+| `handlePluginRoutes` | plugins.ts | Plugin load/unload/capabilities |
+| `handlePersonaRoutes` | personas.ts | Agent persona CRUD |
+| `handleSkillBundleRoutes` | skill-bundles.ts | Skill bundle CRUD and assignment |
+| `handleMcpServerRoutes` | mcp-servers.ts | MCP server config management |
+| `handleExamRoutes` | exam.ts | Live model exams |
+| `handleOllamaRoutes` | ollama.ts | Ollama model management |
+| `handleAuditRoutes` | audit.ts | Immutable audit log queries |
+| `handleGitHubAllowlistRoutes` | github-allowlist.ts | GitHub username allowlist |
+| `handlePerformanceRoutes` | performance.ts | Performance metrics and reports |
+| `handleSlackRoutes` | slack.ts | Slack events API handler |
+| `handleTenantRoutes` | tenants.ts | Tenant registration and members |
+| `handleUsageRoutes` | usage.ts | Usage summaries and anomalies |
 
-Handlers return `Response` for matched routes or `null` to pass to the next handler. Some handlers are `async` (sessions, settings, billing, a2a, exam).
+### Exported Functions (projects.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `getAllowedRoots` | `()` | `string[]` | Get list of allowed directory roots for browsing |
+| `isPathAllowed` | `(path: string)` | `boolean` | Check if a path is within allowed roots |
+| `handleBrowseDirs` | `(req, url, db)` | `Promise<Response \| null>` | Handle directory browsing requests |
+
+### Exported Functions (councils.ts re-exports)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `launchCouncil` | `(db, council, prompt, options)` | `Promise<LaunchCouncilResult>` | Launch a council deliberation session |
+| `waitForSessions` | `(db, launchId, sessionIds, options)` | `Promise<WaitForSessionsResult>` | Wait for all council sessions to complete |
+| `onCouncilStageChange` | `(launchId, stage, callback)` | `void` | Subscribe to council stage transitions |
+| `onCouncilLog` | `(launchId, callback)` | `void` | Subscribe to council log events |
+| `onCouncilDiscussionMessage` | `(launchId, callback)` | `void` | Subscribe to council discussion messages |
+
+### Exported Types (councils.ts re-exports)
+
+| Type | Description |
+|------|-------------|
+| `LaunchCouncilResult` | Result of launching a council deliberation |
+| `WaitForSessionsResult` | Result of waiting for council sessions |
+
+### Exported Types (mcp-api.ts)
+
+| Type | Description |
+|------|-------------|
+| `McpApiDeps` | Interface for MCP API route dependencies (bridge, messenger, etc.) |
+
+### Exported Functions (webhooks.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleGitHubWebhook` | `(req, db, services)` | `Promise<Response>` | Process incoming GitHub webhook payloads (HMAC validated) |
+| `_resetRepoRateMap` | `()` | `void` | Reset webhook per-repo rate map (test-only) |
 
 ## Request Pipeline
 

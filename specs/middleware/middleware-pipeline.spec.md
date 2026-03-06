@@ -43,6 +43,10 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 | `roleGuard` | `(...allowedRoles: string[])` | `Guard` | Guard that checks role inclusion |
 | `rateLimitGuard` | `(limiter: RateLimiter)` | `Guard` | Guard version of global rate limit |
 | `endpointRateLimitGuard` | `(limiter: EndpointRateLimiter)` | `Guard` | Guard version of endpoint rate limit |
+| `contentLengthGuard` | `(maxBytes?: number)` | `Guard` | Guard that enforces maximum request body size (default 1MB) |
+| `tenantGuard` | `(db: Database, tenantService: TenantService \| null)` | `Guard` | Guard that extracts and validates tenant ID from request |
+| `tenantRoleGuard` | `(...roles: TenantRole[])` | `Guard` | Guard that checks tenant member role inclusion |
+| `dashboardAuthGuard` | `(bindHost: string)` | `Guard` | Guard that enforces dashboard-specific authentication for non-localhost |
 | `applyGuards` | `(req: Request, url: URL, context: RequestContext, ...guards: Guard[])` | `Response \| null` | Runs guards sequentially; returns first non-null response or null |
 | `createRequestContext` | `(walletAddress?: string)` | `RequestContext` | Creates a fresh RequestContext with `authenticated: false` |
 | `requiresAdminRole` | `(pathname: string)` | `boolean` | Returns true if the pathname requires the admin role |

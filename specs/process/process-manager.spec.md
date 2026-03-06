@@ -29,12 +29,25 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | Type | Description |
 |------|-------------|
 | `EventCallback` | `(sessionId: string, event: ClaudeStreamEvent) => void` — re-exported from `./interfaces` |
+| `McpServices` | Interface for registering all MCP-related services (from mcp-service-container.ts) |
+| `BuildContextOptions` | Options for building MCP tool context (from mcp-service-container.ts) |
+| `SessionPrompts` | Resolved persona + skill prompts for a session (from session-config-resolver.ts) |
+| `ResolvedSessionConfig` | Complete resolved configuration for a session (from session-config-resolver.ts) |
 
 ### Exported Classes
 
 | Class | Description |
 |-------|-------------|
 | `ProcessManager` | Session lifecycle orchestrator |
+| `McpServiceContainer` | Manages MCP service registration and tool context building (from mcp-service-container.ts) |
+
+### Exported Functions (from session-config-resolver.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `resolveSessionPrompts` | `(db, agent, projectId)` | `SessionPrompts` | Resolve persona and skill prompts for a session |
+| `resolveToolPermissions` | `(db, agentId, projectId)` | `string[] \| null` | Resolve merged tool permissions from agent and project skill bundles |
+| `resolveSessionConfig` | `(db, agent, agentId, projectId)` | `ResolvedSessionConfig` | Resolve complete session config (prompts + tools + MCP servers) |
 
 #### ProcessManager Constructor
 

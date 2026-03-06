@@ -31,6 +31,21 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 |----------|-----------|---------|-------------|
 | `createWebSocketHandler` | `(processManager, getBridge, authConfig, getMessenger?, getWorkTaskService?, getSchedulerService?, getOwnerQuestionManager?)` | `{ open, message, close }` | Factory returning Bun WebSocket handler callbacks |
 | `broadcastAlgoChatMessage` | `(server, participant, content, direction)` | `void` | Publish an AlgoChat message to all WebSocket clients subscribed to the `algochat` topic |
+| `tenantTopic` | `(base: string, tenantId?: string)` | `string` | Build tenant-scoped topic string for pub/sub routing |
+
+### Exported Types (from shared/ws-protocol.ts)
+
+| Type | Description |
+|------|-------------|
+| `ClientMessage` | Union type of all client-to-server WebSocket message shapes |
+| `ServerMessage` | Union type of all server-to-client WebSocket message shapes |
+| `StreamEvent` | Session stream event payload forwarded via WebSocket |
+
+### Exported Functions (from shared/ws-protocol.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `isClientMessage` | `(data: unknown)` | `data is ClientMessage` | Type guard for validating incoming WebSocket messages |
 
 ### Exported Constants
 

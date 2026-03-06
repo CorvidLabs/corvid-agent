@@ -27,6 +27,11 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 | `buildCorsHeaders` | `(req: Request, config: AuthConfig)` | `Record<string, string>` | Builds CORS headers with origin reflection |
 | `applyCors` | `(response: Response, req: Request, config: AuthConfig)` | `void` | Sets CORS headers on an existing Response |
 | `timingSafeEqual` | `(a: string, b: string)` | `boolean` | Constant-time string comparison |
+| `rotateApiKey` | `(config: AuthConfig)` | `{ newKey: string }` | Generate and apply a new API key, updating config in-place |
+| `getApiKeyRotationStatus` | `(config: AuthConfig)` | `{ lastRotated, age, ... }` | Get rotation status including age and rotation history |
+| `setApiKeyExpiry` | `(config: AuthConfig, ttlMs: number)` | `void` | Set expiry TTL on the current API key |
+| `isApiKeyExpired` | `(config: AuthConfig)` | `boolean` | Check if the current API key has expired |
+| `getApiKeyExpiryWarning` | `(config: AuthConfig)` | `string \| null` | Get warning message if key is near expiry, null otherwise |
 
 ### Exported Types
 

@@ -22,6 +22,7 @@ Sliding-window per-IP HTTP rate limiter. Separates traffic into two buckets — 
 |----------|-----------|---------|-------------|
 | `loadRateLimitConfig` | `()` | `RateLimitConfig` | Reads `RATE_LIMIT_GET` and `RATE_LIMIT_MUTATION` from env; falls back to defaults |
 | `checkRateLimit` | `(req: Request, url: URL, limiter: RateLimiter)` | `Response \| null` | Top-level check — exempts specific paths, extracts client IP, delegates to `RateLimiter.check` |
+| `getClientIp` | `(req: Request)` | `string` | Extract client IP from `X-Forwarded-For` (first entry) → `X-Real-IP` → `'unknown'` |
 
 ### Exported Types
 

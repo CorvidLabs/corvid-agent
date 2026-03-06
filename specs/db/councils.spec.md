@@ -43,6 +43,12 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | `updateCouncilLaunchDiscussionRound` | `db: Database, launchId: string, round: number, totalRounds?: number` | `void` | Update the current discussion round (and optionally total rounds) on a launch |
 | `updateDiscussionMessageTxid` | `db: Database, messageId: number, txid: string` | `void` | Set the on-chain transaction ID for a discussion message |
 | `updateCouncilLaunchChatSession` | `db: Database, launchId: string, chatSessionId: string` | `void` | Associate a follow-up chat session with a completed launch |
+| `createGovernanceVote` | `db: Database, params: { launchId, totalVoters }, tenantId?` | `GovernanceVote` | Create a new governance vote for a council launch |
+| `getGovernanceVote` | `db: Database, launchId: string` | `GovernanceVote \| null` | Retrieve a governance vote by launch ID |
+| `castGovernanceMemberVote` | `db: Database, params: { launchId, memberAgentId, voteChoice }, tenantId?` | `void` | Record a member's vote on a proposal |
+| `getGovernanceMemberVotes` | `db: Database, launchId: string` | `GovernanceMemberVote[]` | Get all member votes for a governance vote |
+| `updateGovernanceVoteStatus` | `db: Database, launchId: string, status` | `void` | Update the governance vote status (open/closed/approved/rejected) |
+| `approveGovernanceVoteHuman` | `db: Database, launchId: string, approved: boolean` | `void` | Record human approval/denial of a governance vote |
 
 ### Exported Types
 

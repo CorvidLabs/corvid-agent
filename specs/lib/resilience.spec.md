@@ -60,7 +60,8 @@ Provides fault-tolerance primitives (exponential-backoff retry and circuit break
 | `recordSuccess` | _(none)_ | `void` | Manually records a successful operation. In HALF_OPEN, increments success count toward closing. In CLOSED, resets failure count. |
 | `recordFailure` | _(none)_ | `void` | Manually records a failed operation. Increments failure count. In HALF_OPEN, immediately re-opens. In CLOSED, opens when threshold reached. |
 
-#### shutdown-coordinator.ts
+### Exported Classes (shutdown-coordinator.ts)
+
 | Class | Description |
 |-------|-------------|
 | `ShutdownCoordinator` | Centralized graceful shutdown with priority-ordered phases. Services register cleanup handlers; on shutdown, handlers execute in priority order with per-handler timeouts and error isolation. |
