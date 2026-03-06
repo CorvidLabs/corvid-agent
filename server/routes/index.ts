@@ -58,6 +58,7 @@ import { RateLimiter, loadRateLimitConfig } from '../middleware/rate-limit';
 import { EndpointRateLimiter, loadEndpointRateLimitConfig } from '../middleware/endpoint-rate-limit';
 import {
     authGuard,
+    dashboardAuthGuard,
     roleGuard,
     rateLimitGuard,
     endpointRateLimitGuard,
@@ -209,6 +210,11 @@ export async function handleRequest(
         tenantGuard(db, tenantService ?? null),
         endpointRateLimitGuard(endpointRateLimiter),
     ];
+
+    // Dashboard-specific auth: requires DASHBOARD_API_KEY on non-localhost
+    if (url.pathname.startsWith('/api/dashboard')) {
+        guards.push(dashboardAuthGuard(config.bindHost));
+    }
 
     // Apply admin role guard for sensitive endpoints
     if (requiresAdminRole(url.pathname)) {

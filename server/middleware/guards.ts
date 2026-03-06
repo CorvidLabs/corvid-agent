@@ -4,7 +4,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { AuthConfig } from './auth';
-import { checkHttpAuth } from './auth';
+import { checkHttpAuth, timingSafeEqual } from './auth';
 import type { RateLimiter } from './rate-limit';
 import { getClientIp } from './rate-limit';
 import type { EndpointRateLimiter, RateLimitResult } from './endpoint-rate-limit';
@@ -208,6 +208,65 @@ export function tenantRoleGuard(...roles: TenantRole[]): Guard {
                 headers: { 'Content-Type': 'application/json' },
             });
         }
+        return null;
+    };
+}
+
+/**
+ * Dashboard auth guard — requires DASHBOARD_API_KEY for /api/dashboard/* routes.
+ * Bypassed when BIND_HOST is localhost (127.0.0.1, ::1, localhost).
+ * When the general API_KEY is set and the request already passed authGuard,
+ * this guard is satisfied (defense-in-depth: dashboard is still protected).
+ */
+export function dashboardAuthGuard(bindHost: string): Guard {
+    const dashboardApiKey = process.env.DASHBOARD_API_KEY?.trim() || null;
+    const isLocalhost = bindHost === '127.0.0.1' || bindHost === 'localhost' || bindHost === '::1';
+
+    return (req: Request, url: URL, context: RequestContext): Response | null => {
+        // Only apply to dashboard paths
+        if (!url.pathname.startsWith('/api/dashboard')) return null;
+
+        // Bypass on localhost
+        if (isLocalhost) return null;
+
+        // If already authenticated via general API_KEY, allow through
+        if (context.authenticated) return null;
+
+        // No DASHBOARD_API_KEY configured and not authenticated — block
+        if (!dashboardApiKey) {
+            return new Response(JSON.stringify({ error: 'Dashboard authentication required. Set DASHBOARD_API_KEY or API_KEY.' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+            });
+        }
+
+        // Check bearer token
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: 'Dashboard authentication required' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+            });
+        }
+
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (!match) {
+            return new Response(JSON.stringify({ error: 'Invalid Authorization header format. Expected: Bearer <key>' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+            });
+        }
+
+        if (!timingSafeEqual(match[1], dashboardApiKey)) {
+            log.warn('Rejected dashboard request with invalid DASHBOARD_API_KEY', { path: url.pathname });
+            return new Response(JSON.stringify({ error: 'Invalid dashboard API key' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Dashboard key is valid — mark as authenticated
+        context.authenticated = true;
         return null;
     };
 }
