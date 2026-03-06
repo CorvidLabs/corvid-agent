@@ -17,7 +17,7 @@ test.describe('Councils', () => {
         await expect(page.locator('h2')).toBeVisible({ timeout: 10_000 });
         // Wait for either council cards or empty state to render
         await expect(
-            page.locator('.council-card, .empty, .empty-state').first()
+            page.locator('.council-card, .empty-state').first()
         ).toBeVisible({ timeout: 10_000 });
     });
 
@@ -30,7 +30,7 @@ test.describe('Councils', () => {
         await expect(page.locator('h2')).toHaveText('New Council');
 
         // Fill form
-        await page.locator('#name').fill('My Test Council');
+        await page.locator('#name').fill('Integration Council');
         await page.locator('#description').fill('A council for testing');
 
         // Select agents via checkboxes
@@ -42,11 +42,11 @@ test.describe('Councils', () => {
 
         // Should redirect to council detail
         await page.waitForURL(/\/councils\//);
-        await expect(page.locator('h2')).toHaveText('My Test Council');
+        await expect(page.locator('h2')).toHaveText('Integration Council');
 
         // Navigate to list and verify
         await gotoWithRetry(page, '/councils');
-        await expect(page.locator('text=My Test Council').first()).toBeVisible();
+        await expect(page.locator('text=Integration Council').first()).toBeVisible();
     });
 
     test('council detail shows members and launch form', async ({ page, api }) => {
