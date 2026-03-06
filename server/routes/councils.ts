@@ -203,7 +203,10 @@ async function handleLaunch(
     try {
         const data = await parseBodyOrThrow(req, LaunchCouncilSchema);
 
-        const result = launchCouncil(db, processManager, councilId, data.projectId, data.prompt, agentMessenger);
+        const result = launchCouncil(db, processManager, councilId, data.projectId, data.prompt, agentMessenger, {
+            voteType: data.voteType,
+            affectedPaths: data.affectedPaths,
+        });
         return json(result, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);

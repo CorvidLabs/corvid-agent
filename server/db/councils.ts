@@ -38,6 +38,8 @@ interface CouncilLaunchRow {
     current_discussion_round: number;
     total_discussion_rounds: number;
     chat_session_id: string | null;
+    vote_type: string;
+    governance_tier: number | null;
     created_at: string;
 }
 
@@ -66,6 +68,8 @@ function rowToLaunch(row: CouncilLaunchRow, sessionIds: string[]): CouncilLaunch
         currentDiscussionRound: row.current_discussion_round ?? 0,
         totalDiscussionRounds: row.total_discussion_rounds ?? 0,
         chatSessionId: row.chat_session_id ?? null,
+        voteType: (row.vote_type as CouncilLaunch['voteType']) ?? 'standard',
+        governanceTier: row.governance_tier ?? null,
         createdAt: row.created_at,
     };
 }
@@ -173,13 +177,28 @@ export function deleteCouncil(db: Database, id: string, tenantId: string = DEFAU
 
 export function createCouncilLaunch(
     db: Database,
-    params: { id: string; councilId: string; projectId: string; prompt: string },
+    params: {
+        id: string;
+        councilId: string;
+        projectId: string;
+        prompt: string;
+        voteType?: string;
+        governanceTier?: number | null;
+    },
     tenantId: string = DEFAULT_TENANT_ID,
 ): CouncilLaunchRow {
     db.query(
-        `INSERT INTO council_launches (id, council_id, project_id, prompt, tenant_id)
-         VALUES (?, ?, ?, ?, ?)`
-    ).run(params.id, params.councilId, params.projectId, params.prompt, tenantId);
+        `INSERT INTO council_launches (id, council_id, project_id, prompt, vote_type, governance_tier, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+        params.id,
+        params.councilId,
+        params.projectId,
+        params.prompt,
+        params.voteType ?? 'standard',
+        params.governanceTier ?? null,
+        tenantId,
+    );
 
     return db.query('SELECT * FROM council_launches WHERE id = ?').get(params.id) as CouncilLaunchRow;
 }
@@ -373,4 +392,119 @@ export function updateCouncilLaunchChatSession(
     chatSessionId: string,
 ): void {
     db.query('UPDATE council_launches SET chat_session_id = ? WHERE id = ?').run(chatSessionId, launchId);
+}
+
+// MARK: - Governance Votes
+
+interface GovernanceVoteRow {
+    id: number;
+    launch_id: string;
+    governance_tier: number;
+    affected_paths: string;
+    status: string;
+    human_approved: number;
+    human_approved_by: string | null;
+    human_approved_at: string | null;
+    tenant_id: string;
+    created_at: string;
+    resolved_at: string | null;
+}
+
+interface GovernanceMemberVoteRow {
+    id: number;
+    governance_vote_id: number;
+    agent_id: string;
+    vote: string;
+    reason: string;
+    created_at: string;
+}
+
+export function createGovernanceVote(
+    db: Database,
+    params: {
+        launchId: string;
+        governanceTier: number;
+        affectedPaths: string[];
+        tenantId?: string;
+    },
+): GovernanceVoteRow {
+    const result = db.query(`
+        INSERT INTO governance_votes (launch_id, governance_tier, affected_paths, tenant_id)
+        VALUES (?, ?, ?, ?)
+    `).run(
+        params.launchId,
+        params.governanceTier,
+        JSON.stringify(params.affectedPaths),
+        params.tenantId ?? DEFAULT_TENANT_ID,
+    );
+
+    return db.query('SELECT * FROM governance_votes WHERE id = ?')
+        .get(result.lastInsertRowid) as GovernanceVoteRow;
+}
+
+export function getGovernanceVote(db: Database, launchId: string): GovernanceVoteRow | null {
+    return db.query('SELECT * FROM governance_votes WHERE launch_id = ?')
+        .get(launchId) as GovernanceVoteRow | null;
+}
+
+export function castGovernanceMemberVote(
+    db: Database,
+    params: {
+        governanceVoteId: number;
+        agentId: string;
+        vote: 'approve' | 'reject' | 'abstain';
+        reason?: string;
+    },
+): GovernanceMemberVoteRow {
+    const result = db.query(`
+        INSERT INTO governance_member_votes (governance_vote_id, agent_id, vote, reason)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(governance_vote_id, agent_id) DO UPDATE SET
+            vote = excluded.vote,
+            reason = excluded.reason,
+            created_at = datetime('now')
+    `).run(
+        params.governanceVoteId,
+        params.agentId,
+        params.vote,
+        params.reason ?? '',
+    );
+
+    return db.query('SELECT * FROM governance_member_votes WHERE id = ?')
+        .get(result.lastInsertRowid) as GovernanceMemberVoteRow;
+}
+
+export function getGovernanceMemberVotes(
+    db: Database,
+    governanceVoteId: number,
+): GovernanceMemberVoteRow[] {
+    return db.query('SELECT * FROM governance_member_votes WHERE governance_vote_id = ? ORDER BY created_at ASC')
+        .all(governanceVoteId) as GovernanceMemberVoteRow[];
+}
+
+export function updateGovernanceVoteStatus(
+    db: Database,
+    voteId: number,
+    status: string,
+    resolvedAt?: string,
+): void {
+    if (resolvedAt) {
+        db.query('UPDATE governance_votes SET status = ?, resolved_at = ? WHERE id = ?')
+            .run(status, resolvedAt, voteId);
+    } else {
+        db.query('UPDATE governance_votes SET status = ? WHERE id = ?')
+            .run(status, voteId);
+    }
+}
+
+export function approveGovernanceVoteHuman(
+    db: Database,
+    voteId: number,
+    approvedBy: string,
+): void {
+    db.query(`
+        UPDATE governance_votes
+        SET human_approved = 1, human_approved_by = ?, human_approved_at = datetime('now')
+        WHERE id = ?
+    `).run(approvedBy, voteId);
 }
