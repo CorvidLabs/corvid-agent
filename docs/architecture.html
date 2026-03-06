@@ -17,9 +17,10 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a href="#main-content" class="skip-nav">Skip to main content</a>
 
   <!-- ═══════════════════ NAV ═══════════════════ -->
-  <nav class="nav">
+  <nav class="nav" aria-label="Main navigation">
     <div class="container nav__inner">
       <a href="index.html" class="nav__brand">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
@@ -27,7 +28,7 @@
       <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
       <div class="nav__links" id="nav-links">
         <a href="getting-started.html" class="nav__link">Start</a>
-        <a href="architecture.html" class="nav__link nav__link--active">API</a>
+        <a href="architecture.html" class="nav__link nav__link--active" aria-current="page">API</a>
         <a href="algochat.html" class="nav__link">AlgoChat</a>
         <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
         <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
@@ -37,6 +38,7 @@
     </div>
   </nav>
 
+  <main id="main-content">
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="page-hero">
     <div class="container">
@@ -1983,6 +1985,8 @@
       </div>
     </div>
   </section>
+
+  </main>
 
   <!-- ═══════════════════ FOOTER ═══════════════════ -->
   <footer class="footer">

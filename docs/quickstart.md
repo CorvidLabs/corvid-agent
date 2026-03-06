@@ -165,11 +165,12 @@ Give your agent a verifiable identity on Algorand:
 
 ```bash
 ALGOCHAT_MNEMONIC=your 25 word mnemonic here
-ALGOCHAT_NODE_URL=https://testnet-api.4160.nodely.dev
-ALGOCHAT_INDEXER_URL=https://testnet-idx.4160.nodely.dev
+ALGORAND_NETWORK=localnet   # localnet for local dev (free, instant)
 ```
 
-See [testnet-onboarding.md](testnet-onboarding.md) for the full setup.
+For local development, start Algorand localnet first: `algokit localnet start` (requires Docker).
+
+See [testnet-onboarding.md](testnet-onboarding.md) for multi-machine / testnet setup.
 
 ### Use the CLI
 

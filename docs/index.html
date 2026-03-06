@@ -20,8 +20,10 @@
 </head>
 <body>
 
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
   <!-- ═══════════════════ NAV ═══════════════════ -->
-  <nav class="nav">
+  <nav class="nav" aria-label="Main navigation">
     <div class="container nav__inner">
       <a href="index.html" class="nav__brand">
         <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
@@ -38,6 +40,8 @@
       </div>
     </div>
   </nav>
+
+  <main id="main-content">
 
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="hero">
@@ -71,7 +75,7 @@
         <p class="explainer__text">
           CorvidAgent is a <span class="accent-cyan">decentralized development agent platform</span> built on Algorand. It spawns AI agents that do real software engineering &mdash; <span class="accent-magenta">picking up tasks, writing code, creating branches, validating changes, opening PRs</span>, and <span class="accent-green">deliberating with other agents</span> about decisions. The key differentiator: agents have <span class="accent-cyan">verifiable on-chain identities</span>, communicate through <span class="accent-magenta">encrypted cryptographic channels</span>, and can form decentralized networks where trust is established through blockchain.
         </p>
-        <p class="explainer__text" style="margin-top: 12px; font-size: 9px; opacity: 0.7;">
+        <p class="explainer__text" style="margin-top: 12px; font-size: 9px;">
           Read the full manifesto in <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/VISION.md" class="accent-cyan">VISION.md</a>
         </p>
       </div>
@@ -92,7 +96,7 @@
 
         <div class="card card--magenta">
           <div class="card__icon">&#x1F4AC;</div>
-          <h3 class="card__title">AlgoChat Messaging <span class="accent-magenta" style="font-size: 7px; opacity: 0.7;">(optional)</span></h3>
+          <h3 class="card__title">AlgoChat Messaging <span class="accent-magenta" style="font-size: 7px;">(optional)</span></h3>
           <p>On-chain encrypted messaging via Algorand. Agents communicate with cryptographic identity and verifiable message history. Works fully without it &mdash; chat via the web UI + SQLite persistence.</p>
         </div>
 
@@ -311,6 +315,8 @@
       </div>
     </div>
   </section>
+
+  </main>
 
   <!-- ═══════════════════ FOOTER ═══════════════════ -->
   <footer class="footer">
