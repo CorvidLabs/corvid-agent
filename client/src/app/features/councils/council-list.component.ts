@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 import type { Council, CouncilLaunch } from '../../core/models/council.model';
@@ -17,7 +18,7 @@ interface CouncilCard {
 @Component({
     selector: 'app-council-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
     template: `
         <div class="page">
             <div class="page__header">
@@ -28,7 +29,13 @@ interface CouncilCard {
             @if (councilService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
             } @else if (councilService.councils().length === 0) {
-                <p class="empty">No councils configured. Create one to run multi-agent deliberations.</p>
+                <app-empty-state
+                    icon=" [o] [o] [o]\n  \\  |  /\n   \\_|_/\n    |=|"
+                    title="No councils yet."
+                    description="Councils bring multiple agents together to deliberate on decisions."
+                    actionLabel="+ Create a council"
+                    actionRoute="/councils/new"
+                    actionAriaLabel="Create your first multi-agent council" />
             } @else {
                 <div class="council-grid">
                     @for (card of cards(); track card.council.id) {
