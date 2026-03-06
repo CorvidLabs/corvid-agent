@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, ElementRef, viewChild, AfterViewChecked, computed, booleanAttribute } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, ElementRef, viewChild, AfterViewChecked, computed, booleanAttribute, signal, OnDestroy, NgZone, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import type { StreamEvent } from '../../core/models/ws-message.model';
 import type { SessionMessage } from '../../core/models/session.model';
@@ -16,13 +16,15 @@ interface ParsedEvent {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [DatePipe],
     template: `
-        <div class="terminal" #outputContainer role="log" aria-live="polite" aria-label="Session output">
+        <div class="terminal" #outputContainer role="log" aria-live="polite" aria-label="Session output"
+             (scroll)="onScroll()">
             @for (msg of messages(); track msg.id) {
-                <div class="line" [class]="'line--' + msg.role">
+                <div class="line" [class]="'line--' + msg.role" [title]="msg.timestamp | date:'yyyy-MM-dd HH:mm:ss'">
                     <span class="prompt">{{ msg.role === 'user' ? '>' : msg.role === 'assistant' ? '<' : '#' }}</span>
                     <span class="label">{{ msg.role === 'assistant' ? agentName() : msg.role }}</span>
                     <span class="time">{{ msg.timestamp | date:'HH:mm:ss' }}</span>
                     <pre class="text">{{ msg.content }}</pre>
+                    <button class="copy-btn" (click)="onCopyMessage(msg.content)" [title]="'Copy message'" aria-label="Copy message">⎘</button>
                 </div>
             }
 
@@ -34,7 +36,7 @@ interface ParsedEvent {
             @for (evt of visibleEvents(); track $index) {
                 @if (evt.kind === 'tool_group') {
                     <details class="tool-group" [attr.open]="isRunning() ? '' : null">
-                        <summary class="tool-group-summary">
+                        <summary class="tool-group-summary" [title]="evt.timestamp ?? ''">
                             <span class="prompt tool-group-icon" [class.spinning]="isRunning()">{{ isRunning() ? '⟳' : '⤶' }}</span>
                             <span class="label tool-group-label">tools</span>
                             <span class="meta">{{ evt.meta }} · {{ evt.content }}</span>
@@ -55,11 +57,13 @@ interface ParsedEvent {
                                                 <summary class="tool-summary">{{ child.meta ?? 'output' }}</summary>
                                                 <pre class="text text--result">{{ child.content }}</pre>
                                             </details>
+                                            <button class="copy-btn" (click)="onCopyMessage(child.content)" title="Copy result" aria-label="Copy result">⎘</button>
                                         }
                                         @case ('error') {
                                             <span class="prompt">!</span>
                                             <span class="label error-label">error</span>
                                             <pre class="text text--error">{{ child.content }}</pre>
+                                            <button class="copy-btn" (click)="onCopyMessage(child.content)" title="Copy error" aria-label="Copy error">⎘</button>
                                         }
                                     }
                                 </div>
@@ -67,17 +71,19 @@ interface ParsedEvent {
                         </div>
                     </details>
                 } @else {
-                    <div class="line" [class]="'line--' + evt.kind">
+                    <div class="line" [class]="'line--' + evt.kind" [title]="evt.timestamp ?? ''">
                         @switch (evt.kind) {
                             @case ('assistant') {
                                 <span class="prompt">&lt;</span>
                                 <span class="label">{{ agentName() }}</span>
                                 <pre class="text">{{ evt.content }}</pre>
+                                <button class="copy-btn" (click)="onCopyMessage(evt.content)" title="Copy message" aria-label="Copy message">⎘</button>
                             }
                             @case ('user') {
                                 <span class="prompt">&gt;</span>
                                 <span class="label">user</span>
                                 <pre class="text">{{ evt.content }}</pre>
+                                <button class="copy-btn" (click)="onCopyMessage(evt.content)" title="Copy message" aria-label="Copy message">⎘</button>
                             }
                             @case ('tool_use') {
                                 <span class="prompt">$</span>
@@ -101,6 +107,7 @@ interface ParsedEvent {
                                 <span class="prompt">!</span>
                                 <span class="label error-label">error</span>
                                 <pre class="text text--error">{{ evt.content }}</pre>
+                                <button class="copy-btn" (click)="onCopyMessage(evt.content)" title="Copy error" aria-label="Copy error">⎘</button>
                             }
                             @case ('system') {
                                 <span class="prompt">#</span>
@@ -115,7 +122,20 @@ interface ParsedEvent {
                     </div>
                 }
             }
+
+            @if (isRunning() && showThinking()) {
+                <div class="thinking-indicator">
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-dot"></span>
+                    <span class="thinking-text">thinking</span>
+                </div>
+            }
         </div>
+
+        @if (showScrollFab()) {
+            <button class="scroll-fab" (click)="scrollToBottom()" aria-label="Scroll to bottom" title="Scroll to bottom">↓</button>
+        }
     `,
     styles: `
         :host {
@@ -124,6 +144,7 @@ interface ParsedEvent {
             flex: 1;
             min-height: 0;
             overflow: hidden;
+            position: relative;
         }
         .terminal {
             flex: 1;
@@ -150,6 +171,7 @@ interface ParsedEvent {
             gap: 0.5rem;
             padding: 0.2rem 0;
             min-height: 1.4em;
+            position: relative;
         }
 
         .line + .line--assistant,
@@ -197,6 +219,28 @@ interface ParsedEvent {
             font-size: 0.75rem;
             color: var(--text-tertiary);
             line-height: 1.6;
+        }
+
+        /* Copy button */
+        .copy-btn {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 0 0.25rem;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 0.15s, color 0.15s;
+            font-family: inherit;
+        }
+        .line:hover .copy-btn,
+        .tool-group-children .line:hover .copy-btn {
+            opacity: 1;
+        }
+        .copy-btn:hover {
+            color: var(--accent-cyan);
         }
 
         /* Assistant */
@@ -314,10 +358,68 @@ interface ParsedEvent {
         .load-more:hover {
             background: var(--bg-hover);
         }
+
+        /* Scroll-to-bottom FAB */
+        .scroll-fab {
+            position: absolute;
+            bottom: 1rem;
+            right: 1.5rem;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: var(--bg-raised);
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--glow-cyan);
+            transition: background 0.15s, box-shadow 0.15s;
+            z-index: 10;
+            font-family: inherit;
+        }
+        .scroll-fab:hover {
+            background: var(--bg-hover);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+        }
+
+        /* Thinking indicator */
+        .thinking-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.5rem 0;
+            margin-top: 0.25rem;
+        }
+        .thinking-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            animation: thinking-pulse 1.4s ease-in-out infinite;
+        }
+        .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+        .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes thinking-pulse {
+            0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1); }
+        }
+        .thinking-text {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-left: 0.25rem;
+        }
     `,
 })
-export class SessionOutputComponent implements AfterViewChecked {
+export class SessionOutputComponent implements AfterViewChecked, OnDestroy {
     private static readonly RENDER_WINDOW = 200;
+    private static readonly SCROLL_THRESHOLD = 60;
+
+    private readonly zone = inject(NgZone);
 
     readonly messages = input<SessionMessage[]>([]);
     readonly events = input<StreamEvent[]>([]);
@@ -327,6 +429,14 @@ export class SessionOutputComponent implements AfterViewChecked {
     private readonly outputContainer = viewChild<ElementRef<HTMLDivElement>>('outputContainer');
 
     protected readonly parsedEvents = computed(() => this.groupToolEvents(this.parseEvents(this.events())));
+
+    protected readonly showThinking = computed(() => {
+        const evts = this.parsedEvents();
+        if (evts.length === 0) return true;
+        const last = evts[evts.length - 1];
+        // Show thinking when last event is a tool group (agent is working) or it's been running
+        return last.kind === 'tool_group' || last.kind === 'tool_use' || last.kind === 'tool_result';
+    });
 
     private showAll = false;
 
@@ -342,14 +452,21 @@ export class SessionOutputComponent implements AfterViewChecked {
         !this.showAll && this.parsedEvents().length > SessionOutputComponent.RENDER_WINDOW,
     );
 
+    protected readonly showScrollFab = signal(false);
+
     private shouldScroll = true;
+    private userScrolledUp = false;
     private lastEventCount = 0;
+    private scrollListener: (() => void) | null = null;
 
     ngAfterViewChecked(): void {
         const currentCount = this.events().length;
         if (currentCount !== this.lastEventCount) {
-            this.shouldScroll = true;
             this.lastEventCount = currentCount;
+            // Only auto-scroll if user hasn't scrolled up
+            if (!this.userScrolledUp) {
+                this.shouldScroll = true;
+            }
         }
         if (this.shouldScroll) {
             const el = this.outputContainer()?.nativeElement;
@@ -358,6 +475,30 @@ export class SessionOutputComponent implements AfterViewChecked {
                 this.shouldScroll = false;
             }
         }
+    }
+
+    ngOnDestroy(): void {
+        this.scrollListener?.();
+    }
+
+    protected onScroll(): void {
+        const el = this.outputContainer()?.nativeElement;
+        if (!el) return;
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        this.userScrolledUp = distanceFromBottom > SessionOutputComponent.SCROLL_THRESHOLD;
+        this.showScrollFab.set(this.userScrolledUp);
+    }
+
+    protected scrollToBottom(): void {
+        const el = this.outputContainer()?.nativeElement;
+        if (!el) return;
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+        this.userScrolledUp = false;
+        this.showScrollFab.set(false);
+    }
+
+    protected onCopyMessage(content: string): void {
+        navigator.clipboard.writeText(content);
     }
 
     protected showAllEvents(): void {
@@ -385,10 +526,10 @@ export class SessionOutputComponent implements AfterViewChecked {
 
                     const text = this.extractText(content);
                     if (text) {
-                        parsed.push({ kind: 'assistant', content: text });
+                        parsed.push({ kind: 'assistant', content: text, timestamp: event.timestamp });
                     }
                     // Check for tool use
-                    const toolUses = this.extractToolUses(content);
+                    const toolUses = this.extractToolUses(content, event.timestamp);
                     for (const toolUse of toolUses) {
                         parsed.push(toolUse);
                     }
@@ -413,6 +554,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                                     kind: isError ? 'error' : 'tool_result',
                                     content: truncated,
                                     meta: isError ? 'error' : `${truncated.split('\n').length} lines`,
+                                    timestamp: event.timestamp,
                                 });
                             }
                         }
@@ -425,7 +567,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                     // Actual human text input
                     const text = this.extractText(content);
                     if (text) {
-                        parsed.push({ kind: 'user', content: text });
+                        parsed.push({ kind: 'user', content: text, timestamp: event.timestamp });
                     }
                     break;
                 }
@@ -441,6 +583,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                     parsed.push({
                         kind: subtype === 'error_during_execution' ? 'error' : 'result',
                         content: parts.join(' · ') || (subtype ?? 'done'),
+                        timestamp: event.timestamp,
                     });
                     break;
                 }
@@ -452,7 +595,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                         const parts: string[] = ['session initialized'];
                         if (model) parts.push(model);
                         if (cwd) parts.push(cwd);
-                        parsed.push({ kind: 'system', content: parts.join(' · ') });
+                        parsed.push({ kind: 'system', content: parts.join(' · '), timestamp: event.timestamp });
                     }
                     break;
                 }
@@ -460,7 +603,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                 case 'error': {
                     const error = data['error'] as Record<string, unknown> | undefined;
                     const msg = (error?.['message'] as string) ?? JSON.stringify(data);
-                    parsed.push({ kind: 'error', content: msg });
+                    parsed.push({ kind: 'error', content: msg, timestamp: event.timestamp });
                     break;
                 }
 
@@ -476,7 +619,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                     // Show unknown events compactly
                     const content = typeof data === 'string' ? data : JSON.stringify(data);
                     if (content && content !== '{}') {
-                        parsed.push({ kind: 'raw', content: `[${eventType}] ${content}`.slice(0, 200) });
+                        parsed.push({ kind: 'raw', content: `[${eventType}] ${content}`.slice(0, 200), timestamp: event.timestamp });
                     }
                     break;
                 }
@@ -504,7 +647,7 @@ export class SessionOutputComponent implements AfterViewChecked {
         for (const evt of parsed) {
             if (evt.kind === 'tool_use' || evt.kind === 'tool_result' || evt.kind === 'error') {
                 if (!currentGroup) {
-                    currentGroup = { kind: 'tool_group', content: '', children: [] };
+                    currentGroup = { kind: 'tool_group', content: '', children: [], timestamp: evt.timestamp };
                 }
                 currentGroup.children?.push(evt);
             } else {
@@ -529,7 +672,7 @@ export class SessionOutputComponent implements AfterViewChecked {
         return '';
     }
 
-    private extractToolUses(content: unknown): ParsedEvent[] {
+    private extractToolUses(content: unknown, timestamp?: string): ParsedEvent[] {
         if (!Array.isArray(content)) return [];
         const results: ParsedEvent[] = [];
         for (const block of content) {
@@ -557,7 +700,7 @@ export class SessionOutputComponent implements AfterViewChecked {
                             : `${keys.length} params`;
                     }
                 }
-                results.push({ kind: 'tool_use', content: summary, meta: name });
+                results.push({ kind: 'tool_use', content: summary, meta: name, timestamp });
             }
         }
         return results;
