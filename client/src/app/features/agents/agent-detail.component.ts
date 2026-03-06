@@ -9,6 +9,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { WorkTaskService } from '../../core/services/work-task.service';
 import { PersonaService } from '../../core/services/persona.service';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
@@ -453,6 +454,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     private readonly workTaskService = inject(WorkTaskService);
     private readonly personaService = inject(PersonaService);
     private readonly skillBundleService = inject(SkillBundleService);
+    private readonly notify = inject(NotificationService);
 
     protected readonly agent = signal<Agent | null>(null);
     protected readonly persona = signal<AgentPersona | null>(null);
@@ -608,14 +610,18 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             const task = await this.workTaskService.createTask({ agentId: a.id, description: this.workDescription, projectId: a.defaultProjectId ?? undefined });
             this.workTasks.update((tasks) => [task, ...tasks]);
             this.workDescription = '';
-        } catch {} finally { this.creatingWork.set(false); }
+        } catch {
+            this.notify.error('Failed to create work task');
+        } finally { this.creatingWork.set(false); }
     }
 
     async onCancelWork(taskId: string): Promise<void> {
         try {
             const task = await this.workTaskService.cancelTask(taskId);
             this.workTasks.update((tasks) => tasks.map((t) => (t.id === taskId ? task : t)));
-        } catch {}
+        } catch {
+            this.notify.error('Failed to cancel work task');
+        }
     }
 
     async onInvoke(): Promise<void> {
@@ -627,6 +633,8 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             this.invokeContent = '';
             const msgs = await this.agentService.getMessages(a.id);
             this.messages.set(msgs);
-        } catch {} finally { this.invoking.set(false); }
+        } catch {
+            this.notify.error('Failed to invoke agent');
+        } finally { this.invoking.set(false); }
     }
 }
