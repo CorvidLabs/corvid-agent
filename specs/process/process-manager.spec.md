@@ -4,6 +4,8 @@ version: 1
 status: active
 files:
   - server/process/manager.ts
+  - server/process/mcp-service-container.ts
+  - server/process/session-config-resolver.ts
 db_tables:
   - sessions
   - session_messages
@@ -18,7 +20,7 @@ depends_on:
 
 Central orchestration hub for agent session lifecycles. Manages starting, stopping, resuming, and monitoring Claude agent processes. Integrates every subsystem: persona/skill prompt injection, MCP tool resolution, credit deduction, provider routing (SDK vs direct, Claude vs Ollama), approval workflows, timeout management, auto-restart for AlgoChat sessions, and API outage recovery.
 
-This is the most complex module in the system (1258 lines). It is the single point through which all agent sessions are created and managed.
+This is the most complex module in the system (~1135 lines after decomposition). It is the single point through which all agent sessions are created and managed. MCP service management and session config resolution have been extracted into dedicated modules.
 
 ## Public API
 
@@ -53,7 +55,7 @@ Side effects on construction:
 |--------|-----------|---------|-------------|
 | `setBroadcast` | `(fn: (topic, data) => void)` | `void` | Inject WebSocket broadcast function |
 | `setOwnerCheck` | `(fn: (address) => boolean)` | `void` | Inject owner check for credit exemption |
-| `setMcpServices` | `(messenger, directory, walletService, ...)` | `void` | Register all MCP-related services for corvid_* tools |
+| `setMcpServices` | `(services: McpServices)` | `void` | Register all MCP-related services for corvid_* tools (delegates to McpServiceContainer) |
 | `startProcess` | `(session: Session, prompt?: string, options?: { depth?, schedulerMode? })` | `void` | Start a new agent process. Routes to SDK or direct based on provider |
 | `resumeProcess` | `(session: Session, prompt?: string)` | `void` | Resume an existing session. Builds history-aware prompt, handles context reset |
 | `stopProcess` | `(sessionId: string)` | `void` | Kill process, set status to stopped, emit session_stopped, clean up state |
@@ -163,12 +165,12 @@ Side effects on construction:
 | `server/process/approval-manager.ts` | `ApprovalManager` |
 | `server/process/owner-question-manager.ts` | `OwnerQuestionManager` |
 | `server/process/event-bus.ts` | `SessionEventBus` |
+| `server/process/mcp-service-container.ts` | `McpServiceContainer`, `McpServices` |
+| `server/process/session-config-resolver.ts` | `resolveSessionConfig` |
 | `server/process/types.ts` | `ClaudeStreamEvent`, `extractContentText` |
 | `server/db/sessions.ts` | Session CRUD, message operations |
 | `server/db/projects.ts` | `getProject` |
 | `server/db/agents.ts` | `getAgent`, `getAlgochatEnabledAgents` |
-| `server/db/personas.ts` | `getPersona`, `composePersonaPrompt` |
-| `server/db/skill-bundles.ts` | `resolveAgentPromptAdditions`, `resolveProjectPromptAdditions`, `resolveAgentTools`, `resolveProjectTools` |
 | `server/db/mcp-servers.ts` | `getActiveServersForAgent` |
 | `server/db/credits.ts` | `deductTurnCredits`, `getCreditConfig` |
 | `server/db/spending.ts` | `recordApiCost` |
@@ -223,3 +225,4 @@ Internal constants (not env-configurable):
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Extracted McpServiceContainer and SessionConfigResolver (#453) |
