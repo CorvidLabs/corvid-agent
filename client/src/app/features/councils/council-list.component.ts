@@ -46,7 +46,7 @@ interface CouncilCard {
                 <app-skeleton variant="table" [count]="5" />
             } @else if (councilService.councils().length === 0) {
                 <app-empty-state
-                    icon=" [o] [o] [o]\n  \\  |  /\n   \\_|_/\n    |=|"
+                    icon=" [o] [o] [o]\n  \  |  /\n   \_|_/\n    |=|"
                     title="No councils yet."
                     description="Councils run multi-agent deliberations — each member responds, discusses, and a chairman synthesizes the outcome."
                     actionLabel="+ Create a council"

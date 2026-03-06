@@ -7,6 +7,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { WorkTask } from '../../core/models/work-task.model';
 
 @Component({
     selector: 'app-work-task-list',
@@ -80,9 +81,21 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             } @else {
                 <div class="task-list">
                     @for (task of filteredTasks(); track task.id) {
-                        <div class="task-card" [attr.data-status]="task.status">
+                        <div class="task-card" [attr.data-status]="getDisplayStatus(task)">
                             <div class="task-card__header">
-                                <span class="task-status" [attr.data-status]="task.status">{{ task.status }}</span>
+                                @if (isInterrupted(task)) {
+                                    <span class="task-status" data-status="interrupted">interrupted</span>
+                                } @else {
+                                    <span class="task-status" [attr.data-status]="task.status">
+                                        @if (task.status === 'completed') {
+                                            <span class="status-icon status-icon--ok" aria-hidden="true"></span>
+                                        }
+                                        @if (task.status === 'failed') {
+                                            <span class="status-icon status-icon--fail" aria-hidden="true"></span>
+                                        }
+                                        {{ task.status }}
+                                    </span>
+                                }
                                 <span class="task-agent">{{ getAgentName(task.agentId) }}</span>
                                 <span class="task-time">{{ task.createdAt | relativeTime }}</span>
                             </div>
@@ -96,20 +109,44 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                             }
                             <div class="task-meta">
                                 @if (task.branchName) {
-                                    <span class="task-branch">{{ task.branchName }}</span>
+                                    <a class="task-branch" [href]="getBranchUrl(task)" [title]="task.branchName" target="_blank" rel="noopener">{{ truncateBranch(task.branchName) }}</a>
                                 }
                                 @if (task.prUrl) {
-                                    <a class="task-pr" [href]="task.prUrl" target="_blank" rel="noopener">View PR</a>
+                                    <a class="task-pr" [href]="task.prUrl" target="_blank" rel="noopener">
+                                        @if (task.status === 'completed') {
+                                            <span class="status-icon status-icon--ok" aria-hidden="true"></span>
+                                        }
+                                        View PR
+                                    </a>
                                 }
                                 @if (task.sessionId) {
                                     <a class="task-session" [routerLink]="['/sessions', task.sessionId]">Session</a>
                                 }
                                 @if (task.iterationCount > 0) {
-                                    <span class="task-iterations">{{ task.iterationCount }} iteration{{ task.iterationCount > 1 ? 's' : '' }}</span>
+                                    <span class="task-iterations">
+                                        @if (task.status === 'failed' && !isInterrupted(task)) {
+                                            <span class="status-icon status-icon--fail" aria-hidden="true"></span>
+                                        }
+                                        {{ task.iterationCount }} iteration{{ task.iterationCount > 1 ? 's' : '' }}
+                                    </span>
                                 }
                             </div>
                             @if (task.error) {
-                                <div class="task-error">{{ task.error }}</div>
+                                <div class="task-error-wrapper">
+                                    @if (isErrorExpanded(task.id)) {
+                                        <div class="task-error task-error--expanded" [class.task-error--interrupted]="isInterrupted(task)">
+                                            <div class="task-error__content">{{ task.error }}</div>
+                                        </div>
+                                        <button class="error-toggle" (click)="toggleError(task.id)">Hide details</button>
+                                    } @else {
+                                        <div class="task-error task-error--collapsed" [class.task-error--interrupted]="isInterrupted(task)">
+                                            {{ getErrorFirstLine(task.error) }}
+                                        </div>
+                                        @if (hasMultipleLines(task.error)) {
+                                            <button class="error-toggle" (click)="toggleError(task.id)">Show details</button>
+                                        }
+                                    }
+                                </div>
                             }
                             @if (task.summary) {
                                 <div class="task-summary">{{ task.summary }}</div>
@@ -214,6 +251,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .task-card[data-status="failed"] {
             border-left: 3px solid var(--accent-red);
         }
+        .task-card[data-status="interrupted"] {
+            border-left: 3px solid var(--accent-orange);
+        }
         .task-card[data-status="pending"] {
             border-left: 3px solid var(--accent-amber);
         }
@@ -233,6 +273,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             padding: 2px 8px;
             border-radius: var(--radius-sm);
             border: 1px solid;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
         .task-status[data-status="pending"] { color: var(--accent-amber); background: var(--accent-amber-dim); border-color: var(--accent-amber); }
         .task-status[data-status="branching"],
@@ -240,6 +283,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .task-status[data-status="validating"] { color: var(--accent-cyan); background: var(--accent-cyan-dim); border-color: var(--accent-cyan); }
         .task-status[data-status="completed"] { color: var(--accent-green); background: var(--accent-green-dim); border-color: var(--accent-green); }
         .task-status[data-status="failed"] { color: var(--accent-red); background: var(--accent-red-dim); border-color: var(--accent-red); }
+        .task-status[data-status="interrupted"] { color: var(--accent-orange); background: var(--accent-orange-dim); border-color: var(--accent-orange); }
+
+        .status-icon { font-style: normal; }
+        .status-icon--ok::before { content: '\\2713'; }
+        .status-icon--fail::before { content: '\\2717'; }
 
         .task-time {
             font-size: 0.65rem;
@@ -266,7 +314,14 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             padding: 2px 6px;
             border-radius: var(--radius-sm);
             font-family: monospace;
+            text-decoration: none;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
         }
+        .task-branch:hover { text-decoration: underline; }
         .task-pr {
             font-size: 0.65rem;
             color: var(--accent-green);
@@ -274,6 +329,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             border: 1px solid var(--accent-green);
             padding: 2px 6px;
             border-radius: var(--radius-sm);
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
         }
         .task-pr:hover { background: var(--accent-green-dim); }
         .task-session {
@@ -288,10 +346,14 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         .task-iterations {
             font-size: 0.6rem;
             color: var(--text-tertiary);
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
         }
 
+        .task-error-wrapper { margin-top: 0.5rem; }
+
         .task-error {
-            margin-top: 0.5rem;
             padding: 0.5rem;
             background: var(--accent-red-dim);
             border: 1px solid var(--accent-red);
@@ -299,10 +361,40 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
             color: var(--accent-red);
             font-size: 0.7rem;
             font-family: monospace;
+        }
+        .task-error--interrupted {
+            background: var(--accent-orange-dim);
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+        }
+        .task-error--collapsed {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-error--expanded {
             white-space: pre-wrap;
-            max-height: 100px;
+            max-height: 300px;
             overflow-y: auto;
         }
+        .task-error--expanded .task-error__content {
+            background: var(--bg-deep);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem;
+        }
+        .error-toggle {
+            display: inline-block;
+            margin-top: 0.25rem;
+            padding: 0;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 0.6rem;
+            font-family: inherit;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .error-toggle:hover { color: var(--text-secondary); }
 
         .task-summary {
             margin-top: 0.5rem;
@@ -331,6 +423,7 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
     protected createDescription = '';
 
     private agentNameCache: Record<string, string> = {};
+    private expandedErrors = new Set<string>();
 
     readonly allTasks = computed(() => this.taskService.tasks());
 
@@ -366,6 +459,7 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
         for (const a of this.agentService.agents()) {
             this.agentNameCache[a.id] = a.name;
         }
+        this.setSmartDefaultFilter();
     }
 
     ngOnDestroy(): void {
@@ -378,6 +472,46 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     protected getAgentName(agentId: string): string {
         return this.agentNameCache[agentId] ?? agentId.slice(0, 8);
+    }
+
+    protected isInterrupted(task: WorkTask): boolean {
+        return task.status === 'failed' && task.error?.includes('Interrupted by server restart') === true;
+    }
+
+    protected getDisplayStatus(task: WorkTask): string {
+        return this.isInterrupted(task) ? 'interrupted' : task.status;
+    }
+
+    protected truncateBranch(name: string): string {
+        if (name.length <= 30) return name;
+        return '...' + name.slice(-27);
+    }
+
+    protected getBranchUrl(task: WorkTask): string {
+        if (!task.branchName) return '#';
+        const repo = task.projectId || 'CorvidLabs/corvid-agent';
+        return `https://github.com/${repo}/tree/${encodeURIComponent(task.branchName)}`;
+    }
+
+    protected getErrorFirstLine(error: string): string {
+        const firstLine = error.split('\n')[0];
+        return firstLine.length > 120 ? firstLine.slice(0, 117) + '...' : firstLine;
+    }
+
+    protected hasMultipleLines(error: string): boolean {
+        return error.includes('\n') || error.length > 120;
+    }
+
+    protected isErrorExpanded(taskId: string): boolean {
+        return this.expandedErrors.has(taskId);
+    }
+
+    protected toggleError(taskId: string): void {
+        if (this.expandedErrors.has(taskId)) {
+            this.expandedErrors.delete(taskId);
+        } else {
+            this.expandedErrors.add(taskId);
+        }
     }
 
     protected async onCreateTask(): Promise<void> {
@@ -405,6 +539,14 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
             this.notify.success('Work task cancelled');
         } catch (e) {
             this.notify.error('Failed to cancel task', String(e));
+        }
+    }
+
+    private setSmartDefaultFilter(): void {
+        if (this.activeTasks().length > 0) {
+            this.activeFilter.set('active');
+        } else if (this.completedTasks().length > 0) {
+            this.activeFilter.set('completed');
         }
     }
 }
