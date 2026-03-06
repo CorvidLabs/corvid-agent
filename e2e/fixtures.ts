@@ -221,9 +221,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     throw new Error(`publishListing failed: ${pubRes.status} ${pubRes.statusText} — ${body}`);
                 }
 
-                const listing = await pubRes.json();
-                createdListingIds.push(listing.id);
-                return listing;
+                const published = await pubRes.json();
+                createdListingIds.push(published.id);
+                return published;
             },
 
             async seedMcpServer(data: Record<string, unknown> = {}) {
