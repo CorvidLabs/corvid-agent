@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 65;
+const SCHEMA_VERSION = 66;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1255,6 +1255,17 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_perm_checks_agent ON permission_checks(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_perm_checks_tool ON permission_checks(tool_name)`,
         `CREATE INDEX IF NOT EXISTS idx_perm_checks_tenant ON permission_checks(tenant_id)`,
+    ],
+    66: [
+        // Formalize dedup_state table (#587)
+        `CREATE TABLE IF NOT EXISTS dedup_state (
+            namespace  TEXT NOT NULL,
+            key        TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            PRIMARY KEY (namespace, key)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_dedup_state_expires ON dedup_state(expires_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_dedup_state_ns_expires ON dedup_state(namespace, expires_at)`,
     ],
 };
 
