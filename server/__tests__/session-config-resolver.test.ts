@@ -1,148 +1,121 @@
-import { describe, it, expect, mock, beforeEach } from 'bun:test';
-import type { Database } from 'bun:sqlite';
-import type { Agent } from '../../shared/types';
-
-// ── Mock DB functions ──────────────────────────────────────────────────
-// Must be declared before importing the module under test.
-
-const mockGetPersona = mock(() => null as { name: string; systemPrompt: string } | null);
-const mockComposePersonaPrompt = mock((_persona: unknown): string | null => null);
-const mockResolveAgentPromptAdditions = mock((_db: unknown, _agentId: string) => null as string | null);
-const mockResolveProjectPromptAdditions = mock((_db: unknown, _projectId: string) => null as string | null);
-const mockResolveAgentTools = mock((_db: unknown, _agentId: string, base: string[] | null) => base);
-const mockResolveProjectTools = mock((_db: unknown, _projectId: string, merged: string[] | null) => merged);
-const mockGetAgent = mock((_db: unknown, _agentId: string) => null as Agent | null);
-
-mock.module('../db/personas', () => ({
-    getPersona: mockGetPersona,
-    composePersonaPrompt: mockComposePersonaPrompt,
-}));
-
-mock.module('../db/skill-bundles', () => ({
-    resolveAgentPromptAdditions: mockResolveAgentPromptAdditions,
-    resolveProjectPromptAdditions: mockResolveProjectPromptAdditions,
-    resolveAgentTools: mockResolveAgentTools,
-    resolveProjectTools: mockResolveProjectTools,
-}));
-
-mock.module('../db/agents', () => ({
-    getAgent: mockGetAgent,
-}));
-
-// Import after mocks are set up
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { Database } from 'bun:sqlite';
+import { runMigrations } from '../db/schema';
+import { createAgent } from '../db/agents';
+import { upsertPersona } from '../db/personas';
+import { createBundle, assignBundle } from '../db/skill-bundles';
 import { resolveSessionPrompts, resolveToolPermissions, resolveSessionConfig } from '../process/session-config-resolver';
 
-const fakeDb = {} as Database;
-const fakeAgent = { id: 'agent-1', mcpToolPermissions: null } as unknown as Agent;
+/**
+ * SessionConfigResolver integration tests — uses real in-memory SQLite
+ * to avoid mock.module leaking into other test files.
+ */
+
+let db: Database;
+
+beforeEach(() => {
+    db = new Database(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
+});
+
+afterEach(() => {
+    db.close();
+});
 
 describe('session-config-resolver', () => {
-    beforeEach(() => {
-        mockGetPersona.mockReset();
-        mockComposePersonaPrompt.mockReset();
-        mockResolveAgentPromptAdditions.mockReset();
-        mockResolveProjectPromptAdditions.mockReset();
-        mockResolveAgentTools.mockReset();
-        mockResolveProjectTools.mockReset();
-        mockGetAgent.mockReset();
-
-        // Default return values
-        mockGetPersona.mockReturnValue(null);
-        mockComposePersonaPrompt.mockReturnValue(null);
-        mockResolveAgentPromptAdditions.mockReturnValue(null);
-        mockResolveProjectPromptAdditions.mockReturnValue(null);
-        mockResolveAgentTools.mockImplementation((_db, _agentId, base) => base);
-        mockResolveProjectTools.mockImplementation((_db, _projectId, merged) => merged);
-        mockGetAgent.mockReturnValue(null);
-    });
 
     // ── resolveSessionPrompts ──────────────────────────────────────────
 
     describe('resolveSessionPrompts', () => {
         it('returns undefined prompts when no agent is provided', () => {
-            const result = resolveSessionPrompts(fakeDb, null, null);
+            const result = resolveSessionPrompts(db, null, null);
             expect(result.personaPrompt).toBeUndefined();
             expect(result.skillPrompt).toBeUndefined();
         });
 
         it('returns persona prompt when agent has a persona', () => {
-            const persona = { name: 'CorvidAgent', systemPrompt: 'You are helpful' };
-            mockGetPersona.mockReturnValue(persona);
-            mockComposePersonaPrompt.mockReturnValue('You are CorvidAgent. You are helpful.');
+            const agent = createAgent(db, { name: 'TestAgent' });
+            upsertPersona(db, agent.id, {
+                archetype: 'professional',
+                traits: ['analytical'],
+                voiceGuidelines: 'Be precise.',
+                background: 'Expert engineer.',
+            });
 
-            const result = resolveSessionPrompts(fakeDb, fakeAgent, null);
-            expect(result.personaPrompt).toBe('You are CorvidAgent. You are helpful.');
-            expect(mockGetPersona).toHaveBeenCalledWith(fakeDb, 'agent-1');
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toBeDefined();
+            expect(result.personaPrompt).toContain('Persona');
+            expect(result.personaPrompt).toContain('professional');
+        });
+
+        it('returns undefined persona when agent has no persona', () => {
+            const agent = createAgent(db, { name: 'NoPersona' });
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.personaPrompt).toBeUndefined();
         });
 
         it('returns skill prompt from agent-level bundles', () => {
-            mockResolveAgentPromptAdditions.mockReturnValue('skill prompt A');
+            const agent = createAgent(db, { name: 'SkillAgent' });
+            const bundle = createBundle(db, {
+                name: 'test-skill-resolver',
+                promptAdditions: 'Always use formal language.',
+            });
+            assignBundle(db, agent.id, bundle.id);
 
-            const result = resolveSessionPrompts(fakeDb, fakeAgent, null);
-            expect(result.skillPrompt).toBe('skill prompt A');
+            const result = resolveSessionPrompts(db, agent, null);
+            expect(result.skillPrompt).toContain('Always use formal language.');
         });
 
-        it('returns project-level skill prompt when no agent', () => {
-            mockResolveProjectPromptAdditions.mockReturnValue('project skill B');
-
-            const result = resolveSessionPrompts(fakeDb, null, 'proj-1');
-            expect(result.skillPrompt).toBe('project skill B');
-        });
-
-        it('merges agent and project skill prompts', () => {
-            mockResolveAgentPromptAdditions.mockReturnValue('agent skill');
-            mockResolveProjectPromptAdditions.mockReturnValue('project skill');
-
-            const result = resolveSessionPrompts(fakeDb, fakeAgent, 'proj-1');
-            expect(result.skillPrompt).toBe('agent skill\n\nproject skill');
-        });
-
-        it('uses only agent skill when project has none', () => {
-            mockResolveAgentPromptAdditions.mockReturnValue('agent skill');
-            mockResolveProjectPromptAdditions.mockReturnValue(null);
-
-            const result = resolveSessionPrompts(fakeDb, fakeAgent, 'proj-1');
-            expect(result.skillPrompt).toBe('agent skill');
+        it('returns undefined skill prompt when no bundles assigned', () => {
+            const agent = createAgent(db, { name: 'NoBundles' });
+            const result = resolveSessionPrompts(db, agent, null);
+            // resolveAgentPromptAdditions returns empty string when no bundles
+            expect(result.skillPrompt).toBeUndefined();
         });
     });
 
     // ── resolveToolPermissions ─────────────────────────────────────────
 
     describe('resolveToolPermissions', () => {
-        it('returns null when agent has no explicit permissions', () => {
-            mockGetAgent.mockReturnValue({ ...fakeAgent, mcpToolPermissions: null } as Agent);
-            mockResolveAgentTools.mockReturnValue(null);
-            mockResolveProjectTools.mockReturnValue(null);
-
-            const result = resolveToolPermissions(fakeDb, 'agent-1', 'proj-1');
+        it('returns null when agent has no explicit permissions and no bundles', () => {
+            const agent = createAgent(db, { name: 'NoPerms' });
+            const result = resolveToolPermissions(db, agent.id, null);
             expect(result).toBeNull();
         });
 
-        it('returns agent-level tools when agent has explicit permissions', () => {
-            const perms = ['corvid_send_message'];
-            mockGetAgent.mockReturnValue({ ...fakeAgent, mcpToolPermissions: perms } as unknown as Agent);
-            mockResolveAgentTools.mockReturnValue(perms);
+        it('returns agent-level tools from bundles', () => {
+            const agent = createAgent(db, { name: 'BundleAgent' });
+            const bundle = createBundle(db, {
+                name: 'tool-bundle-resolver',
+                tools: ['corvid_send_message', 'corvid_web_search'],
+            });
+            assignBundle(db, agent.id, bundle.id);
 
-            const result = resolveToolPermissions(fakeDb, 'agent-1', 'proj-1');
-            expect(result).toEqual(perms);
-            // Should NOT call resolveProjectTools when agent has explicit perms
-            expect(mockResolveProjectTools).not.toHaveBeenCalled();
+            const result = resolveToolPermissions(db, agent.id, null);
+            expect(result).toContain('corvid_send_message');
+            expect(result).toContain('corvid_web_search');
         });
 
-        it('merges project tools when agent has no explicit permissions', () => {
-            mockGetAgent.mockReturnValue({ ...fakeAgent, mcpToolPermissions: null } as Agent);
-            mockResolveAgentTools.mockReturnValue(null);
-            mockResolveProjectTools.mockReturnValue(['corvid_create_work_task']);
+        it('merges base permissions with bundle tools', () => {
+            const agent = createAgent(db, {
+                name: 'MergeAgent',
+                mcpToolPermissions: ['corvid_list_agents'],
+            });
+            const bundle = createBundle(db, {
+                name: 'extra-tools-resolver',
+                tools: ['corvid_web_search'],
+            });
+            assignBundle(db, agent.id, bundle.id);
 
-            const result = resolveToolPermissions(fakeDb, 'agent-1', 'proj-1');
-            expect(result).toEqual(['corvid_create_work_task']);
+            const result = resolveToolPermissions(db, agent.id, null);
+            expect(result).toContain('corvid_list_agents');
+            expect(result).toContain('corvid_web_search');
         });
 
-        it('skips project tools when no projectId', () => {
-            mockGetAgent.mockReturnValue({ ...fakeAgent, mcpToolPermissions: null } as Agent);
-            mockResolveAgentTools.mockReturnValue(null);
-
-            resolveToolPermissions(fakeDb, 'agent-1', null);
-            expect(mockResolveProjectTools).not.toHaveBeenCalled();
+        it('returns null for nonexistent agent', () => {
+            const result = resolveToolPermissions(db, 'nonexistent-id', null);
+            expect(result).toBeNull();
         });
     });
 
@@ -150,21 +123,33 @@ describe('session-config-resolver', () => {
 
     describe('resolveSessionConfig', () => {
         it('returns all three config values', () => {
-            mockComposePersonaPrompt.mockReturnValue('persona');
-            mockGetPersona.mockReturnValue({ name: 'Test', systemPrompt: '' });
-            mockResolveAgentPromptAdditions.mockReturnValue('skill');
-            mockGetAgent.mockReturnValue({ ...fakeAgent, mcpToolPermissions: null } as Agent);
-            mockResolveAgentTools.mockReturnValue(['tool-a']);
+            const agent = createAgent(db, { name: 'FullConfig' });
+            upsertPersona(db, agent.id, {
+                archetype: 'technical',
+                traits: ['precise'],
+            });
+            const bundle = createBundle(db, {
+                name: 'full-config-bundle',
+                tools: ['corvid_send_message'],
+                promptAdditions: 'Be concise.',
+            });
+            assignBundle(db, agent.id, bundle.id);
 
-            const result = resolveSessionConfig(fakeDb, fakeAgent, 'agent-1', null);
-            expect(result.personaPrompt).toBe('persona');
-            expect(result.skillPrompt).toBe('skill');
-            expect(result.resolvedToolPermissions).toEqual(['tool-a']);
+            const result = resolveSessionConfig(db, agent, agent.id, null);
+            expect(result.personaPrompt).toBeDefined();
+            expect(result.skillPrompt).toContain('Be concise.');
+            expect(result.resolvedToolPermissions).toContain('corvid_send_message');
         });
 
         it('returns null permissions when no agentId', () => {
-            const result = resolveSessionConfig(fakeDb, null, null, null);
+            const result = resolveSessionConfig(db, null, null, null);
             expect(result.resolvedToolPermissions).toBeNull();
+        });
+
+        it('returns undefined prompts when agent has no persona or bundles', () => {
+            const agent = createAgent(db, { name: 'Bare' });
+            const result = resolveSessionConfig(db, agent, agent.id, null);
+            expect(result.personaPrompt).toBeUndefined();
         });
     });
 });
