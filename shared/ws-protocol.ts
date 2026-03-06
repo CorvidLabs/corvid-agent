@@ -35,7 +35,31 @@ export type ServerMessage =
     | { type: 'agent_question'; question: { id: string; sessionId: string; agentId: string; question: string; options: string[] | null; context: string | null; createdAt: string; timeoutMs: number } }
     | { type: 'ping'; serverTime: string }
     | { type: 'welcome'; serverTime: string }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string; severity?: ErrorSeverity; errorCode?: string }
+    | { type: 'session_error'; sessionId: string; error: SessionErrorInfo }
+    | { type: 'council_agent_error'; launchId: string; agentId: string; agentName: string; error: CouncilAgentErrorInfo };
+
+/** Error severity level for structured WebSocket error messages. */
+export type ErrorSeverity = 'info' | 'warning' | 'error' | 'fatal';
+
+/** Structured error info for session failure recovery events. */
+export interface SessionErrorInfo {
+    message: string;
+    errorType: 'spawn_error' | 'credits_exhausted' | 'timeout' | 'crash' | 'unknown';
+    severity: ErrorSeverity;
+    recoverable: boolean;
+    sessionStatus?: string;
+}
+
+/** Structured error info for council agent failure events. */
+export interface CouncilAgentErrorInfo {
+    message: string;
+    errorType: 'spawn_error' | 'timeout' | 'crash' | 'unknown';
+    severity: ErrorSeverity;
+    stage: string;
+    sessionId?: string;
+    round?: number;
+}
 
 export interface StreamEvent {
     eventType: string;

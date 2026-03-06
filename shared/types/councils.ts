@@ -117,3 +117,16 @@ export interface CouncilDiscussionMessage {
     sessionId: string | null;
     createdAt: string;
 }
+
+/** Structured error emitted when a council agent fails mid-session. */
+export interface CouncilAgentError {
+    launchId: string;
+    agentId: string;
+    agentName: string;
+    errorType: 'spawn_error' | 'timeout' | 'crash' | 'unknown';
+    severity: 'info' | 'warning' | 'error' | 'fatal';
+    message: string;
+    stage: string;
+    sessionId?: string;
+    round?: number;
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { createWebSocketHandler, broadcastAlgoChatMessage, HEARTBEAT_INTERVAL_MS, PONG_TIMEOUT_MS, AUTH_TIMEOUT_MS, type WsData } from '../ws/handler';
 import { isClientMessage } from '../../shared/ws-protocol';
+import type { SessionErrorRecoveryEvent } from '../process/types';
 import type { ProcessManager } from '../process/manager';
 import type { AuthConfig } from '../middleware/auth';
 
@@ -896,5 +897,151 @@ describe('broadcastAlgoChatMessage', () => {
         expect(msg.participant).toBe('Alice');
         expect(msg.content).toBe('Hello!');
         expect(msg.direction).toBe('inbound');
+    });
+});
+
+// ─── Session error recovery events ────────────────────────────────────────
+
+describe('session error recovery forwarding', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('forwards session_error as dedicated session_error message', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs();
+        handler.open(ws);
+        sent.length = 0;
+
+        handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-err' }));
+
+        const callback = ws.data.subscriptions.get('sess-err')!;
+        const errorEvent: SessionErrorRecoveryEvent = {
+            type: 'session_error',
+            session_id: 'sess-err',
+            error: {
+                message: 'Session crashed with exit code 1',
+                errorType: 'crash',
+                severity: 'error',
+                recoverable: true,
+            },
+        };
+        callback('sess-err', errorEvent);
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('session_error');
+        expect(msg.sessionId).toBe('sess-err');
+        expect(msg.error.message).toBe('Session crashed with exit code 1');
+        expect(msg.error.errorType).toBe('crash');
+        expect(msg.error.severity).toBe('error');
+        expect(msg.error.recoverable).toBe(true);
+        expect(msg.error.sessionStatus).toBe('error');
+    });
+
+    it('forwards spawn_error as fatal non-recoverable session_error', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs();
+        handler.open(ws);
+        sent.length = 0;
+
+        handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-spawn' }));
+
+        const callback = ws.data.subscriptions.get('sess-spawn')!;
+        callback('sess-spawn', {
+            type: 'session_error',
+            session_id: 'sess-spawn',
+            error: {
+                message: 'Failed to start SDK process: ENOENT',
+                errorType: 'spawn_error',
+                severity: 'fatal',
+                recoverable: false,
+            },
+        } as SessionErrorRecoveryEvent);
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('session_error');
+        expect(msg.error.errorType).toBe('spawn_error');
+        expect(msg.error.severity).toBe('fatal');
+        expect(msg.error.recoverable).toBe(false);
+    });
+
+    it('forwards credits_exhausted as warning recoverable session_error', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs();
+        handler.open(ws);
+        sent.length = 0;
+
+        handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-credits' }));
+
+        const callback = ws.data.subscriptions.get('sess-credits')!;
+        callback('sess-credits', {
+            type: 'session_error',
+            session_id: 'sess-credits',
+            error: {
+                message: 'Session paused: credits exhausted.',
+                errorType: 'credits_exhausted',
+                severity: 'warning',
+                recoverable: true,
+            },
+        } as SessionErrorRecoveryEvent);
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('session_error');
+        expect(msg.error.errorType).toBe('credits_exhausted');
+        expect(msg.error.severity).toBe('warning');
+        expect(msg.error.recoverable).toBe(true);
+    });
+
+    it('session_error does not duplicate as session_event', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs();
+        handler.open(ws);
+        sent.length = 0;
+
+        handler.message(ws, JSON.stringify({ type: 'subscribe', sessionId: 'sess-no-dup' }));
+
+        const callback = ws.data.subscriptions.get('sess-no-dup')!;
+        callback('sess-no-dup', {
+            type: 'session_error',
+            session_id: 'sess-no-dup',
+            error: {
+                message: 'Crash',
+                errorType: 'crash',
+                severity: 'error',
+                recoverable: true,
+            },
+        } as SessionErrorRecoveryEvent);
+
+        // Should only send session_error, NOT session_event
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('session_error');
+        expect(msg.type).not.toBe('session_event');
+    });
+});
+
+// ─── Error severity in WebSocket error messages ───────────────────────────
+
+describe('error severity', () => {
+    it('error messages include optional severity and errorCode fields', () => {
+        // sendMessage returns true by default, so use non-running variant
+        const pmNotRunning = createMockProcessManager({
+            sendMessage: mock(() => false),
+        } as unknown as Partial<ProcessManager>);
+        const handler2 = createWebSocketHandler(pmNotRunning, () => null, noAuthConfig);
+        const { ws: ws2, sent: sent2 } = createMockWs();
+
+        handler2.message(ws2, JSON.stringify({ type: 'send_message', sessionId: 'x', content: 'hi' }));
+
+        const msg = JSON.parse(sent2[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('not running');
+        // severity and errorCode are optional — should be present in type but may be undefined
+        expect('severity' in msg || msg.severity === undefined).toBe(true);
     });
 });

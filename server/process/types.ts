@@ -116,6 +116,17 @@ export interface SessionStoppedEvent extends BaseStreamEvent {
     type: 'session_stopped';
 }
 
+/** Session error with structured recovery info (synthetic, emitted by ProcessManager) */
+export interface SessionErrorRecoveryEvent extends BaseStreamEvent {
+    type: 'session_error';
+    error: {
+        message: string;
+        errorType: 'spawn_error' | 'credits_exhausted' | 'timeout' | 'crash' | 'unknown';
+        severity: 'info' | 'warning' | 'error' | 'fatal';
+        recoverable: boolean;
+    };
+}
+
 /** Queue status for inference slot waiting (direct-process) */
 export interface QueueStatusEvent extends BaseStreamEvent {
     type: 'queue_status';
@@ -170,6 +181,7 @@ export type ClaudeStreamEvent =
     | SessionStartedEvent
     | SessionExitedEvent
     | SessionStoppedEvent
+    | SessionErrorRecoveryEvent
     | QueueStatusEvent
     | PerformanceEvent
     | RawStreamEvent;
@@ -220,4 +232,8 @@ export function isApprovalEvent(e: ClaudeStreamEvent): e is ApprovalRequestEvent
 
 export function isSessionEndEvent(e: ClaudeStreamEvent): e is SessionExitedEvent | SessionStoppedEvent {
     return e.type === 'session_exited' || e.type === 'session_stopped';
+}
+
+export function isSessionErrorRecoveryEvent(e: ClaudeStreamEvent): e is SessionErrorRecoveryEvent {
+    return e.type === 'session_error';
 }

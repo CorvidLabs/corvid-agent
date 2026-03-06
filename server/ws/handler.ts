@@ -234,6 +234,24 @@ function handleClientMessage(
                     return;
                 }
 
+                // Forward session errors as dedicated recovery messages
+                if (event.type === 'session_error') {
+                    const errorEvent = event as import('../process/types').SessionErrorRecoveryEvent;
+                    const errorMsg: ServerMessage = {
+                        type: 'session_error',
+                        sessionId,
+                        error: {
+                            message: errorEvent.error.message,
+                            errorType: errorEvent.error.errorType,
+                            severity: errorEvent.error.severity,
+                            recoverable: errorEvent.error.recoverable,
+                            sessionStatus: 'error',
+                        },
+                    };
+                    ws.send(JSON.stringify(errorMsg));
+                    return;
+                }
+
                 const serverMsg: ServerMessage = {
                     type: 'session_event',
                     sessionId,
@@ -481,8 +499,8 @@ function safeSend(ws: ServerWebSocket<WsData>, msg: ServerMessage): void {
     }
 }
 
-function sendError(ws: ServerWebSocket<WsData>, message: string): void {
-    safeSend(ws, { type: 'error', message });
+function sendError(ws: ServerWebSocket<WsData>, message: string, severity?: import('../../shared/ws-protocol').ErrorSeverity, errorCode?: string): void {
+    safeSend(ws, { type: 'error', message, severity, errorCode });
 }
 
 export function broadcastAlgoChatMessage(

@@ -254,6 +254,16 @@ export class ProcessManager {
                 type: 'error',
                 error: { message: `Failed to start SDK process: ${message}`, type: 'spawn_error' },
             } as ClaudeStreamEvent);
+            this.eventBus.emit(session.id, {
+                type: 'session_error',
+                session_id: session.id,
+                error: {
+                    message: `Failed to start SDK process: ${message}`,
+                    errorType: 'spawn_error',
+                    severity: 'fatal',
+                    recoverable: false,
+                },
+            } as ClaudeStreamEvent);
             return;
         }
 
@@ -322,6 +332,16 @@ export class ProcessManager {
             this.eventBus.emit(session.id, {
                 type: 'error',
                 error: { message: `Failed to start direct process: ${message}`, type: 'spawn_error' },
+            } as ClaudeStreamEvent);
+            this.eventBus.emit(session.id, {
+                type: 'session_error',
+                session_id: session.id,
+                error: {
+                    message: `Failed to start direct process: ${message}`,
+                    errorType: 'spawn_error',
+                    severity: 'fatal',
+                    recoverable: false,
+                },
             } as ClaudeStreamEvent);
             return;
         }
@@ -823,6 +843,16 @@ export class ProcessManager {
                                     type: 'credits_exhausted',
                                 },
                             } as ClaudeStreamEvent);
+                            this.eventBus.emit(sessionId, {
+                                type: 'session_error',
+                                session_id: sessionId,
+                                error: {
+                                    message: 'Session paused: credits exhausted. Send ALGO to resume.',
+                                    errorType: 'credits_exhausted',
+                                    severity: 'warning',
+                                    recoverable: true,
+                                },
+                            } as ClaudeStreamEvent);
                             this.stopProcess(sessionId);
                             return;
                         }
@@ -852,6 +882,21 @@ export class ProcessManager {
 
         const status = code === 0 ? 'idle' : 'error';
         updateSessionStatus(this.db, sessionId, status);
+
+        // Emit structured session_error for non-zero exits so frontend can show recovery UI
+        if (code !== 0) {
+            const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;
+            this.eventBus.emit(sessionId, {
+                type: 'session_error',
+                session_id: sessionId,
+                error: {
+                    message: `Session crashed with exit code ${code}`,
+                    errorType: 'crash',
+                    severity: isAutoRestartable ? 'warning' : 'error',
+                    recoverable: true,
+                },
+            } as ClaudeStreamEvent);
+        }
 
         // Emit before cleanup so subscribers still receive the exit event
         this.eventBus.emit(sessionId, {

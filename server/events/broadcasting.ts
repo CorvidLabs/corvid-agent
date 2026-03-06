@@ -13,7 +13,7 @@ import type { MentionPollingService } from '../polling/service';
 import type { WorkflowService } from '../workflow/service';
 import type { NotificationService } from '../notifications/service';
 import type { ProcessManager } from '../process/manager';
-import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from '../routes/councils';
+import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError } from '../routes/councils';
 import { tenantTopic } from '../ws/handler';
 import { resolveAgentTenant, resolveCouncilTenant } from '../tenant/resolve';
 
@@ -94,6 +94,24 @@ export function wireEventBroadcasting(deps: BroadcastDeps): void {
     onCouncilDiscussionMessage((message) => {
         const msg = JSON.stringify({ type: 'council_discussion_message', message });
         publish('council', msg, resolveAgent(message.agentId));
+    });
+
+    onCouncilAgentError((error) => {
+        const msg = JSON.stringify({
+            type: 'council_agent_error',
+            launchId: error.launchId,
+            agentId: error.agentId,
+            agentName: error.agentName,
+            error: {
+                message: error.message,
+                errorType: error.errorType,
+                severity: error.severity,
+                stage: error.stage,
+                sessionId: error.sessionId,
+                round: error.round,
+            },
+        });
+        publish('council', msg, resolveCouncil(error.launchId));
     });
 
     // Broadcast schedule events

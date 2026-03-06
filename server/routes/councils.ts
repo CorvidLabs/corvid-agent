@@ -26,12 +26,13 @@ import {
     onCouncilStageChange,
     onCouncilLog,
     onCouncilDiscussionMessage,
+    onCouncilAgentError,
     waitForSessions,
 } from '../councils/discussion';
 import type { LaunchCouncilResult, WaitForSessionsResult } from '../councils/discussion';
 
 // Re-export business logic and types for external consumers
-export { launchCouncil, onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, waitForSessions };
+export { launchCouncil, onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError, waitForSessions };
 export type { LaunchCouncilResult, WaitForSessionsResult };
 
 // ─── Route handler ────────────────────────────────────────────────────────────
