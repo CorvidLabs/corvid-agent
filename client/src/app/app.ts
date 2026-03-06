@@ -13,13 +13,15 @@ import { HeaderComponent } from './shared/components/header.component';
 import { SidebarComponent } from './shared/components/sidebar.component';
 import { BreadcrumbComponent } from './shared/components/breadcrumb.component';
 import { ToastContainerComponent } from './shared/components/toast-container.component';
+import { KeyboardShortcutsOverlayComponent } from './shared/components/keyboard-shortcuts-overlay.component';
 import { WebSocketService } from './core/services/websocket.service';
 import { SessionService } from './core/services/session.service';
+import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.service';
 
 @Component({
     selector: 'app-root',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterOutlet, HeaderComponent, SidebarComponent, BreadcrumbComponent, ToastContainerComponent],
+    imports: [RouterOutlet, HeaderComponent, SidebarComponent, BreadcrumbComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
     template: `
         <div class="app-layout">
             <app-header
@@ -40,6 +42,7 @@ import { SessionService } from './core/services/session.service';
                 </main>
             </div>
         </div>
+        <app-keyboard-shortcuts-overlay />
         <app-toast-container />
     `,
     styles: `
@@ -82,6 +85,8 @@ import { SessionService } from './core/services/session.service';
 export class App implements OnInit, OnDestroy, AfterViewInit {
     protected readonly wsService = inject(WebSocketService);
     private readonly sessionService = inject(SessionService);
+    // Inject to ensure service is instantiated and listening for keyboard events
+    private readonly _shortcuts = inject(KeyboardShortcutsService);
 
     protected readonly sidebarOpen = signal(false);
 

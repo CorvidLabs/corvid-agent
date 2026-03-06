@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
+import { KeyboardShortcutsService } from '../../core/services/keyboard-shortcuts.service';
 
 /** Section definition with routes for auto-expand */
 interface SidebarSection {
@@ -347,6 +348,15 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                 </li>
             </ul>
             <button
+                class="sidebar__help-btn"
+                (click)="openHelp()"
+                aria-label="Keyboard shortcuts"
+                title="Keyboard shortcuts"
+                type="button">
+                <span class="sidebar__label">Help</span>
+                <span class="sidebar__abbr">?</span>
+            </button>
+            <button
                 class="sidebar__collapse-btn"
                 (click)="toggleCollapse()"
                 [attr.aria-label]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
@@ -483,9 +493,35 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             display: none;
         }
 
+        /* Help button */
+        .sidebar__help-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: auto;
+            padding: 0.6rem 1.5rem;
+            background: transparent;
+            border: none;
+            border-top: 1px solid var(--border);
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-family: inherit;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            transition: color 0.15s, background 0.15s;
+        }
+        .sidebar__help-btn:hover {
+            color: var(--accent-cyan);
+            background: var(--bg-hover);
+        }
+        .sidebar__help-btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: -2px;
+        }
+
         /* Collapse toggle button */
         .sidebar__collapse-btn {
-            margin-top: auto;
             padding: 0.6rem;
             background: transparent;
             border: none;
@@ -603,6 +639,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     readonly sectionStates = signal<Record<string, boolean>>(this.loadSectionStates());
 
     private readonly router = inject(Router);
+    private readonly shortcutsService = inject(KeyboardShortcutsService);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
     private routerSub: Subscription | null = null;
 
@@ -662,6 +699,11 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     /** Check if a section is collapsed */
     isSectionCollapsed(sectionKey: string): boolean {
         return this.sectionStates()[sectionKey] ?? false;
+    }
+
+    openHelp(): void {
+        this.closeSidebar();
+        this.shortcutsService.overlayOpen.set(true);
     }
 
     protected onEscape(): void {
