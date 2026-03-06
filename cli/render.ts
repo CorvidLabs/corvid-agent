@@ -63,8 +63,12 @@ export class Spinner {
 
 /** Strip ANSI escape sequences, newlines, and control characters to prevent log injection */
 function sanitize(s: string): string {
+    // Remove line breaks explicitly, then strip other control chars and ANSI escape sequences
     // eslint-disable-next-line no-control-regex
-    return s.replace(/[\x00-\x1f\x7f]/g, '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    return s
+        .replace(/[\r\n]/g, '')
+        .replace(/[\x00-\x1f\x7f]/g, '')
+        .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 }
 
 // ─── Output Helpers ─────────────────────────────────────────────────────────
