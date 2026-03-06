@@ -197,8 +197,8 @@ export function grantCredits(
     amount: number,
     reference?: string,
 ): void {
-    if (amount <= 0) {
-        throw new Error(`Cannot grant non-positive credit amount: ${amount}`);
+    if (!Number.isInteger(amount) || amount <= 0) {
+        throw new Error(`Cannot grant non-positive or fractional credit amount: ${amount}`);
     }
 
     ensureLedgerRow(db, walletAddress);
@@ -231,11 +231,9 @@ export function deductTurnCredits(
     const config = getCreditConfig(db);
 
     // Atomic check-and-deduct in a single transaction to prevent race conditions
-    // where concurrent handlers both read the same balance and both deduct.
     const result = db.transaction(() => {
         ensureLedgerRow(db, walletAddress);
 
-        // Atomic deduct with WHERE guard — returns 0 rows if balance insufficient
         const updated = db.query(
             `UPDATE credit_ledger
              SET credits = credits - ?,
@@ -254,7 +252,6 @@ export function deductTurnCredits(
             };
         }
 
-        // Update session credits_consumed if we have a session
         if (sessionId) {
             db.query(
                 `UPDATE sessions SET credits_consumed = credits_consumed + ? WHERE id = ?`
@@ -291,7 +288,6 @@ export function deductAgentMessageCredits(
 ): { success: boolean; creditsRemaining: number } {
     const config = getCreditConfig(db);
 
-    // Atomic check-and-deduct to prevent race conditions
     return db.transaction(() => {
         ensureLedgerRow(db, walletAddress);
 
@@ -332,23 +328,28 @@ export function reserveGroupCredits(
 ): { success: boolean; reserved: number; creditsRemaining: number } {
     const config = getCreditConfig(db);
     const reserveAmount = config.reservePerGroupMessage * memberCount;
-    const balance = getBalance(db, walletAddress);
 
-    if (balance.available < reserveAmount) {
-        return { success: false, reserved: 0, creditsRemaining: balance.available };
-    }
+    // Atomic check-and-reserve to prevent over-reservation from concurrent calls
+    return db.transaction(() => {
+        ensureLedgerRow(db, walletAddress);
 
-    db.query(
-        `UPDATE credit_ledger
-         SET reserved = reserved + ?,
-             updated_at = datetime('now')
-         WHERE wallet_address = ?`
-    ).run(reserveAmount, walletAddress);
+        const updated = db.query(
+            `UPDATE credit_ledger
+             SET reserved = reserved + ?,
+                 updated_at = datetime('now')
+             WHERE wallet_address = ? AND (credits - reserved) >= ?`
+        ).run(reserveAmount, walletAddress, reserveAmount);
 
-    const newBalance = getBalance(db, walletAddress);
-    recordTransaction(db, walletAddress, 'reserve', reserveAmount, newBalance.credits, `group:${memberCount}`);
+        if (updated.changes === 0) {
+            const balance = getBalance(db, walletAddress);
+            return { success: false, reserved: 0, creditsRemaining: balance.available };
+        }
 
-    return { success: true, reserved: reserveAmount, creditsRemaining: newBalance.available };
+        const newBalance = getBalance(db, walletAddress);
+        recordTransaction(db, walletAddress, 'reserve', reserveAmount, newBalance.credits, `group:${memberCount}`);
+
+        return { success: true, reserved: reserveAmount, creditsRemaining: newBalance.available };
+    })();
 }
 
 /**
@@ -360,17 +361,21 @@ export function consumeReservedCredits(
     amount: number,
     sessionId?: string,
 ): void {
-    db.query(
-        `UPDATE credit_ledger
-         SET reserved = MAX(0, reserved - ?),
-             credits = credits - ?,
-             total_consumed = total_consumed + ?,
-             updated_at = datetime('now')
-         WHERE wallet_address = ?`
-    ).run(amount, amount, amount, walletAddress);
+    // Atomic consume — credits were already reserved, so debit is safe.
+    // MAX(0, ...) prevents reserved underflow; credits debit matches the reservation.
+    db.transaction(() => {
+        db.query(
+            `UPDATE credit_ledger
+             SET reserved = MAX(0, reserved - ?),
+                 credits = MAX(0, credits - ?),
+                 total_consumed = total_consumed + ?,
+                 updated_at = datetime('now')
+             WHERE wallet_address = ?`
+        ).run(amount, amount, amount, walletAddress);
 
-    const balance = getBalance(db, walletAddress);
-    recordTransaction(db, walletAddress, 'deduction', amount, balance.credits, 'group_consumed', null, sessionId);
+        const balance = getBalance(db, walletAddress);
+        recordTransaction(db, walletAddress, 'deduction', amount, balance.credits, 'group_consumed', null, sessionId);
+    })();
 }
 
 /**
@@ -381,15 +386,18 @@ export function releaseReservedCredits(
     walletAddress: string,
     amount: number,
 ): void {
-    db.query(
-        `UPDATE credit_ledger
-         SET reserved = MAX(0, reserved - ?),
-             updated_at = datetime('now')
-         WHERE wallet_address = ?`
-    ).run(amount, walletAddress);
+    // Atomic release — MAX(0, ...) prevents underflow
+    db.transaction(() => {
+        db.query(
+            `UPDATE credit_ledger
+             SET reserved = MAX(0, reserved - ?),
+                 updated_at = datetime('now')
+             WHERE wallet_address = ?`
+        ).run(amount, walletAddress);
 
-    const balance = getBalance(db, walletAddress);
-    recordTransaction(db, walletAddress, 'release', amount, balance.credits, 'group_release');
+        const balance = getBalance(db, walletAddress);
+        recordTransaction(db, walletAddress, 'release', amount, balance.credits, 'group_release');
+    })();
 }
 
 // ─── Query helpers ────────────────────────────────────────────────────────

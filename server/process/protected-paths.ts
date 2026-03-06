@@ -39,11 +39,7 @@ export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed
 export function isProtectedPath(filePath: string): boolean {
     // Resolve symlinks to prevent bypass via `ln -s protected.ts link.ts`
     let resolved = filePath;
-    try {
-        resolved = realpathSync(filePath);
-    } catch {
-        // File may not exist yet (e.g. Write tool creating new file) — use as-is
-    }
+    try { resolved = realpathSync(filePath); } catch { /* file may not exist yet */ }
 
     // Normalize to forward slashes for cross-platform matching
     const normalized = resolved.replace(/\\/g, '/');

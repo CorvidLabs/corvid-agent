@@ -104,7 +104,6 @@ async function checkLlmProviders(): Promise<DependencyHealth> {
 
 function checkDiskAndWal(db: Database): DependencyHealth {
     try {
-        // Get WAL file size
         let walSizeBytes = 0;
         try {
             const dbPath = (db.query("PRAGMA database_list").all() as Array<{ file: string }>)[0]?.file;
@@ -113,29 +112,16 @@ function checkDiskAndWal(db: Database): DependencyHealth {
             }
         } catch { /* ignore */ }
 
-        // Get free disk space (Unix only — df is not available on Windows)
-        let freeBytes = -1;
+        let freeBytes = 0;
         try {
             const dfOutput = execSync('df -k . 2>/dev/null | tail -1', { encoding: 'utf-8', timeout: 3000 });
             const parts = dfOutput.trim().split(/\s+/);
-            // df -k output: filesystem blocks used available ...
-            const parsed = parseInt(parts[3] ?? '', 10);
-            if (!isNaN(parsed)) freeBytes = parsed * 1024;
-        } catch { /* not available on this platform */ }
-
-        const walMB = Math.round(walSizeBytes / (1024 * 1024) * 100) / 100;
-
-        // If we couldn't determine free space, only check WAL size
-        if (freeBytes < 0) {
-            if (walMB > 100) {
-                return { status: 'degraded', warning: `Large WAL file (${walMB}MB)`, wal_mb: walMB };
-            }
-            return { status: 'healthy', wal_mb: walMB };
-        }
+            freeBytes = parseInt(parts[3] ?? '0', 10) * 1024;
+        } catch { /* ignore */ }
 
         const freeMB = Math.round(freeBytes / (1024 * 1024));
+        const walMB = Math.round(walSizeBytes / (1024 * 1024) * 100) / 100;
 
-        // Warn at 500MB free, unhealthy at 100MB
         if (freeMB < 100) {
             return { status: 'unhealthy', error: `Critical: only ${freeMB}MB disk free`, free_mb: freeMB, wal_mb: walMB };
         }

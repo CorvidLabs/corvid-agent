@@ -77,27 +77,22 @@ export class EscrowService {
         sellerTenantId: string,
         amountCredits: number,
     ): EscrowTransaction | null {
-        const balance = getBalance(this.db, buyerTenantId);
-        if (balance.available < amountCredits) {
-            log.warn('Escrow fund failed: insufficient credits', {
-                buyer: buyerTenantId,
-                available: balance.available,
-                required: amountCredits,
-            });
-            return null;
-        }
-
         const id = crypto.randomUUID();
 
-        const create = this.db.transaction(() => {
-            // Debit buyer
-            this.db.query(`
+        // Atomic check-and-debit inside transaction to prevent double-funding
+        const funded = this.db.transaction(() => {
+            // Atomic debit with balance guard
+            const updated = this.db.query(`
                 UPDATE credit_ledger
                 SET credits = credits - ?,
                     total_consumed = total_consumed + ?,
                     updated_at = datetime('now')
-                WHERE wallet_address = ?
-            `).run(amountCredits, amountCredits, buyerTenantId);
+                WHERE wallet_address = ? AND (credits - reserved) >= ?
+            `).run(amountCredits, amountCredits, buyerTenantId, amountCredits);
+
+            if (updated.changes === 0) {
+                return false;
+            }
 
             // Record transaction
             const newBalance = getBalance(this.db, buyerTenantId);
@@ -113,9 +108,17 @@ export class EscrowService {
                     (id, listing_id, buyer_tenant_id, seller_tenant_id, amount_credits, state)
                 VALUES (?, ?, ?, ?, ?, 'FUNDED')
             `).run(id, listingId, buyerTenantId, sellerTenantId, amountCredits);
-        });
 
-        create();
+            return true;
+        })();
+
+        if (!funded) {
+            log.warn('Escrow fund failed: insufficient credits', {
+                buyer: buyerTenantId,
+                required: amountCredits,
+            });
+            return null;
+        }
 
         recordAudit(this.db, 'credit_deduction', buyerTenantId, 'escrow_transactions', id,
             `Escrow funded: ${amountCredits} credits for listing ${listingId}`);

@@ -10,7 +10,7 @@
 import type { Middleware, MiddlewareContext, NextFn } from './pipeline';
 import type { AuthConfig } from './auth';
 import { buildCorsHeaders } from './auth';
-import { checkHttpAuth } from './auth';
+import { checkHttpAuth, timingSafeEqual } from './auth';
 import type { RateLimiter } from './rate-limit';
 import { getClientIp } from './rate-limit';
 import type { EndpointRateLimiter } from './endpoint-rate-limit';
@@ -258,7 +258,7 @@ export function authMiddleware(config: AuthConfig): Middleware {
                 const authHeader = req.headers.get('Authorization');
                 const token = authHeader?.replace(/^Bearer\s+/i, '') ?? '';
 
-                if (adminKey && token === adminKey) {
+                if (adminKey && timingSafeEqual(token, adminKey)) {
                     requestContext.role = 'admin';
                 } else {
                     requestContext.role = 'user';
