@@ -13,6 +13,9 @@ import { createLogger } from '../lib/logger';
 
 const log = createLogger('Retention');
 
+/** Allowlist pattern for valid SQL identifiers (table/column names). */
+const SAFE_SQL_IDENTIFIER = /^[a-z_][a-z0-9_]*$/i;
+
 /** Retention policy for a single table. */
 interface RetentionPolicy {
     table: string;
@@ -39,6 +42,12 @@ const RETENTION_POLICIES: RetentionPolicy[] = [
  * Returns the number of deleted rows.
  */
 export function pruneTable(db: Database, policy: RetentionPolicy): number {
+    if (!SAFE_SQL_IDENTIFIER.test(policy.table)) {
+        throw new Error(`pruneTable: invalid table name '${policy.table}'`);
+    }
+    if (!SAFE_SQL_IDENTIFIER.test(policy.timestampColumn)) {
+        throw new Error(`pruneTable: invalid column name '${policy.timestampColumn}'`);
+    }
     const cutoff = new Date(Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000);
     // daily_spending and agent_daily_spending use date-only format (YYYY-MM-DD)
     const cutoffStr = policy.timestampColumn === 'date'

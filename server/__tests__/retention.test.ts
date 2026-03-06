@@ -65,6 +65,31 @@ describe('pruneTable', () => {
         const deleted = pruneTable(db, { table: 'audit_log', timestampColumn: 'timestamp', retentionDays: 180 });
         expect(deleted).toBe(0);
     });
+
+    test('rejects invalid table name (SQL injection attempt)', () => {
+        expect(() =>
+            pruneTable(db, { table: 'audit_log; DROP TABLE agents--', timestampColumn: 'timestamp', retentionDays: 90 }),
+        ).toThrow("invalid table name");
+    });
+
+    test('rejects invalid column name (SQL injection attempt)', () => {
+        expect(() =>
+            pruneTable(db, { table: 'audit_log', timestampColumn: '1; DROP TABLE agents--', retentionDays: 90 }),
+        ).toThrow("invalid column name");
+    });
+
+    test('rejects table name with special characters', () => {
+        expect(() =>
+            pruneTable(db, { table: 'audit-log', timestampColumn: 'timestamp', retentionDays: 90 }),
+        ).toThrow("invalid table name");
+    });
+
+    test('accepts valid SQL identifiers', () => {
+        // Should not throw for valid identifier patterns (may throw for missing table, but not for validation)
+        expect(() =>
+            pruneTable(db, { table: 'audit_log', timestampColumn: 'timestamp', retentionDays: 180 }),
+        ).not.toThrow();
+    });
 });
 
 // ── runRetentionCleanup ──────────────────────────────────────────────
