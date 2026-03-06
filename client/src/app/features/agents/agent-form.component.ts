@@ -4,6 +4,7 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { ApiService } from '../../core/services/api.service';
+import { NotificationService } from '../../core/services/notification.service';
 import type { CreateAgentInput, ProviderInfo } from '../../core/models/agent.model';
 import type { Project } from '../../core/models/project.model';
 import { firstValueFrom } from 'rxjs';
@@ -157,6 +158,7 @@ export class AgentFormComponent implements OnInit {
     private readonly projectService = inject(ProjectService);
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
+    private readonly notify = inject(NotificationService);
 
     readonly id = input<string | undefined>(undefined);
     protected readonly saving = signal(false);
@@ -259,11 +261,15 @@ export class AgentFormComponent implements OnInit {
 
             if (id) {
                 await this.agentService.updateAgent(id, value);
+                this.notify.success('Agent updated');
                 this.router.navigate(['/agents', id]);
             } else {
                 const agent = await this.agentService.createAgent(value);
+                this.notify.success(`Agent '${value.name}' created successfully`);
                 this.router.navigate(['/agents', agent.id]);
             }
+        } catch (e) {
+            this.notify.error('Failed to save agent', String(e));
         } finally {
             this.saving.set(false);
         }

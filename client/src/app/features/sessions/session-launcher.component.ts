@@ -4,6 +4,7 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ProjectService } from '../../core/services/project.service';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
     selector: 'app-session-launcher',
@@ -87,6 +88,7 @@ export class SessionLauncherComponent implements OnInit {
     protected readonly projectService = inject(ProjectService);
     protected readonly agentService = inject(AgentService);
     private readonly sessionService = inject(SessionService);
+    private readonly notify = inject(NotificationService);
 
     protected readonly launching = signal(false);
 
@@ -121,7 +123,10 @@ export class SessionLauncherComponent implements OnInit {
                 name: value.name || undefined,
                 initialPrompt: value.initialPrompt || undefined,
             });
+            this.notify.success('Session started');
             this.router.navigate(['/sessions', session.id]);
+        } catch (e) {
+            this.notify.error('Failed to start session', String(e));
         } finally {
             this.launching.set(false);
         }

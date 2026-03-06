@@ -76,16 +76,42 @@ describe('NotificationService', () => {
     // ──────────────────────────────────────────────
     // Max visible cap
     // ──────────────────────────────────────────────
-    it('should cap visible notifications at 5', () => {
+    it('should cap visible notifications at 3', () => {
+        // Errors now auto-dismiss at 8s, so use fake timers (already set up)
         service.error('One');
         service.error('Two');
         service.error('Three');
         service.error('Four');
-        service.error('Five');
-        service.error('Six');
 
-        // Using error type because it has duration=0 (no auto-dismiss)
         const visible = service.notifications();
-        expect(visible).toHaveLength(5);
+        expect(visible).toHaveLength(3);
+    });
+
+    // ──────────────────────────────────────────────
+    // Error auto-dismiss
+    // ──────────────────────────────────────────────
+    it('should auto-dismiss error notifications after 8s', () => {
+        service.error('Failure');
+        expect(service.notifications()).toHaveLength(1);
+
+        vi.advanceTimersByTime(7999);
+        expect(service.notifications()).toHaveLength(1);
+
+        vi.advanceTimersByTime(1);
+        expect(service.notifications()).toHaveLength(0);
+    });
+
+    // ──────────────────────────────────────────────
+    // Success auto-dismiss
+    // ──────────────────────────────────────────────
+    it('should auto-dismiss success notifications after 4s', () => {
+        service.success('Done');
+        expect(service.notifications()).toHaveLength(1);
+
+        vi.advanceTimersByTime(3999);
+        expect(service.notifications()).toHaveLength(1);
+
+        vi.advanceTimersByTime(1);
+        expect(service.notifications()).toHaveLength(0);
     });
 });

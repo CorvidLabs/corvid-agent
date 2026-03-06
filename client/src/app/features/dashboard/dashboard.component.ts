@@ -12,6 +12,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { ApiService } from '../../core/services/api.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
 import type { Agent } from '../../core/models/agent.model';
@@ -455,6 +456,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly wsService = inject(WebSocketService);
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
+    private readonly notify = inject(NotificationService);
 
     protected readonly algochatStatus = this.sessionService.algochatStatus;
     protected readonly showWelcome = computed(() =>
@@ -595,6 +597,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     protected async runSelfTest(): Promise<void> {
         this.selfTestRunning.set(true);
+        this.notify.info('Self-test running...');
         try {
             const result = await firstValueFrom(
                 this.apiService.post<{ sessionId: string }>('/selftest/run', { testType: 'all' }),
