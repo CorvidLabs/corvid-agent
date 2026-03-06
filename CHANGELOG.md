@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0] - 2026-03-06
+
+### Added
+- **Governance tier architecture** — council launches support vote types (`standard`, `weighted`, `unanimous`) and governance tiers; `governance_votes` and `governance_member_votes` tables for structured multi-agent voting (#627)
+- **Empty state components** — dashboard pages (agents, councils, work tasks, schedules, sessions) show helpful empty states with ASCII art icons, descriptions, and quick-action buttons (#623)
+- **Skeleton loading states** — animated skeleton placeholders replace "Loading..." text across all list views (#623)
+- **Deduplication state persistence** — `dedup_state` table for crash-resilient dedup across polling, messaging, and bridge modules (#613)
+- **Tooltip directive** — reusable `appTooltip` directive for truncated text throughout the dashboard (#618)
+- **McpServiceContainer** — extracted MCP tool dependencies into a typed service container for cleaner dependency injection (#615)
+- **Global PR review polling** — centralized PR review detection across all configured repos (#628)
+- **Auto-merge dedup** — prevents duplicate merge attempts on the same PR (#626)
+
+### Improved
+- **Council list cards** — show last launch synthesis summary, stage badges, member chips, and chairman highlighting (#618)
+- **Schedule list** — improved layout with status badges, next-run display, and test-data filtering (#616)
+- **Work task list** — inline create form, status/type filters, and rich task cards with validation indicators (#616)
+- **Migration robustness** — `IDEMPOTENT_CREATE_INDEX` regex handles `CREATE UNIQUE INDEX IF NOT EXISTS`; `safeAlter` pattern for idempotent column additions
+
+### Fixed
+- Escaped backtick rendering in Angular template literals (#623, #616, #618)
+- Migration 066/067 collision between dedup_state and governance_tiers (#627)
+- Baseline migration schema drift for governance tables (#627)
+- Dead template references (`filteredSchedules`, `activeFilter`) in schedule-list component (#616)
+- Octal escape sequences in CSS template literals (#616)
+- Duplicate empty-state blocks in work-task-list component (#616)
+
+### Stats
+- **5,192** unit tests across 206 files (14,598 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **108** module specs with automated validation
+- **37** MCP tools, **~200** API endpoints, **67** migrations, **82** tables
+
 ## [0.17.0] - 2026-03-06
 
 ### Added

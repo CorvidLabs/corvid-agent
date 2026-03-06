@@ -89,7 +89,7 @@ jobs:
           cosign attest --yes --predicate sbom-spdx.json --type spdxjson "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@ea165f8d65b6db9a8b7a0d7c1b4e6bac2e267a29  # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: sbom
           path: sbom-spdx.json
