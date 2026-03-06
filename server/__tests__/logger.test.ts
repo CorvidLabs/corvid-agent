@@ -257,6 +257,59 @@ describe('child logger', () => {
     });
 });
 
+// ── Mnemonic / secret redaction ──────────────────────────────────────────────
+
+const FAKE_MNEMONIC = 'abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual about';
+
+describe('mnemonic redaction in logger', () => {
+    it('redacts a mnemonic in the log message', () => {
+        process.env.LOG_LEVEL = 'debug';
+        const log = createLogger('Test');
+        startCapture();
+        log.info(`Account created: ${FAKE_MNEMONIC}`);
+        stopCapture();
+        const output = capturedStdout[0];
+        expect(output).not.toContain('ability');
+        expect(output).not.toContain('absorb');
+        expect(output).toContain('***');
+    });
+
+    it('redacts a mnemonic in structured context error field', () => {
+        process.env.LOG_LEVEL = 'debug';
+        const log = createLogger('Test');
+        startCapture();
+        log.error('Decryption failed', { error: `Invalid mnemonic: ${FAKE_MNEMONIC}` });
+        stopCapture();
+        const output = capturedStderr[0];
+        expect(output).not.toContain('ability');
+        expect(output).not.toContain('absorb');
+    });
+
+    it('redacts hex-encoded private keys in messages', () => {
+        process.env.LOG_LEVEL = 'debug';
+        const log = createLogger('Test');
+        const hexKey = 'ab'.repeat(32); // 64 hex chars
+        startCapture();
+        log.warn(`Key exported: ${hexKey}`);
+        stopCapture();
+        const output = capturedStderr[0];
+        expect(output).toContain('[REDACTED]');
+        expect(output).not.toContain(hexKey);
+    });
+
+    it('redacts hex-encoded private keys in structured context', () => {
+        process.env.LOG_LEVEL = 'debug';
+        const log = createLogger('Test');
+        const hexKey = 'cd'.repeat(32); // 64 hex chars
+        startCapture();
+        log.error('Key leaked', { privateKey: hexKey });
+        stopCapture();
+        const output = capturedStderr[0];
+        expect(output).toContain('[REDACTED]');
+        expect(output).not.toContain(hexKey);
+    });
+});
+
 // ── Empty / edge cases ───────────────────────────────────────────────────────
 
 describe('edge cases', () => {

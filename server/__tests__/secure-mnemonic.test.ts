@@ -80,4 +80,44 @@ describe('sanitizeLogMessage', () => {
         const message = 'this is a normal sentence with several words in it';
         expect(sanitizeLogMessage(message)).toBe(message);
     });
+
+    it('redacts hex-encoded private keys (64+ hex chars)', () => {
+        const hexKey = 'a'.repeat(64);
+        const message = `Private key: ${hexKey} was exported`;
+        const sanitized = sanitizeLogMessage(message);
+        expect(sanitized).not.toBe(message);
+        expect(sanitized).toContain('[REDACTED]');
+        expect(sanitized).not.toContain(hexKey);
+    });
+
+    it('redacts longer hex strings (128 chars)', () => {
+        const hexKey = 'abcdef01'.repeat(16); // 128 chars
+        const message = `Key material: ${hexKey}`;
+        const sanitized = sanitizeLogMessage(message);
+        expect(sanitized).toContain('[REDACTED]');
+        expect(sanitized).not.toContain(hexKey);
+    });
+
+    it('leaves short hex strings unchanged', () => {
+        const shortHex = 'abcdef0123456789'; // 16 chars — too short to be a key
+        const message = `txid: ${shortHex}`;
+        expect(sanitizeLogMessage(message)).toBe(message);
+    });
+
+    it('redacts mnemonic in an error message context', () => {
+        const errorMsg = `Failed to create account from mnemonic: ${FAKE_MNEMONIC}`;
+        const sanitized = sanitizeLogMessage(errorMsg);
+        expect(sanitized).toContain('abandon');
+        expect(sanitized).not.toContain('[REDACTED]'); // no hex key in this message
+        expect(sanitized).not.toContain('ability');
+        expect(sanitized).toContain('***');
+    });
+
+    it('redacts both mnemonic and hex key in the same message', () => {
+        const hexKey = 'ff'.repeat(32); // 64 chars
+        const message = `mnemonic: ${FAKE_MNEMONIC} key: ${hexKey}`;
+        const sanitized = sanitizeLogMessage(message);
+        expect(sanitized).not.toContain('ability');
+        expect(sanitized).toContain('[REDACTED]');
+    });
 });

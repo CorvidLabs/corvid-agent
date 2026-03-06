@@ -38,16 +38,31 @@ export function looksLikeMnemonic(value: string): boolean {
 }
 
 /**
+ * Redact hex-encoded private keys (64 hex chars = 32 bytes).
+ * Shows first 8 and last 4 chars for traceability.
+ */
+function redactHexKey(hex: string): string {
+    return `${hex.slice(0, 8)}...${hex.slice(-4)}[REDACTED]`;
+}
+
+/**
  * Scan a log message / error string for anything that looks like it
- * might contain a mnemonic and redact it. Useful as a safety net
- * in structured logging.
+ * might contain a mnemonic or private key material and redact it.
+ * Used as a defense-in-depth safety net in structured logging.
  *
- * Strategy: find runs of lowercase words (20+), then check if any
- * contiguous 25-word window within them looks like a mnemonic.
+ * Detects:
+ * - Algorand mnemonics (25 consecutive lowercase words)
+ * - Hex-encoded private keys (64+ hex characters)
  */
 export function sanitizeLogMessage(message: string): string {
-    // Match runs of 20+ consecutive lowercase alpha words
-    return message.replace(
+    // Phase 1: Redact hex-encoded private keys (64+ hex chars, word-boundary aligned)
+    let result = message.replace(
+        /\b([0-9a-fA-F]{64,})\b/g,
+        (_match, hex: string) => redactHexKey(hex),
+    );
+
+    // Phase 2: Redact mnemonic-like word sequences (20+ consecutive lowercase words)
+    result = result.replace(
         /\b([a-z]+(?:\s+[a-z]+){19,})\b/g,
         (fullMatch, group: string) => {
             const words = group.split(/\s+/);
@@ -67,4 +82,6 @@ export function sanitizeLogMessage(message: string): string {
             return fullMatch;
         },
     );
+
+    return result;
 }
