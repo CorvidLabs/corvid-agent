@@ -4,8 +4,9 @@ import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
-import type { Council, CouncilLaunch } from '../../core/models/council.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { TooltipDirective } from '../../shared/directives/tooltip.directive';
+import type { Council, CouncilLaunch } from '../../core/models/council.model';
 
 interface CouncilCard {
     council: Council;
@@ -17,11 +18,11 @@ interface CouncilCard {
 @Component({
     selector: 'app-council-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
     template: `
         <div class="page">
             <div class="page__header">
-                <h2>Councils</h2>
+                <h2 class="page-title">Councils</h2>
                 <a class="btn btn--primary" routerLink="/councils/new">New Council</a>
             </div>
 
@@ -46,7 +47,7 @@ interface CouncilCard {
                                 }
                             </div>
                             @if (card.council.description) {
-                                <p class="council-card__desc">{{ card.council.description }}</p>
+                                <p class="council-card__desc" appTooltip>{{ card.council.description }}</p>
                             }
                             <div class="council-card__members">
                                 @for (name of card.memberNames; track name) {

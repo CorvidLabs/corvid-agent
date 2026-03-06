@@ -2,20 +2,22 @@ import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
+import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 
 @Component({
     selector: 'app-project-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe],
+    imports: [RouterLink, RelativeTimePipe, SkeletonComponent, TooltipDirective],
     template: `
         <div class="page">
             <div class="page__header">
-                <h2>Projects</h2>
+                <h2 class="page-title">Projects</h2>
                 <a class="btn btn--primary" routerLink="/projects/new">New Project</a>
             </div>
 
             @if (projectService.loading()) {
-                <p>Loading...</p>
+                <app-skeleton variant="table" [count]="5" />
             } @else if (projectService.projects().length === 0) {
                 <p class="empty">No projects yet. Create one to get started.</p>
             } @else {

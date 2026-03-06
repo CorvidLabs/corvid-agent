@@ -110,10 +110,10 @@ test.describe('Dashboard', () => {
         const cards = grid.locator('.agent-card');
         expect(await cards.count()).toBeGreaterThanOrEqual(2);
 
-        // Each card should have name and model
+        // Each card should have name and provider badge
         const firstCard = cards.first();
         await expect(firstCard.locator('.agent-card__name')).toBeVisible();
-        await expect(firstCard.locator('.agent-card__model')).toBeVisible();
+        await expect(firstCard.locator('.agent-card__provider-badge')).toBeVisible();
     });
 
     test('agent card shows status badge with data-status', async ({ page, api }) => {
