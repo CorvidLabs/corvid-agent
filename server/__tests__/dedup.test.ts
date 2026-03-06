@@ -334,4 +334,154 @@ describe('DedupService', () => {
             svc2.stop();
         });
     });
+
+    // -----------------------------------------------------------------------
+    // Write-through persistence (immediate SQLite writes)
+    // -----------------------------------------------------------------------
+
+    describe('write-through persistence', () => {
+        let db: Database;
+
+        beforeEach(() => {
+            db = new Database(':memory:');
+        });
+
+        afterEach(() => {
+            db.close();
+        });
+
+        test('isDuplicate writes to SQLite immediately', () => {
+            const svc = new DedupService(db);
+            svc.register('wt', { maxSize: 100, ttlMs: 60_000, persist: true });
+
+            svc.isDuplicate('wt', 'txid-abc');
+
+            // Verify the row exists in SQLite without stop/flush
+            const count = queryCount(db, `SELECT COUNT(*) as cnt FROM dedup_state WHERE namespace = 'wt' AND key = 'txid-abc'`);
+            expect(count).toBe(1);
+            svc.stop();
+        });
+
+        test('markSeen writes to SQLite immediately', () => {
+            const svc = new DedupService(db);
+            svc.register('wt', { maxSize: 100, ttlMs: 60_000, persist: true });
+
+            svc.markSeen('wt', 'txid-def');
+
+            const count = queryCount(db, `SELECT COUNT(*) as cnt FROM dedup_state WHERE namespace = 'wt' AND key = 'txid-def'`);
+            expect(count).toBe(1);
+            svc.stop();
+        });
+
+        test('isDuplicate does not write duplicates to SQLite again', () => {
+            const svc = new DedupService(db);
+            svc.register('wt', { maxSize: 100, ttlMs: 60_000, persist: true });
+
+            expect(svc.isDuplicate('wt', 'txid-1')).toBe(false);
+            expect(svc.isDuplicate('wt', 'txid-1')).toBe(true); // duplicate — no new write
+
+            const count = queryCount(db, `SELECT COUNT(*) as cnt FROM dedup_state WHERE namespace = 'wt'`);
+            expect(count).toBe(1);
+            svc.stop();
+        });
+
+        test('write-through survives crash (no stop/flush needed)', () => {
+            const svc1 = new DedupService(db);
+            svc1.register('crash-test', { maxSize: 100, ttlMs: 60_000, persist: true });
+            svc1.isDuplicate('crash-test', 'key-survive');
+            // Simulate crash: do NOT call stop() — skip the flush
+
+            // New service instance should find the key via read-through
+            const svc2 = new DedupService(db);
+            svc2.register('crash-test', { maxSize: 100, ttlMs: 60_000, persist: true });
+            expect(svc2.isDuplicate('crash-test', 'key-survive')).toBe(true);
+            svc2.stop();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Read-through persistence (SQLite fallback on cache miss)
+    // -----------------------------------------------------------------------
+
+    describe('read-through persistence', () => {
+        let db: Database;
+
+        beforeEach(() => {
+            db = new Database(':memory:');
+        });
+
+        afterEach(() => {
+            db.close();
+        });
+
+        test('has() finds key in SQLite after cache eviction', () => {
+            const svc = new DedupService(db);
+            svc.register('rt', { maxSize: 2, ttlMs: 60_000, persist: true });
+
+            svc.markSeen('rt', 'a');
+            svc.markSeen('rt', 'b');
+            svc.markSeen('rt', 'c'); // evicts 'a' from cache
+
+            // 'a' is gone from cache but should be found in SQLite
+            expect(svc.has('rt', 'a')).toBe(true);
+            svc.stop();
+        });
+
+        test('isDuplicate detects duplicate via SQLite after cache eviction', () => {
+            const svc = new DedupService(db);
+            svc.register('rt', { maxSize: 2, ttlMs: 60_000, persist: true });
+
+            svc.isDuplicate('rt', 'tx-1');
+            svc.isDuplicate('rt', 'tx-2');
+            svc.isDuplicate('rt', 'tx-3'); // evicts 'tx-1' from cache
+
+            // 'tx-1' should still be detected as duplicate via SQLite read-through
+            expect(svc.isDuplicate('rt', 'tx-1')).toBe(true);
+            svc.stop();
+        });
+
+        test('read-through does not activate for non-persistent namespaces', () => {
+            const svc = new DedupService(db);
+            svc.register('ephemeral', { maxSize: 2, ttlMs: 60_000, persist: false });
+
+            svc.markSeen('ephemeral', 'a');
+            svc.markSeen('ephemeral', 'b');
+            svc.markSeen('ephemeral', 'c'); // evicts 'a'
+
+            // No read-through — 'a' is gone
+            expect(svc.has('ephemeral', 'a')).toBe(false);
+            svc.stop();
+        });
+
+        test('read-through respects TTL in SQLite', async () => {
+            const svc = new DedupService(db);
+            svc.register('rt-ttl', { maxSize: 2, ttlMs: 50, persist: true });
+
+            svc.markSeen('rt-ttl', 'expiring');
+            svc.markSeen('rt-ttl', 'filler1');
+            svc.markSeen('rt-ttl', 'filler2'); // evicts 'expiring' from cache
+
+            await Bun.sleep(80); // wait for TTL to expire
+
+            // Expired in both cache and SQLite
+            expect(svc.has('rt-ttl', 'expiring')).toBe(false);
+            svc.stop();
+        });
+
+        test('pruneAll cleans expired rows from SQLite', async () => {
+            const svc = new DedupService(db);
+            svc.register('prune', { maxSize: 100, ttlMs: 50, persist: true });
+
+            svc.markSeen('prune', 'will-expire');
+
+            await Bun.sleep(80);
+
+            // Manually trigger prune (normally runs on interval)
+            (svc as unknown as { pruneAll: () => void }).pruneAll();
+
+            const count = queryCount(db, `SELECT COUNT(*) as cnt FROM dedup_state WHERE namespace = 'prune'`);
+            expect(count).toBe(0);
+            svc.stop();
+        });
+    });
 });
