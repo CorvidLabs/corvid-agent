@@ -111,7 +111,11 @@ interface ActivityEvent {
                                 <div class="agent-card__top">
                                     <div class="agent-card__info">
                                         <span class="agent-card__name">{{ summary.agent.name }}</span>
-                                        <span class="agent-card__model">{{ summary.agent.model || 'default' }}</span>
+                                        <span
+                                            class="agent-card__provider-badge"
+                                            [attr.data-provider]="summary.agent.provider || 'anthropic'">
+                                            {{ summary.agent.provider || 'anthropic' }}{{ summary.agent.model ? ' / ' + summary.agent.model : '' }}
+                                        </span>
                                     </div>
                                     <span
                                         class="agent-card__status"
@@ -321,7 +325,14 @@ interface ActivityEvent {
         .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
         .agent-card__info { display: flex; flex-direction: column; gap: 0.1rem; }
         .agent-card__name { font-weight: 700; font-size: 0.85rem; color: var(--text-primary); }
-        .agent-card__model { font-size: 0.65rem; color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
+        .agent-card__provider-badge {
+            font-size: 0.55rem; font-family: var(--font-mono, monospace); font-weight: 600;
+            padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid;
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .agent-card__provider-badge[data-provider="anthropic"] { color: #d4a574; border-color: rgba(212, 165, 116, 0.4); }
+        .agent-card__provider-badge[data-provider="openai"] { color: #74d4a5; border-color: rgba(116, 212, 165, 0.4); }
+        .agent-card__provider-badge[data-provider="ollama"] { color: #a5a5ff; border-color: rgba(165, 165, 255, 0.4); }
         .agent-card__status {
             font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid;
