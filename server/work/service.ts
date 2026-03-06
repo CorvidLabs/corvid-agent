@@ -21,6 +21,7 @@ import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
 import { isRepoOffLimits } from '../github/off-limits';
 import { assessImpact } from '../councils/governance';
+import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
@@ -55,12 +56,18 @@ export class WorkTaskService {
     private db: Database;
     private processManager: ProcessManager;
     private astParserService: AstParserService | null;
+    private agentMessenger: AgentMessenger | null = null;
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
 
     constructor(db: Database, processManager: ProcessManager, astParserService?: AstParserService) {
         this.db = db;
         this.processManager = processManager;
         this.astParserService = astParserService ?? null;
+    }
+
+    /** Set the agent messenger (set after async AlgoChat init). */
+    setAgentMessenger(messenger: AgentMessenger): void {
+        this.agentMessenger = messenger;
     }
 
     /**
@@ -145,6 +152,12 @@ export class WorkTaskService {
         }
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId });
+
+        // Fire-and-forget AlgoChat notification for task creation
+        if (this.agentMessenger) {
+            const snippet = input.description.slice(0, 100);
+            this.agentMessenger.sendOnChainToSelf(input.agentId, `[WORK_TASK:created] ${snippet}`).catch(() => {});
+        }
 
         recordAudit(
             this.db,
@@ -500,6 +513,14 @@ export class WorkTaskService {
     private notifyCallbacks(taskId: string): void {
         const task = getWorkTask(this.db, taskId);
         if (task) {
+            // Fire-and-forget AlgoChat notification for task completion/failure
+            if (this.agentMessenger && task.agentId) {
+                const msg = task.status === 'completed'
+                    ? `[WORK_TASK:completed] ${task.prUrl ? `PR: ${task.prUrl}` : task.description.slice(0, 100)}`
+                    : `[WORK_TASK:failed] ${(task.error ?? task.description).slice(0, 100)}`;
+                this.agentMessenger.sendOnChainToSelf(task.agentId, msg).catch(() => {});
+            }
+
             const callbacks = this.completionCallbacks.get(taskId);
             if (callbacks) {
                 for (const cb of callbacks) {

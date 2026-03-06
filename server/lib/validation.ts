@@ -192,6 +192,7 @@ export const CreateCouncilSchema = z.object({
     description: z.string().optional(),
     chairmanAgentId: z.string().optional(),
     discussionRounds: z.number().int().min(0).optional(),
+    onChainMode: z.enum(['off', 'attestation', 'full']).optional(),
 });
 
 export const UpdateCouncilSchema = z.object({
@@ -200,6 +201,7 @@ export const UpdateCouncilSchema = z.object({
     description: z.string().optional(),
     chairmanAgentId: z.string().nullable().optional(),
     discussionRounds: z.number().int().min(0).optional(),
+    onChainMode: z.enum(['off', 'attestation', 'full']).optional(),
 });
 
 export const LaunchCouncilSchema = z.object({

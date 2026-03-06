@@ -10,12 +10,17 @@ import {
     getCouncil,
     getCouncilLaunch,
     updateCouncilLaunchStage,
+    updateCouncilLaunchSynthesisTxid,
     getDiscussionMessages,
 } from '../db/councils';
 import { createSession, getSessionMessages, listSessionsByCouncilLaunch } from '../db/sessions';
 import { getAgent } from '../db/agents';
 import type { ProcessManager, EventCallback } from '../process/manager';
-import type { CouncilDiscussionMessage } from '../../shared/types';
+import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { CouncilDiscussionMessage, CouncilOnChainMode } from '../../shared/types';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('CouncilSynthesis');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,6 +180,8 @@ export function triggerSynthesis(
     broadcastStageChange: BroadcastStageChangeFn,
     formatDiscussionMessages: (messages: CouncilDiscussionMessage[]) => string,
     chairmanOverride?: string,
+    agentMessenger?: AgentMessenger | null,
+    onChainMode?: CouncilOnChainMode,
 ): { ok: true; synthesisSessionId: string } | { ok: false; error: string; status: number } {
     const launch = getCouncilLaunch(db, launchId);
     if (!launch) return { ok: false, error: 'Launch not found', status: 404 };
@@ -248,6 +255,7 @@ Produce a final, comprehensive answer that incorporates the best elements from a
     });
 
     // Watch for chairman session completion to store synthesis
+    const effectiveOnChainMode = onChainMode ?? 'off';
     const callback: EventCallback = (sessionId, event) => {
         if (sessionId !== session.id) return;
         if (event.type === 'session_exited' || event.type === 'session_stopped') {
@@ -257,6 +265,18 @@ Produce a final, comprehensive answer that incorporates the best elements from a
             if (lastMsg) {
                 updateCouncilLaunchStage(db, launchId, 'complete', lastMsg.content);
                 emitLog(db, launchId, 'stage', 'Council complete', `Synthesis: ${lastMsg.content.length} chars`);
+
+                // Publish synthesis attestation on-chain (SHA-256 hash of synthesis text)
+                if (effectiveOnChainMode === 'attestation' && agentMessenger && chairmanAgentId) {
+                    publishSynthesisAttestation(
+                        agentMessenger, chairmanAgentId, launchId, lastMsg.content, db,
+                    ).catch((err) => {
+                        log.error('Failed to publish synthesis attestation', {
+                            launchId,
+                            error: err instanceof Error ? err.message : String(err),
+                        });
+                    });
+                }
             } else {
                 updateCouncilLaunchStage(db, launchId, 'complete', '(no synthesis produced)');
                 emitLog(db, launchId, 'warn', 'Council complete — no synthesis produced');
@@ -280,4 +300,27 @@ Produce a final, comprehensive answer that incorporates the best elements from a
     broadcastStageChange(launchId, 'synthesizing', [session.id]);
 
     return { ok: true, synthesisSessionId: session.id };
+}
+
+// ─── Synthesis attestation ────────────────────────────────────────────────────
+
+async function publishSynthesisAttestation(
+    agentMessenger: AgentMessenger,
+    chairmanAgentId: string,
+    launchId: string,
+    synthesisText: string,
+    db: Database,
+): Promise<void> {
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(synthesisText));
+    const hashHex = Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+    const attestation = `[council:${launchId.slice(0, 8)}:synthesis] sha256:${hashHex}`;
+    const txid = await agentMessenger.sendOnChainToSelf(chairmanAgentId, attestation);
+    if (txid) {
+        updateCouncilLaunchSynthesisTxid(db, launchId, txid);
+        log.info('Published synthesis attestation', { launchId, txid, hash: hashHex.slice(0, 16) + '...' });
+    }
 }

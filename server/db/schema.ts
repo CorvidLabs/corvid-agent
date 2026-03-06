@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 67;
+const SCHEMA_VERSION = 69;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1298,6 +1298,26 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_gov_member_votes_vote ON governance_member_votes(governance_vote_id)`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_gov_member_votes_unique ON governance_member_votes(governance_vote_id, agent_id)`,
+    ],
+    68: [
+        // Council on-chain communication mode (#653)
+        `ALTER TABLE councils ADD COLUMN on_chain_mode TEXT NOT NULL DEFAULT 'off'`,
+        `ALTER TABLE council_launches ADD COLUMN synthesis_txid TEXT DEFAULT NULL`,
+    ],
+    69: [
+        // USDC revenue tracking for agent wallets (#654)
+        `CREATE TABLE IF NOT EXISTS agent_usdc_revenue (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id       TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+            amount_micro   INTEGER NOT NULL,
+            from_address   TEXT NOT NULL,
+            txid           TEXT NOT NULL UNIQUE,
+            forward_txid   TEXT DEFAULT NULL,
+            forward_status TEXT NOT NULL DEFAULT 'pending',
+            created_at     TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
     ],
 };
 
