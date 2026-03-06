@@ -205,6 +205,8 @@ export const UpdateCouncilSchema = z.object({
 export const LaunchCouncilSchema = z.object({
     projectId: z.string().min(1, 'projectId is required'),
     prompt: z.string().min(1, 'prompt is required'),
+    voteType: z.enum(['standard', 'governance']).optional(),
+    affectedPaths: z.array(z.string()).optional(),
 });
 
 export const CouncilChatSchema = z.object({

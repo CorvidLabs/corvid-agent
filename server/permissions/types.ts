@@ -19,7 +19,8 @@ export type PermissionNamespace =
     | 'fs'        // File system (coding tools)
     | 'repo'      // Repo blocklist management
     | 'reputation' // Reputation system
-    | 'owner';    // Owner communication
+    | 'owner'     // Owner communication
+    | 'council';  // Council governance operations
 
 /** A permission action string: "namespace:verb", "namespace:*", or "*". */
 export type PermissionAction = string;

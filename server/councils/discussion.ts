@@ -28,8 +28,10 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { getModelPricing } from '../providers/cost-table';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
+import { assessImpact, GOVERNANCE_TIERS } from './governance';
+import { createGovernanceVote } from '../db/councils';
 import {
     triggerReview as triggerReviewImpl,
     triggerSynthesis as triggerSynthesisImpl,
@@ -125,6 +127,7 @@ export function launchCouncil(
     projectId: string,
     prompt: string,
     agentMessenger: AgentMessenger | null,
+    opts?: { voteType?: string; affectedPaths?: string[] },
 ): LaunchCouncilResult {
     const ctx = createEventContext('council');
     return runWithEventContext(ctx, () => {
@@ -134,8 +137,45 @@ export function launchCouncil(
     const project = getProject(db, projectId);
     if (!project) throw new NotFoundError("Project", projectId);
 
+    // Governance impact assessment for governance votes
+    const voteType = opts?.voteType ?? 'standard';
+    let governanceTier: number | null = null;
+
+    if (voteType === 'governance' && opts?.affectedPaths && opts.affectedPaths.length > 0) {
+        const impact = assessImpact(opts.affectedPaths);
+        governanceTier = impact.tier;
+
+        // Layer 0 — hard block. No council can vote on constitutional changes.
+        if (impact.tier === 0) {
+            throw new ValidationError(
+                'Layer 0 (Constitutional) changes cannot be submitted for council vote — human-only commits required',
+                {
+                    tier: 0,
+                    tierLabel: impact.tierLabel,
+                    blockedPaths: impact.affectedPaths.filter((p) => p.tier === 0).map((p) => p.path),
+                },
+            );
+        }
+
+        log.info('Governance vote launched', {
+            tier: impact.tier,
+            tierLabel: impact.tierLabel,
+            quorum: GOVERNANCE_TIERS[impact.tier].quorumThreshold,
+            affectedPaths: opts.affectedPaths,
+        });
+    }
+
     const launchId = crypto.randomUUID();
-    createCouncilLaunch(db, { id: launchId, councilId, projectId, prompt });
+    createCouncilLaunch(db, { id: launchId, councilId, projectId, prompt, voteType, governanceTier });
+
+    // Create formal governance vote record for governance launches
+    if (voteType === 'governance' && governanceTier !== null && opts?.affectedPaths) {
+        createGovernanceVote(db, {
+            launchId,
+            governanceTier,
+            affectedPaths: opts.affectedPaths,
+        });
+    }
     // Set total discussion rounds upfront so the UI knows from the start
     updateCouncilLaunchDiscussionRound(db, launchId, 0, council.discussionRounds ?? 2);
 

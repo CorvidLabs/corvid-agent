@@ -1,9 +1,12 @@
 /**
  * Shared path-protection utilities used by both SDK and direct execution engines.
  * Agents must never modify these paths, even in full-auto mode.
+ *
+ * For governance-tier classification of paths, see councils/governance.ts.
  */
 
 import { analyzeBashCommand } from '../lib/bash-security';
+import { classifyPath, checkAutomationAllowed, type GovernanceTier, type AutomationCheckResult } from '../councils/governance';
 
 // Paths that agents must never modify, even in full-auto mode.
 // Uses basename matching to avoid false positives (e.g. "manager.ts" matching "task-manager.ts").
@@ -91,4 +94,21 @@ export function isProtectedBashCommand(command: string): ProtectedBashResult {
     }
 
     return { blocked: false };
+}
+
+// ─── Governance tier integration ──────────────────────────────────────────────
+
+/**
+ * Get the governance tier for a file path.
+ * Re-exported from councils/governance.ts for consumers that import from protected-paths.
+ */
+export { classifyPath as getGovernanceTier };
+export type { GovernanceTier, AutomationCheckResult };
+
+/**
+ * Check whether automated workflows may modify a set of file paths.
+ * Layer 0 (Constitutional) and Layer 1 (Structural) paths are blocked.
+ */
+export function isBlockedByGovernance(filePaths: string[]): AutomationCheckResult {
+    return checkAutomationAllowed(filePaths);
 }

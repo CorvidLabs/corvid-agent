@@ -20,6 +20,7 @@ import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
 import { isRepoOffLimits } from '../github/off-limits';
+import { assessImpact } from '../councils/governance';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
 
@@ -603,6 +604,38 @@ export class WorkTaskService {
             await diffProc.exited;
 
             if (diffOutput.trim()) {
+                // Governance tier check — block changes to Layer 0/1 paths in automated workflows
+                const changedFiles = diffOutput
+                    .split('\n')
+                    .filter((line) => line.startsWith('diff --git'))
+                    .map((line) => {
+                        const match = line.match(/b\/(.+)$/);
+                        return match?.[1] ?? '';
+                    })
+                    .filter(Boolean);
+
+                if (changedFiles.length > 0) {
+                    const impact = assessImpact(changedFiles);
+                    if (impact.blockedFromAutomation) {
+                        passed = false;
+                        const blockedList = impact.affectedPaths
+                            .filter((p) => p.tier < 2)
+                            .map((p) => `  - ${p.path} (Layer ${p.tier})`)
+                            .join('\n');
+                        outputs.push(
+                            `=== Governance Tier Violation ===\n` +
+                            `Work task attempted to modify ${impact.tierLabel} (Layer ${impact.tier}) paths.\n` +
+                            `Automated workflows cannot modify Layer 0 or Layer 1 paths.\n\n` +
+                            `Blocked paths:\n${blockedList}`,
+                        );
+                        log.warn('Work task blocked by governance tier', {
+                            tier: impact.tier,
+                            tierLabel: impact.tierLabel,
+                            blockedPaths: impact.affectedPaths.filter((p) => p.tier < 2).map((p) => p.path),
+                        });
+                    }
+                }
+
                 // Fetch detector
                 const fetchResult = scanDiff(diffOutput);
                 if (fetchResult.hasUnapprovedFetches) {
