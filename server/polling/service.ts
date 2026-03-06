@@ -181,6 +181,9 @@ export class MentionPollingService {
 
             log.debug('Found due polling configs', { count: dueConfigs.length });
 
+            // Clear the global review cache so each poll cycle gets fresh results
+            this.searcher.clearGlobalReviewCache();
+
             // Process up to MAX_CONCURRENT_POLLS at once
             const batch = dueConfigs
                 .filter(c => !this.activePolls.has(c.id))

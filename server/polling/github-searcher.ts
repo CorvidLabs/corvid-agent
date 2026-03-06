@@ -52,6 +52,17 @@ export type IsAllowedFn = (sender: string) => boolean;
 // ─── GitHubSearcher ─────────────────────────────────────────────────────────
 
 export class GitHubSearcher {
+    /**
+     * Per-cycle cache for global authored PR review results.
+     * Prevents redundant API calls when multiple configs share the same username.
+     * Call clearGlobalReviewCache() at the start of each poll cycle.
+     */
+    private globalReviewCache = new Map<string, DetectedMention[]>();
+
+    clearGlobalReviewCache(): void {
+        this.globalReviewCache.clear();
+    }
+
     constructor(private readonly runGh: RunGhFn) {}
 
     // ─── Orchestrator ───────────────────────────────────────────────────────
@@ -89,9 +100,17 @@ export class GitHubSearcher {
         mentions.push(...assignedIssues);
 
         if (shouldPollEventType(config, 'pull_request_review_comment')) {
-            const prReviewMentions = await this.searchAuthoredPRReviews(
-                config.repo, config.mentionUsername, sinceDate,
-            );
+            // Global search: find review comments on ALL agent-authored PRs,
+            // not just within the config's repo scope. This catches feedback on
+            // external/cross-org PRs (e.g. PRs on repos outside CorvidLabs).
+            const cacheKey = `${config.mentionUsername}:${sinceDate.split('T')[0]}`;
+            let prReviewMentions = this.globalReviewCache.get(cacheKey);
+            if (!prReviewMentions) {
+                prReviewMentions = await this.searchGlobalAuthoredPRReviews(
+                    config.mentionUsername, sinceDate,
+                );
+                this.globalReviewCache.set(cacheKey, prReviewMentions);
+            }
             mentions.push(...prReviewMentions);
         }
 
@@ -376,6 +395,54 @@ export class GitHubSearcher {
     /**
      * Search for open PRs authored by the user and fetch new reviews/review comments on each.
      */
+    /**
+     * Search for review comments on ALL open PRs authored by the agent globally
+     * (not scoped to a specific repo). Catches feedback on external/cross-org PRs
+     * that aren't covered by repo-scoped polling configs.
+     */
+    async searchGlobalAuthoredPRReviews(
+        username: string,
+        since: string,
+    ): Promise<DetectedMention[]> {
+        try {
+            const sinceDate = since.split('T')[0];
+            const query = `is:pr is:open author:${username} updated:>=${sinceDate}`;
+            const result = await this.runGh([
+                'api', 'search/issues',
+                '-X', 'GET',
+                '-f', `q=${query}`,
+                '-f', 'sort=updated',
+                '-f', 'order=desc',
+                '-f', 'per_page=20',
+            ]);
+
+            if (!result.ok || !result.stdout.trim()) return [];
+
+            const parsed = JSON.parse(result.stdout) as { items?: Array<Record<string, unknown>> };
+            const items = parsed.items ?? [];
+            const mentions: DetectedMention[] = [];
+
+            for (const item of items) {
+                const prNumber = item.number as number;
+                const prTitle = (item.title as string) ?? '';
+                const prHtmlUrl = (item.html_url as string) ?? '';
+                const fullRepo = resolveFullRepo('', prHtmlUrl);
+
+                const [reviews, reviewComments] = await Promise.all([
+                    this.fetchPRReviews(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+                    this.fetchPRReviewComments(fullRepo, prNumber, username, since, prTitle, prHtmlUrl),
+                ]);
+
+                mentions.push(...reviews, ...reviewComments);
+            }
+
+            return mentions;
+        } catch (err) {
+            log.error('Error searching global authored PR reviews', { error: err instanceof Error ? err.message : String(err) });
+            return [];
+        }
+    }
+
     async searchAuthoredPRReviews(
         repo: string,
         username: string,
