@@ -6,6 +6,8 @@ import { sessionCommand } from './commands/session';
 import { agentCommand } from './commands/agent';
 import { configCommand } from './commands/config';
 import { interactiveCommand } from './commands/interactive';
+import { initCommand } from './commands/init';
+import { demoCommand } from './commands/demo';
 import { c, printError } from './render';
 
 // ─── Argument Parsing ───────────────────────────────────────────────────────
@@ -42,40 +44,55 @@ const VERSION = '0.9.0';
 
 function printHelp(): void {
     console.log(`
-${c.bold}corvid-agent${c.reset} v${VERSION} — Agent orchestration CLI
+${c.bold}corvid-agent${c.reset} v${VERSION} — AI agent orchestration platform
 
-${c.bold}Usage:${c.reset}
-  corvid-agent                          Launch interactive REPL
-  corvid-agent <command> [options]
+${c.bold}Getting Started:${c.reset}
+  ${c.cyan('corvid-agent init')}                Set up .env, install deps, create first agent
+  ${c.cyan('corvid-agent demo')}                Run a self-contained demo session
+  ${c.cyan('bun run try')}                      Open the dashboard in zero-config sandbox mode
 
 ${c.bold}Commands:${c.reset}
   ${c.cyan('(no args)')}                         Interactive chat REPL
-  ${c.cyan('status')}                          Check server health
-  ${c.cyan('chat')} <prompt>                    Send a message to an agent
-  ${c.cyan('session')} list|get|stop|resume     Manage sessions
-  ${c.cyan('agent')} list|get|create            Manage agents
-  ${c.cyan('config')} show|get|set              Manage CLI configuration
+  ${c.cyan('init')}                             Interactive project setup
+  ${c.cyan('demo')}                             Run a self-contained demo
+  ${c.cyan('status')}                           Check server health
+  ${c.cyan('chat')} <prompt>                     Send a message to an agent
+  ${c.cyan('session')} list|get|stop|resume      Manage sessions
+  ${c.cyan('agent')} list|get|create             Manage agents
+  ${c.cyan('config')} show|get|set               Manage CLI configuration
 
 ${c.bold}Global Options:${c.reset}
   --agent <id>       Agent ID (or set default via config)
   --project <id>     Project ID (or set default via config)
   --model <model>    Model override
-
-${c.bold}Agent Create Options:${c.reset}
-  --name <name>      Agent name (required)
-  --description <d>  Agent description
-  --model <model>    Model (default: claude-sonnet-4-5-20250929)
+  --help, -h         Show this help
+  --version, -v      Show version
 
 ${c.bold}Examples:${c.reset}
-  corvid-agent                                    # interactive REPL
+  ${c.gray('# First time? Start here:')}
+  corvid-agent init                               ${c.gray('# guided setup')}
+  corvid-agent demo                               ${c.gray('# see it in action')}
+
+  ${c.gray('# Daily usage:')}
+  corvid-agent                                    ${c.gray('# interactive REPL')}
+  corvid-agent chat "What files are in this project?"
+  corvid-agent chat "Fix the bug in auth.ts" --agent def456
+
+  ${c.gray('# Managing resources:')}
+  corvid-agent agent list
+  corvid-agent agent create --name "Reviewer" --model claude-sonnet-4-20250514
+  corvid-agent session list
   corvid-agent status
+
+  ${c.gray('# Configuration:')}
   corvid-agent config set serverUrl http://localhost:3578
   corvid-agent config set authToken my-api-key
   corvid-agent config set defaultAgent abc123
-  corvid-agent chat "What files are in this project?"
-  corvid-agent chat "Fix the bug in auth.ts" --agent def456
-  corvid-agent session list
-  corvid-agent agent list
+
+${c.bold}Documentation:${c.reset}
+  Quickstart:  docs/quickstart.md
+  Self-host:   docs/self-hosting.md
+  Dashboard:   http://127.0.0.1:3000
 `);
 }
 
@@ -99,6 +116,14 @@ async function main(): Promise<void> {
     }
 
     switch (command) {
+        case 'init':
+            await initCommand();
+            break;
+
+        case 'demo':
+            await demoCommand();
+            break;
+
         case 'status':
             await statusCommand();
             break;
