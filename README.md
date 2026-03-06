@@ -24,7 +24,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **108** with automated validation |
 | MCP tools | **37** corvid_* tool handlers |
-| API endpoints | **~200** across 36 route modules |
+| API endpoints | **~200** across 37 route modules |
 | DB migrations | **67** (82 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
@@ -313,6 +313,7 @@ server/          Bun HTTP + WebSocket server
   db/            SQLite schema (67 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
+  events/        Event bus and WebSocket broadcasting
   exam/          Model exam system with 18 test cases across 6 categories
   github/        GitHub API operations (PRs, issues, reviews)
   feedback/      PR outcome tracking and schedule effectiveness learning
@@ -327,13 +328,14 @@ server/          Bun HTTP + WebSocket server
   observability/ OpenTelemetry tracing, Prometheus metrics
   openapi/       OpenAPI spec generator and route registry
   performance/   Performance metrics collection and regression detection
+  permissions/   Capability broker — grant, revoke, and check agent tool access
   plugins/       Plugin SDK and dynamic tool registration
   polling/       GitHub mention polling for @mention-driven automation
   process/       Agent lifecycle (SDK + Ollama, approval, event bus, persona/skill injection)
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (34 route modules)
+  routes/        REST API routes (37 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -380,7 +382,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 34 route modules:
+~200 REST endpoints and a WebSocket interface across 37 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
@@ -398,6 +400,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Reputation | `/api/reputation` | Trust scores, events, attestations |
 | Billing | `/api/billing` | Subscriptions, usage metering, invoices |
 | Sandbox | `/api/sandbox` | Container policies and allocation |
+| Dashboard | `/api/dashboard/summary` | Aggregated dashboard summary with activity feed |
 | Analytics | `/api/analytics` | Cost, token, and session statistics |
 | Audit | `/api/audit` | Immutable audit log queries |
 | Exam | `/api/exam` | Model examination and capability scoring |
@@ -405,7 +408,9 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | MCP Servers | `/api/mcp-servers` | External MCP server configuration |
 | Ollama | `/api/ollama` | Ollama provider management and model pulls |
 | Plugins | `/api/plugins` | Plugin registry and capability management |
+| Permissions | `/api/permissions` | Capability broker — grant, revoke, and check agent tool access |
 | Allowlist | `/api/allowlist` | Address allowlist management |
+| Repo Blocklist | `/api/repo-blocklist` | Blocked repository management |
 | GitHub Allowlist | `/api/github-allowlist` | GitHub username allowlist management |
 | Projects | `/api/projects` | Project CRUD and filesystem browsing |
 | Tenants | `/api/tenants` | Multi-tenant registration and member management |
