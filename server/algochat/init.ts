@@ -35,6 +35,7 @@ import { OnChainTransactor } from './on-chain-transactor';
 import { WorkCommandRouter } from './work-command-router';
 import { broadcastAlgoChatMessage } from '../ws/handler';
 import { publishToTenant } from '../events/broadcasting';
+import { resolveAgentTenant } from '../tenant/resolve';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -199,7 +200,7 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
         algochatState.messenger.onMessageUpdate((message) => {
             const msg = JSON.stringify({ type: 'agent_message_update', message });
             const fromTid = message.fromAgentId
-                ? resolveAgentTenantForBroadcast(deps.db, message.fromAgentId)
+                ? resolveAgentTenant(deps.db, message.fromAgentId)
                 : undefined;
             publishToTenant(deps.server, 'algochat', msg, fromTid);
         });
@@ -225,11 +226,4 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
     workflowService.start();
     usageMeter.start();
     healthMonitorService.start();
-}
-
-// Internal helper — TODO: deduplicate with broadcasting.ts in a future PR
-function resolveAgentTenantForBroadcast(db: Database, agentId: string): string | undefined {
-    const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agentId) as { tenant_id: string } | null;
-    const tid = row?.tenant_id;
-    return tid && tid !== 'default' ? tid : undefined;
 }

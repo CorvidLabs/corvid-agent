@@ -15,7 +15,7 @@ import type { NotificationService } from '../notifications/service';
 import type { ProcessManager } from '../process/manager';
 import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from '../routes/councils';
 import { tenantTopic } from '../ws/handler';
-import { DEFAULT_TENANT_ID } from '../tenant/types';
+import { resolveAgentTenant, resolveCouncilTenant } from '../tenant/resolve';
 
 export interface BroadcastDeps {
     server: BunServer;
@@ -27,31 +27,6 @@ export interface BroadcastDeps {
     workflowService: WorkflowService;
     notificationService: NotificationService;
     multiTenant: boolean;
-}
-
-/**
- * Resolve the tenant for an agent (used by event broadcasts).
- * Returns undefined in single-tenant mode (flat topics).
- */
-function resolveAgentTenant(db: Database, multiTenant: boolean, agentId: string): string | undefined {
-    if (!multiTenant) return undefined;
-    const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agentId) as { tenant_id: string } | null;
-    const tid = row?.tenant_id;
-    return tid && tid !== DEFAULT_TENANT_ID ? tid : undefined;
-}
-
-/**
- * Resolve the tenant for a council launch (used by council event broadcasts).
- */
-function resolveCouncilTenant(db: Database, multiTenant: boolean, launchId: string): string | undefined {
-    if (!multiTenant) return undefined;
-    const row = db.query(
-        `SELECT a.tenant_id FROM sessions s
-         JOIN agents a ON s.agent_id = a.id
-         WHERE s.council_launch_id = ? LIMIT 1`,
-    ).get(launchId) as { tenant_id: string } | null;
-    const tid = row?.tenant_id;
-    return tid && tid !== DEFAULT_TENANT_ID ? tid : undefined;
 }
 
 function spreadScheduleEvent(event: { type: string; data: unknown }): Record<string, unknown> {
@@ -95,8 +70,8 @@ export function publishToTenant(server: BunServer, baseTopic: string, data: stri
 export function wireEventBroadcasting(deps: BroadcastDeps): void {
     const { server, db, processManager, schedulerService, webhookService, mentionPollingService, workflowService, notificationService, multiTenant } = deps;
 
-    const resolveAgent = (agentId: string) => resolveAgentTenant(db, multiTenant, agentId);
-    const resolveCouncil = (launchId: string) => resolveCouncilTenant(db, multiTenant, launchId);
+    const resolveAgent = (agentId: string) => resolveAgentTenant(db, agentId, multiTenant);
+    const resolveCouncil = (launchId: string) => resolveCouncilTenant(db, launchId, multiTenant);
     const publish = (baseTopic: string, data: string, tid?: string) => publishToTenant(server, baseTopic, data, tid);
 
     // Wire broadcast function so MCP tools can publish to WS clients
