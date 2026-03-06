@@ -1256,8 +1256,18 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_perm_checks_tool ON permission_checks(tool_name)`,
         `CREATE INDEX IF NOT EXISTS idx_perm_checks_tenant ON permission_checks(tenant_id)`,
     ],
-
     66: [
+        // Formalize dedup_state table (#587)
+        `CREATE TABLE IF NOT EXISTS dedup_state (
+            namespace  TEXT NOT NULL,
+            key        TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            PRIMARY KEY (namespace, key)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_dedup_state_expires ON dedup_state(expires_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_dedup_state_ns_expires ON dedup_state(namespace, expires_at)`,
+    ],
+    67: [
         // Governance tier architecture for council jurisdiction (#590)
         `ALTER TABLE council_launches ADD COLUMN vote_type TEXT NOT NULL DEFAULT 'standard'`,
         `ALTER TABLE council_launches ADD COLUMN governance_tier INTEGER DEFAULT NULL`,
@@ -1283,7 +1293,8 @@ const MIGRATIONS: Record<number, string[]> = {
             agent_id            TEXT NOT NULL,
             vote                TEXT NOT NULL CHECK(vote IN ('approve', 'reject', 'abstain')),
             reason              TEXT NOT NULL DEFAULT '',
-            created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+            created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(governance_vote_id, agent_id)
         )`,
         `CREATE INDEX IF NOT EXISTS idx_gov_member_votes_vote ON governance_member_votes(governance_vote_id)`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_gov_member_votes_unique ON governance_member_votes(governance_vote_id, agent_id)`,
