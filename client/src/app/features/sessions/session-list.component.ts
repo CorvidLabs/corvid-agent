@@ -6,12 +6,14 @@ import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { Session, SessionStatus, SessionSource } from '../../core/models/session.model';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe, SlicePipe],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe, SlicePipe, SkeletonComponent, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -60,8 +62,15 @@ import type { Session, SessionStatus, SessionSource } from '../../core/models/se
             }
 
             @if (sessionService.loading()) {
-                <p class="loading">Loading...</p>
+<<<<<<< HEAD
+                <app-skeleton variant="table" [count]="5" />
             } @else if (filteredSessions().length === 0) {
+=======
+                <app-skeleton variant="table" [count]="5" />
+            } @else if (sessionService.sessions().length === 0) {
+                <app-empty-state icon=" _____&#10;|     |&#10;| > _ |&#10;|_____|" title="No conversations yet." description="Start a session to chat with an agent in real time." actionLabel="+ Start a conversation" actionRoute="/sessions/new" actionAriaLabel="Start a new conversation with an agent" />
+            } @else if (dayGroups().length === 0) {
+>>>>>>> 0fe708f (feat(ui): add empty states with guided actions for new users (#607))
                 <p class="empty">No conversations match your filters.</p>
             } @else {
                 <div class="session-table">

@@ -6,7 +6,9 @@ import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
 import { PersonaService } from '../../core/services/persona.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { Agent } from '../../core/models/agent.model';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 
 interface AgentCard {
     agent: Agent;
@@ -20,7 +22,7 @@ interface AgentCard {
 @Component({
     selector: 'app-agent-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -74,9 +76,16 @@ interface AgentCard {
             </div>
 
             @if (agentService.loading()) {
-                <p class="loading">Loading...</p>
+                <app-skeleton variant="table" [count]="5" />
             } @else if (agentService.agents().length === 0) {
-                <p class="empty">No agents configured. Create one to define how Claude behaves.</p>
+                <app-empty-state
+                    icon="  [>_]  \n /|\\  \n / \\"
+                    title="No agents yet."
+                    description="Agents are AI assistants that write code, review PRs, and automate tasks."
+                    actionLabel="+ Create your first agent"
+                    actionRoute="/agents/new"
+                    actionAriaLabel="Create your first agent configuration"
+                    docsHint="Learn more: docs/quickstart.md" />
             } @else if (filteredAgents().length === 0) {
                 <p class="empty">No agents match your filters.</p>
             } @else {
