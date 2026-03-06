@@ -45,7 +45,10 @@ export type AuditAction =
     | 'webhook_register'
     | 'webhook_delete'
     | 'auth_login'
-    | 'auth_failed';
+    | 'auth_failed'
+    | 'permission_grant'
+    | 'permission_revoke'
+    | 'permission_emergency_revoke';
 
 export interface AuditEntry {
     id: number;
