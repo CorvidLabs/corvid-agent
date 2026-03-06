@@ -19,6 +19,7 @@ import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilDiscussionMessage, CouncilOnChainMode } from '../../shared/types';
 import { createLogger } from '../lib/logger';
+import { broadcastAgentError } from './discussion';
 
 const log = createLogger('CouncilSynthesis');
 
@@ -113,6 +114,16 @@ export function triggerReview(
         } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
             emitLog(db, launchId, 'error', `Failed to start reviewer for ${agentName}`, errMsg);
+            broadcastAgentError({
+                launchId,
+                agentId,
+                agentName,
+                errorType: 'spawn_error',
+                severity: 'error',
+                message: `Failed to start reviewer: ${errMsg}`,
+                stage: 'reviewing',
+                sessionId: session.id,
+            });
         }
     }
 

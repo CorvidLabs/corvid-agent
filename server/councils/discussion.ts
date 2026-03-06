@@ -25,7 +25,7 @@ import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
-import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage } from '../../shared/types';
+import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage, CouncilAgentError } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { getModelPricing } from '../providers/cost-table';
 import { NotFoundError, ValidationError } from '../lib/errors';
@@ -86,6 +86,20 @@ export function onCouncilDiscussionMessage(cb: DiscussionMessageCallback): () =>
 function broadcastDiscussionMessage(message: CouncilDiscussionMessage): void {
     for (const cb of discussionMessageListeners) {
         try { cb(message); } catch { /* ignore */ }
+    }
+}
+
+type AgentErrorCallback = (error: CouncilAgentError) => void;
+const agentErrorListeners = new Set<AgentErrorCallback>();
+
+export function onCouncilAgentError(cb: AgentErrorCallback): () => void {
+    agentErrorListeners.add(cb);
+    return () => { agentErrorListeners.delete(cb); };
+}
+
+export function broadcastAgentError(error: CouncilAgentError): void {
+    for (const cb of agentErrorListeners) {
+        try { cb(error); } catch { /* ignore */ }
     }
 }
 
@@ -202,6 +216,16 @@ export function launchCouncil(
         } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
             emitLog(db, launchId, 'error', `Failed to start session for ${agentName}`, errMsg);
+            broadcastAgentError({
+                launchId,
+                agentId,
+                agentName,
+                errorType: 'spawn_error',
+                severity: 'error',
+                message: `Failed to start session: ${errMsg}`,
+                stage: 'member',
+                sessionId: session.id,
+            });
         }
     }
 
@@ -523,6 +547,17 @@ async function runDiscussionRounds(
             } catch (err) {
                 const errMsg = err instanceof Error ? err.message : String(err);
                 emitLog(db, launchId, 'error', `Failed to start discusser for ${agentName}`, errMsg);
+                broadcastAgentError({
+                    launchId,
+                    agentId,
+                    agentName,
+                    errorType: 'spawn_error',
+                    severity: 'error',
+                    message: `Failed to start discusser: ${errMsg}`,
+                    stage: 'discussing',
+                    sessionId: session.id,
+                    round,
+                });
             }
         }
 
@@ -537,6 +572,17 @@ async function runDiscussionRounds(
                     const timedOutAgent = timedOutAgentId ? getAgent(db, timedOutAgentId) : null;
                     const timedOutName = timedOutAgent?.name ?? timedOutAgentId?.slice(0, 8) ?? 'unknown';
                     emitLog(db, launchId, 'warn', `Discusser ${timedOutName} timed out in round ${round}`, timedOutSessionId);
+                    broadcastAgentError({
+                        launchId,
+                        agentId: timedOutAgentId ?? 'unknown',
+                        agentName: timedOutName,
+                        errorType: 'timeout',
+                        severity: 'warning',
+                        message: `Discusser timed out in round ${round}`,
+                        stage: 'discussing',
+                        sessionId: timedOutSessionId,
+                        round,
+                    });
                     try { processManager.stopProcess(timedOutSessionId); } catch { /* already stopped */ }
                 }
                 emitLog(db, launchId, 'info',
