@@ -37,6 +37,13 @@ e2e/             — Playwright end-to-end tests
 - **Blockchain:** Algorand (AlgoChat, wallets)
 - **Voice:** OpenAI TTS (tts-1) and Whisper (STT)
 
+## Algorand Network Topology
+
+- **`localnet`** — Always used for agents on the same machine. Requires Docker + `algokit localnet start`. This is the default and correct setting for `ALGORAND_NETWORK` in `.env`.
+- **`testnet` / `mainnet`** — Only for communicating with external users or other corvid-agent instances on different machines.
+
+**Never set `ALGORAND_NETWORK=testnet` for local development.** Testnet wallets cost real testnet ALGO and transactions are slow. Localnet is free, instant, and self-contained.
+
 ## Protected Files
 
 These files **must not** be modified by agents (enforced in `sdk-process.ts`).
