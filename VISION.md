@@ -241,7 +241,7 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 
 ## Roadmap
 
-### Shipped (v0.1.0 -> v0.17.0)
+### Shipped (v0.1.0 -> v0.18.0)
 
 - Agent orchestration with Claude SDK
 - Council deliberation with structured voting and follow-up chat
@@ -250,13 +250,13 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - Angular 21 web UI with real-time WebSocket updates
 - Discord bridge (raw WebSocket gateway, bidirectional)
 - Telegram bridge
-- MCP tool system (27 corvid_* handlers, 34 total tools)
+- MCP tool system (37 corvid_* tool handlers)
 - GitHub integration (PRs, issues, reviews)
 - Google A2A protocol (inbound task handling, agent card)
 - AST code analysis via Tree-sitter
 - Model exam system (18 tests, 6 categories)
 - Structured memory with vector embeddings
-- SQLite persistence (62 migrations)
+- SQLite persistence (67 migrations, 82 tables)
 - Billing/metering infrastructure
 - Agent marketplace foundations
 - Notification system (Discord, Telegram, GitHub, AlgoChat)
@@ -265,8 +265,13 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - Nginx + Caddy reverse proxy configs with TLS
 - Playwright end-to-end tests
 - Autonomous app development (Angular apps designed, coded, and deployed by agents)
+- Governance tier architecture with structured voting
+- Slack bridge (bidirectional messaging, notifications, question routing)
+- RBAC and multi-tenant isolation
+- 108 module specs with automated validation
+- 5,192 unit tests + 360 E2E tests
 
-### Next (v0.14.x)
+### Next
 
 - **Agent Directory on-chain:** Publish agent capabilities to Algorand for discovery by other agents
 - **Cross-instance messaging:** Two corvid-agent instances communicating via AlgoChat
@@ -275,7 +280,7 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - **Ollama parity:** Full feature parity with Claude SDK for local model inference
 - **Deeper AST understanding:** Smarter refactoring through richer code comprehension
 
-### Later (v0.15.x+)
+### Later
 
 - **Multi-instance agent networks:** Decentralized mesh of corvid-agent nodes
 - **Smart contract task agreements:** On-chain contracts defining work scope, validation criteria, and completion verification between agents
