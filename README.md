@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.16.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.17.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-4978%20unit%20%7C%20360%20E2E-brightgreen" alt="4978 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-5040%20unit%20%7C%20360%20E2E-brightgreen" alt="5040 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -20,12 +20,12 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 
 | Metric | Count |
 |--------|-------|
-| Unit tests | **4,978** across 200 files (14,080 assertions) |
+| Unit tests | **5,040** across 202 files (14,118 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **107** with automated validation |
+| Module specs | **109** with automated validation |
 | MCP tools | **37** corvid_* tool handlers |
 | API endpoints | **~200** across 36 route modules |
-| DB migrations | **64** (74 tables) |
+| DB migrations | **64** (82 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.

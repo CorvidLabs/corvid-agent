@@ -1,4 +1,4 @@
-# corvid-agent v0.16.0 Demo Script
+# corvid-agent v0.17.0 Demo Script
 
 Structured walkthrough for demonstrating the full corvid-agent platform.
 

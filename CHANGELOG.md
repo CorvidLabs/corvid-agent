@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0] - 2026-03-06
+
+### Added
+- **Repo blocklist with auto-block on PR rejection** — rejected PRs automatically add repos to the blocklist; org-wide wildcard support (e.g. `vapor/*`); enforced in polling and webhooks (#547, #554, #561, #565)
+- **Branch protection** — script to enable branch protection on unprotected public repos (#560)
+- **Dashboard summary batch endpoint** — `GET /api/dashboard/summary` aggregates agents, sessions, work tasks, and recent activity in a single call (#567)
+- **Schedule management via MCP** — `update` action added to `corvid_manage_schedule` tool (#568)
+- **Daily review schedule action** — automated end-of-day retrospective with PR outcome analysis (#570)
+- **Selective tool gating** — scheduler sessions can restrict which MCP tools are available (#578)
+- **Permission broker** — capability-based security layer for agent actions (#578, #579)
+- **69 module specs** for full server coverage — 109 total specs with automated validation (#552)
+
+### Security
+- **CSP and Permissions-Policy headers** — Content-Security-Policy and Permissions-Policy middleware on all responses (#566)
+- **WebSocket post-connect auth timeout** — 5-second deadline to authenticate after connection (#564)
+- **@hono/node-server authorization bypass patch** — override for GHSA-wc8c-qw6v-h7f6 (#575)
+- **Blocklist enforcement** in polling and webhook handlers (#565)
+
+### Fixed
+- Localhost exempted from rate limiting for local dashboard access (#562, #563)
+- Logger special characters test handles JSON format in production mode (#574)
+- Cosign installer pinned to current v3 SHA; id-token permission for release workflow (#545, #546)
+
+### Changed
+- **Service bootstrap extracted** from `server/index.ts` into `server/bootstrap.ts` — cleaner startup, testable initialization (#579)
+- Architecture docs synced with all 200+ API endpoints and 70 tables (#569)
+- README updated with At a Glance stats section, accurate counts (#573, #576, #577)
+
+### Stats
+- **5,040** unit tests across 202 files (14,118 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **109** module specs with automated validation
+- **37** MCP tools, **~200** API endpoints, **64** migrations, **82** tables
+
 ## [0.16.0] - 2026-03-04
 
 ### Added

@@ -1,5 +1,5 @@
 /**
- * Crypto audit test suite for v0.16.0 — key rotation, grace periods, and memory wipe.
+ * Crypto audit test suite for v0.17.0 — key rotation, grace periods, and memory wipe.
  *
  * Tests:
  *  - Wallet encryption key rotation (round-trip, old key invalid, atomic write, error recovery)
