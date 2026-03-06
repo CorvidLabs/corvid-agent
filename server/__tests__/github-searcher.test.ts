@@ -637,6 +637,64 @@ describe('GitHubSearcher', () => {
         });
     });
 
+    // ─── searchGlobalAuthoredPRReviews ─────────────────────────────────
+
+    describe('searchGlobalAuthoredPRReviews', () => {
+        test('searches without repo qualifier to catch cross-org PRs', async () => {
+            const searcher = createSearcher(new Map([['search/issues', ghOk(JSON.stringify({ items: [] }))]]));
+            await searcher.searchGlobalAuthoredPRReviews('corvid-agent', '2026-03-01T00:00:00Z');
+
+            const qArg = capturedArgs[0].find(a => a.startsWith('q='));
+            expect(qArg).toContain('is:pr');
+            expect(qArg).toContain('is:open');
+            expect(qArg).toContain('author:corvid-agent');
+            // Should NOT contain repo: or org: qualifier
+            expect(qArg).not.toContain('repo:');
+            expect(qArg).not.toContain('org:');
+        });
+
+        test('resolves repo from html_url for external repos', async () => {
+            const searchResponse = ghOk(JSON.stringify({
+                items: [{
+                    number: 1,
+                    title: 'External PR',
+                    html_url: 'https://github.com/MattFlower/cc-focus/pull/1',
+                }],
+            }));
+            const reviewsResponse = ghOk(JSON.stringify([
+                { id: 500, user: { login: 'MattFlower' }, state: 'CHANGES_REQUESTED', body: 'Fix the bug', submitted_at: '2026-03-05T10:00:00Z', html_url: 'rev-url' },
+            ]));
+            const commentsResponse = ghOk(JSON.stringify([]));
+
+            const responses = new Map<string, GhResult>();
+            responses.set('search/issues', searchResponse);
+            responses.set('pulls/1/reviews', reviewsResponse);
+            responses.set('pulls/1/comments', commentsResponse);
+            const searcher = createSearcher(responses);
+
+            const result = await searcher.searchGlobalAuthoredPRReviews('corvid-agent', '2026-03-01T00:00:00Z');
+            expect(result).toHaveLength(1);
+            expect(result[0].id).toBe('review-500');
+            expect(result[0].sender).toBe('MattFlower');
+        });
+
+        test('caches results per username+date to avoid redundant API calls', async () => {
+            const searcher = createSearcher(new Map([['search/issues', ghOk(JSON.stringify({ items: [] }))]]));
+            const config = makeConfig({ eventFilter: [] });
+
+            // Call fetchMentions twice with same config — global review search should only run once
+            await searcher.fetchMentions(config, () => true);
+            await searcher.fetchMentions(config, () => true);
+
+            // Count how many search/issues calls had the global pattern (no repo:/org:)
+            const globalCalls = capturedArgs.filter(args => {
+                const qArg = args.find(a => a.startsWith('q='));
+                return qArg && qArg.includes('author:') && !qArg.includes('repo:') && !qArg.includes('org:');
+            });
+            expect(globalCalls).toHaveLength(1);
+        });
+    });
+
     // ─── fetchMentions (orchestrator) ───────────────────────────────────
 
     describe('fetchMentions', () => {
