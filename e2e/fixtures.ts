@@ -91,6 +91,16 @@ async function fetchWithRetry(
 export const test = base.extend<{ api: ApiHelpers }>({
     api: async ({}, use) => {
         const createdAgentIds: string[] = [];
+        const createdProjectIds: string[] = [];
+        const createdCouncilIds: string[] = [];
+        const createdSessionIds: string[] = [];
+        const createdScheduleIds: string[] = [];
+        const createdWorkflowIds: string[] = [];
+        const createdWebhookIds: string[] = [];
+        const createdPollingIds: string[] = [];
+        const createdSkillBundleIds: string[] = [];
+        const createdMcpServerIds: string[] = [];
+        const createdListingIds: string[] = [];
 
         const helpers: ApiHelpers = {
             async seedProject(name = 'E2E Test Project') {
@@ -221,9 +231,9 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     throw new Error(`publishListing failed: ${pubRes.status} ${pubRes.statusText} — ${body}`);
                 }
 
-                const listing = await pubRes.json();
-                createdListingIds.push(listing.id);
-                return listing;
+                const published = await pubRes.json();
+                createdListingIds.push(published.id);
+                return published;
             },
 
             async seedMcpServer(data: Record<string, unknown> = {}) {
