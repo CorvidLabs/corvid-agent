@@ -61,10 +61,10 @@ export class Spinner {
 
 // ─── Sanitization ───────────────────────────────────────────────────────────
 
-/** Strip ANSI escape sequences and other control characters from user-provided strings */
+/** Strip ANSI escape sequences, newlines, and control characters to prevent log injection */
 function sanitize(s: string): string {
     // eslint-disable-next-line no-control-regex
-    return s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    return s.replace(/[\x00-\x1f\x7f]/g, '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 }
 
 // ─── Output Helpers ─────────────────────────────────────────────────────────
