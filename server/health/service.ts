@@ -112,16 +112,30 @@ function checkDiskAndWal(db: Database): DependencyHealth {
             }
         } catch { /* ignore */ }
 
-        let freeBytes = 0;
+        let freeBytes = -1;
         try {
-            const dfOutput = execSync('df -k . 2>/dev/null | tail -1', { encoding: 'utf-8', timeout: 3000 });
-            const parts = dfOutput.trim().split(/\s+/);
-            freeBytes = parseInt(parts[3] ?? '0', 10) * 1024;
-        } catch { /* ignore */ }
+            const cmd = process.platform === 'win32'
+                ? 'wmic logicaldisk where "DeviceID=C:" get FreeSpace /value 2>nul'
+                : 'df -k . 2>/dev/null | tail -1';
+            const output = execSync(cmd, { encoding: 'utf-8', timeout: 3000 });
+            if (process.platform === 'win32') {
+                const match = output.match(/FreeSpace=(\d+)/);
+                freeBytes = match ? parseInt(match[1], 10) : -1;
+            } else {
+                const parts = output.trim().split(/\s+/);
+                freeBytes = parseInt(parts[3] ?? '0', 10) * 1024;
+            }
+        } catch { /* ignore — disk check unavailable */ }
 
-        const freeMB = Math.round(freeBytes / (1024 * 1024));
+        const freeMB = freeBytes >= 0 ? Math.round(freeBytes / (1024 * 1024)) : -1;
         const walMB = Math.round(walSizeBytes / (1024 * 1024) * 100) / 100;
 
+        if (freeMB < 0) {
+            // Disk check unavailable (e.g. command not found) — not a health issue
+            return walMB > 100
+                ? { status: 'degraded', warning: `Large WAL (${walMB}MB), disk check unavailable`, wal_mb: walMB }
+                : { status: 'healthy', free_mb: 'unknown', wal_mb: walMB };
+        }
         if (freeMB < 100) {
             return { status: 'unhealthy', error: `Critical: only ${freeMB}MB disk free`, free_mb: freeMB, wal_mb: walMB };
         }
