@@ -10,6 +10,7 @@ import { ScheduleService } from '../../core/services/schedule.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import type { ServerWsMessage } from '../../core/models/ws-message.model';
@@ -51,7 +52,7 @@ interface ActivityEvent {
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, WelcomeWizardComponent],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent],
     template: `
         @if (showWelcome()) {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
@@ -137,7 +138,7 @@ interface ActivityEvent {
                                         <span class="agent-card__stat-label">ALGO</span>
                                     </div>
                                     <div class="agent-card__stat">
-                                        <span class="agent-card__stat-value--time">{{ summary.lastActive | relativeTime }}</span>
+                                        <span class="agent-card__stat-value--time" [title]="summary.lastActive | absoluteTime">{{ summary.lastActive | relativeTime }}</span>
                                         <span class="agent-card__stat-label">Last Active</span>
                                     </div>
                                 </div>
@@ -176,7 +177,7 @@ interface ActivityEvent {
                                         <span class="activity-item__label">{{ event.label }}</span>
                                         <span class="activity-item__detail">{{ event.detail }}</span>
                                     </div>
-                                    <span class="activity-item__time">{{ event.timestamp | relativeTime }}</span>
+                                    <span class="activity-item__time" [title]="event.timestamp | absoluteTime">{{ event.timestamp | relativeTime }}</span>
                                 </a>
                             }
                         </div>

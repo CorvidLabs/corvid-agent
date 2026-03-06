@@ -7,17 +7,19 @@ import { AgentService } from '../../core/services/agent.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import type { Session, SessionStatus } from '../../core/models/session.model';
 
 interface SessionGroup {
     label: string;
     sessions: Session[];
+    total: number;
 }
 
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe, EmptyStateComponent],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, DecimalPipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -91,7 +93,7 @@ interface SessionGroup {
             } @else {
                 @for (group of groupedSessions(); track group.label) {
                     <div class="session-group">
-                        <div class="session-group__label">{{ group.label }}</div>
+                        <div class="session-group__label">{{ group.label }} ({{ group.total }})</div>
                         <div class="session-table">
                             <div class="session-table__header">
                                 <span>Name</span>
@@ -109,10 +111,15 @@ interface SessionGroup {
                                     <span><app-status-badge [status]="session.status" /></span>
                                     <span class="session-table__cost">\${{ session.totalCostUsd | number:'1.2-4' }}</span>
                                     <span class="session-table__source">{{ session.source }}</span>
-                                    <span class="session-table__time">{{ session.updatedAt | relativeTime }}</span>
+                                    <span class="session-table__time" [title]="session.updatedAt | absoluteTime">{{ session.updatedAt | relativeTime }}</span>
                                 </a>
                             }
                         </div>
+                        @if (group.total > group.sessions.length) {
+                            <button class="show-more" (click)="showMore(group.label)">
+                                Show more ({{ group.total - group.sessions.length }} remaining)
+                            </button>
+                        }
                     </div>
                 }
             }
@@ -201,6 +208,14 @@ interface SessionGroup {
         .session-table__source { font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase; }
         .session-table__time { font-size: 0.7rem; color: var(--text-tertiary); }
 
+        .show-more {
+            display: block; width: 100%; margin-top: 0.5rem; padding: 0.5rem;
+            background: transparent; border: 1px dashed var(--border-bright); border-radius: var(--radius);
+            color: var(--accent-cyan); font-size: 0.75rem; font-family: inherit; font-weight: 600;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em; transition: background 0.15s;
+        }
+        .show-more:hover { background: var(--accent-cyan-dim); }
+
         @media (max-width: 768px) {
             .session-table__header, .session-table__row { grid-template-columns: 2fr 1fr 1fr; }
             .session-table__header span:nth-child(n+4), .session-table__row span:nth-child(n+4) { display: none; }
@@ -216,6 +231,8 @@ export class SessionListComponent implements OnInit {
     protected searchQuery = '';
     protected sourceFilter = '';
     protected readonly statusFilter = signal<SessionStatus | null>(null);
+    private readonly PAGE_SIZE = 25;
+    private readonly groupLimits = signal<Record<string, number>>({});
 
     private agentNameCache: Record<string, string> = {};
 
@@ -283,9 +300,14 @@ export class SessionListComponent implements OnInit {
             else groups['Older'].push(s);
         }
 
+        const limits = this.groupLimits();
         return Object.entries(groups)
             .filter(([, arr]) => arr.length > 0)
-            .map(([label, arr]) => ({ label, sessions: arr }));
+            .map(([label, arr]) => ({
+                label,
+                total: arr.length,
+                sessions: arr.slice(0, limits[label] ?? this.PAGE_SIZE),
+            }));
     });
 
     async ngOnInit(): Promise<void> {
@@ -311,6 +333,13 @@ export class SessionListComponent implements OnInit {
     protected getAgentName(agentId: string | null): string {
         if (!agentId) return 'N/A';
         return this.agentNameCache[agentId] ?? agentId.slice(0, 8);
+    }
+
+    protected showMore(groupLabel: string): void {
+        this.groupLimits.update((limits) => ({
+            ...limits,
+            [groupLabel]: (limits[groupLabel] ?? this.PAGE_SIZE) + this.PAGE_SIZE,
+        }));
     }
 
     protected async stopAllRunning(): Promise<void> {
