@@ -64,8 +64,9 @@ This module must be correct -- bugs mean real money lost. All balance mutations 
 6. **Purchase conversion**: `creditsToAdd = floor((microAlgos / 1,000,000) * creditsPerAlgo)`. Zero-credit purchases are silently discarded
 7. **First-time grant idempotency**: `maybeGrantFirstTimeCredits` checks `total_purchased == 0` before granting; subsequent calls return 0
 8. **Config defaults**: All config values have hardcoded defaults (defined in `getCreditConfig`) if not present in the `credit_config` table
-9. **Deduction atomicity**: Each deduction operation checks balance, updates ledger, and records transaction in sequence (SQLite's single-writer guarantees atomicity)
+9. **Deduction atomicity**: All credit mutation functions (`deductTurnCredits`, `deductAgentMessageCredits`, `reserveGroupCredits`, `consumeReservedCredits`, `releaseReservedCredits`) use `db.transaction()` with atomic WHERE guards to prevent TOCTOU race conditions
 10. **Session credit tracking**: When `sessionId` is provided to deduction functions, `sessions.credits_consumed` is incremented alongside the ledger update
+11. **Grant validation**: `grantCredits` rejects non-integer and non-positive amounts
 
 ## Behavioral Examples
 
@@ -111,6 +112,7 @@ This module must be correct -- bugs mean real money lost. All balance mutations 
 | Insufficient credits for turn deduction | Returns `{ success: false }`, no ledger change |
 | Insufficient credits for agent message | Returns `{ success: false }`, no ledger change |
 | Insufficient credits for group reserve | Returns `{ success: false, reserved: 0 }`, no ledger change |
+| `grantCredits` called with non-integer or non-positive amount | Throws an error, no ledger change |
 | Config key missing from DB | Falls back to hardcoded default |
 
 ## Dependencies
@@ -184,4 +186,5 @@ This module must be correct -- bugs mean real money lost. All balance mutations 
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-06 | corvid-agent | Added db.transaction() with atomic WHERE guards to all credit mutation functions to prevent TOCTOU race conditions. grantCredits now validates amount is a positive integer. |
 | 2026-02-19 | corvid-agent | Initial spec |

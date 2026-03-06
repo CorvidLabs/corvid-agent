@@ -54,7 +54,7 @@ function rowToCouncil(row: CouncilRow, agentIds: string[]): Council {
         chairmanAgentId: row.chairman_agent_id,
         agentIds,
         discussionRounds: row.discussion_rounds ?? 2,
-        onChainMode: (row.on_chain_mode as CouncilOnChainMode) ?? 'off',
+        onChainMode: (row.on_chain_mode as CouncilOnChainMode) ?? 'full',
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -108,7 +108,7 @@ export function createCouncil(db: Database, input: CreateCouncilInput, tenantId:
         db.query(
             `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, tenant_id)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, input.onChainMode ?? 'off', tenantId);
+        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, input.onChainMode ?? 'full', tenantId);
 
         for (let i = 0; i < input.agentIds.length; i++) {
             db.query(

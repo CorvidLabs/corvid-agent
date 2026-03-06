@@ -255,7 +255,7 @@ Produce a final, comprehensive answer that incorporates the best elements from a
     });
 
     // Watch for chairman session completion to store synthesis
-    const effectiveOnChainMode = onChainMode ?? 'off';
+    const effectiveOnChainMode = onChainMode ?? 'full';
     const callback: EventCallback = (sessionId, event) => {
         if (sessionId !== session.id) return;
         if (event.type === 'session_exited' || event.type === 'session_stopped') {

@@ -249,7 +249,7 @@ export function triggerSynthesis(
     // Resolve on-chain mode from the council configuration
     const launch = getCouncilLaunch(db, launchId);
     const council = launch ? getCouncil(db, launch.councilId) : null;
-    const onChainMode = council?.onChainMode ?? 'off';
+    const onChainMode = council?.onChainMode ?? 'full';
 
     return triggerSynthesisImpl(
         db, processManager, launchId,
@@ -579,7 +579,7 @@ async function runDiscussionRounds(
             broadcastDiscussionMessage(discMsg);
 
             // Best-effort on-chain send — only when council is configured for full on-chain mode
-            const councilOnChainMode = council.onChainMode ?? 'off';
+            const councilOnChainMode = council.onChainMode ?? 'full';
             if (agentMessenger && councilOnChainMode === 'full') {
                 const threadPrefix = `[council:${launchId.slice(0, 8)}:R${round}] `;
                 sendDiscussionOnChain(agentMessenger, agentId, council.agentIds, threadPrefix + content, discMsg.id, db).catch((err) => {

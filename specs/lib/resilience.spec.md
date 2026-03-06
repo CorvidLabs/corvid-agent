@@ -81,7 +81,7 @@ Provides fault-tolerance primitives (exponential-backoff retry and circuit break
 | `constructor` | `gracePeriodMs?: number` | `ShutdownCoordinator` | Creates coordinator with overall grace period (default 30000ms). |
 | `register` | `handler: ShutdownHandler` | `void` | Registers a cleanup handler. Ignored if shutdown is already in progress. |
 | `registerService` | `name: string, service: { stop: () => void \| Promise<void> }, priority?: number, timeoutMs?: number` | `void` | Convenience method to register a service that has a `stop()` method. Default priority: 10. |
-| `registerSignals` | `logDiagnostics?: (signal: string) => void, exitCodeMap?: Record<string, number>` | `void` | Registers SIGINT/SIGTERM handlers that trigger coordinated shutdown. Idempotent (only registers once). Default exit codes: SIGINT=0, SIGTERM=1. |
+| `registerSignals` | `logDiagnostics?: (signal: string) => void, exitCodeMap?: Record<string, number>` | `void` | Registers SIGINT/SIGTERM handlers that trigger coordinated shutdown. Idempotent (only registers once). Default exit codes: SIGINT=0, SIGTERM=0. |
 | `shutdown` | _(none)_ | `Promise<ShutdownResult>` | Executes all registered handlers in priority order (ascending). Idempotent: concurrent calls wait for the in-progress shutdown. Returns result summary. |
 | `getStatus` | _(none)_ | `{ phase, handlerCount, result }` | Returns status summary for health endpoints. |
 
@@ -178,3 +178,4 @@ Provides fault-tolerance primitives (exponential-backoff retry and circuit break
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | SIGTERM exit code changed from 1 to 0 to prevent systemd restart loops on graceful shutdown. |

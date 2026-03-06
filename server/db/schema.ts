@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 69;
+const SCHEMA_VERSION = 70;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -25,8 +25,8 @@ const MIGRATIONS: Record<number, string[]> = {
             disallowed_tools  TEXT DEFAULT '',
             permission_mode   TEXT DEFAULT 'default',
             max_budget_usd    REAL DEFAULT NULL,
-            algochat_enabled  INTEGER DEFAULT 0,
-            algochat_auto     INTEGER DEFAULT 0,
+            algochat_enabled  INTEGER DEFAULT 1,
+            algochat_auto     INTEGER DEFAULT 1,
             custom_flags      TEXT DEFAULT '{}',
             created_at        TEXT DEFAULT (datetime('now')),
             updated_at        TEXT DEFAULT (datetime('now'))
@@ -1301,7 +1301,7 @@ const MIGRATIONS: Record<number, string[]> = {
     ],
     68: [
         // Council on-chain communication mode (#653)
-        `ALTER TABLE councils ADD COLUMN on_chain_mode TEXT NOT NULL DEFAULT 'off'`,
+        `ALTER TABLE councils ADD COLUMN on_chain_mode TEXT NOT NULL DEFAULT 'full'`,
         `ALTER TABLE council_launches ADD COLUMN synthesis_txid TEXT DEFAULT NULL`,
     ],
     69: [
@@ -1318,6 +1318,11 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
         `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`,
+    ],
+    70: [
+        // Default all agents and councils to AlgoChat-enabled
+        `UPDATE agents SET algochat_enabled = 1, algochat_auto = 1 WHERE algochat_enabled = 0`,
+        `UPDATE councils SET on_chain_mode = 'full' WHERE on_chain_mode = 'off'`,
     ],
 };
 

@@ -5,6 +5,7 @@
  * For governance-tier classification of paths, see councils/governance.ts.
  */
 
+import { realpathSync } from 'node:fs';
 import { analyzeBashCommand } from '../lib/bash-security';
 import { classifyPath, checkAutomationAllowed, type GovernanceTier, type AutomationCheckResult } from '../councils/governance';
 
@@ -36,8 +37,12 @@ export const PROTECTED_SUBSTRINGS = [
 export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|perl\s+-|rsync\s|install\s|truncate\s|ruby\s+-[ie]|php\s+-r|command\s+-p\s+\w|find\s.*-(?:delete|exec))/;
 
 export function isProtectedPath(filePath: string): boolean {
+    // Resolve symlinks to prevent bypass via `ln -s protected.ts link.ts`
+    let resolved = filePath;
+    try { resolved = realpathSync(filePath); } catch { /* file may not exist yet */ }
+
     // Normalize to forward slashes for cross-platform matching
-    const normalized = filePath.replace(/\\/g, '/');
+    const normalized = resolved.replace(/\\/g, '/');
     const basename = normalized.split('/').pop() ?? '';
 
     // Exact basename match (e.g. "manager.ts" only matches ".../server/process/manager.ts",

@@ -66,6 +66,7 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 6. `discussion_rounds` defaults to 2 when not specified in input or when the DB value is null.
 7. Launch stage progression follows: `responding` -> `discussing` -> `reviewing` -> `synthesizing` -> `complete`.
 8. Discussion messages are ordered by `(round ASC, id ASC)` and launch logs by `(created_at ASC, id ASC)`.
+9. `on_chain_mode` defaults to `'full'` for new councils. `createCouncil()` defaults `onChainMode` to `'full'` when not specified. All fallback `??` values in `discussion.ts` and `synthesis.ts` use `'full'` as the default.
 
 ## Behavioral Examples
 
@@ -139,6 +140,7 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | discussion_rounds | INTEGER | DEFAULT 2 | Number of discussion rounds per launch (added v9) |
 | tenant_id | TEXT | NOT NULL DEFAULT 'default', INDEXED | Tenant isolation identifier (added v56) |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
+| on_chain_mode | TEXT | DEFAULT 'full' | On-chain mode: 'off', 'metadata', 'full' (added v68) |
 | updated_at | TEXT | DEFAULT datetime('now') | Last modification timestamp |
 
 ### council_members
@@ -164,6 +166,7 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | current_discussion_round | INTEGER | DEFAULT 0 | Current round number during discussion (added v9) |
 | total_discussion_rounds | INTEGER | DEFAULT 0 | Total planned discussion rounds (added v9) |
 | chat_session_id | TEXT | DEFAULT NULL | Follow-up chat session ID (added v22) |
+| synthesis_txid | TEXT | DEFAULT NULL | On-chain transaction ID for the synthesis (added v68) |
 | tenant_id | TEXT | NOT NULL DEFAULT 'default', INDEXED | Tenant isolation identifier (added v56) |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
 
@@ -203,3 +206,4 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Councils now default to on_chain_mode='full'. All fallback defaults changed from 'off' to 'full'. |

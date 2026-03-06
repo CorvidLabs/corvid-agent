@@ -65,10 +65,10 @@ secrets:
 
 probes:
   liveness:
-    path: /api/health
+    path: /health/live
     initialDelaySeconds: 10
     periodSeconds: 30
   readiness:
-    path: /api/health
+    path: /health/ready
     initialDelaySeconds: 5
     periodSeconds: 10

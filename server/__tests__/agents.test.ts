@@ -42,8 +42,8 @@ describe('createAgent', () => {
         expect(agent.appendPrompt).toBe('');
         expect(agent.permissionMode).toBe('default');
         expect(agent.maxBudgetUsd).toBeNull();
-        expect(agent.algochatEnabled).toBe(false);
-        expect(agent.algochatAuto).toBe(false);
+        expect(agent.algochatEnabled).toBe(true);
+        expect(agent.algochatAuto).toBe(true);
         expect(agent.customFlags).toEqual({});
         expect(agent.defaultProjectId).toBeNull();
         expect(agent.mcpToolPermissions).toBeNull();

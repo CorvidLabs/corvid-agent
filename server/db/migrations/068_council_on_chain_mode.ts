@@ -15,7 +15,7 @@ function safeAlter(db: Database, sql: string): void {
 }
 
 export function up(db: Database): void {
-    safeAlter(db, `ALTER TABLE councils ADD COLUMN on_chain_mode TEXT NOT NULL DEFAULT 'off'`);
+    safeAlter(db, `ALTER TABLE councils ADD COLUMN on_chain_mode TEXT NOT NULL DEFAULT 'full'`);
     safeAlter(db, `ALTER TABLE council_launches ADD COLUMN synthesis_txid TEXT DEFAULT NULL`);
 }
 

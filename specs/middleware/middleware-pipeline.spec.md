@@ -124,6 +124,8 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 20. **Endpoint rate limit order**: Runs at `ORDER.RATE_LIMIT + 15` (115), between global rate limit (100) and auth (110) in the pipeline pattern, but after auth in the guard chain.
 21. **Rate limit key preference**: Both global and endpoint rate limiters prefer wallet address over IP as the rate limit key.
 22. **Global rate limit exempt paths**: `/api/health`, `/webhooks/github`, and `/ws` bypass global rate limiting.
+23. **Admin API key comparison uses timingSafeEqual()**: Never plain `===` — prevents timing oracle attacks on the admin key.
+24. **POST /api/algochat/network requires admin role**: The network switch endpoint is gated via `requiresAdminRole()` in the `ADMIN_PATHS` set.
 
 ## Behavioral Examples
 
@@ -262,10 +264,11 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 
 ### Admin-Protected Paths
 
-`/metrics`, `/api/audit-log`, `/api/operational-mode`, `/api/backup`, `/api/memories/backfill`, `/api/selftest/run`, `/api/escalation-queue/*`
+`/metrics`, `/api/audit-log`, `/api/operational-mode`, `/api/backup`, `/api/memories/backfill`, `/api/selftest/run`, `/api/escalation-queue/*`, `/api/algochat/network`
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-26 | corvid-agent | Initial spec |
+| 2026-03-06 | corvid-agent | Admin key comparison changed from === to timingSafeEqual(). Network switch endpoint added to requiresAdminRole(). |
