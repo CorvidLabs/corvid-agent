@@ -59,10 +59,18 @@ export class Spinner {
     }
 }
 
+// ─── Sanitization ───────────────────────────────────────────────────────────
+
+/** Strip ANSI escape sequences and other control characters from user-provided strings */
+function sanitize(s: string): string {
+    // eslint-disable-next-line no-control-regex
+    return s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 // ─── Output Helpers ─────────────────────────────────────────────────────────
 
 export function printError(message: string): void {
-    console.error(`${c.red('error')}: ${message}`);
+    console.error(`${c.red('error')}: ${sanitize(message)}`);
 }
 
 export function printSuccess(message: string): void {
@@ -122,7 +130,7 @@ export function renderToolUse(toolName: string, input: string): void {
 
     // Try to extract a meaningful summary from JSON tool input (SDK mode)
     const detail = summarizeToolInput(toolName, input);
-    console.log(`${c.cyan('│')} ${c.magenta(toolName)} ${c.dim}${detail}${c.reset}`);
+    console.log(`${c.cyan('│')} ${c.magenta(sanitize(toolName))} ${c.dim}${sanitize(detail)}${c.reset}`);
 }
 
 function summarizeToolInput(_toolName: string, input: string): string {
