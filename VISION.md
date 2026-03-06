@@ -241,7 +241,7 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 
 ## Roadmap
 
-### Shipped (v0.1.0 -> v0.18.0)
+### Shipped (v0.1.0 -> v0.19.0)
 
 - Agent orchestration with Claude SDK
 - Council deliberation with structured voting and follow-up chat
@@ -268,8 +268,8 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - Governance tier architecture with structured voting
 - Slack bridge (bidirectional messaging, notifications, question routing)
 - RBAC and multi-tenant isolation
-- 109 module specs with automated validation
-- 5,215 unit tests + 360 E2E tests
+- 111 module specs with automated validation
+- 5,427 unit tests + 360 E2E tests
 
 ### Next
 
