@@ -98,7 +98,7 @@ interface SessionGroup {
                                     <span class="session-table__name" [title]="sessionDisplayName(session)">{{ sessionDisplayName(session) }}</span>
                                     <span class="session-table__agent" [title]="getAgentName(session.agentId)">{{ getAgentName(session.agentId) }}</span>
                                     <span><app-status-badge [status]="session.status" /></span>
-                                    <span class="session-table__cost">${{ session.totalCostUsd | number:'1.2-4' }}</span>
+                                    <span class="session-table__cost">\${{ session.totalCostUsd | number:'1.2-4' }}</span>
                                     <span class="session-table__source">{{ session.source }}</span>
                                     <span class="session-table__time">{{ session.updatedAt | relativeTime }}</span>
                                 </a>
