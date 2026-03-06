@@ -59,6 +59,26 @@
     --accent-red-dim: rgba(255, 51, 85, 0.15);
     --accent-amber: #ffaa00;
     --accent-amber-dim: rgba(255, 170, 0, 0.15);
+    --accent-orange: #ff8800;
+    --accent-orange-dim: rgba(255, 136, 0, 0.15);
+
+    /* Status colors — WCAG AAA on --bg-surface */
+    --status-running: #5ddb72;
+    --status-running-dim: rgba(93, 219, 114, 0.15);
+    --status-idle: #a8b2c1;
+    --status-idle-dim: rgba(168, 178, 193, 0.1);
+    --status-stopped: #ffa657;
+    --status-stopped-dim: rgba(255, 166, 87, 0.12);
+    --status-completed: #56d4e0;
+    --status-completed-dim: rgba(86, 212, 224, 0.12);
+    --status-failed: #ff7b72;
+    --status-failed-dim: rgba(255, 123, 114, 0.12);
+
+    /* Source colors */
+    --source-schedule: #c792ea;
+    --source-poll: #ffa657;
+    --source-manual: #56d4e0;
+    --source-work: #79b8ff;
 
     /* Glow effects */
     --glow-cyan: 0 0 8px rgba(0, 229, 255, 0.25);
