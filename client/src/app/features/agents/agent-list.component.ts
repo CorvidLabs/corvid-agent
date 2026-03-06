@@ -280,7 +280,8 @@ export class AgentListComponent implements OnInit {
             const cutoff = Date.now() - INACTIVE_THRESHOLD_MS;
             cards = cards.filter((c) =>
                 c.runningSessions > 0 ||
-                (c.lastActive && new Date(c.lastActive).getTime() > cutoff),
+                (c.lastActive && new Date(c.lastActive).getTime() > cutoff) ||
+                new Date(c.agent.createdAt).getTime() > cutoff,
             );
         }
 
