@@ -72,15 +72,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     description="Work tasks are agent-driven code changes — branch, implement, validate, PR."
                     actionLabel="+ Create a work task"
                     actionAriaLabel="Create your first agent work task"
-                    [actionClick]="openCreateForm" />
-            } @else if (taskService.tasks().length === 0) {
-                <app-empty-state
-                    icon="  ____\n |    |\n | /\\ |\n |/  \\|\n |____|"
-                    title="No work tasks yet."
-                    description="Work tasks are agent-driven code changes — branch, implement, validate, PR."
-                    actionLabel="+ Create a work task"
-                    actionAriaLabel="Create your first agent work task"
-                    [actionClick]="openCreateForm" />
+                    [actionClick]="toggleCreateForm" />
             } @else if (filteredTasks().length === 0) {
                 <div class="empty">
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
@@ -333,6 +325,7 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     readonly activeFilter = signal<'all' | 'active' | 'completed' | 'failed'>('all');
     readonly showCreateForm = signal(false);
+    readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
     protected createAgentId = '';
     protected createDescription = '';

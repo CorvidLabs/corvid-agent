@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
     selector: 'app-empty-state',
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterLink],
-    template: \`
+    template: `
         <div class="empty-state" role="status" [attr.aria-label]="description">
             <pre class="empty-state__icon" aria-hidden="true">{{ icon }}</pre>
             <p class="empty-state__title">{{ title }}</p>
@@ -29,8 +29,8 @@ import { RouterLink } from '@angular/router';
                 <p class="empty-state__docs">{{ docsHint }}</p>
             }
         </div>
-    \`,
-    styles: \`
+    `,
+    styles: `
         .empty-state {
             display: flex;
             flex-direction: column;
@@ -107,7 +107,7 @@ import { RouterLink } from '@angular/router';
                 min-height: 200px;
             }
         }
-    \`,
+    `,
 })
 export class EmptyStateComponent {
     @Input({ required: true }) icon!: string;

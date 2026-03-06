@@ -157,10 +157,10 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     description="Schedules run agent tasks automatically on a cron or interval."
                     actionLabel="+ Create a schedule"
                     actionAriaLabel="Create your first automation schedule"
-                    [actionClick]="openCreateForm" />
-            } @else if (filteredSchedules().length === 0) {
+                    [actionClick]="toggleCreateForm" />
+            } @else if (noFilteredSchedules()) {
                 <div class="empty">
-                    <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}schedules found.</p>
+                    <p>No matching schedules found.</p>
                 </div>
             } @else {
                 @for (group of statusGroups(); track group.status) {
@@ -335,6 +335,7 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     protected readonly agentService = inject(AgentService);
     private readonly notifications = inject(NotificationService);
     readonly showCreateForm = signal(false);
+    readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
     readonly formScheduleType = signal<'cron' | 'interval'>('cron');
     readonly triggering = signal<string | null>(null);
@@ -380,6 +381,9 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
             { status: 'completed', label: 'Completed', schedules: sorted.filter((s) => s.status === 'completed') },
         ];
     });
+    readonly noFilteredSchedules = computed(() =>
+        this.statusGroups().every(g => g.schedules.length === 0),
+    );
     async ngOnInit(): Promise<void> {
         this.scheduleService.loadSchedules(); this.scheduleService.loadExecutions(); this.scheduleService.startListening();
         await this.agentService.loadAgents();
