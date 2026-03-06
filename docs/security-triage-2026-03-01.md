@@ -8,8 +8,8 @@ Triage of open security issues against PR #391 (security hardening batch) and su
 
 **Status:** Fully implemented in PR #391
 
-- `contentLengthGuard()` in `server/middleware/guards.ts:103-115`
-- Wired as first guard in `server/routes/index.ts:199`
+- `contentLengthGuard()` in `server/middleware/guards.ts:109`
+- Wired as first guard in `server/routes/index.ts:206`
 - Rejects POST/PUT/PATCH with Content-Length > 1MB (configurable) with 413
 - GET/HEAD/OPTIONS/DELETE exempted
 - 6 test cases in `server/__tests__/guards.test.ts`
@@ -18,7 +18,7 @@ Triage of open security issues against PR #391 (security hardening batch) and su
 
 **Status:** Fully implemented in PR #391
 
-`instrumentResponse()` in `server/index.ts:433-455` sets on every response:
+`instrumentResponse()` in `server/index.ts:488` sets on every response:
 
 | Header | Value |
 |--------|-------|

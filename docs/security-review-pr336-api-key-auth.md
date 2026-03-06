@@ -74,19 +74,19 @@ The existing code at line 195 already handles this with more path prefixes
 **Risk**: Medium (CORS regression for non-API routes).
 **Action**: Remove the duplicate check.
 
-### [LOW] L-1: DB_PATH env var is a silent behavior change
+### [LOW] L-1: DB_PATH env var is a silent behavior change — RESOLVED
 
-**Location**: `server/db/connection.ts:29`
+**Location**: `server/db/connection.ts:29` (no longer present)
 
-Setting `DB_PATH` in a non-Docker environment silently changes where the
-database is created. Combined with the volume rename (`db-data` to
-`corvid-data`), existing Docker users could lose data on upgrade.
+The `DB_PATH` env var was removed from `connection.ts` after this review.
+The database path is now determined by convention (`corvid-agent.db` in the
+working directory) without an env-var override.
 
-**Action**: Log when `DB_PATH` overrides the default; document volume migration.
+**Status**: Resolved — the silent behavior change no longer exists.
 
 ### [LOW] L-2: `.env.example` has partial API key prefix
 
-**Location**: `deploy/.env.example:12`
+**Location**: `.env.example` (project root; `deploy/.env.example` no longer exists)
 
 `ANTHROPIC_API_KEY=sk-ant-` may confuse users or leak key format if the
 file is accidentally committed.

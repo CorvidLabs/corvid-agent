@@ -222,8 +222,10 @@ Trigger a backup via the API:
 
 ```bash
 curl -X POST https://your-corvid-instance.example.com/api/backup \
-  -H "Authorization: Bearer $API_KEY"
+  -H "Authorization: Bearer $ADMIN_API_KEY"
 ```
+
+> **Note:** The `/api/backup` endpoint requires `ADMIN_API_KEY`, not the regular `API_KEY`.
 
 Response:
 
@@ -267,7 +269,7 @@ You can schedule backups with cron:
 
 ```bash
 # Backup every 6 hours
-0 */6 * * * curl -s -X POST http://localhost:3000/api/backup -H "Authorization: Bearer $API_KEY" >> /var/log/corvid-backup.log 2>&1
+0 */6 * * * curl -s -X POST http://localhost:3000/api/backup -H "Authorization: Bearer $ADMIN_API_KEY" >> /var/log/corvid-backup.log 2>&1
 ```
 
 ## Security
@@ -389,7 +391,7 @@ Always create a database backup before upgrading:
 
 ```bash
 curl -X POST http://localhost:3000/api/backup \
-  -H "Authorization: Bearer $API_KEY"
+  -H "Authorization: Bearer $ADMIN_API_KEY"
 ```
 
 ## Additional Deployment Options

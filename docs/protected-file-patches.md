@@ -1,9 +1,9 @@
 # Protected File Patches for v1.0
 
-> **Status:** Many of these patches have already been applied as of schema v62.
+> **Status:** Many of these patches have already been applied as of schema v64.
 > Review current code before applying — line numbers and baseline values are
 > approximate and may have shifted. The schema migrations (39-43) below are
-> for reference; actual migrations now extend to v62.
+> for reference; actual migrations now extend to v64.
 
 These patches integrate the Phase 2-4 modules into the protected files.
 Apply them manually in the order shown below.
@@ -545,4 +545,4 @@ bunx tsc --noEmit --skipLibCheck
 bun test
 ```
 
-Both must pass. Current baseline: ~4400+ tests, 0 failures.
+Both must pass. Current baseline: ~4900+ tests, 0 failures.
