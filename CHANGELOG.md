@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0] - 2026-03-06
+
+### Security
+- **232 security tests** across 3 dedicated test suites — security-audit (104), jailbreak-prevention (81), rate-limit-bypass (47)
+- **SECURITY.md threat model** — expanded from 90 to 324 lines with asset inventory, threat actors, attack surfaces, injection detection, rate limiting, and incident response playbook
+- **Jailbreak prevention tests** — multi-turn attacks, encoding bypasses (base64, hex, ROT13), persona hijacking, instruction hierarchy, payload splitting, language-switching
+- **Rate limit bypass tests** — IP rotation, header manipulation (X-Forwarded-For, X-Real-IP), concurrent floods, sliding window, content length guard
+- **Dependency audit** — manual audit of all direct and transitive dependencies; 0 HIGH/CRITICAL CVEs in direct deps, 5 transitive overrides analyzed (`docs/dependency-audit.md`)
+- **External review scope document** — P0–P3 critical paths, test coverage map, access instructions for third-party auditors (`docs/external-review-scope.md`)
+
+### Added
+- **ProcessManager decomposition** — extracted `TimerManager` and `ResilienceManager` from ProcessManager for cleaner separation of concerns (#453)
+
+### Stats
+- **5,427** unit tests across 212 files (15,465 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **111** module specs with automated validation
+- **37** MCP tools, **~200** API endpoints, **70** migrations, **81** tables
+
 ## [0.18.0] - 2026-03-06
 
 ### Added

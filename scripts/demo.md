@@ -1,4 +1,4 @@
-# corvid-agent v0.18.0 Demo Script
+# corvid-agent v0.19.0 Demo Script
 
 Structured walkthrough for demonstrating the full corvid-agent platform.
 
@@ -278,7 +278,7 @@ Mobile-first dashboard built with Angular 21 (standalone components, signals).
 
 ## 11. Module Specs
 
-Spec-driven development with 109 `.spec.md` files.
+Spec-driven development with 111 `.spec.md` files.
 
 **Covered modules:** Full server coverage — all route, service, and infrastructure modules
 
@@ -305,24 +305,24 @@ cat specs/providers/ollama-provider.spec.md
 ## 12. Test Suite
 
 **Stats:**
-- 5215+ tests passing
-- 210+ test files
-- 14598+ expect() calls
-- 109 spec files validated
+- 5427+ tests passing
+- 212+ test files
+- 15465+ expect() calls
+- 111 spec files validated
 - CI on 3 platforms (macOS, Ubuntu, Windows)
 
 **Demo flow:**
 ```bash
 # Full suite
 bun test
-# → 5215 pass, 0 fail
+# → 5427 pass, 0 fail
 
 # TypeScript strict
 bunx tsc --noEmit --skipLibCheck
 
 # Spec validation
 bun run spec:check
-# → 109 specs checked: 109 passed
+# → 111 specs checked: 111 passed
 
 # All three must pass before any commit
 ```
