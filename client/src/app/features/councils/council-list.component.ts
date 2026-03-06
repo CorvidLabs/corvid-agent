@@ -46,13 +46,12 @@ interface CouncilCard {
                 <app-skeleton variant="table" [count]="5" />
             } @else if (councilService.councils().length === 0) {
                 <app-empty-state
-                    icon=" [o] [o] [o]&#10;  \\  |  /&#10;   \\_|_/&#10;    |=|"
-                    title="No councils yet"
+                    icon=" [o] [o] [o]\n  \\  |  /\n   \\_|_/\n    |=|"
+                    title="No councils yet."
                     description="Councils run multi-agent deliberations — each member responds, discusses, and a chairman synthesizes the outcome."
-                    actionLabel="Create Council"
+                    actionLabel="+ Create a council"
                     actionRoute="/councils/new"
-                    actionAriaLabel="Create your first multi-agent council"
-                />
+                    actionAriaLabel="Create your first multi-agent council" />
             } @else if (filteredCards().length === 0) {
                 <p class="empty-filtered">All councils are hidden by the test-data filter.
                     <button class="link-btn" (click)="toggleTestFilter()">Show all</button>
