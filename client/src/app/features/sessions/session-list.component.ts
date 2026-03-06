@@ -5,13 +5,14 @@ import { DecimalPipe, SlicePipe } from '@angular/common';
 import { SessionService } from '../../core/services/session.service';
 import { AgentService } from '../../core/services/agent.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Session, SessionStatus, SessionSource } from '../../core/models/session.model';
 
 @Component({
     selector: 'app-session-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, StatusBadgeComponent, RelativeTimePipe, DecimalPipe, SlicePipe],
+    imports: [RouterLink, FormsModule, StatusBadgeComponent, EmptyStateComponent, RelativeTimePipe, DecimalPipe, SlicePipe],
     template: `
         <div class="page">
             <div class="page__header">
@@ -61,6 +62,13 @@ import type { Session, SessionStatus, SessionSource } from '../../core/models/se
 
             @if (sessionService.loading()) {
                 <p class="loading">Loading...</p>
+            } @else if (sessionService.sessions().length === 0) {
+                <app-empty-state
+                    icon="\u25C8"
+                    title="No sessions yet"
+                    subtitle="Start a conversation with one of your agents to see it here."
+                    ctaLabel="+ New Conversation"
+                    ctaRoute="/sessions/new" />
             } @else if (filteredSessions().length === 0) {
                 <p class="empty">No conversations match your filters.</p>
             } @else {

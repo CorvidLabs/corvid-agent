@@ -5,13 +5,14 @@ import { SlicePipe } from '@angular/common';
 import { ScheduleService } from '../../core/services/schedule.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy, ScheduleTriggerEvent } from '../../core/models/schedule.model';
 
 @Component({
     selector: 'app-schedule-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, SlicePipe, EmptyStateComponent, RelativeTimePipe],
     template: `
         <div class="schedules">
             <div class="schedules__header">
@@ -190,10 +191,16 @@ import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionTy
 
             @if (scheduleService.loading()) {
                 <p class="loading">Loading schedules...</p>
+            } @else if (scheduleService.schedules().length === 0) {
+                <app-empty-state
+                    icon="\u25F7"
+                    title="No schedules yet"
+                    subtitle="Automate agent tasks like PR reviews, repo starring, and codebase audits on a cron or interval."
+                    ctaLabel="+ New Schedule"
+                    (ctaClick)="showCreateForm.set(true)" />
             } @else if (filteredSchedules().length === 0) {
                 <div class="empty">
-                    <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}schedules found.</p>
-                    <p class="empty-hint">Create a schedule to automate agent tasks like PR reviews, repo starring, and more.</p>
+                    <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}schedules match.</p>
                 </div>
             } @else {
                 <div class="schedule-list">

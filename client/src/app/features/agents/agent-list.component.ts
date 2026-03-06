@@ -5,6 +5,7 @@ import { DecimalPipe } from '@angular/common';
 import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
 import { PersonaService } from '../../core/services/persona.service';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
 
@@ -20,7 +21,7 @@ interface AgentCard {
 @Component({
     selector: 'app-agent-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, DecimalPipe, EmptyStateComponent, RelativeTimePipe],
     template: `
         <div class="page">
             <div class="page__header">
@@ -76,7 +77,12 @@ interface AgentCard {
             @if (agentService.loading()) {
                 <p class="loading">Loading...</p>
             } @else if (agentService.agents().length === 0) {
-                <p class="empty">No agents configured. Create one to define how Claude behaves.</p>
+                <app-empty-state
+                    icon="\u25C6"
+                    title="No agents configured"
+                    subtitle="Create an agent to define how Claude behaves, what tools it can use, and its permissions."
+                    ctaLabel="+ New Agent"
+                    ctaRoute="/agents/new" />
             } @else if (filteredAgents().length === 0) {
                 <p class="empty">No agents match your filters.</p>
             } @else {

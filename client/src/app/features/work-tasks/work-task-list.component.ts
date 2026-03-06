@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { WorkTaskService } from '../../core/services/work-task.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, EmptyStateComponent, RelativeTimePipe],
     template: `
         <div class="tasks">
             <div class="tasks__header">
@@ -63,6 +64,13 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 
             @if (taskService.loading()) {
                 <p class="loading">Loading work tasks...</p>
+            } @else if (taskService.tasks().length === 0) {
+                <app-empty-state
+                    icon="\u26A1"
+                    title="No work tasks yet"
+                    subtitle="Spawn an agent session to implement code changes, open PRs, and validate builds automatically."
+                    ctaLabel="+ New Task"
+                    (ctaClick)="showCreateForm.set(true)" />
             } @else if (filteredTasks().length === 0) {
                 <div class="empty">
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
