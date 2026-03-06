@@ -90,7 +90,7 @@ export class PSKManager {
         this.network = network;
         this.contactId = contactId ?? pskConfig.address;
         this.dedupNs = `psk:txids:${this.contactId}`;
-        this.dedup.register(this.dedupNs, { maxSize: 1000, ttlMs: 600_000 });
+        this.dedup.register(this.dedupNs, { maxSize: 1000, ttlMs: 24 * 60 * 60 * 1000, persist: true });
 
         // Try to restore ratchet state from DB, otherwise create fresh.
         // Always use the PSK from pskConfig (authoritative source — psk_contacts

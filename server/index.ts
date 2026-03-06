@@ -1,14 +1,6 @@
 import { getDb, initDb } from './db/connection';
 import { handleRequest, initRateLimiterDb } from './routes/index';
-import { createWebSocketHandler, broadcastAlgoChatMessage, tenantTopic } from './ws/handler';
-import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from './routes/councils';
-import { initAlgoChatService } from './algochat/service';
-import { AlgoChatBridge } from './algochat/bridge';
-import { AgentWalletService } from './algochat/agent-wallet';
-import { AgentDirectory } from './algochat/agent-directory';
-import { AgentMessenger } from './algochat/agent-messenger';
-import { OnChainTransactor } from './algochat/on-chain-transactor';
-import { WorkCommandRouter } from './algochat/work-command-router';
+import { createWebSocketHandler } from './ws/handler';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
@@ -29,12 +21,14 @@ import {
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
 import { handlePermissionRoutes } from './routes/permissions';
+import { handleHealthRoutes } from './routes/health';
 import { buildAgentCard } from './a2a/agent-card';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
-import { getHealthCheck, getLivenessCheck, getReadinessCheck, type HealthCheckDeps } from './health/service';
-import { listHealthSnapshots, getUptimeStats } from './db/health-snapshots';
+import type { HealthCheckDeps } from './health/service';
 import { bootstrapServices } from './bootstrap';
+import { wireEventBroadcasting, publishToTenant } from './events/broadcasting';
+import { initAlgoChat, switchNetwork as switchAlgoChatNetwork, wirePostInit, type AlgoChatInitDeps } from './algochat/init';
 
 const log = createLogger('Server');
 
@@ -94,99 +88,17 @@ const {
     permissionBroker,
 } = await bootstrapServices(db, startTime);
 
+// AlgoChat init dependencies (shared by init, switchNetwork, and post-init wiring)
+const algochatInitDeps: AlgoChatInitDeps = {
+    db, server: null!, processManager, algochatConfig, algochatState,
+    workTaskService, schedulerService, workflowService, notificationService,
+    questionDispatcher, reputationScorer, reputationAttestation, reputationVerifier,
+    astParserService, permissionBroker, shutdownCoordinator, memorySyncService,
+    responsePollingService, usageMeter, healthMonitorService, mentionPollingService,
+};
+
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
-    log.info(`Switching AlgoChat network to ${network}`);
-
-    // Stop existing services
-    if (algochatState.bridge) {
-        algochatState.bridge.stop();
-        algochatState.bridge = null;
-    }
-    algochatState.walletService = null;
-    algochatState.messenger = null;
-    algochatState.directory = null;
-
-    // Update the config
-    (algochatConfig as { network: string }).network = network;
-
-    // Reinitialize
-    await initAlgoChat();
-    log.info(`Network switched to ${network}`);
-}
-
-async function initAlgoChat(): Promise<void> {
-    if (!algochatConfig.enabled) {
-        log.info('AlgoChat disabled');
-        return;
-    }
-
-    const service = await initAlgoChatService(algochatConfig);
-    if (!service) return;
-
-    // If agent network differs from main network, create a separate service for agents
-    let agentService = service;
-    if (algochatConfig.agentNetwork !== algochatConfig.network) {
-        const agentConfig = { ...algochatConfig, network: algochatConfig.agentNetwork };
-        const localService = await initAlgoChatService(agentConfig);
-        if (localService) {
-            agentService = localService;
-            log.info(`Agent network: ${algochatConfig.agentNetwork} (separate from ${algochatConfig.network})`);
-        } else {
-            log.warn(`Failed to init agent network (${algochatConfig.agentNetwork}), falling back to ${algochatConfig.network}`);
-        }
-    }
-
-    // Use the agent-network config for wallet and messenger operations
-    const agentNetworkConfig = algochatConfig.agentNetwork !== algochatConfig.network
-        ? { ...algochatConfig, network: algochatConfig.agentNetwork }
-        : algochatConfig;
-
-    algochatState.bridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
-
-    // Initialize agent wallet service on the agent network (localnet for funding/keys)
-    algochatState.walletService = new AgentWalletService(db, agentNetworkConfig, agentService);
-
-    // Only let the bridge use agent wallets if both networks match;
-    // otherwise the bridge (testnet) would try to send from wallets
-    // that only have funds on localnet.
-    if (algochatConfig.agentNetwork === algochatConfig.network) {
-        algochatState.bridge.setAgentWalletService(algochatState.walletService);
-    }
-
-    // Initialize agent directory and messenger on the agent network
-    algochatState.directory = new AgentDirectory(db, algochatState.walletService);
-    algochatState.bridge.setAgentDirectory(algochatState.directory);
-    algochatState.bridge.setApprovalManager(processManager.approvalManager);
-    algochatState.bridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
-    algochatState.bridge.setWorkTaskService(workTaskService);
-
-    // Create OnChainTransactor — handles all Algorand transaction operations
-    const onChainTransactor = new OnChainTransactor(db, agentService, algochatState.walletService, algochatState.directory);
-    algochatState.bridge.setOnChainTransactor(onChainTransactor);
-
-    algochatState.messenger = new AgentMessenger(db, agentNetworkConfig, onChainTransactor, processManager);
-    const workCommandRouter = new WorkCommandRouter(db);
-    workCommandRouter.setWorkTaskService(workTaskService);
-    algochatState.messenger.setWorkCommandRouter(workCommandRouter);
-    algochatState.bridge.setAgentMessenger(algochatState.messenger);
-
-    // Register MCP services so agent sessions get corvid_* tools
-    processManager.setMcpServices(algochatState.messenger, algochatState.directory, algochatState.walletService, {
-        serverMnemonic: algochatConfig.mnemonic,
-        network: agentNetworkConfig.network,
-    }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher,
-    reputationScorer, reputationAttestation, reputationVerifier, astParserService, permissionBroker);
-
-    // Forward AlgoChat events to WebSocket clients
-    algochatState.bridge.onEvent((participant, content, direction) => {
-        broadcastAlgoChatMessage(server, participant, content, direction);
-    });
-
-    // Publish encryption keys for all existing agent wallets
-    await algochatState.walletService.publishAllKeys();
-
-    algochatState.bridge.start();
-    shutdownCoordinator.register({ name: 'AlgoChatBridge', priority: 25, handler: () => algochatState.bridge?.stop() });
+    await switchAlgoChatNetwork(algochatInitDeps, network);
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
@@ -345,56 +257,8 @@ const server = Bun.serve<WsData>({
                     getWorkflowStats: () => workflowService.getStats(),
                 };
 
-                // Liveness probe: /health/live
-                if (url.pathname === '/health/live') {
-                    return instrumentResponse(
-                        new Response(JSON.stringify(getLivenessCheck()), {
-                            headers: { 'Content-Type': 'application/json' },
-                        }),
-                        '/health/live',
-                    );
-                }
-
-                // Readiness probe: /health/ready
-                if (url.pathname === '/health/ready') {
-                    const readiness = getReadinessCheck(healthDeps);
-                    const httpStatus = readiness.status === 'ready' ? 200 : 503;
-                    return instrumentResponse(
-                        new Response(JSON.stringify(readiness), {
-                            status: httpStatus,
-                            headers: { 'Content-Type': 'application/json' },
-                        }),
-                        '/health/ready',
-                    );
-                }
-
-                // Health history: /api/health/history
-                if (url.pathname === '/api/health/history') {
-                    const hours = Math.min(Math.max(Number(url.searchParams.get('hours') ?? '24'), 1), 720);
-                    const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-                    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? '100'), 1), 1000);
-                    const snapshots = listHealthSnapshots(db, { limit, since });
-                    const uptime = getUptimeStats(db, since);
-                    return instrumentResponse(
-                        new Response(JSON.stringify({ uptime, snapshots }), {
-                            headers: { 'Content-Type': 'application/json' },
-                        }),
-                        '/api/health/history',
-                    );
-                }
-
-                // Full health check: /health or /api/health
-                if (url.pathname === '/health' || url.pathname === '/api/health') {
-                    const health = await getHealthCheck(healthDeps);
-                    const httpStatus = health.status === 'unhealthy' ? 503 : 200;
-                    return instrumentResponse(
-                        new Response(JSON.stringify(health), {
-                            status: httpStatus,
-                            headers: { 'Content-Type': 'application/json' },
-                        }),
-                        '/api/health',
-                    );
-                }
+                const healthResponse = await handleHealthRoutes(req, url, healthDeps, db);
+                if (healthResponse) return instrumentResponse(healthResponse, url.pathname);
             }
 
             // A2A Protocol: Agent Card (public, no auth required)
@@ -473,7 +337,7 @@ const server = Bun.serve<WsData>({
             // Ollama model management routes
             const ollamaResponse = await handleOllamaRoutes(req, url, (status) => {
                 const msg = JSON.stringify({ type: 'ollama_pull_progress', ...status });
-                publishToTenant('ollama', msg); // Ollama is system-wide, no tenant scoping
+                publishToTenant(server, 'ollama', msg); // Ollama is system-wide, no tenant scoping
             });
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
@@ -539,161 +403,22 @@ const server = Bun.serve<WsData>({
     websocket: wsHandler,
 });
 
-/**
- * Resolve the tenant for an agent (used by event broadcasts).
- * Returns undefined in single-tenant mode (flat topics).
- */
-function resolveAgentTenantForBroadcast(agentId: string): string | undefined {
-    if (!multiTenant) return undefined;
-    const row = db.query('SELECT tenant_id FROM agents WHERE id = ?').get(agentId) as { tenant_id: string } | null;
-    const tid = row?.tenant_id;
-    return tid && tid !== DEFAULT_TENANT_ID ? tid : undefined;
-}
+// Patch the server reference into AlgoChat init deps (server wasn't available at declaration time)
+algochatInitDeps.server = server;
 
-/**
- * Resolve the tenant for a council launch (used by council event broadcasts).
- * Looks up any agent in the council's sessions.
- */
-function resolveCouncilTenantForBroadcast(launchId: string): string | undefined {
-    if (!multiTenant) return undefined;
-    const row = db.query(
-        `SELECT a.tenant_id FROM sessions s
-         JOIN agents a ON s.agent_id = a.id
-         WHERE s.council_launch_id = ? LIMIT 1`,
-    ).get(launchId) as { tenant_id: string } | null;
-    const tid = row?.tenant_id;
-    return tid && tid !== DEFAULT_TENANT_ID ? tid : undefined;
-}
-
-/**
- * Publish a message to a tenant-scoped topic.
- * In single-tenant mode, publishes to the flat topic.
- */
-function publishToTenant(baseTopic: string, data: string, tid?: string): void {
-    server.publish(tenantTopic(baseTopic, tid), data);
-}
-
-// Wire broadcast function so MCP tools can publish to WS clients
-processManager.setBroadcast((topic, data) => server.publish(topic, data));
-
-// Wire notification service broadcast (publishes to 'owner' topic)
-notificationService.setBroadcast((msg) => server.publish(tenantTopic('owner'), JSON.stringify(msg)));
-
-// Broadcast council events to tenant-scoped WS topics
-onCouncilStageChange((launchId, stage, sessionIds) => {
-    const msg = JSON.stringify({ type: 'council_stage_change', launchId, stage, sessionIds });
-    publishToTenant('council', msg, resolveCouncilTenantForBroadcast(launchId));
+// Wire all service event broadcasting to WebSocket topics
+wireEventBroadcasting({
+    server, db, processManager, schedulerService, webhookService,
+    mentionPollingService, workflowService, notificationService, multiTenant,
 });
-
-onCouncilLog((logEntry) => {
-    const msg = JSON.stringify({ type: 'council_log', log: logEntry });
-    publishToTenant('council', msg, resolveCouncilTenantForBroadcast(logEntry.launchId));
-});
-
-onCouncilDiscussionMessage((message) => {
-    const msg = JSON.stringify({ type: 'council_discussion_message', message });
-    publishToTenant('council', msg, resolveAgentTenantForBroadcast(message.agentId));
-});
-
-// Broadcast schedule events to tenant-scoped WS topics
-schedulerService.onEvent((event) => {
-    const msg = JSON.stringify({ type: event.type, ...spreadScheduleEvent(event) });
-    // Resolve tenant from schedule/execution agentId if available
-    const eventData = event.data as Record<string, unknown> | undefined;
-    const agentId = (eventData as { agentId?: string } | undefined)?.agentId;
-    publishToTenant('council', msg, agentId ? resolveAgentTenantForBroadcast(agentId) : undefined);
-});
-
-function spreadScheduleEvent(event: { type: string; data: unknown }): Record<string, unknown> {
-    switch (event.type) {
-        case 'schedule_update':
-            return { schedule: event.data };
-        case 'schedule_execution_update':
-            return { execution: event.data };
-        case 'schedule_approval_request':
-            return event.data as Record<string, unknown>;
-        default:
-            return {};
-    }
-}
-
-// Broadcast webhook events to tenant-scoped WS topics
-webhookService.onEvent((event) => {
-    const msg = JSON.stringify({ type: event.type, delivery: event.data });
-    const delivery = event.data as Record<string, unknown> | undefined;
-    const agentId = (delivery as { agentId?: string } | undefined)?.agentId;
-    publishToTenant('council', msg, agentId ? resolveAgentTenantForBroadcast(agentId) : undefined);
-});
-
-// Broadcast mention polling events to tenant-scoped WS topics
-mentionPollingService.onEvent((event) => {
-    const eventData = event.data as Record<string, unknown>;
-    const msg = JSON.stringify({ type: event.type, ...eventData });
-    const agentId = (eventData as { agentId?: string }).agentId;
-    publishToTenant('council', msg, agentId ? resolveAgentTenantForBroadcast(agentId) : undefined);
-});
-
-// Broadcast workflow events to tenant-scoped WS topics
-workflowService.onEvent((event) => {
-    const msg = JSON.stringify({ type: event.type, ...spreadWorkflowEvent(event) });
-    publishToTenant('council', msg); // Workflows don't carry agentId in events yet
-});
-
-function spreadWorkflowEvent(event: { type: string; data: unknown }): Record<string, unknown> {
-    switch (event.type) {
-        case 'workflow_update':
-            return { workflow: event.data };
-        case 'workflow_run_update':
-            return { run: event.data };
-        case 'workflow_node_update':
-            return { nodeRun: event.data };
-        default:
-            return {};
-    }
-}
 
 // Initialize AlgoChat after server starts
-initAlgoChat().then(() => {
-    // Wire agent message broadcasts once messenger is available
-    if (algochatState.messenger) {
-        algochatState.messenger.onMessageUpdate((message) => {
-            const msg = JSON.stringify({ type: 'agent_message_update', message });
-            const fromTid = message.fromAgentId ? resolveAgentTenantForBroadcast(message.fromAgentId) : undefined;
-            publishToTenant('algochat', msg, fromTid);
-        });
-    }
-
-    // Start memory sync service if AlgoChat is available
-    if (algochatState.messenger) {
-        memorySyncService.setServices(algochatState.messenger, algochatConfig.mnemonic, algochatConfig.network);
-        memorySyncService.start();
-    }
-
-    // Start the scheduler now that all services are available
-    // Give it the messenger if AlgoChat is initialized
-    if (algochatState.messenger) {
-        schedulerService.setAgentMessenger(algochatState.messenger);
-        workflowService.setAgentMessenger(algochatState.messenger);
-        notificationService.setAgentMessenger(algochatState.messenger);
-        questionDispatcher.setAgentMessenger(algochatState.messenger);
-    }
-    notificationService.start();
-    responsePollingService.start();
-    schedulerService.start();
-    mentionPollingService.start();
-    workflowService.start();
-    usageMeter.start();
-    healthMonitorService.start();
+initAlgoChat(algochatInitDeps).then(() => {
+    wirePostInit(algochatInitDeps);
 }).catch((err) => {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
-    // Start scheduler, polling, workflows, and notifications even if AlgoChat fails — they can still do GitHub ops and work tasks
-    notificationService.start();
-    responsePollingService.start();
-    schedulerService.start();
-    mentionPollingService.start();
-    workflowService.start();
-    usageMeter.start();
-    healthMonitorService.start();
+    // Start background services even if AlgoChat fails
+    wirePostInit(algochatInitDeps);
 });
 
 // Start session lifecycle cleanup after server is running
