@@ -1,10 +1,7 @@
-import { getDb, closeDb, initDb } from './db/connection';
-import { PerformanceCollector } from './performance/collector';
+import { getDb, initDb } from './db/connection';
 import { handleRequest, initRateLimiterDb } from './routes/index';
-import { ProcessManager } from './process/manager';
 import { createWebSocketHandler, broadcastAlgoChatMessage, tenantTopic } from './ws/handler';
 import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage } from './routes/councils';
-import { loadAlgoChatConfig } from './algochat/config';
 import { initAlgoChatService } from './algochat/service';
 import { AlgoChatBridge } from './algochat/bridge';
 import { AgentWalletService } from './algochat/agent-wallet';
@@ -12,30 +9,14 @@ import { AgentDirectory } from './algochat/agent-directory';
 import { AgentMessenger } from './algochat/agent-messenger';
 import { OnChainTransactor } from './algochat/on-chain-transactor';
 import { WorkCommandRouter } from './algochat/work-command-router';
-import { SelfTestService } from './selftest/service';
-import { WorkTaskService } from './work/service';
-import { SchedulerService } from './scheduler/service';
-import { UsageMonitor } from './usage/monitor';
-import { WebhookService } from './webhooks/service';
-import { MentionPollingService } from './polling/service';
-import { WorkflowService } from './workflow/service';
-import { SessionLifecycleManager } from './process/session-lifecycle';
-import { MemorySyncService } from './db/memory-sync';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
-import { DedupService } from './lib/dedup';
-import { ShutdownCoordinator } from './lib/shutdown-coordinator';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity, timingSafeEqual } from './middleware/auth';
 import { applySecurityHeaders } from './lib/security-headers';
-import { LlmProviderRegistry } from './providers/registry';
-import { AnthropicProvider } from './providers/anthropic/provider';
-import { OllamaProvider } from './providers/ollama/provider';
 import { handleOllamaRoutes } from './routes/ollama';
 import { handleOpenApiRoutes } from './openapi/index';
-import { listProjects, createProject } from './db/projects';
 import {
-    initObservability,
     renderMetrics,
     httpRequestsTotal,
     httpRequestDuration,
@@ -48,32 +29,11 @@ import {
 import { runWithTraceId } from './observability/trace-context';
 import { handleAuditRoutes } from './routes/audit';
 import { buildAgentCard } from './a2a/agent-card';
-import { AstParserService } from './ast/service';
-import { NotificationService } from './notifications/service';
-import { QuestionDispatcher } from './notifications/question-dispatcher';
-import { ResponsePollingService } from './notifications/response-poller';
-import { SandboxManager } from './sandbox/manager';
-import { MarketplaceService } from './marketplace/service';
-import { MarketplaceFederation } from './marketplace/federation';
-import { ReputationScorer } from './reputation/scorer';
-import { ReputationAttestation } from './reputation/attestation';
-import { ReputationVerifier } from './reputation/verifier';
-import { MemoryManager } from './memory/index';
-import { AutonomousLoopService } from './improvement/service';
-import { OutcomeTrackerService } from './feedback/outcome-tracker';
-import { DailyReviewService } from './improvement/daily-review';
-import { TelegramBridge } from './telegram/bridge';
-import { DiscordBridge } from './discord/bridge';
-import { SlackBridge } from './slack/bridge';
-import { TenantService } from './tenant/context';
-import { enableMultiTenantGuard } from './tenant/db-filter';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
-import { BillingService } from './billing/service';
-import { UsageMeter } from './billing/meter';
 import { getHealthCheck, getLivenessCheck, getReadinessCheck, type HealthCheckDeps } from './health/service';
-import { HealthMonitorService } from './health/monitor';
 import { listHealthSnapshots, getUptimeStats } from './db/health-snapshots';
+import { bootstrapServices } from './bootstrap';
 
 const log = createLogger('Server');
 
@@ -97,263 +57,52 @@ initDb().then(() => {
     log.error('File-based migration failed', { error: err instanceof Error ? err.message : String(err) });
 });
 
-// Initialize centralized dedup service (TTL + LRU + optional SQLite persistence)
-const dedupService = DedupService.init(db);
-dedupService.start();
-
-// Initialize performance collector (periodic system snapshots)
-const performanceCollector = new PerformanceCollector(db, 'corvid-agent.db', startTime);
-performanceCollector.start();
-
-// Initialize shutdown coordinator (30s grace period, configurable via env)
-const SHUTDOWN_GRACE_MS = parseInt(process.env.SHUTDOWN_GRACE_MS ?? '30000', 10);
-const shutdownCoordinator = new ShutdownCoordinator(SHUTDOWN_GRACE_MS);
-
-// Initialize observability (OpenTelemetry tracing + metrics) — non-blocking, opt-in.
-// Empty catch is intentional: initObservability() logs warnings internally when
-// the OTLP endpoint is unavailable, so we silently swallow the rejection here.
-initObservability().catch(() => {});
-
-// Initialize AST parser service (non-critical — warn on failure)
-const astParserService = new AstParserService();
-astParserService.init().catch((err) => {
-    log.warn('AST parser service failed to initialize', { error: err instanceof Error ? err.message : String(err) });
-});
-
-// Initialize LLM provider registry
-const providerRegistry = LlmProviderRegistry.getInstance();
-providerRegistry.register(new AnthropicProvider());
-const ollamaProvider = new OllamaProvider();
-providerRegistry.register(ollamaProvider);
-
-// Ollama startup validation — health-check when Ollama is the only enabled provider
-const isOllamaOnly = !providerRegistry.get('anthropic') && !providerRegistry.get('openai');
-if (isOllamaOnly) {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
-    try {
-        const tagsResponse = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(5_000) });
-        if (tagsResponse.ok) {
-            const tagsData = (await tagsResponse.json()) as { models?: Array<{ name: string }> };
-            const modelCount = tagsData.models?.length ?? 0;
-            if (modelCount === 0) {
-                log.warn('Ollama is running but no models are pulled. Suggested: ollama pull qwen3:8b');
-            } else {
-                log.info(`Ollama health check OK — ${modelCount} model(s) available`);
-            }
-        } else {
-            log.error(`Ollama health check failed (HTTP ${tagsResponse.status}). Is Ollama running at ${ollamaHost}?`);
-        }
-    } catch (err) {
-        log.error('Ollama is unreachable — install from https://ollama.com and run: ollama serve', {
-            host: ollamaHost,
-            error: err instanceof Error ? err.message : String(err),
-        });
-    }
-}
-
-// Fire-and-forget: refresh Ollama models on startup (warn if not running)
-ollamaProvider.refreshModels().catch((err) => {
-    log.warn('Ollama not available on startup', { error: err instanceof Error ? err.message : String(err) });
-});
-
-// Ensure a project exists for the server's own codebase
-{
-    const projects = listProjects(db);
-    const selfProject = projects.find((p) => p.workingDir === process.cwd());
-    if (!selfProject) {
-        createProject(db, {
-            name: 'corvid-agent',
-            workingDir: process.cwd(),
-        });
-    }
-}
-
-// Initialize process manager
-const processManager = new ProcessManager(db);
-
-// Initialize session lifecycle manager for automatic cleanup of expired sessions
-const sessionLifecycle = new SessionLifecycleManager(db);
-
-// Initialize memory sync service (started after AlgoChat init)
-const memorySyncService = new MemorySyncService(db);
-
-// Initialize AlgoChat
-const algochatConfig = loadAlgoChatConfig();
-let algochatBridge: AlgoChatBridge | null = null;
-let agentWalletService: AgentWalletService | null = null;
-let agentMessenger: AgentMessenger | null = null;
-let agentDirectory: AgentDirectory | null = null;
-const selfTestService = new SelfTestService(db, processManager);
-const workTaskService = new WorkTaskService(db, processManager, astParserService);
-workTaskService.recoverStaleTasks().catch((err) =>
-    log.error('Failed to recover stale work tasks', { error: err instanceof Error ? err.message : String(err) }),
-);
-
-// Initialize scheduler (cron/interval automation for agents)
-const schedulerService = new SchedulerService(db, processManager, workTaskService);
-
-// Initialize webhook service (GitHub event-driven automation)
-const webhookService = new WebhookService(db, processManager, workTaskService);
-
-// Initialize mention polling service (local-first GitHub @mention detection)
-const mentionPollingService = new MentionPollingService(db, processManager, workTaskService);
-
-// Initialize workflow service (graph-based orchestration)
-const workflowService = new WorkflowService(db, processManager, workTaskService);
-
-// Initialize notification service (multi-channel owner notifications)
-const notificationService = new NotificationService(db);
-
-// Initialize question dispatcher and response poller (two-way question channels)
-const questionDispatcher = new QuestionDispatcher(db);
-const responsePollingService = new ResponsePollingService(db, processManager.ownerQuestionManager);
-
-// Initialize sandbox manager (opt-in via SANDBOX_ENABLED=true)
-const sandboxEnabled = process.env.SANDBOX_ENABLED === 'true';
-const sandboxManager = sandboxEnabled ? new SandboxManager(db) : null;
-if (sandboxManager) {
-    sandboxManager.initialize().catch((err: Error) => {
-        log.warn('Sandbox manager failed to initialize', { error: err.message });
-    });
-}
-
-// Initialize marketplace
-const marketplaceService = new MarketplaceService(db);
-const marketplaceFederation = new MarketplaceFederation(db);
-
-// Initialize reputation system
-const reputationScorer = new ReputationScorer(db);
-const reputationAttestation = new ReputationAttestation(db);
-const reputationVerifier = new ReputationVerifier();
-
-// Initialize memory manager (for structured memory with semantic search)
-const memoryManager = new MemoryManager(db);
-
-// Initialize outcome tracker for PR feedback loop
-const outcomeTrackerService = new OutcomeTrackerService(db, memoryManager);
-
-// Initialize autonomous improvement loop service
-const improvementLoopService = new AutonomousLoopService(
-    db, processManager, workTaskService, memoryManager, reputationScorer,
-);
-improvementLoopService.setOutcomeTrackerService(outcomeTrackerService);
-schedulerService.setImprovementLoopService(improvementLoopService);
-schedulerService.setReputationServices(reputationScorer, reputationAttestation);
-schedulerService.setNotificationService(notificationService);
-const dailyReviewService = new DailyReviewService(db, memoryManager);
-schedulerService.setDailyReviewService(dailyReviewService);
-webhookService.setSchedulerService(schedulerService);
-mentionPollingService.setSchedulerService(schedulerService);
-
-// Initialize usage monitor (scheduled session cost tracking + anomaly detection)
-const usageMonitor = new UsageMonitor(db, processManager);
-usageMonitor.setNotificationService(notificationService);
-usageMonitor.backfillCosts();
-usageMonitor.start();
-
-// Initialize health monitor (periodic self-check + alerting on status transitions)
-const healthMonitorDeps: HealthCheckDeps = {
-    db,
-    startTime,
-    version: (require('../package.json') as { version: string }).version,
-    getActiveSessions: () => processManager.getActiveSessionIds(),
-    isAlgoChatConnected: () => algochatBridge !== null,
-    isShuttingDown: () => shutdownCoordinator.getStatus().phase !== 'idle',
-    getSchedulerStats: () => schedulerService.getStats(),
-    getMentionPollingStats: () => mentionPollingService.getStats(),
-    getWorkflowStats: () => workflowService.getStats(),
-};
-const healthMonitorService = new HealthMonitorService(db, healthMonitorDeps);
-healthMonitorService.setNotificationService(notificationService);
-
-// Initialize multi-tenant (opt-in via MULTI_TENANT=true)
-const multiTenant = process.env.MULTI_TENANT === 'true';
-const tenantService = new TenantService(db, multiTenant);
-if (multiTenant) {
-    enableMultiTenantGuard();
-    log.info('Multi-tenant guard enabled — DEFAULT_TENANT_ID calls will throw');
-}
-
-// Initialize billing
-const billingService = new BillingService(db);
-const usageMeter = new UsageMeter(db, billingService);
-
-// Initialize bidirectional Telegram bridge (opt-in via env vars)
-let telegramBridge: TelegramBridge | null = null;
-if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-    telegramBridge = new TelegramBridge(db, processManager, {
-        botToken: process.env.TELEGRAM_BOT_TOKEN,
-        chatId: process.env.TELEGRAM_CHAT_ID,
-        allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
-    });
-    telegramBridge.start();
-    shutdownCoordinator.registerService('TelegramBridge', telegramBridge, 20);
-    log.info('Telegram bridge initialized');
-}
-
-// Initialize bidirectional Discord bridge (opt-in via env vars)
-let discordBridge: DiscordBridge | null = null;
-if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
-    discordBridge = new DiscordBridge(db, processManager, {
-        botToken: process.env.DISCORD_BOT_TOKEN,
-        channelId: process.env.DISCORD_CHANNEL_ID,
-        allowedUserIds: process.env.DISCORD_ALLOWED_USER_IDS
-            ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
-            : [],
-    });
-    discordBridge.start();
-    shutdownCoordinator.registerService('DiscordBridge', discordBridge, 20);
-    log.info('Discord bridge initialized');
-}
-
-// Initialize bidirectional Slack bridge (opt-in via env vars)
-let slackBridge: SlackBridge | null = null;
-if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET) {
-    slackBridge = new SlackBridge(db, processManager, {
-        botToken: process.env.SLACK_BOT_TOKEN,
-        signingSecret: process.env.SLACK_SIGNING_SECRET,
-        channelId: process.env.SLACK_CHANNEL_ID ?? '',
-        allowedUserIds: process.env.SLACK_ALLOWED_USER_IDS
-            ? process.env.SLACK_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
-            : [],
-    });
-    slackBridge.start();
-    shutdownCoordinator.registerService('SlackBridge', slackBridge, 20);
-    log.info('Slack bridge initialized');
-}
-
-// Register all services with the shutdown coordinator.
-// Priority convention: 0=pollers/schedulers, 10=processing, 20=bridges, 30=process manager, 40=persistence, 50=database
-shutdownCoordinator.registerService('ResponsePollingService', responsePollingService, 0);
-shutdownCoordinator.registerService('NotificationService', notificationService, 0);
-shutdownCoordinator.registerService('WorkflowService', workflowService, 0);
-shutdownCoordinator.registerService('SchedulerService', schedulerService, 0);
-shutdownCoordinator.registerService('MentionPollingService', mentionPollingService, 0);
-shutdownCoordinator.registerService('SessionLifecycleManager', sessionLifecycle, 0);
-shutdownCoordinator.register({ name: 'UsageMonitor', priority: 0, handler: () => usageMonitor.stop() });
-shutdownCoordinator.registerService('HealthMonitorService', healthMonitorService, 0);
-shutdownCoordinator.registerService('UsageMeter', usageMeter, 5);
-shutdownCoordinator.register({ name: 'MarketplaceFederation', priority: 5, handler: () => marketplaceFederation.stopPeriodicSync() });
-shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
-if (sandboxManager) {
-    shutdownCoordinator.register({ name: 'SandboxManager', priority: 15, handler: () => sandboxManager.shutdown(), timeoutMs: 10_000 });
-}
-shutdownCoordinator.register({ name: 'ProcessManager', priority: 30, handler: () => processManager.shutdown(), timeoutMs: 15_000 });
-shutdownCoordinator.register({ name: 'PerformanceCollector', priority: 0, handler: () => performanceCollector.stop() });
-shutdownCoordinator.registerService('DedupService', dedupService, 40);
-shutdownCoordinator.register({ name: 'Database', priority: 50, handler: () => closeDb() });
+// Bootstrap all application services (see server/bootstrap.ts)
+const {
+    shutdownCoordinator,
+    providerRegistry,
+    processManager,
+    sessionLifecycle,
+    algochatConfig,
+    algochatState,
+    memorySyncService,
+    selfTestService,
+    workTaskService,
+    schedulerService,
+    webhookService,
+    mentionPollingService,
+    workflowService,
+    notificationService,
+    questionDispatcher,
+    responsePollingService,
+    sandboxManager,
+    marketplaceService,
+    marketplaceFederation,
+    reputationScorer,
+    reputationAttestation,
+    billingService,
+    usageMeter,
+    tenantService,
+    multiTenant,
+    performanceCollector,
+    outcomeTrackerService,
+    slackBridge,
+    healthMonitorService,
+    reputationVerifier,
+    astParserService,
+} = await bootstrapServices(db, startTime);
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
     log.info(`Switching AlgoChat network to ${network}`);
 
     // Stop existing services
-    if (algochatBridge) {
-        algochatBridge.stop();
-        algochatBridge = null;
+    if (algochatState.bridge) {
+        algochatState.bridge.stop();
+        algochatState.bridge = null;
     }
-    agentWalletService = null;
-    agentMessenger = null;
-    agentDirectory = null;
+    algochatState.walletService = null;
+    algochatState.messenger = null;
+    algochatState.directory = null;
 
     // Update the config
     (algochatConfig as { network: string }).network = network;
@@ -390,56 +139,56 @@ async function initAlgoChat(): Promise<void> {
         ? { ...algochatConfig, network: algochatConfig.agentNetwork }
         : algochatConfig;
 
-    algochatBridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
+    algochatState.bridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
 
     // Initialize agent wallet service on the agent network (localnet for funding/keys)
-    agentWalletService = new AgentWalletService(db, agentNetworkConfig, agentService);
+    algochatState.walletService = new AgentWalletService(db, agentNetworkConfig, agentService);
 
     // Only let the bridge use agent wallets if both networks match;
     // otherwise the bridge (testnet) would try to send from wallets
     // that only have funds on localnet.
     if (algochatConfig.agentNetwork === algochatConfig.network) {
-        algochatBridge.setAgentWalletService(agentWalletService);
+        algochatState.bridge.setAgentWalletService(algochatState.walletService);
     }
 
     // Initialize agent directory and messenger on the agent network
-    agentDirectory = new AgentDirectory(db, agentWalletService);
-    algochatBridge.setAgentDirectory(agentDirectory);
-    algochatBridge.setApprovalManager(processManager.approvalManager);
-    algochatBridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
-    algochatBridge.setWorkTaskService(workTaskService);
+    algochatState.directory = new AgentDirectory(db, algochatState.walletService);
+    algochatState.bridge.setAgentDirectory(algochatState.directory);
+    algochatState.bridge.setApprovalManager(processManager.approvalManager);
+    algochatState.bridge.setOwnerQuestionManager(processManager.ownerQuestionManager);
+    algochatState.bridge.setWorkTaskService(workTaskService);
 
     // Create OnChainTransactor — handles all Algorand transaction operations
-    const onChainTransactor = new OnChainTransactor(db, agentService, agentWalletService, agentDirectory);
-    algochatBridge.setOnChainTransactor(onChainTransactor);
+    const onChainTransactor = new OnChainTransactor(db, agentService, algochatState.walletService, algochatState.directory);
+    algochatState.bridge.setOnChainTransactor(onChainTransactor);
 
-    agentMessenger = new AgentMessenger(db, agentNetworkConfig, onChainTransactor, processManager);
+    algochatState.messenger = new AgentMessenger(db, agentNetworkConfig, onChainTransactor, processManager);
     const workCommandRouter = new WorkCommandRouter(db);
     workCommandRouter.setWorkTaskService(workTaskService);
-    agentMessenger.setWorkCommandRouter(workCommandRouter);
-    algochatBridge.setAgentMessenger(agentMessenger);
+    algochatState.messenger.setWorkCommandRouter(workCommandRouter);
+    algochatState.bridge.setAgentMessenger(algochatState.messenger);
 
     // Register MCP services so agent sessions get corvid_* tools
-    processManager.setMcpServices(agentMessenger, agentDirectory, agentWalletService, {
+    processManager.setMcpServices(algochatState.messenger, algochatState.directory, algochatState.walletService, {
         serverMnemonic: algochatConfig.mnemonic,
         network: agentNetworkConfig.network,
     }, workTaskService, schedulerService, workflowService, notificationService, questionDispatcher,
     reputationScorer, reputationAttestation, reputationVerifier, astParserService);
 
     // Forward AlgoChat events to WebSocket clients
-    algochatBridge.onEvent((participant, content, direction) => {
+    algochatState.bridge.onEvent((participant, content, direction) => {
         broadcastAlgoChatMessage(server, participant, content, direction);
     });
 
     // Publish encryption keys for all existing agent wallets
-    await agentWalletService.publishAllKeys();
+    await algochatState.walletService.publishAllKeys();
 
-    algochatBridge.start();
-    shutdownCoordinator.register({ name: 'AlgoChatBridge', priority: 25, handler: () => algochatBridge?.stop() });
+    algochatState.bridge.start();
+    shutdownCoordinator.register({ name: 'AlgoChatBridge', priority: 25, handler: () => algochatState.bridge?.stop() });
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatBridge, authConfig, () => agentMessenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
+const wsHandler = createWebSocketHandler(processManager, () => algochatState.bridge, authConfig, () => algochatState.messenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
 
 interface WsData {
     subscriptions: Map<string, unknown>;
@@ -581,7 +330,7 @@ const server = Bun.serve<WsData>({
                     startTime,
                     version: (require('../package.json') as { version: string }).version,
                     getActiveSessions: () => processManager.getActiveSessionIds(),
-                    isAlgoChatConnected: () => algochatBridge !== null,
+                    isAlgoChatConnected: () => algochatState.bridge !== null,
                     isShuttingDown: () => shutdownCoordinator.getStatus().phase !== 'idle',
                     getSchedulerStats: () => schedulerService.getStats(),
                     getMentionPollingStats: () => mentionPollingService.getStats(),
@@ -721,7 +470,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService);
+            const apiResponse = await handleRequest(req, db, processManager, algochatState.bridge, algochatState.walletService, algochatState.messenger, workTaskService, selfTestService, algochatState.directory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
@@ -898,8 +647,8 @@ function spreadWorkflowEvent(event: { type: string; data: unknown }): Record<str
 // Initialize AlgoChat after server starts
 initAlgoChat().then(() => {
     // Wire agent message broadcasts once messenger is available
-    if (agentMessenger) {
-        agentMessenger.onMessageUpdate((message) => {
+    if (algochatState.messenger) {
+        algochatState.messenger.onMessageUpdate((message) => {
             const msg = JSON.stringify({ type: 'agent_message_update', message });
             const fromTid = message.fromAgentId ? resolveAgentTenantForBroadcast(message.fromAgentId) : undefined;
             publishToTenant('algochat', msg, fromTid);
@@ -907,18 +656,18 @@ initAlgoChat().then(() => {
     }
 
     // Start memory sync service if AlgoChat is available
-    if (agentMessenger) {
-        memorySyncService.setServices(agentMessenger, algochatConfig.mnemonic, algochatConfig.network);
+    if (algochatState.messenger) {
+        memorySyncService.setServices(algochatState.messenger, algochatConfig.mnemonic, algochatConfig.network);
         memorySyncService.start();
     }
 
     // Start the scheduler now that all services are available
-    // Give it the agentMessenger if AlgoChat is initialized
-    if (agentMessenger) {
-        schedulerService.setAgentMessenger(agentMessenger);
-        workflowService.setAgentMessenger(agentMessenger);
-        notificationService.setAgentMessenger(agentMessenger);
-        questionDispatcher.setAgentMessenger(agentMessenger);
+    // Give it the messenger if AlgoChat is initialized
+    if (algochatState.messenger) {
+        schedulerService.setAgentMessenger(algochatState.messenger);
+        workflowService.setAgentMessenger(algochatState.messenger);
+        notificationService.setAgentMessenger(algochatState.messenger);
+        questionDispatcher.setAgentMessenger(algochatState.messenger);
     }
     notificationService.start();
     responsePollingService.start();
