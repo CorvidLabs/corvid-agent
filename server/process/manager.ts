@@ -8,12 +8,12 @@ import { ApprovalManager } from './approval-manager';
 import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { getProject } from '../db/projects';
-import { getAgent, getAlgochatEnabledAgents } from '../db/agents';
+import { getAgent } from '../db/agents';
 import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
-import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, updateSessionAgent, addSessionMessage } from '../db/sessions';
+import { getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
@@ -23,6 +23,8 @@ import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { getParticipantForSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { SessionEventBus } from './event-bus';
+import { SessionTimerManager } from './session-timer-manager';
+import { SessionResilienceManager, MAX_RESTARTS } from './session-resilience-manager';
 
 // Re-export EventCallback from interfaces for backward compatibility —
 // callers importing { EventCallback } from './manager' continue to work.
@@ -30,22 +32,6 @@ export type { EventCallback } from './interfaces';
 import type { EventCallback } from './interfaces';
 
 const log = createLogger('ProcessManager');
-
-const AGENT_TIMEOUT_MS = parseInt(process.env.AGENT_TIMEOUT_MS ?? String(30 * 60 * 1000), 10);
-const MAX_RESTARTS = 3;
-const BACKOFF_BASE_MS = 5000;
-const STABLE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes uptime resets restart counter
-
-// Orphan pruning: every 5 minutes, clean subscriber/pausedSession entries
-// that reference sessions with no active process.
-const ORPHAN_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
-
-// Auto-resume backoff: 5min → 15min → 45min → cap at 60min
-const AUTO_RESUME_CHECK_MS = 60_000; // Check every minute
-const AUTO_RESUME_BASE_MS = 5 * 60 * 1000; // 5 minutes
-const AUTO_RESUME_MULTIPLIER = 3;
-const AUTO_RESUME_CAP_MS = 60 * 60 * 1000; // 1 hour max
-const AUTO_RESUME_MAX_ATTEMPTS = 10;
 
 // After this many user messages in a single process lifetime, kill and restart
 // through the capped resume path to keep context size manageable.
@@ -67,23 +53,11 @@ interface SessionMeta {
     lastActivityAt: number;
 }
 
-interface PausedSessionInfo {
-    pausedAt: number;
-    resumeAttempts: number;
-    nextResumeAt: number;
-}
-
 export class ProcessManager {
     private processes: Map<string, SdkProcess> = new Map();
     private readonly eventBus = new SessionEventBus();
     private sessionMeta: Map<string, SessionMeta> = new Map();
     private db: Database;
-    private timeoutTimer: ReturnType<typeof setInterval> | null = null;
-    private sessionTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
-    private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-    private pausedSessions: Map<string, PausedSessionInfo> = new Map();
-    private autoResumeTimer: ReturnType<typeof setInterval> | null = null;
-    private orphanPruneTimer: ReturnType<typeof setInterval> | null = null;
     readonly approvalManager: ApprovalManager;
     readonly ownerQuestionManager: OwnerQuestionManager;
     private broadcastFn: ((topic: string, data: string) => void) | null = null;
@@ -94,16 +68,44 @@ export class ProcessManager {
     // MCP services — composed container set after AlgoChat init
     private readonly mcpServices = new McpServiceContainer();
 
+    // Composed managers — delegated concerns
+    private readonly timerManager: SessionTimerManager;
+    private readonly resilienceManager: SessionResilienceManager;
+
     constructor(db: Database) {
         this.db = db;
         this.approvalManager = new ApprovalManager();
         this.approvalManager.setDatabase(db);
         this.ownerQuestionManager = new OwnerQuestionManager();
         this.ownerQuestionManager.setDatabase(db);
+
+        this.timerManager = new SessionTimerManager({
+            onTimeout: (sessionId) => this.stopProcess(sessionId),
+            onStablePeriod: (sessionId) => {
+                const meta = this.sessionMeta.get(sessionId);
+                if (meta && meta.restartCount > 0) {
+                    log.info(`Session ${sessionId} stable, resetting restart counter`, {
+                        previousCount: meta.restartCount,
+                    });
+                    meta.restartCount = 0;
+                }
+            },
+            isRunning: (sessionId) => this.processes.has(sessionId),
+            getLastActivityAt: (sessionId) => this.sessionMeta.get(sessionId)?.lastActivityAt,
+        });
+
+        this.resilienceManager = new SessionResilienceManager(db, this.eventBus, {
+            resumeProcess: (session) => this.resumeProcess(session),
+            stopProcess: (sessionId) => this.stopProcess(sessionId),
+            isRunning: (sessionId) => this.processes.has(sessionId),
+            clearTimers: (sessionId) => this.timerManager.cleanupSession(sessionId),
+            cancelApprovals: (sessionId) => this.approvalManager.cancelSession(sessionId),
+        });
+
         this.cleanupStaleSessions();
-        this.startTimeoutChecker();
-        this.startAutoResumeChecker();
-        this.startOrphanPruner();
+        this.timerManager.startTimeoutChecker(() => [...this.sessionMeta.keys()]);
+        this.resilienceManager.startAutoResumeChecker();
+        this.resilienceManager.startOrphanPruner(() => this.pruneOrphans());
     }
 
     /** Set the broadcast function so MCP tools can publish to WS clients. */
@@ -180,15 +182,14 @@ export class ProcessManager {
         const registry = LlmProviderRegistry.getInstance();
         let provider = providerType ? registry.get(providerType) : undefined;
 
-        // Auto-fallback: no explicit provider + no Claude access → try Ollama
+        // Auto-fallback: no explicit provider + no Claude access -> try Ollama
         if (!provider && !providerType && !hasClaudeAccess()) {
             const ollamaFallback = registry.get('ollama');
             if (ollamaFallback) {
-                log.info(`No Claude access — falling back to Ollama for session ${session.id}`);
+                log.info(`No Claude access -- falling back to Ollama for session ${session.id}`);
                 provider = ollamaFallback;
-                // Clear agent's non-Ollama model so direct-process uses the Ollama default
                 if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
-                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model — will use Ollama default`, { agentId: effectiveAgent.id });
+                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model -- will use Ollama default`, { agentId: effectiveAgent.id });
                     effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
                 }
             }
@@ -214,15 +215,12 @@ export class ProcessManager {
     }
 
     private startSdkProcessWrapped(session: Session, project: import('../../shared/types').Project, agent: import('../../shared/types').Agent | null, prompt: string, depth?: number, schedulerMode?: boolean, schedulerActionType?: ScheduleActionType): void {
-        // Use session-level workDir override (e.g. git worktree for work tasks)
         const effectiveProject = session.workDir
             ? { ...project, workingDir: session.workDir }
             : project;
 
-        // Resolve prompts + tool permissions in one call
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
-        // Build MCP servers for this agent session
         const mcpServers = session.agentId
             ? (() => {
                 const ctx = this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType);
@@ -284,19 +282,16 @@ export class ProcessManager {
             ? { ...project, workingDir: session.workDir }
             : project;
 
-        // Resolve prompts + tool permissions in one call
         const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
 
         const mcpToolContext = session.agentId
             ? this.buildMcpContext(session.agentId, session.source, session.id, depth, schedulerMode, config.resolvedToolPermissions, schedulerActionType)
             : null;
 
-        // Query external MCP server configs for this agent
         const externalMcpConfigs = session.agentId
             ? getActiveServersForAgent(this.db, session.agentId)
             : [];
 
-        // COUNCIL_MODEL override: use a bigger model for council chairman/synthesis
         const councilModel = process.env.COUNCIL_MODEL;
         const modelOverride = (session.councilRole === 'chairman' && councilModel)
             ? councilModel
@@ -304,8 +299,6 @@ export class ProcessManager {
 
         let sp: SdkProcess;
         try {
-            // Poll-triggered sessions only need run_command to execute gh CLI commands.
-            // Giving small models the full tool set causes them to call random tools.
             const isPollSession = session.name.startsWith('Poll:');
             sp = startDirectProcess({
                 session,
@@ -363,7 +356,6 @@ export class ProcessManager {
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
 
-        // Debug: verify DB write persisted
         const verify = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as { status: string; pid: number | null } | null;
         if (verify?.status !== 'running' || verify?.pid !== process.pid) {
             log.error(`registerProcess DB verification FAILED`, {
@@ -373,11 +365,8 @@ export class ProcessManager {
             });
         }
 
-        // Start stable period timer — resets restart counter after sustained uptime
-        this.startStableTimer(session.id);
-
-        // Start per-session inactivity timeout — resets on each event
-        this.startSessionTimeout(session.id);
+        this.timerManager.startStableTimer(session.id);
+        this.timerManager.startSessionTimeout(session.id);
 
         log.info(`Started process for session ${session.id}`, { pid: process.pid });
 
@@ -398,16 +387,12 @@ export class ProcessManager {
         if (this.processes.has(session.id)) {
             const meta = this.sessionMeta.get(session.id);
             if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
-                // Context has grown too large — kill process so it restarts
-                // through buildResumePrompt with the capped message window.
                 log.info(`Context reset: killing session ${session.id} after ${meta.turnCount} turns`);
                 const cp = this.processes.get(session.id);
                 cp?.kill();
                 this.processes.delete(session.id);
                 updateSessionPid(this.db, session.id, null);
-                // Fall through to restart below
             } else {
-                // Process still running, send message instead
                 if (prompt) {
                     this.sendMessage(session.id, prompt);
                 }
@@ -416,7 +401,6 @@ export class ProcessManager {
         }
 
         const project = session.projectId ? getProject(this.db, session.projectId) : null;
-        // Use a minimal default project when session has no project
         const effectiveProject = project ?? {
             id: 'general',
             name: 'General',
@@ -430,38 +414,28 @@ export class ProcessManager {
 
         let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
-        // Start a fresh process — our session IDs are not Claude conversation IDs,
-        // so --resume would fail. Build a prompt that includes conversation history
-        // so the agent has context from prior exchanges.
         const resumePrompt = this.buildResumePrompt(session, prompt);
 
-        // Persist the new prompt after building the resume prompt to avoid
-        // duplication (buildResumePrompt fetches history from DB, then appends
-        // the new prompt separately)
         if (prompt) {
             addSessionMessage(this.db, session.id, 'user', prompt);
         }
 
-        // Route based on provider execution mode (same logic as startProcess)
         const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
         const registry = LlmProviderRegistry.getInstance();
         let providerInstance = providerType ? registry.get(providerType) : undefined;
 
-        // Auto-fallback: no explicit provider + no Claude access → try Ollama
         if (!providerInstance && !providerType && !hasClaudeAccess()) {
             const ollamaFallback = registry.get('ollama');
             if (ollamaFallback) {
-                log.info(`No Claude access — falling back to Ollama for resumed session ${session.id}`);
+                log.info(`No Claude access -- falling back to Ollama for resumed session ${session.id}`);
                 providerInstance = ollamaFallback;
-                // Clear agent's non-Ollama model so direct-process uses the Ollama default
                 if (effectiveAgent && effectiveAgent.model && !effectiveAgent.model.includes(':') && !effectiveAgent.model.startsWith('qwen') && !effectiveAgent.model.startsWith('llama')) {
-                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model — will use Ollama default`, { agentId: effectiveAgent.id });
+                    log.warn(`Agent model "${effectiveAgent.model}" is not an Ollama model -- will use Ollama default`, { agentId: effectiveAgent.id });
                     effectiveAgent = { ...effectiveAgent, model: ollamaFallback.getInfo().defaultModel };
                 }
             }
         }
 
-        // Resolve prompts + tool permissions in one call
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
         let sp: SdkProcess;
@@ -470,7 +444,6 @@ export class ProcessManager {
                 const mcpToolContext = session.agentId
                     ? this.buildMcpContext(session.agentId, session.source, session.id, undefined, undefined, resumeConfig.resolvedToolPermissions)
                     : null;
-                // COUNCIL_MODEL override for resumed sessions
                 const councilModelResume = process.env.COUNCIL_MODEL;
                 const modelOverrideResume = (session.councilRole === 'chairman' && councilModelResume)
                     ? councilModelResume
@@ -541,33 +514,27 @@ export class ProcessManager {
         }
         updateSessionStatus(this.db, session.id, 'running');
 
-        // Start stable period timer — resets restart counter after sustained uptime
-        this.startStableTimer(session.id);
-
-        // Start per-session inactivity timeout — resets on each event
-        this.startSessionTimeout(session.id);
+        this.timerManager.startStableTimer(session.id);
+        this.timerManager.startSessionTimeout(session.id);
     }
 
     private buildResumePrompt(session: Session, newPrompt?: string): string {
         const messages = getSessionMessages(this.db, session.id);
 
-        // No history — just use the prompt as-is
         if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
 
-        // Build a conversation history block (cap at last 20 messages to stay within limits)
         const recent = messages.slice(-20);
         const historyLines = recent
             .filter((m) => m.role === 'user' || m.role === 'assistant')
             .map((m) => {
                 const role = m.role === 'user' ? 'User' : 'Assistant';
-                // Truncate very long messages to keep the prompt reasonable
                 const text = m.content.length > 2000 ? m.content.slice(0, 2000) + '...' : m.content;
                 return `[${role}]: ${text}`;
             });
 
         const instruction = newPrompt
             ? 'The following is the conversation history from this session. Use it for context when responding to the new message.'
-            : 'The following is the conversation history from this session. The session was interrupted — continue the conversation based on the history above.';
+            : 'The following is the conversation history from this session. The session was interrupted -- continue the conversation based on the history above.';
 
         const parts = [
             '<conversation_history>',
@@ -591,7 +558,6 @@ export class ProcessManager {
             updateSessionPid(this.db, sessionId, null);
             updateSessionStatus(this.db, sessionId, 'stopped');
 
-            // Emit before cleanup so subscribers still receive the event
             this.eventBus.emit(sessionId, {
                 type: 'session_stopped',
                 session_id: sessionId,
@@ -602,7 +568,7 @@ export class ProcessManager {
     }
 
     /**
-     * Remove all in-memory state for a session. Idempotent — safe to call
+     * Remove all in-memory state for a session. Idempotent -- safe to call
      * multiple times or for sessions that have already been partially cleaned.
      *
      * This is the single source of truth for memory cleanup. All exit paths
@@ -612,9 +578,8 @@ export class ProcessManager {
         this.processes.delete(sessionId);
         this.sessionMeta.delete(sessionId);
         this.eventBus.removeSessionSubscribers(sessionId);
-        this.pausedSessions.delete(sessionId);
-        this.clearStableTimer(sessionId);
-        this.clearSessionTimeout(sessionId);
+        this.resilienceManager.deletePausedSession(sessionId);
+        this.timerManager.cleanupSession(sessionId);
         this.approvalManager.cancelSession(sessionId);
         this.ownerQuestionManager.cancelSession(sessionId);
     }
@@ -631,13 +596,14 @@ export class ProcessManager {
         stableTimers: number;
         globalSubscribers: number;
     } {
+        const timerStats = this.timerManager.getStats();
         return {
             processes: this.processes.size,
             subscribers: this.eventBus.getSubscriberCount(),
             sessionMeta: this.sessionMeta.size,
-            pausedSessions: this.pausedSessions.size,
-            sessionTimeouts: this.sessionTimeouts.size,
-            stableTimers: this.stableTimers.size,
+            pausedSessions: this.resilienceManager.pausedSessionCount,
+            sessionTimeouts: timerStats.sessionTimeouts,
+            stableTimers: timerStats.stableTimers,
             globalSubscribers: this.eventBus.getGlobalSubscriberCount(),
         };
     }
@@ -654,7 +620,6 @@ export class ProcessManager {
 
         addSessionMessage(this.db, sessionId, 'user', content);
 
-        // Track turns for context reset
         const meta = this.sessionMeta.get(sessionId);
         if (meta) meta.turnCount++;
 
@@ -667,8 +632,6 @@ export class ProcessManager {
 
     subscribe(sessionId: string, callback: EventCallback): void {
         this.eventBus.subscribe(sessionId, callback);
-        // Immediately replay current state so clients that subscribe late
-        // don't see an empty event log for running sessions.
         if (this.processes.has(sessionId)) {
             callback(sessionId, { type: 'thinking', thinking: true } as ClaudeStreamEvent);
         }
@@ -691,111 +654,54 @@ export class ProcessManager {
     }
 
     shutdown(): void {
-        if (this.timeoutTimer) {
-            clearInterval(this.timeoutTimer);
-            this.timeoutTimer = null;
-        }
-        if (this.autoResumeTimer) {
-            clearInterval(this.autoResumeTimer);
-            this.autoResumeTimer = null;
-        }
-        if (this.orphanPruneTimer) {
-            clearInterval(this.orphanPruneTimer);
-            this.orphanPruneTimer = null;
-        }
+        this.timerManager.shutdown();
+        this.resilienceManager.shutdown();
         this.approvalManager.shutdown();
         this.ownerQuestionManager.shutdown();
 
-        // Kill all running processes first (stopProcess also calls cleanupSessionState)
         for (const [sessionId] of this.processes) {
             this.stopProcess(sessionId);
         }
 
-        // Final sweep: clear any remaining entries (e.g. subscribers for
-        // sessions that were never started but had subscriptions registered)
         this.eventBus.clearAllSessionSubscribers();
-        this.pausedSessions.clear();
         this.sessionMeta.clear();
-        for (const timer of this.stableTimers.values()) {
-            clearTimeout(timer);
-        }
-        this.stableTimers.clear();
-        for (const timer of this.sessionTimeouts.values()) {
-            clearTimeout(timer);
-        }
-        this.sessionTimeouts.clear();
     }
 
     private handleApiOutage(sessionId: string): void {
-        log.warn(`API outage detected — pausing session ${sessionId} (not counted toward restart budget)`);
-
         const cp = this.processes.get(sessionId);
         if (cp) {
             cp.kill();
             this.processes.delete(sessionId);
         }
-
-        this.clearStableTimer(sessionId);
-        this.clearSessionTimeout(sessionId);
-        const now = Date.now();
-        this.pausedSessions.set(sessionId, {
-            pausedAt: now,
-            resumeAttempts: 0,
-            nextResumeAt: now + AUTO_RESUME_BASE_MS,
-        });
-        this.approvalManager.cancelSession(sessionId);
-        updateSessionPid(this.db, sessionId, null);
-        updateSessionStatus(this.db, sessionId, 'paused');
-
-        // Emit BEFORE removing subscribers so they receive the outage notification
-        this.eventBus.emit(sessionId, {
-            type: 'error',
-            error: { message: `Session paused due to API outage — auto-resume in ${AUTO_RESUME_BASE_MS / 60_000}min`, type: 'api_outage' },
-        } as ClaudeStreamEvent);
-
-        this.eventBus.removeSessionSubscribers(sessionId);
+        this.resilienceManager.handleApiOutage(sessionId);
     }
 
     resumeSession(sessionId: string): boolean {
-        if (!this.pausedSessions.has(sessionId)) return false;
-
-        this.pausedSessions.delete(sessionId);
-        const session = getSession(this.db, sessionId);
-        if (!session) {
-            log.warn(`Cannot resume session ${sessionId} — not found in DB`);
-            return false;
+        const resumed = this.resilienceManager.resumeSession(sessionId);
+        if (resumed) {
+            const meta = this.sessionMeta.get(sessionId);
+            if (meta) {
+                meta.restartCount = 0;
+            }
         }
-
-        // Reset restart counter for a clean slate after resume
-        const meta = this.sessionMeta.get(sessionId);
-        if (meta) {
-            meta.restartCount = 0;
-        }
-
-        log.info(`Resuming paused session ${sessionId}`);
-        this.resumeProcess(session);
-        return true;
+        return resumed;
     }
 
     isPaused(sessionId: string): boolean {
-        return this.pausedSessions.has(sessionId);
+        return this.resilienceManager.isPaused(sessionId);
     }
 
     getPausedSessionIds(): string[] {
-        return [...this.pausedSessions.keys()];
+        return this.resilienceManager.getPausedSessionIds();
     }
 
     private handleEvent(sessionId: string, event: ClaudeStreamEvent): void {
-        // Reset inactivity timeout on every event — the session is still working.
-        // This ensures sessions are only killed when they're stuck (no events for
-        // AGENT_TIMEOUT_MS), not when they're actively making progress.
         const meta = this.sessionMeta.get(sessionId);
         if (meta) {
             meta.lastActivityAt = Date.now();
-            this.startSessionTimeout(sessionId);
+            this.timerManager.startSessionTimeout(sessionId);
         }
 
-        // Persist assistant messages
         if (event.type === 'assistant' && event.message?.content) {
             const text = extractContentText(event.message.content);
             if (text) {
@@ -803,7 +709,6 @@ export class ProcessManager {
             }
         }
 
-        // Track cost (fields are at top level of result events)
         if (event.total_cost_usd !== undefined) {
             updateSessionCost(
                 this.db,
@@ -812,10 +717,9 @@ export class ProcessManager {
                 event.num_turns ?? 0,
             );
 
-            // Record daily API cost delta
-            const meta = this.sessionMeta.get(sessionId);
-            if (meta) {
-                const delta = event.total_cost_usd - meta.lastKnownCostUsd;
+            const costMeta = this.sessionMeta.get(sessionId);
+            if (costMeta) {
+                const delta = event.total_cost_usd - costMeta.lastKnownCostUsd;
                 if (delta > 0) {
                     try {
                         recordApiCost(this.db, delta);
@@ -823,17 +727,16 @@ export class ProcessManager {
                         log.warn(`Failed to record API cost`, { error: err instanceof Error ? err.message : String(err) });
                     }
                 }
-                meta.lastKnownCostUsd = event.total_cost_usd;
+                costMeta.lastKnownCostUsd = event.total_cost_usd;
 
-                // ── Credit system: deduct credits for AlgoChat sessions (skip for owners) ──
-                if (meta.source === 'algochat') {
+                if (costMeta.source === 'algochat') {
                     const participantAddr = getParticipantForSession(this.db, sessionId);
                     if (participantAddr && this.isOwnerAddress?.(participantAddr)) {
                         // Owners are exempt from credit deduction
                     } else if (participantAddr) {
                         const result = deductTurnCredits(this.db, participantAddr, sessionId);
                         if (!result.success) {
-                            log.warn(`Credits exhausted mid-session — pausing session ${sessionId}`, {
+                            log.warn(`Credits exhausted mid-session -- pausing session ${sessionId}`, {
                                 participantAddr: participantAddr.slice(0, 8) + '...',
                             });
                             this.eventBus.emit(sessionId, {
@@ -864,7 +767,7 @@ export class ProcessManager {
                             });
                             this.eventBus.emit(sessionId, {
                                 type: 'system',
-                                statusMessage: `⚠️ Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
+                                statusMessage: `Low credits: ${result.creditsRemaining} remaining. Send ALGO to top up.`,
                             });
                         }
                     }
@@ -883,7 +786,6 @@ export class ProcessManager {
         const status = code === 0 ? 'idle' : 'error';
         updateSessionStatus(this.db, sessionId, status);
 
-        // Emit structured session_error for non-zero exits so frontend can show recovery UI
         if (code !== 0) {
             const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;
             this.eventBus.emit(sessionId, {
@@ -898,7 +800,6 @@ export class ProcessManager {
             } as ClaudeStreamEvent);
         }
 
-        // Emit before cleanup so subscribers still receive the exit event
         this.eventBus.emit(sessionId, {
             type: 'session_exited',
             session_id: sessionId,
@@ -908,273 +809,56 @@ export class ProcessManager {
             num_turns: 0,
         } as ClaudeStreamEvent);
 
-        // Auto-restart for AlgoChat sessions on non-zero exit.
-        // attemptRestart needs meta, so we extract it before cleanup.
         if (code !== 0 && meta?.source === 'algochat') {
-            // Clean everything except sessionMeta (attemptRestart needs it)
             this.processes.delete(sessionId);
             this.eventBus.removeSessionSubscribers(sessionId);
-            this.pausedSessions.delete(sessionId);
-            this.clearStableTimer(sessionId);
-            this.clearSessionTimeout(sessionId);
+            this.resilienceManager.deletePausedSession(sessionId);
+            this.timerManager.cleanupSession(sessionId);
             this.approvalManager.cancelSession(sessionId);
-            this.attemptRestart(sessionId, meta);
+            const restarted = this.resilienceManager.attemptRestart(sessionId, meta.restartCount);
+            if (restarted) {
+                meta.restartCount++;
+                this.sessionMeta.set(sessionId, meta);
+            } else {
+                this.sessionMeta.delete(sessionId);
+            }
         } else {
             this.cleanupSessionState(sessionId);
         }
     }
 
-    private attemptRestart(sessionId: string, meta: SessionMeta): void {
-        if (meta.restartCount >= MAX_RESTARTS) {
-            log.warn(`Max restarts reached for session ${sessionId}`, { restarts: meta.restartCount });
-            this.sessionMeta.delete(sessionId);
-            return;
-        }
-
-        const backoffMs = BACKOFF_BASE_MS * Math.pow(3, meta.restartCount);
-        meta.restartCount++;
-        this.sessionMeta.set(sessionId, meta);
-
-        log.info(`Scheduling restart for session ${sessionId}`, {
-            attempt: meta.restartCount,
-            backoffMs,
-        });
-
-        setTimeout(() => {
-            const session = getSession(this.db, sessionId);
-            if (!session) {
-                log.warn(`Cannot restart session ${sessionId} — not found in DB`);
-                this.sessionMeta.delete(sessionId);
-                return;
-            }
-
-            // Don't restart sessions that have been manually stopped
-            if (session.status === 'stopped') {
-                log.info(`Session ${sessionId} was stopped, skipping restart`);
-                this.sessionMeta.delete(sessionId);
-                return;
-            }
-
-            // Only restart if not already running (user may have manually restarted)
-            if (this.processes.has(sessionId)) return;
-
-            // For algochat sessions, resolve the current algochat-enabled agent
-            // so restarts always use the right model/provider
-            if (session.source === 'algochat' && session.agentId) {
-                const agents = getAlgochatEnabledAgents(this.db);
-                const currentAgent = agents.find((a) => a.algochatAuto) ?? agents[0];
-                if (currentAgent && currentAgent.id !== session.agentId) {
-                    log.info(`Reassigning session ${sessionId} from agent ${session.agentId} to ${currentAgent.id} (${currentAgent.name})`);
-                    updateSessionAgent(this.db, sessionId, currentAgent.id);
-                    session.agentId = currentAgent.id;
-                }
-            }
-
-            log.info(`Auto-restarting session ${sessionId}`, { attempt: meta.restartCount });
-            this.resumeProcess(session);
-        }, backoffMs);
-    }
-
-    private startStableTimer(sessionId: string): void {
-        this.clearStableTimer(sessionId);
-        const timer = setTimeout(() => {
-            this.stableTimers.delete(sessionId);
-            const meta = this.sessionMeta.get(sessionId);
-            if (meta && meta.restartCount > 0) {
-                log.info(`Session ${sessionId} stable for ${STABLE_PERIOD_MS / 1000}s, resetting restart counter`, {
-                    previousCount: meta.restartCount,
-                });
-                meta.restartCount = 0;
-            }
-        }, STABLE_PERIOD_MS);
-        this.stableTimers.set(sessionId, timer);
-    }
-
-    private clearStableTimer(sessionId: string): void {
-        const timer = this.stableTimers.get(sessionId);
-        if (timer) {
-            clearTimeout(timer);
-            this.stableTimers.delete(sessionId);
-        }
-    }
-
-    private startSessionTimeout(sessionId: string, timeoutMs: number = AGENT_TIMEOUT_MS): void {
-        this.clearSessionTimeout(sessionId);
-        const timer = setTimeout(() => {
-            this.sessionTimeouts.delete(sessionId);
-            if (!this.processes.has(sessionId)) return;
-            const meta = this.sessionMeta.get(sessionId);
-            const inactiveMs = meta ? Date.now() - meta.lastActivityAt : timeoutMs;
-            log.warn(`Session ${sessionId} exceeded inactivity timeout`, {
-                inactiveMs,
-                timeoutMs,
-            });
-            this.stopProcess(sessionId);
-        }, timeoutMs);
-        this.sessionTimeouts.set(sessionId, timer);
-    }
-
     /** Extend a running session's timeout. Returns false if session not found. */
     extendTimeout(sessionId: string, additionalMs: number): boolean {
-        if (!this.processes.has(sessionId)) return false;
-        const maxTimeout = AGENT_TIMEOUT_MS * 4; // Cap at 4x default (2 hours at 30min default)
-        const clamped = Math.min(additionalMs, maxTimeout);
-        log.info(`Session ${sessionId} timeout extended`, { additionalMs: clamped });
-        this.startSessionTimeout(sessionId, clamped);
-        return true;
+        return this.timerManager.extendTimeout(sessionId, additionalMs);
     }
 
-    private clearSessionTimeout(sessionId: string): void {
-        const timer = this.sessionTimeouts.get(sessionId);
-        if (timer) {
-            clearTimeout(timer);
-            this.sessionTimeouts.delete(sessionId);
+    /**
+     * Prune orphaned subscribers and metadata entries.
+     * Called by the resilience manager's orphan pruner interval.
+     */
+    private pruneOrphans(): number {
+        let pruned = 0;
+
+        const isOrphan = (sessionId: string) =>
+            !this.processes.has(sessionId) && !this.resilienceManager.isPaused(sessionId);
+        pruned += this.eventBus.pruneSubscribers(isOrphan);
+
+        for (const sessionId of this.sessionMeta.keys()) {
+            if (isOrphan(sessionId)) {
+                this.sessionMeta.delete(sessionId);
+                pruned++;
+            }
         }
-    }
 
-    /**
-     * Polling fallback: catches sessions that somehow survive past their
-     * inactivity timeout (e.g. timer was lost due to a bug). Runs every 60s
-     * as a safety net — the per-session setTimeout is the primary mechanism.
-     */
-    private startTimeoutChecker(): void {
-        this.timeoutTimer = setInterval(() => {
-            const now = Date.now();
-            for (const [sessionId, meta] of this.sessionMeta) {
-                if (!this.processes.has(sessionId)) continue;
-                const inactiveMs = now - meta.lastActivityAt;
-                if (inactiveMs > AGENT_TIMEOUT_MS) {
-                    log.warn(`Session ${sessionId} exceeded inactivity timeout (fallback checker)`, {
-                        inactiveMs,
-                        timeoutMs: AGENT_TIMEOUT_MS,
-                    });
-                    this.stopProcess(sessionId);
-                }
-            }
-        }, 60_000);
-    }
-
-    /** Quick connectivity check to the Anthropic API. Returns true if reachable. */
-    private async checkApiHealth(): Promise<boolean> {
-        try {
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: '{}',
-                signal: AbortSignal.timeout(10_000),
+        if (pruned > 0) {
+            log.info(`Orphan pruner cleaned ${pruned} stale entries`, {
+                subscribers: this.eventBus.getSubscriberCount(),
+                sessionMeta: this.sessionMeta.size,
+                pausedSessions: this.resilienceManager.pausedSessionCount,
+                processes: this.processes.size,
             });
-            // Any response (even 401/422) means the API is reachable.
-            // Only network errors or timeouts indicate an outage.
-            return response.status < 500;
-        } catch {
-            return false;
         }
-    }
 
-    /**
-     * Periodically attempt to resume paused sessions with exponential backoff.
-     * Backoff: 5min → 15min → 45min → cap at 60min, max 10 attempts then give up.
-     * Checks API health before resuming to avoid burning attempts on a still-down API.
-     */
-    private startAutoResumeChecker(): void {
-        this.autoResumeTimer = setInterval(() => {
-            if (this.pausedSessions.size === 0) return;
-
-            const now = Date.now();
-            const dueSessionIds: string[] = [];
-
-            for (const [sessionId, info] of this.pausedSessions) {
-                if (now < info.nextResumeAt) continue;
-
-                if (info.resumeAttempts >= AUTO_RESUME_MAX_ATTEMPTS) {
-                    log.warn(`Giving up auto-resume for session ${sessionId} after ${info.resumeAttempts} attempts`);
-                    this.pausedSessions.delete(sessionId);
-                    updateSessionStatus(this.db, sessionId, 'error');
-                    this.eventBus.emit(sessionId, {
-                        type: 'error',
-                        error: { message: `Auto-resume abandoned after ${info.resumeAttempts} attempts`, type: 'auto_resume_exhausted' },
-                    } as ClaudeStreamEvent);
-                    continue;
-                }
-
-                dueSessionIds.push(sessionId);
-            }
-
-            if (dueSessionIds.length === 0) return;
-
-            // Check API health once for all due sessions (avoid redundant requests)
-            this.checkApiHealth().then((healthy) => {
-                if (!healthy) {
-                    log.debug(`API health check failed — deferring auto-resume for ${dueSessionIds.length} session(s)`);
-                    // Don't increment attempt counter — API is still down
-                    return;
-                }
-
-                for (const sessionId of dueSessionIds) {
-                    const info = this.pausedSessions.get(sessionId);
-                    if (!info) continue; // May have been manually resumed
-
-                    const backoffMs = Math.min(
-                        AUTO_RESUME_BASE_MS * Math.pow(AUTO_RESUME_MULTIPLIER, info.resumeAttempts),
-                        AUTO_RESUME_CAP_MS,
-                    );
-                    info.resumeAttempts++;
-                    info.nextResumeAt = Date.now() + backoffMs;
-
-                    log.info(`Auto-resuming paused session ${sessionId}`, {
-                        attempt: info.resumeAttempts,
-                        nextRetryMin: Math.round(backoffMs / 60_000),
-                    });
-
-                    const resumed = this.resumeSession(sessionId);
-                    if (!resumed) {
-                        log.warn(`Auto-resume failed for session ${sessionId}`);
-                    }
-                }
-            }).catch((err) => {
-                log.warn('Auto-resume health check error', { error: err instanceof Error ? err.message : String(err) });
-            });
-        }, AUTO_RESUME_CHECK_MS);
-    }
-
-    /**
-     * Periodic safety-net: prune subscriber and pausedSession entries that
-     * reference sessions with no active process. This catches any entries that
-     * slipped through the normal exit paths (e.g. due to unhandled exceptions,
-     * race conditions between concurrent operations, or bugs in callback cleanup).
-     *
-     * Runs every ORPHAN_PRUNE_INTERVAL_MS. Deliberately conservative — only
-     * removes entries where the session has no process AND is not paused (waiting
-     * for auto-resume).
-     */
-    private startOrphanPruner(): void {
-        this.orphanPruneTimer = setInterval(() => {
-            let pruned = 0;
-
-            // Prune subscriber entries for sessions with no active process
-            // and no paused entry (paused sessions may still receive events
-            // when they resume).
-            const isOrphan = (sessionId: string) =>
-                !this.processes.has(sessionId) && !this.pausedSessions.has(sessionId);
-            pruned += this.eventBus.pruneSubscribers(isOrphan);
-
-            // Prune sessionMeta for sessions with no active process and not
-            // scheduled for restart (restartCount handled by attemptRestart timeout).
-            for (const sessionId of this.sessionMeta.keys()) {
-                if (isOrphan(sessionId)) {
-                    this.sessionMeta.delete(sessionId);
-                    pruned++;
-                }
-            }
-
-            if (pruned > 0) {
-                log.info(`Orphan pruner cleaned ${pruned} stale entries`, {
-                    subscribers: this.eventBus.getSubscriberCount(),
-                    sessionMeta: this.sessionMeta.size,
-                    pausedSessions: this.pausedSessions.size,
-                    processes: this.processes.size,
-                });
-            }
-        }, ORPHAN_PRUNE_INTERVAL_MS);
+        return pruned;
     }
 }
