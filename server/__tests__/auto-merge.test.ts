@@ -374,6 +374,45 @@ describe('AutoMergeService.checkAll', () => {
         expect(mergeCall).toBeUndefined();
     });
 
+    test('only posts one comment per PR across multiple checkAll cycles', async () => {
+        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
+
+        const commentCalls: string[][] = [];
+        const runGh: RunGhFn = async (args) => {
+            const key = args.join(' ');
+            if (key.includes('search/issues')) {
+                return {
+                    ok: true,
+                    stdout: JSON.stringify({
+                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
+                    }),
+                    stderr: '',
+                };
+            }
+            if (key.includes('pr checks')) {
+                return { ok: true, stdout: 'pass', stderr: '' };
+            }
+            if (key.includes('repos/') && key.includes('/pulls/')) {
+                return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// protected file', stderr: '' };
+            }
+            if (key.includes('pr comment')) {
+                commentCalls.push(args);
+                return { ok: true, stdout: '', stderr: '' };
+            }
+            return { ok: false, stdout: '', stderr: '' };
+        };
+
+        const service = new AutoMergeService(db, runGh);
+        (service as any).running = true;
+
+        // Run checkAll three times — should only comment once
+        await service.checkAll();
+        await service.checkAll();
+        await service.checkAll();
+
+        expect(commentCalls.length).toBe(1);
+    });
+
     test('blocks merge when diff has malicious code patterns', async () => {
         insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
 
