@@ -304,11 +304,17 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     // ── Communication bridges (opt-in via env vars) ──────────────────────
     let telegramBridge: TelegramBridge | null = null;
     if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-        telegramBridge = new TelegramBridge(db, processManager, {
-            botToken: process.env.TELEGRAM_BOT_TOKEN,
-            chatId: process.env.TELEGRAM_CHAT_ID,
-            allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
-        });
+        telegramBridge = new TelegramBridge(
+            db,
+            processManager,
+            {
+                botToken: process.env.TELEGRAM_BOT_TOKEN,
+                chatId: process.env.TELEGRAM_CHAT_ID,
+                allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+                mode: (process.env.TELEGRAM_BRIDGE_MODE as 'chat' | 'work_intake') ?? undefined,
+            },
+            workTaskService,
+        );
         telegramBridge.start();
         shutdownCoordinator.registerService('TelegramBridge', telegramBridge, 20);
         log.info('Telegram bridge initialized');

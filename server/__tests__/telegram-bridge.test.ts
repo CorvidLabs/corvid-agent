@@ -25,6 +25,8 @@ interface TelegramBridgeInternals {
     callTelegramApi: (method: string, body: Record<string, unknown>) => Promise<{ result: unknown }>;
     downloadFile: (fileId: string) => Promise<Buffer>;
     routeToAgent: (chatId: number, userId: number, text: string, replyTo?: number) => Promise<void>;
+    handleWorkIntake: (chatId: number, userId: number, text: string, replyTo?: number) => Promise<void>;
+    sendTaskResult: (chatId: number, task: import('../../shared/types/work-tasks').WorkTask, replyTo?: number) => Promise<void>;
     sendVoice: (chatId: number, text: string, voicePreset: string, replyTo?: number) => Promise<void>;
     subscribeForResponse: (sessionId: string, chatId: number, replyTo?: number) => void;
 }
@@ -638,5 +640,229 @@ describe('polling', () => {
         await internals(bridge).poll();
         internals(bridge).running = false;
         expect(internals(bridge).offset).toBe(101);
+    });
+});
+
+// ─── Work Intake Mode ──────────────────────────────────────────────────────
+
+describe('TelegramBridge work intake mode', () => {
+    const workIntakeConfig: TelegramBridgeConfig = {
+        ...defaultConfig,
+        mode: 'work_intake',
+    };
+
+    function createMockWorkTaskService() {
+        const completionCallbacks = new Map<string, (task: import('../../shared/types/work-tasks').WorkTask) => void>();
+        return {
+            create: mock(async (input: Record<string, unknown>) => ({
+                id: 'wt-test-001',
+                agentId: input.agentId,
+                projectId: 'proj-1',
+                sessionId: null,
+                source: 'telegram',
+                sourceId: String(input.sourceId ?? ''),
+                requesterInfo: input.requesterInfo ?? {},
+                description: input.description,
+                branchName: null,
+                status: 'pending' as const,
+                prUrl: null,
+                summary: null,
+                error: null,
+                originalBranch: null,
+                worktreeDir: null,
+                iterationCount: 0,
+                createdAt: new Date().toISOString(),
+                completedAt: null,
+            })),
+            onComplete: mock((taskId: string, cb: (task: import('../../shared/types/work-tasks').WorkTask) => void) => {
+                completionCallbacks.set(taskId, cb);
+            }),
+            // Helper for tests to trigger completion
+            _triggerComplete(taskId: string, task: import('../../shared/types/work-tasks').WorkTask) {
+                const cb = completionCallbacks.get(taskId);
+                if (cb) cb(task);
+            },
+        };
+    }
+
+    test('mode switch routes to work intake handler', async () => {
+        const pm = createMockProcessManager();
+        const wts = createMockWorkTaskService();
+        const agent = createAgent(db, { name: 'test-agent' });
+        createProject(db, { name: 'test-proj', workingDir: '/tmp/test' });
+
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig, wts as any);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: 'Fix the login bug',
+        }));
+
+        expect(wts.create).toHaveBeenCalledTimes(1);
+        const createArg = (wts.create as any).mock.calls[0][0];
+        expect(createArg.description).toBe('Fix the login bug');
+        expect(createArg.source).toBe('telegram');
+        expect(createArg.agentId).toBe(agent.id);
+        expect(createArg.requesterInfo.telegramUserId).toBe(42);
+        expect(sent).toContain('Task queued: wt-test-001');
+    });
+
+    test('work intake sends error when no WorkTaskService', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: 'Do something',
+        }));
+
+        expect(sent).toContain('Work intake mode requires WorkTaskService. Check server configuration.');
+    });
+
+    test('work intake sends error when no agents configured', async () => {
+        const pm = createMockProcessManager();
+        const wts = createMockWorkTaskService();
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig, wts as any);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: 'Do something',
+        }));
+
+        expect(sent).toContain('No agents configured. Create an agent first.');
+    });
+
+    test('work intake subscribes for completion', async () => {
+        const pm = createMockProcessManager();
+        const wts = createMockWorkTaskService();
+        createAgent(db, { name: 'test-agent' });
+        createProject(db, { name: 'test-proj', workingDir: '/tmp/test' });
+
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig, wts as any);
+        mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: 'Add dark mode',
+        }));
+
+        expect(wts.onComplete).toHaveBeenCalledTimes(1);
+        expect((wts.onComplete as any).mock.calls[0][0]).toBe('wt-test-001');
+    });
+
+    test('sendTaskResult formats completed task with PR URL', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).sendTaskResult(12345, {
+            id: 'wt-001',
+            agentId: 'a1',
+            projectId: 'p1',
+            sessionId: null,
+            source: 'telegram',
+            sourceId: null,
+            requesterInfo: {},
+            description: 'Test',
+            branchName: 'feat/test',
+            status: 'completed',
+            prUrl: 'https://github.com/org/repo/pull/1',
+            summary: 'Added dark mode toggle',
+            error: null,
+            originalBranch: 'main',
+            worktreeDir: null,
+            iterationCount: 1,
+            createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+        });
+
+        expect(sent.length).toBe(1);
+        expect(sent[0]).toContain('Task completed!');
+        expect(sent[0]).toContain('https://github.com/org/repo/pull/1');
+        expect(sent[0]).toContain('Added dark mode toggle');
+    });
+
+    test('sendTaskResult formats failed task', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).sendTaskResult(12345, {
+            id: 'wt-001',
+            agentId: 'a1',
+            projectId: 'p1',
+            sessionId: null,
+            source: 'telegram',
+            sourceId: null,
+            requesterInfo: {},
+            description: 'Test',
+            branchName: null,
+            status: 'failed',
+            prUrl: null,
+            summary: null,
+            error: 'Build failed: type errors',
+            originalBranch: 'main',
+            worktreeDir: null,
+            iterationCount: 1,
+            createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+        });
+
+        expect(sent.length).toBe(1);
+        expect(sent[0]).toContain('Task failed');
+        expect(sent[0]).toContain('Build failed: type errors');
+    });
+
+    test('work intake handles create failure gracefully', async () => {
+        const pm = createMockProcessManager();
+        const wts = createMockWorkTaskService();
+        wts.create = mock(async () => { throw new Error('Active task already exists for this project'); });
+        createAgent(db, { name: 'test-agent' });
+        createProject(db, { name: 'test-proj', workingDir: '/tmp/test' });
+
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig, wts as any);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: 'Do something',
+        }));
+
+        expect(sent.some(m => m.includes('Task failed'))).toBe(true);
+        expect(sent.some(m => m.includes('Active task already exists'))).toBe(true);
+    });
+
+    test('chat mode still works when mode is chat', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'test-agent' });
+        createProject(db, { name: 'test-proj', workingDir: '/tmp/test' });
+
+        const chatConfig: TelegramBridgeConfig = { ...defaultConfig, mode: 'chat' };
+        const bridge = new TelegramBridge(db, pm, chatConfig);
+        mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: 'Hello',
+        }));
+
+        // Should have started a process (chat mode behavior)
+        expect(pm.startProcess).toHaveBeenCalledTimes(1);
+    });
+
+    test('commands still work in work intake mode', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, workIntakeConfig);
+        const sent = mockApiCapture(bridge);
+
+        await internals(bridge).handleMessage(makeMessage({
+            from: { id: 42, is_bot: false, first_name: 'User' },
+            text: '/start',
+        }));
+
+        expect(sent).toContain('Connected to corvid-agent. Send a message to talk to an agent.');
     });
 });
