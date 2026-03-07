@@ -146,21 +146,6 @@ export class AutoMergeService {
     }
 
     /**
-     * Check if we've already posted a security-scan comment on this PR.
-     * Prevents duplicate comments across server restarts.
-     */
-    private async hasSecurityComment(repo: string, prNumber: number): Promise<boolean> {
-        const result = await this.runGh([
-            'pr', 'view', String(prNumber),
-            '--repo', repo,
-            '--json', 'comments',
-            '--jq', '.comments[].body',
-        ]);
-        if (!result.ok) return false;
-        return result.stdout.includes('Auto-merge blocked — security scan failed');
-    }
-
-    /**
      * Auto-merge passing PRs for a specific repo authored by the given username.
      */
     private async mergeForRepo(repo: string, username: string): Promise<void> {
@@ -204,20 +189,18 @@ export class AutoMergeService {
                 continue;
             }
             if (rejection) {
-                log.warn('Auto-merge blocked by security scan', {
+                log.warn('Auto-merge blocked by security scan — closing PR', {
                     repo: prRepo, number: prNumber, reason: rejection,
                 });
-                // Only post the comment once per PR — check in-memory set first,
-                // then fall back to checking existing comments on the PR (survives restarts)
+                // Close the PR instead of leaving it open with a comment.
+                // The agent should not have modified protected files — close the bad work.
                 if (!this.flaggedPRs.has(prKey)) {
-                    const alreadyCommented = await this.hasSecurityComment(prRepo, prNumber);
-                    if (!alreadyCommented) {
-                        await this.runGh([
-                            'pr', 'comment', String(prNumber),
-                            '--repo', prRepo,
-                            '--body', `⚠️ **Auto-merge blocked — security scan failed**\n\n${rejection}\n\nThis PR requires manual review before merging.`,
-                        ]);
-                    }
+                    await this.runGh([
+                        'pr', 'close', String(prNumber),
+                        '--repo', prRepo,
+                        '--comment', `Closing — security scan failed:\n\n${rejection}`,
+                        '--delete-branch',
+                    ]);
                     this.flaggedPRs.add(prKey);
                 }
                 continue;
