@@ -30,6 +30,8 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `onCouncilStageChange` | `cb: (launchId: string, stage: string, sessionIds?: string[]) => void` | `() => void` | Register a callback for council stage change events. Returns an unsubscribe function. |
 | `onCouncilLog` | `cb: (logEntry: CouncilLaunchLog) => void` | `() => void` | Register a callback for council log entries. Returns an unsubscribe function. |
 | `onCouncilDiscussionMessage` | `cb: (message: CouncilDiscussionMessage) => void` | `() => void` | Register a callback for council discussion messages. Returns an unsubscribe function. |
+| `onCouncilAgentError` | `cb: (error: CouncilAgentError) => void` | `() => void` | Register a callback for council agent error events. Returns an unsubscribe function. |
+| `broadcastAgentError` | `error: CouncilAgentError` | `void` | Broadcast an agent error to all registered error listeners. |
 | `launchCouncil` | `db: Database, processManager: ProcessManager, councilId: string, projectId: string, prompt: string, agentMessenger: AgentMessenger \| null` | `LaunchCouncilResult` | Core council launch: validates council/project, creates launch record, starts member sessions, and sets up auto-advance watcher. |
 | `triggerReview` | `db: Database, processManager: ProcessManager, launchId: string` | `{ ok: true; reviewSessionIds: string[] } \| { ok: false; error: string; status: number }` | Trigger peer review stage — delegates to synthesis module with injected infrastructure callbacks. |
 | `finishWithAggregatedSynthesis` | `db: Database, launchId: string` | `void` | Finish a council by aggregating all session responses into a combined synthesis (no chairman). |
