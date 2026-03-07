@@ -28,12 +28,14 @@ import {
     onCouncilDiscussionMessage,
     onCouncilAgentError,
     waitForSessions,
+    HEARTBEAT_INTERVAL_MS,
+    SAFETY_TIMEOUT_MS,
 } from '../councils/discussion';
-import type { LaunchCouncilResult, WaitForSessionsResult } from '../councils/discussion';
+import type { LaunchCouncilResult, WaitForSessionsResult, WaitForSessionsOptions } from '../councils/discussion';
 
 // Re-export business logic and types for external consumers
-export { launchCouncil, onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError, waitForSessions };
-export type { LaunchCouncilResult, WaitForSessionsResult };
+export { launchCouncil, onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError, waitForSessions, HEARTBEAT_INTERVAL_MS, SAFETY_TIMEOUT_MS };
+export type { LaunchCouncilResult, WaitForSessionsResult, WaitForSessionsOptions };
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
