@@ -57,10 +57,13 @@ export class DiscordBridge {
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 10;
 
-    // Map Discord userId → active sessionId
-    private userSessions: Map<string, string> = new Map();
+    // Map Discord userId → active session info (sessionId + threadId + agent)
+    private userSessions: Map<string, { sessionId: string; threadId: string; agentName: string }> = new Map();
 
-    // Map Discord userId → preferred agent ID (set by /switch or @mention)
+    // Map Discord threadId → session info (for thread-based conversations)
+    private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }> = new Map();
+
+    // Map Discord userId → preferred agent ID (set by /switch)
     private userPreferredAgent: Map<string, string> = new Map();
 
     // Per-user rate limiting: userId → timestamps of recent messages
@@ -386,14 +389,18 @@ export class DiscordBridge {
 
         switch (commandName) {
             case 'status': {
-                const sessionId = this.userSessions.get(userId) ?? 'none';
-                await this.respondToInteraction(interaction, `Your session: ${sessionId}`);
+                const info = this.userSessions.get(userId);
+                if (info) {
+                    await this.respondToInteraction(interaction, `Agent: **${info.agentName}** | Session: \`${info.sessionId.slice(0, 8)}\``);
+                } else {
+                    await this.respondToInteraction(interaction, 'No active session. Send a message to start one.');
+                }
                 break;
             }
 
             case 'new': {
                 this.userSessions.delete(userId);
-                await this.respondToInteraction(interaction, 'Session cleared. Your next message will start a new session.');
+                await this.respondToInteraction(interaction, 'Session cleared. Your next message will start a new conversation thread.');
                 break;
             }
 
@@ -571,24 +578,27 @@ export class DiscordBridge {
         // Ignore bot messages
         if (data.author.bot) return;
 
-        // Only respond in configured channel
-        if (data.channel_id !== this.config.channelId) return;
-
         const text = data.content;
         if (!text) return;
 
         const userId = data.author.id;
+        const channelId = data.channel_id;
+
+        // Allow messages from configured channel OR from threads we created
+        const isMainChannel = channelId === this.config.channelId;
+        const isOurThread = this.threadSessions.has(channelId);
+        if (!isMainChannel && !isOurThread) return;
 
         // Authorization check
         if (this.config.allowedUserIds.length > 0 && !this.config.allowedUserIds.includes(userId)) {
             log.warn('Unauthorized Discord user', { userId, username: data.author.username });
-            await this.sendMessage(data.channel_id, 'Unauthorized.');
+            await this.sendMessage(channelId, 'Unauthorized.');
             return;
         }
 
         // Per-user rate limiting (10 messages per 60 seconds)
         if (!this.checkRateLimit(userId)) {
-            await this.sendMessage(data.channel_id, 'Rate limit exceeded. Please wait before sending more messages.');
+            await this.sendMessage(channelId, 'Rate limit exceeded. Please wait before sending more messages.');
             return;
         }
 
@@ -615,21 +625,27 @@ export class DiscordBridge {
                     contentPreview: text.slice(0, 200),
                 }),
             );
-            await this.sendMessage(data.channel_id, 'Message blocked: content policy violation.');
+            await this.sendMessage(channelId, 'Message blocked: content policy violation.');
             return;
         }
 
-        // Handle commands
+        // Handle text commands (slash commands are handled via INTERACTION_CREATE)
         if (text.startsWith('/')) {
-            const handled = await this.handleCommand(data.channel_id, userId, text);
+            const handled = await this.handleCommand(channelId, userId, text);
             if (handled) return;
+        }
+
+        // If this message is in a thread we're tracking, route to that thread's session
+        if (isOurThread) {
+            await this.routeToThread(channelId, userId, text);
+            return;
         }
 
         // Route based on mode
         if (this.mode === 'work_intake') {
-            await this.handleWorkIntake(data.channel_id, data.id, userId, text);
+            await this.handleWorkIntake(channelId, data.id, userId, text);
         } else {
-            await this.routeToChatAgent(data.channel_id, userId, text);
+            await this.routeToChatAgent(channelId, userId, data.id, text);
         }
     }
 
@@ -639,8 +655,12 @@ export class DiscordBridge {
         const trimmed = text.trim();
 
         if (trimmed === '/status') {
-            const sessionId = this.userSessions.get(userId) ?? 'none';
-            await this.sendMessage(channelId, `Your session: ${sessionId}`);
+            const info = this.userSessions.get(userId);
+            if (info) {
+                await this.sendMessage(channelId, `Agent: **${info.agentName}** | Session: \`${info.sessionId.slice(0, 8)}\``);
+            } else {
+                await this.sendMessage(channelId, 'No active session. Send a message to start one.');
+            }
             return true;
         }
 
@@ -714,15 +734,15 @@ export class DiscordBridge {
 
         if (trimmed === '/help') {
             const helpText = [
-                '**Available commands:**',
-                '`/status` — Show your current session ID',
-                '`/new` — Clear your session and start fresh',
+                '**Commands** (also available as slash commands):',
+                '`/status` — Show your current agent and session',
+                '`/new` — Start a new conversation thread',
                 '`/agents` — List all available agents',
                 '`/switch <AgentName>` — Switch to a different agent',
                 '`/council <topic>` — Launch a council deliberation',
                 '`/help` — Show this help message',
                 '',
-                '**Tip:** Start a message with `@AgentName` to route it to a specific agent.',
+                'Each conversation gets its own thread. Anyone can reply in a thread to join the conversation.',
             ].join('\n');
             await this.sendMessage(channelId, helpText);
             return true;
@@ -839,7 +859,7 @@ export class DiscordBridge {
     private async sendEmbed(
         channelId: string,
         embed: {
-            title: string;
+            title?: string;
             description?: string;
             color?: number;
             fields?: Array<{ name: string; value: string; inline?: boolean }>;
@@ -866,97 +886,83 @@ export class DiscordBridge {
 
     // ── Chat Mode ────────────────────────────────────────────────────────
 
-    private async routeToChatAgent(channelId: string, userId: string, text: string): Promise<void> {
-        let agentOverride: import('../../shared/types').Agent | undefined;
-        let messageText = text;
-
-        // Check for @AgentName mention at start of message
-        const mentionMatch = text.match(/^@(\S+)\s+([\s\S]*)/);
-        if (mentionMatch) {
-            const targetName = mentionMatch[1];
-            const actualText = mentionMatch[2];
-            const agents = listAgents(this.db);
-            const targetAgent = agents.find(a =>
-                a.name.toLowerCase() === targetName.toLowerCase() ||
-                a.name.toLowerCase().replace(/\s+/g, '') === targetName.toLowerCase()
-            );
-            if (targetAgent) {
-                // Clear existing session so a new one is created with the target agent
-                this.userSessions.delete(userId);
-                agentOverride = targetAgent;
-                messageText = actualText;
-            }
+    /**
+     * Route a message from the main channel to an agent.
+     * Creates a Discord thread from the user's message for the conversation.
+     */
+    private async routeToChatAgent(channelId: string, userId: string, messageId: string, text: string): Promise<void> {
+        const agent = this.resolveAgent(userId);
+        if (!agent) {
+            await this.sendMessage(channelId, 'No agents configured. Create an agent first.');
+            return;
         }
 
-        await this.routeToAgent(channelId, userId, messageText, agentOverride);
+        const projects = listProjects(this.db);
+        const project = agent.defaultProjectId
+            ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
+            : projects[0];
+
+        if (!project) {
+            await this.sendMessage(channelId, 'No projects configured.');
+            return;
+        }
+
+        // Create a Discord thread from the user's message
+        const threadName = `${agent.name} — ${text.slice(0, 80)}${text.length > 80 ? '...' : ''}`;
+        const threadId = await this.createThread(channelId, messageId, threadName);
+        if (!threadId) {
+            await this.sendMessage(channelId, 'Failed to create conversation thread.');
+            return;
+        }
+
+        const session = createSession(this.db, {
+            projectId: project.id,
+            agentId: agent.id,
+            name: `Discord thread (user ${userId})`,
+            initialPrompt: text,
+            source: 'discord' as SessionSource,
+        });
+
+        // Track the session for both user and thread
+        this.userSessions.set(userId, { sessionId: session.id, threadId, agentName: agent.name });
+        this.threadSessions.set(threadId, {
+            sessionId: session.id,
+            agentName: agent.name,
+            agentModel: agent.model || 'unknown',
+            ownerUserId: userId,
+        });
+
+        this.processManager.startProcess(session, text);
+        this.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
     }
 
-    private async routeToAgent(
-        channelId: string,
-        userId: string,
-        text: string,
-        agentOverride?: import('../../shared/types').Agent,
-    ): Promise<void> {
-        let sessionId = this.userSessions.get(userId);
-        const source: SessionSource = 'discord';
+    /**
+     * Route a message within an existing thread to the thread's session.
+     * Any user can participate — conversations are shared within threads.
+     */
+    private async routeToThread(threadId: string, _userId: string, text: string): Promise<void> {
+        const threadInfo = this.threadSessions.get(threadId);
+        if (!threadInfo) return;
+
+        const { sessionId, agentName, agentModel } = threadInfo;
 
         // Check if session still exists and is active
-        if (sessionId) {
-            const session = getSession(this.db, sessionId);
-            if (!session || session.status === 'stopped' || session.status === 'error') {
-                this.userSessions.delete(userId);
-                sessionId = undefined;
-            }
-        }
-
-        // Find or create session
-        if (!sessionId) {
-            const agent = agentOverride ?? this.resolveAgent(userId);
-            if (!agent) {
-                await this.sendMessage(channelId, 'No agents configured. Create an agent first.');
-                return;
-            }
-
-            const projects = listProjects(this.db);
-            const project = agent.defaultProjectId
-                ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
-                : projects[0];
-
-            if (!project) {
-                await this.sendMessage(channelId, 'No projects configured.');
-                return;
-            }
-
-            const session = createSession(this.db, {
-                projectId: project.id,
-                agentId: agent.id,
-                name: `Discord (user ${userId})`,
-                initialPrompt: text,
-                source,
-            });
-
-            sessionId = session.id;
-            this.userSessions.set(userId, sessionId);
-
-            this.processManager.startProcess(session, text);
-            this.subscribeForResponse(sessionId, channelId);
+        const session = getSession(this.db, sessionId);
+        if (!session || session.status === 'stopped' || session.status === 'error') {
+            this.threadSessions.delete(threadId);
+            await this.sendMessage(threadId, 'This conversation has ended. Start a new one in the main channel.');
             return;
         }
 
         const sent = this.processManager.sendMessage(sessionId, text);
         if (!sent) {
-            const session = getSession(this.db, sessionId);
-            if (session) {
-                this.processManager.startProcess(session, text);
-                this.subscribeForResponse(sessionId, channelId);
-            } else {
-                this.userSessions.delete(userId);
-                await this.sendMessage(channelId, 'Session expired. Send another message to start a new one.');
-            }
+            // Try to restart the process
+            this.processManager.startProcess(session, text);
+            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
             return;
         }
 
-        this.subscribeForResponse(sessionId, channelId);
+        this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
     }
 
     /**
@@ -983,15 +989,62 @@ export class DiscordBridge {
         return agents[0];
     }
 
-    private subscribeForResponse(sessionId: string, channelId: string): void {
+    /**
+     * Create a Discord thread from a message.
+     * Returns the thread channel ID, or null on failure.
+     */
+    private async createThread(channelId: string, messageId: string, name: string): Promise<string | null> {
+        const response = await fetch(
+            `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/threads`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${this.config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name.slice(0, 100), // Discord thread name limit
+                    auto_archive_duration: 1440, // 24 hours
+                }),
+            },
+        );
+
+        if (response.ok) {
+            const thread = await response.json() as { id: string };
+            log.info('Discord thread created', { threadId: thread.id, name: name.slice(0, 60) });
+            return thread.id;
+        }
+
+        const error = await response.text();
+        log.error('Failed to create Discord thread', { status: response.status, error: error.slice(0, 200) });
+        return null;
+    }
+
+    /**
+     * Subscribe for agent responses and send them as rich embeds in the thread.
+     * Shows agent name and model in the embed footer.
+     */
+    private subscribeForResponseWithEmbed(
+        sessionId: string,
+        threadId: string,
+        agentName: string,
+        agentModel: string,
+    ): void {
         let buffer = '';
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        // Agent color — consistent per agent name
+        const color = this.agentColor(agentName);
 
         const flush = async () => {
             if (!buffer) return;
             const text = buffer;
             buffer = '';
-            await this.sendMessage(channelId, text);
+            await this.sendEmbed(threadId, {
+                description: text.slice(0, 4096), // Discord embed description limit
+                color,
+                footer: { text: `${agentName} · ${agentModel}` },
+            });
         };
 
         this.processManager.subscribe(sessionId, (_sid, event) => {
@@ -1011,6 +1064,31 @@ export class DiscordBridge {
                 flush();
             }
         });
+    }
+
+    /** Generate a consistent color for an agent name. */
+    private agentColor(name: string): number {
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+        }
+        // Map to a pleasant color range (avoid very dark/light)
+        const hue = Math.abs(hash) % 360;
+        // HSL to RGB approximation for Discord embed colors
+        const s = 0.6, l = 0.5;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+        const m = l - c / 2;
+        let r = 0, g = 0, b = 0;
+        if (hue < 60) { r = c; g = x; }
+        else if (hue < 120) { r = x; g = c; }
+        else if (hue < 180) { g = c; b = x; }
+        else if (hue < 240) { g = x; b = c; }
+        else if (hue < 300) { r = x; b = c; }
+        else { r = c; b = x; }
+        return (Math.round((r + m) * 255) << 16)
+             | (Math.round((g + m) * 255) << 8)
+             | Math.round((b + m) * 255);
     }
 
     // ── Messaging ────────────────────────────────────────────────────────

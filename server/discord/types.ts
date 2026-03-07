@@ -59,6 +59,8 @@ export interface DiscordMessageData {
     author: DiscordAuthor;
     content: string;
     timestamp: string;
+    /** Present when message is in a thread — the thread's channel ID */
+    thread?: { id: string };
 }
 
 export interface DiscordAuthor {

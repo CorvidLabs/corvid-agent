@@ -509,7 +509,8 @@ describe('DiscordBridge work_intake mode', () => {
 
         const originalFetch = globalThis.fetch;
         globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
+            // Return a thread-like response with an id for thread creation
+            return new Response(JSON.stringify({ id: 'thread-1' }), { status: 200 });
         }) as unknown as typeof fetch;
 
         try {
@@ -523,7 +524,7 @@ describe('DiscordBridge work_intake mode', () => {
 
             // In chat mode, WorkTaskService.create should NOT be called
             expect(wts.create).not.toHaveBeenCalled();
-            // Process manager should start a session
+            // Process manager should start a session (in a thread)
             expect(pm.startProcess).toHaveBeenCalled();
         } finally {
             globalThis.fetch = originalFetch;
