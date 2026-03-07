@@ -627,7 +627,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
 
                 // Surface thinking/tool activity for Ollama (direct-process) sessions
                 const agentId = this.agentIdBySession[msg.sessionId];
-                const eventData = msg.event?.data as Record<string, unknown> | undefined;
+                const eventData = msg.event?.data as unknown as Record<string, unknown> | undefined;
                 if (agentId && msg.event?.eventType === 'thinking') {
                     const active = !!(eventData?.['thinking']);
                     this.setActivity(agentId, active ? 'Thinking...' : '');
@@ -779,7 +779,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
         const log: { ts: number; time: string; text: string }[] = [];
         let lastText = '';
         for (const evt of events) {
-            const data = evt.data as Record<string, unknown> | undefined;
+            const data = evt.data as unknown as Record<string, unknown> | undefined;
             let text = '';
             if (evt.eventType === 'tool_status' && data?.['statusMessage']) {
                 text = data['statusMessage'] as string;

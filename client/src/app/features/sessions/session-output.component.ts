@@ -509,7 +509,7 @@ export class SessionOutputComponent implements AfterViewChecked, OnDestroy {
         const parsed: ParsedEvent[] = [];
 
         for (const event of events) {
-            const data = event.data as Record<string, unknown> | undefined;
+            const data = event.data as unknown as Record<string, unknown> | undefined;
             if (!data) continue;
 
             const eventType = (data['type'] as string) ?? event.eventType;
