@@ -396,7 +396,7 @@ export class MentionPollingService {
         // within 60s, but allows different mentions on the same config concurrently.
         const rateLimitKey = `${config.id}:${mention.id}`;
         if (this.dedup.has(TRIGGER_DEDUP_NS, rateLimitKey)) {
-            log.debug('Skipping mention due to rate limit', { configId: config.id, mentionId: mention.id });
+            log.debug('Skipping mention — rate limit dedup', { configId: config.id, mentionId: mention.id, number: mention.number });
             return false;
         }
 
@@ -423,7 +423,7 @@ export class MentionPollingService {
             `SELECT id FROM sessions WHERE name LIKE ? AND status = 'running'`
         ).get(sessionPrefix + '%') as { id: string } | null;
         if (existing) {
-            log.debug('Running session already exists for issue', { number: mention.number, existingId: existing.id });
+            log.debug('Skipping mention — running session exists', { number: mention.number, existingId: existing.id, mentionId: mention.id });
             return false;
         }
 
@@ -453,15 +453,20 @@ export class MentionPollingService {
             }
         }
 
-        // Block mentions with HIGH/CRITICAL injection confidence before creating a session
-        const injectionScan = scanGitHubContent(mention.body);
-        if (injectionScan.blocked) {
-            log.warn('Blocked mention: prompt injection detected', {
-                configId: config.id, mentionId: mention.id,
-                sender: mention.sender, confidence: injectionScan.confidence,
-                patterns: injectionScan.matches.map(m => m.pattern),
-            });
-            return false;
+        // Block mentions with HIGH/CRITICAL injection confidence before creating a session.
+        // Skip injection scanning for mentions authored by the bot itself — its own
+        // issues legitimately contain code blocks, shell commands, and SQL.
+        if (mention.sender !== config.mentionUsername) {
+            const injectionScan = scanGitHubContent(mention.body);
+            if (injectionScan.blocked) {
+                log.warn('Blocked mention: prompt injection detected', {
+                    configId: config.id, mentionId: mention.id,
+                    sender: mention.sender, confidence: injectionScan.confidence,
+                    patterns: injectionScan.matches.map(m => m.pattern),
+                });
+                // Mark as processed to prevent infinite retry loop
+                return true;
+            }
         }
 
         // Always create an agent session — the session is responsible for both
