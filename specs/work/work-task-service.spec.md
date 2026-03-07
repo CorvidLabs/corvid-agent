@@ -4,6 +4,7 @@ version: 1
 status: active
 files:
   - server/work/service.ts
+  - server/work/validation.ts
 db_tables:
   - work_tasks
 depends_on:
@@ -24,6 +25,13 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | Class | Description |
 |-------|-------------|
 | `WorkTaskService` | Orchestrates the create-branch-execute-validate-PR lifecycle |
+
+### Exported Functions (server/work/validation.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `runBunInstall` | `(cwd: string)` | `Promise<void>` | Run `bun install --frozen-lockfile --ignore-scripts`, retrying without `--frozen-lockfile` on failure |
+| `runValidation` | `(workingDir: string)` | `Promise<{ passed: boolean; output: string }>` | Full validation pipeline: install deps, tsc, tests, security/governance scans |
 
 #### WorkTaskService Constructor
 
@@ -151,6 +159,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `server/db/work-tasks.ts` | `createWorkTaskAtomic`, `getWorkTask`, `updateWorkTaskStatus`, `listWorkTasks`, `cleanupStaleWorkTasks` |
 | `server/db/audit.ts` | `recordAudit` |
 | `server/process/types.ts` | `ClaudeStreamEvent`, `extractContentText` |
+| `server/work/validation.ts` | `runBunInstall`, `runValidation` |
 
 ### Consumed By
 
@@ -199,3 +208,4 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-02-20 | corvid-agent | Updated invariant #6 and behavioral example: PR creation now falls back to service-level `createPrFallback()` (fixes #182) |
 | 2026-03-06 | corvid-agent | Added AlgoChat notifications for work task lifecycle events |
+| 2026-03-07 | corvid-agent | Extracted `runValidation` and `runBunInstall` into `server/work/validation.ts` |

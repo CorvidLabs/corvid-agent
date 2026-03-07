@@ -18,10 +18,8 @@ import {
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
-import { scanDiff, formatScanReport } from '../lib/fetch-detector';
-import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
 import { isRepoOffLimits } from '../github/off-limits';
-import { assessImpact } from '../councils/governance';
+import { runBunInstall, runValidation } from './validation';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AstParserService } from '../ast/service';
 import type { AstSymbol, FileSymbolIndex } from '../ast/types';
@@ -251,30 +249,8 @@ export class WorkTaskService {
         }
 
         // Install dependencies in the worktree (worktrees don't share node_modules).
-        // --ignore-scripts prevents postinstall hooks from bypassing protected-file checks.
         try {
-            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], {
-                cwd: worktreeDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const installStderr = await new Response(installProc.stderr).text();
-            const installExit = await installProc.exited;
-
-            if (installExit !== 0) {
-                log.warn('bun install failed in worktree, retrying without --frozen-lockfile', {
-                    taskId: task.id,
-                    stderr: installStderr.trim(),
-                });
-                // Retry without frozen lockfile in case the lock is out of date
-                const retryProc = Bun.spawn(['bun', 'install', '--ignore-scripts'], {
-                    cwd: worktreeDir,
-                    stdout: 'pipe',
-                    stderr: 'pipe',
-                });
-                await new Response(retryProc.stdout).text();
-                await retryProc.exited;
-            }
+            await runBunInstall(worktreeDir);
         } catch (err) {
             log.warn('Failed to install dependencies in worktree', {
                 taskId: task.id,
@@ -399,7 +375,7 @@ export class WorkTaskService {
         updateWorkTaskStatus(this.db, taskId, 'validating');
         log.info('Running post-session validation', { taskId });
 
-        const validation = await this.runValidation(validationDir);
+        const validation = await runValidation(validationDir);
         const iteration = task.iterationCount || 1;
 
         if (validation.passed) {
@@ -577,167 +553,6 @@ export class WorkTaskService {
                 this.completionCallbacks.delete(taskId);
             }
         }
-    }
-
-    private async runValidation(workingDir: string): Promise<{ passed: boolean; output: string }> {
-        const outputs: string[] = [];
-        let passed = true;
-
-        // Ensure dependencies are installed before validation.
-        // --ignore-scripts prevents postinstall hooks from bypassing protected-file checks.
-        try {
-            const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], {
-                cwd: workingDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            await new Response(installProc.stdout).text();
-            await new Response(installProc.stderr).text();
-            const installExit = await installProc.exited;
-
-            if (installExit !== 0) {
-                // Retry without frozen lockfile
-                const retryProc = Bun.spawn(['bun', 'install', '--ignore-scripts'], {
-                    cwd: workingDir,
-                    stdout: 'pipe',
-                    stderr: 'pipe',
-                });
-                await new Response(retryProc.stdout).text();
-                await retryProc.exited;
-            }
-        } catch (_err) {
-            // Non-fatal — if install fails, tsc/tests will report the real errors
-        }
-
-        // Run TypeScript check
-        try {
-            const tscProc = Bun.spawn(['bun', 'x', 'tsc', '--noEmit', '--skipLibCheck'], {
-                cwd: workingDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const tscStdout = await new Response(tscProc.stdout).text();
-            const tscStderr = await new Response(tscProc.stderr).text();
-            const tscExit = await tscProc.exited;
-
-            const tscOutput = (tscStdout + tscStderr).trim();
-            if (tscExit !== 0) {
-                passed = false;
-                outputs.push(`=== TypeScript Check Failed (exit ${tscExit}) ===\n${tscOutput}`);
-            } else {
-                outputs.push('=== TypeScript Check Passed ===');
-            }
-        } catch (err) {
-            passed = false;
-            outputs.push(`=== TypeScript Check Error ===\n${err instanceof Error ? err.message : String(err)}`);
-        }
-
-        // Run tests
-        try {
-            const testProc = Bun.spawn(['bun', 'test'], {
-                cwd: workingDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const testStdout = await new Response(testProc.stdout).text();
-            const testStderr = await new Response(testProc.stderr).text();
-            const testExit = await testProc.exited;
-
-            const testOutput = (testStdout + testStderr).trim();
-            if (testExit !== 0) {
-                passed = false;
-                outputs.push(`=== Tests Failed (exit ${testExit}) ===\n${testOutput}`);
-            } else {
-                outputs.push('=== Tests Passed ===');
-            }
-        } catch (err) {
-            passed = false;
-            outputs.push(`=== Test Runner Error ===\n${err instanceof Error ? err.message : String(err)}`);
-        }
-
-        // Security scan: check git diff for unapproved external fetch calls and malicious patterns
-        try {
-            const diffProc = Bun.spawn(['git', 'diff', 'main...HEAD'], {
-                cwd: workingDir,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const diffOutput = await new Response(diffProc.stdout).text();
-            await diffProc.exited;
-
-            if (diffOutput.trim()) {
-                // Governance tier check — block changes to Layer 0/1 paths in automated workflows
-                const changedFiles = diffOutput
-                    .split('\n')
-                    .filter((line) => line.startsWith('diff --git'))
-                    .map((line) => {
-                        const match = line.match(/b\/(.+)$/);
-                        return match?.[1] ?? '';
-                    })
-                    .filter(Boolean);
-
-                if (changedFiles.length > 0) {
-                    const impact = assessImpact(changedFiles);
-                    if (impact.blockedFromAutomation) {
-                        passed = false;
-                        const blockedList = impact.affectedPaths
-                            .filter((p) => p.tier < 2)
-                            .map((p) => `  - ${p.path} (Layer ${p.tier})`)
-                            .join('\n');
-                        outputs.push(
-                            `=== Governance Tier Violation ===\n` +
-                            `Work task attempted to modify ${impact.tierLabel} (Layer ${impact.tier}) paths.\n` +
-                            `Automated workflows cannot modify Layer 0 or Layer 1 paths.\n\n` +
-                            `Blocked paths:\n${blockedList}`,
-                        );
-                        log.warn('Work task blocked by governance tier', {
-                            tier: impact.tier,
-                            tierLabel: impact.tierLabel,
-                            blockedPaths: impact.affectedPaths.filter((p) => p.tier < 2).map((p) => p.path),
-                        });
-                    }
-                }
-
-                // Fetch detector
-                const fetchResult = scanDiff(diffOutput);
-                if (fetchResult.hasUnapprovedFetches) {
-                    passed = false;
-                    outputs.push(formatScanReport(fetchResult));
-                    log.warn('Security scan detected unapproved fetch calls', {
-                        findings: fetchResult.findings.map((f) => `${f.domain} (${f.pattern})`),
-                    });
-                }
-
-                // Code pattern scanner
-                const codeResult = scanCodeDiff(diffOutput);
-                if (codeResult.hasCriticalFindings) {
-                    passed = false;
-                    outputs.push(formatCodeScanReport(codeResult));
-                    log.warn('Code scanner detected critical findings', {
-                        findings: codeResult.findings
-                            .filter((f) => f.severity === 'critical')
-                            .map((f) => `${f.category}: ${f.pattern}`),
-                    });
-                } else if (codeResult.hasWarnings) {
-                    const report = formatCodeScanReport(codeResult);
-                    if (report) outputs.push(report);
-                    log.info('Code scanner warnings (non-blocking)', {
-                        findings: codeResult.findings.map((f) => `${f.category}: ${f.pattern}`),
-                    });
-                }
-
-                if (!fetchResult.hasUnapprovedFetches && !codeResult.hasCriticalFindings) {
-                    outputs.push('=== Security Scan Passed ===');
-                }
-            }
-        } catch (err) {
-            // Non-fatal: log but don't block — prefer false negatives over broken validation
-            log.warn('Security scan error', {
-                error: err instanceof Error ? err.message : String(err),
-            });
-        }
-
-        return { passed, output: outputs.join('\n\n') };
     }
 
     private buildIterationPrompt(branchName: string, validationOutput: string): string {

@@ -619,7 +619,7 @@ describe('Validation loop iteration control', () => {
 
         // Queue validation spawns: bun install (success), tsc (success), bun test (success)
         queueSpawn(0); // bun install --frozen-lockfile
-        queueSpawn(0); // bunx tsc --noEmit
+        queueSpawn(0); // bun x tsc --noEmit
         queueSpawn(0); // bun test
 
         // Simulate session ending with a PR URL in the output
@@ -639,7 +639,7 @@ describe('Validation loop iteration control', () => {
 
         // Queue validation spawns: install, tsc, test (all pass)
         queueSpawn(0); // bun install --frozen-lockfile
-        queueSpawn(0); // bunx tsc
+        queueSpawn(0); // bun x tsc
         queueSpawn(0); // bun test
 
         // Simulate session ending WITHOUT a PR URL

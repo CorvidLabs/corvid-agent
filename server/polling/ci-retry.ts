@@ -173,7 +173,7 @@ export class CIRetryService {
             `3. Read the PR diff to understand what was changed:`,
             `   \`gh pr diff ${prNumber} --repo ${repo}\``,
             `4. Run the failing checks locally to reproduce:`,
-            `   \`bunx tsc --noEmit --skipLibCheck\``,
+            `   \`bun x tsc --noEmit --skipLibCheck\``,
             `   \`bun test\``,
             `5. Fix the issues on the existing branch:`,
             `   - Edit the relevant files`,

@@ -136,7 +136,7 @@ export function buildImprovementPrompt(
         `4. **Save your analysis** to memory via \`corvid_save_memory\` with key \`improvement_loop:outcome:{ISO timestamp}\`\n` +
         `5. **Notify the owner** via \`corvid_notify_owner\` with a summary of findings and created tasks\n` +
         `6. Each work task description should be specific and actionable — include file paths, error codes, and expected outcomes\n` +
-        `7. Focus on changes that will pass validation (\`bunx tsc --noEmit --skipLibCheck\` and \`bun test\`)\n` +
+        `7. Focus on changes that will pass validation (\`bun x tsc --noEmit --skipLibCheck\` and \`bun test\`)\n` +
         `8. Do NOT modify protected files (spending.ts, sdk-process.ts, manager.ts, sdk-tools.ts, tool-handlers.ts, schema.ts, package.json, CLAUDE.md, .env, server/index.ts, etc.)`,
     );
 
