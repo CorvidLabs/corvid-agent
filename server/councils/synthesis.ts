@@ -19,7 +19,7 @@ import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { CouncilDiscussionMessage, CouncilOnChainMode } from '../../shared/types';
 import { createLogger } from '../lib/logger';
-import { broadcastAgentError } from './discussion';
+import { broadcastAgentError } from './events';
 
 const log = createLogger('CouncilSynthesis');
 
