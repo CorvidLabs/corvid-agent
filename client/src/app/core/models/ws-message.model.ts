@@ -10,11 +10,50 @@ export type ClientWsMessage =
     | { type: 'create_work_task'; agentId: string; description: string; projectId?: string }
     | { type: 'question_response'; questionId: string; answer: string; selectedOption?: number };
 
-export interface StreamEvent {
-    eventType: string;
-    data: unknown;
+/** Content block type for assistant messages. */
+export interface ContentBlock {
+    type: string;
+    text?: string;
+}
+
+/** Base fields present on all ClaudeStreamEvent data payloads. */
+interface StreamEventDataBase {
+    type: string;
+    session_id?: string;
+    subtype?: string;
+    total_cost_usd?: number;
+    num_turns?: number;
+    duration_ms?: number;
+}
+
+interface StreamEventBase {
     timestamp: string;
 }
+
+export type StreamEvent =
+    | StreamEventBase & { eventType: 'message_start'; data: StreamEventDataBase & { type: 'message_start'; message?: { role?: string; content?: string | ContentBlock[] } } }
+    | StreamEventBase & { eventType: 'message_delta'; data: StreamEventDataBase & { type: 'message_delta'; delta?: { type?: string; text?: string } } }
+    | StreamEventBase & { eventType: 'message_stop'; data: StreamEventDataBase & { type: 'message_stop' } }
+    | StreamEventBase & { eventType: 'content_block_start'; data: StreamEventDataBase & { type: 'content_block_start'; content_block?: { type: string; text?: string; name?: string; input?: unknown } } }
+    | StreamEventBase & { eventType: 'content_block_delta'; data: StreamEventDataBase & { type: 'content_block_delta'; delta?: { type?: string; text?: string } } }
+    | StreamEventBase & { eventType: 'content_block_stop'; data: StreamEventDataBase & { type: 'content_block_stop' } }
+    | StreamEventBase & { eventType: 'assistant'; data: StreamEventDataBase & { type: 'assistant'; message: { role: 'assistant'; content: string | ContentBlock[] } } }
+    | StreamEventBase & { eventType: 'thinking'; data: StreamEventDataBase & { type: 'thinking'; thinking: boolean } }
+    | StreamEventBase & { eventType: 'result'; data: StreamEventDataBase & { type: 'result'; result?: string; total_cost_usd: number } }
+    | StreamEventBase & { eventType: 'error'; data: StreamEventDataBase & { type: 'error'; error: { message: string; type: string } } }
+    | StreamEventBase & { eventType: 'tool_status'; data: StreamEventDataBase & { type: 'tool_status'; statusMessage: string } }
+    | StreamEventBase & { eventType: 'system'; data: StreamEventDataBase & { type: 'system'; statusMessage?: string; message?: { content: string } } }
+    | StreamEventBase & { eventType: 'approval_request'; data: StreamEventDataBase & { type: 'approval_request'; id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number } }
+    | StreamEventBase & { eventType: 'session_started'; data: StreamEventDataBase & { type: 'session_started' } }
+    | StreamEventBase & { eventType: 'session_exited'; data: StreamEventDataBase & { type: 'session_exited'; result?: string } }
+    | StreamEventBase & { eventType: 'session_stopped'; data: StreamEventDataBase & { type: 'session_stopped' } }
+    | StreamEventBase & { eventType: 'session_error'; data: StreamEventDataBase & { type: 'session_error'; error: { message: string; errorType: string; severity: string; recoverable: boolean } } }
+    | StreamEventBase & { eventType: 'queue_status'; data: StreamEventDataBase & { type: 'queue_status'; statusMessage: string } }
+    | StreamEventBase & { eventType: 'performance'; data: StreamEventDataBase & { type: 'performance'; model: string; tokensPerSecond: number; outputTokens: number; evalDurationMs: number } }
+    | StreamEventBase & { eventType: 'raw'; data: StreamEventDataBase & { type: 'raw'; message?: { content: string } } };
+
+/** Convenience type for all known stream event type strings. */
+export type StreamEventType = StreamEvent['eventType'];
 
 export type ServerWsMessage =
     | { type: 'session_event'; sessionId: string; event: StreamEvent }

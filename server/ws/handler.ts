@@ -1,7 +1,8 @@
 import type { ServerWebSocket } from 'bun';
 import type { ProcessManager, EventCallback } from '../process/manager';
-import type { ClientMessage, ServerMessage } from '../../shared/ws-protocol';
+import type { ClientMessage, ServerMessage, StreamEvent } from '../../shared/ws-protocol';
 import { isClientMessage } from '../../shared/ws-protocol';
+import type { ClaudeStreamEvent } from '../process/types';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { WorkTaskService } from '../work/service';
@@ -12,6 +13,11 @@ import { timingSafeEqual } from '../middleware/auth';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
+
+/** Convert a ClaudeStreamEvent to the WebSocket StreamEvent wire format. */
+function toStreamEvent(event: ClaudeStreamEvent): StreamEvent {
+    return { eventType: event.type, data: event, timestamp: new Date().toISOString() } as StreamEvent;
+}
 
 /** Server-initiated ping interval (ms). */
 export const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -255,11 +261,7 @@ function handleClientMessage(
                 const serverMsg: ServerMessage = {
                     type: 'session_event',
                     sessionId,
-                    event: {
-                        eventType: event.type,
-                        data: event,
-                        timestamp: new Date().toISOString(),
-                    },
+                    event: toStreamEvent(event),
                 };
                 ws.send(JSON.stringify(serverMsg));
             };
