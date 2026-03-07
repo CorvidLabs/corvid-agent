@@ -25,6 +25,7 @@ export type AuditAction =
     | 'schedule_delete'
     | 'work_task_create'
     | 'work_task_complete'
+    | 'work_task_retry'
     | 'workflow_create'
     | 'workflow_trigger'
     | 'agent_message_send'

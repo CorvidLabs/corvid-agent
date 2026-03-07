@@ -162,9 +162,19 @@ function buildSampleSymbolIndex(projectDir: string): Map<string, FileSymbolIndex
  * and .exited as a Promise<number>.
  */
 function makeMockProc(result: { exitCode: number; stdout: string; stderr: string }) {
+    // Use ReadableStream directly instead of Blob.stream() for cross-version Bun compat.
+    // Blob.stream() can fail when multiple streams are consumed concurrently via
+    // new Response(stream).text() in some Bun versions (e.g. 1.3.8 in CI).
+    const makeStream = (text: string) =>
+        new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode(text));
+                controller.close();
+            },
+        });
     return {
-        stdout: new Blob([result.stdout]).stream(),
-        stderr: new Blob([result.stderr]).stream(),
+        stdout: makeStream(result.stdout),
+        stderr: makeStream(result.stderr),
         exited: Promise.resolve(result.exitCode),
         pid: 12345,
         kill: () => {},
