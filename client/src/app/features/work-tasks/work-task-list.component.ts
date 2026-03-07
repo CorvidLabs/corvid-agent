@@ -156,6 +156,13 @@ import { WorkTask } from '../../core/models/work-task.model';
                                     <button class="action-btn action-btn--cancel" (click)="onCancel(task.id)">Cancel</button>
                                 </div>
                             }
+                            @if (task.status === 'failed') {
+                                <div class="task-actions">
+                                    <button class="action-btn action-btn--retry" (click)="onRetry(task.id)" [disabled]="retrying().has(task.id)">
+                                        {{ retrying().has(task.id) ? 'Retrying...' : 'Retry' }}
+                                    </button>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -201,6 +208,9 @@ import { WorkTask } from '../../core/models/work-task.model';
         .action-btn { padding: 0.25rem 0.6rem; font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; border-radius: var(--radius-sm); text-transform: uppercase; }
         .action-btn--cancel { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); }
         .action-btn--cancel:hover { background: var(--accent-red-dim); }
+        .action-btn--retry { background: transparent; color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .action-btn--retry:hover { background: var(--accent-cyan-dim); }
+        .action-btn--retry:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .tasks__filters {
             display: flex;
@@ -419,6 +429,7 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
     readonly showCreateForm = signal(false);
     readonly toggleCreateForm = (): void => { this.showCreateForm.set(true); };
     readonly creating = signal(false);
+    readonly retrying = signal<Set<string>>(new Set());
     protected createAgentId = '';
     protected createDescription = '';
 
@@ -539,6 +550,22 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
             this.notify.success('Work task cancelled');
         } catch (e) {
             this.notify.error('Failed to cancel task', String(e));
+        }
+    }
+
+    protected async onRetry(taskId: string): Promise<void> {
+        this.retrying.update((s) => new Set(s).add(taskId));
+        try {
+            await this.taskService.retryTask(taskId);
+            this.notify.success('Work task retried');
+        } catch (e) {
+            this.notify.error('Failed to retry task', String(e));
+        } finally {
+            this.retrying.update((s) => {
+                const next = new Set(s);
+                next.delete(taskId);
+                return next;
+            });
         }
     }
 

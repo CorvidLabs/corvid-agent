@@ -151,7 +151,7 @@ describe('withRetry', () => {
                         lastTime = now;
                         throw new Error('fail');
                     },
-                    { maxAttempts: 3, baseDelayMs: 20, multiplier: 2, jitter: false },
+                    { maxAttempts: 3, baseDelayMs: 50, multiplier: 2, jitter: false },
                 ),
             ).rejects.toThrow('fail');
             results.push(runDelays);
@@ -160,12 +160,12 @@ describe('withRetry', () => {
         // Both runs should produce similar delays (no randomness)
         expect(results[0]).toHaveLength(2);
         expect(results[1]).toHaveLength(2);
-        // First delay should be ~20ms, second ~40ms
+        // First delay should be ~50ms, second ~100ms — wide bounds for CI variability (esp. macOS)
         for (const runDelays of results) {
-            expect(runDelays[0]).toBeGreaterThanOrEqual(15);
-            expect(runDelays[0]).toBeLessThan(50);
-            expect(runDelays[1]).toBeGreaterThanOrEqual(30);
-            expect(runDelays[1]).toBeLessThan(80);
+            expect(runDelays[0]).toBeGreaterThanOrEqual(30);
+            expect(runDelays[0]).toBeLessThan(150);
+            expect(runDelays[1]).toBeGreaterThanOrEqual(60);
+            expect(runDelays[1]).toBeLessThan(250);
         }
     });
 

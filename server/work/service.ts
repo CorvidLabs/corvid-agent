@@ -1,4 +1,5 @@
 import { resolve, dirname } from 'node:path';
+import { existsSync } from 'node:fs';
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTask, CreateWorkTaskInput } from '../../shared/types';
@@ -10,6 +11,7 @@ import { createSession } from '../db/sessions';
 import {
     createWorkTaskAtomic,
     getWorkTask,
+    getActiveWorkTasks,
     updateWorkTaskStatus,
     listWorkTasks as dbListWorkTasks,
     cleanupStaleWorkTasks,
@@ -33,12 +35,21 @@ const WORK_MAX_ITERATIONS = parseInt(process.env.WORK_MAX_ITERATIONS ?? '3', 10)
 
 type CompletionCallback = (task: WorkTask) => void;
 
+const DRAIN_TIMEOUT_MS = parseInt(process.env.WORK_DRAIN_TIMEOUT_MS ?? '300000', 10); // 5 minutes
+const DRAIN_POLL_INTERVAL_MS = 10_000; // 10 seconds
+
 export class WorkTaskService {
     private db: Database;
     private processManager: ProcessManager;
     private astParserService: AstParserService | null;
     private agentMessenger: AgentMessenger | null = null;
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
+    private _shuttingDown = false;
+
+    /** True when the service is draining — no new tasks accepted. */
+    get shuttingDown(): boolean {
+        return this._shuttingDown;
+    }
 
     constructor(db: Database, processManager: ProcessManager, astParserService?: AstParserService) {
         this.db = db;
@@ -101,6 +112,115 @@ export class WorkTaskService {
     }
 
     /**
+     * Recover tasks that were interrupted by a previous unclean shutdown.
+     * Unlike recoverStaleTasks (which always retries), this method only
+     * requeues a task if its worktree directory still exists on disk and
+     * its iteration_count is below WORK_MAX_ITERATIONS. Otherwise the
+     * task is left as failed.
+     */
+    async recoverInterruptedTasks(): Promise<void> {
+        const staleTasks = cleanupStaleWorkTasks(this.db);
+        if (staleTasks.length === 0) return;
+
+        log.info('Recovering interrupted work tasks', { count: staleTasks.length });
+
+        for (const task of staleTasks) {
+            try {
+                const worktreeExists = task.worktreeDir ? existsSync(task.worktreeDir) : false;
+                const canRetry = (task.iterationCount ?? 0) < WORK_MAX_ITERATIONS;
+
+                if (!worktreeExists || !canRetry) {
+                    log.info('Skipping recovery for task (worktree missing or max iterations reached)', {
+                        taskId: task.id,
+                        worktreeExists,
+                        iterationCount: task.iterationCount,
+                    });
+                    // Already marked failed by cleanupStaleWorkTasks — clean up worktree if present
+                    if (task.worktreeDir) {
+                        await this.cleanupWorktree(task.id);
+                    }
+                    continue;
+                }
+
+                const agent = getAgent(this.db, task.agentId);
+                const project = getProject(this.db, task.projectId);
+                if (!agent || !project || !project.workingDir) {
+                    log.warn('Cannot recover interrupted task: agent or project missing', { taskId: task.id });
+                    continue;
+                }
+
+                resetWorkTaskForRetry(this.db, task.id);
+                log.info('Requeuing interrupted work task', {
+                    taskId: task.id,
+                    iterationCount: task.iterationCount,
+                    description: task.description.slice(0, 80),
+                });
+
+                const resetTask = getWorkTask(this.db, task.id);
+                if (!resetTask) continue;
+
+                // Fire-and-forget so recovery doesn't block startup
+                this.executeTask(resetTask, agent, project).catch((err) => {
+                    log.error('Failed to recover interrupted work task', {
+                        taskId: task.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            } catch (err) {
+                log.error('Error during work task recovery', {
+                    taskId: task.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+    }
+
+    /**
+     * Drain running tasks during graceful shutdown.
+     * Sets the shuttingDown flag to block new task creation, then waits
+     * up to DRAIN_TIMEOUT_MS for all active tasks to complete, polling
+     * every DRAIN_POLL_INTERVAL_MS.
+     */
+    async drainRunningTasks(pollIntervalMs: number = DRAIN_POLL_INTERVAL_MS): Promise<void> {
+        this._shuttingDown = true;
+
+        const activeTasks = getActiveWorkTasks(this.db);
+        if (activeTasks.length === 0) {
+            log.info('No active work tasks to drain');
+            return;
+        }
+
+        log.info('Draining active work tasks', { count: activeTasks.length });
+        const deadline = Date.now() + DRAIN_TIMEOUT_MS;
+
+        while (Date.now() < deadline) {
+            const remaining = getActiveWorkTasks(this.db);
+            if (remaining.length === 0) {
+                log.info('All work tasks drained successfully');
+                return;
+            }
+
+            log.info('Waiting for work tasks to complete', {
+                remaining: remaining.length,
+                timeLeftMs: deadline - Date.now(),
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        }
+
+        // Timeout reached — mark remaining active tasks as failed
+        const timedOut = getActiveWorkTasks(this.db);
+        if (timedOut.length > 0) {
+            log.warn('Drain timeout reached, marking remaining tasks as failed', { count: timedOut.length });
+            for (const task of timedOut) {
+                updateWorkTaskStatus(this.db, task.id, 'failed', {
+                    error: 'Interrupted by server shutdown (drain timeout)',
+                });
+            }
+        }
+    }
+
+    /**
      * Resolve the base directory for git worktrees.
      * Defaults to a `.corvid-worktrees` sibling directory next to the project.
      */
@@ -110,6 +230,10 @@ export class WorkTaskService {
     }
 
     async create(input: CreateWorkTaskInput, tenantId?: string): Promise<WorkTask> {
+        if (this._shuttingDown) {
+            throw new ValidationError('Server is shutting down — new work tasks are not accepted');
+        }
+
         // Validate agent exists
         const agent = getAgent(this.db, input.agentId, tenantId);
         if (!agent) {
@@ -329,6 +453,54 @@ export class WorkTaskService {
 
     listTasks(agentId?: string, tenantId?: string): WorkTask[] {
         return dbListWorkTasks(this.db, agentId, tenantId);
+    }
+
+    /**
+     * Retry a failed work task: reset it to pending and re-execute from scratch.
+     */
+    async retryTask(id: string, tenantId?: string): Promise<WorkTask | null> {
+        if (this._shuttingDown) {
+            throw new ValidationError('Server is shutting down — retries are not accepted');
+        }
+
+        const task = getWorkTask(this.db, id, tenantId);
+        if (!task) return null;
+
+        if (task.status !== 'failed') {
+            throw new ValidationError('Only failed tasks can be retried', { taskId: id, status: task.status });
+        }
+
+        const agent = getAgent(this.db, task.agentId, tenantId);
+        if (!agent) {
+            throw new NotFoundError('Agent', task.agentId);
+        }
+
+        const project = getProject(this.db, task.projectId, tenantId);
+        if (!project || !project.workingDir) {
+            throw new NotFoundError('Project', task.projectId);
+        }
+
+        if (task.worktreeDir) {
+            await this.cleanupWorktree(task.id);
+        }
+
+        resetWorkTaskForRetry(this.db, task.id);
+
+        log.info('Retrying failed work task', { taskId: task.id, description: task.description.slice(0, 80) });
+
+        recordAudit(
+            this.db,
+            'work_task_retry',
+            task.agentId,
+            'work_task',
+            task.id,
+            `Retried work task: ${task.description.slice(0, 200)}`,
+        );
+
+        const resetTask = getWorkTask(this.db, task.id);
+        if (!resetTask) return null;
+
+        return this.executeTask(resetTask, agent, project);
     }
 
     async cancelTask(id: string): Promise<WorkTask | null> {

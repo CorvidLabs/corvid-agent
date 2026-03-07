@@ -20,7 +20,7 @@ export interface BackupResult {
     pruned: number;
 }
 
-export function backupDatabase(db: Database, dbPath: string = 'corvid-agent.db'): BackupResult {
+export function backupDatabase(db: Database, dbPath: string = process.env.DATABASE_PATH ?? 'corvid-agent.db'): BackupResult {
     // Ensure backup directory exists
     const backupDir = DEFAULT_BACKUP_DIR;
     if (!existsSync(backupDir)) {

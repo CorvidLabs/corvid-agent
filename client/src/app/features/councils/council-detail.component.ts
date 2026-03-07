@@ -35,6 +35,8 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
                         <dd>{{ chairmanName() || 'None' }}</dd>
                         <dt>Discussion Rounds</dt>
                         <dd>{{ c.discussionRounds }}</dd>
+                        <dt>Governance Tier</dt>
+                        <dd>{{ c.onChainMode }}</dd>
                         <dt>Created</dt>
                         <dd>{{ c.createdAt | relativeTime }}</dd>
                     </dl>
