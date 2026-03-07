@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createProject } from '../db/projects';
 import { createAgent } from '../db/agents';
-import { getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
+import { getWorkTask, updateWorkTaskStatus, cleanupStaleWorkTasks } from '../db/work-tasks';
 import { WorkTaskService } from '../work/service';
 import type { ProcessManager } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
@@ -1028,9 +1028,8 @@ describe('onComplete callbacks', () => {
 });
 
 describe('recoverStaleTasks', () => {
-    test('marks active tasks as failed on recovery', async () => {
+    test('retries interrupted tasks after recovery', async () => {
         const { agent, project } = createTestAgentAndProject();
-        // Create task directly in DB with 'running' status
         const { createWorkTask } = await import('../db/work-tasks');
         const task = createWorkTask(db, {
             agentId: agent.id,
@@ -1039,11 +1038,14 @@ describe('recoverStaleTasks', () => {
         });
         updateWorkTaskStatus(db, task.id, 'running');
 
+        // Queue spawns for: worktree add, bun install, git remote (off-limits check not called for retry)
+        queueSuccessfulSpawns(3);
+
         await service.recoverStaleTasks();
 
+        // Task should be re-executing (running or branching), not failed
         const recovered = getWorkTask(db, task.id);
-        expect(recovered!.status).toBe('failed');
-        expect(recovered!.error).toContain('server restart');
+        expect(['branching', 'running']).toContain(recovered!.status);
     });
 
     test('does nothing when no stale tasks exist', async () => {
@@ -1051,7 +1053,7 @@ describe('recoverStaleTasks', () => {
         await service.recoverStaleTasks(); // Should not throw
     });
 
-    test('cleans up worktrees for stale tasks', async () => {
+    test('cleans up worktrees before retrying', async () => {
         const { agent, project } = createTestAgentAndProject();
         const { createWorkTask } = await import('../db/work-tasks');
         const task = createWorkTask(db, {
@@ -1061,8 +1063,8 @@ describe('recoverStaleTasks', () => {
         });
         updateWorkTaskStatus(db, task.id, 'running', { worktreeDir: '/tmp/worktree-123' });
 
-        // Queue worktree remove
-        queueSpawn(0);
+        // Queue worktree remove + worktree add + bun install for retry
+        queueSuccessfulSpawns(4);
 
         await service.recoverStaleTasks();
 
@@ -1071,6 +1073,40 @@ describe('recoverStaleTasks', () => {
             c => c.cmd.includes('worktree') && c.cmd.includes('remove')
         );
         expect(removeCalls.length).toBeGreaterThanOrEqual(1);
+
+        // Task should be retrying, not permanently failed
+        const recovered = getWorkTask(db, task.id);
+        expect(recovered!.status).not.toBe('failed');
+    });
+
+    test('resets interrupted task to pending before retrying', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        const { createWorkTask, resetWorkTaskForRetry } = await import('../db/work-tasks');
+        const task = createWorkTask(db, {
+            agentId: agent.id,
+            projectId: project.id,
+            description: 'Reset test task',
+        });
+        updateWorkTaskStatus(db, task.id, 'running', {
+            sessionId: 'old-session',
+            branchName: 'old-branch',
+            worktreeDir: '/tmp/old-worktree',
+        });
+
+        // Simulate the cleanup + reset that recoverStaleTasks does
+        cleanupStaleWorkTasks(db);
+        const failed = getWorkTask(db, task.id)!;
+        expect(failed.status).toBe('failed');
+        expect(failed.error).toContain('server restart');
+
+        resetWorkTaskForRetry(db, task.id);
+        const reset = getWorkTask(db, task.id)!;
+        expect(reset.status).toBe('pending');
+        expect(reset.sessionId).toBeNull();
+        expect(reset.branchName).toBeNull();
+        expect(reset.worktreeDir).toBeNull();
+        expect(reset.error).toBeNull();
+        expect(reset.completedAt).toBeNull();
     });
 });
 

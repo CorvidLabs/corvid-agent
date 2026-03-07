@@ -231,6 +231,25 @@ export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
     return cleanup();
 }
 
+/**
+ * Reset a failed work task back to pending for retry.
+ * Clears transient fields so the task can be re-executed from scratch.
+ */
+export function resetWorkTaskForRetry(db: Database, id: string): void {
+    db.query(
+        `UPDATE work_tasks
+         SET status = 'pending',
+             session_id = NULL,
+             branch_name = NULL,
+             worktree_dir = NULL,
+             original_branch = NULL,
+             error = NULL,
+             completed_at = NULL,
+             iteration_count = 0
+         WHERE id = ?`
+    ).run(id);
+}
+
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
     if (agentId) {
         const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
