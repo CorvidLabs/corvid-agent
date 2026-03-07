@@ -5,7 +5,37 @@ export interface DiscordBridgeConfig {
     channelId: string;
     allowedUserIds: string[];
     mode?: DiscordBridgeMode;
+    defaultAgentId?: string;
+    appId?: string;
+    guildId?: string;
 }
+
+export interface DiscordInteractionData {
+    id: string;
+    type: number; // 1=PING, 2=APPLICATION_COMMAND
+    channel_id: string;
+    guild_id?: string;
+    member?: { user: DiscordAuthor };
+    user?: DiscordAuthor;
+    data?: {
+        name: string;
+        options?: Array<{ name: string; type: number; value: string | number | boolean }>;
+    };
+    token: string; // interaction token for responding
+}
+
+// Interaction types
+export const InteractionType = {
+    PING: 1,
+    APPLICATION_COMMAND: 2,
+} as const;
+
+// Interaction callback types
+export const InteractionCallbackType = {
+    PONG: 1,
+    CHANNEL_MESSAGE: 4,
+    DEFERRED_CHANNEL_MESSAGE: 5,
+} as const;
 
 export interface DiscordGatewayPayload {
     op: number;
@@ -29,6 +59,8 @@ export interface DiscordMessageData {
     author: DiscordAuthor;
     content: string;
     timestamp: string;
+    /** Present when message is in a thread — the thread's channel ID */
+    thread?: { id: string };
 }
 
 export interface DiscordAuthor {
@@ -42,6 +74,7 @@ export const GatewayOp = {
     DISPATCH: 0,
     HEARTBEAT: 1,
     IDENTIFY: 2,
+    PRESENCE_UPDATE: 3,
     RESUME: 6,
     RECONNECT: 7,
     INVALID_SESSION: 9,

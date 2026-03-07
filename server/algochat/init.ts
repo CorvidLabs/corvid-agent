@@ -147,6 +147,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
         reputationVerifier,
         astParserService,
         permissionBroker,
+        processManager,
     });
 
     // Forward AlgoChat events to WebSocket clients

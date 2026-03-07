@@ -47,7 +47,7 @@ Creates the MCP server that exposes all `corvid_*` tools to Claude agent session
 4. **Scheduler mode filtering**: When `ctx.schedulerMode` is true, `isToolBlockedForScheduler(toolName, ctx.schedulerActionType)` determines which tools are removed. Always-blocked tools are removed unconditionally; gated tools are allowed only when the action type is in the tool's allowed set
 5. **Plugin tool injection**: Optional `pluginTools` parameter allows dynamically loaded plugin tools to be added to the MCP server alongside built-in tools
 6. **Zod schema validation**: Every tool has a Zod v4 input schema. Invalid inputs are rejected before the handler is called
-7. **Conditional tool registration**: `corvid_create_work_task` is only registered when `ctx.workTaskService` is available. `corvid_code_symbols` and `corvid_find_references` are only registered when `ctx.astParserService` is available. All other tools are registered unconditionally
+7. **Conditional tool registration**: `corvid_create_work_task` is only registered when `ctx.workTaskService` is available. `corvid_code_symbols` and `corvid_find_references` are only registered when `ctx.astParserService` is available. `corvid_launch_council` is only registered when `ctx.processManager` is available. All other tools are registered unconditionally
 
 ## Behavioral Examples
 

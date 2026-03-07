@@ -66,5 +66,8 @@ export {
     handleVerifyAgentReputation,
 } from './reputation';
 
+// ─── Councils ─────────────────────────────────────────────────────────────────
+export { handleLaunchCouncil } from './councils';
+
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';

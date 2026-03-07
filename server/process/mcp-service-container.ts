@@ -21,6 +21,7 @@ import type { ReputationAttestation } from '../reputation/attestation';
 import type { ReputationVerifier } from '../reputation/verifier';
 import type { AstParserService } from '../ast/service';
 import type { PermissionBroker } from '../permissions/broker';
+import type { ProcessManager } from './manager';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import type { OwnerQuestionManager } from './owner-question-manager';
 import type { ScheduleActionType } from '../../shared/types/schedules';
@@ -43,6 +44,7 @@ export interface McpServices {
     reputationVerifier?: ReputationVerifier;
     astParserService?: AstParserService;
     permissionBroker?: PermissionBroker;
+    processManager?: ProcessManager;
 }
 
 export interface BuildContextOptions {
@@ -109,6 +111,7 @@ export class McpServiceContainer {
             resolvedToolPermissions: options.resolvedToolPermissions,
             astParserService: this.services.astParserService,
             permissionBroker: this.services.permissionBroker,
+            processManager: this.services.processManager,
         };
     }
 }

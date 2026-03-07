@@ -29,6 +29,8 @@ const mockProcessManager = {
     stopProcess: mock(() => {}),
     getProcess: mock(() => null),
     listProcesses: mock(() => []),
+    subscribe: mock(() => {}),
+    unsubscribe: mock(() => {}),
     approvalManager: { operationalMode: 'autonomous' },
 } as unknown as import('../process/manager').ProcessManager;
 

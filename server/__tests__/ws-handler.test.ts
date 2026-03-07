@@ -353,7 +353,7 @@ describe('createWebSocketHandler', () => {
             expect(errors.length).toBe(0);
         });
 
-        it('sends error when session is not running', () => {
+        it('sends error when session is not found', () => {
             const pmNotRunning = createMockProcessManager({
                 sendMessage: mock(() => false),
             } as unknown as Partial<ProcessManager>);
@@ -365,7 +365,7 @@ describe('createWebSocketHandler', () => {
             expect(sent.length).toBe(1);
             const msg = JSON.parse(sent[0]);
             expect(msg.type).toBe('error');
-            expect(msg.message).toContain('not running');
+            expect(msg.message).toContain('not found');
         });
     });
 
@@ -1040,7 +1040,7 @@ describe('error severity', () => {
 
         const msg = JSON.parse(sent2[0]);
         expect(msg.type).toBe('error');
-        expect(msg.message).toContain('not running');
+        expect(msg.message).toContain('not found');
         // severity and errorCode are optional — should be present in type but may be undefined
         expect('severity' in msg || msg.severity === undefined).toBe(true);
     });

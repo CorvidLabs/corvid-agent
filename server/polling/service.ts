@@ -43,6 +43,7 @@ import {
     resolveFullRepo,
     type DetectedMention,
 } from './github-searcher';
+import { addIssueComment } from '../github/operations';
 import { AutoMergeService } from './auto-merge';
 import { CIRetryService } from './ci-retry';
 import { AutoUpdateService } from './auto-update';
@@ -490,12 +491,59 @@ export class MentionPollingService {
             incrementPollingTriggerCount(this.db, config.id);
             log.info('Polling triggered agent session', { configId: config.id, sessionId: session.id, mention: mention.id });
 
+            // Post an immediate acknowledgment on GitHub and subscribe
+            // to session end events to guarantee a follow-up comment.
+            const agentName = getAgent(this.db, config.agentId)?.name ?? 'corvid-agent';
+            const ackBody = `👋 **${agentName}** is looking into this.`;
+            addIssueComment(fullRepo, mention.number, ackBody).catch(err => {
+                log.warn('Failed to post acknowledgment comment', {
+                    repo: fullRepo, number: mention.number,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+
+            // Guarantee follow-up: when the session ends (success or failure),
+            // post a completion comment. This fires even if the agent itself
+            // forgot to comment, crashed, or timed out.
+            this.subscribeForCompletion(session.id, fullRepo, mention.number, agentName);
+
             this.emit({ type: 'mention_poll_trigger', data: { configId: config.id, mention, sessionId: session.id } });
             return true;
         } catch (err) {
             log.error('Failed to create session from mention poll', { error: err instanceof Error ? err.message : String(err) });
             return false;
         }
+    }
+
+    // ─── Session completion tracking ──────────────────────────────────────────
+
+    /**
+     * Subscribe to a session's end events and post a GitHub comment on failure.
+     * On normal exit the agent itself posts a substantive reply, so no extra
+     * comment is needed. On error or manual stop, post a follow-up so the
+     * issue doesn't go silent after the acknowledgment.
+     */
+    private subscribeForCompletion(sessionId: string, repo: string, issueNumber: number, agentName: string): void {
+        let fired = false;
+        const postCompletion = (body: string) => {
+            if (fired) return;
+            fired = true;
+            addIssueComment(repo, issueNumber, body).catch(err => {
+                log.warn('Failed to post completion comment', {
+                    repo, number: issueNumber, sessionId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        };
+
+        this.processManager.subscribe(sessionId, (_sid, event) => {
+            if (event.type === 'session_error') {
+                const errMsg = (event as { error?: { message?: string } }).error?.message ?? 'unknown error';
+                postCompletion(`⚠️ **${agentName}** ran into an issue while working on this: ${errMsg}`);
+            } else if (event.type === 'session_stopped') {
+                postCompletion(`🛑 **${agentName}**'s session was stopped before completion.`);
+            }
+        });
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

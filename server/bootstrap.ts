@@ -332,6 +332,9 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
                     ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
                     : [],
                 mode: (process.env.DISCORD_BRIDGE_MODE as 'chat' | 'work_intake') ?? undefined,
+                defaultAgentId: process.env.DISCORD_DEFAULT_AGENT_ID ?? undefined,
+                appId: process.env.DISCORD_APP_ID ?? undefined,
+                guildId: process.env.DISCORD_GUILD_ID ?? undefined,
             },
             workTaskService,
         );

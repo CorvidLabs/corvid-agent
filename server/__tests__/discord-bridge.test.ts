@@ -70,7 +70,7 @@ describe('DiscordBridge', () => {
         const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
@@ -89,7 +89,7 @@ describe('DiscordBridge', () => {
         const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
@@ -100,7 +100,7 @@ describe('DiscordBridge', () => {
 
         await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             id: '1',
-            channel_id: 'test-channel',
+            channel_id: '100000000000000001',
             author: { id: 'bot-1', username: 'TestBot', bot: true },
             content: 'hello from bot',
             timestamp: new Date().toISOString(),
@@ -113,7 +113,7 @@ describe('DiscordBridge', () => {
         const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'my-channel',
+            channelId: '100000000000000002',
             allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
@@ -123,7 +123,7 @@ describe('DiscordBridge', () => {
 
         await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             id: '1',
-            channel_id: 'other-channel',
+            channel_id: '100000000000000003',
             author: { id: 'user-1', username: 'TestUser' },
             content: 'hello',
             timestamp: new Date().toISOString(),
@@ -136,7 +136,7 @@ describe('DiscordBridge', () => {
         const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
@@ -150,13 +150,13 @@ describe('DiscordBridge', () => {
 
         try {
             // Short message — single API call
-            await bridge.sendMessage('test-channel', 'Hello');
+            await bridge.sendMessage('100000000000000001', 'Hello');
             expect(fetchCalls.length).toBe(1);
 
             // Long message (>2000 chars) — split into multiple calls
             fetchCalls.length = 0;
             const longText = 'x'.repeat(3000);
-            await bridge.sendMessage('test-channel', longText);
+            await bridge.sendMessage('100000000000000001', longText);
             expect(fetchCalls.length).toBe(2);
         } finally {
             globalThis.fetch = originalFetch;
@@ -167,7 +167,7 @@ describe('DiscordBridge', () => {
         const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
         };
         const bridge = new DiscordBridge(db, pm, config);
@@ -193,7 +193,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'work_intake',
         };
@@ -208,8 +208,8 @@ describe('DiscordBridge work_intake mode', () => {
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-1',
-                channel_id: 'test-channel',
+                id: '200000000000000001',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: 'Fix the login bug',
                 timestamp: new Date().toISOString(),
@@ -221,7 +221,7 @@ describe('DiscordBridge work_intake mode', () => {
             const input = createCall[0] as { description: string; source: string; sourceId: string };
             expect(input.description).toBe('Fix the login bug');
             expect(input.source).toBe('discord');
-            expect(input.sourceId).toBe('msg-1');
+            expect(input.sourceId).toBe('200000000000000001');
 
             // Should have sent an embed acknowledgment
             expect(fetchBodies.length).toBeGreaterThanOrEqual(1);
@@ -241,7 +241,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'work_intake',
         };
@@ -254,8 +254,8 @@ describe('DiscordBridge work_intake mode', () => {
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-2',
-                channel_id: 'test-channel',
+                id: '200000000000000002',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: '<@!12345678> Fix the login bug',
                 timestamp: new Date().toISOString(),
@@ -277,7 +277,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'work_intake',
         };
@@ -292,8 +292,8 @@ describe('DiscordBridge work_intake mode', () => {
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-3',
-                channel_id: 'test-channel',
+                id: '200000000000000003',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: '<@!12345678>',
                 timestamp: new Date().toISOString(),
@@ -319,7 +319,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'work_intake',
         };
@@ -335,8 +335,8 @@ describe('DiscordBridge work_intake mode', () => {
         try {
             // Create task
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-4',
-                channel_id: 'test-channel',
+                id: '200000000000000004',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: 'Build the feature',
                 timestamp: new Date().toISOString(),
@@ -394,7 +394,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'work_intake',
         };
@@ -409,8 +409,8 @@ describe('DiscordBridge work_intake mode', () => {
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-5',
-                channel_id: 'test-channel',
+                id: '200000000000000005',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: 'Break something',
                 timestamp: new Date().toISOString(),
@@ -461,7 +461,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'work_intake',
         };
@@ -477,8 +477,8 @@ describe('DiscordBridge work_intake mode', () => {
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-6',
-                channel_id: 'test-channel',
+                id: '200000000000000006',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: 'Do something',
                 timestamp: new Date().toISOString(),
@@ -501,7 +501,7 @@ describe('DiscordBridge work_intake mode', () => {
 
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
-            channelId: 'test-channel',
+            channelId: '100000000000000001',
             allowedUserIds: [],
             mode: 'chat',  // explicitly chat mode
         };
@@ -509,13 +509,14 @@ describe('DiscordBridge work_intake mode', () => {
 
         const originalFetch = globalThis.fetch;
         globalThis.fetch = mock(async () => {
-            return new Response(JSON.stringify({}), { status: 200 });
+            // Return a thread-like response with an id for thread creation
+            return new Response(JSON.stringify({ id: '300000000000000001' }), { status: 200 });
         }) as unknown as typeof fetch;
 
         try {
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: 'msg-7',
-                channel_id: 'test-channel',
+                id: '200000000000000007',
+                channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
                 content: 'hello there',
                 timestamp: new Date().toISOString(),
@@ -523,7 +524,7 @@ describe('DiscordBridge work_intake mode', () => {
 
             // In chat mode, WorkTaskService.create should NOT be called
             expect(wts.create).not.toHaveBeenCalled();
-            // Process manager should start a session
+            // Process manager should start a session (in a thread)
             expect(pm.startProcess).toHaveBeenCalled();
         } finally {
             globalThis.fetch = originalFetch;

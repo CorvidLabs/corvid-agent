@@ -102,7 +102,7 @@ async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
 }
 
 // WebSocket handler — bridge reference is resolved lazily since init is async
-const wsHandler = createWebSocketHandler(processManager, () => algochatState.bridge, authConfig, () => algochatState.messenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager);
+const wsHandler = createWebSocketHandler(processManager, () => algochatState.bridge, authConfig, () => algochatState.messenger, () => workTaskService, () => schedulerService, () => processManager.ownerQuestionManager, () => db);
 
 interface WsData {
     subscriptions: Map<string, unknown>;

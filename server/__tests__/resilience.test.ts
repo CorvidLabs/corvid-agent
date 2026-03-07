@@ -257,7 +257,7 @@ describe('CircuitBreaker', () => {
         } catch { /* trip */ }
         expect(cb.getState()).toBe('OPEN');
 
-        await new Promise((r) => setTimeout(r, 60));
+        await new Promise((r) => setTimeout(r, 150));
         expect(cb.getState()).toBe('HALF_OPEN');
     });
 

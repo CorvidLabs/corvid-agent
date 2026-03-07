@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { getAgent } from '../db/agents';
@@ -43,6 +43,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_code_symbols',
     'corvid_find_references',
     'corvid_repo_blocklist',
+    'corvid_launch_council',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -476,6 +477,23 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             },
             async (args) => handleManageRepoBlocklist(ctx, args),
         ),
+
+        // ─── Council deliberation ───────────────────────────────────────
+        ...(ctx.processManager ? [
+            tool(
+                'corvid_launch_council',
+                'Launch a multi-agent council deliberation on a topic. Agents discuss, debate, and synthesize a decision. ' +
+                'Creates a council configuration and immediately launches it. Returns the council ID and launch ID for tracking.',
+                {
+                    topic: z.string().describe('The topic or question for the council to deliberate on'),
+                    agentIds: z.array(z.string()).optional().describe('Agent IDs to participate. Omit to include all agents.'),
+                    chairmanAgentId: z.string().optional().describe('Agent ID for the chairman who synthesizes the final decision. Defaults to first agent.'),
+                    discussionRounds: z.number().optional().describe('Number of discussion rounds (default 2)'),
+                    governanceTier: z.string().optional().describe('Governance tier: "standard" (default) or "governance" for formal governance votes'),
+                },
+                async (args) => handleLaunchCouncil(ctx, args),
+            ),
+        ] : []),
     ];
 
     // Merge plugin tools if provided

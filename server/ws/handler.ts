@@ -3,6 +3,7 @@ import type { ProcessManager, EventCallback } from '../process/manager';
 import type { ClientMessage, ServerMessage, StreamEvent } from '../../shared/ws-protocol';
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { ClaudeStreamEvent } from '../process/types';
+import type { Database } from 'bun:sqlite';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { WorkTaskService } from '../work/service';
@@ -10,6 +11,7 @@ import type { SchedulerService } from '../scheduler/service';
 import type { OwnerQuestionManager } from '../process/owner-question-manager';
 import type { AuthConfig } from '../middleware/auth';
 import { timingSafeEqual } from '../middleware/auth';
+import { getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('WebSocket');
@@ -95,6 +97,7 @@ export function createWebSocketHandler(
     getWorkTaskService?: () => WorkTaskService | null,
     getSchedulerService?: () => SchedulerService | null,
     getOwnerQuestionManager?: () => OwnerQuestionManager | null,
+    getDb?: () => Database,
 ) {
     return {
         open(ws: ServerWebSocket<WsData>) {
@@ -180,7 +183,7 @@ export function createWebSocketHandler(
                 return;
             }
 
-            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService, getOwnerQuestionManager);
+            handleClientMessage(ws, parsed, processManager, getBridge, getMessenger, getWorkTaskService, getSchedulerService, getOwnerQuestionManager, getDb);
         },
 
         close(ws: ServerWebSocket<WsData>) {
@@ -217,6 +220,7 @@ function handleClientMessage(
     getWorkTaskService?: () => WorkTaskService | null,
     getSchedulerService?: () => SchedulerService | null,
     getOwnerQuestionManager?: () => OwnerQuestionManager | null,
+    getDb?: () => Database,
 ): void {
     switch (msg.type) {
         case 'subscribe': {
@@ -285,7 +289,14 @@ function handleClientMessage(
             const sent = processManager.sendMessage(msg.sessionId, msg.content);
             log.info('send_message result', { sessionId: msg.sessionId, sent });
             if (!sent) {
-                sendError(ws, `Session ${msg.sessionId} is not running`);
+                const db = getDb?.();
+                const session = db ? getSession(db, msg.sessionId) : null;
+                if (session) {
+                    log.info('Auto-resuming idle session', { sessionId: msg.sessionId, status: session.status });
+                    processManager.resumeProcess(session, msg.content);
+                } else {
+                    sendError(ws, `Session ${msg.sessionId} not found`);
+                }
             }
             break;
         }
