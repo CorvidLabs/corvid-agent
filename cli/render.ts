@@ -73,19 +73,23 @@ function sanitize(s: string): string {
 // ─── Output Helpers ─────────────────────────────────────────────────────────
 
 export function printError(message: string): void {
-    console.error(`${c.red('error')}: ${sanitize(message)}`);
+    const safe = sanitize(message);
+    console.error(`${c.red('error')}: ${safe}`);
 }
 
 export function printSuccess(message: string): void {
-    console.log(`${c.green('✓')} ${message}`);
+    const safe = sanitize(message);
+    console.log(`${c.green('✓')} ${safe}`);
 }
 
 export function printWarning(message: string): void {
-    console.log(`${c.yellow('!')} ${message}`);
+    const safe = sanitize(message);
+    console.log(`${c.yellow('!')} ${safe}`);
 }
 
 export function printHeader(title: string): void {
-    console.log(`\n${c.bold}${title}${c.reset}\n`);
+    const safe = sanitize(title);
+    console.log(`\n${c.bold}${safe}${c.reset}\n`);
 }
 
 // ─── Table Rendering ────────────────────────────────────────────────────────
@@ -133,7 +137,9 @@ export function renderToolUse(toolName: string, input: string): void {
 
     // Try to extract a meaningful summary from JSON tool input (SDK mode)
     const detail = summarizeToolInput(toolName, input);
-    console.log(`${c.cyan('│')} ${c.magenta(sanitize(toolName))} ${c.dim}${sanitize(detail)}${c.reset}`);
+    const safeName = sanitize(toolName);
+    const safeDetail = sanitize(detail);
+    console.log(`${c.cyan('│')} ${c.magenta(safeName)} ${c.dim}${safeDetail}${c.reset}`);
 }
 
 function summarizeToolInput(_toolName: string, input: string): string {
