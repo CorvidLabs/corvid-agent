@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Hosting &mdash; CorvidAgent</title>
+  <meta name="description" content="Deploy CorvidAgent to production. Docker, systemd, macOS LaunchAgent, reverse proxy, environment variables, monitoring, and upgrade procedures.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="Self-Hosting &mdash; CorvidAgent">
+  <meta property="og:description" content="Deploy CorvidAgent to production with Docker, systemd, or macOS LaunchAgent.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/self-hosting.html">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/self-hosting.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+  <!-- NAV -->
+  <nav class="nav" aria-label="Main navigation">
+    <div class="container nav__inner">
+      <a href="index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="architecture.html" class="nav__link">API</a>
+        <a href="algochat.html" class="nav__link">AlgoChat</a>
+        <a href="security.html" class="nav__link">Security</a>
+        <a href="self-hosting.html" class="nav__link nav__link--active" aria-current="page">Deploy</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/VISION.md" class="nav__link" target="_blank" rel="noopener">Vision <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content">
+  <!-- HERO -->
+  <header class="page-hero">
+    <div class="container">
+      <h1 class="page-hero__title">Self-<span class="accent-cyan">Hosting</span></h1>
+      <p class="page-hero__tagline">Deploy CorvidAgent to your own infrastructure &mdash; Docker, systemd, or bare metal.</p>
+    </div>
+    <div class="hero__scanline"></div>
+  </header>
+
+  <!-- DEPLOYMENT OPTIONS -->
+  <section class="section" id="deployment-options">
+    <div class="container">
+      <h2 class="section__title">Deployment Options</h2>
+      <div class="grid grid--4">
+        <a href="#docker" class="card card--cyan card--link">
+          <div class="card__icon">&#x1F433;</div>
+          <h3 class="card__title">Docker</h3>
+          <p>Multi-stage build with Compose. Named volume for SQLite persistence. Production-ready.</p>
+        </a>
+        <a href="#systemd" class="card card--magenta card--link">
+          <div class="card__icon">&#x2699;</div>
+          <h3 class="card__title">systemd</h3>
+          <p>Linux service unit with auto-restart. Install via the included daemon script.</p>
+        </a>
+        <a href="#launchd" class="card card--green card--link">
+          <div class="card__icon">&#x1F34E;</div>
+          <h3 class="card__title">macOS LaunchAgent</h3>
+          <p>Persistent background service on macOS. Starts on login, restarts on crash.</p>
+        </a>
+        <a href="#reverse-proxy" class="card card--outline card--link">
+          <div class="card__icon">&#x1F510;</div>
+          <h3 class="card__title">Reverse Proxy</h3>
+          <p>Caddy or nginx configs for TLS termination, WebSocket proxying, and rate limiting.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOCKER -->
+  <section class="section section--alt" id="docker">
+    <div class="container">
+      <h2 class="section__title">Docker</h2>
+
+      <div class="step">
+        <div class="step__number accent-cyan">01</div>
+        <div class="step__content">
+          <h3 class="step__title">Start with Docker Compose</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> git clone https://github.com/CorvidLabs/corvid-agent.git
+<span class="t-prompt">$</span> cd corvid-agent
+<span class="t-prompt">$</span> cp .env.example .env
+<span class="t-comment"># Edit .env with your API keys</span>
+
+<span class="t-prompt">$</span> docker compose -f deploy/docker-compose.yml up -d</code></pre>
+          </div>
+          <p class="step__note">Builds a multi-stage image (Angular client in stage 1, production server in stage 2). Database persists via a named <code>db-data</code> volume at <code>/app/data</code>.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__number accent-magenta">02</div>
+        <div class="step__content">
+          <h3 class="step__title">Pass Environment Variables</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> export ANTHROPIC_API_KEY=sk-ant-...
+<span class="t-prompt">$</span> export API_KEY=your-secret-key
+<span class="t-prompt">$</span> export LOG_LEVEL=info
+
+<span class="t-prompt">$</span> docker compose -f deploy/docker-compose.yml up -d</code></pre>
+          </div>
+          <p class="step__note">The Compose file forwards key variables. You can also set them in your <code>.env</code> file.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__number accent-green">03</div>
+        <div class="step__content">
+          <h3 class="step__title">Verify Image Signatures</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># Verify image signature (Cosign keyless via Sigstore)</span>
+<span class="t-prompt">$</span> cosign verify \
+  --certificate-identity-regexp "https://github.com/CorvidLabs/corvid-agent" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/corvidlabs/corvid-agent:latest
+
+<span class="t-comment"># Verify SBOM attestation</span>
+<span class="t-prompt">$</span> cosign verify-attestation --type spdxjson \
+  --certificate-identity-regexp "https://github.com/CorvidLabs/corvid-agent" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/corvidlabs/corvid-agent:latest | jq -r '.payload' | base64 -d | jq .</code></pre>
+          </div>
+          <p class="step__note">Released images are signed with Cosign (keyless, via Sigstore/Fulcio) and include an SPDX SBOM attestation.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__number accent-cyan">04</div>
+        <div class="step__content">
+          <h3 class="step__title">Localnet Docker Networking</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">.env</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># If Algorand localnet runs on the host machine:</span>
+LOCALNET_ALGOD_URL=http://host.docker.internal:4001
+LOCALNET_KMD_URL=http://host.docker.internal:4002
+LOCALNET_INDEXER_URL=http://host.docker.internal:8980</code></pre>
+          </div>
+          <p class="step__note">The Compose file includes <code>extra_hosts: ["host.docker.internal:host-gateway"]</code> for Linux compatibility.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYSTEMD -->
+  <section class="section" id="systemd">
+    <div class="container">
+      <h2 class="section__title">systemd</h2>
+
+      <div class="step">
+        <div class="step__number accent-magenta">01</div>
+        <div class="step__content">
+          <h3 class="step__title">Install the Service</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># Install and enable the systemd service</span>
+<span class="t-prompt">$</span> ./deploy/daemon.sh install
+
+<span class="t-comment"># Check status</span>
+<span class="t-prompt">$</span> systemctl status corvid-agent
+
+<span class="t-comment"># View logs</span>
+<span class="t-prompt">$</span> journalctl -u corvid-agent -f</code></pre>
+          </div>
+          <p class="step__note">The service unit is at <code>deploy/corvid-agent.service</code>. It runs as a dedicated user with auto-restart on failure.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MACOS LAUNCHAGENT -->
+  <section class="section section--alt" id="launchd">
+    <div class="container">
+      <h2 class="section__title">macOS LaunchAgent</h2>
+
+      <div class="step">
+        <div class="step__number accent-green">01</div>
+        <div class="step__content">
+          <h3 class="step__title">Install the LaunchAgent</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># Copy the plist to LaunchAgents</span>
+<span class="t-prompt">$</span> cp deploy/com.corvidlabs.corvid-agent.plist ~/Library/LaunchAgents/
+
+<span class="t-comment"># Load and start</span>
+<span class="t-prompt">$</span> launchctl load ~/Library/LaunchAgents/com.corvidlabs.corvid-agent.plist
+
+<span class="t-comment"># Check status</span>
+<span class="t-prompt">$</span> launchctl list | grep corvid</code></pre>
+          </div>
+          <p class="step__note">Starts on login and restarts on crash. Edit the plist to adjust the working directory and environment variables for your setup.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVERSE PROXY -->
+  <section class="section" id="reverse-proxy">
+    <div class="container">
+      <h2 class="section__title">Reverse Proxy</h2>
+      <p style="margin-bottom: 2rem; opacity: 0.8;">When <code>BIND_HOST=0.0.0.0</code>, always place the server behind a reverse proxy with TLS. Configs are in the <code>deploy/</code> directory.</p>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">Caddy</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">Caddyfile</span>
+            </div>
+            <pre class="terminal__body"><code>corvid.example.com {
+  reverse_proxy localhost:3000
+}</code></pre>
+          </div>
+          <p class="step__note">Automatic HTTPS via Let&rsquo;s Encrypt. Config at <code>deploy/caddy/</code>.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">nginx</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">nginx.conf</span>
+            </div>
+            <pre class="terminal__body"><code>location / {
+  proxy_pass http://127.0.0.1:3000;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+}</code></pre>
+          </div>
+          <p class="step__note">WebSocket upgrade headers are required for real-time streaming. Config at <code>deploy/nginx/</code>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENVIRONMENT VARIABLES -->
+  <section class="section section--alt" id="env-vars">
+    <div class="container">
+      <h2 class="section__title">Environment Variables</h2>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">Core Server</h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key accent-cyan">PORT</span>
+              <span class="config-val">3000</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">BIND_HOST</span>
+              <span class="config-val">127.0.0.1 (use 0.0.0.0 for Docker)</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">API_KEY</span>
+              <span class="config-val">auto-generated if exposed</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">ADMIN_API_KEY</span>
+              <span class="config-val">for elevated admin ops</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">ALLOWED_ORIGINS</span>
+              <span class="config-val">comma-separated CORS origins</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">LOG_LEVEL</span>
+              <span class="config-val">debug | info | warn | error</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-cyan">LOG_FORMAT</span>
+              <span class="config-val">text | json</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">AI Providers</h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key accent-magenta">ANTHROPIC_API_KEY</span>
+              <span class="config-val">for Claude models</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-magenta">OPENAI_API_KEY</span>
+              <span class="config-val">for voice TTS/STT</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-magenta">ENABLED_PROVIDERS</span>
+              <span class="config-val">anthropic,ollama</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-magenta">OLLAMA_HOST</span>
+              <span class="config-val">http://localhost:11434</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card--green">
+          <h3 class="card__title">Multi-Tenant &amp; Backups</h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key accent-green">MULTI_TENANT</span>
+              <span class="config-val">false (set true for isolation)</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-green">BACKUP_DIR</span>
+              <span class="config-val">./backups</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-green">BACKUP_MAX_KEEP</span>
+              <span class="config-val">10</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Rate Limiting</h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key">RATE_LIMIT_GET</span>
+              <span class="config-val">600 req/min/IP</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key">RATE_LIMIT_MUTATION</span>
+              <span class="config-val">60 req/min/IP</span>
+            </div>
+          </div>
+          <p style="margin-top: 0.75rem; font-size: 0.85rem; opacity: 0.7;">Auth-tier multipliers: public &times;0.5, user &times;1, admin &times;2. Health and WebSocket endpoints are exempt.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONITORING -->
+  <section class="section" id="monitoring">
+    <div class="container">
+      <h2 class="section__title">Monitoring</h2>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">Health Endpoints</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># Liveness probe (is the process running?)</span>
+<span class="t-prompt">$</span> curl http://localhost:3000/health/live
+
+<span class="t-comment"># Readiness probe (ready for requests?)</span>
+<span class="t-prompt">$</span> curl http://localhost:3000/health/ready</code></pre>
+          </div>
+          <p class="step__note">Both return HTTP 200 when healthy. Docker healthcheck uses <code>/health/live</code> every 30s. No authentication required.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">Logging</h3>
+          <div class="config-table">
+            <div class="config-row">
+              <span class="config-key accent-magenta">LOG_LEVEL</span>
+              <span class="config-val">debug, info, warn, error</span>
+            </div>
+            <div class="config-row">
+              <span class="config-key accent-magenta">LOG_FORMAT</span>
+              <span class="config-val">text (human) or json (structured)</span>
+            </div>
+          </div>
+          <p style="margin-top: 0.75rem; font-size: 0.85rem; opacity: 0.7;">Use <code>LOG_FORMAT=json</code> in production for structured log aggregation.</p>
+        </div>
+      </div>
+
+      <div class="step" style="margin-top: 2rem;">
+        <div class="step__number accent-green">&#x2713;</div>
+        <div class="step__content">
+          <h3 class="step__title">Self-Test Suite</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> curl -X POST http://localhost:3000/api/selftest/run \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"scope": "all"}'</code></pre>
+          </div>
+          <p class="step__note">Scopes: <code>unit</code>, <code>e2e</code>, <code>all</code>. Verifies server health, database integrity, and agent connectivity.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BACKUPS -->
+  <section class="section section--alt" id="backups">
+    <div class="container">
+      <h2 class="section__title">Database Backups</h2>
+
+      <div class="step">
+        <div class="step__number accent-cyan">01</div>
+        <div class="step__content">
+          <h3 class="step__title">Create a Backup</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># Trigger backup (requires ADMIN_API_KEY)</span>
+<span class="t-prompt">$</span> curl -X POST http://localhost:3000/api/backup \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+
+<span class="t-comment"># Schedule with cron (every 6 hours)</span>
+0 */6 * * * curl -s -X POST http://localhost:3000/api/backup \
+  -H "Authorization: Bearer $ADMIN_API_KEY" >> /var/log/corvid-backup.log 2>&1</code></pre>
+          </div>
+          <p class="step__note">Performs a WAL checkpoint before copying. Old backups beyond <code>BACKUP_MAX_KEEP</code> are pruned automatically.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__number accent-magenta">02</div>
+        <div class="step__content">
+          <h3 class="step__title">Restore from Backup</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-comment"># Stop the server first</span>
+
+<span class="t-comment"># Replace the database</span>
+<span class="t-prompt">$</span> cp backups/corvid-agent-2026-02-28T12-00-00-000Z.db corvid-agent.db
+
+<span class="t-comment"># Remove stale WAL/SHM files</span>
+<span class="t-prompt">$</span> rm -f corvid-agent.db-wal corvid-agent.db-shm
+
+<span class="t-comment"># Restart the server</span>
+<span class="t-prompt">$</span> bun run start</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- UPGRADING -->
+  <section class="section" id="upgrading">
+    <div class="container">
+      <h2 class="section__title">Upgrading</h2>
+
+      <div class="grid grid--2">
+        <div class="card card--cyan">
+          <h3 class="card__title">Bare Metal</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> git pull origin main
+<span class="t-prompt">$</span> bun install
+<span class="t-prompt">$</span> bun run build:client
+<span class="t-prompt">$</span> bun run start</code></pre>
+          </div>
+          <p class="step__note">Migrations run automatically on startup.</p>
+        </div>
+
+        <div class="card card--magenta">
+          <h3 class="card__title">Docker</h3>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">$</span> docker compose -f deploy/docker-compose.yml build
+<span class="t-prompt">$</span> docker compose -f deploy/docker-compose.yml up -d</code></pre>
+          </div>
+          <p class="step__note">Always <a href="#backups" class="accent-magenta">create a backup</a> before upgrading.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT'S NEXT -->
+  <section class="section section--alt" id="next">
+    <div class="container">
+      <h2 class="section__title">What&rsquo;s Next</h2>
+      <div class="grid grid--3">
+        <a href="getting-started.html" class="card card--outline card--link">
+          <h3 class="card__title accent-cyan">Getting Started &rarr;</h3>
+          <p>Prerequisites, installation, and first steps with CorvidAgent.</p>
+        </a>
+        <a href="architecture.html" class="card card--outline card--link">
+          <h3 class="card__title accent-magenta">API &amp; Architecture &rarr;</h3>
+          <p>REST endpoints, WebSocket protocol, database schema, and system design.</p>
+        </a>
+        <a href="algochat.html" class="card card--outline card--link">
+          <h3 class="card__title accent-green">AlgoChat Explainer &rarr;</h3>
+          <p>On-chain messaging, PSK encryption, and slash commands.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="index.html">Home</a>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="architecture.html">API</a>
+        <a href="algochat.html">AlgoChat</a>
+        <a href="security.html">Security</a>
+        <a href="self-hosting.html">Deploy</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://corvid-agent.github.io/corvid-agent-chat/" target="_blank" rel="noopener">Chat</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>
