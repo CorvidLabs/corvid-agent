@@ -5,6 +5,7 @@ status: active
 files:
   - server/work/service.ts
   - server/work/validation.ts
+  - server/work/repo-map.ts
 db_tables:
   - work_tasks
 depends_on:
@@ -160,6 +161,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `server/db/audit.ts` | `recordAudit` |
 | `server/process/types.ts` | `ClaudeStreamEvent`, `extractContentText` |
 | `server/work/validation.ts` | `runBunInstall`, `runValidation` |
+| `server/work/repo-map.ts` | `generateRepoMap`, `extractRelevantSymbols` |
 
 ### Consumed By
 
