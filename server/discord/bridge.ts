@@ -26,6 +26,24 @@ const log = createLogger('DiscordBridge');
 const GATEWAY_URL = 'wss://gateway.discord.gg/?v=10&encoding=json';
 const MAX_MESSAGE_LENGTH = 2000;
 
+/** Discord snowflake IDs are purely numeric strings. */
+const DISCORD_SNOWFLAKE_RE = /^\d{17,20}$/;
+
+/** Discord interaction tokens are alphanumeric with dashes, dots, and underscores. */
+const DISCORD_TOKEN_RE = /^[\w.\-]{20,200}$/;
+
+function assertSnowflake(value: string, label: string): void {
+    if (!DISCORD_SNOWFLAKE_RE.test(value)) {
+        throw new Error(`Invalid Discord ${label}: expected snowflake ID`);
+    }
+}
+
+function assertInteractionToken(value: string): void {
+    if (!DISCORD_TOKEN_RE.test(value)) {
+        throw new Error('Invalid Discord interaction token');
+    }
+}
+
 /**
  * Bidirectional Discord bridge using raw WebSocket gateway.
  * No external Discord library dependencies.
@@ -480,6 +498,8 @@ export class DiscordBridge {
     }
 
     private async respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
+        assertSnowflake(interaction.id, 'interaction ID');
+        assertInteractionToken(interaction.token);
         const response = await fetch(
             `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
             {
@@ -1002,6 +1022,8 @@ export class DiscordBridge {
      * Returns the thread channel ID, or null on failure.
      */
     private async createThread(channelId: string, messageId: string, name: string): Promise<string | null> {
+        assertSnowflake(channelId, 'channel ID');
+        assertSnowflake(messageId, 'message ID');
         const response = await fetch(
             `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/threads`,
             {
