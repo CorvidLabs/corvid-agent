@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach, describe, mock, spyOn } from 'bun:test';
+import { test, expect, beforeEach, afterEach, beforeAll, afterAll, describe, mock, spyOn } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createProject } from '../db/projects';
@@ -1500,6 +1500,21 @@ describe('buildWorkPrompt with repo map and relevant symbols', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('PR dedup check', () => {
+    let savedGhToken: string | undefined;
+
+    beforeAll(() => {
+        savedGhToken = process.env.GH_TOKEN;
+        process.env.GH_TOKEN = 'ghp_test_dedup';
+    });
+
+    afterAll(() => {
+        if (savedGhToken !== undefined) {
+            process.env.GH_TOKEN = savedGhToken;
+        } else {
+            delete process.env.GH_TOKEN;
+        }
+    });
+
     test('skips task creation when an open PR already references the issue', async () => {
         const { agent, project } = createTestAgentAndProject();
 
