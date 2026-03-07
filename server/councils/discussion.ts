@@ -13,6 +13,7 @@ import {
     createCouncilLaunch,
     getCouncilLaunch,
     updateCouncilLaunchStage,
+    addCouncilLaunchLog,
     insertDiscussionMessage,
     getDiscussionMessages,
     updateCouncilLaunchDiscussionRound,
@@ -24,7 +25,7 @@ import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
-import type { CouncilDiscussionMessage } from '../../shared/types';
+import type { CouncilLogLevel, CouncilLaunchLog, CouncilDiscussionMessage, CouncilAgentError } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { getModelPricing } from '../providers/cost-table';
 import { NotFoundError, ValidationError } from '../lib/errors';
@@ -37,23 +38,80 @@ import {
     aggregateSessionResponses,
     finishWithAggregatedSynthesis as finishWithAggregatedSynthesisImpl,
 } from './synthesis';
-import {
-    onCouncilStageChange,
-    onCouncilLog,
-    onCouncilDiscussionMessage,
-    onCouncilAgentError,
-    broadcastAgentError,
-    broadcastStageChange,
-    broadcastDiscussionMessage,
-    emitLog,
-} from './events';
 
-// Re-export event bus functions and synthesis types for consumers
-export { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError, broadcastAgentError };
+// Re-export synthesis types and pure functions for consumers
 export { aggregateSessionResponses };
 export type { EmitLogFn, BroadcastStageChangeFn, WatchAutoAdvanceFn } from './synthesis';
 
 const log = createLogger('CouncilDiscussion');
+
+// ─── WS broadcast callbacks ──────────────────────────────────────────────────
+
+type StageChangeCallback = (launchId: string, stage: string, sessionIds?: string[]) => void;
+const stageChangeListeners = new Set<StageChangeCallback>();
+
+export function onCouncilStageChange(cb: StageChangeCallback): () => void {
+    stageChangeListeners.add(cb);
+    return () => { stageChangeListeners.delete(cb); };
+}
+
+function broadcastStageChange(launchId: string, stage: string, sessionIds?: string[]): void {
+    for (const cb of stageChangeListeners) {
+        try { cb(launchId, stage, sessionIds); } catch { /* ignore */ }
+    }
+}
+
+type LogCallback = (logEntry: CouncilLaunchLog) => void;
+const logListeners = new Set<LogCallback>();
+
+export function onCouncilLog(cb: LogCallback): () => void {
+    logListeners.add(cb);
+    return () => { logListeners.delete(cb); };
+}
+
+function broadcastLog(entry: CouncilLaunchLog): void {
+    for (const cb of logListeners) {
+        try { cb(entry); } catch { /* ignore */ }
+    }
+}
+
+type DiscussionMessageCallback = (message: CouncilDiscussionMessage) => void;
+const discussionMessageListeners = new Set<DiscussionMessageCallback>();
+
+export function onCouncilDiscussionMessage(cb: DiscussionMessageCallback): () => void {
+    discussionMessageListeners.add(cb);
+    return () => { discussionMessageListeners.delete(cb); };
+}
+
+function broadcastDiscussionMessage(message: CouncilDiscussionMessage): void {
+    for (const cb of discussionMessageListeners) {
+        try { cb(message); } catch { /* ignore */ }
+    }
+}
+
+type AgentErrorCallback = (error: CouncilAgentError) => void;
+const agentErrorListeners = new Set<AgentErrorCallback>();
+
+export function onCouncilAgentError(cb: AgentErrorCallback): () => void {
+    agentErrorListeners.add(cb);
+    return () => { agentErrorListeners.delete(cb); };
+}
+
+export function broadcastAgentError(error: CouncilAgentError): void {
+    for (const cb of agentErrorListeners) {
+        try { cb(error); } catch { /* ignore */ }
+    }
+}
+
+/** Persist a log entry and broadcast it to WS clients. */
+function emitLog(db: Database, launchId: string, level: CouncilLogLevel, message: string, detail?: string): void {
+    const entry = addCouncilLaunchLog(db, launchId, level, message, detail);
+    broadcastLog(entry);
+    // Also log to server console
+    if (level === 'error') log.error(message, detail ? { detail } : undefined);
+    else if (level === 'warn') log.warn(message, detail ? { detail } : undefined);
+    else log.info(message, detail ? { detail } : undefined);
+}
 
 // ─── Timeout constants ───────────────────────────────────────────────────────
 
