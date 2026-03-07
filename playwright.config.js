@@ -5,6 +5,7 @@ const E2E_BASE = `http://localhost:${E2E_PORT}`;
 
 export default defineConfig({
     testDir: './e2e',
+    globalTeardown: './e2e/global-teardown.ts',
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
@@ -28,6 +29,7 @@ export default defineConfig({
         timeout: 30_000,
         env: {
             PORT: E2E_PORT,
+            DATABASE_PATH: 'e2e-test.db', // Isolate e2e data from production database
             RATE_LIMIT_GET: '5000',      // Higher read limit for e2e test volume
             RATE_LIMIT_MUTATION: '1000',  // Higher write limit for parallel e2e tests
             ENABLED_PROVIDERS: 'anthropic,ollama', // Prevent auto-restrict to ollama-only in CI
