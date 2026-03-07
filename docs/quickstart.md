@@ -4,7 +4,19 @@ Get corvid-agent running and have an AI agent open a real PR on a test repo.
 
 ---
 
-## 1. Install and start (2 minutes)
+## One-line install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+```
+
+This checks prerequisites, installs Bun if needed, clones the repo to `~/corvid-agent`, runs setup, and starts the server. Safe to pipe from curl — interactive prompts use `/dev/tty`. Set `CORVID_INSTALL_DIR` to change the install location.
+
+---
+
+## 1. Manual install (2 minutes)
+
+If you prefer to install step-by-step:
 
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
