@@ -13,6 +13,9 @@ import { createProject } from '../db/projects';
 
 const TEST_OWNER_WALLET = 'TESTOWNERADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234';
 
+/** Dynamic owner-address set controlled by `setOwnerAddresses()` in each test. */
+let _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
+
 mock.module('../algochat/config', () => ({
     loadAlgoChatConfig: () => ({
         mnemonic: null,
@@ -22,8 +25,9 @@ mock.module('../algochat/config', () => ({
         defaultAgentId: null,
         enabled: false,
         pskContact: null,
-        ownerAddresses: new Set([TEST_OWNER_WALLET.toUpperCase()]),
+        ownerAddresses: _mockOwnerAddresses,
     }),
+    _resetConfigCache: () => {},
 }));
 
 import {
@@ -40,6 +44,19 @@ import {
 } from '../mcp/tool-handlers';
 import { grantCredits } from '../db/credits';
 import { saveMemory } from '../db/agent-memories';
+const OWNER_WALLET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
+
+/** Set the agent's wallet address in the DB. */
+function setAgentWallet(database: Database, id: string, wallet: string): void {
+    database.query(`UPDATE agents SET wallet_address = ? WHERE id = ?`).run(wallet, id);
+}
+
+/** Configure the mock owner-address set used by loadAlgoChatConfig. */
+function setOwnerAddresses(addresses: string): void {
+    _mockOwnerAddresses = new Set(
+        addresses ? addresses.split(',').map(a => a.trim().toUpperCase()) : [],
+    );
+}
 
 let db: Database;
 let agentId: string;
@@ -79,6 +96,7 @@ beforeEach(() => {
 
 afterEach(() => {
     db.close();
+    _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
 });
 
 // ─── Send Message Guards ─────────────────────────────────────────────────────
@@ -244,20 +262,43 @@ describe('handleCheckCredits', () => {
 });
 
 describe('handleGrantCredits', () => {
-    test('rejects amount <= 0', async () => {
+    test('rejects non-owner caller', async () => {
+        setOwnerAddresses('');
+        const ctx = createMockContext();
+        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50 });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
+    });
+
+    test('rejects caller with no wallet address', async () => {
+        setOwnerAddresses(OWNER_WALLET);
+        // Agent has no wallet set
+        const ctx = createMockContext();
+        const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50 });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
+    });
+
+    test('rejects amount <= 0 (owner caller)', async () => {
+        setOwnerAddresses(OWNER_WALLET);
+        setAgentWallet(db, agentId, OWNER_WALLET);
         const ctx = createMockContext();
         const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 0 });
         expect(result.isError).toBe(true);
         expect((result.content[0] as { text: string }).text).toContain('between 1');
     });
 
-    test('rejects amount > 1,000,000', async () => {
+    test('rejects amount > 1,000,000 (owner caller)', async () => {
+        setOwnerAddresses(OWNER_WALLET);
+        setAgentWallet(db, agentId, OWNER_WALLET);
         const ctx = createMockContext();
         const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 1_000_001 });
         expect(result.isError).toBe(true);
     });
 
-    test('grants credits successfully', async () => {
+    test('grants credits successfully (owner caller)', async () => {
+        setOwnerAddresses(OWNER_WALLET);
+        setAgentWallet(db, agentId, OWNER_WALLET);
         const ctx = createMockContext();
         const result = await handleGrantCredits(ctx, { wallet_address: 'W1', amount: 50, reason: 'test' });
         expect(result.isError).toBeUndefined();
@@ -266,7 +307,8 @@ describe('handleGrantCredits', () => {
 });
 
 describe('handleCreditConfig', () => {
-    test('returns config when no key/value', async () => {
+    test('returns config when no key/value (no owner check needed)', async () => {
+        setOwnerAddresses('');
         const ctx = createMockContext();
         const result = await handleCreditConfig(ctx, {});
         const text = (result.content[0] as { text: string }).text;
@@ -274,7 +316,17 @@ describe('handleCreditConfig', () => {
         expect(text).toContain('1000');
     });
 
-    test('updates config with key and value', async () => {
+    test('rejects non-owner write', async () => {
+        setOwnerAddresses('');
+        const ctx = createMockContext();
+        const result = await handleCreditConfig(ctx, { key: 'credits_per_algo', value: '5000' });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('Unauthorized');
+    });
+
+    test('updates config with key and value (owner caller)', async () => {
+        setOwnerAddresses(OWNER_WALLET);
+        setAgentWallet(db, agentId, OWNER_WALLET);
         const ctx = createMockContext();
         const result = await handleCreditConfig(ctx, { key: 'credits_per_algo', value: '5000' });
         expect((result.content[0] as { text: string }).text).toContain('updated');

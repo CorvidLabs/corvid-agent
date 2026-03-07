@@ -24,6 +24,11 @@ export interface AlgoChatConfig {
 
 let _cachedConfig: AlgoChatConfig | null = null;
 
+/** Reset cached config (for testing only). */
+export function _resetConfigCache(): void {
+    _cachedConfig = null;
+}
+
 export function loadAlgoChatConfig(): AlgoChatConfig {
     if (_cachedConfig) return _cachedConfig;
     const mnemonic = process.env.ALGOCHAT_MNEMONIC ?? null;
