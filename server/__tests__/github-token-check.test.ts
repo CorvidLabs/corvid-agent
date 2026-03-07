@@ -24,7 +24,7 @@ describe('validateGitHubTokenScopes', () => {
     it('returns early when GH_TOKEN is not set', async () => {
         delete process.env.GH_TOKEN;
         const fetchSpy = mock(() => Promise.resolve(new Response()));
-        globalThis.fetch = fetchSpy as typeof fetch;
+        globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
         await validateGitHubTokenScopes();
 
@@ -36,7 +36,7 @@ describe('validateGitHubTokenScopes', () => {
         process.env.GH_TOKEN = 'ghp_test';
         globalThis.fetch = mock(() =>
             Promise.resolve(new Response('Unauthorized', { status: 401 })),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw
         await validateGitHubTokenScopes();
@@ -51,7 +51,7 @@ describe('validateGitHubTokenScopes', () => {
                     headers: { 'X-OAuth-Scopes': 'repo, read:org, gist' },
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw
         await validateGitHubTokenScopes();
@@ -66,7 +66,7 @@ describe('validateGitHubTokenScopes', () => {
                     headers: { 'X-OAuth-Scopes': 'read:org, gist' },
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw — just logs warnings
         await validateGitHubTokenScopes();
@@ -81,7 +81,7 @@ describe('validateGitHubTokenScopes', () => {
                     headers: { 'X-OAuth-Scopes': 'repo, gist' },
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw — just logs warnings
         await validateGitHubTokenScopes();
@@ -96,7 +96,7 @@ describe('validateGitHubTokenScopes', () => {
                     headers: { 'X-OAuth-Scopes': 'repo, admin:org' },
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw — admin:org covers read:org
         await validateGitHubTokenScopes();
@@ -111,7 +111,7 @@ describe('validateGitHubTokenScopes', () => {
                     headers: { 'X-OAuth-Scopes': 'repo, write:org' },
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw — write:org covers read:org
         await validateGitHubTokenScopes();
@@ -126,7 +126,7 @@ describe('validateGitHubTokenScopes', () => {
                     // No X-OAuth-Scopes header for fine-grained tokens
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw
         await validateGitHubTokenScopes();
@@ -136,7 +136,7 @@ describe('validateGitHubTokenScopes', () => {
         process.env.GH_TOKEN = 'ghp_test';
         globalThis.fetch = mock(() =>
             Promise.reject(new Error('Network error')),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw
         await validateGitHubTokenScopes();
@@ -151,7 +151,7 @@ describe('validateGitHubTokenScopes', () => {
                     headers: { 'X-OAuth-Scopes': '' },
                 }),
             ),
-        ) as typeof fetch;
+        ) as unknown as typeof fetch;
 
         // Should not throw — warns about missing scopes
         await validateGitHubTokenScopes();
