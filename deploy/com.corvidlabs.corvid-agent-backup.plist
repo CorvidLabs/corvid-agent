@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.corvidlabs.corvid-agent-backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__BACKUP_SCRIPT__</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WORKING_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>BACKUP_DIR</key>
+        <string>__BACKUP_DIR__</string>
+        <key>MAX_KEEP</key>
+        <string>10</string>
+    </dict>
+
+    <!-- Run every 6 hours -->
+    <key>StartInterval</key>
+    <integer>21600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/backup.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/backup.stderr.log</string>
+</dict>
+</plist>
