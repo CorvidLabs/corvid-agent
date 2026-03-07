@@ -21,6 +21,7 @@ export default defineConfig({
             use: { ...devices['Desktop Chrome'] },
         },
     ],
+    globalTeardown: './e2e/global-teardown.ts',
     webServer: {
         command: 'bun run dev',
         url: `${E2E_BASE}/api/health`,
@@ -33,6 +34,7 @@ export default defineConfig({
             ENABLED_PROVIDERS: 'anthropic,ollama', // Prevent auto-restrict to ollama-only in CI
             API_KEY: 'e2e-test-key',     // Auth key for client-side + server-side auth gates
             ADMIN_API_KEY: 'e2e-test-key', // Same key for admin endpoints in E2E
+            DATABASE_PATH: 'e2e-test.db', // Isolate E2E data from production DB
         },
     },
 });
