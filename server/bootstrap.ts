@@ -316,13 +316,19 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
 
     let discordBridge: DiscordBridge | null = null;
     if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CHANNEL_ID) {
-        discordBridge = new DiscordBridge(db, processManager, {
-            botToken: process.env.DISCORD_BOT_TOKEN,
-            channelId: process.env.DISCORD_CHANNEL_ID,
-            allowedUserIds: process.env.DISCORD_ALLOWED_USER_IDS
-                ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
-                : [],
-        });
+        discordBridge = new DiscordBridge(
+            db,
+            processManager,
+            {
+                botToken: process.env.DISCORD_BOT_TOKEN,
+                channelId: process.env.DISCORD_CHANNEL_ID,
+                allowedUserIds: process.env.DISCORD_ALLOWED_USER_IDS
+                    ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
+                    : [],
+                mode: (process.env.DISCORD_BRIDGE_MODE as 'chat' | 'work_intake') ?? undefined,
+            },
+            workTaskService,
+        );
         discordBridge.start();
         shutdownCoordinator.registerService('DiscordBridge', discordBridge, 20);
         log.info('Discord bridge initialized');

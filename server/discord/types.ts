@@ -1,7 +1,10 @@
+export type DiscordBridgeMode = 'chat' | 'work_intake';
+
 export interface DiscordBridgeConfig {
     botToken: string;
     channelId: string;
     allowedUserIds: string[];
+    mode?: DiscordBridgeMode;
 }
 
 export interface DiscordGatewayPayload {
