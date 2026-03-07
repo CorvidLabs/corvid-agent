@@ -78,9 +78,6 @@ describe('validateTenantOwnership', () => {
 
     beforeEach(() => {
         resetMultiTenantGuard();
-    });
-    afterEach(() => {
-        resetMultiTenantGuard();
         db = new Database(':memory:');
         db.exec(`
             CREATE TABLE projects (
@@ -91,6 +88,9 @@ describe('validateTenantOwnership', () => {
             INSERT INTO projects (id, name, tenant_id) VALUES ('p1', 'Project A', 'tenant-a');
             INSERT INTO projects (id, name, tenant_id) VALUES ('p2', 'Project B', 'tenant-b');
         `);
+    });
+    afterEach(() => {
+        resetMultiTenantGuard();
     });
 
     test('returns true for DEFAULT_TENANT_ID (backwards compat)', () => {
