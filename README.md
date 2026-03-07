@@ -24,7 +24,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **111** with automated validation |
 | MCP tools | **37** corvid_* tool handlers |
-| API endpoints | **~200** across 37 route modules |
+| API endpoints | **~200** across 38 route modules |
 | DB migrations | **70** (81 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
@@ -342,7 +342,7 @@ server/          Bun HTTP + WebSocket server
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (37 route modules)
+  routes/        REST API routes (38 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -389,7 +389,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 37 route modules:
+~200 REST endpoints and a WebSocket interface across 38 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
