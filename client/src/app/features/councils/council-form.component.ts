@@ -58,6 +58,16 @@ import type { Agent } from '../../core/models/agent.model';
                 </div>
 
                 <div class="form__field">
+                    <label for="onChainMode" class="form__label">Governance Tier</label>
+                    <select id="onChainMode" formControlName="onChainMode" class="form__input">
+                        <option value="off">Off</option>
+                        <option value="attestation">Attestation</option>
+                        <option value="full">Full</option>
+                    </select>
+                    <p class="form__hint">Controls on-chain recording: off (local only), attestation (hash on-chain), or full (all data on-chain).</p>
+                </div>
+
+                <div class="form__field">
                     <label for="chairman" class="form__label">Chairman (optional)</label>
                     <select #chairmanSelect id="chairman" class="form__input" (change)="onChairmanChange($event)">
                         <option value="">None</option>
@@ -125,6 +135,7 @@ export class CouncilFormComponent implements OnInit {
         name: ['', Validators.required],
         description: [''],
         discussionRounds: [2, [Validators.min(0), Validators.max(10)]],
+        onChainMode: ['full' as 'off' | 'attestation' | 'full'],
     });
 
     protected get selectedAgentsList(): () => Agent[] {
@@ -147,6 +158,7 @@ export class CouncilFormComponent implements OnInit {
                 name: council.name,
                 description: council.description,
                 discussionRounds: council.discussionRounds ?? 2,
+                onChainMode: council.onChainMode ?? 'full',
             });
             this.selectedAgentIds.set(new Set(council.agentIds));
             this.chairmanId.set(council.chairmanAgentId ?? '');
@@ -186,6 +198,7 @@ export class CouncilFormComponent implements OnInit {
                     name: value.name,
                     description: value.description,
                     discussionRounds: value.discussionRounds,
+                    onChainMode: value.onChainMode,
                     agentIds,
                     chairmanAgentId: chairmanAgentId ?? null,
                 });
@@ -195,6 +208,7 @@ export class CouncilFormComponent implements OnInit {
                     name: value.name,
                     description: value.description,
                     discussionRounds: value.discussionRounds,
+                    onChainMode: value.onChainMode,
                     agentIds,
                     chairmanAgentId,
                 });
