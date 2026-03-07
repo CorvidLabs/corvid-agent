@@ -614,7 +614,11 @@ export class DiscordBridge {
 
         // Allow messages from configured channel OR from threads we created
         const isMainChannel = channelId === this.config.channelId;
-        const isOurThread = this.threadSessions.has(channelId);
+        let isOurThread = this.threadSessions.has(channelId);
+        // Try to recover thread from DB if not in memory (e.g. after server restart)
+        if (!isOurThread && !isMainChannel) {
+            isOurThread = this.tryRecoverThread(channelId) !== null;
+        }
         if (!isMainChannel && !isOurThread) return;
 
         // Authorization check
@@ -946,7 +950,7 @@ export class DiscordBridge {
         const session = createSession(this.db, {
             projectId: project.id,
             agentId: agent.id,
-            name: `Discord thread (user ${userId})`,
+            name: `Discord thread:${threadId}`,
             initialPrompt: text,
             source: 'discord' as SessionSource,
         });
@@ -969,14 +973,19 @@ export class DiscordBridge {
      * Any user can participate — conversations are shared within threads.
      */
     private async routeToThread(threadId: string, _userId: string, text: string): Promise<void> {
-        const threadInfo = this.threadSessions.get(threadId);
-        if (!threadInfo) return;
+        let threadInfo = this.threadSessions.get(threadId);
+
+        // Try to recover thread mapping from DB if not in memory (e.g. after server restart)
+        if (!threadInfo) {
+            threadInfo = this.tryRecoverThread(threadId) ?? undefined;
+            if (!threadInfo) return;
+        }
 
         const { sessionId, agentName, agentModel } = threadInfo;
 
-        // Check if session still exists and is active
+        // Check if session still exists (stopped/error sessions can be resumed)
         const session = getSession(this.db, sessionId);
-        if (!session || session.status === 'stopped' || session.status === 'error') {
+        if (!session) {
             this.threadSessions.delete(threadId);
             await this.sendMessage(threadId, 'This conversation has ended. Start a new one in the main channel.');
             return;
@@ -984,13 +993,44 @@ export class DiscordBridge {
 
         const sent = this.processManager.sendMessage(sessionId, text);
         if (!sent) {
-            // Try to restart the process
-            this.processManager.startProcess(session, text);
+            // Resume with conversation context instead of starting fresh
+            this.processManager.resumeProcess(session, text);
             this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
             return;
         }
 
         this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
+    }
+
+    /**
+     * Try to recover a thread-to-session mapping from the database.
+     * Sessions are named `Discord thread:{threadId}` so we can look them up.
+     */
+    private tryRecoverThread(threadId: string): { sessionId: string; agentName: string; agentModel: string; ownerUserId: string } | null {
+        try {
+            const row = this.db.query(
+                `SELECT s.id, s.agent_id, a.name as agent_name, a.model as agent_model
+                 FROM sessions s
+                 LEFT JOIN agents a ON a.id = s.agent_id
+                 WHERE s.name = ? AND s.source = 'discord'
+                 ORDER BY s.created_at DESC LIMIT 1`,
+            ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; agent_name: string; agent_model: string } | null;
+
+            if (!row) return null;
+
+            const info = {
+                sessionId: row.id,
+                agentName: row.agent_name || 'Agent',
+                agentModel: row.agent_model || 'unknown',
+                ownerUserId: '',
+            };
+            this.threadSessions.set(threadId, info);
+            log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
+            return info;
+        } catch (err) {
+            log.warn('Failed to recover thread session', { threadId, error: err instanceof Error ? err.message : String(err) });
+            return null;
+        }
     }
 
     /**
