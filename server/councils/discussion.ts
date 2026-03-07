@@ -829,9 +829,28 @@ function watchSessionsForAutoAdvance(
         advance();
     }, WATCHER_TIMEOUT_MS);
 
+    // Heartbeat: periodically poll isRunning for pending sessions as a safety net.
+    // Closes any race window where a session exits and its subscriber is removed
+    // (e.g. via removeSessionSubscribers during cleanup) before the watcher receives the event.
+    const HEARTBEAT_MS = 30_000;
+    const heartbeatTimer = setInterval(() => {
+        if (settled || pending.size === 0) return;
+        let reaped = 0;
+        for (const sid of pending) {
+            if (!processManager.isRunning(sid)) {
+                pending.delete(sid);
+                reaped++;
+                const roleLabel = role === 'member' ? 'Member' : 'Reviewer';
+                emitLog(db, launchId, 'info', `${roleLabel} session ${sid.slice(0, 8)} reaped by heartbeat`, `${pending.size} remaining`);
+            }
+        }
+        if (reaped > 0) checkAllDone();
+    }, HEARTBEAT_MS);
+
     const cleanup = (): void => {
         settled = true;
         clearTimeout(watcherTimer);
+        clearInterval(heartbeatTimer);
         for (const [sid, cb] of callbacks) {
             processManager.unsubscribe(sid, cb);
         }
@@ -878,6 +897,8 @@ function watchSessionsForAutoAdvance(
         if (pending.size === 0) advance();
     };
 
+    emitLog(db, launchId, 'info', `Watcher started for ${pending.size} ${role} sessions`, sessionIds.map((s) => s.slice(0, 8)).join(', '));
+
     // Subscribe FIRST, then check isRunning — closes the race window where
     // a process exits between the isRunning check and the subscribe call.
     for (const sessionId of sessionIds) {
@@ -885,9 +906,8 @@ function watchSessionsForAutoAdvance(
             if (sid !== sessionId) return;
             if (event.type === 'session_exited' || event.type === 'session_stopped') {
                 pending.delete(sessionId);
-                // Log session completion
                 const roleLabel = role === 'member' ? 'Member' : 'Reviewer';
-                emitLog(db, launchId, 'info', `${roleLabel} session exited`, `${pending.size} remaining`);
+                emitLog(db, launchId, 'info', `${roleLabel} session ${sessionId.slice(0, 8)} exited (${event.type})`, `${pending.size} remaining`);
                 checkAllDone();
             }
         };
@@ -898,6 +918,7 @@ function watchSessionsForAutoAdvance(
         // If the process already exited before we subscribed, handle it now
         if (!processManager.isRunning(sessionId)) {
             pending.delete(sessionId);
+            emitLog(db, launchId, 'info', `${role} session ${sessionId.slice(0, 8)} already exited at subscribe time`, `${pending.size} remaining`);
         }
     }
 
