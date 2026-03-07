@@ -3,7 +3,6 @@ module: councils
 version: 1
 status: draft
 files:
-  - server/councils/events.ts
   - server/councils/discussion.ts
   - server/councils/synthesis.ts
 db_tables: []
@@ -24,7 +23,7 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 
 ## Public API
 
-### Event Bus (events.ts)
+### Exported Functions
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
@@ -33,17 +32,6 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `onCouncilDiscussionMessage` | `cb: (message: CouncilDiscussionMessage) => void` | `() => void` | Register a callback for council discussion messages. Returns an unsubscribe function. |
 | `onCouncilAgentError` | `cb: (error: CouncilAgentError) => void` | `() => void` | Register a callback for council agent error events. Returns an unsubscribe function. |
 | `broadcastAgentError` | `error: CouncilAgentError` | `void` | Broadcast an agent error to all registered error listeners. |
-| `broadcastStageChange` | `launchId: string, stage: string, sessionIds?: string[]` | `void` | Broadcast a stage change to all registered stage change listeners. |
-| `broadcastLog` | `entry: CouncilLaunchLog` | `void` | Broadcast a log entry to all registered log listeners. |
-| `broadcastDiscussionMessage` | `message: CouncilDiscussionMessage` | `void` | Broadcast a discussion message to all registered discussion message listeners. |
-| `emitLog` | `db: Database, launchId: string, level: CouncilLogLevel, message: string, detail?: string` | `void` | Persist a log entry via `addCouncilLaunchLog` and broadcast it to WS clients. Also logs to server console. |
-
-### Exported Functions (discussion.ts)
-
-_Note: `onCouncilStageChange`, `onCouncilLog`, `onCouncilDiscussionMessage`, `onCouncilAgentError`, and `broadcastAgentError` are re-exported from `events.ts` for backward compatibility._
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
 | `launchCouncil` | `db: Database, processManager: ProcessManager, councilId: string, projectId: string, prompt: string, agentMessenger: AgentMessenger \| null` | `LaunchCouncilResult` | Core council launch: validates council/project, creates launch record, starts member sessions, and sets up auto-advance watcher. |
 | `triggerReview` | `db: Database, processManager: ProcessManager, launchId: string` | `{ ok: true; reviewSessionIds: string[] } \| { ok: false; error: string; status: number }` | Trigger peer review stage — delegates to synthesis module with injected infrastructure callbacks. |
 | `finishWithAggregatedSynthesis` | `db: Database, launchId: string` | `void` | Finish a council by aggregating all session responses into a combined synthesis (no chairman). |
