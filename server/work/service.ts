@@ -611,7 +611,7 @@ export class WorkTaskService {
 
         // Run TypeScript check
         try {
-            const tscProc = Bun.spawn(['bunx', 'tsc', '--noEmit', '--skipLibCheck'], {
+            const tscProc = Bun.spawn(['bun', 'x', 'tsc', '--noEmit', '--skipLibCheck'], {
                 cwd: workingDir,
                 stdout: 'pipe',
                 stderr: 'pipe',
@@ -753,7 +753,7 @@ ${validationOutput}
 2. Fix the TypeScript and/or test failures on this branch.
 3. Commit your fixes with clear messages.
 4. Verify your changes work:
-   bunx tsc --noEmit --skipLibCheck
+   bun x tsc --noEmit --skipLibCheck
    bun test
    Fix any remaining issues.
 5. If a PR already exists, push your fixes. If not, create one:
@@ -819,7 +819,7 @@ ${repoMapSection}${relevantSymbolsSection}
 2. Implement the changes on this branch.
 3. Commit with clear, descriptive messages as you go.
 4. Verify your changes work:
-   bunx tsc --noEmit --skipLibCheck
+   bun x tsc --noEmit --skipLibCheck
    bun test
    Fix any issues before creating the PR.
 5. When done, create a PR:
