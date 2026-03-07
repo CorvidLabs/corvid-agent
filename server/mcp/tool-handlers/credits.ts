@@ -65,7 +65,10 @@ export async function handleGrantCredits(
 ): Promise<CallToolResult> {
     try {
         const authError = checkOwnerAuthorization(ctx);
-        if (authError) return errorResult(authError);
+        if (authError) {
+            log.warn('Unauthorized grant_credits attempt', { agentId: ctx.agentId });
+            return errorResult(authError);
+        }
 
         if (args.amount <= 0 || args.amount > 1_000_000) {
             return errorResult('Amount must be between 1 and 1,000,000');
@@ -92,8 +95,10 @@ export async function handleCreditConfig(
     try {
         if (args.key && args.value) {
             const authError = checkOwnerAuthorization(ctx);
-            if (authError) return errorResult(authError);
-
+            if (authError) {
+                log.warn('Unauthorized credit_config write attempt', { agentId: ctx.agentId });
+                return errorResult(authError);
+            }
             updateCreditConfig(ctx.db, args.key, args.value);
             return textResult(`Credit config updated: ${args.key} = ${args.value}`);
         }
