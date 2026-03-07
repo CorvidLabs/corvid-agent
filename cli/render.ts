@@ -189,12 +189,6 @@ export function renderAgentSuffix(): void {
     console.log(`${c.cyan(`└${'─'.repeat(FRAME_WIDTH - 1)}`)}`);
 }
 
-// ─── REPL Prompt ───────────────────────────────────────────────────────────
-
-export function printPrompt(): void {
-    process.stdout.write(`${c.green('You')} ${c.cyan('>')} `);
-}
-
 // ─── Stream Chunk Display ───────────────────────────────────────────────────
 
 let _atLineStart = true;

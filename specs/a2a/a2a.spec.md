@@ -36,7 +36,6 @@ Agent-to-Agent (A2A) protocol implementation for inter-agent communication. Hand
 |----------|-----------|---------|-------------|
 | `fetchAgentCard` | `(baseUrl: string)` | `Promise<A2AAgentCard>` | Fetch remote agent card from `/.well-known/agent-card.json` with 5-min cache |
 | `discoverAgent` | `(baseUrl: string)` | `Promise<A2AAgentCard \| null>` | Safe wrapper — returns null on fetch failure |
-| `clearAgentCardCache` | `()` | `void` | Clear the in-memory agent card cache |
 | `validateUrl` | `(urlString: string)` | `void` | Validates that a URL is a valid HTTPS or HTTP URL; throws `ValidationError` if invalid |
 | `invokeRemoteAgent` | `(baseUrl, message, options?)` | `Promise<RemoteInvocationResult>` | Submit task to remote agent and poll until completion |
 | `handleTaskSend` | `(deps, body)` | `A2ATask` | Handle inbound task: resolve agent, create session, start process |

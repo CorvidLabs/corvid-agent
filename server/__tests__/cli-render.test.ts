@@ -16,7 +16,6 @@ import {
     resetStreamState,
     flushStreamBuffer,
     stripLeakedToolCalls,
-    printPrompt,
 } from '../../cli/render';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -958,19 +957,6 @@ describe('printTable', () => {
         // Each column should be padded
         expect(plainHeader).toContain('Short');
         expect(plainHeader).toContain('LongerHeader');
-    });
-});
-
-// ─── printPrompt ────────────────────────────────────────────────────────────
-
-describe('printPrompt', () => {
-    test('writes prompt with "You" and ">" symbols', () => {
-        const output = captureStdout(() => {
-            printPrompt();
-        });
-        const plain = stripAnsi(output);
-        expect(plain).toContain('You');
-        expect(plain).toContain('>');
     });
 });
 

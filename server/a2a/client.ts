@@ -166,13 +166,6 @@ export async function discoverAgent(baseUrl: string): Promise<A2AAgentCard | nul
     }
 }
 
-/**
- * Clear the agent card cache (useful for testing).
- */
-export function clearAgentCardCache(): void {
-    cache.clear();
-}
-
 // ---------------------------------------------------------------------------
 // Remote Agent Invocation (A2A tasks/send)
 // ---------------------------------------------------------------------------
