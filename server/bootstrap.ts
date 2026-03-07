@@ -220,8 +220,8 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     // ── Work orchestration ───────────────────────────────────────────────
     const selfTestService = new SelfTestService(db, processManager);
     const workTaskService = new WorkTaskService(db, processManager, astParserService);
-    workTaskService.recoverStaleTasks().catch((err) =>
-        log.error('Failed to recover stale work tasks', { error: err instanceof Error ? err.message : String(err) }),
+    workTaskService.recoverInterruptedTasks().catch((err) =>
+        log.error('Failed to recover interrupted work tasks', { error: err instanceof Error ? err.message : String(err) }),
     );
 
     const schedulerService = new SchedulerService(db, processManager, workTaskService);
@@ -367,6 +367,12 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     shutdownCoordinator.registerService('HealthMonitorService', healthMonitorService, 0);
     shutdownCoordinator.registerService('UsageMeter', usageMeter, 5);
     shutdownCoordinator.register({ name: 'MarketplaceFederation', priority: 5, handler: () => marketplaceFederation.stopPeriodicSync() });
+    shutdownCoordinator.register({
+        name: 'WorkTaskDrain',
+        priority: 10,
+        handler: () => workTaskService.drainRunningTasks(),
+        timeoutMs: 310_000, // 5 min drain + 10s buffer
+    });
     shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
     if (sandboxManager) {
         shutdownCoordinator.register({ name: 'SandboxManager', priority: 15, handler: () => sandboxManager.shutdown(), timeoutMs: 10_000 });

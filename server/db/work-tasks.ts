@@ -250,6 +250,16 @@ export function resetWorkTaskForRetry(db: Database, id: string): void {
     ).run(id);
 }
 
+/**
+ * Return all work tasks currently in an active state (branching, running, validating).
+ */
+export function getActiveWorkTasks(db: Database): WorkTask[] {
+    const rows = db.query(
+        `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
+    ).all() as WorkTaskRow[];
+    return rows.map(rowToWorkTask);
+}
+
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
     if (agentId) {
         const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
