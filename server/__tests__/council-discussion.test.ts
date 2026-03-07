@@ -5,6 +5,7 @@ import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { waitForSessions } from '../routes/councils';
+import { HEARTBEAT_INTERVAL_MS, IDLE_TIMEOUT_MS } from '../councils/discussion';
 import type { ProcessManager, EventCallback } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
 
@@ -415,5 +416,57 @@ describe('Council Discussion: Event Types', () => {
         const result = await promise;
         expect(result.completed).toEqual(['s1']);
         expect(result.timedOut).toEqual([]);
+    });
+});
+
+// ─── Heartbeat Polling (fixes #710) ─────────────────────────────────────────
+
+describe('Council Discussion: Heartbeat Polling', () => {
+    it('heartbeat detects sessions that stopped without emitting events', async () => {
+        const { pm, markRunning, running } = createMockPM();
+
+        markRunning('s1');
+        markRunning('s2');
+
+        // Main timeout must be longer than HEARTBEAT_INTERVAL_MS so the
+        // heartbeat gets a chance to fire before the timeout resolves.
+        const promise = waitForSessions(pm, ['s1', 's2'], HEARTBEAT_INTERVAL_MS * 3);
+
+        // Silently remove sessions from running WITHOUT emitting events —
+        // simulates the race condition where exit events are lost.
+        running.delete('s1');
+        running.delete('s2');
+
+        // The heartbeat (every 30s) should detect both sessions are no longer
+        // running and mark them completed.
+        const result = await promise;
+        expect(result.completed.sort()).toEqual(['s1', 's2']);
+        expect(result.timedOut).toEqual([]);
+    }, { timeout: HEARTBEAT_INTERVAL_MS * 3 + 5000 });
+
+    it('heartbeat does not double-count sessions already completed by events', async () => {
+        const { pm, markRunning, emitExit } = createMockPM();
+
+        markRunning('s1');
+        markRunning('s2');
+
+        const promise = waitForSessions(pm, ['s1', 's2'], 5000);
+
+        // s1 completes via event, s2 completes via event
+        emitExit('s1');
+        emitExit('s2');
+
+        const result = await promise;
+        // Even if heartbeat fires later, completed should not have duplicates
+        const s1Count = result.completed.filter(id => id === 's1').length;
+        const s2Count = result.completed.filter(id => id === 's2').length;
+        expect(s1Count).toBe(1);
+        expect(s2Count).toBe(1);
+        expect(result.completed).toHaveLength(2);
+    });
+
+    it('exports HEARTBEAT_INTERVAL_MS and IDLE_TIMEOUT_MS constants', () => {
+        expect(HEARTBEAT_INTERVAL_MS).toBe(30_000);
+        expect(IDLE_TIMEOUT_MS).toBe(10 * 60 * 1000);
     });
 });

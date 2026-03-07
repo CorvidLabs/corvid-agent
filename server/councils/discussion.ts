@@ -122,6 +122,12 @@ const PER_AGENT_ROUND_BUDGET_MS = 10 * 60 * 1000; // 10 minutes per agent per ro
 const MIN_ROUND_TIMEOUT_MS = 10 * 60 * 1000; // minimum 10 minutes per round
 const MAX_DISCUSSION_TOTAL_MS = 3 * 60 * 60 * 1000; // hard cap at 3 hours
 
+/** Heartbeat interval for polling isRunning as a safety net against missed events. */
+export const HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30 seconds
+
+/** Idle timeout: auto-advance if all sessions are idle (not running) for this long. */
+export const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
 // ─── Launch logic ────────────────────────────────────────────────────────────
 
 /** Launch result returned by launchCouncil(). */
@@ -717,11 +723,13 @@ export function waitForSessions(processManager: ProcessManager, sessionIds: stri
         const pending = new Set(sessionIds);
         const completed: string[] = [];
         const callbacks = new Map<string, EventCallback>();
+        let idleStart: number | null = null;
 
         const finish = (): void => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
+            clearInterval(heartbeat);
             for (const [sid, cb] of callbacks) {
                 processManager.unsubscribe(sid, cb);
             }
@@ -738,6 +746,44 @@ export function waitForSessions(processManager: ProcessManager, sessionIds: stri
         const checkDone = (): void => {
             if (pending.size === 0) finish();
         };
+
+        // Heartbeat: periodically poll isRunning for all pending sessions as a
+        // safety net against missed events (fixes #710 race condition).
+        const pollPending = (): void => {
+            if (settled) return;
+            let changed = false;
+            for (const sessionId of Array.from(pending)) {
+                if (!processManager.isRunning(sessionId)) {
+                    log.info(`Heartbeat detected session ${sessionId} is no longer running`);
+                    markCompleted(sessionId);
+                    changed = true;
+                }
+            }
+
+            // Idle timeout: if all remaining pending sessions are not running,
+            // start/check idle timer. This catches cases where sessions are
+            // registered but never actually started.
+            if (pending.size > 0) {
+                const allIdle = Array.from(pending).every(sid => !processManager.isRunning(sid));
+                if (allIdle) {
+                    if (idleStart === null) {
+                        idleStart = Date.now();
+                    } else if (Date.now() - idleStart >= IDLE_TIMEOUT_MS) {
+                        log.warn(`waitForSessions idle timeout (${Math.round(IDLE_TIMEOUT_MS / 60000)}m) — ${pending.size} sessions never started, auto-advancing`);
+                        // Mark remaining as completed (they're idle, not stuck)
+                        for (const sid of Array.from(pending)) {
+                            markCompleted(sid);
+                        }
+                    }
+                } else {
+                    idleStart = null; // Reset if any session is running
+                }
+            }
+
+            if (changed) checkDone();
+        };
+
+        const heartbeat = setInterval(pollPending, HEARTBEAT_INTERVAL_MS);
 
         // Timeout: resolve even if some sessions are stuck
         const effectiveTimeout = timeoutMs ?? MIN_ROUND_TIMEOUT_MS;
@@ -829,9 +875,23 @@ function watchSessionsForAutoAdvance(
         advance();
     }, WATCHER_TIMEOUT_MS);
 
+    // Heartbeat: periodically poll isRunning for all pending sessions as a
+    // safety net against missed events (fixes #710 race condition).
+    const heartbeat = setInterval(() => {
+        if (settled || pending.size === 0) return;
+        for (const sessionId of Array.from(pending)) {
+            if (!processManager.isRunning(sessionId)) {
+                emitLog(db, launchId, 'info', `Heartbeat detected ${role} session no longer running`, `${pending.size - 1} remaining`);
+                pending.delete(sessionId);
+            }
+        }
+        checkAllDone();
+    }, HEARTBEAT_INTERVAL_MS);
+
     const cleanup = (): void => {
         settled = true;
         clearTimeout(watcherTimer);
+        clearInterval(heartbeat);
         for (const [sid, cb] of callbacks) {
             processManager.unsubscribe(sid, cb);
         }
