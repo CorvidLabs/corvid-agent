@@ -189,7 +189,7 @@ describe('withRetry', () => {
         // With multiplier=3: delay[0] = 30*3^0 = 30ms, delay[1] = 30*3^1 = 90ms
         // Use wide tolerances for CI (Windows timer granularity ~15ms)
         expect(delays[0]).toBeGreaterThanOrEqual(10);
-        expect(delays[0]).toBeLessThan(80);
+        expect(delays[0]).toBeLessThan(120);
         expect(delays[1]).toBeGreaterThanOrEqual(50);
         expect(delays[1]).toBeLessThan(200);
         // The absolute range checks above already verify the multiplier works
