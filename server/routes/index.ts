@@ -32,6 +32,7 @@ import { handleTenantRoutes } from './tenants';
 import { handlePerformanceRoutes } from './performance';
 import { handleUsageRoutes } from './usage';
 import { handleFeedbackRoutes } from './feedback';
+import { handleOnboardingRoutes } from './onboarding';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -280,6 +281,10 @@ async function handleRoutes(
     // Tenant routes (registration, info, members)
     const tenantResponse = await handleTenantRoutes(req, url, db, context, tenantService ?? null);
     if (tenantResponse) return tenantResponse;
+
+    // Onboarding status (lightweight, no auth dependency on services)
+    const onboardingResponse = handleOnboardingRoutes(req, url, db, algochatBridge, agentWalletService ?? null);
+    if (onboardingResponse) return onboardingResponse;
 
     const projectResponse = handleProjectRoutes(req, url, db, context);
     if (projectResponse) return projectResponse;
