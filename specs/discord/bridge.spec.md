@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 1
+version: 2
 status: active
 files:
   - server/discord/bridge.ts
@@ -11,13 +11,14 @@ db_tables:
 depends_on:
   - specs/process/process-manager.spec.md
   - specs/db/sessions.spec.md
+  - specs/councils/councils.spec.md
 ---
 
 # Discord Bridge
 
 ## Purpose
 
-Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). No external Discord library dependencies. Connects to the Discord gateway, handles heartbeating, identifies/resumes sessions, and routes channel messages to agent sessions. Includes per-user rate limiting, user authorization, session management, and automatic reconnection with exponential backoff.
+Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). No external Discord library dependencies. Connects to the Discord gateway, handles heartbeating, identifies/resumes sessions, and routes channel messages to agent sessions. Includes per-user rate limiting, user authorization, prompt injection scanning, session management, automatic reconnection with exponential backoff, agent routing, slash command registration, and bot presence management.
 
 ## Public API
 
@@ -33,29 +34,34 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |-----------|------|-------------|
 | `db` | `Database` | SQLite database handle |
 | `processManager` | `ProcessManager` | For starting sessions and subscribing to events |
-| `config` | `DiscordBridgeConfig` | Bot token, channel ID, allowed user IDs |
+| `config` | `DiscordBridgeConfig` | Bot token, channel ID, allowed user IDs, app ID, etc. |
+| `workTaskService?` | `WorkTaskService` | Optional work task service for `work_intake` mode |
 
 #### DiscordBridge Methods
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `start` | `()` | `void` | Open the gateway WebSocket connection; idempotent (no-op if already running) |
+| `start` | `()` | `void` | Open the gateway WebSocket connection; idempotent. Also registers slash commands if `appId` is configured |
 | `stop` | `()` | `void` | Close the WebSocket with code 1000, clear heartbeat timer |
 | `sendMessage` | `(channelId: string, content: string)` | `Promise<void>` | Send a message to a Discord channel via REST API; auto-chunks at 2000 characters |
+| `updatePresence` | `(statusText?: string, activityType?: number)` | `void` | Update the bot's presence/status on the live gateway connection |
 
 ### Exported Types (from types.ts)
 
 | Type | Description |
 |------|-------------|
 | `DiscordBridgeMode` | `'chat' \| 'work_intake'` — operational mode for the bridge |
-| `DiscordBridgeConfig` | `{ botToken: string; channelId: string; allowedUserIds: string[]; mode?: DiscordBridgeMode }` |
+| `DiscordBridgeConfig` | `{ botToken, channelId, allowedUserIds, mode?, defaultAgentId?, appId?, guildId? }` |
 | `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
 | `DiscordHelloData` | `{ heartbeat_interval: number }` |
 | `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
-| `DiscordMessageData` | `{ id: string; channel_id: string; author: DiscordAuthor; content: string; timestamp: string }` |
+| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp }` |
 | `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
-| `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
+| `DiscordInteractionData` | Slash command interaction payload from gateway |
+| `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, PRESENCE_UPDATE=3, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
 | `GatewayIntent` | Bit flags: `GUILD_MESSAGES` (1<<9), `MESSAGE_CONTENT` (1<<15) |
+| `InteractionType` | `PING=1, APPLICATION_COMMAND=2` |
+| `InteractionCallbackType` | `PONG=1, CHANNEL_MESSAGE=4, DEFERRED_CHANNEL_MESSAGE=5` |
 
 ## Invariants
 
@@ -72,12 +78,18 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 11. **User authorization**: If `config.allowedUserIds` is non-empty, only those user IDs can interact. Unauthorized users receive `"Unauthorized."` reply
 12. **Per-user rate limiting**: Each user is limited to 10 messages per 60-second sliding window
 13. **Session-per-user mapping**: Each Discord user ID maps to at most one active session. Stored in-memory
-14. **Session reuse and restart**: Same logic as Telegram bridge — reuses active sessions, creates new ones when stopped/error, restarts process if send fails
+14. **Session reuse and restart**: Reuses active sessions, creates new ones when stopped/error, restarts process if send fails
 15. **Response debouncing**: Session events are buffered for 1500ms before being sent to Discord
 16. **Message chunking**: Discord has a 2000-character limit per message. Long responses are split at that boundary
-17. **Agent selection**: Uses the first agent from `listAgents` with its default project, falling back to the first project
-18. **Slash commands**: `/status` reports the current session ID, `/new` clears the user's session mapping
-19. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY
+17. **Agent resolution priority**: (1) user's preferred agent (set by `/switch` or `@mention`), (2) config `defaultAgentId`, (3) first agent from `listAgents`
+18. **Text commands**: `/status`, `/new`, `/agents`, `/switch <name>`, `/council <topic>`, `/help` — parsed from regular messages starting with `/`
+19. **Slash commands**: If `appId` is configured, the same commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events
+20. **@AgentName routing**: Messages starting with `@AgentName` route to the named agent and clear the user's existing session
+21. **Bot presence**: Set via the `presence` field in IDENTIFY payload. Configurable via `DISCORD_STATUS` and `DISCORD_ACTIVITY_TYPE` env vars. Can be updated at runtime via `updatePresence()`
+22. **Prompt injection scanning**: All incoming messages are scanned via `scanForInjection()`. Blocked messages are audited and rejected
+23. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
+24. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY
+25. **Work intake mode**: When `mode='work_intake'`, messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
 
 ## Behavioral Examples
 
@@ -87,9 +99,31 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 - **When** `start()` is called
 - **Then** a WebSocket connects to the Discord gateway
 - **When** HELLO is received with `heartbeat_interval`
-- **Then** heartbeating starts at the fixed 41.25s interval, and IDENTIFY is sent with the bot token and intents
+- **Then** heartbeating starts at the fixed 41.25s interval, and IDENTIFY is sent with the bot token, intents, and presence
 - **When** READY dispatch is received
 - **Then** the `session_id` is stored (but `resume_gateway_url` is discarded)
+
+### Scenario: Slash command registration
+
+- **Given** a Discord bridge with `appId` configured
+- **When** `start()` is called
+- **Then** slash commands (`status`, `new`, `agents`, `switch`, `council`) are registered via PUT to the Discord API
+- **When** a guild ID is also configured
+- **Then** commands are registered as guild-scoped (instant availability) instead of global (up to 1 hour propagation)
+
+### Scenario: Slash command interaction
+
+- **Given** a running Discord bridge with registered slash commands
+- **When** a user invokes `/agents` via Discord's slash command UI
+- **Then** an `INTERACTION_CREATE` gateway event is received
+- **And** the bridge responds via the interaction callback URL with the agent list
+- **And** no new session is created (command-only interaction)
+
+### Scenario: Agent routing via @mention
+
+- **Given** a running bridge with agents "CorvidAgent" and "ResearchBot"
+- **When** user sends `@ResearchBot what is AlgoChat?`
+- **Then** the user's existing session is cleared, a new session is created with ResearchBot, and the message text `what is AlgoChat?` is sent
 
 ### Scenario: Message from authorized user in configured channel
 
@@ -132,6 +166,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Message from wrong channel | Silently ignored |
 | Unauthorized user | Replies `"Unauthorized."` |
 | Rate limit exceeded | Replies with rate limit message |
+| Prompt injection detected | Replies `"Message blocked: content policy violation."`, logs audit record |
 | No agents configured | Replies `"No agents configured. Create an agent first."` |
 | No projects configured | Replies `"No projects configured."` |
 | Session expired and send fails | Replies `"Session expired. Send another message to start a new one."` |
@@ -140,6 +175,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Heartbeat not acknowledged | Closes connection with code 4000, triggers reconnect |
 | Max reconnect attempts reached | Stops bridge (`running = false`), logs error |
 | Heartbeat interval out of 10s-120s range | Logs warning, uses default 41.25s |
+| Slash command registration fails | Logs error, continues (text commands still work) |
+| Interaction response fails | Logs error |
 
 ## Dependencies
 
@@ -148,16 +185,22 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Module | What is used |
 |--------|-------------|
 | `server/process/manager.ts` | `ProcessManager` — startProcess, sendMessage, subscribe |
+| `server/process/types.ts` | `extractContentText` — ContentBlock text extraction |
 | `server/db/agents.ts` | `listAgents` |
 | `server/db/sessions.ts` | `createSession`, `getSession` |
 | `server/db/projects.ts` | `listProjects` |
+| `server/db/councils.ts` | `listCouncils` |
+| `server/db/audit.ts` | `recordAudit` |
+| `server/councils/discussion.ts` | `launchCouncil` |
 | `server/lib/logger.ts` | `createLogger` |
+| `server/lib/prompt-injection.ts` | `scanForInjection` |
+| `server/work/service.ts` | `WorkTaskService` (optional, for work_intake mode) |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
-| `server/index.ts` | Lifecycle: construction, `start()`, `stop()` |
+| `server/bootstrap.ts` | Lifecycle: construction, `start()`, registered with ShutdownCoordinator |
 
 ## Configuration
 
@@ -165,10 +208,17 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |---------|---------|-------------|
 | `DISCORD_BOT_TOKEN` | (required) | Discord bot token |
 | `DISCORD_CHANNEL_ID` | (required) | Discord channel ID to listen on |
-| `DISCORD_ALLOWED_USERS` | `""` | Comma-separated list of allowed Discord user IDs; empty = allow all |
+| `DISCORD_ALLOWED_USER_IDS` | `""` | Comma-separated list of allowed Discord user IDs; empty = allow all |
+| `DISCORD_BRIDGE_MODE` | `"chat"` | `chat` or `work_intake` |
+| `DISCORD_DEFAULT_AGENT_ID` | (none) | Default agent UUID for new sessions |
+| `DISCORD_APP_ID` | (none) | Discord application ID; enables slash command registration |
+| `DISCORD_GUILD_ID` | (none) | Discord guild ID; if set, slash commands are guild-scoped (instant) |
+| `DISCORD_STATUS` | `"corvid-agent"` | Bot presence status text |
+| `DISCORD_ACTIVITY_TYPE` | `3` | Activity type: 0=Playing, 1=Streaming, 2=Listening, 3=Watching, 5=Competing |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-03-07 | corvid-agent | v2: Added slash command registration, interaction handling, @AgentName routing, bot presence, prompt injection scanning, council launching, work intake mode, agent resolution priority, ContentBlock extraction |
