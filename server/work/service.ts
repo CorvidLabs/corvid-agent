@@ -82,6 +82,16 @@ export class WorkTaskService {
         // Reset interrupted tasks to pending and re-execute them
         for (const task of staleTasks) {
             try {
+                // If already at max iterations, don't retry — leave as failed
+                if ((task.iterationCount || 0) >= WORK_MAX_ITERATIONS) {
+                    log.warn('Interrupted task at max iterations — not retrying', {
+                        taskId: task.id,
+                        iterationCount: task.iterationCount,
+                        maxIterations: WORK_MAX_ITERATIONS,
+                    });
+                    continue;
+                }
+
                 const agent = getAgent(this.db, task.agentId);
                 const project = getProject(this.db, task.projectId);
                 if (!agent || !project || !project.workingDir) {
