@@ -9,7 +9,7 @@
 - **Agent SDK**: @anthropic-ai/claude-agent-sdk (Claude AI)
 - **Blockchain**: Algorand (AlgoChat messaging, wallets)
 - **Frontend**: Angular 21 (dashboard)
-- **Tests**: 5427 unit tests, 232 security-specific tests
+- **Tests**: 5471 unit tests, 232 security-specific tests
 
 ## Architecture
 
@@ -78,7 +78,7 @@ Client (Angular) --HTTP/WS--> Bun Server --> SQLite
 2. **Local setup**: `git clone`, `bun install`, `bun run dev` (requires Bun 1.3+)
 3. **Database**: Auto-created on first run, 70 migrations applied automatically
 4. **Environment**: Copy `.env.example` to `.env` — all defaults work for local testing
-5. **Tests**: `bun test` (5427 tests), `bun run spec:check` (111 specs)
+5. **Tests**: `bun test` (5471 tests), `bun run spec:check` (112 specs)
 6. **Key files to review first**: credits.ts, spending.ts, auth.ts, guards.ts, prompt-injection.ts, protected-paths.ts
 7. **Specs**: `specs/` directory has module-level specifications with invariants
 8. **Threat model**: `SECURITY.md` (324 lines, comprehensive)
