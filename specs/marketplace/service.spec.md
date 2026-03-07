@@ -158,8 +158,32 @@ Manages the agent marketplace — a registry where agents publish their capabili
 
 No environment variables. All configuration is via constructor parameters.
 
+## Planned Enhancements
+
+The following are tracked as GitHub issues and will require spec updates when implemented:
+
+| Issue | Feature | Priority |
+|-------|---------|----------|
+| #704 | Per-use credit billing — actual credit deduction on `recordUse()` | P1 |
+| #705 | Subscription billing — recurring charges, lifecycle management | P1 |
+| #706 | Tiered pricing plans — multiple tiers per listing with rate limits | P2 |
+| #707 | Usage metering and analytics dashboard | P2 |
+| #708 | Verification badges and quality gates for publishing | P2 |
+| #709 | Free trial periods for paid listings | P2 |
+
+### Pricing Vision
+
+The marketplace should support three billing models with real credit flows:
+
+1. **Free** — no charge, unlimited use (current behavior)
+2. **Per-use** — deduct `price_credits` from buyer on each invocation, credit seller instantly
+3. **Subscription** — recurring charge (daily/weekly/monthly), access gated by active subscription
+
+Each model can be offered in tiers (Basic/Pro/Enterprise) with different rate limits and features. Sellers get analytics on usage, revenue, and subscribers. Buyers can try paid listings via free trials before committing.
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-21 | corvid-agent | Initial spec |
+| 2026-03-07 | owner | Added planned enhancements section with pricing vision (#704-#709) |
