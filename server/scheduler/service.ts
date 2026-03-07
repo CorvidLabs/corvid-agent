@@ -933,7 +933,7 @@ export class SchedulerService {
 
         const prompt = `You are performing an automated codebase review.\n\n` +
             `## Instructions\n` +
-            `1. Run \`bunx tsc --noEmit 2>&1\` and collect any TypeScript errors.\n` +
+            `1. Run \`bun x tsc --noEmit 2>&1\` and collect any TypeScript errors.\n` +
             `2. Run \`bun test 2>&1 | tail -50\` and collect any test failures.\n` +
             `3. Search for TODO, FIXME, and HACK comments in the source code.\n` +
             `4. Identify files over 500 lines that may need refactoring.\n` +

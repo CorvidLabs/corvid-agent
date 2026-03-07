@@ -26,7 +26,7 @@ jobs:
       - uses: ./.github/actions/setup-workspace
 
       - name: TypeScript check
-        run: bunx tsc --noEmit --skipLibCheck
+        run: bun x tsc --noEmit --skipLibCheck
 
       - name: Run database migrations
         run: bun run migrate:up

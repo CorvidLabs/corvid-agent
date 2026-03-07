@@ -235,7 +235,7 @@ export class CodebaseHealthCollector {
 
     private async runTsc(cwd: string): Promise<{ errors: TscError[]; passed: boolean }> {
         const { stdout, exitCode } = await spawnAndCapture(
-            ['bunx', 'tsc', '--noEmit', '--skipLibCheck'],
+            ['bun', 'x', 'tsc', '--noEmit', '--skipLibCheck'],
             cwd,
         );
         const errors = parseTscOutput(stdout);
