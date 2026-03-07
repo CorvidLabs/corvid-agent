@@ -66,8 +66,10 @@ function sanitize(s: string): string {
     const input = String(s);
     // Remove ANSI escape sequences (CSI: ESC [ ... letter)
     const withoutAnsi = input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-    // Allow only safe printable characters; drop control chars and newlines
-    return withoutAnsi.replace(/[^ -~\t]/g, '');
+    // Strip newlines/carriage returns explicitly (CodeQL log-injection barrier)
+    const noNewlines = withoutAnsi.replace(/[\r\n]/g, '');
+    // Drop remaining control characters outside safe printable ASCII + tab
+    return noNewlines.replace(/[^ -~\t]/g, '');
 }
 
 // ─── Output Helpers ─────────────────────────────────────────────────────────
