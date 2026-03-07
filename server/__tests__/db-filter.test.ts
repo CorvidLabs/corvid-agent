@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import {
     withTenantFilter,
     enableMultiTenantGuard,
@@ -55,6 +55,9 @@ describe('multi-tenant guard', () => {
     beforeEach(() => {
         resetMultiTenantGuard();
     });
+    afterEach(() => {
+        resetMultiTenantGuard();
+    });
 
     test('withTenantFilter throws for DEFAULT_TENANT_ID when guard is enabled', () => {
         enableMultiTenantGuard();
@@ -74,6 +77,9 @@ describe('validateTenantOwnership', () => {
     let db: Database;
 
     beforeEach(() => {
+        resetMultiTenantGuard();
+    });
+    afterEach(() => {
         resetMultiTenantGuard();
         db = new Database(':memory:');
         db.exec(`
