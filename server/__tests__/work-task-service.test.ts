@@ -1494,3 +1494,122 @@ describe('buildWorkPrompt with repo map and relevant symbols', () => {
         expect(prompt).toContain('## Instructions');
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PR dedup check
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('PR dedup check', () => {
+    test('skips task creation when an open PR already references the issue', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        // 1. git remote get-url origin → returns a GitHub URL
+        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+        // 2. gh pr list --search → returns a matching PR
+        queueSpawn(0, JSON.stringify([{
+            number: 716,
+            title: 'fix: heartbeat polling (#710)',
+            url: 'https://github.com/CorvidLabs/corvid-agent/pull/716',
+            author: { login: 'corvid-agent' },
+            state: 'OPEN',
+            headRefName: 'fix/710',
+            baseRefName: 'main',
+            body: 'Fixes #710',
+            createdAt: '2026-03-07T00:00:00Z',
+            additions: 10,
+            deletions: 5,
+            changedFiles: 2,
+        }]));
+
+        await expect(
+            service.create({
+                agentId: agent.id,
+                description: 'Fix the council race condition (#710)',
+                projectId: project.id,
+            }),
+        ).rejects.toThrow('PR #716 already addresses issue #710');
+    });
+
+    test('proceeds when no open PR references the issue', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        // 1. git remote get-url origin
+        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+        // 2. gh pr list --search → empty results
+        queueSpawn(0, '[]');
+        // 3. git worktree add (success)
+        queueSpawn(0);
+        // 4. bun install (success)
+        queueSpawn(0);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Fix the council race condition (#710)',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('running');
+        expect(task.branchName).toBeTruthy();
+    });
+
+    test('proceeds when description has no issue reference', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        // 1. git remote get-url origin (for off-limits check only, no dedup needed)
+        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+        // 2. git worktree add
+        queueSpawn(0);
+        // 3. bun install
+        queueSpawn(0);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Refactor the logging system',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('running');
+    });
+
+    test('proceeds when GitHub search fails (non-fatal)', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        // 1. git remote get-url origin
+        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+        // 2. gh pr list --search → fails
+        queueSpawn(1, '', 'API rate limit exceeded');
+        // 3. git worktree add
+        queueSpawn(0);
+        // 4. bun install
+        queueSpawn(0);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Fix issue #999',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('running');
+    });
+
+    test('ignores closed/merged PRs (only open PRs block)', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        // 1. git remote get-url origin
+        queueSpawn(0, 'https://github.com/CorvidLabs/corvid-agent.git');
+        // 2. gh pr list --search (state=open) → empty (the PR is merged so not in results)
+        queueSpawn(0, '[]');
+        // 3. git worktree add
+        queueSpawn(0);
+        // 4. bun install
+        queueSpawn(0);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Follow up on #500',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('running');
+    });
+});
