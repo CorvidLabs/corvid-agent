@@ -270,7 +270,7 @@ export class PSKManager {
 
         // Use cached encryption key from received envelopes, fall back to indexer discovery
         const recipientPubKey = this.contactEncryptionKey
-            ?? await this.service.algorandService.discoverPublicKey(this.contact.address);
+            ?? await this.service.algorandService.discoverPublicKey(this.contact.address, 1000);
 
         // Encrypt
         const envelope = algochat.encryptPSKMessage(

@@ -313,7 +313,7 @@ export class OnChainTransactor {
 
         if (!this.service) throw new NotFoundError('AlgoChatService');
 
-        const pubKey = await this.service.algorandService.discoverPublicKey(address);
+        const pubKey = await this.service.algorandService.discoverPublicKey(address, 1000);
         this.publicKeyCache.set(address, { key: pubKey, cachedAt: Date.now() });
         return pubKey;
     }
