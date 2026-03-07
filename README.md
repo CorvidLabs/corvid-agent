@@ -77,7 +77,7 @@ bun run dev
 
 Server starts at `http://localhost:3000`. See `.env.example` for all configuration options.
 
-**New here?** Follow the **[5-minute quickstart](docs/quickstart.md)** to create your first agent and have it open a PR.
+**New here?** Follow the **[5-minute quickstart](docs/quickstart.md)** to create your first agent and have it open a PR. Then see **[use cases](docs/use-cases.md)** for practical examples and **[how it works](docs/how-it-works.md)** for the architecture.
 
 ### Minimum `.env`
 

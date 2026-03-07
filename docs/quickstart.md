@@ -228,6 +228,8 @@ Everything runs locally. No cloud dependencies except the AI provider you choose
 
 ## Further reading
 
+- [How It Works](how-it-works.md) — the agent execution loop explained
+- [Use Cases](use-cases.md) — practical examples: PR reviews, CI fixes, test generation, and more
 - [Self-Hosting Guide](self-hosting.md) — production deployment with Docker, systemd, TLS
 - [Testnet Onboarding](testnet-onboarding.md) — multi-tenant mode and AlgoChat setup
 - [VISION.md](../VISION.md) — project manifesto and roadmap
