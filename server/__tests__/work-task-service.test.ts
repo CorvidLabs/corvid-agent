@@ -1638,3 +1638,136 @@ describe('PR dedup check', () => {
         expect(task.status).toBe('running');
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Graceful shutdown: shutdown gate, drain, and startup recovery
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Shutdown gate', () => {
+    test('create() rejects new tasks when shuttingDown flag is set', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        // Trigger the shutdown flag via drainRunningTasks (sets _shuttingDown = true)
+        await service.drainRunningTasks();
+
+        await expect(
+            service.create({
+                agentId: agent.id,
+                description: 'Should be rejected',
+                projectId: project.id,
+            }),
+        ).rejects.toThrow('Server is shutting down');
+    });
+});
+
+describe('Drain on shutdown (drainRunningTasks)', () => {
+    test('drainRunningTasks() resolves immediately when no active tasks exist', async () => {
+        const start = Date.now();
+        await service.drainRunningTasks();
+        const elapsed = Date.now() - start;
+
+        expect(elapsed).toBeLessThan(1000);
+    });
+
+    test('drainRunningTasks() completes quickly when tasks are already done', async () => {
+        const { agent, project } = createTestAgentAndProject();
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Long running task',
+            projectId: project.id,
+        });
+
+        updateWorkTaskStatus(db, task.id, 'completed', { prUrl: 'https://github.com/test/test/pull/1' });
+
+        const start = Date.now();
+        await service.drainRunningTasks();
+        const elapsed = Date.now() - start;
+
+        expect(elapsed).toBeLessThan(2000);
+
+        const finalTask = getWorkTask(db, task.id);
+        expect(finalTask?.status).toBe('completed');
+    });
+});
+
+describe('Startup recovery with iteration limit', () => {
+    test('recoverStaleTasks retries tasks below max iterations', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        db.query(
+            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+             VALUES (?, ?, ?, ?, 'running', 'web', '{}', 1)`,
+        ).run('stale-task-1', agent.id, project.id, 'Interrupted task');
+
+        queueSuccessfulSpawns(2);
+
+        await service.recoverStaleTasks();
+
+        const recovered = getWorkTask(db, 'stale-task-1');
+        expect(recovered).toBeTruthy();
+        expect(['branching', 'running']).toContain(recovered!.status);
+    });
+
+    test('recoverStaleTasks skips tasks at max iterations (3)', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        db.query(
+            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+             VALUES (?, ?, ?, ?, 'running', 'web', '{}', 3)`,
+        ).run('maxed-task', agent.id, project.id, 'Task at max iterations');
+
+        await service.recoverStaleTasks();
+
+        const task = getWorkTask(db, 'maxed-task');
+        expect(task).toBeTruthy();
+        expect(task?.status).toBe('failed');
+        expect(task?.error).toBe('Interrupted by server restart');
+    });
+
+    test('recoverStaleTasks retries task at iteration 2 (below max of 3)', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        db.query(
+            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+             VALUES (?, ?, ?, ?, 'validating', 'web', '{}', 2)`,
+        ).run('mid-task', agent.id, project.id, 'Task at iteration 2');
+
+        queueSuccessfulSpawns(2);
+
+        await service.recoverStaleTasks();
+
+        const task = getWorkTask(db, 'mid-task');
+        expect(task).toBeTruthy();
+        expect(['branching', 'running']).toContain(task!.status);
+    });
+
+    test('recoverStaleTasks handles mix of retryable and maxed-out tasks', async () => {
+        const { agent, project } = createTestAgentAndProject();
+
+        db.query(
+            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+             VALUES (?, ?, ?, ?, 'running', 'web', '{}', 1)`,
+        ).run('retry-me', agent.id, project.id, 'Retryable task');
+
+        const project2 = createProject(db, { name: 'Project2', workingDir: '/tmp/test-project-2' });
+
+        db.query(
+            `INSERT INTO work_tasks (id, agent_id, project_id, description, status, source, requester_info, iteration_count)
+             VALUES (?, ?, ?, ?, 'running', 'web', '{}', 3)`,
+        ).run('skip-me', agent.id, project2.id, 'Maxed out task');
+
+        queueSuccessfulSpawns(2);
+
+        await service.recoverStaleTasks();
+
+        const retryable = getWorkTask(db, 'retry-me');
+        expect(['branching', 'running']).toContain(retryable!.status);
+
+        const maxed = getWorkTask(db, 'skip-me');
+        expect(maxed?.status).toBe('failed');
+        expect(maxed?.error).toBe('Interrupted by server restart');
+    });
+});
