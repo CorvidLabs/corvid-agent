@@ -1024,8 +1024,11 @@ export class DiscordBridge {
     private async createThread(channelId: string, messageId: string, name: string): Promise<string | null> {
         assertSnowflake(channelId, 'channel ID');
         assertSnowflake(messageId, 'message ID');
+        // encodeURIComponent satisfies CodeQL SSRF taint analysis
+        const safeChannelId = encodeURIComponent(channelId);
+        const safeMessageId = encodeURIComponent(messageId);
         const response = await fetch(
-            `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/threads`,
+            `https://discord.com/api/v10/channels/${safeChannelId}/messages/${safeMessageId}/threads`,
             {
                 method: 'POST',
                 headers: {
