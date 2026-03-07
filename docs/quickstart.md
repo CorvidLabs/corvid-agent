@@ -68,13 +68,13 @@ curl -X POST http://localhost:3000/api/sessions \
 
 Now open the dashboard — your session appears under **Sessions**. Click it to chat in real time.
 
-Or send a message via API:
+Or resume the session with a follow-up prompt via API:
 
 ```bash
 # Replace SESSION_ID with the id from the session response
-curl -X POST http://localhost:3000/api/sessions/SESSION_ID/message \
+curl -X POST http://localhost:3000/api/sessions/SESSION_ID/resume \
   -H "Content-Type: application/json" \
-  -d '{"content": "Create a simple TypeScript hello world project with a test file"}'
+  -d '{"prompt": "Create a simple TypeScript hello world project with a test file"}'
 ```
 
 Watch the agent work in the dashboard — it reads files, writes code, and runs commands.
@@ -86,9 +86,9 @@ Watch the agent work in the dashboard — it reads files, writes code, and runs 
 For this you need a `GH_TOKEN` in your `.env` with repo access. Then:
 
 ```bash
-curl -X POST http://localhost:3000/api/sessions/SESSION_ID/message \
+curl -X POST http://localhost:3000/api/sessions/SESSION_ID/resume \
   -H "Content-Type: application/json" \
-  -d '{"content": "Create a new branch, commit your changes, and open a PR on my-username/my-test-repo"}'
+  -d '{"prompt": "Create a new branch, commit your changes, and open a PR on my-username/my-test-repo"}'
 ```
 
 The agent will:
