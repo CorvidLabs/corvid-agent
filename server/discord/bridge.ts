@@ -1062,6 +1062,8 @@ export class DiscordBridge {
     ): void {
         let buffer = '';
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        let lastStatusTime = 0;
+        const STATUS_DEBOUNCE_MS = 3000; // Don't flood status updates
 
         // Agent color — consistent per agent name
         const color = this.agentColor(agentName);
@@ -1086,6 +1088,19 @@ export class DiscordBridge {
                     buffer += content;
                     if (debounceTimer) clearTimeout(debounceTimer);
                     debounceTimer = setTimeout(() => flush(), 1500);
+                }
+            }
+
+            // Show tool status updates (e.g. "Creating work task...", "Searching...")
+            if (event.type === 'tool_status' && event.statusMessage) {
+                const now = Date.now();
+                if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
+                    lastStatusTime = now;
+                    this.sendEmbed(threadId, {
+                        description: `⏳ ${event.statusMessage}`,
+                        color: 0x95a5a6, // Gray for status
+                        footer: { text: `${agentName} · working...` },
+                    }).catch(() => {}); // Best-effort
                 }
             }
 
