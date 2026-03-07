@@ -484,6 +484,12 @@ export const routes: RouteEntry[] = [
         tags: ['Work Tasks'],
         auth: 'required',
     },
+    {
+        method: 'POST', path: '/api/work-tasks/{id}/retry',
+        summary: 'Retry a failed work task',
+        tags: ['Work Tasks'],
+        auth: 'required',
+    },
 
     // ── MCP API ─────────────────────────────────────────────────────────────
     {

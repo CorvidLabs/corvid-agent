@@ -39,6 +39,16 @@ export function handleWorkTaskRoutes(
         return handleCancel(cancelMatch[1], workTaskService);
     }
 
+    // POST /api/work-tasks/:id/retry — retry a failed task
+    const retryMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/retry$/);
+    if (retryMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleRetry(retryMatch[1], workTaskService, tenantId);
+    }
+
     // GET /api/work-tasks/:id — get single
     const idMatch = path.match(/^\/api\/work-tasks\/([^/]+)$/);
     if (idMatch && method === 'GET') {
@@ -48,6 +58,17 @@ export function handleWorkTaskRoutes(
     }
 
     return null;
+}
+
+async function handleRetry(taskId: string, workTaskService: WorkTaskService, tenantId: string): Promise<Response> {
+    try {
+        const task = await workTaskService.retryTask(taskId, tenantId);
+        if (!task) return json({ error: 'Work task not found' }, 404);
+        return json(task);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        return handleRouteError(err);
+    }
 }
 
 async function handleCancel(taskId: string, workTaskService: WorkTaskService): Promise<Response> {

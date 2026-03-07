@@ -35,6 +35,7 @@ function createMockWorkTaskService(overrides?: Partial<WorkTaskService>): WorkTa
             updatedAt: new Date().toISOString(),
         })),
         cancelTask: mock(async () => null),
+        retryTask: mock(async () => null),
         onComplete: mock(() => {}),
         ...overrides,
     } as unknown as WorkTaskService;
@@ -103,6 +104,25 @@ describe('Work Task Routes', () => {
         const { req, url } = fakeReq('POST', '/api/work-tasks/nonexistent/cancel');
         const res = await handleWorkTaskRoutes(req, url, svc)!;
         expect((res as Response).status).toBe(404);
+    });
+
+    it('POST /api/work-tasks/:id/retry returns 404 for unknown', async () => {
+        const svc = createMockWorkTaskService();
+        const { req, url } = fakeReq('POST', '/api/work-tasks/nonexistent/retry');
+        const res = await handleWorkTaskRoutes(req, url, svc)!;
+        expect((res as Response).status).toBe(404);
+    });
+
+    it('POST /api/work-tasks/:id/retry returns retried task', async () => {
+        const svc = createMockWorkTaskService({
+            retryTask: mock(async () => ({ id: 'task-1', status: 'pending', description: 'fix bug' })),
+        } as unknown as Partial<WorkTaskService>);
+        const { req, url } = fakeReq('POST', '/api/work-tasks/task-1/retry');
+        const res = await handleWorkTaskRoutes(req, url, svc)!;
+        expect((res as Response).status).toBe(200);
+        const data = await (res as Response).json();
+        expect(data.id).toBe('task-1');
+        expect(svc.retryTask).toHaveBeenCalledWith('task-1', 'default');
     });
 
     it('returns null for unmatched paths', () => {

@@ -66,6 +66,12 @@ export class WorkTaskService {
         return task;
     }
 
+    async retryTask(id: string): Promise<WorkTask> {
+        const task = await firstValueFrom(this.api.post<WorkTask>(`/work-tasks/${id}/retry`));
+        this.tasks.update((current) => current.map((t) => (t.id === id ? task : t)));
+        return task;
+    }
+
     createViaWebSocket(agentId: string, description: string, projectId?: string): void {
         this.ws.createWorkTask(agentId, description, projectId);
     }

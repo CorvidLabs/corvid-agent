@@ -421,6 +421,54 @@ export class WorkTaskService {
         return dbListWorkTasks(this.db, agentId, tenantId);
     }
 
+    /**
+     * Retry a failed work task: reset it to pending and re-execute from scratch.
+     */
+    async retryTask(id: string, tenantId?: string): Promise<WorkTask | null> {
+        if (this._shuttingDown) {
+            throw new ValidationError('Server is shutting down — retries are not accepted');
+        }
+
+        const task = getWorkTask(this.db, id, tenantId);
+        if (!task) return null;
+
+        if (task.status !== 'failed') {
+            throw new ValidationError('Only failed tasks can be retried', { taskId: id, status: task.status });
+        }
+
+        const agent = getAgent(this.db, task.agentId, tenantId);
+        if (!agent) {
+            throw new NotFoundError('Agent', task.agentId);
+        }
+
+        const project = getProject(this.db, task.projectId, tenantId);
+        if (!project || !project.workingDir) {
+            throw new NotFoundError('Project', task.projectId);
+        }
+
+        if (task.worktreeDir) {
+            await this.cleanupWorktree(task.id);
+        }
+
+        resetWorkTaskForRetry(this.db, task.id);
+
+        log.info('Retrying failed work task', { taskId: task.id, description: task.description.slice(0, 80) });
+
+        recordAudit(
+            this.db,
+            'work_task_retry',
+            task.agentId,
+            'work_task',
+            task.id,
+            `Retried work task: ${task.description.slice(0, 200)}`,
+        );
+
+        const resetTask = getWorkTask(this.db, task.id);
+        if (!resetTask) return null;
+
+        return this.executeTask(resetTask, agent, project);
+    }
+
     async cancelTask(id: string): Promise<WorkTask | null> {
         const task = getWorkTask(this.db, id);
         if (!task) return null;
