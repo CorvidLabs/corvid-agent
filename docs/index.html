@@ -318,6 +318,66 @@
     </div>
   </section>
 
+  <!-- ═══════════════════ USE CASES ═══════════════════ -->
+  <section class="section" id="use-cases">
+    <div class="container">
+      <h2 class="section__title">Use Cases</h2>
+      <div class="grid grid--2">
+
+        <div class="card card--cyan">
+          <div class="card__icon">&gt;&gt;</div>
+          <div class="card__title accent-cyan">Daily PR Reviews</div>
+          <p>Schedule an agent to review every open PR each morning. It reads diffs, checks for bugs, suggests improvements, and posts review comments &mdash; before your team starts work.</p>
+          <div class="terminal terminal--compact" style="margin-top: 16px;">
+            <div class="terminal__body"><code><span class="t-comment"># schedule: every day at 8am</span>
+<span class="t-prompt">agent:</span> review open PRs on my-org/api
+<span class="t-prompt">result:</span> 3 PRs reviewed, 2 approved, 1 changes-requested</code></div>
+          </div>
+        </div>
+
+        <div class="card card--magenta">
+          <div class="card__icon">!</div>
+          <div class="card__title accent-magenta">Fix CI Failures</div>
+          <p>When CI goes red, trigger a work task. The agent clones the branch, reads the failure logs, writes a fix, and opens a PR &mdash; often before you notice the failure.</p>
+          <div class="terminal terminal--compact" style="margin-top: 16px;">
+            <div class="terminal__body"><code><span class="t-comment"># webhook: on CI failure</span>
+<span class="t-prompt">agent:</span> fix failing tests on feature/auth
+<span class="t-prompt">result:</span> PR #142 opened — fixed type error in auth middleware</code></div>
+          </div>
+        </div>
+
+        <div class="card card--green">
+          <div class="card__icon">+</div>
+          <div class="card__title accent-green">Write Tests for Untested Code</div>
+          <p>Point an agent at your repo and let it find untested files. It generates meaningful test suites that follow your existing patterns and conventions.</p>
+          <div class="terminal terminal--compact" style="margin-top: 16px;">
+            <div class="terminal__body"><code><span class="t-comment"># work task: improve coverage</span>
+<span class="t-prompt">agent:</span> write tests for src/services/billing.ts
+<span class="t-prompt">result:</span> PR #156 opened — 14 tests, coverage 47% → 89%</code></div>
+          </div>
+        </div>
+
+        <div class="card card--cyan">
+          <div class="card__icon">?</div>
+          <div class="card__title accent-cyan">Triage New Issues</div>
+          <p>Monitor your issue tracker. When new issues arrive, the agent reads them, labels by area, estimates complexity, and assigns to the right team member or picks them up itself.</p>
+          <div class="terminal terminal--compact" style="margin-top: 16px;">
+            <div class="terminal__body"><code><span class="t-comment"># schedule: poll issues every 30m</span>
+<span class="t-prompt">agent:</span> triage #412 "login page broken on Safari"
+<span class="t-prompt">result:</span> labeled: bug, frontend — assigned to @ui-team</code></div>
+          </div>
+        </div>
+
+        <div class="card card--magenta" style="grid-column: 1 / -1;">
+          <div class="card__icon">&amp;</div>
+          <div class="card__title accent-magenta">Multi-Agent Councils</div>
+          <p>Assemble a council of agents with different perspectives &mdash; security auditor, performance engineer, UX reviewer &mdash; to deliberate on architecture decisions or review complex PRs together, reaching consensus through on-chain communication.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   </main>
 
   <!-- ═══════════════════ FOOTER ═══════════════════ -->
