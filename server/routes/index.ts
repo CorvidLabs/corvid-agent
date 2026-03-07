@@ -575,7 +575,7 @@ async function handleRoutes(
     // Database backup
     if (url.pathname === '/api/backup' && req.method === 'POST') {
         try {
-            const result = backupDatabase(db);
+            const result = backupDatabase(db, process.env.DATABASE_PATH || 'corvid-agent.db');
             return json(result);
         } catch (err) {
             log.error('Backup failed', { error: err instanceof Error ? err.message : String(err) });
