@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 2
+version: 3
 status: active
 files:
   - server/discord/bridge.ts
@@ -73,23 +73,25 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 6. **Session resume**: On reconnection, if a `sessionId` exists, a RESUME is sent instead of IDENTIFY. On INVALID_SESSION with `resumable=false`, the session ID is cleared and IDENTIFY is used
 7. **INVALID_SESSION delay**: After receiving INVALID_SESSION, the bridge waits 1-5 seconds (random) before re-identifying, per Discord documentation
 8. **Reconnection backoff**: Exponential backoff with `delay = min(1000 * 2^attempt, 60000)`. Maximum 10 reconnect attempts before giving up and setting `running = false`
-9. **Channel filter**: Only messages from the configured `channelId` are processed. Messages from other channels are silently ignored
+9. **Channel filter**: Messages from the configured `channelId` and from threads created by the bridge are processed. Messages from other channels are silently ignored
 10. **Bot message ignore**: Messages from bot accounts (`author.bot === true`) are silently ignored to prevent loops
 11. **User authorization**: If `config.allowedUserIds` is non-empty, only those user IDs can interact. Unauthorized users receive `"Unauthorized."` reply
 12. **Per-user rate limiting**: Each user is limited to 10 messages per 60-second sliding window
-13. **Session-per-user mapping**: Each Discord user ID maps to at most one active session. Stored in-memory
-14. **Session reuse and restart**: Reuses active sessions, creates new ones when stopped/error, restarts process if send fails
-15. **Response debouncing**: Session events are buffered for 1500ms before being sent to Discord
-16. **Message chunking**: Discord has a 2000-character limit per message. Long responses are split at that boundary
-17. **Agent resolution priority**: (1) user's preferred agent (set by `/switch` or `@mention`), (2) config `defaultAgentId`, (3) first agent from `listAgents`
-18. **Text commands**: `/status`, `/new`, `/agents`, `/switch <name>`, `/council <topic>`, `/help` — parsed from regular messages starting with `/`
-19. **Slash commands**: If `appId` is configured, the same commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events
-20. **@AgentName routing**: Messages starting with `@AgentName` route to the named agent and clear the user's existing session
-21. **Bot presence**: Set via the `presence` field in IDENTIFY payload. Configurable via `DISCORD_STATUS` and `DISCORD_ACTIVITY_TYPE` env vars. Can be updated at runtime via `updatePresence()`
-22. **Prompt injection scanning**: All incoming messages are scanned via `scanForInjection()`. Blocked messages are audited and rejected
-23. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
-24. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY
-25. **Work intake mode**: When `mode='work_intake'`, messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
+13. **Thread-based conversations**: Each new conversation creates a Discord thread from the user's message. The thread is named `AgentName — message preview...` (truncated to 100 chars). Threads auto-archive after 24 hours of inactivity
+14. **Shared thread sessions**: Any user can reply in a thread to participate in the conversation. Thread sessions are tracked by thread ID, not user ID
+15. **Session-per-user mapping**: Each Discord user ID maps to at most one active session (the most recent thread). Stored in-memory
+16. **Rich embed responses**: Agent responses are sent as Discord embeds with the message content in the description, agent name and model in the footer, and a consistent per-agent color derived from name hashing
+17. **Response debouncing**: Session events are buffered for 1500ms before being sent as embeds to the thread
+18. **Message chunking**: Discord has a 4096-character embed description limit. Long responses are truncated. Plain messages are chunked at 2000 characters
+19. **Agent resolution priority**: (1) user's preferred agent (set by `/switch`), (2) config `defaultAgentId`, (3) first agent from `listAgents`
+20. **Text commands**: `/status`, `/new`, `/agents`, `/switch <name>`, `/council <topic>`, `/help` — parsed from regular messages starting with `/`
+21. **Slash commands**: If `appId` is configured, the same commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events
+22. **Agent dropdown in /switch**: The `/switch` slash command populates its `agent` option with `choices` from the agent database, showing `AgentName (model)` in a dropdown picker (capped at 25, Discord's limit)
+23. **Bot presence**: Set via the `presence` field in IDENTIFY payload. Configurable via `DISCORD_STATUS` and `DISCORD_ACTIVITY_TYPE` env vars. Can be updated at runtime via `updatePresence()`
+24. **Prompt injection scanning**: All incoming messages are scanned via `scanForInjection()`. Blocked messages are audited and rejected
+25. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
+26. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY
+27. **Work intake mode**: When `mode='work_intake'`, messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
 
 ## Behavioral Examples
 
@@ -119,17 +121,28 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 - **And** the bridge responds via the interaction callback URL with the agent list
 - **And** no new session is created (command-only interaction)
 
-### Scenario: Agent routing via @mention
-
-- **Given** a running bridge with agents "CorvidAgent" and "ResearchBot"
-- **When** user sends `@ResearchBot what is AlgoChat?`
-- **Then** the user's existing session is cleared, a new session is created with ResearchBot, and the message text `what is AlgoChat?` is sent
-
-### Scenario: Message from authorized user in configured channel
+### Scenario: New conversation creates a thread
 
 - **Given** a running Discord bridge with an agent and project configured
 - **When** user "user123" (in `allowedUserIds`) sends "Hello" in the configured channel
-- **Then** a new session is created with source `discord`, the process is started, and responses are forwarded back as Discord messages
+- **Then** a Discord thread is created from the user's message, named `AgentName — Hello`
+- **And** a new session is created with source `discord`, the process is started
+- **And** agent responses are sent as rich embeds in the thread (with agent name/model in footer)
+
+### Scenario: Multiple users in a thread
+
+- **Given** user A started a conversation thread with CorvidAgent
+- **When** user B sends a message in that same thread
+- **Then** user B's message is routed to the same agent session
+- **And** the agent responds in the thread, visible to both users
+
+### Scenario: /switch with agent dropdown
+
+- **Given** a running bridge with agents "CorvidAgent" and "ResearchBot"
+- **When** a user invokes `/switch` via Discord's slash command UI
+- **Then** a dropdown shows all agents with their models (e.g. "CorvidAgent (claude-opus-4-6)")
+- **When** the user selects "ResearchBot"
+- **Then** the user's session is cleared and their next message starts a new thread with ResearchBot
 
 ### Scenario: Reconnection after disconnect
 
@@ -163,7 +176,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Condition | Behavior |
 |-----------|----------|
 | Bot message received | Silently ignored |
-| Message from wrong channel | Silently ignored |
+| Message from unknown channel/thread | Silently ignored |
 | Unauthorized user | Replies `"Unauthorized."` |
 | Rate limit exceeded | Replies with rate limit message |
 | Prompt injection detected | Replies `"Message blocked: content policy violation."`, logs audit record |
@@ -177,6 +190,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Heartbeat interval out of 10s-120s range | Logs warning, uses default 41.25s |
 | Slash command registration fails | Logs error, continues (text commands still work) |
 | Interaction response fails | Logs error |
+| Thread creation fails | Replies in main channel: `"Failed to create conversation thread."` |
+| Thread session ended | Replies in thread: `"This conversation has ended. Start a new one in the main channel."` |
 
 ## Dependencies
 
@@ -221,4 +236,5 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
-| 2026-03-07 | corvid-agent | v2: Added slash command registration, interaction handling, @AgentName routing, bot presence, prompt injection scanning, council launching, work intake mode, agent resolution priority, ContentBlock extraction |
+| 2026-03-07 | corvid-agent | v2: Slash commands (with agent dropdown), interaction handling, bot presence, prompt injection scanning, council launching, work intake mode, agent resolution priority, ContentBlock extraction |
+| 2026-03-07 | corvid-agent | v3: Thread-based conversations (shared sessions), rich embed responses with agent name/model, removed @AgentName routing (conflicts with Discord @), agent choices dropdown in /switch |
