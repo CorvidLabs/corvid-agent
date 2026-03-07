@@ -162,7 +162,7 @@ export class ResponseFormatter {
 
             // Fallback: direct send if no transactor available (should not normally happen)
             log.warn('No OnChainTransactor available, attempting direct send');
-            const pubKey = await this.service.algorandService.discoverPublicKey(participant);
+            const pubKey = await this.service.algorandService.discoverPublicKey(participant, 1000);
             let sendContent = content;
             const encoded = new TextEncoder().encode(content);
             if (encoded.byteLength > 850) {
