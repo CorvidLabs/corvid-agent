@@ -32,6 +32,7 @@ interface ValidationResult {
     specPath: string;
     errors: string[];
     warnings: string[];
+    exportSummary?: string;
 }
 
 // ─── YAML Frontmatter Parser (simple regex, no deps) ────────────────────
@@ -322,11 +323,13 @@ function validateSpec(specPath: string, schemaTables: Set<string>): ValidationRe
     // ─── Level 2: API Surface ────────────────────────────────────────────
 
     if (fm.files && Array.isArray(fm.files)) {
-        const allExports: string[] = [];
+        const rawExports: string[] = [];
         for (const file of fm.files) {
             const fullPath = join(ROOT, file);
-            allExports.push(...getExportedSymbols(fullPath));
+            rawExports.push(...getExportedSymbols(fullPath));
         }
+        // Deduplicate: a symbol re-exported from index.ts should count once
+        const allExports = [...new Set(rawExports)];
 
         const specSymbols = getSpecSymbols(body);
         const specSet = new Set(specSymbols);
@@ -346,10 +349,16 @@ function validateSpec(specPath: string, schemaTables: Set<string>): ValidationRe
             }
         }
 
-        // Summary line
+        // Summary line (informational — only a warning when coverage is incomplete)
         const documented = specSymbols.filter((s) => exportSet.has(s)).length;
         if (allExports.length > 0) {
-            result.warnings.unshift(`${documented}/${allExports.length} exports documented`);
+            const summary = `${documented}/${allExports.length} exports documented`;
+            if (documented < allExports.length) {
+                result.warnings.unshift(summary);
+            } else {
+                // Full coverage — store as informational, not a warning
+                result.exportSummary = summary;
+            }
         }
     }
 
@@ -448,6 +457,8 @@ function main(): void {
         const apiExportLine = result.warnings.find((w) => w.match(/^\d+\/\d+ exports documented$/));
         if (apiExportLine) {
             console.log(`  \u2713 ${apiExportLine}`);
+        } else if (result.exportSummary) {
+            console.log(`  \u2713 ${result.exportSummary}`);
         }
         const specDescribesNonexistent = result.errors.filter((e) => e.startsWith('Spec documents'));
         for (const e of specDescribesNonexistent) console.log(`  \u2717 ${e}`);
