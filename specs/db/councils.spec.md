@@ -42,6 +42,7 @@ Provides the data-access layer for the council deliberation system: CRUD operati
 | `getDiscussionMessages` | `db: Database, launchId: string` | `CouncilDiscussionMessage[]` | Get all discussion messages for a launch, ordered by `round` then `id` ascending |
 | `updateCouncilLaunchDiscussionRound` | `db: Database, launchId: string, round: number, totalRounds?: number` | `void` | Update the current discussion round (and optionally total rounds) on a launch |
 | `updateDiscussionMessageTxid` | `db: Database, messageId: number, txid: string` | `void` | Set the on-chain transaction ID for a discussion message |
+| `updateCouncilLaunchSynthesisTxid` | `db: Database, launchId: string, synthesisTxid: string` | `void` | Set the on-chain transaction ID for a launch's synthesis |
 | `updateCouncilLaunchChatSession` | `db: Database, launchId: string, chatSessionId: string` | `void` | Associate a follow-up chat session with a completed launch |
 | `createGovernanceVote` | `db: Database, params: { launchId, totalVoters }, tenantId?` | `GovernanceVote` | Create a new governance vote for a council launch |
 | `getGovernanceVote` | `db: Database, launchId: string` | `GovernanceVote \| null` | Retrieve a governance vote by launch ID |
