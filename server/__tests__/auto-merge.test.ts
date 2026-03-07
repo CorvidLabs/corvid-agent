@@ -294,7 +294,7 @@ describe('AutoMergeService.checkAll', () => {
         await service.checkAll();
     });
 
-    test('blocks merge when diff modifies protected files', async () => {
+    test('closes PR when diff modifies protected files', async () => {
         insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
 
         const calls: string[][] = [];
@@ -314,14 +314,9 @@ describe('AutoMergeService.checkAll', () => {
                 return { ok: true, stdout: 'pass', stderr: '' };
             }
             if (key.includes('repos/') && key.includes('/pulls/')) {
-                // Diff that modifies a protected file
                 return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// malicious change', stderr: '' };
             }
-            if (key.includes('pr view')) {
-                // No existing security comment
-                return { ok: true, stdout: '', stderr: '' };
-            }
-            if (key.includes('pr comment')) {
+            if (key.includes('pr close')) {
                 return { ok: true, stdout: '', stderr: '' };
             }
             return { ok: false, stdout: '', stderr: '' };
@@ -331,14 +326,15 @@ describe('AutoMergeService.checkAll', () => {
         (service as any).running = true;
         await service.checkAll();
 
-        // Should NOT have merged — should have commented instead
+        // Should NOT have merged — should have closed the PR
         const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
         expect(mergeCall).toBeUndefined();
-        const commentCall = calls.find((c) => c.join(' ').includes('pr comment'));
-        expect(commentCall).toBeDefined();
+        const closeCall = calls.find((c) => c.join(' ').includes('pr close'));
+        expect(closeCall).toBeDefined();
+        expect(closeCall!.join(' ')).toContain('--delete-branch');
     });
 
-    test('blocks merge when diff has unapproved external fetches', async () => {
+    test('closes PR when diff has unapproved external fetches', async () => {
         insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
 
         const calls: string[][] = [];
@@ -364,10 +360,7 @@ describe('AutoMergeService.checkAll', () => {
                     stderr: '',
                 };
             }
-            if (key.includes('pr view')) {
-                return { ok: true, stdout: '', stderr: '' };
-            }
-            if (key.includes('pr comment')) {
+            if (key.includes('pr close')) {
                 return { ok: true, stdout: '', stderr: '' };
             }
             return { ok: false, stdout: '', stderr: '' };
@@ -379,12 +372,14 @@ describe('AutoMergeService.checkAll', () => {
 
         const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
         expect(mergeCall).toBeUndefined();
+        const closeCall = calls.find((c) => c.join(' ').includes('pr close'));
+        expect(closeCall).toBeDefined();
     });
 
-    test('only posts one comment per PR across multiple checkAll cycles', async () => {
+    test('only closes PR once across multiple checkAll cycles', async () => {
         insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
 
-        const commentCalls: string[][] = [];
+        const closeCalls: string[][] = [];
         const runGh: RunGhFn = async (args) => {
             const key = args.join(' ');
             if (key.includes('search/issues')) {
@@ -402,11 +397,8 @@ describe('AutoMergeService.checkAll', () => {
             if (key.includes('repos/') && key.includes('/pulls/')) {
                 return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// protected file', stderr: '' };
             }
-            if (key.includes('pr view')) {
-                return { ok: true, stdout: '', stderr: '' };
-            }
-            if (key.includes('pr comment')) {
-                commentCalls.push(args);
+            if (key.includes('pr close')) {
+                closeCalls.push(args);
                 return { ok: true, stdout: '', stderr: '' };
             }
             return { ok: false, stdout: '', stderr: '' };
@@ -415,12 +407,12 @@ describe('AutoMergeService.checkAll', () => {
         const service = new AutoMergeService(db, runGh);
         (service as any).running = true;
 
-        // Run checkAll three times — should only comment once
+        // Run checkAll three times — should only close once
         await service.checkAll();
         await service.checkAll();
         await service.checkAll();
 
-        expect(commentCalls.length).toBe(1);
+        expect(closeCalls.length).toBe(1);
     });
 
     test('skips PR when diff fetch fails (transient error)', async () => {
@@ -460,47 +452,7 @@ describe('AutoMergeService.checkAll', () => {
         expect(commentCall).toBeUndefined();
     });
 
-    test('does not post duplicate comment if one already exists on the PR', async () => {
-        insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
-
-        const commentCalls: string[][] = [];
-        const runGh: RunGhFn = async (args) => {
-            const key = args.join(' ');
-            if (key.includes('search/issues')) {
-                return {
-                    ok: true,
-                    stdout: JSON.stringify({
-                        items: [{ number: 42, html_url: 'https://github.com/CorvidLabs/corvid-agent/pull/42' }],
-                    }),
-                    stderr: '',
-                };
-            }
-            if (key.includes('pr checks')) {
-                return { ok: true, stdout: 'pass', stderr: '' };
-            }
-            if (key.includes('repos/') && key.includes('/pulls/')) {
-                return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// protected file', stderr: '' };
-            }
-            if (key.includes('pr view')) {
-                // Simulate an existing security comment from a previous server run
-                return { ok: true, stdout: '⚠️ **Auto-merge blocked — security scan failed**\n\nProtected files', stderr: '' };
-            }
-            if (key.includes('pr comment')) {
-                commentCalls.push(args);
-                return { ok: true, stdout: '', stderr: '' };
-            }
-            return { ok: false, stdout: '', stderr: '' };
-        };
-
-        const service = new AutoMergeService(db, runGh);
-        (service as any).running = true;
-        await service.checkAll();
-
-        // Should NOT post a new comment since one already exists
-        expect(commentCalls.length).toBe(0);
-    });
-
-    test('blocks merge when diff has malicious code patterns', async () => {
+    test('closes PR when diff has malicious code patterns', async () => {
         insertPollingConfig('CorvidLabs/corvid-agent', 'corvid-agent');
 
         const calls: string[][] = [];
@@ -526,10 +478,7 @@ describe('AutoMergeService.checkAll', () => {
                     stderr: '',
                 };
             }
-            if (key.includes('pr view')) {
-                return { ok: true, stdout: '', stderr: '' };
-            }
-            if (key.includes('pr comment')) {
+            if (key.includes('pr close')) {
                 return { ok: true, stdout: '', stderr: '' };
             }
             return { ok: false, stdout: '', stderr: '' };
@@ -541,6 +490,8 @@ describe('AutoMergeService.checkAll', () => {
 
         const mergeCall = calls.find((c) => c.join(' ').includes('pr merge'));
         expect(mergeCall).toBeUndefined();
+        const closeCall = calls.find((c) => c.join(' ').includes('pr close'));
+        expect(closeCall).toBeDefined();
     });
 });
 
