@@ -296,10 +296,17 @@ export class DiscordBridge {
         const appId = this.config.appId;
         if (!appId) return;
 
+        // Build agent choices for /switch from the database
+        const agents = listAgents(this.db);
+        const agentChoices = agents.slice(0, 25).map(a => ({
+            name: `${a.name} (${a.model || 'unknown'})`.slice(0, 100),
+            value: a.name,
+        }));
+
         const commands = [
             {
                 name: 'status',
-                description: 'Show your current session ID',
+                description: 'Show your current agent and session',
                 type: 1, // CHAT_INPUT
             },
             {
@@ -321,6 +328,7 @@ export class DiscordBridge {
                     description: 'Name of the agent to switch to',
                     type: 3, // STRING
                     required: true,
+                    ...(agentChoices.length > 0 ? { choices: agentChoices } : {}),
                 }],
             },
             {
