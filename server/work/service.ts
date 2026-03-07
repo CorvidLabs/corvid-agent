@@ -21,6 +21,7 @@ import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import { isRepoOffLimits } from '../github/off-limits';
+import { searchOpenPrsForIssue } from '../github/operations';
 import { runBunInstall, runValidation } from './validation';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AstParserService } from '../ast/service';
@@ -254,23 +255,56 @@ export class WorkTaskService {
             throw new ValidationError('Project has no workingDir', { projectId });
         }
 
-        // Check if the project's repo is off-limits
+        // Resolve repo slug from git remote (used for off-limits check and dedup)
+        let repoSlug: string | null = null;
         try {
             const proc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
                 cwd: project.workingDir, stdout: 'pipe', stderr: 'pipe',
             });
             const remoteUrl = (await new Response(proc.stdout).text()).trim();
-            // Extract owner/repo from GitHub URLs (https or ssh)
             const match = remoteUrl.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-            if (match && isRepoOffLimits(match[1])) {
-                throw new ValidationError(
-                    `Repository ${match[1]} is off-limits — contributions are not allowed`,
-                    { projectId, repo: match[1] },
-                );
-            }
-        } catch (err) {
-            if (err instanceof ValidationError) throw err;
+            if (match) repoSlug = match[1];
+        } catch {
             // Non-git directories or missing remote — allow (local-only projects)
+        }
+
+        // Check if the project's repo is off-limits
+        if (repoSlug && isRepoOffLimits(repoSlug)) {
+            throw new ValidationError(
+                `Repository ${repoSlug} is off-limits — contributions are not allowed`,
+                { projectId, repo: repoSlug },
+            );
+        }
+
+        // Dedup check: if description references a GitHub issue (#NNN), skip if an open PR already exists
+        if (repoSlug) {
+            const issueMatch = input.description.match(/#(\d+)/);
+            if (issueMatch) {
+                const issueNumber = parseInt(issueMatch[1], 10);
+                try {
+                    const search = await searchOpenPrsForIssue(repoSlug, issueNumber);
+                    if (search.ok && search.prs.length > 0) {
+                        const existingPr = search.prs[0];
+                        log.info('Skipping work task — PR already addresses issue', {
+                            issueNumber,
+                            existingPr: existingPr.number,
+                            prUrl: existingPr.url,
+                            repo: repoSlug,
+                        });
+                        throw new ConflictError(
+                            `Skipping work task — PR #${existingPr.number} already addresses issue #${issueNumber}`,
+                            { issueNumber, existingPr: existingPr.number, prUrl: existingPr.url },
+                        );
+                    }
+                } catch (err) {
+                    if (err instanceof ConflictError) throw err;
+                    // Non-fatal: if we can't check, proceed with task creation
+                    log.warn('Failed to check for existing PRs', {
+                        issueNumber,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                }
+            }
         }
 
         // Atomic insert — fails if a concurrent active task exists on this project

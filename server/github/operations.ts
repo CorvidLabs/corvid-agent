@@ -155,6 +155,54 @@ export async function addPrReview(
     return result.ok ? { ok: true } : { ok: false, error: result.stderr };
 }
 
+/**
+ * Search for open PRs that reference a specific issue number in their title or body.
+ * Returns matching PRs so callers can deduplicate before creating new work.
+ */
+export async function searchOpenPrsForIssue(
+    repo: string,
+    issueNumber: number,
+): Promise<{ ok: boolean; prs: PullRequest[]; error?: string }> {
+    const result = await runGh([
+        'pr', 'list', '--repo', repo, '--state', 'open',
+        '--search', String(issueNumber),
+        '--json', 'number,title,url,author,state,headRefName,baseRefName,body,createdAt,additions,deletions,changedFiles',
+    ]);
+
+    if (!result.ok) {
+        return { ok: false, prs: [], error: result.stderr };
+    }
+
+    try {
+        const raw = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
+        // Filter to PRs that actually reference #NNN (not just any mention of the number)
+        const issueRef = `#${issueNumber}`;
+        const prs: PullRequest[] = raw
+            .filter((pr) => {
+                const title = (pr.title as string) ?? '';
+                const body = (pr.body as string) ?? '';
+                return title.includes(issueRef) || body.includes(issueRef);
+            })
+            .map((pr) => ({
+                number: pr.number as number,
+                title: pr.title as string,
+                url: pr.url as string,
+                author: ((pr.author as Record<string, unknown>)?.login as string) ?? 'unknown',
+                state: pr.state as string,
+                headBranch: pr.headRefName as string,
+                baseBranch: pr.baseRefName as string,
+                body: (pr.body as string) ?? '',
+                createdAt: pr.createdAt as string,
+                additions: (pr.additions as number) ?? 0,
+                deletions: (pr.deletions as number) ?? 0,
+                changedFiles: (pr.changedFiles as number) ?? 0,
+            }));
+        return { ok: true, prs };
+    } catch {
+        return { ok: false, prs: [], error: 'Failed to parse PR search results' };
+    }
+}
+
 // ─── Create PR ───────────────────────────────────────────────────────────────
 
 export async function createPr(
