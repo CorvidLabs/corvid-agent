@@ -121,8 +121,6 @@ function emitLog(db: Database, launchId: string, level: CouncilLogLevel, message
 const PER_AGENT_ROUND_BUDGET_MS = 10 * 60 * 1000; // 10 minutes per agent per round
 const MIN_ROUND_TIMEOUT_MS = 10 * 60 * 1000; // minimum 10 minutes per round
 const MAX_DISCUSSION_TOTAL_MS = 3 * 60 * 60 * 1000; // hard cap at 3 hours
-export const HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30s periodic re-check for missed exits
-export const SAFETY_TIMEOUT_MS = 10 * 60 * 1000; // 10m safety net when all sessions dead but pending non-empty
 
 // ─── Launch logic ────────────────────────────────────────────────────────────
 
@@ -713,13 +711,7 @@ export interface WaitForSessionsResult {
     timedOut: string[];
 }
 
-/** Optional overrides for internal timing (primarily for testing). */
-export interface WaitForSessionsOptions {
-    heartbeatMs?: number;
-    safetyTimeoutMs?: number;
-}
-
-export function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number, options?: WaitForSessionsOptions): Promise<WaitForSessionsResult> {
+export function waitForSessions(processManager: ProcessManager, sessionIds: string[], timeoutMs?: number): Promise<WaitForSessionsResult> {
     return new Promise<WaitForSessionsResult>((resolve) => {
         let settled = false;
         const pending = new Set(sessionIds);
@@ -730,8 +722,6 @@ export function waitForSessions(processManager: ProcessManager, sessionIds: stri
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            clearInterval(heartbeat);
-            clearTimeout(safetyTimer);
             for (const [sid, cb] of callbacks) {
                 processManager.unsubscribe(sid, cb);
             }
@@ -758,33 +748,6 @@ export function waitForSessions(processManager: ProcessManager, sessionIds: stri
                 finish();
             }
         }, effectiveTimeout);
-
-        // Heartbeat: periodically re-check isRunning for all pending sessions
-        // to catch exits missed by event subscription (race condition fix)
-        const heartbeat = setInterval(() => {
-            if (settled) return;
-            for (const sessionId of pending) {
-                if (!processManager.isRunning(sessionId)) {
-                    log.info(`waitForSessions heartbeat: session ${sessionId} no longer running, marking completed`);
-                    markCompleted(sessionId);
-                }
-            }
-            checkDone();
-        }, options?.heartbeatMs ?? HEARTBEAT_INTERVAL_MS);
-
-        // Safety timeout: if pending is not empty but ALL pending sessions are dead,
-        // auto-advance after 10 minutes to prevent stuck councils
-        const safetyTimer = setTimeout(() => {
-            if (settled || pending.size === 0) return;
-            const allDead = [...pending].every(sid => !processManager.isRunning(sid));
-            if (allDead) {
-                log.warn(`waitForSessions safety timeout: ${pending.size} sessions still pending but none running, auto-advancing`);
-                for (const sid of [...pending]) {
-                    markCompleted(sid);
-                }
-                finish();
-            }
-        }, options?.safetyTimeoutMs ?? SAFETY_TIMEOUT_MS);
 
         // Subscribe FIRST, then check isRunning — this closes the race window
         // where a process exits between the isRunning check and subscribe call.
