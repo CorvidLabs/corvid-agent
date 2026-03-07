@@ -7,11 +7,11 @@
  * 2. Safety timeout that auto-advances when all pending sessions are dead
  *    but no exit event was received (prevents stuck councils)
  *
- * Extracted to a separate file because discussion.ts is Layer 0 (Constitutional)
+ * Extracted to server/lib/ because server/councils/ is Layer 0 (Constitutional)
  * and cannot be modified by automated workflows.
  */
 
-import { createLogger } from '../lib/logger';
+import { createLogger } from './logger';
 import type { ProcessManager, EventCallback } from '../process/manager';
 
 const log = createLogger('WaitForSessions');
