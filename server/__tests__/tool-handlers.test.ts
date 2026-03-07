@@ -10,6 +10,22 @@ import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
+
+const TEST_OWNER_WALLET = 'TESTOWNERADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234';
+
+mock.module('../algochat/config', () => ({
+    loadAlgoChatConfig: () => ({
+        mnemonic: null,
+        network: 'localnet' as const,
+        agentNetwork: 'localnet' as const,
+        syncInterval: 30000,
+        defaultAgentId: null,
+        enabled: false,
+        pskContact: null,
+        ownerAddresses: new Set([TEST_OWNER_WALLET.toUpperCase()]),
+    }),
+}));
+
 import {
     handleSendMessage,
     handleExtendTimeout,
@@ -58,6 +74,7 @@ beforeEach(() => {
     runMigrations(db);
     const agent = createAgent(db, { name: 'TestAgent', model: 'sonnet' });
     agentId = agent.id;
+    db.query('UPDATE agents SET wallet_address = ? WHERE id = ?').run(TEST_OWNER_WALLET, agentId);
 });
 
 afterEach(() => {

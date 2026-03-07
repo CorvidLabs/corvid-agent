@@ -7,9 +7,24 @@ import {
     grantCredits,
     updateCreditConfig,
 } from '../../db/credits';
+import { getAgent } from '../../db/agents';
+import { loadAlgoChatConfig } from '../../algochat/config';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('McpToolHandlers');
+
+function checkOwnerAuthorization(ctx: McpToolContext): string | null {
+    const agent = getAgent(ctx.db, ctx.agentId);
+    const walletAddress = agent?.walletAddress;
+    if (!walletAddress) {
+        return 'Unauthorized: calling agent has no wallet address';
+    }
+    const { ownerAddresses } = loadAlgoChatConfig();
+    if (!ownerAddresses.has(walletAddress.toUpperCase())) {
+        return 'Unauthorized: only owner addresses can perform this action';
+    }
+    return null;
+}
 
 export async function handleCheckCredits(
     ctx: McpToolContext,
@@ -49,6 +64,9 @@ export async function handleGrantCredits(
     args: { wallet_address: string; amount: number; reason?: string },
 ): Promise<CallToolResult> {
     try {
+        const authError = checkOwnerAuthorization(ctx);
+        if (authError) return errorResult(authError);
+
         if (args.amount <= 0 || args.amount > 1_000_000) {
             return errorResult('Amount must be between 1 and 1,000,000');
         }
@@ -73,6 +91,9 @@ export async function handleCreditConfig(
 ): Promise<CallToolResult> {
     try {
         if (args.key && args.value) {
+            const authError = checkOwnerAuthorization(ctx);
+            if (authError) return errorResult(authError);
+
             updateCreditConfig(ctx.db, args.key, args.value);
             return textResult(`Credit config updated: ${args.key} = ${args.value}`);
         }
