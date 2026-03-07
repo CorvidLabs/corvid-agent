@@ -8,6 +8,7 @@ import {
     getWorkTaskBySessionId,
     updateWorkTaskStatus,
     cleanupStaleWorkTasks,
+    resetWorkTaskForRetry,
     listWorkTasks,
 } from '../db/work-tasks';
 
@@ -301,5 +302,49 @@ describe('cleanupStaleWorkTasks', () => {
 
     test('returns empty array when no stale tasks', () => {
         expect(cleanupStaleWorkTasks(db)).toEqual([]);
+    });
+});
+
+describe('resetWorkTaskForRetry', () => {
+    test('resets a failed task back to pending with cleared transient fields', () => {
+        const task = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Test retry' });
+        updateWorkTaskStatus(db, task.id, 'running', {
+            sessionId: 'sess-1',
+            branchName: 'agent/test/branch',
+            worktreeDir: '/tmp/worktree',
+            iterationCount: 2,
+        });
+        updateWorkTaskStatus(db, task.id, 'failed', { error: 'Interrupted by server restart' });
+
+        resetWorkTaskForRetry(db, task.id);
+
+        const reset = getWorkTask(db, task.id)!;
+        expect(reset.status).toBe('pending');
+        expect(reset.sessionId).toBeNull();
+        expect(reset.branchName).toBeNull();
+        expect(reset.worktreeDir).toBeNull();
+        expect(reset.error).toBeNull();
+        expect(reset.completedAt).toBeNull();
+        expect(reset.iterationCount).toBe(0);
+    });
+
+    test('preserves original task metadata', () => {
+        const task = createWorkTask(db, {
+            agentId: AGENT_ID,
+            projectId: PROJECT_ID,
+            description: 'Important work',
+            source: 'algochat',
+            sourceId: 'msg-123',
+        });
+        updateWorkTaskStatus(db, task.id, 'failed', { error: 'Interrupted by server restart' });
+
+        resetWorkTaskForRetry(db, task.id);
+
+        const reset = getWorkTask(db, task.id)!;
+        expect(reset.description).toBe('Important work');
+        expect(reset.source).toBe('algochat');
+        expect(reset.sourceId).toBe('msg-123');
+        expect(reset.agentId).toBe(AGENT_ID);
+        expect(reset.projectId).toBe(PROJECT_ID);
     });
 });

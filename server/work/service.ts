@@ -13,6 +13,7 @@ import {
     updateWorkTaskStatus,
     listWorkTasks as dbListWorkTasks,
     cleanupStaleWorkTasks,
+    resetWorkTaskForRetry,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
@@ -72,7 +73,7 @@ export class WorkTaskService {
 
     /**
      * Recover tasks left in active states from a previous unclean shutdown.
-     * Marks them as failed and attempts to restore their original branches.
+     * Cleans up stale worktrees, then resets and retries interrupted tasks.
      */
     async recoverStaleTasks(): Promise<void> {
         const staleTasks = cleanupStaleWorkTasks(this.db);
@@ -80,9 +81,41 @@ export class WorkTaskService {
 
         log.info('Recovering stale work tasks', { count: staleTasks.length });
 
+        // Clean up any leftover worktrees first
         for (const task of staleTasks) {
             if (task.worktreeDir) {
                 await this.cleanupWorktree(task.id);
+            }
+        }
+
+        // Reset interrupted tasks to pending and re-execute them
+        for (const task of staleTasks) {
+            try {
+                const agent = getAgent(this.db, task.agentId);
+                const project = getProject(this.db, task.projectId);
+                if (!agent || !project || !project.workingDir) {
+                    log.warn('Cannot retry interrupted task: agent or project missing', { taskId: task.id });
+                    continue;
+                }
+
+                resetWorkTaskForRetry(this.db, task.id);
+                log.info('Retrying interrupted work task', { taskId: task.id, description: task.description.slice(0, 80) });
+
+                const resetTask = getWorkTask(this.db, task.id);
+                if (!resetTask) continue;
+
+                // Fire-and-forget: execute in background so recovery doesn't block startup
+                this.executeTask(resetTask, agent, project).catch((err) => {
+                    log.error('Failed to retry interrupted work task', {
+                        taskId: task.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            } catch (err) {
+                log.error('Failed to reset interrupted work task for retry', {
+                    taskId: task.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
             }
         }
     }
@@ -168,9 +201,17 @@ export class WorkTaskService {
             `Created work task: ${input.description.slice(0, 200)}`,
         );
 
+        return this.executeTask(task, agent, project);
+    }
+
+    /**
+     * Execute a pending work task: create worktree, install deps, start session.
+     * Shared by both `create` (new tasks) and `recoverStaleTasks` (retried tasks).
+     */
+    private async executeTask(task: WorkTask, agent: { id: string; name: string }, project: { id: string; workingDir: string }): Promise<WorkTask> {
         // Generate branch name
         const agentSlug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const taskSlug = input.description.slice(0, 40).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const taskSlug = task.description.slice(0, 40).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const timestamp = Date.now().toString(36);
         const suffix = crypto.randomUUID().slice(0, 6);
         const branchName = `agent/${agentSlug}/${taskSlug}-${timestamp}-${suffix}`;
@@ -253,18 +294,18 @@ export class WorkTaskService {
         const repoMap = await this.generateRepoMap(worktreeDir);
 
         // Extract relevant symbols based on task description keywords
-        const relevantSymbols = this.extractRelevantSymbols(worktreeDir, input.description);
+        const relevantSymbols = this.extractRelevantSymbols(worktreeDir, task.description);
 
         // Build work prompt
-        const prompt = this.buildWorkPrompt(branchName, input.description, repoMap ?? undefined, relevantSymbols ?? undefined);
+        const prompt = this.buildWorkPrompt(branchName, task.description, repoMap ?? undefined, relevantSymbols ?? undefined);
 
         // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
-            projectId,
-            agentId: input.agentId,
-            name: `Work: ${input.description.slice(0, 60)}`,
+            projectId: project.id,
+            agentId: agent.id,
+            name: `Work: ${task.description.slice(0, 60)}`,
             initialPrompt: prompt,
-            source: input.source ?? 'web',
+            source: task.source ?? 'web',
             workDir: worktreeDir,
         });
 
