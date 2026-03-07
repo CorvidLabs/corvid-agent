@@ -13,6 +13,9 @@ import { createProject } from '../db/projects';
 
 const TEST_OWNER_WALLET = 'TESTOWNERADDRESS1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234';
 
+/** Dynamic owner-address set controlled by `setOwnerAddresses()` in each test. */
+let _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
+
 mock.module('../algochat/config', () => ({
     loadAlgoChatConfig: () => ({
         mnemonic: null,
@@ -22,8 +25,9 @@ mock.module('../algochat/config', () => ({
         defaultAgentId: null,
         enabled: false,
         pskContact: null,
-        ownerAddresses: new Set([TEST_OWNER_WALLET.toUpperCase()]),
+        ownerAddresses: _mockOwnerAddresses,
     }),
+    _resetConfigCache: () => {},
 }));
 
 import {
@@ -40,8 +44,6 @@ import {
 } from '../mcp/tool-handlers';
 import { grantCredits } from '../db/credits';
 import { saveMemory } from '../db/agent-memories';
-import { _resetConfigCache } from '../algochat/config';
-
 const OWNER_WALLET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 
 /** Set the agent's wallet address in the DB. */
@@ -49,10 +51,11 @@ function setAgentWallet(database: Database, id: string, wallet: string): void {
     database.query(`UPDATE agents SET wallet_address = ? WHERE id = ?`).run(wallet, id);
 }
 
-/** Configure ALGOCHAT_OWNER_ADDRESSES and reset cached config. */
+/** Configure the mock owner-address set used by loadAlgoChatConfig. */
 function setOwnerAddresses(addresses: string): void {
-    process.env.ALGOCHAT_OWNER_ADDRESSES = addresses;
-    _resetConfigCache();
+    _mockOwnerAddresses = new Set(
+        addresses ? addresses.split(',').map(a => a.trim().toUpperCase()) : [],
+    );
 }
 
 let db: Database;
@@ -93,8 +96,7 @@ beforeEach(() => {
 
 afterEach(() => {
     db.close();
-    delete process.env.ALGOCHAT_OWNER_ADDRESSES;
-    _resetConfigCache();
+    _mockOwnerAddresses = new Set([TEST_OWNER_WALLET.toUpperCase()]);
 });
 
 // ─── Send Message Guards ─────────────────────────────────────────────────────
