@@ -121,6 +121,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `onCouncilStageChange` | `(launchId, stage, callback)` | `void` | Subscribe to council stage transitions |
 | `onCouncilLog` | `(launchId, callback)` | `void` | Subscribe to council log events |
 | `onCouncilDiscussionMessage` | `(launchId, callback)` | `void` | Subscribe to council discussion messages |
+| `onCouncilAgentError` | `(cb: (error: CouncilAgentError) => void)` | `() => void` | Subscribe to council agent error events. Returns an unsubscribe function. |
 
 ### Exported Types (councils.ts re-exports)
 

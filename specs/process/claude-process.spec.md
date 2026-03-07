@@ -30,6 +30,7 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `isErrorEvent` | `e: ClaudeStreamEvent` | `e is ErrorEvent` | Type guard: returns `true` if the event is an `error` event. |
 | `isApprovalEvent` | `e: ClaudeStreamEvent` | `e is ApprovalRequestEvent` | Type guard: returns `true` if the event is an `approval_request` event. |
 | `isSessionEndEvent` | `e: ClaudeStreamEvent` | `e is SessionExitedEvent \| SessionStoppedEvent` | Type guard: returns `true` if the event is `session_exited` or `session_stopped`. |
+| `isSessionErrorRecoveryEvent` | `e: ClaudeStreamEvent` | `e is SessionErrorRecoveryEvent` | Type guard: returns `true` if the event is a `session_error` event. |
 
 ### Exported Types
 
@@ -55,6 +56,7 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `SessionExitedEvent` | Event emitted when a session process exits. Contains optional `result`. |
 | `SessionStoppedEvent` | Event emitted when a session is stopped by user/system. |
 | `QueueStatusEvent` | Event for inference slot queue waiting. Contains `statusMessage`. |
+| `SessionErrorRecoveryEvent` | Event emitted for session errors with structured recovery info. Contains `error` with `message`, `errorType`, `severity`, and `recoverable` fields. |
 | `PerformanceEvent` | Event carrying inference metrics: `model`, `tokensPerSecond`, `outputTokens`, `evalDurationMs`. |
 | `RawStreamEvent` | Raw SDK event passthrough. Contains optional `message` with `content`. |
 | `ClaudeInputMessage` | Interface for messages sent to Claude via stdin: `{ type: 'user', message: { role: 'user', content: string } }`. |

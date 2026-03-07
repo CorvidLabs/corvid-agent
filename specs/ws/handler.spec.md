@@ -39,7 +39,12 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 |------|-------------|
 | `ClientMessage` | Union type of all client-to-server WebSocket message shapes |
 | `ServerMessage` | Union type of all server-to-client WebSocket message shapes |
-| `StreamEvent` | Session stream event payload forwarded via WebSocket |
+| `StreamEvent` | Session stream event payload forwarded via WebSocket (discriminated union on `eventType`) |
+| `StreamEventType` | String literal union of all `StreamEvent` eventType discriminants |
+| `ContentBlock` | Interface with `type: string` and optional `text?: string`. Represents a content block in assistant messages. |
+| `ErrorSeverity` | `'info' \| 'warning' \| 'error' \| 'fatal'` — severity level for structured error messages |
+| `SessionErrorInfo` | Structured error info for session failure recovery: `message`, `errorType`, `severity`, `recoverable`, `sessionStatus?` |
+| `CouncilAgentErrorInfo` | Structured error info for council agent failures: `message`, `errorType`, `severity`, `stage`, `sessionId?`, `round?` |
 
 ### Exported Functions (from shared/ws-protocol.ts)
 
