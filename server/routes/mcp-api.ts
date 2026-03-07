@@ -68,7 +68,7 @@ async function handleSendMessageRoute(req: Request, deps: McpApiDeps): Promise<R
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleSendMessage(ctx, { to_agent: data.toAgent, message: data.message });
-        return json({ response: extractResultText(result), isError: result.isError });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);
     }
@@ -80,7 +80,7 @@ async function handleSaveMemoryRoute(req: Request, deps: McpApiDeps): Promise<Re
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleSaveMemory(ctx, { key: data.key, content: data.content });
-        return json({ response: extractResultText(result), isError: result.isError });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);
     }
@@ -92,7 +92,7 @@ async function handleRecallMemoryRoute(req: Request, deps: McpApiDeps): Promise<
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleRecallMemory(ctx, { key: data.key, query: data.query });
-        return json({ response: extractResultText(result), isError: result.isError });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);
     }
@@ -107,7 +107,7 @@ async function handleListAgentsRoute(url: URL, deps: McpApiDeps): Promise<Respon
 
         const ctx = buildContext(deps, agentId);
         const result = await handleListAgents(ctx);
-        return json({ response: extractResultText(result), isError: result.isError });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);
     }
