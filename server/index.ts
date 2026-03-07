@@ -29,12 +29,16 @@ import type { HealthCheckDeps } from './health/service';
 import { bootstrapServices } from './bootstrap';
 import { wireEventBroadcasting, publishToTenant } from './events/broadcasting';
 import { initAlgoChat, switchNetwork as switchAlgoChatNetwork, wirePostInit, type AlgoChatInitDeps } from './algochat/init';
+import { validateGitHubTokenScopes } from './lib/github-token-check';
 
 const log = createLogger('Server');
 
 // Load auth configuration for WebSocket authentication
 const authConfig = loadAuthConfig();
 validateStartupSecurity(authConfig);
+
+// Validate GH_TOKEN scopes (non-blocking — logs warnings only)
+validateGitHubTokenScopes().catch(() => { /* errors logged internally */ });
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
