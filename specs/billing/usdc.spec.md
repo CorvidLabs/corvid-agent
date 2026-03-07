@@ -43,9 +43,45 @@ Monitors an Algorand wallet for incoming USDC ASA transfers via the Algorand ind
 | `stop` | none | `void` | Stops polling by clearing the interval timer and setting the running flag to false. |
 | `poll` | none | `Promise<number>` | Queries the indexer for new ASA transfers to the watched wallet since the last processed round. Returns the number of newly processed deposits. |
 
+### Exported Types (from `server/billing/usdc-revenue.ts`)
+
+| Type | Description |
+|------|-------------|
+| `UsdcRevenueConfig` | Configuration interface for the revenue service: `db` (Database), `ownerAddress` (string), `asaId` (number), `indexerBaseUrl` (string), `indexerToken?` (string), `pollIntervalMs?` (number). |
+
+### Exported Classes (from `server/billing/usdc-revenue.ts`)
+
+| Class | Description |
+|-------|-------------|
+| `UsdcRevenueService` | Monitors all agent wallets for incoming USDC ASA transfers, records revenue per agent, and auto-forwards collected USDC to the owner wallet. |
+
+### Exported Functions (from `server/billing/usdc-revenue.ts`)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `createUsdcRevenueService` | `db: Database` | `UsdcRevenueService \| null` | Factory that creates a UsdcRevenueService from environment configuration. Returns null if required config is missing. |
+
+### Exported Types (from `server/db/usdc-revenue.ts`)
+
+| Type | Description |
+|------|-------------|
+| `UsdcRevenueRow` | Database row interface for a USDC revenue record: `id`, `agentId`, `walletAddress`, `txid`, `amount`, `status`, `forwardTxid`, `createdAt`. |
+| `UsdcRevenueSummary` | Aggregated revenue summary for an agent: `totalReceived`, `totalForwarded`, `totalPending`, `totalFailed`. |
+
+### Exported Functions (from `server/db/usdc-revenue.ts`)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `recordRevenue` | `db: Database, params: { agentId, walletAddress, txid, amount }` | `void` | Record a new USDC revenue entry for an agent. Idempotent via UNIQUE txid constraint. |
+| `markForwarded` | `db: Database, id: number, forwardTxid: string` | `void` | Mark a revenue entry as forwarded with the outbound transaction ID. |
+| `markForwardFailed` | `db: Database, id: number` | `void` | Mark a revenue entry as failed to forward. |
+| `getPendingRevenue` | `db: Database` | `UsdcRevenueRow[]` | Get all revenue entries with `pending` status awaiting forwarding. |
+| `getAgentRevenue` | `db: Database, agentId: string` | `UsdcRevenueRow[]` | Get all revenue entries for a specific agent. |
+| `getAgentRevenueSummary` | `db: Database, agentId: string` | `UsdcRevenueSummary` | Get aggregated revenue summary for an agent. |
+
 ## Revenue Mode
 
-### `UsdcRevenueService` (in `server/billing/usdc-revenue.ts`)
+### `UsdcRevenueService` Details
 
 Monitors all agent wallets for incoming USDC ASA transfers, records revenue per agent, and auto-forwards collected USDC to the owner wallet.
 

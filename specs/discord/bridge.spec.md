@@ -47,7 +47,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Type | Description |
 |------|-------------|
-| `DiscordBridgeConfig` | `{ botToken: string; channelId: string; allowedUserIds: string[] }` |
+| `DiscordBridgeMode` | `'chat' \| 'work_intake'` — operational mode for the bridge |
+| `DiscordBridgeConfig` | `{ botToken: string; channelId: string; allowedUserIds: string[]; mode?: DiscordBridgeMode }` |
 | `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
 | `DiscordHelloData` | `{ heartbeat_interval: number }` |
 | `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
