@@ -1,7 +1,10 @@
+export type TelegramBridgeMode = 'chat' | 'work_intake';
+
 export interface TelegramBridgeConfig {
     botToken: string;
     chatId: string;
     allowedUserIds: string[];
+    mode?: TelegramBridgeMode;
 }
 
 export interface TelegramUpdate {

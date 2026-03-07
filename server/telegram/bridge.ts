@@ -1,7 +1,9 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
+import type { WorkTaskService } from '../work/service';
 import type { TelegramBridgeConfig, TelegramUpdate, TelegramMessage, TelegramFile } from './types';
 import type { SessionSource } from '../../shared/types';
+import type { WorkTask } from '../../shared/types/work-tasks';
 import { getAgent, listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
@@ -23,6 +25,7 @@ const POLL_TIMEOUT = 30; // Long-polling timeout in seconds
 export class TelegramBridge {
     private db: Database;
     private processManager: ProcessManager;
+    private workTaskService: WorkTaskService | null;
     private config: TelegramBridgeConfig;
     private offset = 0;
     private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -36,10 +39,15 @@ export class TelegramBridge {
     private readonly RATE_LIMIT_WINDOW_MS = 60_000;
     private readonly RATE_LIMIT_MAX_MESSAGES = 10;
 
-    constructor(db: Database, processManager: ProcessManager, config: TelegramBridgeConfig) {
+    constructor(db: Database, processManager: ProcessManager, config: TelegramBridgeConfig, workTaskService?: WorkTaskService) {
         this.db = db;
         this.processManager = processManager;
         this.config = config;
+        this.workTaskService = workTaskService ?? null;
+    }
+
+    private get mode() {
+        return this.config.mode ?? 'chat';
     }
 
     start(): void {
@@ -196,9 +204,78 @@ export class TelegramBridge {
             return;
         }
 
-        // Route to agent session
-        await this.routeToAgent(message.chat.id, userId, text, message.message_id);
+        // Route based on mode
+        if (this.mode === 'work_intake') {
+            await this.handleWorkIntake(message.chat.id, userId, text, message.message_id);
+        } else {
+            await this.routeToAgent(message.chat.id, userId, text, message.message_id);
+        }
     }
+
+    // ── Work Intake Mode ─────────────────────────────────────────────────
+
+    private async handleWorkIntake(chatId: number, userId: number, text: string, replyTo?: number): Promise<void> {
+        if (!this.workTaskService) {
+            await this.sendText(chatId, 'Work intake mode requires WorkTaskService. Check server configuration.');
+            return;
+        }
+
+        const description = text.trim();
+        if (!description) {
+            await this.sendText(chatId, 'Please provide a task description.');
+            return;
+        }
+
+        // Resolve agent
+        const agents = listAgents(this.db);
+        const agent = agents[0];
+        if (!agent) {
+            await this.sendText(chatId, 'No agents configured. Create an agent first.');
+            return;
+        }
+
+        try {
+            const task = await this.workTaskService.create({
+                agentId: agent.id,
+                description,
+                source: 'telegram',
+                sourceId: String(replyTo ?? ''),
+                requesterInfo: { telegramUserId: userId, chatId, messageId: replyTo },
+            });
+
+            log.info('Work task created from Telegram', { taskId: task.id, userId });
+
+            // Send acknowledgment
+            await this.sendText(chatId, `Task queued: ${task.id}`, replyTo);
+
+            // Subscribe for completion
+            this.workTaskService.onComplete(task.id, (completedTask) => {
+                this.sendTaskResult(chatId, completedTask, replyTo).catch(err => {
+                    log.error('Failed to send task result to Telegram', {
+                        taskId: completedTask.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error('Failed to create work task from Telegram', { error: message, userId });
+            await this.sendText(chatId, `Task failed: ${message.slice(0, 500)}`, replyTo);
+        }
+    }
+
+    private async sendTaskResult(chatId: number, task: WorkTask, replyTo?: number): Promise<void> {
+        if (task.status === 'completed') {
+            const parts = ['Task completed!'];
+            if (task.prUrl) parts.push(`PR: ${task.prUrl}`);
+            if (task.summary) parts.push(task.summary.slice(0, 3000));
+            await this.sendText(chatId, parts.join('\n'), replyTo);
+        } else {
+            await this.sendText(chatId, `Task failed: ${(task.error ?? 'Unknown error').slice(0, 1000)}`, replyTo);
+        }
+    }
+
+    // ── Chat Mode ────────────────────────────────────────────────────────
 
     private async routeToAgent(chatId: number, userId: number, text: string, replyTo?: number): Promise<void> {
         let sessionId = this.userSessions.get(userId);
