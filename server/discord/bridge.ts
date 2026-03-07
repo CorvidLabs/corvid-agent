@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { SessionSource } from '../../shared/types';
+import type { WorkTaskService } from '../work/service';
 import type {
     DiscordBridgeConfig,
     DiscordGatewayPayload,
@@ -25,6 +26,10 @@ const MAX_MESSAGE_LENGTH = 2000;
  * Bidirectional Discord bridge using raw WebSocket gateway.
  * No external Discord library dependencies.
  *
+ * Supports two modes:
+ * - `chat` (default): Messages route to persistent agent sessions.
+ * - `work_intake`: Messages create async work tasks via WorkTaskService.
+ *
  * Security note: This bridge authenticates via the Discord Gateway WebSocket API
  * using a bot token — it does NOT use the HTTP-based Interactions endpoint.
  * Therefore, Ed25519 request signature validation (X-Signature-Ed25519) is not
@@ -34,6 +39,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 export class DiscordBridge {
     private db: Database;
     private processManager: ProcessManager;
+    private workTaskService: WorkTaskService | null;
     private config: DiscordBridgeConfig;
 
     private ws: WebSocket | null = null;
@@ -55,16 +61,26 @@ export class DiscordBridge {
     private readonly RATE_LIMIT_WINDOW_MS = 60_000;
     private readonly RATE_LIMIT_MAX_MESSAGES = 10;
 
-    constructor(db: Database, processManager: ProcessManager, config: DiscordBridgeConfig) {
+    constructor(
+        db: Database,
+        processManager: ProcessManager,
+        config: DiscordBridgeConfig,
+        workTaskService?: WorkTaskService,
+    ) {
         this.db = db;
         this.processManager = processManager;
         this.config = config;
+        this.workTaskService = workTaskService ?? null;
+    }
+
+    private get mode() {
+        return this.config.mode ?? 'chat';
     }
 
     start(): void {
         if (this.running) return;
         this.running = true;
-        log.info('Discord bridge starting', { channelId: this.config.channelId });
+        log.info('Discord bridge starting', { channelId: this.config.channelId, mode: this.mode });
         this.connect();
     }
 
@@ -357,9 +373,145 @@ export class DiscordBridge {
             return;
         }
 
-        // Route to agent session
-        await this.routeToAgent(data.channel_id, userId, text);
+        // Route based on mode
+        if (this.mode === 'work_intake') {
+            await this.handleWorkIntake(data.channel_id, data.id, userId, text);
+        } else {
+            await this.routeToAgent(data.channel_id, userId, text);
+        }
     }
+
+    // ── Work Intake Mode ─────────────────────────────────────────────────
+
+    private async handleWorkIntake(
+        channelId: string,
+        messageId: string,
+        userId: string,
+        text: string,
+    ): Promise<void> {
+        if (!this.workTaskService) {
+            await this.sendMessage(channelId, 'Work intake mode requires WorkTaskService. Check server configuration.');
+            return;
+        }
+
+        // Strip bot mentions from the task description
+        const description = text.replace(/<@!?\d+>/g, '').trim();
+        if (!description) {
+            await this.sendMessage(channelId, 'Please provide a task description.');
+            return;
+        }
+
+        // Resolve agent
+        const agents = listAgents(this.db);
+        const agent = agents[0];
+        if (!agent) {
+            await this.sendMessage(channelId, 'No agents configured. Create an agent first.');
+            return;
+        }
+
+        try {
+            const task = await this.workTaskService.create({
+                agentId: agent.id,
+                description,
+                source: 'discord',
+                sourceId: messageId,
+                requesterInfo: { discordUserId: userId, channelId, messageId },
+            });
+
+            log.info('Work task created from Discord', { taskId: task.id, userId });
+
+            // Send acknowledgment embed
+            await this.sendEmbed(channelId, {
+                title: 'Task Queued',
+                description: `**${task.id}**\n\n${description.slice(0, 200)}${description.length > 200 ? '...' : ''}`,
+                color: 0x5865f2, // Discord blurple
+                footer: { text: `Status: ${task.status}` },
+            });
+
+            // Subscribe for completion
+            this.workTaskService.onComplete(task.id, (completedTask) => {
+                this.sendTaskResult(channelId, completedTask).catch(err => {
+                    log.error('Failed to send task result to Discord', {
+                        taskId: completedTask.id,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error('Failed to create work task from Discord', { error: message, userId });
+
+            await this.sendEmbed(channelId, {
+                title: 'Task Failed',
+                description: message.slice(0, 500),
+                color: 0xed4245, // Red
+            });
+        }
+    }
+
+    private async sendTaskResult(channelId: string, task: import('../../shared/types/work-tasks').WorkTask): Promise<void> {
+        if (task.status === 'completed') {
+            const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+
+            if (task.prUrl) {
+                fields.push({ name: 'Pull Request', value: task.prUrl, inline: false });
+            }
+
+            if (task.summary) {
+                fields.push({ name: 'Summary', value: task.summary.slice(0, 1024), inline: false });
+            }
+
+            await this.sendEmbed(channelId, {
+                title: 'Task Completed',
+                description: task.description.slice(0, 200),
+                color: 0x57f287, // Green
+                fields,
+                footer: { text: `Task: ${task.id}` },
+            });
+        } else if (task.status === 'failed') {
+            await this.sendEmbed(channelId, {
+                title: 'Task Failed',
+                description: task.description.slice(0, 200),
+                color: 0xed4245, // Red
+                fields: task.error
+                    ? [{ name: 'Error', value: task.error.slice(0, 1024), inline: false }]
+                    : [],
+                footer: { text: `Task: ${task.id} | Iterations: ${task.iterationCount}` },
+            });
+        }
+    }
+
+    // ── Discord Embeds ───────────────────────────────────────────────────
+
+    private async sendEmbed(
+        channelId: string,
+        embed: {
+            title: string;
+            description?: string;
+            color?: number;
+            fields?: Array<{ name: string; value: string; inline?: boolean }>;
+            footer?: { text: string };
+        },
+    ): Promise<void> {
+        const response = await fetch(
+            `https://discord.com/api/v10/channels/${channelId}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${this.config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ embeds: [embed] }),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
+        }
+    }
+
+    // ── Chat Mode ────────────────────────────────────────────────────────
 
     private async routeToAgent(channelId: string, userId: string, text: string): Promise<void> {
         let sessionId = this.userSessions.get(userId);
@@ -455,6 +607,8 @@ export class DiscordBridge {
             }
         });
     }
+
+    // ── Messaging ────────────────────────────────────────────────────────
 
     async sendMessage(channelId: string, content: string): Promise<void> {
         // Discord has a 2000 character limit per message
