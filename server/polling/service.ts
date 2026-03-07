@@ -513,9 +513,10 @@ export class MentionPollingService {
     // ─── Session completion tracking ──────────────────────────────────────────
 
     /**
-     * Subscribe to a session's end events and post a GitHub comment when it finishes.
-     * Handles session_exited (normal), session_stopped (manual), and session_error (crash).
-     * This guarantees we always follow up after the acknowledgment comment.
+     * Subscribe to a session's end events and post a GitHub comment on failure.
+     * On normal exit the agent itself posts a substantive reply, so no extra
+     * comment is needed. On error or manual stop, post a follow-up so the
+     * issue doesn't go silent after the acknowledgment.
      */
     private subscribeForCompletion(sessionId: string, repo: string, issueNumber: number, agentName: string): void {
         let fired = false;
@@ -531,9 +532,7 @@ export class MentionPollingService {
         };
 
         this.processManager.subscribe(sessionId, (_sid, event) => {
-            if (event.type === 'session_exited') {
-                postCompletion(`✅ **${agentName}** finished working on this.`);
-            } else if (event.type === 'session_error') {
+            if (event.type === 'session_error') {
                 const errMsg = (event as { error?: { message?: string } }).error?.message ?? 'unknown error';
                 postCompletion(`⚠️ **${agentName}** ran into an issue while working on this: ${errMsg}`);
             } else if (event.type === 'session_stopped') {
