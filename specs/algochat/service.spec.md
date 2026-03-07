@@ -22,7 +22,8 @@ Initializes the AlgoChat on-chain messaging service (Algorand SDK clients, chat 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `initAlgoChatService` | `(config: AlgoChatConfig)` | `Promise<AlgoChatService \| null>` | Initialize AlgoChat with Algorand SDK clients, chat account, and sync manager. Returns null if disabled, LocalNet unavailable, or no mnemonic on non-localnet |
+| `initAlgoChatService` | `(config: AlgoChatConfig)` | `Promise<AlgoChatService \| null>` | Initialize AlgoChat with Algorand SDK clients, chat account, and sync manager. Returns null if disabled, LocalNet unavailable, or no mnemonic on mainnet |
+| `fundFromTestnetFaucet` | `(address: string)` | `Promise<void>` | Fund a new account from the Algorand testnet dispenser API. Respects `TESTNET_DISPENSER_URL` and `TESTNET_DISPENSER_TOKEN` env vars |
 
 ### Exported Types
 
@@ -57,9 +58,10 @@ Initializes the AlgoChat on-chain messaging service (Algorand SDK clients, chat 
 
 ## Invariants
 
-1. **Config gating**: `initAlgoChatService` returns `null` when `config.enabled` is false, LocalNet is unreachable (for localnet network), or no mnemonic is provided on non-localnet networks
+1. **Config gating**: `initAlgoChatService` returns `null` when `config.enabled` is false, LocalNet is unreachable (for localnet network), or no mnemonic is provided on mainnet. On testnet without a mnemonic, a new account is auto-generated and funded via the testnet faucet
 2. **LocalNet health check**: Before initializing on localnet, the algod `/v2/status` endpoint is probed with a 2-second timeout. If unreachable, initialization is skipped
 3. **LocalNet auto-funding**: New or unfunded accounts on localnet are funded with 100 ALGO from the KMD default wallet dispenser
+3a. **Testnet auto-funding**: New or unfunded accounts on testnet are funded with 10 ALGO from the Algorand testnet dispenser API (`TESTNET_DISPENSER_URL` / `TESTNET_DISPENSER_TOKEN` env vars for custom endpoints)
 4. **Key publication**: After account setup, the encryption key is published on-chain so other accounts can discover and encrypt messages to this node
 5. **No duplicate subscriptions**: Both `subscribeForResponse` and `subscribeForLocalResponse` are idempotent -- repeated calls for the same sessionId are no-ops
 6. **Subscription timeout**: Subscriptions time out after 10 minutes of inactivity. Activity (content deltas, assistant events, turn completions) resets the timer
@@ -76,6 +78,11 @@ Initializes the AlgoChat on-chain messaging service (Algorand SDK clients, chat 
 - **Given** `config.enabled` is true, `config.network` is `localnet`, and LocalNet is running
 - **When** `initAlgoChatService(config)` is called
 - **Then** returns an `AlgoChatService` with `algorandService`, `chatAccount`, `syncManager`, `algodClient`, and `indexerClient`
+
+### Scenario: Testnet initialization without mnemonic
+- **Given** `config.enabled` is true, `config.network` is `testnet`, and no mnemonic is configured
+- **When** `initAlgoChatService(config)` is called
+- **Then** generates a new account, funds it via the testnet faucet, publishes the encryption key, and returns an `AlgoChatService`
 
 ### Scenario: LocalNet unavailable
 - **Given** `config.enabled` is true, `config.network` is `localnet`, and LocalNet is not running
@@ -113,7 +120,8 @@ Initializes the AlgoChat on-chain messaging service (Algorand SDK clients, chat 
 |-----------|----------|
 | AlgoChat disabled in config | Returns `null`, logs "Disabled" |
 | LocalNet not reachable (localnet network) | Returns `null`, logs info message |
-| No mnemonic and not on localnet | Returns `null`, logs info message |
+| No mnemonic and on mainnet | Returns `null`, logs info message |
+| Testnet faucet request fails | Throws `Error` with status code and body |
 | Key publication fails | Logs warning, continues (key may already exist) |
 | KMD default wallet not found | Throws `NotFoundError` |
 | Initialization exception | Catches error, logs, returns `null` |
@@ -146,6 +154,7 @@ Initializes the AlgoChat on-chain messaging service (Algorand SDK clients, chat 
 | `server/algochat/on-chain-transactor.ts` | `AlgoChatService` type for on-chain sends |
 | `server/algochat/agent-wallet.ts` | `AlgoChatService` type |
 | `server/algochat/message-router.ts` | `SubscriptionManager` via bridge |
+| `server/routes/onboarding.ts` | `AlgoChatBridge` for wallet/bridge status in onboarding endpoint |
 
 ## Change Log
 

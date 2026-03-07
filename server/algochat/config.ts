@@ -54,8 +54,8 @@ export function loadAlgoChatConfig(): AlgoChatConfig {
         agentNetwork,
         syncInterval: isNaN(syncInterval) ? 30000 : syncInterval,
         defaultAgentId: defaultAgentId && defaultAgentId.trim().length > 0 ? defaultAgentId.trim() : null,
-        // Enabled if mnemonic is provided, or if we can try localnet
-        enabled: hasMnemonic || network === 'localnet',
+        // Enabled if mnemonic is provided, or if we can try localnet/testnet
+        enabled: hasMnemonic || network === 'localnet' || network === 'testnet',
         pskContact,
         ownerAddresses,
     };

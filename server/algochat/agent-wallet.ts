@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
+import { fundFromTestnetFaucet } from './service';
 import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, listAgents } from '../db/agents';
 import { encryptMnemonic, decryptMnemonic } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
@@ -31,13 +32,12 @@ export class AgentWalletService {
     }
 
     /**
-     * Ensure the agent has a wallet. On localnet with no existing wallet,
+     * Ensure the agent has a wallet. On localnet/testnet with no existing wallet,
      * check the persistent keystore first (survives DB rebuilds), then
-     * auto-create and fund from the master account if not found.
-     * On testnet/mainnet this is a no-op.
+     * auto-create and fund. On mainnet this is a no-op (wallets must be funded manually).
      */
     async ensureWallet(agentId: string): Promise<void> {
-        if (this.config.network !== 'localnet') return;
+        if (this.config.network === 'mainnet') return;
 
         const agent = getAgent(this.db, agentId);
         if (!agent) return;
@@ -58,7 +58,7 @@ export class AgentWalletService {
                     log.info(`Agent ${agent.name} has existing balance: ${fundedAlgo} ALGO`);
                 } else {
                     // Re-fund if the account has zero balance
-                    await this.fundFromDispenser(saved.address, DEFAULT_FUND_ALGO * 1_000_000);
+                    await this.fundWallet(saved.address, DEFAULT_FUND_ALGO * 1_000_000);
                     addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
                     log.info(`Re-funded agent ${agent.name} with ${DEFAULT_FUND_ALGO} ALGO`);
                 }
@@ -85,8 +85,8 @@ export class AgentWalletService {
             saveKeystoreEntry(agent.name, generated.account.address, encrypted);
             log.info(`Created wallet for agent ${agent.name}`, { address: generated.account.address });
 
-            // Fund from master via KMD dispenser
-            await this.fundFromDispenser(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
+            // Fund from appropriate dispenser (KMD on localnet, faucet on testnet)
+            await this.fundWallet(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
             addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
             log.info(`Funded agent ${agent.name} with ${DEFAULT_FUND_ALGO} ALGO`);
 
@@ -144,10 +144,10 @@ export class AgentWalletService {
                 error: err instanceof Error ? err.message : String(err),
             });
 
-            // On localnet, re-create the wallet if decryption fails
+            // On localnet/testnet, re-create the wallet if decryption fails
             // (wallet was encrypted with a different key)
-            if (this.config.network === 'localnet') {
-                log.info(`Re-creating wallet for agent ${agentId} on localnet`);
+            if (this.config.network !== 'mainnet') {
+                log.info(`Re-creating wallet for agent ${agentId} on ${this.config.network}`);
                 try {
                     return await this.recreateWallet(agentId);
                 } catch (recreateErr) {
@@ -178,10 +178,10 @@ export class AgentWalletService {
     }
 
     /**
-     * Check if agent balance is below threshold and auto-refill (localnet only).
+     * Check if agent balance is below threshold and auto-refill (localnet/testnet).
      */
     async checkAndRefill(agentId: string): Promise<void> {
-        if (this.config.network !== 'localnet') return;
+        if (this.config.network === 'mainnet') return;
 
         const agent = getAgent(this.db, agentId);
         if (!agent?.walletAddress) return;
@@ -198,7 +198,7 @@ export class AgentWalletService {
      * Called at startup to ensure keys are discoverable on localnet.
      */
     async publishAllKeys(): Promise<void> {
-        if (this.config.network !== 'localnet') return;
+        if (this.config.network === 'mainnet') return;
 
         const agents = listAgents(this.db);
         for (const agent of agents) {
@@ -283,7 +283,7 @@ export class AgentWalletService {
     }
 
     /**
-     * Re-create an agent wallet on localnet when the existing encrypted
+     * Re-create an agent wallet on localnet/testnet when the existing encrypted
      * mnemonic can't be decrypted (encrypted with a different key).
      * Generates a new wallet, funds it, publishes the key, and returns the account.
      */
@@ -299,7 +299,7 @@ export class AgentWalletService {
         saveKeystoreEntry(agent.name, generated.account.address, encrypted);
         log.info(`Re-created wallet for agent ${agent.name}`, { address: generated.account.address });
 
-        await this.fundFromDispenser(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
+        await this.fundWallet(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
         addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
         log.info(`Funded agent ${agent.name} with ${DEFAULT_FUND_ALGO} ALGO`);
 
@@ -346,7 +346,19 @@ export class AgentWalletService {
         }
     }
 
-    private async fundFromDispenser(address: string, microAlgos: number): Promise<void> {
+    /**
+     * Fund a wallet using the appropriate mechanism for the current network.
+     * LocalNet uses KMD dispenser; testnet uses the public faucet API.
+     */
+    private async fundWallet(address: string, microAlgos: number): Promise<void> {
+        if (this.config.network === 'testnet') {
+            await fundFromTestnetFaucet(address);
+            return;
+        }
+        await this.fundFromLocalNetDispenser(address, microAlgos);
+    }
+
+    private async fundFromLocalNetDispenser(address: string, microAlgos: number): Promise<void> {
         const algosdk = (await import('algosdk')).default;
         const kmdToken = 'a'.repeat(64);
         const kmdUrl = process.env.LOCALNET_KMD_URL ?? 'http://localhost:4002';

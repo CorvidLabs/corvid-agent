@@ -96,6 +96,37 @@ async function fundFromLocalNetDispenser(
     }
 }
 
+/** Testnet dispenser API URL (Algorand public faucet). */
+const TESTNET_DISPENSER_URL = 'https://dispenser.testnet.aws.algodev.network';
+
+/**
+ * Fund a new account from the Algorand testnet dispenser API.
+ * The public dispenser provides small amounts of testnet ALGO for development.
+ */
+export async function fundFromTestnetFaucet(address: string): Promise<void> {
+    const url = process.env.TESTNET_DISPENSER_URL ?? TESTNET_DISPENSER_URL;
+    const dispenserToken = process.env.TESTNET_DISPENSER_TOKEN ?? '';
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (dispenserToken) {
+        headers['Authorization'] = `Bearer ${dispenserToken}`;
+    }
+
+    const response = await fetch(`${url}/fund`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ receiver: address, amount: 10_000_000 }), // 10 ALGO
+        signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Testnet faucet request failed (${response.status}): ${body}`);
+    }
+
+    log.info(`Funded ${address} with testnet ALGO from faucet`);
+}
+
 /** Check if LocalNet is reachable by hitting the algod health endpoint. */
 async function isLocalNetAvailable(): Promise<boolean> {
     try {
@@ -177,28 +208,36 @@ export async function initAlgoChatService(config: AlgoChatConfig): Promise<AlgoC
             chatAccount = algochat.createChatAccountFromMnemonic(config.mnemonic);
             log.info(`Restored account from mnemonic`, { address: chatAccount.address });
 
-            // On localnet, ensure the restored account is funded
-            if (config.network === 'localnet') {
+            // On localnet/testnet, ensure the restored account is funded
+            if (config.network === 'localnet' || config.network === 'testnet') {
                 try {
                     const info = await algodClient.accountInformation(chatAccount.address).do();
                     if (Number(info.amount ?? 0) === 0) {
-                        await fundFromLocalNetDispenser(algodClient, chatAccount.address);
+                        if (config.network === 'localnet') {
+                            await fundFromLocalNetDispenser(algodClient, chatAccount.address);
+                        } else {
+                            await fundFromTestnetFaucet(chatAccount.address);
+                        }
                     }
                 } catch {
                     // Best-effort funding; key publish will fail if unfunded
                 }
             }
-        } else if (config.network === 'localnet') {
+        } else if (config.network === 'localnet' || config.network === 'testnet') {
             const generated = algochat.createRandomChatAccount();
             chatAccount = generated.account;
             log.info(`Generated new account`, { address: chatAccount.address });
             // SECURITY: Never log the mnemonic — it can be set via ALGOCHAT_MNEMONIC env var to persist across restarts
             log.info('Generated new account — set ALGOCHAT_MNEMONIC env var to persist across restarts', { address: chatAccount.address });
 
-            // Fund from LocalNet dispenser
-            await fundFromLocalNetDispenser(algodClient, chatAccount.address);
+            // Fund from appropriate dispenser
+            if (config.network === 'localnet') {
+                await fundFromLocalNetDispenser(algodClient, chatAccount.address);
+            } else {
+                await fundFromTestnetFaucet(chatAccount.address);
+            }
         } else {
-            log.info('No mnemonic and not on localnet — cannot initialize');
+            log.info('No mnemonic and not on localnet/testnet — cannot initialize');
             return null;
         }
 
