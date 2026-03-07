@@ -1,38 +1,23 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, beforeAll, afterAll, spyOn } from 'bun:test';
+import { Database } from 'bun:sqlite';
 import { QuestionDispatcher } from '../notifications/question-dispatcher';
-import type { Database } from 'bun:sqlite';
+import { runMigrations } from '../db/schema';
+import { upsertChannel } from '../db/notifications';
 import type { OwnerQuestion } from '../process/owner-question-manager';
 
-// Mock the DB functions
-const mockListChannels = mock(() => [] as Array<{ channelType: string; config: Record<string, unknown>; enabled: boolean }>);
-const mockCreateDispatch = mock(() => {});
+// Use a real in-memory DB instead of mock.module to avoid polluting global state.
+// mock.module replaces modules process-wide, breaking other test files that import
+// from the same modules (e.g., question-channels.test.ts, notification DB tests).
 
-// Mock channel senders — all resolve to success
-const mockGithub = mock(() => Promise.resolve({ success: true, externalRef: 'issue-1' }));
-const mockTelegram = mock(() => Promise.resolve({ success: true, externalRef: 'msg-1' }));
-const mockAlgoChat = mock(() => Promise.resolve({ success: true, externalRef: 'tx-1' }));
-const mockSlack = mock(() => Promise.resolve({ success: true, externalRef: 'ts-1' }));
+let db: Database;
 
-mock.module('../db/notifications', () => ({
-    listChannelsForAgent: mockListChannels,
-    createQuestionDispatch: mockCreateDispatch,
-}));
+beforeAll(() => {
+    db = new Database(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
+});
 
-mock.module('../notifications/channels/github-question', () => ({
-    sendGitHubQuestion: mockGithub,
-}));
-
-mock.module('../notifications/channels/telegram-question', () => ({
-    sendTelegramQuestion: mockTelegram,
-}));
-
-mock.module('../notifications/channels/algochat-question', () => ({
-    sendAlgoChatQuestion: mockAlgoChat,
-}));
-
-mock.module('../notifications/channels/slack-question', () => ({
-    sendSlackQuestion: mockSlack,
-}));
+afterAll(() => db.close());
 
 function makeQuestion(overrides: Partial<OwnerQuestion> = {}): OwnerQuestion {
     return {
@@ -48,85 +33,115 @@ function makeQuestion(overrides: Partial<OwnerQuestion> = {}): OwnerQuestion {
     };
 }
 
+function seedAgent(agentId: string): void {
+    // Ensure agent exists for foreign key constraint
+    db.query(
+        `INSERT OR IGNORE INTO agents (id, name, model, system_prompt) VALUES (?, ?, ?, ?)`,
+    ).run(agentId, 'Test Agent', 'test-model', 'test prompt');
+}
+
 describe('QuestionDispatcher', () => {
     let dispatcher: QuestionDispatcher;
-    const fakeDb = {} as Database;
 
     beforeEach(() => {
-        dispatcher = new QuestionDispatcher(fakeDb);
-        mockListChannels.mockReset();
-        mockCreateDispatch.mockReset();
-        mockGithub.mockReset();
-        mockTelegram.mockReset();
-        mockAlgoChat.mockReset();
-        mockSlack.mockReset();
+        dispatcher = new QuestionDispatcher(db);
+        // Clean channels between tests
+        db.exec('DELETE FROM owner_question_dispatches');
+        db.exec('DELETE FROM notification_channels');
     });
 
     test('returns empty array when no channels configured', async () => {
-        mockListChannels.mockReturnValue([]);
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual([]);
     });
 
     test('skips disabled channels', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'github', config: { repo: 'org/repo' }, enabled: false },
-        ]);
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'github', { repo: 'org/repo' }, false);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const spy = spyOn(dispatcher as any, 'dispatchToChannel');
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual([]);
-        expect(mockGithub).not.toHaveBeenCalled();
+        expect(spy).not.toHaveBeenCalled();
     });
 
-    test('dispatches to github channel and records dispatch', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'github', config: { repo: 'org/repo' }, enabled: true },
-        ]);
-        mockGithub.mockResolvedValue({ success: true, externalRef: 'issue-42' });
+    test('dispatches to channel and records dispatch', async () => {
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'github', { repo: 'org/repo' }, true);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spyOn(dispatcher as any, 'dispatchToChannel').mockResolvedValue({
+            success: true,
+            externalRef: 'issue-42',
+        });
 
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual(['github']);
-        expect(mockCreateDispatch).toHaveBeenCalledWith(fakeDb, 'q-1', 'github', 'issue-42');
+
+        // Verify dispatch was recorded in DB
+        const dispatches = db.query(
+            `SELECT * FROM owner_question_dispatches WHERE question_id = ?`,
+        ).all('q-1') as Record<string, unknown>[];
+        expect(dispatches.length).toBe(1);
+        expect(dispatches[0].channel_type).toBe('github');
+        expect(dispatches[0].external_ref).toBe('issue-42');
     });
 
     test('handles channel dispatch failure gracefully', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'github', config: { repo: 'org/repo' }, enabled: true },
-        ]);
-        mockGithub.mockResolvedValue({ success: false, externalRef: '' });
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'github', { repo: 'org/repo' }, true);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spyOn(dispatcher as any, 'dispatchToChannel').mockResolvedValue({
+            success: false,
+            error: 'failed',
+        });
 
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual([]);
-        expect(mockCreateDispatch).not.toHaveBeenCalled();
+
+        // No dispatch recorded
+        const dispatches = db.query(
+            `SELECT * FROM owner_question_dispatches WHERE question_id = ?`,
+        ).all('q-1') as Record<string, unknown>[];
+        expect(dispatches.length).toBe(0);
     });
 
     test('handles channel dispatch exception gracefully', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'github', config: { repo: 'org/repo' }, enabled: true },
-        ]);
-        mockGithub.mockRejectedValue(new Error('network error'));
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'github', { repo: 'org/repo' }, true);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spyOn(dispatcher as any, 'dispatchToChannel').mockRejectedValue(new Error('network error'));
 
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual([]);
     });
 
     test('dispatches to multiple channels', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'github', config: { repo: 'org/repo' }, enabled: true },
-            { channelType: 'telegram', config: { botToken: 'tok', chatId: '123' }, enabled: true },
-        ]);
-        mockGithub.mockResolvedValue({ success: true, externalRef: 'issue-1' });
-        mockTelegram.mockResolvedValue({ success: true, externalRef: 'msg-1' });
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'github', { repo: 'org/repo' }, true);
+        upsertChannel(db, 'agent-1', 'telegram', { botToken: 'tok', chatId: '123' }, true);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spyOn(dispatcher as any, 'dispatchToChannel').mockResolvedValue({
+            success: true,
+            externalRef: 'ref-1',
+        });
 
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual(['github', 'telegram']);
-        expect(mockCreateDispatch).toHaveBeenCalledTimes(2);
+
+        const dispatches = db.query(
+            `SELECT * FROM owner_question_dispatches WHERE question_id = ?`,
+        ).all('q-1') as Record<string, unknown>[];
+        expect(dispatches.length).toBe(2);
     });
 
     test('returns error for missing github repo config', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'github', config: {}, enabled: true },
-        ]);
-        // Clear env var to ensure it fails
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'github', {}, true);
         const origRepo = process.env.NOTIFICATION_GITHUB_REPO;
         delete process.env.NOTIFICATION_GITHUB_REPO;
 
@@ -137,9 +152,8 @@ describe('QuestionDispatcher', () => {
     });
 
     test('returns error for missing telegram config', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'telegram', config: {}, enabled: true },
-        ]);
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'telegram', {}, true);
         const origToken = process.env.TELEGRAM_BOT_TOKEN;
         const origChat = process.env.TELEGRAM_CHAT_ID;
         delete process.env.TELEGRAM_BOT_TOKEN;
@@ -153,27 +167,24 @@ describe('QuestionDispatcher', () => {
     });
 
     test('returns error for unknown channel type', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'carrier_pigeon', config: {}, enabled: true },
-        ]);
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'carrier_pigeon', {}, true);
 
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual([]);
     });
 
     test('returns error for discord (notification-only)', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'discord', config: {}, enabled: true },
-        ]);
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'discord', {}, true);
 
         const result = await dispatcher.dispatch(makeQuestion());
         expect(result).toEqual([]);
     });
 
     test('algochat requires messenger to be set', async () => {
-        mockListChannels.mockReturnValue([
-            { channelType: 'algochat', config: { toAddress: 'ADDR123' }, enabled: true },
-        ]);
+        seedAgent('agent-1');
+        upsertChannel(db, 'agent-1', 'algochat', { toAddress: 'ADDR123' }, true);
 
         // No messenger set — should fail
         const result = await dispatcher.dispatch(makeQuestion());
