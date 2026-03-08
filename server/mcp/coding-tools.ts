@@ -5,11 +5,20 @@
  * so Ollama agents can do real coding work without Claude SDK.
  */
 
-import { resolve, relative, dirname } from 'path';
+import { resolve, relative, dirname, sep } from 'path';
 import { mkdir } from 'fs/promises';
 import { isProtectedPath, isProtectedBashCommand } from '../process/protected-paths';
 import type { DirectToolDefinition } from './direct-tools';
 import { AuthorizationError } from '../lib/errors';
+
+/**
+ * Normalize a file path for cross-platform consistency.
+ * Converts Windows backslashes to forward slashes so tool responses
+ * look the same regardless of the host OS.
+ */
+export function normalizePath(p: string): string {
+    return sep === '\\' ? p.replaceAll('\\', '/') : p;
+}
 
 export interface CodingToolContext {
     workingDir: string;          // Project working directory (absolute)
@@ -107,7 +116,7 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     const absPath = resolveSafePath(ctx.workingDir, String(args.path));
                     const file = Bun.file(absPath);
                     if (!await file.exists()) {
-                        return { text: `File not found: ${args.path}`, isError: true };
+                        return { text: `File not found: ${normalizePath(String(args.path))}`, isError: true };
                     }
 
                     const content = await file.text();
@@ -145,14 +154,14 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     const absPath = resolveSafePath(ctx.workingDir, filePath);
 
                     if (isProtectedPath(filePath) || isProtectedPath(absPath)) {
-                        return { text: `Protected file — cannot write: ${filePath}`, isError: true };
+                        return { text: `Protected file — cannot write: ${normalizePath(filePath)}`, isError: true };
                     }
 
                     // Ensure parent directory exists (cross-platform)
                     await mkdir(dirname(absPath), { recursive: true });
 
                     await Bun.write(absPath, String(args.content));
-                    return { text: `File written: ${filePath}` };
+                    return { text: `File written: ${normalizePath(filePath)}` };
                 } catch (err) {
                     return { text: String(err instanceof Error ? err.message : err), isError: true };
                 }
@@ -178,12 +187,12 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     const absPath = resolveSafePath(ctx.workingDir, filePath);
 
                     if (isProtectedPath(filePath) || isProtectedPath(absPath)) {
-                        return { text: `Protected file — cannot edit: ${filePath}`, isError: true };
+                        return { text: `Protected file — cannot edit: ${normalizePath(filePath)}`, isError: true };
                     }
 
                     const file = Bun.file(absPath);
                     if (!await file.exists()) {
-                        return { text: `File not found: ${filePath}`, isError: true };
+                        return { text: `File not found: ${normalizePath(filePath)}`, isError: true };
                     }
 
                     const content = await file.text();
@@ -203,15 +212,15 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     }
 
                     if (count === 0) {
-                        return { text: `old_string not found in ${filePath}. Read the file first to see its current content.`, isError: true };
+                        return { text: `old_string not found in ${normalizePath(filePath)}. Read the file first to see its current content.`, isError: true };
                     }
                     if (count > 1) {
-                        return { text: `old_string appears ${count} times in ${filePath}. It must be unique — include more surrounding context.`, isError: true };
+                        return { text: `old_string appears ${count} times in ${normalizePath(filePath)}. It must be unique — include more surrounding context.`, isError: true };
                     }
 
                     const updated = content.replace(oldStr, newStr);
                     await Bun.write(absPath, updated);
-                    return { text: `File edited: ${filePath}` };
+                    return { text: `File edited: ${normalizePath(filePath)}` };
                 } catch (err) {
                     return { text: String(err instanceof Error ? err.message : err), isError: true };
                 }
@@ -413,7 +422,12 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     }
 
                     // Make paths relative to workingDir for readability
+                    // Handle both forward and backslash separators for cross-platform
                     output = output.replaceAll(ctx.workingDir + '/', '');
+                    if (sep === '\\') {
+                        output = output.replaceAll(ctx.workingDir + '\\', '');
+                        output = output.replaceAll('\\', '/');
+                    }
 
                     return { text: truncateOutput(output) };
                 } catch (err) {
