@@ -51,6 +51,7 @@ export interface DiscordHelloData {
 export interface DiscordReadyData {
     session_id: string;
     resume_gateway_url: string;
+    user?: { id: string; username: string };
 }
 
 export interface DiscordMessageData {
@@ -61,6 +62,8 @@ export interface DiscordMessageData {
     timestamp: string;
     /** Present when message is in a thread — the thread's channel ID */
     thread?: { id: string };
+    /** Users mentioned in this message — used for @mention detection */
+    mentions?: DiscordAuthor[];
 }
 
 export interface DiscordAuthor {

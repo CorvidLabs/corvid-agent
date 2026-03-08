@@ -15,6 +15,7 @@ function createMockProcessManager() {
         sendMessage: mock(() => true),
         subscribe: mock(() => {}),
         unsubscribe: mock(() => {}),
+        resumeProcess: mock(() => {}),
     } as unknown as import('../process/manager').ProcessManager;
 }
 
@@ -51,6 +52,11 @@ function createMockWorkTaskService() {
     } as unknown as import('../work/service').WorkTaskService & {
         _triggerComplete: (taskId: string, task: WorkTask) => void;
     };
+}
+
+/** Set the bot's user ID on the bridge (simulates READY event). */
+function setBotUserId(bridge: DiscordBridge, botUserId: string): void {
+    (bridge as unknown as { botUserId: string }).botUserId = botUserId;
 }
 
 let db: Database;
@@ -94,10 +100,6 @@ describe('DiscordBridge', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        // Simulate bot message — should not call routeToAgent
-        const routeSpy = mock(() => Promise.resolve());
-        (bridge as unknown as { routeToAgent: (...args: unknown[]) => Promise<void> }).routeToAgent = routeSpy;
-
         await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             id: '1',
             channel_id: '100000000000000001',
@@ -106,7 +108,7 @@ describe('DiscordBridge', () => {
             timestamp: new Date().toISOString(),
         });
 
-        expect(routeSpy).not.toHaveBeenCalled();
+        expect(pm.startProcess).not.toHaveBeenCalled();
     });
 
     test('ignores messages from other channels', async () => {
@@ -118,9 +120,6 @@ describe('DiscordBridge', () => {
         };
         const bridge = new DiscordBridge(db, pm, config);
 
-        const routeSpy = mock(() => Promise.resolve());
-        (bridge as unknown as { routeToAgent: (...args: unknown[]) => Promise<void> }).routeToAgent = routeSpy;
-
         await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
             id: '1',
             channel_id: '100000000000000003',
@@ -129,7 +128,79 @@ describe('DiscordBridge', () => {
             timestamp: new Date().toISOString(),
         });
 
-        expect(routeSpy).not.toHaveBeenCalled();
+        expect(pm.startProcess).not.toHaveBeenCalled();
+    });
+
+    test('ignores regular channel messages (passive mode)', async () => {
+        const pm = createMockProcessManager();
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const fetchCalls: string[] = [];
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async (url: string | URL | Request) => {
+            fetchCalls.push(String(url));
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            // Regular message without @mention — should be silently ignored
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000001',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'Hello everyone',
+                timestamp: new Date().toISOString(),
+                mentions: [], // no mentions
+            });
+
+            expect(pm.startProcess).not.toHaveBeenCalled();
+            expect(fetchCalls.length).toBe(0);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('@mention triggers one-off reply', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000001',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: '<@999000000000000001> what time is it?',
+                timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
+            });
+
+            // Should start a process for one-off reply
+            expect(pm.startProcess).toHaveBeenCalled();
+            // Should subscribe for response
+            expect(pm.subscribe).toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
     });
 
     test('sendMessage splits long messages', async () => {
@@ -181,14 +252,65 @@ describe('DiscordBridge', () => {
         bridge.stop();
         expect((bridge as unknown as { running: boolean }).running).toBe(false);
     });
+
+    test('thread messages route to session', async () => {
+        const pm = createMockProcessManager();
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        // Simulate a tracked thread session
+        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        // Create a real session to query
+        const { createSession } = await import('../db/sessions');
+        const session = createSession(db, {
+            projectId: (await import('../db/projects')).listProjects(db)[0].id,
+            agentId: (await import('../db/agents')).listAgents(db)[0].id,
+            name: 'Discord thread:300000000000000001',
+            initialPrompt: 'test',
+            source: 'discord',
+        });
+
+        threadSessions.set('300000000000000001', {
+            sessionId: session.id,
+            agentName: 'TestAgent',
+            agentModel: 'test-model',
+            ownerUserId: 'user-1',
+        });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000002',
+                channel_id: '300000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'continue the conversation',
+                timestamp: new Date().toISOString(),
+            });
+
+            // Should send message to existing session
+            expect(pm.sendMessage).toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
 });
 
 describe('DiscordBridge work_intake mode', () => {
-    test('work_intake mode creates work task from message', async () => {
+    test('work_intake mode creates work task from @mention', async () => {
         const pm = createMockProcessManager();
         const wts = createMockWorkTaskService();
 
-        // Seed agent so handleWorkIntake can resolve one
         createAgent(db, { name: 'TestAgent' });
 
         const config: DiscordBridgeConfig = {
@@ -198,6 +320,7 @@ describe('DiscordBridge work_intake mode', () => {
             mode: 'work_intake',
         };
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
+        setBotUserId(bridge, '999000000000000001');
 
         const fetchBodies: unknown[] = [];
         const originalFetch = globalThis.fetch;
@@ -211,8 +334,9 @@ describe('DiscordBridge work_intake mode', () => {
                 id: '200000000000000001',
                 channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
-                content: 'Fix the login bug',
+                content: '<@999000000000000001> Fix the login bug',
                 timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
             });
 
             // WorkTaskService.create should have been called
@@ -233,7 +357,7 @@ describe('DiscordBridge work_intake mode', () => {
         }
     });
 
-    test('work_intake mode strips bot mentions from description', async () => {
+    test('work_intake mode ignores non-mention messages', async () => {
         const pm = createMockProcessManager();
         const wts = createMockWorkTaskService();
 
@@ -246,6 +370,7 @@ describe('DiscordBridge work_intake mode', () => {
             mode: 'work_intake',
         };
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
+        setBotUserId(bridge, '999000000000000001');
 
         const originalFetch = globalThis.fetch;
         globalThis.fetch = mock(async () => {
@@ -257,55 +382,13 @@ describe('DiscordBridge work_intake mode', () => {
                 id: '200000000000000002',
                 channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
-                content: '<@!12345678> Fix the login bug',
+                content: 'Fix the login bug',
                 timestamp: new Date().toISOString(),
+                mentions: [],
             });
 
-            const createCall = (wts.create as ReturnType<typeof mock>).mock.calls[0] as unknown[];
-            const input = createCall[0] as { description: string };
-            expect(input.description).toBe('Fix the login bug');
-        } finally {
-            globalThis.fetch = originalFetch;
-        }
-    });
-
-    test('work_intake mode rejects empty description after mention strip', async () => {
-        const pm = createMockProcessManager();
-        const wts = createMockWorkTaskService();
-
-        createAgent(db, { name: 'TestAgent' });
-
-        const config: DiscordBridgeConfig = {
-            botToken: 'test-token',
-            channelId: '100000000000000001',
-            allowedUserIds: [],
-            mode: 'work_intake',
-        };
-        const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
-
-        const fetchBodies: unknown[] = [];
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
-            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
-            return new Response(JSON.stringify({}), { status: 200 });
-        }) as unknown as typeof fetch;
-
-        try {
-            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: '200000000000000003',
-                channel_id: '100000000000000001',
-                author: { id: 'user-1', username: 'TestUser' },
-                content: '<@!12345678>',
-                timestamp: new Date().toISOString(),
-            });
-
-            // Should NOT have created a task
+            // Should NOT have created a task — no @mention
             expect(wts.create).not.toHaveBeenCalled();
-
-            // Should have sent a "provide a description" message
-            const textBody = fetchBodies.find((b: unknown) => (b as { content?: string }).content) as { content: string } | undefined;
-            expect(textBody).toBeDefined();
-            expect(textBody!.content).toContain('task description');
         } finally {
             globalThis.fetch = originalFetch;
         }
@@ -324,6 +407,7 @@ describe('DiscordBridge work_intake mode', () => {
             mode: 'work_intake',
         };
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
+        setBotUserId(bridge, '999000000000000001');
 
         const fetchBodies: unknown[] = [];
         const originalFetch = globalThis.fetch;
@@ -333,13 +417,14 @@ describe('DiscordBridge work_intake mode', () => {
         }) as unknown as typeof fetch;
 
         try {
-            // Create task
+            // Create task via @mention
             await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
                 id: '200000000000000004',
                 channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
-                content: 'Build the feature',
+                content: '<@999000000000000001> Build the feature',
                 timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
             });
 
             // onComplete should have been registered
@@ -399,6 +484,7 @@ describe('DiscordBridge work_intake mode', () => {
             mode: 'work_intake',
         };
         const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
+        setBotUserId(bridge, '999000000000000001');
 
         const fetchBodies: unknown[] = [];
         const originalFetch = globalThis.fetch;
@@ -412,8 +498,9 @@ describe('DiscordBridge work_intake mode', () => {
                 id: '200000000000000005',
                 channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
-                content: 'Break something',
+                content: '<@999000000000000001> Break something',
                 timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
             });
 
             fetchBodies.length = 0;
@@ -467,6 +554,7 @@ describe('DiscordBridge work_intake mode', () => {
         };
         // No workTaskService passed
         const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
 
         const fetchBodies: unknown[] = [];
         const originalFetch = globalThis.fetch;
@@ -480,52 +568,14 @@ describe('DiscordBridge work_intake mode', () => {
                 id: '200000000000000006',
                 channel_id: '100000000000000001',
                 author: { id: 'user-1', username: 'TestUser' },
-                content: 'Do something',
+                content: '<@999000000000000001> Do something',
                 timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
             });
 
             const textBody = fetchBodies.find((b: unknown) => (b as { content?: string }).content) as { content: string } | undefined;
             expect(textBody).toBeDefined();
             expect(textBody!.content).toContain('WorkTaskService');
-        } finally {
-            globalThis.fetch = originalFetch;
-        }
-    });
-
-    test('chat mode still works with work_intake configured', async () => {
-        const pm = createMockProcessManager();
-        const wts = createMockWorkTaskService();
-
-        createAgent(db, { name: 'TestAgent' });
-        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
-
-        const config: DiscordBridgeConfig = {
-            botToken: 'test-token',
-            channelId: '100000000000000001',
-            allowedUserIds: [],
-            mode: 'chat',  // explicitly chat mode
-        };
-        const bridge = new DiscordBridge(db, pm, config, wts as unknown as import('../work/service').WorkTaskService);
-
-        const originalFetch = globalThis.fetch;
-        globalThis.fetch = mock(async () => {
-            // Return a thread-like response with an id for thread creation
-            return new Response(JSON.stringify({ id: '300000000000000001' }), { status: 200 });
-        }) as unknown as typeof fetch;
-
-        try {
-            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
-                id: '200000000000000007',
-                channel_id: '100000000000000001',
-                author: { id: 'user-1', username: 'TestUser' },
-                content: 'hello there',
-                timestamp: new Date().toISOString(),
-            });
-
-            // In chat mode, WorkTaskService.create should NOT be called
-            expect(wts.create).not.toHaveBeenCalled();
-            // Process manager should start a session (in a thread)
-            expect(pm.startProcess).toHaveBeenCalled();
         } finally {
             globalThis.fetch = originalFetch;
         }
