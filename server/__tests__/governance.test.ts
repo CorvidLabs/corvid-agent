@@ -6,9 +6,11 @@ import {
     classifyPaths,
     assessImpact,
     evaluateVote,
+    evaluateWeightedVote,
     checkAutomationAllowed,
     GOVERNANCE_TIERS,
     type GovernanceVoteRecord,
+    type WeightedVoteRecord,
 } from '../councils/governance';
 import {
     createCouncil,
@@ -481,5 +483,157 @@ describe('governance vote DB operations', () => {
         const row = db.query('SELECT vote_type, governance_tier FROM council_launches WHERE id = ?').get(launchId) as { vote_type: string; governance_tier: number | null };
         expect(row.vote_type).toBe('standard');
         expect(row.governance_tier).toBeNull();
+    });
+
+    test('council stores quorum_type and quorum_threshold', () => {
+        const council = createCouncil(db, {
+            name: 'Custom Quorum Council',
+            agentIds: AGENT_IDS,
+            quorumType: 'supermajority',
+            quorumThreshold: 0.8,
+        });
+
+        expect(council.quorumType).toBe('supermajority');
+        expect(council.quorumThreshold).toBe(0.8);
+    });
+
+    test('council defaults quorum_type to majority', () => {
+        const council = createCouncil(db, {
+            name: 'Default Quorum Council',
+            agentIds: AGENT_IDS,
+        });
+
+        expect(council.quorumType).toBe('majority');
+        expect(council.quorumThreshold).toBeNull();
+    });
+});
+
+// ─── Weighted vote evaluation tests ──────────────────────────────────────────
+
+describe('weighted governance vote evaluation', () => {
+    const makeWeightedVotes = (
+        specs: { vote: 'approve' | 'reject' | 'abstain'; weight: number }[],
+    ): WeightedVoteRecord[] => {
+        return specs.map((s, i) => ({
+            agentId: `agent-${i}`,
+            vote: s.vote,
+            reason: '',
+            votedAt: new Date().toISOString(),
+            weight: s.weight,
+        }));
+    };
+
+    test('Layer 0 always fails regardless of weights', () => {
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 100 },
+            { vote: 'approve', weight: 100 },
+        ]);
+        const result = evaluateWeightedVote(0, 2, votes, true);
+        expect(result.passed).toBe(false);
+    });
+
+    test('high-reputation approvers can outvote low-reputation rejectors', () => {
+        // Agent 0 (weight 90) approves, agents 1-2 (weight 20 each) reject
+        // Weighted: 90 approve / (90+20+20) = 69.2% < 75% → fails Layer 1
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 90 },
+            { vote: 'reject', weight: 20 },
+            { vote: 'reject', weight: 20 },
+        ]);
+        const result = evaluateWeightedVote(1, 3, votes, true);
+        expect(result.passed).toBe(false);
+        expect(result.weightedApprovalRatio).toBeCloseTo(90 / 130, 2);
+    });
+
+    test('weighted majority passes Layer 2 at 50% threshold', () => {
+        // Agent 0 (weight 80) approves, Agent 1 (weight 20) rejects
+        // Weighted: 80/(80+20) = 80% > 50% → passes
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 80 },
+            { vote: 'reject', weight: 20 },
+        ]);
+        const result = evaluateWeightedVote(2, 2, votes);
+        expect(result.passed).toBe(true);
+        expect(result.weightedApprovalRatio).toBeCloseTo(0.8, 2);
+    });
+
+    test('weighted minority fails even if unweighted majority', () => {
+        // 2 low-weight approvers vs 1 high-weight rejector
+        // Unweighted: 2/3 = 66% > 50% → would pass
+        // Weighted: (10+10)/(10+10+80) = 20% < 50% → fails
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 10 },
+            { vote: 'approve', weight: 10 },
+            { vote: 'reject', weight: 80 },
+        ]);
+        const result = evaluateWeightedVote(2, 3, votes);
+        expect(result.passed).toBe(false);
+        expect(result.weightedApprovalRatio).toBeCloseTo(20 / 100, 2);
+    });
+
+    test('custom threshold overrides tier default', () => {
+        // 2/3 approve (weight 50 each), 1 rejects (weight 50)
+        // Weighted: 100/150 = 66.7%
+        // Default Layer 2 threshold (50%) → passes
+        // Custom threshold 0.7 → fails
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 50 },
+            { vote: 'approve', weight: 50 },
+            { vote: 'reject', weight: 50 },
+        ]);
+
+        const withDefault = evaluateWeightedVote(2, 3, votes);
+        expect(withDefault.passed).toBe(true);
+
+        const withCustom = evaluateWeightedVote(2, 3, votes, false, 0.7);
+        expect(withCustom.passed).toBe(false);
+    });
+
+    test('abstentions reduce weighted approval ratio', () => {
+        // Agent 0 (weight 50) approves, Agent 1 (weight 50) abstains
+        // Total weight = 100, approve weight = 50 → 50% exactly
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 50 },
+            { vote: 'abstain', weight: 50 },
+        ]);
+        const result = evaluateWeightedVote(2, 2, votes);
+        expect(result.passed).toBe(true); // 50% meets 50% threshold
+        expect(result.weightedApprovalRatio).toBeCloseTo(0.5, 2);
+    });
+
+    test('Layer 1 awaits human approval after weighted vote passes', () => {
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 80 },
+            { vote: 'approve', weight: 80 },
+            { vote: 'reject', weight: 20 },
+        ]);
+        const result = evaluateWeightedVote(1, 3, votes, false);
+        expect(result.passed).toBe(false);
+        expect(result.awaitingHumanApproval).toBe(true);
+
+        const withHuman = evaluateWeightedVote(1, 3, votes, true);
+        expect(withHuman.passed).toBe(true);
+    });
+
+    test('returns vote weights in result', () => {
+        const votes = makeWeightedVotes([
+            { vote: 'approve', weight: 90 },
+            { vote: 'reject', weight: 30 },
+        ]);
+        const result = evaluateWeightedVote(2, 2, votes);
+        expect(result.voteWeights).toHaveLength(2);
+        expect(result.voteWeights[0].weight).toBe(90);
+        expect(result.voteWeights[1].weight).toBe(30);
+    });
+
+    test('no votes cast returns failure', () => {
+        const result = evaluateWeightedVote(2, 5, []);
+        expect(result.passed).toBe(false);
+        expect(result.weightedApprovalRatio).toBe(0);
+    });
+
+    test('no members returns failure', () => {
+        const result = evaluateWeightedVote(2, 0, []);
+        expect(result.passed).toBe(false);
     });
 });

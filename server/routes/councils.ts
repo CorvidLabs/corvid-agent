@@ -9,12 +9,18 @@ import {
     getCouncilLaunch,
     getCouncilLaunchLogs,
     getDiscussionMessages,
+    getGovernanceVote,
+    getGovernanceMemberVotes,
+    castGovernanceMemberVote,
+    updateGovernanceVoteStatus,
+    approveGovernanceVoteHuman,
 } from '../db/councils';
 import type { ProcessManager } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { ReputationScorer } from '../reputation/scorer';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
-import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema, CastVoteSchema, HumanApprovalSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { NotFoundError } from '../lib/errors';
 import {
@@ -29,6 +35,7 @@ import {
     onCouncilAgentError,
 } from '../councils/discussion';
 import type { LaunchCouncilResult } from '../councils/discussion';
+import { evaluateWeightedVote, type GovernanceTier, type WeightedVoteRecord } from '../councils/governance';
 import { waitForSessions, HEARTBEAT_INTERVAL_MS, SAFETY_TIMEOUT_MS } from '../lib/wait-sessions';
 import type { WaitForSessionsResult, WaitForSessionsOptions } from '../lib/wait-sessions';
 
@@ -45,6 +52,7 @@ export function handleCouncilRoutes(
     processManager: ProcessManager,
     agentMessenger?: AgentMessenger | null,
     context?: RequestContext,
+    reputationScorer?: ReputationScorer | null,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
@@ -122,6 +130,27 @@ export function handleCouncilRoutes(
                 if (denied) return denied;
             }
             return handleCouncilChat(req, db, processManager, launchId);
+        }
+
+        // Governance vote endpoints
+        if (action === 'vote' && method === 'GET') {
+            return handleGetVoteStatus(db, launchId, reputationScorer);
+        }
+
+        if (action === 'vote' && method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (denied) return denied;
+            }
+            return handleCastVote(req, db, launchId, reputationScorer);
+        }
+
+        if (action === 'vote/approve' && method === 'POST') {
+            if (context) {
+                const denied = tenantRoleGuard('owner')(req, url, context);
+                if (denied) return denied;
+            }
+            return handleHumanApproval(req, db, launchId, reputationScorer);
         }
     }
 
@@ -257,4 +286,189 @@ async function handleCouncilChat(
     const result = startCouncilChat(db, processManager, launchId, body.message);
     if (!result.ok) return json({ error: result.error }, result.status);
     return json({ sessionId: result.sessionId, created: result.created }, result.created ? 201 : 200);
+}
+
+// ─── Governance vote handlers ─────────────────────────────────────────────────
+
+/** Build weighted vote records by enriching member votes with reputation scores. */
+function buildWeightedVotes(
+    db: Database,
+    governanceVoteId: number,
+    reputationScorer?: ReputationScorer | null,
+): WeightedVoteRecord[] {
+    const memberVotes = getGovernanceMemberVotes(db, governanceVoteId);
+    return memberVotes.map((mv) => {
+        let weight = 50; // Default weight if no reputation data
+        if (reputationScorer) {
+            const score = reputationScorer.getCachedScore(mv.agent_id);
+            if (score) weight = score.overallScore;
+        }
+        return {
+            agentId: mv.agent_id,
+            vote: mv.vote as 'approve' | 'reject' | 'abstain',
+            reason: mv.reason,
+            votedAt: mv.created_at,
+            weight,
+        };
+    });
+}
+
+function handleGetVoteStatus(
+    db: Database,
+    launchId: string,
+    reputationScorer?: ReputationScorer | null,
+): Response {
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch) return json({ error: 'Launch not found' }, 404);
+
+    if (launch.voteType !== 'governance') {
+        return json({ error: 'This launch is not a governance vote' }, 400);
+    }
+
+    const governanceVote = getGovernanceVote(db, launchId);
+    if (!governanceVote) return json({ error: 'Governance vote record not found' }, 404);
+
+    const council = getCouncil(db, launch.councilId);
+    const totalMembers = council?.agentIds.length ?? 0;
+    const weightedVotes = buildWeightedVotes(db, governanceVote.id, reputationScorer);
+
+    const check = evaluateWeightedVote(
+        governanceVote.governance_tier as GovernanceTier,
+        totalMembers,
+        weightedVotes,
+        governanceVote.human_approved === 1,
+        council?.quorumThreshold,
+    );
+
+    return json({
+        governanceVoteId: governanceVote.id,
+        launchId,
+        governanceTier: governanceVote.governance_tier,
+        status: governanceVote.status,
+        affectedPaths: JSON.parse(governanceVote.affected_paths),
+        humanApproved: governanceVote.human_approved === 1,
+        humanApprovedBy: governanceVote.human_approved_by,
+        votes: weightedVotes,
+        evaluation: check,
+        totalMembers,
+    });
+}
+
+async function handleCastVote(
+    req: Request,
+    db: Database,
+    launchId: string,
+    reputationScorer?: ReputationScorer | null,
+): Promise<Response> {
+    let body: { agentId: string; vote: 'approve' | 'reject' | 'abstain'; reason?: string };
+    try {
+        body = await parseBodyOrThrow(req, CastVoteSchema);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
+    }
+
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch) return json({ error: 'Launch not found' }, 404);
+    if (launch.voteType !== 'governance') {
+        return json({ error: 'This launch is not a governance vote' }, 400);
+    }
+
+    const governanceVote = getGovernanceVote(db, launchId);
+    if (!governanceVote) return json({ error: 'Governance vote record not found' }, 404);
+    if (governanceVote.status !== 'pending') {
+        return json({ error: `Vote already resolved with status '${governanceVote.status}'` }, 400);
+    }
+
+    // Verify the agent is a council member
+    const council = getCouncil(db, launch.councilId);
+    if (!council || !council.agentIds.includes(body.agentId)) {
+        return json({ error: 'Agent is not a member of this council' }, 403);
+    }
+
+    castGovernanceMemberVote(db, {
+        governanceVoteId: governanceVote.id,
+        agentId: body.agentId,
+        vote: body.vote,
+        reason: body.reason,
+    });
+
+    // Re-evaluate vote after casting
+    const totalMembers = council.agentIds.length;
+    const weightedVotes = buildWeightedVotes(db, governanceVote.id, reputationScorer);
+    const check = evaluateWeightedVote(
+        governanceVote.governance_tier as GovernanceTier,
+        totalMembers,
+        weightedVotes,
+        governanceVote.human_approved === 1,
+        council.quorumThreshold,
+    );
+
+    // Auto-resolve the vote if enough votes are in
+    if (check.passed) {
+        updateGovernanceVoteStatus(db, governanceVote.id, 'approved', new Date().toISOString());
+    } else if (check.awaitingHumanApproval) {
+        updateGovernanceVoteStatus(db, governanceVote.id, 'awaiting_human');
+    } else {
+        // Check if all members have voted and the vote failed
+        const allVoted = weightedVotes.length === totalMembers;
+        if (allVoted && !check.passed) {
+            updateGovernanceVoteStatus(db, governanceVote.id, 'rejected', new Date().toISOString());
+        }
+    }
+
+    return json({
+        ok: true,
+        vote: body.vote,
+        agentId: body.agentId,
+        evaluation: check,
+    });
+}
+
+async function handleHumanApproval(
+    req: Request,
+    db: Database,
+    launchId: string,
+    reputationScorer?: ReputationScorer | null,
+): Promise<Response> {
+    let body: { approvedBy: string };
+    try {
+        body = await parseBodyOrThrow(req, HumanApprovalSchema);
+    } catch (err) {
+        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+        throw err;
+    }
+
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch) return json({ error: 'Launch not found' }, 404);
+    if (launch.voteType !== 'governance') {
+        return json({ error: 'This launch is not a governance vote' }, 400);
+    }
+
+    const governanceVote = getGovernanceVote(db, launchId);
+    if (!governanceVote) return json({ error: 'Governance vote record not found' }, 404);
+
+    approveGovernanceVoteHuman(db, governanceVote.id, body.approvedBy);
+
+    // Re-evaluate after human approval
+    const council = getCouncil(db, launch.councilId);
+    const totalMembers = council?.agentIds.length ?? 0;
+    const weightedVotes = buildWeightedVotes(db, governanceVote.id, reputationScorer);
+    const check = evaluateWeightedVote(
+        governanceVote.governance_tier as GovernanceTier,
+        totalMembers,
+        weightedVotes,
+        true,
+        council?.quorumThreshold,
+    );
+
+    if (check.passed) {
+        updateGovernanceVoteStatus(db, governanceVote.id, 'approved', new Date().toISOString());
+    }
+
+    return json({
+        ok: true,
+        approvedBy: body.approvedBy,
+        evaluation: check,
+    });
 }

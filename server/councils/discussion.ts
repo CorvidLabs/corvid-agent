@@ -269,6 +269,7 @@ export function triggerSynthesis(
     launchId: string,
     chairmanOverride?: string,
     agentMessenger?: AgentMessenger | null,
+    reputationScorer?: import('../reputation/scorer').ReputationScorer | null,
 ): { ok: true; synthesisSessionId: string } | { ok: false; error: string; status: number } {
     // Resolve on-chain mode from the council configuration
     const launch = getCouncilLaunch(db, launchId);
@@ -278,7 +279,7 @@ export function triggerSynthesis(
     return triggerSynthesisImpl(
         db, processManager, launchId,
         emitLog, broadcastStageChange, formatDiscussionMessages,
-        chairmanOverride, agentMessenger, onChainMode,
+        chairmanOverride, agentMessenger, onChainMode, reputationScorer,
     );
 }
 
