@@ -12,8 +12,8 @@ import type {
 } from './types';
 import { GatewayOp, GatewayIntent, InteractionType, InteractionCallbackType } from './types';
 import { listAgents } from '../db/agents';
-import { listCouncils } from '../db/councils';
-import { launchCouncil } from '../councils/discussion';
+import { listCouncils, getCouncilLaunch } from '../db/councils';
+import { launchCouncil, onCouncilStageChange } from '../councils/discussion';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
 import { createLogger } from '../lib/logger';
@@ -522,8 +522,35 @@ export class DiscordBridge {
                 }
                 try {
                     const result = launchCouncil(this.db, this.processManager, council.id, project.id, topic, null);
+
+                    // Get the channel where the interaction happened for posting results
+                    const councilChannelId = interaction.channel_id;
+
                     await this.respondToInteraction(interaction,
-                        `Council deliberation launched.\nCouncil: **${council.name}**\nLaunch ID: ${result.launchId}\nSessions: ${result.sessionIds.length}`);
+                        `Council deliberation launched.\nCouncil: **${council.name}**\nLaunch ID: \`${result.launchId.slice(0, 8)}\`\nSessions: ${result.sessionIds.length}`);
+
+                    // Subscribe for council completion and post synthesis to Discord
+                    if (councilChannelId) {
+                        const unsubscribe = onCouncilStageChange((launchId, stage) => {
+                            if (launchId !== result.launchId || stage !== 'complete') return;
+                            unsubscribe();
+
+                            const launch = getCouncilLaunch(this.db, result.launchId);
+                            const synthesis = launch?.synthesis || '(No synthesis produced)';
+
+                            this.sendEmbed(councilChannelId, {
+                                title: `Council Complete: ${council.name}`,
+                                description: synthesis.slice(0, 4096),
+                                color: 0x57f287,
+                                footer: { text: `Topic: ${topic.slice(0, 100)} · Launch: ${result.launchId.slice(0, 8)}` },
+                            }).catch(err => {
+                                log.warn('Failed to post council synthesis to Discord', {
+                                    launchId: result.launchId,
+                                    error: err instanceof Error ? err.message : String(err),
+                                });
+                            });
+                        });
+                    }
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err);
                     await this.respondToInteraction(interaction, `Failed to launch council: ${msg}`);
