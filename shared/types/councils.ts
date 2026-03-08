@@ -128,6 +128,68 @@ export interface CouncilDiscussionMessage {
     createdAt: string;
 }
 
+// ─── Governance Proposals ────────────────────────────────────────────────────
+
+/**
+ * Proposal lifecycle:
+ *   draft → open → voting → decided → enacted
+ *
+ * - draft: author is still editing, not yet visible to voters
+ * - open: visible for discussion but voting hasn't started
+ * - voting: votes are being collected
+ * - decided: vote concluded (approved/rejected), awaiting enactment
+ * - enacted: approved proposal has been applied
+ */
+export type ProposalStatus = 'draft' | 'open' | 'voting' | 'decided' | 'enacted';
+
+export type ProposalDecision = 'approved' | 'rejected' | null;
+
+export interface GovernanceProposal {
+    id: string;
+    councilId: string;
+    title: string;
+    description: string;
+    /** Who created the proposal (agent or human identifier). */
+    authorId: string;
+    /** Current lifecycle status. */
+    status: ProposalStatus;
+    /** Decision after voting concludes (null while voting or before). */
+    decision: ProposalDecision;
+    /** Governance tier this proposal targets (0, 1, or 2). */
+    governanceTier: number;
+    /** Paths affected by the proposed change. */
+    affectedPaths: string[];
+    /** Minimum percentage of weighted votes required to pass (0.0–1.0). Overrides council/tier default. */
+    quorumThreshold: number | null;
+    /** Minimum number of voters required for a valid vote (regardless of weight). */
+    minimumVoters: number | null;
+    /** Optional council launch ID if a council deliberation was started for this proposal. */
+    launchId: string | null;
+    createdAt: string;
+    updatedAt: string;
+    decidedAt: string | null;
+    enactedAt: string | null;
+}
+
+export interface CreateProposalInput {
+    councilId: string;
+    title: string;
+    description?: string;
+    authorId: string;
+    governanceTier?: number;
+    affectedPaths?: string[];
+    quorumThreshold?: number | null;
+    minimumVoters?: number | null;
+}
+
+export interface UpdateProposalInput {
+    title?: string;
+    description?: string;
+    affectedPaths?: string[];
+    quorumThreshold?: number | null;
+    minimumVoters?: number | null;
+}
+
 /** Structured error emitted when a council agent fails mid-session. */
 export interface CouncilAgentError {
     launchId: string;
