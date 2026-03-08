@@ -25,6 +25,7 @@ import { createLogger } from '../lib/logger';
 import { SessionEventBus } from './event-bus';
 import { SessionTimerManager } from './session-timer-manager';
 import { SessionResilienceManager, MAX_RESTARTS } from './session-resilience-manager';
+import type { SandboxManager } from '../sandbox/manager';
 
 // Re-export EventCallback from interfaces for backward compatibility —
 // callers importing { EventCallback } from './manager' continue to work.
@@ -67,6 +68,9 @@ export class ProcessManager {
 
     // MCP services — composed container set after AlgoChat init
     private readonly mcpServices = new McpServiceContainer();
+
+    // Sandbox — optional container isolation for agent sessions
+    private sandboxManager: SandboxManager | null = null;
 
     // Composed managers — delegated concerns
     private readonly timerManager: SessionTimerManager;
@@ -121,6 +125,11 @@ export class ProcessManager {
     /** Register MCP-related services so agent sessions get corvid_* tools. */
     setMcpServices(services: McpServices): void {
         this.mcpServices.setServices(services);
+    }
+
+    /** Set the sandbox manager so sessions can be assigned containers. */
+    setSandboxManager(manager: SandboxManager): void {
+        this.sandboxManager = manager;
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
@@ -368,6 +377,19 @@ export class ProcessManager {
         this.timerManager.startStableTimer(session.id);
         this.timerManager.startSessionTimeout(session.id);
 
+        // Assign a sandbox container if enabled (async, best-effort)
+        if (this.sandboxManager?.isEnabled() && session.agentId) {
+            const workDir = (session as { workDir?: string }).workDir ?? null;
+            this.sandboxManager.assignContainer(session.agentId, session.id, workDir).then((containerId) => {
+                log.info(`Sandbox container assigned`, { sessionId: session.id, containerId: containerId.slice(0, 12) });
+            }).catch((err) => {
+                log.warn(`Failed to assign sandbox container`, {
+                    sessionId: session.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
+
         log.info(`Started process for session ${session.id}`, { pid: process.pid });
 
         this.eventBus.emit(session.id, {
@@ -582,6 +604,16 @@ export class ProcessManager {
         this.timerManager.cleanupSession(sessionId);
         this.approvalManager.cancelSession(sessionId);
         this.ownerQuestionManager.cancelSession(sessionId);
+
+        // Release sandbox container if one was assigned
+        if (this.sandboxManager?.isEnabled()) {
+            this.sandboxManager.releaseContainer(sessionId).catch((err) => {
+                log.warn(`Failed to release sandbox container`, {
+                    sessionId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
     }
 
     /**

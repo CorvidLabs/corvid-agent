@@ -113,6 +113,16 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 - **When** `createContainer` is called
 - **Then** an `AuthorizationError` is thrown before any Docker command runs
 
+### Scenario: ProcessManager assigns container on session start
+- **Given** `SANDBOX_ENABLED=true`, Docker is available, and `ProcessManager.setSandboxManager()` has been called
+- **When** a session starts via `startProcess()` or `resumeProcess()`
+- **Then** `assignContainer(agentId, sessionId, workDir)` is called asynchronously; failure logs a warning but does not prevent the session from running
+
+### Scenario: ProcessManager releases container on session cleanup
+- **Given** a sandbox container is assigned to a session
+- **When** the session is stopped or cleaned up via `cleanupSessionState()`
+- **Then** `releaseContainer(sessionId)` is called asynchronously; failure logs a warning
+
 ### Scenario: Agent policy lookup with no custom config
 - **Given** no row exists in `sandbox_configs` for `agent-1`
 - **When** `getAgentPolicy(db, 'agent-1')` is called
@@ -144,7 +154,8 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 
 | Module | What is used |
 |--------|-------------|
-| `server/index.ts` | `SandboxManager` class (initialization and lifecycle) |
+| `server/bootstrap.ts` | `SandboxManager` class (initialization, lifecycle, and wiring into `ProcessManager`) |
+| `server/process/manager.ts` | `SandboxManager` type for container assignment on session start and release on session cleanup |
 | `routes/sandbox` | `SandboxManager` type for pool stats; `getAgentPolicy`, `setAgentPolicy`, `removeAgentPolicy`, `listAgentPolicies` for policy CRUD |
 | `routes/index` | `SandboxManager` type for route handler context |
 | `db/sandbox` | `SandboxConfigRecord` type |
@@ -154,4 +165,5 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-08 | corvid-agent | Integrated SandboxManager into ProcessManager: container assignment on session start, release on cleanup |
 | 2026-03-04 | corvid-agent | Initial spec |

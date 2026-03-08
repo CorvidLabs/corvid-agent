@@ -4,11 +4,12 @@
  * - manager.ts: Pool management, assignment, release
  * - policy.ts: Per-agent resource limits
  */
-import { test, expect, describe, beforeEach } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
 import { DEFAULT_RESOURCE_LIMITS, DEFAULT_POOL_CONFIG } from '../sandbox/types';
+import { ProcessManager } from '../process/manager';
 
 // ─── DB Setup ───────────────────────────────────────────────────────────────
 
@@ -172,5 +173,70 @@ describe('SandboxManager', () => {
         const { SandboxManager } = require('../sandbox/manager');
         const manager = new SandboxManager(setupDb());
         expect(manager.getContainerForSession('session-1')).toBeNull();
+    });
+});
+
+// ─── ProcessManager Integration Tests ─────────────────────────────────────────
+
+describe('ProcessManager Sandbox Integration', () => {
+    let pmDb: Database;
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pmDb = new Database(':memory:');
+        pmDb.exec('PRAGMA foreign_keys = ON');
+        runMigrations(pmDb);
+        pm = new ProcessManager(pmDb);
+    });
+
+    afterEach(() => {
+        pm.shutdown();
+        pmDb.close();
+    });
+
+    test('setSandboxManager accepts a SandboxManager instance', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sandbox = new SandboxManager(setupDb());
+        // Should not throw
+        pm.setSandboxManager(sandbox);
+    });
+
+    test('cleanupSessionState does not throw when sandbox is not set', () => {
+        // No sandbox manager set — should gracefully skip
+        pm.cleanupSessionState('session-1');
+        expect(pm.getMemoryStats().processes).toBe(0);
+    });
+
+    test('cleanupSessionState does not throw when sandbox is disabled', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sandbox = new SandboxManager(setupDb());
+        // Not initialized — isEnabled() returns false
+        pm.setSandboxManager(sandbox);
+        pm.cleanupSessionState('session-1');
+        expect(pm.getMemoryStats().processes).toBe(0);
+    });
+
+    test('cleanupSessionState calls releaseContainer when sandbox is enabled', async () => {
+        let releasedSessionId = '' as string;
+
+        // Create a mock sandbox manager that tracks calls
+        const mockSandbox = {
+            isEnabled: () => true,
+            assignContainer: async () => 'mock-container-id',
+            releaseContainer: async (sessionId: string) => {
+                releasedSessionId = sessionId;
+            },
+            getContainerForSession: () => null,
+            getPoolStats: () => ({ total: 0, warm: 0, assigned: 0, maxContainers: 10, enabled: true }),
+            shutdown: async () => {},
+            initialize: async () => true,
+        };
+
+        pm.setSandboxManager(mockSandbox as unknown as import('../sandbox/manager').SandboxManager);
+        pm.cleanupSessionState('session-abc');
+
+        // Wait for async release to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+        expect(releasedSessionId).toBe('session-abc');
     });
 });
