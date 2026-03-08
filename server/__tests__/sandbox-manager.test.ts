@@ -3,12 +3,15 @@
  * - container.ts: Docker command building, container lifecycle
  * - manager.ts: Pool management, assignment, release
  * - policy.ts: Per-agent resource limits
+ * - lifecycle-adapter.ts: Event-bus driven sandbox ↔ session wiring
  */
 import { test, expect, describe, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
 import { DEFAULT_RESOURCE_LIMITS, DEFAULT_POOL_CONFIG } from '../sandbox/types';
+import { SandboxLifecycleAdapter } from '../sandbox/lifecycle-adapter';
+import { SessionEventBus } from '../process/event-bus';
 
 // ─── DB Setup ───────────────────────────────────────────────────────────────
 
@@ -172,5 +175,98 @@ describe('SandboxManager', () => {
         const { SandboxManager } = require('../sandbox/manager');
         const manager = new SandboxManager(setupDb());
         expect(manager.getContainerForSession('session-1')).toBeNull();
+    });
+
+    test('shutdown is idempotent', async () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const manager = new SandboxManager(setupDb());
+        // Shutdown twice should not throw
+        await manager.shutdown();
+        await manager.shutdown();
+        expect(manager.isEnabled()).toBe(false);
+    });
+
+    test('pool stats reflect maxContainers from config', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const manager = new SandboxManager(setupDb(), {
+            ...DEFAULT_POOL_CONFIG,
+            maxContainers: 5,
+        });
+        const stats = manager.getPoolStats();
+        expect(stats.maxContainers).toBe(5);
+    });
+});
+
+// ─── SandboxLifecycleAdapter Tests ───────────────────────────────────────────
+
+describe('SandboxLifecycleAdapter', () => {
+    let testDb: Database;
+
+    beforeEach(() => {
+        testDb = setupDb();
+    });
+
+    test('start subscribes to event bus', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        const eventBus = new SessionEventBus();
+
+        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+        adapter.start();
+
+        expect(eventBus.getGlobalSubscriberCount()).toBe(1);
+        adapter.stop();
+    });
+
+    test('stop unsubscribes from event bus', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        const eventBus = new SessionEventBus();
+
+        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+        adapter.start();
+        adapter.stop();
+
+        expect(eventBus.getGlobalSubscriberCount()).toBe(0);
+    });
+
+    test('getSessionContainer returns null when no containers', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        const eventBus = new SessionEventBus();
+
+        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+        expect(adapter.getSessionContainer('session-1')).toBeNull();
+    });
+
+    test('handles session events gracefully when sandbox not enabled', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        const eventBus = new SessionEventBus();
+
+        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+        adapter.start();
+
+        // Emit session events — should not throw (sandbox not enabled)
+        eventBus.emit('session-1', { type: 'session_started', session_id: 'session-1' } as any);
+        eventBus.emit('session-1', { type: 'session_stopped', session_id: 'session-1' } as any);
+        eventBus.emit('session-1', { type: 'session_exited', session_id: 'session-1' } as any);
+
+        adapter.stop();
+    });
+
+    test('ignores non-lifecycle events', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        const eventBus = new SessionEventBus();
+
+        const adapter = new SandboxLifecycleAdapter(testDb, sm, eventBus);
+        adapter.start();
+
+        // Non-lifecycle events should be silently ignored
+        eventBus.emit('session-1', { type: 'assistant', session_id: 'session-1' } as any);
+        eventBus.emit('session-1', { type: 'tool_use', session_id: 'session-1' } as any);
+
+        adapter.stop();
     });
 });
