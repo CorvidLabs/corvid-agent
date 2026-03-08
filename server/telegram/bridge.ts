@@ -13,10 +13,14 @@ import { createLogger } from '../lib/logger';
 import { ExternalServiceError, NotFoundError } from '../lib/errors';
 import { scanForInjection } from '../lib/prompt-injection';
 import { recordAudit } from '../db/audit';
+import { DedupService } from '../lib/dedup';
 
 const log = createLogger('TelegramBridge');
 
 const POLL_TIMEOUT = 30; // Long-polling timeout in seconds
+const TELEGRAM_DEDUP_NS = 'telegram:updates';
+const BASE_POLL_DELAY_MS = 500;
+const MAX_POLL_DELAY_MS = 30_000;
 
 /**
  * Bidirectional Telegram bridge.
@@ -30,6 +34,8 @@ export class TelegramBridge {
     private offset = 0;
     private pollTimer: ReturnType<typeof setTimeout> | null = null;
     private running = false;
+    private consecutiveErrors = 0;
+    private dedup = DedupService.global();
 
     // Map Telegram userId → active sessionId
     private userSessions: Map<number, string> = new Map();
@@ -53,6 +59,7 @@ export class TelegramBridge {
     start(): void {
         if (this.running) return;
         this.running = true;
+        this.dedup.register(TELEGRAM_DEDUP_NS, { maxSize: 1000, ttlMs: 300_000 }); // 5 min TTL
         log.info('Telegram bridge started', { chatId: this.config.chatId });
         this.poll();
     }
@@ -69,20 +76,24 @@ export class TelegramBridge {
     private async poll(): Promise<void> {
         if (!this.running) return;
 
+        let delay = BASE_POLL_DELAY_MS;
         try {
             const updates = await this.getUpdates();
+            this.consecutiveErrors = 0;
             for (const update of updates) {
                 this.offset = update.update_id + 1;
                 await this.handleUpdate(update);
             }
         } catch (err) {
+            this.consecutiveErrors++;
+            delay = Math.min(BASE_POLL_DELAY_MS * Math.pow(2, this.consecutiveErrors), MAX_POLL_DELAY_MS);
             const message = err instanceof Error ? err.message : String(err);
-            log.error('Telegram poll error', { error: message });
+            log.error('Telegram poll error', { error: message, attempt: this.consecutiveErrors, retryMs: delay });
         }
 
         // Schedule next poll
         if (this.running) {
-            this.pollTimer = setTimeout(() => this.poll(), 500);
+            this.pollTimer = setTimeout(() => this.poll(), delay);
         }
     }
 
@@ -97,6 +108,12 @@ export class TelegramBridge {
     }
 
     private async handleUpdate(update: TelegramUpdate): Promise<void> {
+        const dedupKey = String(update.update_id);
+        if (this.dedup.isDuplicate(TELEGRAM_DEDUP_NS, dedupKey)) {
+            log.debug('Skipping duplicate Telegram update', { updateId: update.update_id });
+            return;
+        }
+
         if (update.message) {
             await this.handleMessage(update.message);
         }
