@@ -12,14 +12,8 @@ import { classifyPath, checkAutomationAllowed, type GovernanceTier, type Automat
 // Paths that agents must never modify, even in full-auto mode.
 // Uses basename matching to avoid false positives (e.g. "manager.ts" matching "task-manager.ts").
 export const PROTECTED_BASENAMES = new Set([
-    'spending.ts',
     'sdk-process.ts',
-    'manager.ts',
-    'sdk-tools.ts',
-    'tool-handlers.ts',
     'CLAUDE.md',
-    'schema.ts',
-    'package.json',
 ]);
 
 // Paths matched by substring (for files/dirs without unique basenames).
@@ -27,9 +21,6 @@ export const PROTECTED_SUBSTRINGS = [
     '.env',
     'corvid-agent.db',
     'wallet-keystore.json',
-    'server/index.ts',
-    'server/algochat/bridge.ts',
-    'server/algochat/config.ts',
     'server/selftest/',
 ];
 

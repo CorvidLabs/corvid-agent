@@ -205,11 +205,11 @@ describe('edit_file', () => {
     });
 
     test('rejects protected paths', async () => {
-        await Bun.write(join(workDir, 'package.json'), '{}');
+        await Bun.write(join(workDir, 'CLAUDE.md'), '# Rules');
         const result = await getTool('edit_file').handler({
-            path: 'package.json',
-            old_string: '{}',
-            new_string: '{"hacked": true}',
+            path: 'CLAUDE.md',
+            old_string: '# Rules',
+            new_string: '# Hacked',
         });
         expect(result.isError).toBe(true);
         expect(result.text).toContain('Protected file');

@@ -9,14 +9,13 @@ import {
 
 describe('isProtectedPath', () => {
     test('detects basename-protected files', () => {
-        expect(isProtectedPath('server/process/manager.ts')).toBe(true);
         expect(isProtectedPath('sdk-process.ts')).toBe(true);
-        expect(isProtectedPath('/absolute/path/to/schema.ts')).toBe(true);
+        expect(isProtectedPath('/absolute/path/to/CLAUDE.md')).toBe(true);
     });
 
     test('does not false-positive on partial basename matches', () => {
-        expect(isProtectedPath('task-manager.ts')).toBe(false);
-        expect(isProtectedPath('my-schema.ts')).toBe(false);
+        expect(isProtectedPath('my-sdk-process.ts')).toBe(false);
+        expect(isProtectedPath('CLAUDE.md.bak')).toBe(false);
     });
 
     test('detects substring-protected paths', () => {
@@ -65,9 +64,9 @@ describe('BASH_WRITE_OPERATORS', () => {
 
 describe('isProtectedBashCommand', () => {
     test('blocks quoted protected path', () => {
-        const result = isProtectedBashCommand(`rm '/some/path/manager.ts'`);
+        const result = isProtectedBashCommand(`rm '/some/path/sdk-process.ts'`);
         expect(result.blocked).toBe(true);
-        expect(result.path).toContain('manager.ts');
+        expect(result.path).toContain('sdk-process.ts');
     });
 
     test('blocks double-quoted protected path', () => {

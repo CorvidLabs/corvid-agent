@@ -189,17 +189,16 @@ export class AutoMergeService {
                 continue;
             }
             if (rejection) {
-                log.warn('Auto-merge blocked by security scan — closing PR', {
+                log.warn('Auto-merge blocked by security scan — skipping PR', {
                     repo: prRepo, number: prNumber, reason: rejection,
                 });
-                // Close the PR instead of leaving it open with a comment.
-                // The agent should not have modified protected files — close the bad work.
+                // Leave a comment (once) explaining why auto-merge was skipped.
+                // Do NOT close the PR — only humans should close PRs.
                 if (!this.flaggedPRs.has(prKey)) {
                     await this.runGh([
-                        'pr', 'close', String(prNumber),
+                        'pr', 'comment', String(prNumber),
                         '--repo', prRepo,
-                        '--comment', `Closing — security scan failed:\n\n${rejection}`,
-                        '--delete-branch',
+                        '--body', `Auto-merge skipped — security scan flagged issues:\n\n${rejection}\n\nA human must review and merge this PR manually.`,
                     ]);
                     this.flaggedPRs.add(prKey);
                 }
