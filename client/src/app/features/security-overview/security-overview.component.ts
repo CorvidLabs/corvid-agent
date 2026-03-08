@@ -29,7 +29,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                         before squash-merging. Failing CI checks also block merge.
                     </p>
                     <ul class="card__checks">
-                        <li>Author must be in the GitHub allowlist</li>
+                        <li>PR must be authored by the configured bot username</li>
                         <li>All CI checks must pass</li>
                         <li>Diff must not modify protected files</li>
                         <li>Diff must not contain blocked code patterns</li>
