@@ -60,10 +60,7 @@ import { tenantTopic } from '../ws/handler';
 
 describe('Protected File Enforcement', () => {
     test('all critical files are in PROTECTED_BASENAMES', () => {
-        const required = [
-            'spending.ts', 'sdk-process.ts', 'manager.ts', 'sdk-tools.ts',
-            'tool-handlers.ts', 'CLAUDE.md', 'schema.ts', 'package.json',
-        ];
+        const required = ['sdk-process.ts', 'CLAUDE.md'];
         for (const file of required) {
             expect(PROTECTED_BASENAMES.has(file)).toBe(true);
         }
@@ -72,7 +69,7 @@ describe('Protected File Enforcement', () => {
     test('all critical paths are in PROTECTED_SUBSTRINGS', () => {
         const required = [
             '.env', 'corvid-agent.db', 'wallet-keystore.json',
-            'server/index.ts', 'server/algochat/bridge.ts',
+            'server/selftest/',
         ];
         for (const path of required) {
             expect(PROTECTED_SUBSTRINGS.some((p) => p === path)).toBe(true);
@@ -105,7 +102,7 @@ describe('Protected File Enforcement', () => {
     });
 
     test('isProtectedBashCommand blocks writes to protected files', () => {
-        const result = isProtectedBashCommand('echo "hack" > schema.ts');
+        const result = isProtectedBashCommand('echo "hack" > sdk-process.ts');
         expect(result.blocked).toBe(true);
     });
 

@@ -47,16 +47,16 @@ e2e/             — Playwright end-to-end tests
 ## Protected Files
 
 These files **must not** be modified by agents (enforced in `sdk-process.ts`).
-Uses basename matching for unique filenames and substring matching for paths.
+Kept minimal — PR review is the primary safety gate. Only protects files where
+agent self-modification would be dangerous.
 
 **Basename-protected:**
-- `spending.ts`, `sdk-process.ts`, `manager.ts`, `sdk-tools.ts`, `tool-handlers.ts`
-- `schema.ts`, `package.json`, `CLAUDE.md`
+- `sdk-process.ts` — agent must not modify how it spawns
+- `CLAUDE.md` — agent must not rewrite its own rules
 
 **Path-protected:**
-- `.env`, `corvid-agent.db`, `wallet-keystore.json`
-- `server/index.ts`, `server/algochat/bridge.ts`, `server/algochat/config.ts`
-- `server/selftest/`
+- `.env`, `corvid-agent.db`, `wallet-keystore.json` — secrets and data
+- `server/selftest/` — self-test integrity
 
 ## Module Specifications
 

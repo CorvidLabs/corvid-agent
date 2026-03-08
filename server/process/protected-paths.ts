@@ -10,27 +10,19 @@ import { analyzeBashCommand } from '../lib/bash-security';
 import { classifyPath, checkAutomationAllowed, type GovernanceTier, type AutomationCheckResult } from '../councils/governance';
 
 // Paths that agents must never modify, even in full-auto mode.
-// Uses basename matching to avoid false positives (e.g. "manager.ts" matching "task-manager.ts").
+// Kept minimal — PR review is the primary safety gate.
+// Only protect files where agent self-modification would be dangerous.
 export const PROTECTED_BASENAMES = new Set([
-    'spending.ts',
-    'sdk-process.ts',
-    'manager.ts',
-    'sdk-tools.ts',
-    'tool-handlers.ts',
-    'CLAUDE.md',
-    'schema.ts',
-    'package.json',
+    'sdk-process.ts',       // Agent spawning — agent must not modify how it runs
+    'CLAUDE.md',            // Agent rules — agent must not rewrite its own constraints
 ]);
 
 // Paths matched by substring (for files/dirs without unique basenames).
 export const PROTECTED_SUBSTRINGS = [
-    '.env',
-    'corvid-agent.db',
-    'wallet-keystore.json',
-    'server/index.ts',
-    'server/algochat/bridge.ts',
-    'server/algochat/config.ts',
-    'server/selftest/',
+    '.env',                 // Secrets
+    'corvid-agent.db',      // Production database file
+    'wallet-keystore.json', // Encrypted wallet keys
+    'server/selftest/',     // Self-test integrity
 ];
 
 // Shell operators/commands that indicate write/destructive file operations.
