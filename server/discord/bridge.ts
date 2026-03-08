@@ -30,7 +30,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const DISCORD_SNOWFLAKE_RE = /^\d{17,20}$/;
 
 /** Discord interaction tokens are alphanumeric with dashes, dots, and underscores. */
-const DISCORD_TOKEN_RE = /^[\w.\-]{20,200}$/;
+const DISCORD_TOKEN_RE = /^[\w.\-]{20,500}$/;
 
 function assertSnowflake(value: string, label: string): void {
     if (!DISCORD_SNOWFLAKE_RE.test(value)) {
