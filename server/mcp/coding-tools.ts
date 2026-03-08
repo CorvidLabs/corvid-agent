@@ -23,7 +23,10 @@ export interface CodingToolContext {
  * Returns the absolute resolved path, or throws if the path escapes.
  */
 function resolveSafePath(workingDir: string, filePath: string): string {
-    const abs = resolve(workingDir, filePath);
+    // Strip leading slashes — tools expect relative paths, but small models
+    // sometimes pass absolute paths which causes resolve() to ignore workingDir
+    const normalized = filePath.replace(/^\/+/, '');
+    const abs = resolve(workingDir, normalized);
     const rel = relative(workingDir, abs);
     // relative() returns a path starting with '..' if abs escapes workingDir
     if (rel.startsWith('..') || rel.startsWith(process.platform === 'win32' ? '..\\' : '../')) {

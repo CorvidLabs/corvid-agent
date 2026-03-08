@@ -67,6 +67,8 @@ export class DiscordBridge {
 
     // Map Discord threadId → session info (for thread-based conversations)
     private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }> = new Map();
+    /** Active subscription callbacks per thread — used to unsubscribe before re-subscribing. */
+    private threadCallbacks: Map<string, { sessionId: string; callback: import('../process/interfaces').EventCallback }> = new Map();
 
     // Per-user rate limiting: userId → timestamps of recent messages
     private userMessageTimestamps: Map<string, number[]> = new Map();
@@ -898,6 +900,12 @@ export class DiscordBridge {
         agentName: string,
         agentModel: string,
     ): void {
+        // Unsubscribe the previous callback for this thread to prevent duplicates
+        const prev = this.threadCallbacks.get(threadId);
+        if (prev) {
+            this.processManager.unsubscribe(prev.sessionId, prev.callback);
+        }
+
         let buffer = '';
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
         let lastStatusTime = 0;
@@ -917,7 +925,7 @@ export class DiscordBridge {
             });
         };
 
-        this.processManager.subscribe(sessionId, (_sid, event) => {
+        const callback: import('../process/interfaces').EventCallback = (_sid, event) => {
             if (event.type === 'assistant' && event.message) {
                 const msg = event.message as { content?: unknown };
                 const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
@@ -945,8 +953,32 @@ export class DiscordBridge {
             if (event.type === 'result') {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 flush();
+                // Clean up tracking on completion
+                this.threadCallbacks.delete(threadId);
             }
-        });
+
+            // Notify thread on session error
+            if (event.type === 'session_error') {
+                const errEvent = event as { error?: { message?: string; errorType?: string } };
+                const errMsg = errEvent.error?.message || 'Unknown error';
+                this.sendEmbed(threadId, {
+                    title: 'Session Error',
+                    description: errMsg.slice(0, 4096),
+                    color: 0xff3355, // Red
+                    footer: { text: `${agentName} · ${errEvent.error?.errorType || 'error'} · Send a message to resume` },
+                }).catch(() => {});
+            }
+
+            // Notify thread on unexpected exit (no result received)
+            if (event.type === 'session_exited') {
+                if (debounceTimer) clearTimeout(debounceTimer);
+                flush(); // Flush any buffered text first
+                this.threadCallbacks.delete(threadId);
+            }
+        };
+
+        this.processManager.subscribe(sessionId, callback);
+        this.threadCallbacks.set(threadId, { sessionId, callback });
     }
 
     /** Generate a consistent color for an agent name. */
