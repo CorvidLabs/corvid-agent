@@ -42,6 +42,8 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | `getKeystoreEntry` | `agentName: string` | `KeystoreEntry \| null` | Retrieves a single agent's wallet entry from the keystore, or null if not found. |
 | `saveKeystoreEntry` | `agentName: string, address: string, encryptedMnemonic: string` | `void` | Saves or updates an agent's wallet entry in the keystore. Uses atomic write (temp file + rename). |
 | `removeKeystoreEntry` | `agentName: string` | `void` | Removes an agent's wallet entry from the keystore if it exists. Uses atomic write. |
+| `encryptMnemonicWithPassphrase` | `plaintext: string, passphrase: string` | `Promise<string>` | Encrypts a mnemonic with an explicit passphrase (bypasses env-based resolution). Used by KeyProvider-aware callers. |
+| `decryptMnemonicWithPassphrase` | `encrypted: string, passphrase: string` | `Promise<string>` | Decrypts a mnemonic with an explicit passphrase (v2 format only). Used by KeyProvider-aware callers. |
 | `rotateWalletEncryptionKey` | `db: Database, oldPassphrase: string, newPassphrase: string, _network: string` | `Promise<RotationResult>` | Re-encrypts all wallet mnemonics (DB + keystore) from old passphrase to new. All-or-nothing with round-trip verification. Records audit log entry. |
 
 ### Exported Types
@@ -173,3 +175,4 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-08 | CorvidAgent | Added encryptMnemonicWithPassphrase, decryptMnemonicWithPassphrase for KeyProvider integration (#383) |

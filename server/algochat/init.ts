@@ -37,6 +37,7 @@ import { broadcastAlgoChatMessage } from '../ws/handler';
 import { publishToTenant } from '../events/broadcasting';
 import { resolveAgentTenant } from '../tenant/resolve';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
+import { createKeyProvider } from '../lib/key-provider';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -104,7 +105,8 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     algochatState.bridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
 
     // Initialize agent wallet service on the agent network (localnet for funding/keys)
-    algochatState.walletService = new AgentWalletService(db, agentNetworkConfig, agentService);
+    const keyProvider = createKeyProvider(agentNetworkConfig.network, agentNetworkConfig.mnemonic);
+    algochatState.walletService = new AgentWalletService(db, agentNetworkConfig, agentService, keyProvider);
 
     // Only let the bridge use agent wallets if both networks match
     if (algochatConfig.agentNetwork === algochatConfig.network) {

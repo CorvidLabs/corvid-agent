@@ -205,3 +205,70 @@ export async function decryptMemoryContent(
 ): Promise<string> {
     return decryptMnemonic(encrypted, serverMnemonic, network);
 }
+
+/**
+ * Encrypt a mnemonic with an explicit passphrase (bypasses env-based resolution).
+ * Used by KeyProvider-aware callers that resolve the passphrase externally.
+ */
+export async function encryptMnemonicWithPassphrase(
+    plaintext: string,
+    passphrase: string,
+): Promise<string> {
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+    const key = await deriveKey(passphrase, salt, CURRENT_ITERATIONS);
+    const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+    const encoder = new TextEncoder();
+
+    try {
+        const ciphertext = await crypto.subtle.encrypt(
+            { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+            key,
+            encoder.encode(plaintext),
+        );
+
+        const combined = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+        combined.set(salt);
+        combined.set(iv, salt.length);
+        combined.set(new Uint8Array(ciphertext), salt.length + iv.length);
+
+        const result = btoa(String.fromCharCode(...combined));
+        wipeBuffer(combined);
+        return result;
+    } finally {
+        wipeBuffer(salt);
+        wipeBuffer(iv);
+    }
+}
+
+/**
+ * Decrypt a mnemonic with an explicit passphrase (bypasses env-based resolution).
+ * Used by KeyProvider-aware callers that resolve the passphrase externally.
+ *
+ * Only supports v2 format (salt + iv + ciphertext). Legacy v1 format is not
+ * supported since all new encryptions use v2.
+ */
+export async function decryptMnemonicWithPassphrase(
+    encrypted: string,
+    passphrase: string,
+): Promise<string> {
+    const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
+
+    const salt = combined.slice(0, SALT_LENGTH);
+    const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+    const ciphertext = combined.slice(SALT_LENGTH + IV_LENGTH);
+
+    try {
+        const key = await deriveKey(passphrase, salt, CURRENT_ITERATIONS);
+        const decrypted = await crypto.subtle.decrypt(
+            { name: ALGORITHM, iv, tagLength: TAG_LENGTH },
+            key,
+            ciphertext,
+        );
+        return new TextDecoder().decode(decrypted);
+    } finally {
+        wipeBuffer(salt);
+        wipeBuffer(iv);
+        wipeBuffer(ciphertext);
+        wipeBuffer(combined);
+    }
+}
