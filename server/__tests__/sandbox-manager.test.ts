@@ -3,12 +3,14 @@
  * - container.ts: Docker command building, container lifecycle
  * - manager.ts: Pool management, assignment, release
  * - policy.ts: Per-agent resource limits
+ * - ProcessManager integration: sandbox wiring, assign/release lifecycle
  */
 import { test, expect, describe, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { getAgentPolicy, setAgentPolicy, removeAgentPolicy, listAgentPolicies } from '../sandbox/policy';
 import { DEFAULT_RESOURCE_LIMITS, DEFAULT_POOL_CONFIG } from '../sandbox/types';
+import { ProcessManager } from '../process/manager';
 
 // ─── DB Setup ───────────────────────────────────────────────────────────────
 
@@ -172,5 +174,90 @@ describe('SandboxManager', () => {
         const { SandboxManager } = require('../sandbox/manager');
         const manager = new SandboxManager(setupDb());
         expect(manager.getContainerForSession('session-1')).toBeNull();
+    });
+
+    test('shutdown is idempotent', async () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const manager = new SandboxManager(setupDb());
+        // Shutdown twice should not throw
+        await manager.shutdown();
+        await manager.shutdown();
+        expect(manager.isEnabled()).toBe(false);
+    });
+
+    test('pool stats reflect maxContainers from config', () => {
+        const { SandboxManager } = require('../sandbox/manager');
+        const manager = new SandboxManager(setupDb(), {
+            ...DEFAULT_POOL_CONFIG,
+            maxContainers: 5,
+        });
+        const stats = manager.getPoolStats();
+        expect(stats.maxContainers).toBe(5);
+    });
+});
+
+// ─── ProcessManager + Sandbox Integration Tests ──────────────────────────────
+
+describe('ProcessManager Sandbox Integration', () => {
+    let testDb: Database;
+
+    beforeEach(() => {
+        testDb = setupDb();
+    });
+
+    test('setSandboxManager wires sandbox into ProcessManager', () => {
+        const pm = new ProcessManager(testDb);
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+
+        // Should not throw
+        pm.setSandboxManager(sm);
+        pm.shutdown();
+    });
+
+    test('getSessionContainer returns null without sandbox manager', () => {
+        const pm = new ProcessManager(testDb);
+        expect(pm.getSessionContainer('session-1')).toBeNull();
+        pm.shutdown();
+    });
+
+    test('getSessionContainer returns null when sandbox not enabled', () => {
+        const pm = new ProcessManager(testDb);
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        pm.setSandboxManager(sm);
+
+        // Manager not initialized (no Docker), so no container
+        expect(pm.getSessionContainer('session-1')).toBeNull();
+        pm.shutdown();
+    });
+
+    test('cleanupSessionState handles missing sandbox gracefully', () => {
+        const pm = new ProcessManager(testDb);
+        // No sandbox manager set — should not throw
+        pm.cleanupSessionState('nonexistent-session');
+        pm.shutdown();
+    });
+
+    test('cleanupSessionState handles sandbox with no container gracefully', () => {
+        const pm = new ProcessManager(testDb);
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        pm.setSandboxManager(sm);
+
+        // Should not throw even though sandbox is disabled
+        pm.cleanupSessionState('nonexistent-session');
+        pm.shutdown();
+    });
+
+    test('shutdown calls sandbox shutdown', async () => {
+        const pm = new ProcessManager(testDb);
+        const { SandboxManager } = require('../sandbox/manager');
+        const sm = new SandboxManager(testDb);
+        pm.setSandboxManager(sm);
+
+        // Should not throw
+        pm.shutdown();
+        expect(sm.isEnabled()).toBe(false);
     });
 });

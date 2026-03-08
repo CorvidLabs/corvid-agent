@@ -238,6 +238,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const sandboxEnabled = process.env.SANDBOX_ENABLED === 'true';
     const sandboxManager = sandboxEnabled ? new SandboxManager(db) : null;
     if (sandboxManager) {
+        processManager.setSandboxManager(sandboxManager);
         sandboxManager.initialize().catch((err: Error) => {
             log.warn('Sandbox manager failed to initialize', { error: err.message });
         });
