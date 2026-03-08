@@ -1,9 +1,10 @@
 import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
+import type { KeyProvider } from '../lib/key-provider';
 import { fundFromTestnetFaucet } from './service';
 import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, listAgents } from '../db/agents';
-import { encryptMnemonic, decryptMnemonic } from '../lib/crypto';
+import { encryptMnemonic, decryptMnemonic, encryptMnemonicWithPassphrase, decryptMnemonicWithPassphrase } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
 import { wipeBuffer } from '../lib/secure-wipe';
 import { createLogger } from '../lib/logger';
@@ -24,11 +25,37 @@ export class AgentWalletService {
     private db: Database;
     private config: AlgoChatConfig;
     private service: AlgoChatService;
+    private keyProvider: KeyProvider | null;
 
-    constructor(db: Database, config: AlgoChatConfig, service: AlgoChatService) {
+    constructor(db: Database, config: AlgoChatConfig, service: AlgoChatService, keyProvider?: KeyProvider) {
         this.db = db;
         this.config = config;
         this.service = service;
+        this.keyProvider = keyProvider ?? null;
+    }
+
+    /**
+     * Encrypt a mnemonic using the KeyProvider if available, otherwise fall back
+     * to the legacy config-based passphrase resolution.
+     */
+    private async encryptMnemonicInternal(plaintext: string): Promise<string> {
+        if (this.keyProvider) {
+            const passphrase = await this.keyProvider.getEncryptionPassphrase();
+            return encryptMnemonicWithPassphrase(plaintext, passphrase);
+        }
+        return encryptMnemonic(plaintext, this.config.mnemonic, this.config.network);
+    }
+
+    /**
+     * Decrypt a mnemonic using the KeyProvider if available, otherwise fall back
+     * to the legacy config-based passphrase resolution.
+     */
+    private async decryptMnemonicInternal(encrypted: string): Promise<string> {
+        if (this.keyProvider) {
+            const passphrase = await this.keyProvider.getEncryptionPassphrase();
+            return decryptMnemonicWithPassphrase(encrypted, passphrase);
+        }
+        return decryptMnemonic(encrypted, this.config.mnemonic, this.config.network);
     }
 
     /**
@@ -79,7 +106,7 @@ export class AgentWalletService {
         try {
             const algochat = await import('@corvidlabs/ts-algochat');
             const generated = algochat.createRandomChatAccount();
-            const encrypted = await encryptMnemonic(generated.mnemonic, this.config.mnemonic, this.config.network);
+            const encrypted = await this.encryptMnemonicInternal(generated.mnemonic);
 
             setAgentWallet(this.db, agentId, generated.account.address, encrypted);
             saveKeystoreEntry(agent.name, generated.account.address, encrypted);
@@ -133,7 +160,7 @@ export class AgentWalletService {
         if (!encrypted) return null;
 
         try {
-            const mnemonic = await decryptMnemonic(encrypted, this.config.mnemonic, this.config.network);
+            const mnemonic = await this.decryptMnemonicInternal(encrypted);
             const algochat = await import('@corvidlabs/ts-algochat');
             const account = algochat.createChatAccountFromMnemonic(mnemonic);
 
@@ -293,7 +320,7 @@ export class AgentWalletService {
 
         const algochat = await import('@corvidlabs/ts-algochat');
         const generated = algochat.createRandomChatAccount();
-        const encrypted = await encryptMnemonic(generated.mnemonic, this.config.mnemonic, this.config.network);
+        const encrypted = await this.encryptMnemonicInternal(generated.mnemonic);
 
         setAgentWallet(this.db, agentId, generated.account.address, encrypted);
         saveKeystoreEntry(agent.name, generated.account.address, encrypted);
