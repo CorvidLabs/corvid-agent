@@ -2,6 +2,7 @@ import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Project, CreateProjectInput, UpdateProjectInput } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
+import { encryptEnvVars, decryptEnvVars } from '../lib/env-encryption';
 
 interface ProjectRow {
     id: string;
@@ -21,7 +22,7 @@ function rowToProject(row: ProjectRow): Project {
         description: row.description,
         workingDir: row.working_dir,
         claudeMd: row.claude_md,
-        envVars: JSON.parse(row.env_vars),
+        envVars: JSON.parse(decryptEnvVars(row.env_vars)),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -41,7 +42,7 @@ export function getProject(db: Database, id: string, tenantId: string = DEFAULT_
 
 export function createProject(db: Database, input: CreateProjectInput, tenantId: string = DEFAULT_TENANT_ID): Project {
     const id = crypto.randomUUID();
-    const envVars = JSON.stringify(input.envVars ?? {});
+    const envVars = encryptEnvVars(JSON.stringify(input.envVars ?? {}));
 
     db.query(
         `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars, tenant_id)
@@ -76,7 +77,7 @@ export function updateProject(db: Database, id: string, input: UpdateProjectInpu
     }
     if (input.envVars !== undefined) {
         fields.push('env_vars = ?');
-        values.push(JSON.stringify(input.envVars));
+        values.push(encryptEnvVars(JSON.stringify(input.envVars)));
     }
 
     if (fields.length === 0) return existing;
