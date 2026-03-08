@@ -58,6 +58,7 @@ Provides a layered defense system for the corvid-agent platform: bash command an
 | `InjectionCategory` | Union of `'role_impersonation' \| 'command_injection' \| 'data_exfiltration' \| 'jailbreak' \| 'encoding_attack' \| 'social_engineering'` -- categories for injection patterns. |
 | `InjectionMatch` | `{ pattern: string; category: InjectionCategory; confidence: InjectionConfidence; offset: number }` -- single injection pattern match. |
 | `InjectionResult` | `{ confidence: InjectionConfidence; blocked: boolean; matches: InjectionMatch[]; scanTimeMs: number }` -- aggregated injection scan result. |
+| `PatternRule` | `{ name: string; regex: RegExp; category: CodePatternCategory; severity: FindingSeverity; allowedFiles?: string[] }` -- definition of a code-scanner pattern rule. |
 
 ### Exported Constants
 
@@ -65,6 +66,7 @@ Provides a layered defense system for the corvid-agent platform: bash command an
 |----------|------|-------------|
 | `EXPANDED_WRITE_OPERATORS` | `RegExp` | Enhanced regex covering write/destructive bash operators (redirect, rm, mv, cp, chmod, sed -i, tee, dd, curl -o, wget, etc.). |
 | `APPROVED_DOMAINS` | `Set<string>` | Set of pre-approved domains for external fetch calls (GitHub, Anthropic, OpenAI, Stripe, Telegram, Slack, Discord, Algorand indexers, localhost). |
+| `ALL_PATTERNS` | `PatternRule[]` | Combined array of all critical and warning code-scanner patterns used by `scanDiff`. |
 
 ### Exported Classes
 
