@@ -18,6 +18,7 @@ import { createLogger } from '../lib/logger';
 import { scanForInjection } from '../lib/prompt-injection';
 import { extractContentText } from '../process/types';
 import { recordAudit } from '../db/audit';
+import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
 
 const log = createLogger('DiscordBridge');
 
@@ -74,6 +75,7 @@ export class DiscordBridge {
     private userMessageTimestamps: Map<string, number[]> = new Map();
     private readonly RATE_LIMIT_WINDOW_MS = 60_000;
     private readonly RATE_LIMIT_MAX_MESSAGES = 10;
+    private delivery: DeliveryTracker = getDeliveryTracker();
 
     constructor(
         db: Database,
@@ -636,21 +638,28 @@ export class DiscordBridge {
             footer?: { text: string };
         },
     ): Promise<void> {
-        const response = await fetch(
-            `https://discord.com/api/v10/channels/${channelId}/messages`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bot ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ embeds: [embed] }),
-            },
-        );
+        try {
+            await this.delivery.sendWithReceipt('discord', async () => {
+                const response = await fetch(
+                    `https://discord.com/api/v10/channels/${channelId}/messages`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bot ${this.config.botToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ embeds: [embed] }),
+                    },
+                );
 
-        if (!response.ok) {
-            const error = await response.text();
-            log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
+                if (!response.ok) {
+                    const error = await response.text();
+                    log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
+                    throw new Error(`Discord embed failed: ${response.status}`);
+                }
+            });
+        } catch {
+            // Error already logged by DeliveryTracker
         }
     }
 
@@ -754,24 +763,31 @@ export class DiscordBridge {
     ): Promise<void> {
         assertSnowflake(channelId, 'channel ID');
         assertSnowflake(replyToMessageId, 'message ID');
-        const response = await fetch(
-            `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bot ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    embeds: [embed],
-                    message_reference: { message_id: replyToMessageId },
-                }),
-            },
-        );
+        try {
+            await this.delivery.sendWithReceipt('discord', async () => {
+                const response = await fetch(
+                    `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bot ${this.config.botToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            embeds: [embed],
+                            message_reference: { message_id: replyToMessageId },
+                        }),
+                    },
+                );
 
-        if (!response.ok) {
-            const error = await response.text();
-            log.error('Failed to send Discord reply embed', { status: response.status, error: error.slice(0, 200) });
+                if (!response.ok) {
+                    const error = await response.text();
+                    log.error('Failed to send Discord reply embed', { status: response.status, error: error.slice(0, 200) });
+                    throw new Error(`Discord reply embed failed: ${response.status}`);
+                }
+            });
+        } catch {
+            // Error already logged by DeliveryTracker
         }
     }
 
@@ -1020,21 +1036,28 @@ export class DiscordBridge {
         }
 
         for (const chunk of chunks) {
-            const response = await fetch(
-                `https://discord.com/api/v10/channels/${channelId}/messages`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bot ${this.config.botToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ content: chunk }),
-                },
-            );
+            try {
+                await this.delivery.sendWithReceipt('discord', async () => {
+                    const response = await fetch(
+                        `https://discord.com/api/v10/channels/${channelId}/messages`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bot ${this.config.botToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ content: chunk }),
+                        },
+                    );
 
-            if (!response.ok) {
-                const error = await response.text();
-                log.error('Failed to send Discord message', { status: response.status, error: error.slice(0, 200) });
+                    if (!response.ok) {
+                        const error = await response.text();
+                        log.error('Failed to send Discord message', { status: response.status, error: error.slice(0, 200) });
+                        throw new Error(`Discord sendMessage failed: ${response.status}`);
+                    }
+                });
+            } catch {
+                // Error already logged by DeliveryTracker
             }
         }
     }

@@ -34,6 +34,7 @@ import { handleUsageRoutes } from './usage';
 import { handleFeedbackRoutes } from './feedback';
 import { handleOnboardingRoutes } from './onboarding';
 import { handleSecurityOverviewRoutes } from './security-overview';
+import { handleBridgeDeliveryRoutes } from './bridge-delivery';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -316,6 +317,9 @@ async function handleRoutes(
 
     const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
     if (securityOverviewResponse) return securityOverviewResponse;
+
+    const bridgeDeliveryResponse = handleBridgeDeliveryRoutes(req, url);
+    if (bridgeDeliveryResponse) return bridgeDeliveryResponse;
 
     const dashboardResponse = handleDashboardRoutes(req, url, db, context);
     if (dashboardResponse) return dashboardResponse;
