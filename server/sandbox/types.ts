@@ -89,6 +89,8 @@ export interface SandboxConfigRecord {
     timeout_seconds: number;
     read_only_mounts: string;
     work_dir: string | null;
+    pids_limit: number;
+    storage_limit_mb: number;
     created_at: string;
     updated_at: string;
 }

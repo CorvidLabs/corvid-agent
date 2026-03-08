@@ -82,11 +82,12 @@ afterEach(() => {
 describe('createContainer', () => {
     it('constructs correct docker create command with default limits', async () => {
         const { createContainer } = await import('../sandbox/container');
-        const config = makeSandboxConfig();
+        // Use 'host' to avoid network setup calls — this test focuses on resource limits
+        const config = makeSandboxConfig({ networkPolicy: 'host' });
         const containerId = 'abc123def456';
         queueSpawn(0, containerId);
 
-        const result = await createContainer(config);
+        const result = await createContainer(config, { ...DEFAULT_RESOURCE_LIMITS, networkPolicy: 'host' });
 
         expect(result).toBe(containerId);
         expect(spawnCalls).toHaveLength(1);
@@ -121,20 +122,26 @@ describe('createContainer', () => {
         expect(cmd[netIdx + 1]).toBe('none');
     });
 
-    it('applies restricted DNS when policy is restricted', async () => {
+    it('uses internal Docker network when policy is restricted', async () => {
         const { createContainer } = await import('../sandbox/container');
         const config = makeSandboxConfig({ networkPolicy: 'restricted' });
         const limits: ResourceLimits = { ...DEFAULT_RESOURCE_LIMITS, networkPolicy: 'restricted' };
+        // First call: docker network inspect (already exists)
+        queueSpawn(0, '[{"Name":"corvid-sandbox-restricted"}]');
+        // Second call: docker create
         queueSpawn(0, 'container-id');
 
         await createContainer(config, limits);
 
-        const cmd = spawnCalls[0].cmd;
-        const dnsIdx = cmd.indexOf('--dns');
-        expect(dnsIdx).toBeGreaterThan(-1);
-        expect(cmd[dnsIdx + 1]).toBe('0.0.0.0');
-        // Should NOT have --network flag
-        expect(cmd).not.toContain('--network');
+        // The create command should use --network corvid-sandbox-restricted
+        const createCall = spawnCalls.find(c => c.cmd[1] === 'create');
+        expect(createCall).toBeDefined();
+        const cmd = createCall!.cmd;
+        const netIdx = cmd.indexOf('--network');
+        expect(netIdx).toBeGreaterThan(-1);
+        expect(cmd[netIdx + 1]).toBe('corvid-sandbox-restricted');
+        // Should NOT have --dns flag (old behavior removed)
+        expect(cmd).not.toContain('--dns');
     });
 
     it('uses default networking when policy is host', async () => {
@@ -153,11 +160,12 @@ describe('createContainer', () => {
     it('adds read-only volume mounts', async () => {
         const { createContainer } = await import('../sandbox/container');
         const config = makeSandboxConfig({
+            networkPolicy: 'host',
             readOnlyMounts: ['/data/shared', '/etc/config'],
         });
         queueSpawn(0, 'container-id');
 
-        await createContainer(config);
+        await createContainer(config, { ...DEFAULT_RESOURCE_LIMITS, networkPolicy: 'host' });
 
         const cmd = spawnCalls[0].cmd;
         expect(cmd).toContain('-v');
@@ -167,10 +175,10 @@ describe('createContainer', () => {
 
     it('mounts workDir as /workspace when provided', async () => {
         const { createContainer } = await import('../sandbox/container');
-        const config = makeSandboxConfig({ workDir: '/tmp/my-project' });
+        const config = makeSandboxConfig({ networkPolicy: 'host', workDir: '/tmp/my-project' });
         queueSpawn(0, 'container-id');
 
-        await createContainer(config);
+        await createContainer(config, { ...DEFAULT_RESOURCE_LIMITS, networkPolicy: 'host' });
 
         const cmd = spawnCalls[0].cmd;
         expect(cmd).toContain('-w');
@@ -183,7 +191,7 @@ describe('createContainer', () => {
 
     it('throws AuthorizationError on path traversal in workDir', async () => {
         const { createContainer } = await import('../sandbox/container');
-        const config = makeSandboxConfig({ workDir: '/tmp/../etc/shadow' });
+        const config = makeSandboxConfig({ networkPolicy: 'host', workDir: '/tmp/../etc/shadow' });
         queueSpawn(0, 'container-id');
 
         try {
@@ -197,10 +205,10 @@ describe('createContainer', () => {
 
     it('sets SANDBOX_TIMEOUT env var when timeoutSeconds > 0', async () => {
         const { createContainer } = await import('../sandbox/container');
-        const config = makeSandboxConfig({ timeoutSeconds: 300 });
+        const config = makeSandboxConfig({ networkPolicy: 'host', timeoutSeconds: 300 });
         queueSpawn(0, 'container-id');
 
-        await createContainer(config);
+        await createContainer(config, { ...DEFAULT_RESOURCE_LIMITS, networkPolicy: 'host' });
 
         const cmd = spawnCalls[0].cmd;
         const envIdx = cmd.indexOf('-e');
@@ -210,10 +218,10 @@ describe('createContainer', () => {
 
     it('omits SANDBOX_TIMEOUT when timeoutSeconds is 0', async () => {
         const { createContainer } = await import('../sandbox/container');
-        const config = makeSandboxConfig({ timeoutSeconds: 0 });
+        const config = makeSandboxConfig({ networkPolicy: 'host', timeoutSeconds: 0 });
         queueSpawn(0, 'container-id');
 
-        await createContainer(config);
+        await createContainer(config, { ...DEFAULT_RESOURCE_LIMITS, networkPolicy: 'host' });
 
         const cmd = spawnCalls[0].cmd;
         expect(cmd).not.toContain('SANDBOX_TIMEOUT=0');
@@ -221,7 +229,7 @@ describe('createContainer', () => {
 
     it('throws ExternalServiceError on docker failure', async () => {
         const { createContainer } = await import('../sandbox/container');
-        const config = makeSandboxConfig();
+        const config = makeSandboxConfig({ networkPolicy: 'host' });
         queueSpawn(1, '', 'image not found');
 
         try {

@@ -84,7 +84,9 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 3. The warm pool never exceeds `poolConfig.maxContainers` total containers.
 4. `assignContainer` throws `ValidationError` if sandboxing is not enabled and `ConflictError` if the maximum container limit is reached.
 5. `createContainer` throws `AuthorizationError` if `workDir` contains path traversal (`..` segments).
-6. `createContainer` throws `ExternalServiceError` if the `docker create` command fails.
+6. `createContainer` throws `ExternalServiceError` if the `docker create` command fails or if the restricted Docker network cannot be created.
+7. The `restricted` network policy uses a Docker `--internal` bridge network (`corvid-sandbox-restricted`) that blocks all external egress, not just DNS.
+8. `assignContainer` only reuses warm pool containers when the agent's policy matches `DEFAULT_RESOURCE_LIMITS`; agents with custom limits always get fresh containers.
 7. `stopContainer` escalates to `docker kill` if `docker stop` fails.
 8. `removeContainer` logs a warning but does not throw on failure.
 9. Maintenance runs every 30 seconds: recycles containers idle beyond `idleTimeoutMs`, removes dead warm containers, and refills the pool.
@@ -165,5 +167,6 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-08 | corvid-agent | Add pids_limit/storage_limit_mb DB columns, internal network isolation, resume sandbox assignment, custom-limit-aware pool |
 | 2026-03-08 | corvid-agent | Integrated SandboxManager into ProcessManager: container assignment on session start, release on cleanup |
 | 2026-03-04 | corvid-agent | Initial spec |

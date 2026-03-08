@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 71;
+const SCHEMA_VERSION = 72;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -706,6 +706,8 @@ const MIGRATIONS: Record<number, string[]> = {
             timeout_seconds INTEGER DEFAULT 600,
             read_only_mounts TEXT DEFAULT '[]',
             work_dir TEXT DEFAULT NULL,
+            pids_limit INTEGER DEFAULT 100,
+            storage_limit_mb INTEGER DEFAULT 1024,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         )`,
@@ -1328,6 +1330,12 @@ const MIGRATIONS: Record<number, string[]> = {
         // Governance v2: quorum configuration on councils
         `ALTER TABLE councils ADD COLUMN quorum_type TEXT DEFAULT 'majority'`,
         `ALTER TABLE councils ADD COLUMN quorum_threshold REAL DEFAULT NULL`,
+    ],
+
+    72: [
+        // Sandbox: persist pids_limit and storage_limit_mb per-agent
+        `ALTER TABLE sandbox_configs ADD COLUMN pids_limit INTEGER DEFAULT 100`,
+        `ALTER TABLE sandbox_configs ADD COLUMN storage_limit_mb INTEGER DEFAULT 1024`,
     ],
 };
 

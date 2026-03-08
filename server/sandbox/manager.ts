@@ -85,16 +85,27 @@ export class SandboxManager {
             throw new ValidationError('Sandboxing is not enabled');
         }
 
-        // Find an available (unassigned) container from the pool
+        const limits = getAgentPolicy(this.db, agentId);
+
+        // Find an available (unassigned) container from the pool.
+        // If the agent has custom limits that differ from defaults, we must
+        // create a fresh container — warm pool containers use defaults.
+        const needsCustomLimits =
+            limits.cpuLimit !== DEFAULT_RESOURCE_LIMITS.cpuLimit ||
+            limits.memoryLimitMb !== DEFAULT_RESOURCE_LIMITS.memoryLimitMb ||
+            limits.networkPolicy !== DEFAULT_RESOURCE_LIMITS.networkPolicy ||
+            limits.pidsLimit !== DEFAULT_RESOURCE_LIMITS.pidsLimit ||
+            limits.storageLimitMb !== DEFAULT_RESOURCE_LIMITS.storageLimitMb;
+
         let entry: PoolEntry | null = null;
-        for (const [, poolEntry] of this.pool) {
-            if (!poolEntry.sessionId) {
-                entry = poolEntry;
-                break;
+        if (!needsCustomLimits) {
+            for (const [, poolEntry] of this.pool) {
+                if (!poolEntry.sessionId) {
+                    entry = poolEntry;
+                    break;
+                }
             }
         }
-
-        const limits = getAgentPolicy(this.db, agentId);
 
         if (!entry) {
             // No warm containers available — create one on demand

@@ -11,6 +11,10 @@ import { AuthorizationError, ExternalServiceError } from '../lib/errors';
 
 const log = createLogger('Container');
 
+/** Internal Docker network used by the 'restricted' network policy. */
+const RESTRICTED_NETWORK_NAME = 'corvid-sandbox-restricted';
+let restrictedNetworkReady = false;
+
 export interface ExecResult {
     exitCode: number;
     stdout: string;
@@ -42,6 +46,37 @@ async function dockerExec(args: string[], timeoutMs: number = 30_000): Promise<E
 }
 
 /**
+ * Ensure the restricted Docker network exists.
+ * Uses `--internal` which blocks all outbound/inbound traffic to the host network,
+ * providing true network isolation (not just DNS blackholing).
+ */
+async function ensureRestrictedNetwork(): Promise<void> {
+    if (restrictedNetworkReady) return;
+
+    // Check if network already exists
+    const inspect = await dockerExec(['network', 'inspect', RESTRICTED_NETWORK_NAME], 5_000);
+    if (inspect.exitCode === 0) {
+        restrictedNetworkReady = true;
+        return;
+    }
+
+    // Create an internal bridge network (no external connectivity)
+    const result = await dockerExec([
+        'network', 'create',
+        '--driver', 'bridge',
+        '--internal',
+        RESTRICTED_NETWORK_NAME,
+    ], 10_000);
+
+    if (result.exitCode !== 0 && !result.stderr.includes('already exists')) {
+        throw new ExternalServiceError("Docker", `Failed to create restricted network: ${result.stderr}`);
+    }
+
+    restrictedNetworkReady = true;
+    log.info('Created restricted Docker network', { name: RESTRICTED_NETWORK_NAME });
+}
+
+/**
  * Create a Docker container with the given config and resource limits.
  * Returns the container ID.
  */
@@ -62,8 +97,10 @@ export async function createContainer(
     if (limits.networkPolicy === 'none') {
         args.push('--network', 'none');
     } else if (limits.networkPolicy === 'restricted') {
-        // Use default bridge with no DNS (restricted outbound)
-        args.push('--dns', '0.0.0.0');
+        // Use an internal Docker network that blocks all external egress.
+        // Ensure the network exists (idempotent).
+        await ensureRestrictedNetwork();
+        args.push('--network', RESTRICTED_NETWORK_NAME);
     }
     // 'host' uses default Docker networking
 

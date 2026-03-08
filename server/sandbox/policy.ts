@@ -29,8 +29,8 @@ export function getAgentPolicy(db: Database, agentId: string): ResourceLimits {
         memoryLimitMb: row.memory_limit_mb,
         networkPolicy: row.network_policy as ResourceLimits['networkPolicy'],
         timeoutSeconds: row.timeout_seconds,
-        pidsLimit: DEFAULT_RESOURCE_LIMITS.pidsLimit,
-        storageLimitMb: DEFAULT_RESOURCE_LIMITS.storageLimitMb,
+        pidsLimit: row.pids_limit,
+        storageLimitMb: row.storage_limit_mb,
     };
 }
 
@@ -51,21 +51,25 @@ export function setAgentPolicy(
         db.query(`
             UPDATE sandbox_configs
             SET cpu_limit = ?, memory_limit_mb = ?, network_policy = ?,
-                timeout_seconds = ?, updated_at = datetime('now')
+                timeout_seconds = ?, pids_limit = ?, storage_limit_mb = ?,
+                updated_at = datetime('now')
             WHERE agent_id = ?
         `).run(
             merged.cpuLimit,
             merged.memoryLimitMb,
             merged.networkPolicy,
             merged.timeoutSeconds,
+            merged.pidsLimit,
+            merged.storageLimitMb,
             agentId,
         );
     } else {
         const id = crypto.randomUUID();
         db.query(`
             INSERT INTO sandbox_configs (id, agent_id, image, cpu_limit, memory_limit_mb,
-                network_policy, timeout_seconds, read_only_mounts, work_dir)
-            VALUES (?, ?, 'corvid-agent-sandbox:latest', ?, ?, ?, ?, '[]', NULL)
+                network_policy, timeout_seconds, pids_limit, storage_limit_mb,
+                read_only_mounts, work_dir)
+            VALUES (?, ?, 'corvid-agent-sandbox:latest', ?, ?, ?, ?, ?, ?, '[]', NULL)
         `).run(
             id,
             agentId,
@@ -73,6 +77,8 @@ export function setAgentPolicy(
             merged.memoryLimitMb,
             merged.networkPolicy,
             merged.timeoutSeconds,
+            merged.pidsLimit,
+            merged.storageLimitMb,
         );
     }
 

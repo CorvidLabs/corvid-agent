@@ -641,6 +641,8 @@ export function up(db: Database): void {
         timeout_seconds INTEGER DEFAULT 600,
         read_only_mounts TEXT DEFAULT '[]',
         work_dir TEXT DEFAULT NULL,
+        pids_limit INTEGER DEFAULT 100,
+        storage_limit_mb INTEGER DEFAULT 1024,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
     )`);

@@ -538,6 +538,19 @@ export class ProcessManager {
 
         this.timerManager.startStableTimer(session.id);
         this.timerManager.startSessionTimeout(session.id);
+
+        // Assign a sandbox container if enabled (async, best-effort)
+        if (this.sandboxManager?.isEnabled() && session.agentId) {
+            const workDir = (session as { workDir?: string }).workDir ?? null;
+            this.sandboxManager.assignContainer(session.agentId, session.id, workDir).then((containerId) => {
+                log.info(`Sandbox container assigned on resume`, { sessionId: session.id, containerId: containerId.slice(0, 12) });
+            }).catch((err) => {
+                log.warn(`Failed to assign sandbox container on resume`, {
+                    sessionId: session.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
     }
 
     private buildResumePrompt(session: Session, newPrompt?: string): string {
