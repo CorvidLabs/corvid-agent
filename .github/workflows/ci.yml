@@ -39,6 +39,9 @@ jobs:
       - name: Spec check
         run: bun run spec:check
 
+      - name: Stats drift check
+        run: bun run stats:check
+
       - name: Build client
         run: bun run build:client
 
