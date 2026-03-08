@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 71;
+const SCHEMA_VERSION = 72;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1328,6 +1328,31 @@ const MIGRATIONS: Record<number, string[]> = {
         // Governance v2: quorum configuration on councils
         `ALTER TABLE councils ADD COLUMN quorum_type TEXT DEFAULT 'majority'`,
         `ALTER TABLE councils ADD COLUMN quorum_threshold REAL DEFAULT NULL`,
+    ],
+    72: [
+        // Governance v2: proposals lifecycle table
+        `CREATE TABLE IF NOT EXISTS governance_proposals (
+            id                TEXT PRIMARY KEY,
+            council_id        TEXT NOT NULL REFERENCES councils(id) ON DELETE CASCADE,
+            title             TEXT NOT NULL,
+            description       TEXT NOT NULL DEFAULT '',
+            author_id         TEXT NOT NULL,
+            status            TEXT NOT NULL DEFAULT 'draft',
+            decision          TEXT DEFAULT NULL,
+            governance_tier   INTEGER NOT NULL DEFAULT 2,
+            affected_paths    TEXT NOT NULL DEFAULT '[]',
+            quorum_threshold  REAL DEFAULT NULL,
+            minimum_voters    INTEGER DEFAULT NULL,
+            launch_id         TEXT DEFAULT NULL,
+            tenant_id         TEXT NOT NULL DEFAULT 'default',
+            created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+            decided_at        TEXT DEFAULT NULL,
+            enacted_at        TEXT DEFAULT NULL
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_governance_proposals_council ON governance_proposals(council_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
     ],
 };
 

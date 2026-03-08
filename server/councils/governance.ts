@@ -307,12 +307,20 @@ export interface WeightedGovernanceVoteCheck extends GovernanceVoteCheck {
  *
  * Falls back to unweighted evaluation if no weights are provided.
  */
+export interface QuorumConfig {
+    /** Custom quorum threshold (0.0–1.0). Overrides tier default. */
+    threshold?: number | null;
+    /** Minimum number of voters (non-abstaining) required for a valid vote. */
+    minimumVoters?: number | null;
+}
+
 export function evaluateWeightedVote(
     tier: GovernanceTier,
     totalMembers: number,
     votes: WeightedVoteRecord[],
     humanApproved: boolean = false,
     customThreshold?: number | null,
+    minimumVoters?: number | null,
 ): WeightedGovernanceVoteCheck {
     const tierInfo = GOVERNANCE_TIERS[tier];
     const threshold = customThreshold ?? tierInfo.quorumThreshold;
@@ -354,6 +362,19 @@ export function evaluateWeightedVote(
             requiredThreshold: threshold,
             awaitingHumanApproval: false,
             reason: 'No votes cast yet',
+            voteWeights,
+        };
+    }
+
+    // Check minimum voters requirement
+    if (minimumVoters != null && minimumVoters > 0 && activeVotes.length < minimumVoters) {
+        return {
+            passed: false,
+            approvalRatio: 0,
+            weightedApprovalRatio: 0,
+            requiredThreshold: threshold,
+            awaitingHumanApproval: false,
+            reason: `Only ${activeVotes.length} of required ${minimumVoters} minimum voters have voted`,
             voteWeights,
         };
     }
@@ -461,5 +482,57 @@ export function checkAutomationAllowed(filePaths: string[]): AutomationCheckResu
         tier: mostRestrictiveTier,
         reason: 'All paths are within automation-allowed tiers',
         blockedPaths: [],
+    };
+}
+
+// ─── Proposal evaluation ──────────────────────────────────────────────────────
+
+export interface ProposalEvaluationResult extends WeightedGovernanceVoteCheck {
+    /** Whether the minimum voter requirement is satisfied. */
+    minimumVotersMet: boolean;
+    /** The effective quorum threshold used for evaluation. */
+    effectiveThreshold: number;
+    /** The effective minimum voters requirement. */
+    effectiveMinimumVoters: number;
+}
+
+/**
+ * Evaluate a proposal's vote using its quorum configuration.
+ *
+ * Resolves the effective threshold from (in priority order):
+ *   1. Proposal-level quorumThreshold
+ *   2. Council-level quorumThreshold
+ *   3. Governance tier default
+ *
+ * Also enforces minimumVoters when set on the proposal.
+ */
+export function evaluateProposalVote(
+    tier: GovernanceTier,
+    totalMembers: number,
+    votes: WeightedVoteRecord[],
+    humanApproved: boolean,
+    quorum: QuorumConfig = {},
+): ProposalEvaluationResult {
+    const tierInfo = GOVERNANCE_TIERS[tier];
+    const effectiveThreshold = quorum.threshold ?? tierInfo.quorumThreshold;
+    const effectiveMinimumVoters = quorum.minimumVoters ?? 0;
+
+    const check = evaluateWeightedVote(
+        tier,
+        totalMembers,
+        votes,
+        humanApproved,
+        effectiveThreshold,
+        effectiveMinimumVoters > 0 ? effectiveMinimumVoters : null,
+    );
+
+    const activeVotes = votes.filter((v) => v.vote !== 'abstain');
+    const minimumVotersMet = effectiveMinimumVoters <= 0 || activeVotes.length >= effectiveMinimumVoters;
+
+    return {
+        ...check,
+        minimumVotersMet,
+        effectiveThreshold,
+        effectiveMinimumVoters,
     };
 }

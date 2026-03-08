@@ -229,6 +229,32 @@ export const CouncilChatSchema = z.object({
     message: z.string().min(1, 'message is required'),
 });
 
+// ─── Governance Proposals ──────────────────────────────────────────────────────
+
+export const CreateProposalSchema = z.object({
+    councilId: z.string().min(1, 'councilId is required'),
+    title: z.string().min(1, 'title is required'),
+    description: z.string().optional(),
+    authorId: z.string().min(1, 'authorId is required'),
+    governanceTier: z.number().int().min(0).max(2).optional(),
+    affectedPaths: z.array(z.string()).optional(),
+    quorumThreshold: z.number().min(0).max(1).nullable().optional(),
+    minimumVoters: z.number().int().min(0).nullable().optional(),
+});
+
+export const UpdateProposalSchema = z.object({
+    title: z.string().min(1).optional(),
+    description: z.string().optional(),
+    affectedPaths: z.array(z.string()).optional(),
+    quorumThreshold: z.number().min(0).max(1).nullable().optional(),
+    minimumVoters: z.number().int().min(0).nullable().optional(),
+});
+
+export const TransitionProposalSchema = z.object({
+    status: z.enum(['draft', 'open', 'voting', 'decided', 'enacted']),
+    decision: z.enum(['approved', 'rejected']).optional(),
+});
+
 // ─── Work Tasks ────────────────────────────────────────────────────────────────
 
 export const CreateWorkTaskSchema = z.object({
