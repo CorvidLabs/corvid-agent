@@ -4,6 +4,7 @@ version: 1
 status: draft
 files:
   - server/sandbox/container.ts
+  - server/sandbox/lifecycle-adapter.ts
   - server/sandbox/manager.ts
   - server/sandbox/policy.ts
   - server/sandbox/types.ts
@@ -63,6 +64,7 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 | Class | Description |
 |-------|-------------|
 | `SandboxManager` | Manages a warm pool of Docker containers, assigns them to sessions, handles lifecycle and maintenance |
+| `SandboxLifecycleAdapter` | Subscribes to SessionEventBus lifecycle events to assign/release sandbox containers without modifying ProcessManager |
 
 #### SandboxManager Methods
 
@@ -76,6 +78,15 @@ Manages Docker container lifecycle for sandboxed agent execution, including a wa
 | `getPoolStats` | _(none)_ | `{ total, warm, assigned, maxContainers, enabled }` | Returns current pool statistics |
 | `shutdown` | _(none)_ | `Promise<void>` | Stops maintenance timer, stops and removes all containers, clears pool |
 | `isEnabled` | _(none)_ | `boolean` | Returns whether sandboxing is enabled (Docker was available at init) |
+
+#### SandboxLifecycleAdapter Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `constructor` | `db: Database`, `sandboxManager: SandboxManager`, `eventBus: EventSubscriber` | `SandboxLifecycleAdapter` | Creates adapter with DB handle, sandbox manager, and event bus |
+| `start` | _(none)_ | `void` | Subscribes to all session events on the event bus |
+| `stop` | _(none)_ | `void` | Unsubscribes from all session events |
+| `getSessionContainer` | `sessionId: string` | `{ containerId, sandboxId } \| null` | Returns container info for a session, or `null` |
 
 ## Invariants
 

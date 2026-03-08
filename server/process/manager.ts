@@ -25,7 +25,6 @@ import { createLogger } from '../lib/logger';
 import { SessionEventBus } from './event-bus';
 import { SessionTimerManager } from './session-timer-manager';
 import { SessionResilienceManager, MAX_RESTARTS } from './session-resilience-manager';
-import type { SandboxManager } from '../sandbox/manager';
 
 // Re-export EventCallback from interfaces for backward compatibility —
 // callers importing { EventCallback } from './manager' continue to work.
@@ -68,9 +67,6 @@ export class ProcessManager {
 
     // MCP services — composed container set after AlgoChat init
     private readonly mcpServices = new McpServiceContainer();
-
-    // Sandbox — optional container isolation for agent sessions
-    private sandboxManager: SandboxManager | null = null;
 
     // Composed managers — delegated concerns
     private readonly timerManager: SessionTimerManager;
@@ -125,20 +121,6 @@ export class ProcessManager {
     /** Register MCP-related services so agent sessions get corvid_* tools. */
     setMcpServices(services: McpServices): void {
         this.mcpServices.setServices(services);
-    }
-
-    /** Wire optional sandbox manager for container lifecycle integration. */
-    setSandboxManager(manager: SandboxManager): void {
-        this.sandboxManager = manager;
-        log.info('SandboxManager wired into ProcessManager');
-    }
-
-    /** Get the sandbox container assigned to a session, if any. */
-    getSessionContainer(sessionId: string): { containerId: string; sandboxId: string } | null {
-        if (!this.sandboxManager) return null;
-        const entry = this.sandboxManager.getContainerForSession(sessionId);
-        if (!entry) return null;
-        return { containerId: entry.containerId, sandboxId: entry.sandboxId };
     }
 
     /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
@@ -374,20 +356,6 @@ export class ProcessManager {
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
 
-        // Assign sandbox container (best-effort — failure does not block the session)
-        if (this.sandboxManager?.isEnabled() && session.agentId) {
-            this.sandboxManager.assignContainer(session.agentId, session.id, session.workDir ?? null)
-                .then((containerId) => {
-                    log.info('Sandbox container assigned', { sessionId: session.id, containerId: containerId.slice(0, 12) });
-                })
-                .catch((err) => {
-                    log.warn('Failed to assign sandbox container', {
-                        sessionId: session.id,
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                });
-        }
-
         const verify = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as { status: string; pid: number | null } | null;
         if (verify?.status !== 'running' || verify?.pid !== process.pid) {
             log.error(`registerProcess DB verification FAILED`, {
@@ -614,16 +582,6 @@ export class ProcessManager {
         this.timerManager.cleanupSession(sessionId);
         this.approvalManager.cancelSession(sessionId);
         this.ownerQuestionManager.cancelSession(sessionId);
-
-        // Release sandbox container (fire-and-forget)
-        if (this.sandboxManager?.isEnabled()) {
-            this.sandboxManager.releaseContainer(sessionId).catch((err) => {
-                log.warn('Failed to release sandbox container', {
-                    sessionId,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            });
-        }
     }
 
     /**
@@ -703,15 +661,6 @@ export class ProcessManager {
 
         for (const [sessionId] of this.processes) {
             this.stopProcess(sessionId);
-        }
-
-        // Shutdown sandbox manager (stops all containers)
-        if (this.sandboxManager) {
-            this.sandboxManager.shutdown().catch((err) => {
-                log.warn('SandboxManager shutdown error', {
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            });
         }
 
         this.eventBus.clearAllSessionSubscribers();

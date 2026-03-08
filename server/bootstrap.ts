@@ -26,6 +26,7 @@ import { NotificationService } from './notifications/service';
 import { QuestionDispatcher } from './notifications/question-dispatcher';
 import { ResponsePollingService } from './notifications/response-poller';
 import { SandboxManager } from './sandbox/manager';
+import { SandboxLifecycleAdapter } from './sandbox/lifecycle-adapter';
 import { MarketplaceService } from './marketplace/service';
 import { MarketplaceFederation } from './marketplace/federation';
 import { ReputationScorer } from './reputation/scorer';
@@ -237,8 +238,10 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     // ── Optional subsystems ──────────────────────────────────────────────
     const sandboxEnabled = process.env.SANDBOX_ENABLED === 'true';
     const sandboxManager = sandboxEnabled ? new SandboxManager(db) : null;
+    let sandboxLifecycleAdapter: SandboxLifecycleAdapter | null = null;
     if (sandboxManager) {
-        processManager.setSandboxManager(sandboxManager);
+        sandboxLifecycleAdapter = new SandboxLifecycleAdapter(db, sandboxManager, processManager);
+        sandboxLifecycleAdapter.start();
         sandboxManager.initialize().catch((err: Error) => {
             log.warn('Sandbox manager failed to initialize', { error: err.message });
         });
@@ -378,6 +381,9 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         timeoutMs: 310_000, // 5 min drain + 10s buffer
     });
     shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
+    if (sandboxLifecycleAdapter) {
+        shutdownCoordinator.register({ name: 'SandboxLifecycleAdapter', priority: 14, handler: () => sandboxLifecycleAdapter!.stop() });
+    }
     if (sandboxManager) {
         shutdownCoordinator.register({ name: 'SandboxManager', priority: 15, handler: () => sandboxManager.shutdown(), timeoutMs: 10_000 });
     }
