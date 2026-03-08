@@ -317,7 +317,8 @@ export class CommandHandler {
 
             case '/council': {
                 this.handleCouncilCommand(participant, parts, respond).catch((err) => {
-                    respond(`Council error: ${err instanceof Error ? err.message : String(err)}`);
+                    log.error('Council command error', { error: err instanceof Error ? err.message : String(err) });
+                    respond('Council operation failed. Check server logs for details.');
                 });
                 return true;
             }
