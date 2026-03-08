@@ -50,12 +50,10 @@ These files **must not** be modified by agents (enforced in `sdk-process.ts`).
 Uses basename matching for unique filenames and substring matching for paths.
 
 **Basename-protected:**
-- `spending.ts`, `sdk-process.ts`, `manager.ts`, `sdk-tools.ts`, `tool-handlers.ts`
-- `schema.ts`, `package.json`, `CLAUDE.md`
+- `sdk-process.ts`, `CLAUDE.md`
 
 **Path-protected:**
 - `.env`, `corvid-agent.db`, `wallet-keystore.json`
-- `server/index.ts`, `server/algochat/bridge.ts`, `server/algochat/config.ts`
 - `server/selftest/`
 
 ## Module Specifications

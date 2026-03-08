@@ -314,7 +314,7 @@ describe('AutoMergeService.checkAll', () => {
                 return { ok: true, stdout: 'pass', stderr: '' };
             }
             if (key.includes('repos/') && key.includes('/pulls/')) {
-                return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// malicious change', stderr: '' };
+                return { ok: true, stdout: '+++ b/server/process/sdk-process.ts\n+// malicious change', stderr: '' };
             }
             if (key.includes('pr close')) {
                 return { ok: true, stdout: '', stderr: '' };
@@ -395,7 +395,7 @@ describe('AutoMergeService.checkAll', () => {
                 return { ok: true, stdout: 'pass', stderr: '' };
             }
             if (key.includes('repos/') && key.includes('/pulls/')) {
-                return { ok: true, stdout: '+++ b/server/db/schema.ts\n+// protected file', stderr: '' };
+                return { ok: true, stdout: '+++ b/server/process/sdk-process.ts\n+// protected file', stderr: '' };
             }
             if (key.includes('pr close')) {
                 closeCalls.push(args);
@@ -510,17 +510,17 @@ describe('AutoMergeService.validateDiff', () => {
         expect(result).toBeNull();
     });
 
-    test('rejects diff modifying package.json', async () => {
+    test('rejects diff modifying sdk-process.ts', async () => {
         const runGh: RunGhFn = async () => ({
             ok: true,
-            stdout: '+++ b/package.json\n+"evil": "dependency"',
+            stdout: '+++ b/server/process/sdk-process.ts\n+// evil change',
             stderr: '',
         });
 
         const service = new AutoMergeService(db, runGh);
         const result = await service.validateDiff('CorvidLabs/corvid-agent', 1);
         expect(result).toContain('Protected files modified');
-        expect(result).toContain('package.json');
+        expect(result).toContain('sdk-process.ts');
     });
 
     test('rejects diff modifying .env', async () => {
@@ -575,7 +575,7 @@ describe('AutoMergeService.validateDiff', () => {
         const runGh: RunGhFn = async () => ({
             ok: true,
             stdout: [
-                '+++ b/server/db/schema.ts',
+                '+++ b/server/process/sdk-process.ts',
                 '+// modified protected file',
                 '+++ b/server/routes/bad.ts',
                 '+eval("payload")',
