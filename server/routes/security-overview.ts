@@ -19,33 +19,15 @@ import {
     LAYER_1_BASENAMES, LAYER_1_SUBSTRINGS,
 } from '../councils/governance';
 import { json } from '../lib/response';
+import { ALL_PATTERNS } from '../lib/code-scanner';
 
-/** Summarized code scanner pattern for the overview response. */
-interface PatternSummary {
-    name: string;
-    category: string;
-    severity: 'critical' | 'warning';
-}
-
-/** The critical/warning patterns are not exported from code-scanner.ts,
- *  so we maintain a static summary here. Kept in sync via tests. */
-const BLOCKED_PATTERNS: PatternSummary[] = [
-    { name: 'eval()', category: 'dynamic_code_execution', severity: 'critical' },
-    { name: 'new Function()', category: 'dynamic_code_execution', severity: 'critical' },
-    { name: 'setTimeout/setInterval with string arg', category: 'dynamic_code_execution', severity: 'critical' },
-    { name: "require('child_process')", category: 'child_process', severity: 'critical' },
-    { name: "import 'child_process'", category: 'child_process', severity: 'critical' },
-    { name: 'process.kill()', category: 'process_control', severity: 'critical' },
-    { name: 'reverse shell (nc -e)', category: 'backdoor', severity: 'critical' },
-    { name: 'hex-encoded eval', category: 'obfuscation', severity: 'critical' },
-    { name: 'base64 decode + execute', category: 'obfuscation', severity: 'critical' },
-    { name: 'stratum mining URL', category: 'crypto_mining', severity: 'critical' },
-    { name: 'mining pool WebSocket', category: 'crypto_mining', severity: 'critical' },
-    { name: 'process.exit()', category: 'process_control', severity: 'warning' },
-    { name: 'excessive hex escapes', category: 'obfuscation', severity: 'warning' },
-    { name: 'excessive unicode escapes', category: 'obfuscation', severity: 'warning' },
-    { name: 'server binding in non-server file', category: 'backdoor', severity: 'warning' },
-];
+/** Derive blocked-pattern summaries from the canonical code-scanner rules
+ *  so this file never contains literal suspicious strings. */
+const BLOCKED_PATTERNS = ALL_PATTERNS.map((p) => ({
+    name: p.name,
+    category: p.category,
+    severity: p.severity,
+}));
 
 function queryCount(db: Database, sql: string): number {
     const row = db.query(sql).get() as { cnt: number } | null;

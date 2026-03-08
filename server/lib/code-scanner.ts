@@ -157,7 +157,8 @@ const WARNING_PATTERNS: PatternRule[] = [
     },
 ];
 
-const ALL_PATTERNS: PatternRule[] = [...CRITICAL_PATTERNS, ...WARNING_PATTERNS];
+export type { PatternRule };
+export const ALL_PATTERNS: PatternRule[] = [...CRITICAL_PATTERNS, ...WARNING_PATTERNS];
 
 /**
  * Files excluded from scanning — these contain pattern strings as test
