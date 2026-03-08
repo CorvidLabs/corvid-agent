@@ -123,12 +123,20 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `onCouncilDiscussionMessage` | `(launchId, callback)` | `void` | Subscribe to council discussion messages |
 | `onCouncilAgentError` | `(cb: (error: CouncilAgentError) => void)` | `() => void` | Subscribe to council agent error events. Returns an unsubscribe function. |
 
+### Exported Constants (councils.ts re-exports)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `HEARTBEAT_INTERVAL_MS` | `number` (30,000) | Periodic re-check interval for missed session exits during council wait |
+| `SAFETY_TIMEOUT_MS` | `number` (600,000) | Safety net timeout when all sessions appear dead but pending set is non-empty |
+
 ### Exported Types (councils.ts re-exports)
 
 | Type | Description |
 |------|-------------|
 | `LaunchCouncilResult` | Result of launching a council deliberation |
 | `WaitForSessionsResult` | Result of waiting for council sessions |
+| `WaitForSessionsOptions` | Optional overrides for internal timing: `{ heartbeatMs?, safetyTimeoutMs? }` (primarily for testing) |
 
 ### Exported Types (mcp-api.ts)
 
@@ -622,3 +630,4 @@ Every request passes through these stages in order:
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-02-21 | corvid-agent | Add POST /api/reputation/scores for bulk recompute; update GET /scores description to reflect auto-compute behavior |
+| 2026-03-08 | corvid-agent | Documented council re-exports: `HEARTBEAT_INTERVAL_MS`, `SAFETY_TIMEOUT_MS`, `WaitForSessionsOptions` |

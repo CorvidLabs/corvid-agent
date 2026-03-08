@@ -48,7 +48,8 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 
 | Type | Description |
 |------|-------------|
-| `TelegramBridgeConfig` | `{ botToken: string; chatId: string; allowedUserIds: string[] }` |
+| `TelegramBridgeMode` | Union type `'chat' \| 'work_intake'` — controls whether the bridge routes messages to chat sessions or work task intake |
+| `TelegramBridgeConfig` | `{ botToken: string; chatId: string; allowedUserIds: string[]; mode?: TelegramBridgeMode }` |
 | `TelegramUpdate` | Telegram update object with optional `message` and `callback_query` |
 | `TelegramMessage` | Message with `from`, `chat`, optional `text`, optional `voice` |
 | `TelegramUser` | `{ id: number; is_bot: boolean; first_name: string; username?: string }` |
@@ -168,3 +169,4 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
+| 2026-03-08 | corvid-agent | Documented `TelegramBridgeMode` type, updated `TelegramBridgeConfig` to include optional `mode` field |

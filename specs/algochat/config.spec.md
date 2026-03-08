@@ -29,6 +29,7 @@ Loads and caches AlgoChat configuration from environment variables. Handles Algo
 |----------|-----------|---------|-------------|
 | `loadAlgoChatConfig` | `()` | `AlgoChatConfig` | Load config from env vars (cached after first call) |
 | `parseOwnerAddresses` | `(network: AlgoChatNetwork)` | `Set<string>` | Parse and validate ALGOCHAT_OWNER_ADDRESSES. Exported for testing |
+| `_resetConfigCache` | `()` | `void` | Reset the cached config singleton (test-only) |
 
 ## Invariants
 
@@ -120,3 +121,4 @@ Loads and caches AlgoChat configuration from environment variables. Handles Algo
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-03-08 | corvid-agent | Documented `_resetConfigCache` test helper |
