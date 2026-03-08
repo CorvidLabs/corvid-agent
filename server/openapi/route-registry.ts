@@ -549,6 +549,16 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
 
+    // ── Bridge Delivery ───────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/bridges/delivery',
+        summary: 'Bridge delivery metrics',
+        description: 'Returns delivery receipt metrics (success/failure counts and rates) for all bridge platforms (Discord, Telegram, Slack).',
+        tags: ['Bridges'],
+        auth: 'required',
+        responses: { 200: { description: 'Per-platform delivery metrics' } },
+    },
+
     // ── Security Overview ─────────────────────────────────────────────────
     {
         method: 'GET', path: '/api/security/overview',

@@ -14,6 +14,7 @@ import { ExternalServiceError, NotFoundError } from '../lib/errors';
 import { scanForInjection } from '../lib/prompt-injection';
 import { recordAudit } from '../db/audit';
 import { DedupService } from '../lib/dedup';
+import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
 
 const log = createLogger('TelegramBridge');
 
@@ -36,6 +37,7 @@ export class TelegramBridge {
     private running = false;
     private consecutiveErrors = 0;
     private dedup = DedupService.global();
+    private delivery: DeliveryTracker = getDeliveryTracker();
 
     // Map Telegram userId → active sessionId
     private userSessions: Map<number, string> = new Map();
@@ -426,12 +428,18 @@ export class TelegramBridge {
         }
 
         for (const chunk of chunks) {
-            await this.callTelegramApi('sendMessage', {
-                chat_id: chatId,
-                text: chunk,
-                parse_mode: 'Markdown',
-                ...(replyTo ? { reply_to_message_id: replyTo } : {}),
-            });
+            try {
+                await this.delivery.sendWithReceipt('telegram', () =>
+                    this.callTelegramApi('sendMessage', {
+                        chat_id: chatId,
+                        text: chunk,
+                        parse_mode: 'Markdown',
+                        ...(replyTo ? { reply_to_message_id: replyTo } : {}),
+                    }),
+                );
+            } catch {
+                // Error already logged by DeliveryTracker and callTelegramApi
+            }
         }
     }
 
@@ -447,15 +455,18 @@ export class TelegramBridge {
         formData.append('voice', new Blob([new Uint8Array(result.audio)], { type: 'audio/mpeg' }), 'voice.mp3');
         if (replyTo) formData.append('reply_to_message_id', String(replyTo));
 
-        const response = await fetch(
-            `https://api.telegram.org/bot${this.config.botToken}/sendVoice`,
-            { method: 'POST', body: formData },
-        );
+        await this.delivery.sendWithReceipt('telegram', async () => {
+            const response = await fetch(
+                `https://api.telegram.org/bot${this.config.botToken}/sendVoice`,
+                { method: 'POST', body: formData },
+            );
 
-        if (!response.ok) {
-            const error = await response.text();
-            log.error('Failed to send Telegram voice', { error });
-        }
+            if (!response.ok) {
+                const error = await response.text();
+                log.error('Failed to send Telegram voice', { error });
+                throw new Error(`Telegram sendVoice failed: ${response.status}`);
+            }
+        });
 
         // Also send as text for accessibility
         await this.sendText(chatId, text, replyTo);

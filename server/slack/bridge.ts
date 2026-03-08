@@ -12,6 +12,7 @@ import { listProjects } from '../db/projects';
 import { createLogger } from '../lib/logger';
 import { DedupService } from '../lib/dedup';
 import { timingSafeEqual } from '../middleware/auth';
+import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
 
 const log = createLogger('SlackBridge');
 
@@ -37,6 +38,7 @@ export class SlackBridge {
     private readonly RATE_LIMIT_MAX_MESSAGES = 10;
 
     private dedup = DedupService.global();
+    private delivery: DeliveryTracker = getDeliveryTracker();
 
     constructor(db: Database, processManager: ProcessManager, config: SlackBridgeConfig) {
         this.db = db;
@@ -320,23 +322,31 @@ export class SlackBridge {
                 body.thread_ts = threadTs;
             }
 
-            const response = await fetch('https://slack.com/api/chat.postMessage', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(body),
-            });
+            try {
+                await this.delivery.sendWithReceipt('slack', async () => {
+                    const response = await fetch('https://slack.com/api/chat.postMessage', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.config.botToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(body),
+                    });
 
-            if (!response.ok) {
-                const error = await response.text();
-                log.error('Failed to send Slack message', { status: response.status, error: error.slice(0, 200) });
-            } else {
-                const data = await response.json() as { ok: boolean; error?: string };
-                if (!data.ok) {
-                    log.error('Slack API error', { error: data.error });
-                }
+                    if (!response.ok) {
+                        const error = await response.text();
+                        log.error('Failed to send Slack message', { status: response.status, error: error.slice(0, 200) });
+                        throw new Error(`Slack sendMessage failed: ${response.status}`);
+                    } else {
+                        const data = await response.json() as { ok: boolean; error?: string };
+                        if (!data.ok) {
+                            log.error('Slack API error', { error: data.error });
+                            throw new Error(`Slack API error: ${data.error}`);
+                        }
+                    }
+                });
+            } catch {
+                // Error already logged by DeliveryTracker
             }
         }
     }
