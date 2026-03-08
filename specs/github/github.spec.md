@@ -49,6 +49,7 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 | `closeIssue` | `repo: string, issueNumber: number` | `Promise<{ ok: boolean; error?: string }>` | Closes a GitHub issue |
 | `addIssueComment` | `repo: string, issueNumber: number, body: string` | `Promise<{ ok: boolean; error?: string }>` | Adds a comment on a GitHub issue |
 | `getPrState` | `repo: string, prNumber: number` | `Promise<{ ok: boolean; pr?: PrViewResult; error?: string }>` | Gets the state of a PR (open/closed/merged, checks, review decision) |
+| `searchOpenPrsForIssue` | `repo: string, issueNumber: number` | `Promise<{ ok: boolean; prs: PullRequest[]; error?: string }>` | Searches open PRs for references to a given issue number (`#NNN` in title or body). Used to deduplicate before creating new work |
 | `isGitHubConfigured` | (none) | `boolean` | Returns true if GH_TOKEN is set in the environment |
 
 ### Exported Types
@@ -124,3 +125,4 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-08 | corvid-agent | Documented `searchOpenPrsForIssue` |

@@ -34,6 +34,23 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `runBunInstall` | `(cwd: string)` | `Promise<void>` | Run `bun install --frozen-lockfile --ignore-scripts`, retrying without `--frozen-lockfile` on failure |
 | `runValidation` | `(workingDir: string)` | `Promise<{ passed: boolean; output: string }>` | Full validation pipeline: install deps, tsc, tests, security/governance scans |
 
+### Exported Constants (server/work/repo-map.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `REPO_MAP_MAX_LINES` | `number` (200) | Max lines in the generated repo map to keep it lightweight |
+| `PRIORITY_DIRS` | `string[]` | Directories prioritized in repo map ordering (`src/`, `server/`, `lib/`, `packages/`) |
+| `STOP_WORDS` | `Set<string>` | Stop words excluded from keyword extraction for symbol search |
+
+### Exported Functions (server/work/repo-map.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `filePathPriority` | `(relPath: string)` | `number` | Priority score for file path ordering (1=source dirs, 2=other, 3=test files) |
+| `generateRepoMap` | `(astParserService: AstParserService, projectDir: string)` | `Promise<string \| null>` | Generate a lightweight repo map showing exported symbols per file, grouped by directory. Returns null if AST service unavailable or no exported symbols found |
+| `extractRelevantSymbols` | `(repoMap: string, description: string)` | `string` | Extract symbols from the repo map that are relevant to a task description using keyword matching |
+| `tokenizeDescription` | `(description: string)` | `string[]` | Tokenize a task description into lowercase keywords, filtering out stop words and short tokens |
+
 #### WorkTaskService Constructor
 
 | Parameter | Type | Description |
@@ -211,3 +228,4 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | 2026-02-20 | corvid-agent | Updated invariant #6 and behavioral example: PR creation now falls back to service-level `createPrFallback()` (fixes #182) |
 | 2026-03-06 | corvid-agent | Added AlgoChat notifications for work task lifecycle events |
 | 2026-03-07 | corvid-agent | Extracted `runValidation` and `runBunInstall` into `server/work/validation.ts` |
+| 2026-03-08 | corvid-agent | Documented repo-map.ts exports: constants, `generateRepoMap`, `extractRelevantSymbols`, `tokenizeDescription`, `filePathPriority` |

@@ -26,6 +26,8 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | `getWorkTaskBySessionId` | `db: Database, sessionId: string` | `WorkTask \| null` | Retrieves a work task by its associated session ID (no tenant filter) |
 | `updateWorkTaskStatus` | `db: Database, id: string, status: WorkTaskStatus, extra?: { sessionId?: string; branchName?: string; prUrl?: string; summary?: string; error?: string; originalBranch?: string; worktreeDir?: string; iterationCount?: number }` | `void` | Updates a work task's status and optionally sets associated metadata fields; auto-sets completed_at when status is 'completed' or 'failed' |
 | `cleanupStaleWorkTasks` | `db: Database` | `WorkTask[]` | Marks all active tasks (branching/running/validating) as failed with error 'Interrupted by server restart'; returns the affected tasks for branch restoration; runs in a transaction |
+| `resetWorkTaskForRetry` | `db: Database, id: string` | `void` | Reset a failed work task back to pending for retry; clears session_id, branch_name, worktree_dir, error, completed_at and resets iteration_count to 0 |
+| `getActiveWorkTasks` | `db: Database` | `WorkTask[]` | Return all work tasks currently in an active state (branching, running, validating) |
 | `listWorkTasks` | `db: Database, agentId?: string, tenantId?: string` | `WorkTask[]` | Lists work tasks, optionally filtered by agent ID, ordered by created_at DESC |
 
 ### Exported Types
@@ -118,3 +120,4 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-08 | corvid-agent | Documented `resetWorkTaskForRetry` and `getActiveWorkTasks` |

@@ -145,6 +145,8 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `DeviceAuthorizeSchema` | Auth Flow | Validates device authorization: `userCode`, `tenantId`, `email`, `approve` (all required). |
 | `PSKContactNicknameSchema` | PSK Contacts | Validates PSK contact: `nickname` (required). |
 | `CreditGrantSchema` | Wallet Credits | Validates credit grant: `amount` (positive finite number), optional `reference`. |
+| `CastVoteSchema` | Councils | Validates council vote: `agentId` (required), `vote` (approve/reject/abstain), optional `reason`. |
+| `HumanApprovalSchema` | Councils | Validates human approval: `approvedBy` (required). |
 
 ### Re-exports (validation.ts)
 | Export | Source | Description |
@@ -229,3 +231,4 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-08 | corvid-agent | Documented `CastVoteSchema` and `HumanApprovalSchema` Zod schemas |
