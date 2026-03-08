@@ -3,6 +3,7 @@ import { handleProjectRoutes, handleBrowseDirs } from './projects';
 import { handleAgentRoutes } from './agents';
 import { handleSessionRoutes } from './sessions';
 import { handleCouncilRoutes } from './councils';
+import { handleProposalRoutes } from './proposals';
 import { handleWorkTaskRoutes } from './work-tasks';
 import { handleMcpApiRoutes } from './mcp-api';
 import { handleAllowlistRoutes } from './allowlist';
@@ -347,6 +348,9 @@ async function handleRoutes(
 
     const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger, context, reputationScorer);
     if (councilResponse) return councilResponse;
+
+    const proposalResponse = handleProposalRoutes(req, url, db, context, reputationScorer);
+    if (proposalResponse) return proposalResponse;
 
     if (workTaskService) {
         const workTaskResponse = handleWorkTaskRoutes(req, url, workTaskService, context);

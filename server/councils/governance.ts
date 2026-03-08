@@ -424,6 +424,167 @@ export interface AutomationCheckResult {
     blockedPaths: string[];
 }
 
+// ─── Proposal quorum evaluation ───────────────────────────────────────────────
+
+export interface ProposalQuorumConfig {
+    /** Fraction of weighted approvals required (0.0–1.0). Falls back to governance tier default. */
+    threshold: number;
+    /** Minimum number of voters (non-abstaining) for a valid quorum. */
+    minVoters: number;
+}
+
+export interface ProposalQuorumCheck {
+    /** Whether the proposal vote passes. */
+    passed: boolean;
+    /** Weighted approval ratio (sum of approve weights / total weights). */
+    weightedApprovalRatio: number;
+    /** Required threshold. */
+    requiredThreshold: number;
+    /** Number of non-abstaining voters. */
+    voterCount: number;
+    /** Minimum voters required. */
+    requiredMinVoters: number;
+    /** Whether human approval is still needed. */
+    awaitingHumanApproval: boolean;
+    /** Reason for pass/fail. */
+    reason: string;
+}
+
+/**
+ * Evaluate whether a proposal vote meets quorum requirements.
+ *
+ * Combines weighted voting (reputation-based), configurable threshold,
+ * and minimum voter requirements.
+ */
+export function evaluateProposalQuorum(
+    tier: GovernanceTier,
+    votes: { vote: 'approve' | 'reject' | 'abstain'; weight: number }[],
+    config: ProposalQuorumConfig,
+    humanApproved: boolean = false,
+): ProposalQuorumCheck {
+    const tierInfo = GOVERNANCE_TIERS[tier];
+
+    // Layer 0 — NEVER passes via council vote
+    if (tier === 0) {
+        return {
+            passed: false,
+            weightedApprovalRatio: 0,
+            requiredThreshold: 1.0,
+            voterCount: 0,
+            requiredMinVoters: config.minVoters,
+            awaitingHumanApproval: false,
+            reason: 'Layer 0 (Constitutional) changes cannot be approved by proposal — human-only commits required',
+        };
+    }
+
+    const activeVotes = votes.filter((v) => v.vote !== 'abstain');
+    const voterCount = activeVotes.length;
+
+    // Check minimum voters
+    if (voterCount < config.minVoters) {
+        return {
+            passed: false,
+            weightedApprovalRatio: 0,
+            requiredThreshold: config.threshold,
+            voterCount,
+            requiredMinVoters: config.minVoters,
+            awaitingHumanApproval: false,
+            reason: `Insufficient voters: ${voterCount} of ${config.minVoters} required`,
+        };
+    }
+
+    if (activeVotes.length === 0) {
+        return {
+            passed: false,
+            weightedApprovalRatio: 0,
+            requiredThreshold: config.threshold,
+            voterCount: 0,
+            requiredMinVoters: config.minVoters,
+            awaitingHumanApproval: false,
+            reason: 'No votes cast yet',
+        };
+    }
+
+    // Weighted calculation
+    const totalWeight = votes.reduce((sum, v) => sum + v.weight, 0);
+    const approveWeight = votes.filter((v) => v.vote === 'approve').reduce((sum, v) => sum + v.weight, 0);
+    const weightedApprovalRatio = totalWeight > 0 ? approveWeight / totalWeight : 0;
+
+    const meetsThreshold = weightedApprovalRatio >= config.threshold;
+
+    if (!meetsThreshold) {
+        return {
+            passed: false,
+            weightedApprovalRatio,
+            requiredThreshold: config.threshold,
+            voterCount,
+            requiredMinVoters: config.minVoters,
+            awaitingHumanApproval: false,
+            reason: `Weighted approval ${(weightedApprovalRatio * 100).toFixed(0)}% below ${(config.threshold * 100).toFixed(0)}% threshold`,
+        };
+    }
+
+    // Threshold met — check if human approval is needed
+    if (tierInfo.requiresHumanApproval && !humanApproved) {
+        return {
+            passed: false,
+            weightedApprovalRatio,
+            requiredThreshold: config.threshold,
+            voterCount,
+            requiredMinVoters: config.minVoters,
+            awaitingHumanApproval: true,
+            reason: `Weighted vote passed (${(weightedApprovalRatio * 100).toFixed(0)}%) but awaiting human approval`,
+        };
+    }
+
+    return {
+        passed: true,
+        weightedApprovalRatio,
+        requiredThreshold: config.threshold,
+        voterCount,
+        requiredMinVoters: config.minVoters,
+        awaitingHumanApproval: false,
+        reason: `Approved: ${(weightedApprovalRatio * 100).toFixed(0)}% weighted approval meets ${tierInfo.label} tier threshold`,
+    };
+}
+
+/**
+ * Resolve the effective quorum config for a proposal.
+ *
+ * Priority: proposal-level overrides > council-level > governance tier defaults.
+ */
+export function resolveQuorumConfig(
+    tier: GovernanceTier,
+    proposalThreshold: number | null,
+    proposalMinVoters: number | null,
+    councilThreshold: number | null,
+): ProposalQuorumConfig {
+    const tierInfo = GOVERNANCE_TIERS[tier];
+    return {
+        threshold: proposalThreshold ?? councilThreshold ?? tierInfo.quorumThreshold,
+        minVoters: proposalMinVoters ?? 1,
+    };
+}
+
+// ─── Proposal lifecycle validation ────────────────────────────────────────────
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+    draft: ['open'],
+    open: ['voting', 'draft'],
+    voting: ['decided'],
+    decided: ['enacted'],
+    enacted: [],
+};
+
+/**
+ * Check if a proposal status transition is valid.
+ */
+export function isValidTransition(from: string, to: string): boolean {
+    return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+// ─── Automation enforcement ───────────────────────────────────────────────────
+
 /**
  * Check whether an automated workflow (scheduler, work task) may modify a set of paths.
  * Layer 0 and Layer 1 paths are blocked from automated modification.

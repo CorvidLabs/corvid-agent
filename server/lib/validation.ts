@@ -730,3 +730,36 @@ export const CreditGrantSchema = z.object({
     amount: z.number().positive().finite(),
     reference: z.string().optional(),
 });
+
+// ─── Governance Proposals ──────────────────────────────────────────────────
+
+export const CreateProposalSchema = z.object({
+    title: z.string().min(1),
+    description: z.string().optional(),
+    authorAgentId: z.string().min(1),
+    councilId: z.string().optional(),
+    governanceTier: z.number().int().min(0).max(2).optional(),
+    affectedPaths: z.array(z.string()).optional(),
+    quorumThreshold: z.number().min(0).max(1).nullable().optional(),
+    minVoters: z.number().int().min(1).nullable().optional(),
+});
+
+export const UpdateProposalSchema = z.object({
+    title: z.string().min(1).optional(),
+    description: z.string().optional(),
+    governanceTier: z.number().int().min(0).max(2).optional(),
+    affectedPaths: z.array(z.string()).optional(),
+    quorumThreshold: z.number().min(0).max(1).nullable().optional(),
+    minVoters: z.number().int().min(1).nullable().optional(),
+});
+
+export const ProposalTransitionSchema = z.object({
+    status: z.enum(['open', 'voting', 'decided', 'enacted', 'draft']),
+    decision: z.enum(['approved', 'rejected']).optional(),
+});
+
+export const ProposalVoteSchema = z.object({
+    agentId: z.string().min(1),
+    vote: z.enum(['approve', 'reject', 'abstain']),
+    reason: z.string().optional(),
+});

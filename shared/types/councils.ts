@@ -140,3 +140,70 @@ export interface CouncilAgentError {
     sessionId?: string;
     round?: number;
 }
+
+// ─── Governance v2: Proposals ────────────────────────────────────────────────
+
+/** Lifecycle states for a governance proposal. */
+export type ProposalStatus = 'draft' | 'open' | 'voting' | 'decided' | 'enacted';
+
+/** Final decision on a proposal after voting completes. */
+export type ProposalDecision = 'approved' | 'rejected';
+
+export interface GovernanceProposal {
+    id: string;
+    title: string;
+    description: string;
+    authorAgentId: string;
+    councilId: string | null;
+    governanceTier: number;
+    affectedPaths: string[];
+    status: ProposalStatus;
+    decision: ProposalDecision | null;
+    /** Custom quorum threshold (0.0–1.0). Overrides tier default when set. */
+    quorumThreshold: number | null;
+    /** Minimum number of voters required for a valid quorum. */
+    minVoters: number | null;
+    voteStartAt: string | null;
+    voteEndAt: string | null;
+    decidedAt: string | null;
+    enactedAt: string | null;
+    launchId: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface GovernanceProposalVote {
+    id: number;
+    proposalId: string;
+    agentId: string;
+    vote: 'approve' | 'reject' | 'abstain';
+    weight: number;
+    reason: string;
+    createdAt: string;
+}
+
+export interface CreateProposalInput {
+    title: string;
+    description?: string;
+    authorAgentId: string;
+    councilId?: string;
+    governanceTier?: number;
+    affectedPaths?: string[];
+    quorumThreshold?: number | null;
+    minVoters?: number | null;
+}
+
+export interface UpdateProposalInput {
+    title?: string;
+    description?: string;
+    governanceTier?: number;
+    affectedPaths?: string[];
+    quorumThreshold?: number | null;
+    minVoters?: number | null;
+}
+
+export interface ProposalVoteInput {
+    agentId: string;
+    vote: 'approve' | 'reject' | 'abstain';
+    reason?: string;
+}

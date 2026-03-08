@@ -27,6 +27,7 @@ import {
     CreateMcpServerConfigSchema, UpdateMcpServerConfigSchema,
     EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema,
     OllamaPullModelSchema, OllamaDeleteModelSchema,
+    CreateProposalSchema, UpdateProposalSchema, ProposalTransitionSchema, ProposalVoteSchema,
 } from '../lib/validation';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -454,6 +455,62 @@ export const routes: RouteEntry[] = [
         summary: 'Continue chat on completed council',
         tags: ['Councils'],
         auth: 'required',
+    },
+
+    // ── Governance Proposals ─────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/governance/proposals',
+        summary: 'List governance proposals',
+        description: 'Filter by councilId, status, or authorAgentId query parameters.',
+        tags: ['Governance'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/governance/proposals',
+        summary: 'Create governance proposal',
+        tags: ['Governance'],
+        auth: 'required',
+        requestBody: CreateProposalSchema,
+    },
+    {
+        method: 'GET', path: '/api/governance/proposals/{id}',
+        summary: 'Get governance proposal by ID',
+        tags: ['Governance'],
+        auth: 'required',
+    },
+    {
+        method: 'PUT', path: '/api/governance/proposals/{id}',
+        summary: 'Update governance proposal (draft only)',
+        tags: ['Governance'],
+        auth: 'required',
+        requestBody: UpdateProposalSchema,
+    },
+    {
+        method: 'DELETE', path: '/api/governance/proposals/{id}',
+        summary: 'Delete governance proposal (draft only)',
+        tags: ['Governance'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/governance/proposals/{id}/transition',
+        summary: 'Transition proposal status',
+        description: 'Lifecycle: draft → open → voting → decided → enacted.',
+        tags: ['Governance'],
+        auth: 'required',
+        requestBody: ProposalTransitionSchema,
+    },
+    {
+        method: 'GET', path: '/api/governance/proposals/{id}/votes',
+        summary: 'Get proposal votes and quorum evaluation',
+        tags: ['Governance'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/governance/proposals/{id}/votes',
+        summary: 'Cast vote on proposal (reputation-weighted)',
+        tags: ['Governance'],
+        auth: 'required',
+        requestBody: ProposalVoteSchema,
     },
 
     // ── Work Tasks ──────────────────────────────────────────────────────────
