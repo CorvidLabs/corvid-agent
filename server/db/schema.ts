@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 70;
+const SCHEMA_VERSION = 71;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1323,6 +1323,11 @@ const MIGRATIONS: Record<number, string[]> = {
         // Default all agents and councils to AlgoChat-enabled
         `UPDATE agents SET algochat_enabled = 1, algochat_auto = 1 WHERE algochat_enabled = 0`,
         `UPDATE councils SET on_chain_mode = 'full' WHERE on_chain_mode = 'off'`,
+    ],
+    71: [
+        // Governance v2: quorum configuration on councils
+        `ALTER TABLE councils ADD COLUMN quorum_type TEXT DEFAULT 'majority'`,
+        `ALTER TABLE councils ADD COLUMN quorum_threshold REAL DEFAULT NULL`,
     ],
 };
 

@@ -80,6 +80,10 @@ _(none)_
 14. `waitForSessions` resolves with partial results on timeout rather than rejecting, reporting which sessions completed and which timed out.
 15. On-chain discussion messages are only sent when council `onChainMode` is `'full'`.
 16. Synthesis attestation (SHA-256 hash) is published on-chain when `onChainMode` is `'attestation'`.
+17. Governance votes use reputation-weighted voting via `evaluateWeightedVote`. Each agent's vote is weighted by their reputation score (0–100, default 50 if unavailable).
+18. Councils can configure `quorumType` (`majority`/`supermajority`/`unanimous`) and an optional `quorumThreshold` (0.0–1.0) that overrides the governance tier default.
+19. On synthesis completion for governance launches, `resolveGovernanceVote` evaluates the weighted vote and updates the governance vote status to `approved`, `rejected`, or `awaiting_human`.
+20. The chairman synthesis prompt includes governance vote weights for governance launches, instructing higher-reputation positions to carry more influence.
 
 ## Behavioral Examples
 
@@ -131,6 +135,24 @@ _(none)_
 - **When** the per-round timeout fires
 - **Then** `waitForSessions` resolves with 2 completed and 1 timed out, the timed-out session is force-stopped, and the round proceeds
 
+### Scenario: Governance vote with weighted voting
+- **Given** a governance council launch (Layer 2) with 3 agents having reputation scores 90, 30, and 50
+- **When** the high-reputation agent (90) approves and the other two reject
+- **Then** the weighted approval ratio is 90/(90+30+50) = 52.9%, which meets the 50% Layer 2 threshold
+- **And** the governance vote status is updated to `approved`
+
+### Scenario: Governance vote with custom quorum threshold
+- **Given** a council with `quorumThreshold: 0.8`
+- **When** a governance vote achieves 70% weighted approval
+- **Then** the vote is rejected because 70% < 80% custom threshold
+
+### Scenario: Layer 1 governance vote requiring human approval
+- **Given** a governance launch targeting Layer 1 paths (e.g., `package.json`)
+- **When** 80% weighted approval is achieved
+- **Then** the governance vote status is set to `awaiting_human`
+- **When** a human operator approves via the `/vote/approve` endpoint
+- **Then** the vote is re-evaluated and status is updated to `approved`
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -156,7 +178,9 @@ _(none)_
 
 | Module | What is used |
 |--------|-------------|
-| `db` | `getCouncil`, `createCouncilLaunch`, `getCouncilLaunch`, `updateCouncilLaunchStage`, `addCouncilLaunchLog`, `insertDiscussionMessage`, `getDiscussionMessages`, `updateCouncilLaunchDiscussionRound`, `updateDiscussionMessageTxid`, `updateCouncilLaunchChatSession` from `db/councils`; `createSession`, `getSession`, `getSessionMessages`, `listSessionsByCouncilLaunch` from `db/sessions`; `getAgent` from `db/agents`; `getProject` from `db/projects` |
+| `db` | `getCouncil`, `createCouncilLaunch`, `getCouncilLaunch`, `updateCouncilLaunchStage`, `addCouncilLaunchLog`, `insertDiscussionMessage`, `getDiscussionMessages`, `updateCouncilLaunchDiscussionRound`, `updateDiscussionMessageTxid`, `updateCouncilLaunchChatSession`, `getGovernanceVote`, `getGovernanceMemberVotes`, `updateGovernanceVoteStatus` from `db/councils`; `createSession`, `getSession`, `getSessionMessages`, `listSessionsByCouncilLaunch` from `db/sessions`; `getAgent` from `db/agents`; `getProject` from `db/projects` |
+| `reputation` | `ReputationScorer.getCachedScore` — used for weighted governance vote evaluation |
+| `governance` | `evaluateWeightedVote` — reputation-weighted vote evaluation with custom thresholds |
 | `process` | `ProcessManager` — `startProcess`, `stopProcess`, `resumeProcess`, `isRunning`, `subscribe`, `unsubscribe`; `EventCallback` type |
 | `algochat` | `AgentMessenger` — `sendOnChainBestEffort` for on-chain discussion messaging |
 | `lib` | `createLogger` from `lib/logger`; `NotFoundError` from `lib/errors` |
@@ -178,3 +202,4 @@ _(none)_
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Added on-chain mode (off/attestation/full) for council communication |
+| 2026-03-08 | corvid-agent | Governance v2: weighted voting, quorum config, vote resolution on synthesis completion |

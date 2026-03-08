@@ -193,6 +193,8 @@ export const CreateCouncilSchema = z.object({
     chairmanAgentId: z.string().optional(),
     discussionRounds: z.number().int().min(0).optional(),
     onChainMode: z.enum(['off', 'attestation', 'full']).optional(),
+    quorumType: z.enum(['majority', 'supermajority', 'unanimous']).optional(),
+    quorumThreshold: z.number().min(0).max(1).nullable().optional(),
 });
 
 export const UpdateCouncilSchema = z.object({
@@ -202,6 +204,18 @@ export const UpdateCouncilSchema = z.object({
     chairmanAgentId: z.string().nullable().optional(),
     discussionRounds: z.number().int().min(0).optional(),
     onChainMode: z.enum(['off', 'attestation', 'full']).optional(),
+    quorumType: z.enum(['majority', 'supermajority', 'unanimous']).optional(),
+    quorumThreshold: z.number().min(0).max(1).nullable().optional(),
+});
+
+export const CastVoteSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    vote: z.enum(['approve', 'reject', 'abstain']),
+    reason: z.string().optional(),
+});
+
+export const HumanApprovalSchema = z.object({
+    approvedBy: z.string().min(1, 'approvedBy is required'),
 });
 
 export const LaunchCouncilSchema = z.object({

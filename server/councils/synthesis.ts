@@ -12,14 +12,19 @@ import {
     updateCouncilLaunchStage,
     updateCouncilLaunchSynthesisTxid,
     getDiscussionMessages,
+    getGovernanceVote,
+    getGovernanceMemberVotes,
+    updateGovernanceVoteStatus,
 } from '../db/councils';
 import { createSession, getSessionMessages, listSessionsByCouncilLaunch } from '../db/sessions';
 import { getAgent } from '../db/agents';
 import type { ProcessManager, EventCallback } from '../process/manager';
 import type { AgentMessenger } from '../algochat/agent-messenger';
+import type { ReputationScorer } from '../reputation/scorer';
 import type { CouncilDiscussionMessage, CouncilOnChainMode } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import { broadcastAgentError } from './discussion';
+import { evaluateWeightedVote, type GovernanceTier, type WeightedVoteRecord } from './governance';
 
 const log = createLogger('CouncilSynthesis');
 
@@ -193,6 +198,7 @@ export function triggerSynthesis(
     chairmanOverride?: string,
     agentMessenger?: AgentMessenger | null,
     onChainMode?: CouncilOnChainMode,
+    reputationScorer?: ReputationScorer | null,
 ): { ok: true; synthesisSessionId: string } | { ok: false; error: string; status: number } {
     const launch = getCouncilLaunch(db, launchId);
     if (!launch) return { ok: false, error: 'Launch not found', status: 404 };
@@ -240,6 +246,30 @@ export function triggerSynthesis(
         ? `\n\n## Council Discussion\n\n${formatDiscussionMessages(discussionMsgs)}`
         : '';
 
+    // Build governance vote weight context for governance launches
+    let governanceSection = '';
+    if (launch.voteType === 'governance' && reputationScorer) {
+        const govVote = getGovernanceVote(db, launchId);
+        if (govVote) {
+            const memberVoteRows = getGovernanceMemberVotes(db, govVote.id);
+            if (memberVoteRows.length > 0) {
+                const voteLines = memberVoteRows.map((mv) => {
+                    const agent = getAgent(db, mv.agent_id);
+                    const score = reputationScorer.getCachedScore(mv.agent_id);
+                    const weight = score?.overallScore ?? 50;
+                    return `- **${agent?.name ?? mv.agent_id.slice(0, 8)}**: ${mv.vote} (reputation weight: ${weight}/100)${mv.reason ? ` — "${mv.reason}"` : ''}`;
+                }).join('\n');
+
+                governanceSection = `\n\n## Governance Vote (Weighted by Reputation)
+
+Governance Tier: Layer ${govVote.governance_tier}
+Votes are weighted by each agent's reputation score. Higher-reputation agents have more influence on the outcome.
+
+${voteLines}`;
+            }
+        }
+    }
+
     const synthesisPrompt = `You are the chairman of a council. Your job is to produce a final, synthesized answer based on the council's responses, discussion, and peer reviews.
 
 Original question: "${launch.prompt}"
@@ -250,11 +280,11 @@ ${memberResponses}${discussionSection}
 
 ## Peer Reviews
 
-${reviewSummaries}
+${reviewSummaries}${governanceSection}
 
 ## Your Task
 
-Produce a final, comprehensive answer that incorporates the best elements from all responses, discussion points, and addresses any concerns raised in the reviews. Be thorough and balanced.`;
+Produce a final, comprehensive answer that incorporates the best elements from all responses, discussion points, and addresses any concerns raised in the reviews.${launch.voteType === 'governance' ? ' Consider the governance vote weights — higher-reputation agents\' positions should carry more influence in your synthesis.' : ''} Be thorough and balanced.`;
 
     const session = createSession(db, {
         projectId: launch.projectId,
@@ -276,6 +306,9 @@ Produce a final, comprehensive answer that incorporates the best elements from a
             if (lastMsg) {
                 updateCouncilLaunchStage(db, launchId, 'complete', lastMsg.content);
                 emitLog(db, launchId, 'stage', 'Council complete', `Synthesis: ${lastMsg.content.length} chars`);
+
+                // Evaluate governance vote on synthesis completion
+                resolveGovernanceVote(db, launchId, emitLog, reputationScorer);
 
                 // Publish synthesis attestation on-chain (SHA-256 hash of synthesis text)
                 if (effectiveOnChainMode === 'attestation' && agentMessenger && chairmanAgentId) {
@@ -311,6 +344,76 @@ Produce a final, comprehensive answer that incorporates the best elements from a
     broadcastStageChange(launchId, 'synthesizing', [session.id]);
 
     return { ok: true, synthesisSessionId: session.id };
+}
+
+// ─── Governance vote resolution ────────────────────────────────────────────────
+
+/**
+ * Evaluate and resolve a governance vote when synthesis completes.
+ * For governance launches, this checks if enough weighted votes passed.
+ * Called automatically on synthesis completion.
+ */
+function resolveGovernanceVote(
+    db: Database,
+    launchId: string,
+    emitLog: EmitLogFn,
+    reputationScorer?: ReputationScorer | null,
+): void {
+    const launch = getCouncilLaunch(db, launchId);
+    if (!launch || launch.voteType !== 'governance') return;
+
+    const governanceVote = getGovernanceVote(db, launchId);
+    if (!governanceVote || governanceVote.status !== 'pending') return;
+
+    const council = getCouncil(db, launch.councilId);
+    if (!council) return;
+
+    const totalMembers = council.agentIds.length;
+    const memberVotes = getGovernanceMemberVotes(db, governanceVote.id);
+
+    const weightedVotes: WeightedVoteRecord[] = memberVotes.map((mv) => {
+        let weight = 50;
+        if (reputationScorer) {
+            const score = reputationScorer.getCachedScore(mv.agent_id);
+            if (score) weight = score.overallScore;
+        }
+        return {
+            agentId: mv.agent_id,
+            vote: mv.vote as 'approve' | 'reject' | 'abstain',
+            reason: mv.reason,
+            votedAt: mv.created_at,
+            weight,
+        };
+    });
+
+    const check = evaluateWeightedVote(
+        governanceVote.governance_tier as GovernanceTier,
+        totalMembers,
+        weightedVotes,
+        governanceVote.human_approved === 1,
+        council.quorumThreshold,
+    );
+
+    if (check.passed) {
+        updateGovernanceVoteStatus(db, governanceVote.id, 'approved', new Date().toISOString());
+        emitLog(db, launchId, 'stage', 'Governance vote approved',
+            `${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval (threshold: ${(check.requiredThreshold * 100).toFixed(0)}%)`);
+    } else if (check.awaitingHumanApproval) {
+        updateGovernanceVoteStatus(db, governanceVote.id, 'awaiting_human');
+        emitLog(db, launchId, 'info', 'Governance vote passed — awaiting human approval',
+            `${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval`);
+    } else {
+        // If all members voted and it didn't pass, reject
+        const allVoted = weightedVotes.length >= totalMembers;
+        if (allVoted) {
+            updateGovernanceVoteStatus(db, governanceVote.id, 'rejected', new Date().toISOString());
+            emitLog(db, launchId, 'warn', 'Governance vote rejected',
+                `${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval below ${(check.requiredThreshold * 100).toFixed(0)}% threshold`);
+        } else {
+            emitLog(db, launchId, 'info', 'Governance vote pending',
+                `${weightedVotes.length}/${totalMembers} votes cast, ${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval`);
+        }
+    }
 }
 
 // ─── Synthesis attestation ────────────────────────────────────────────────────

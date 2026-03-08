@@ -1,5 +1,7 @@
 export type CouncilOnChainMode = 'off' | 'attestation' | 'full';
 
+export type CouncilQuorumType = 'majority' | 'supermajority' | 'unanimous';
+
 export interface Council {
     id: string;
     name: string;
@@ -8,6 +10,10 @@ export interface Council {
     agentIds: string[];
     discussionRounds: number;
     onChainMode: CouncilOnChainMode;
+    /** Quorum type: majority (50%), supermajority (75%), unanimous (100%). */
+    quorumType: CouncilQuorumType;
+    /** Custom quorum threshold (0.0–1.0). Overrides governance tier default when set. */
+    quorumThreshold: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -19,6 +25,8 @@ export interface CreateCouncilInput {
     chairmanAgentId?: string;
     discussionRounds?: number;
     onChainMode?: CouncilOnChainMode;
+    quorumType?: CouncilQuorumType;
+    quorumThreshold?: number | null;
 }
 
 export interface UpdateCouncilInput {
@@ -28,6 +36,8 @@ export interface UpdateCouncilInput {
     chairmanAgentId?: string | null;
     discussionRounds?: number;
     onChainMode?: CouncilOnChainMode;
+    quorumType?: CouncilQuorumType;
+    quorumThreshold?: number | null;
 }
 
 export type CouncilStage = 'responding' | 'discussing' | 'reviewing' | 'synthesizing' | 'complete';

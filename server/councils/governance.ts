@@ -283,6 +283,138 @@ export function evaluateVote(
     };
 }
 
+// ─── Weighted vote evaluation ─────────────────────────────────────────────────
+
+/** A vote record with an associated reputation weight (0–100). */
+export interface WeightedVoteRecord extends GovernanceVoteRecord {
+    /** Reputation score of the voting agent (0–100). Default 50 if unavailable. */
+    weight: number;
+}
+
+export interface WeightedGovernanceVoteCheck extends GovernanceVoteCheck {
+    /** Weighted approval ratio (sum of approve weights / total weights). */
+    weightedApprovalRatio: number;
+    /** Individual vote weights used in the calculation. */
+    voteWeights: { agentId: string; vote: string; weight: number }[];
+}
+
+/**
+ * Evaluate a governance vote using reputation-weighted voting.
+ *
+ * Each agent's vote is weighted by their reputation score. An agent with
+ * score 90 has more influence than one with score 30. Abstentions are
+ * excluded from the total weight pool (same as unweighted evaluation).
+ *
+ * Falls back to unweighted evaluation if no weights are provided.
+ */
+export function evaluateWeightedVote(
+    tier: GovernanceTier,
+    totalMembers: number,
+    votes: WeightedVoteRecord[],
+    humanApproved: boolean = false,
+    customThreshold?: number | null,
+): WeightedGovernanceVoteCheck {
+    const tierInfo = GOVERNANCE_TIERS[tier];
+    const threshold = customThreshold ?? tierInfo.quorumThreshold;
+
+    // Layer 0 — NEVER passes via council vote
+    if (tier === 0) {
+        return {
+            passed: false,
+            approvalRatio: 0,
+            weightedApprovalRatio: 0,
+            requiredThreshold: 1.0,
+            awaitingHumanApproval: false,
+            reason: 'Layer 0 (Constitutional) changes cannot be approved by council — human-only commits required',
+            voteWeights: votes.map((v) => ({ agentId: v.agentId, vote: v.vote, weight: v.weight })),
+        };
+    }
+
+    if (totalMembers === 0) {
+        return {
+            passed: false,
+            approvalRatio: 0,
+            weightedApprovalRatio: 0,
+            requiredThreshold: threshold,
+            awaitingHumanApproval: false,
+            reason: 'No council members to vote',
+            voteWeights: [],
+        };
+    }
+
+    // Filter out abstentions for weight calculation
+    const activeVotes = votes.filter((v) => v.vote !== 'abstain');
+    const voteWeights = votes.map((v) => ({ agentId: v.agentId, vote: v.vote, weight: v.weight }));
+
+    if (activeVotes.length === 0) {
+        return {
+            passed: false,
+            approvalRatio: 0,
+            weightedApprovalRatio: 0,
+            requiredThreshold: threshold,
+            awaitingHumanApproval: false,
+            reason: 'No votes cast yet',
+            voteWeights,
+        };
+    }
+
+    // Weighted calculation: sum weights of approvals / sum weights of all members
+    // (not just active voters — abstaining reduces approval ratio, same as unweighted)
+    const totalWeight = votes.reduce((sum, v) => sum + v.weight, 0);
+    const approveWeight = votes.filter((v) => v.vote === 'approve').reduce((sum, v) => sum + v.weight, 0);
+
+    const weightedApprovalRatio = totalWeight > 0 ? approveWeight / totalWeight : 0;
+
+    // Also compute unweighted ratio for backward compatibility
+    const approveCount = votes.filter((v) => v.vote === 'approve').length;
+    const approvalRatio = approveCount / totalMembers;
+
+    const meetsThreshold = weightedApprovalRatio >= threshold;
+
+    if (!meetsThreshold) {
+        return {
+            passed: false,
+            approvalRatio,
+            weightedApprovalRatio,
+            requiredThreshold: threshold,
+            awaitingHumanApproval: false,
+            reason: `Weighted approval ${(weightedApprovalRatio * 100).toFixed(0)}% below ${(threshold * 100).toFixed(0)}% threshold`,
+            voteWeights,
+        };
+    }
+
+    // Threshold met — check if human approval is needed
+    if (tierInfo.requiresHumanApproval && !humanApproved) {
+        return {
+            passed: false,
+            approvalRatio,
+            weightedApprovalRatio,
+            requiredThreshold: threshold,
+            awaitingHumanApproval: true,
+            reason: `Weighted vote passed (${(weightedApprovalRatio * 100).toFixed(0)}%) but awaiting human approval`,
+            voteWeights,
+        };
+    }
+
+    log.info('Governance vote passed (weighted)', {
+        tier,
+        weightedApprovalRatio: `${(weightedApprovalRatio * 100).toFixed(0)}%`,
+        threshold: `${(threshold * 100).toFixed(0)}%`,
+        approveWeight,
+        totalWeight,
+    });
+
+    return {
+        passed: true,
+        approvalRatio,
+        weightedApprovalRatio,
+        requiredThreshold: threshold,
+        awaitingHumanApproval: false,
+        reason: `Approved: ${(weightedApprovalRatio * 100).toFixed(0)}% weighted approval meets ${tierInfo.label} tier threshold`,
+        voteWeights,
+    };
+}
+
 // ─── Automation enforcement ───────────────────────────────────────────────────
 
 export interface AutomationCheckResult {

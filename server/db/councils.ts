@@ -6,6 +6,7 @@ import type {
     CouncilLaunchLog,
     CouncilLogLevel,
     CouncilOnChainMode,
+    CouncilQuorumType,
     CouncilStage,
     CreateCouncilInput,
     UpdateCouncilInput,
@@ -20,6 +21,8 @@ interface CouncilRow {
     chairman_agent_id: string | null;
     discussion_rounds: number;
     on_chain_mode: string;
+    quorum_type: string;
+    quorum_threshold: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -55,6 +58,8 @@ function rowToCouncil(row: CouncilRow, agentIds: string[]): Council {
         agentIds,
         discussionRounds: row.discussion_rounds ?? 2,
         onChainMode: (row.on_chain_mode as CouncilOnChainMode) ?? 'full',
+        quorumType: (row.quorum_type as CouncilQuorumType) ?? 'majority',
+        quorumThreshold: row.quorum_threshold ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -106,9 +111,9 @@ export function createCouncil(db: Database, input: CreateCouncilInput, tenantId:
 
     db.transaction(() => {
         db.query(
-            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, tenant_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, input.onChainMode ?? 'full', tenantId);
+            `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, quorum_type, quorum_threshold, tenant_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(id, input.name, input.description ?? '', input.chairmanAgentId ?? null, input.discussionRounds ?? 2, input.onChainMode ?? 'full', input.quorumType ?? 'majority', input.quorumThreshold ?? null, tenantId);
 
         for (let i = 0; i < input.agentIds.length; i++) {
             db.query(
@@ -147,6 +152,14 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
         if (input.onChainMode !== undefined) {
             fields.push('on_chain_mode = ?');
             values.push(input.onChainMode);
+        }
+        if (input.quorumType !== undefined) {
+            fields.push('quorum_type = ?');
+            values.push(input.quorumType);
+        }
+        if (input.quorumThreshold !== undefined) {
+            fields.push('quorum_threshold = ?');
+            values.push(input.quorumThreshold);
         }
 
         if (fields.length > 0) {
