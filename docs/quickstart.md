@@ -217,7 +217,7 @@ corvid-agent server (Bun, port 3000)
   |-- Dashboard (Angular 21)
   |-- REST API + WebSocket
   |-- Agent sessions (Claude SDK / Ollama)
-  |-- 37 MCP tools (GitHub, memory, messaging, code analysis, ...)
+  |-- 38 MCP tools (GitHub, memory, messaging, code analysis, ...)
   |-- SQLite database (sessions, agents, schedules, wallets, ...)
   |-- AlgoChat (optional on-chain messaging via Algorand)
 ```

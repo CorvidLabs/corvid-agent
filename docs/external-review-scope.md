@@ -5,11 +5,11 @@
 **corvid-agent** is a decentralized development agent platform built on Algorand. It spawns, orchestrates, and monitors AI agents that perform software engineering work with on-chain identity, encrypted inter-agent communication, and structured multi-agent deliberation.
 
 - **Runtime**: Bun (TypeScript)
-- **Database**: SQLite via bun:sqlite (70 migrations, 81 tables)
+- **Database**: SQLite via bun:sqlite (21 migrations, 81 tables)
 - **Agent SDK**: @anthropic-ai/claude-agent-sdk (Claude AI)
 - **Blockchain**: Algorand (AlgoChat messaging, wallets)
 - **Frontend**: Angular 21 (dashboard)
-- **Tests**: 5471 unit tests, 232 security-specific tests
+- **Tests**: 5,725 unit tests, 232 security-specific tests
 
 ## Architecture
 
@@ -76,9 +76,9 @@ Client (Angular) --HTTP/WS--> Bun Server --> SQLite
 
 1. **Repository**: Private GitHub repo — auditor will be granted read access
 2. **Local setup**: `git clone`, `bun install`, `bun run dev` (requires Bun 1.3+)
-3. **Database**: Auto-created on first run, 70 migrations applied automatically
+3. **Database**: Auto-created on first run, 21 migrations applied automatically
 4. **Environment**: Copy `.env.example` to `.env` — all defaults work for local testing
-5. **Tests**: `bun test` (5471 tests), `bun run spec:check` (112 specs)
+5. **Tests**: `bun test` (5,725 tests), `bun run spec:check` (111 specs)
 6. **Key files to review first**: credits.ts, spending.ts, auth.ts, guards.ts, prompt-injection.ts, protected-paths.ts
 7. **Specs**: `specs/` directory has module-level specifications with invariants
 8. **Threat model**: `SECURITY.md` (324 lines, comprehensive)

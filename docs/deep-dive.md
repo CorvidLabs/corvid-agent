@@ -38,12 +38,12 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Server modules | 47 |
 | API routes | 38 modules (~200 endpoints) |
 | Database tables | 81 |
-| Database migrations | 70 |
-| MCP tools | 37 corvid_* handlers |
-| Unit tests | 5,471 across 214 files |
+| Database migrations | 21 (squashed baseline) |
+| MCP tools | 38 corvid_* handlers |
+| Unit tests | 5,725 across 228 files |
 | E2E tests | 360 across 31 Playwright specs |
 | Security tests | 232 dedicated |
-| Module specs | 112 .spec.md files |
+| Module specs | 111 .spec.md files |
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
 | Version | 0.20.0 |
@@ -67,9 +67,9 @@ algochat/        21 files — On-chain identity, wallets, PSK messaging, agent d
 councils/        3 files  — Multi-agent deliberation, governance tiers, synthesis
 work/            1 file   — Self-improvement pipeline (worktrees, validation, PRs)
 process/         —          Session lifecycle, SDK + Ollama, approval flow, personas
-mcp/             17 files — 37 corvid_* tool handlers
+mcp/             17 files — 38 corvid_* tool handlers
 routes/          38 files — REST API (~200 endpoints)
-db/              —          SQLite schema, 70 migrations, 81 tables
+db/              —          SQLite schema, 21 migrations, 81 tables
 reputation/      5 files  — Scoring, attestation, verification, identity proofs
 memory/          8 files  — Vector embeddings, FTS5 search, decay, sync
 permissions/     —          Capability broker, tenant role guards
@@ -89,14 +89,14 @@ scheduler/       —          Cron/interval execution engine
 marketplace/     —          Agent service listings, escrow, federation
 ```
 
-### 37 MCP Tools (What Agents Can Do)
+### 38 MCP Tools (What Agents Can Do)
 
 | Category | Tools |
 |----------|-------|
 | Messaging | corvid_send_message, corvid_list_agents |
 | Memory | corvid_save_memory (on-chain encrypted), corvid_recall_memory (FTS5) |
 | GitHub | 12 tools — star, fork, PRs, issues, reviews, comments, repo info |
-| Automation | corvid_create_work_task, corvid_manage_schedule, corvid_manage_workflow |
+| Automation | corvid_create_work_task, corvid_manage_schedule, corvid_manage_workflow, corvid_launch_council |
 | Discovery | corvid_discover_agent, corvid_invoke_remote_agent (A2A) |
 | Web | corvid_web_search (Brave), corvid_deep_research |
 | Credits | corvid_check_credits, corvid_grant_credits, corvid_credit_config |
