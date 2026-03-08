@@ -71,18 +71,13 @@ export class DiscordBridge {
     private sessionId: string | null = null;
     // Note: resume_gateway_url from Discord READY is intentionally not stored
     // to avoid SSRF risk. We always reconnect via the hardcoded gateway URL.
+    private botUserId: string | null = null;
     private running = false;
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 10;
 
-    // Map Discord userId → active session info (sessionId + threadId + agent)
-    private userSessions: Map<string, { sessionId: string; threadId: string; agentName: string }> = new Map();
-
     // Map Discord threadId → session info (for thread-based conversations)
     private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }> = new Map();
-
-    // Map Discord userId → preferred agent ID (set by /switch)
-    private userPreferredAgent: Map<string, string> = new Map();
 
     // Per-user rate limiting: userId → timestamps of recent messages
     private userMessageTimestamps: Map<string, number[]> = new Map();
@@ -228,7 +223,10 @@ export class DiscordBridge {
                 const data = payload.d as DiscordReadyData;
                 this.sessionId = data.session_id;
                 // resume_gateway_url intentionally not stored (SSRF prevention)
-                log.info('Discord gateway ready', { sessionId: this.sessionId });
+                if (data.user?.id) {
+                    this.botUserId = data.user.id;
+                }
+                log.info('Discord gateway ready', { sessionId: this.sessionId, botUserId: this.botUserId });
                 break;
             }
 
@@ -314,7 +312,7 @@ export class DiscordBridge {
         const appId = this.config.appId;
         if (!appId) return;
 
-        // Build agent choices for /switch from the database
+        // Build agent choices for /session from the database
         const agents = listAgents(this.db);
         const agentChoices = agents.slice(0, 25).map(a => ({
             name: `${a.name} (${a.model || 'unknown'})`.slice(0, 100),
@@ -323,14 +321,24 @@ export class DiscordBridge {
 
         const commands = [
             {
-                name: 'status',
-                description: 'Show your current agent and session',
+                name: 'session',
+                description: 'Start a new conversation thread with an agent',
                 type: 1, // CHAT_INPUT
-            },
-            {
-                name: 'new',
-                description: 'Clear your session and start fresh',
-                type: 1,
+                options: [
+                    {
+                        name: 'agent',
+                        description: 'Agent to start the session with',
+                        type: 3, // STRING
+                        required: true,
+                        ...(agentChoices.length > 0 ? { choices: agentChoices } : {}),
+                    },
+                    {
+                        name: 'topic',
+                        description: 'Topic for the conversation',
+                        type: 3, // STRING
+                        required: true,
+                    },
+                ],
             },
             {
                 name: 'agents',
@@ -338,16 +346,9 @@ export class DiscordBridge {
                 type: 1,
             },
             {
-                name: 'switch',
-                description: 'Switch to a different agent',
+                name: 'status',
+                description: 'Show bot status and active sessions',
                 type: 1,
-                options: [{
-                    name: 'agent',
-                    description: 'Name of the agent to switch to',
-                    type: 3, // STRING
-                    required: true,
-                    ...(agentChoices.length > 0 ? { choices: agentChoices } : {}),
-                }],
             },
             {
                 name: 'council',
@@ -359,6 +360,11 @@ export class DiscordBridge {
                     type: 3, // STRING
                     required: true,
                 }],
+            },
+            {
+                name: 'help',
+                description: 'Show available commands and usage',
+                type: 1,
             },
         ];
 
@@ -414,19 +420,67 @@ export class DiscordBridge {
         const getOption = (name: string) => options.find(o => o.name === name)?.value as string | undefined;
 
         switch (commandName) {
-            case 'status': {
-                const info = this.userSessions.get(userId);
-                if (info) {
-                    await this.respondToInteraction(interaction, `Agent: **${info.agentName}** | Session: \`${info.sessionId.slice(0, 8)}\``);
-                } else {
-                    await this.respondToInteraction(interaction, 'No active session. Send a message to start one.');
+            case 'session': {
+                const agentName = getOption('agent');
+                const topic = getOption('topic');
+                if (!agentName || !topic) {
+                    await this.respondToInteraction(interaction, 'Please provide both an agent and a topic.');
+                    break;
                 }
-                break;
-            }
 
-            case 'new': {
-                this.userSessions.delete(userId);
-                await this.respondToInteraction(interaction, 'Session cleared. Your next message will start a new conversation thread.');
+                const agents = listAgents(this.db);
+                if (agents.length === 0) {
+                    await this.respondToInteraction(interaction, 'No agents configured. Create an agent first.');
+                    break;
+                }
+
+                const agent = agents.find(a =>
+                    a.name.toLowerCase() === agentName.toLowerCase() ||
+                    a.name.toLowerCase().replace(/\s+/g, '') === agentName.toLowerCase().replace(/\s+/g, '')
+                );
+                if (!agent) {
+                    const names = agents.map(a => a.name).join(', ');
+                    await this.respondToInteraction(interaction, `Agent not found: "${agentName}". Available: ${names}`);
+                    break;
+                }
+
+                const projects = listProjects(this.db);
+                const project = agent.defaultProjectId
+                    ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
+                    : projects[0];
+                if (!project) {
+                    await this.respondToInteraction(interaction, 'No projects configured.');
+                    break;
+                }
+
+                // Create a standalone thread (not attached to a message)
+                const threadName = `${agent.name} — ${topic}`;
+                const threadId = await this.createStandaloneThread(this.config.channelId, threadName);
+                if (!threadId) {
+                    await this.respondToInteraction(interaction, 'Failed to create conversation thread.');
+                    break;
+                }
+
+                const session = createSession(this.db, {
+                    projectId: project.id,
+                    agentId: agent.id,
+                    name: `Discord thread:${threadId}`,
+                    initialPrompt: topic,
+                    source: 'discord' as SessionSource,
+                });
+
+                this.threadSessions.set(threadId, {
+                    sessionId: session.id,
+                    agentName: agent.name,
+                    agentModel: agent.model || 'unknown',
+                    ownerUserId: userId,
+                });
+
+                this.processManager.startProcess(session, topic);
+                this.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
+
+                await this.respondToInteraction(interaction,
+                    `Session started in <#${threadId}> with **${agent.name}**.\nTopic: ${topic}`);
                 break;
             }
 
@@ -441,25 +495,10 @@ export class DiscordBridge {
                 break;
             }
 
-            case 'switch': {
-                const targetName = getOption('agent');
-                if (!targetName) {
-                    await this.respondToInteraction(interaction, 'Please provide an agent name.');
-                    break;
-                }
-                const agents = listAgents(this.db);
-                const targetAgent = agents.find(a =>
-                    a.name.toLowerCase() === targetName.toLowerCase() ||
-                    a.name.toLowerCase().replace(/\s+/g, '') === targetName.toLowerCase().replace(/\s+/g, '')
-                );
-                if (!targetAgent) {
-                    const names = agents.map(a => a.name).join(', ');
-                    await this.respondToInteraction(interaction, `Agent not found: "${targetName}". Available: ${names}`);
-                    break;
-                }
-                this.userSessions.delete(userId);
-                this.userPreferredAgent.set(userId, targetAgent.id);
-                await this.respondToInteraction(interaction, `Switched to **${targetAgent.name}**. Your next message will start a new session with this agent.`);
+            case 'status': {
+                const activeSessions = this.threadSessions.size;
+                await this.respondToInteraction(interaction,
+                    `Active thread sessions: **${activeSessions}**\nUse \`/session\` to start a new conversation.`);
                 break;
             }
 
@@ -489,6 +528,21 @@ export class DiscordBridge {
                     const msg = err instanceof Error ? err.message : String(err);
                     await this.respondToInteraction(interaction, `Failed to launch council: ${msg}`);
                 }
+                break;
+            }
+
+            case 'help': {
+                const helpText = [
+                    '**Commands:**',
+                    '`/session` — Start a new conversation thread (select agent + topic)',
+                    '`/agents` — List all available agents',
+                    '`/status` — Show bot status and active sessions',
+                    '`/council <topic>` — Launch a council deliberation',
+                    '`/help` — Show this help message',
+                    '',
+                    'You can also @mention the bot for a quick one-off reply.',
+                ].join('\n');
+                await this.respondToInteraction(interaction, helpText);
                 break;
             }
 
@@ -612,7 +666,7 @@ export class DiscordBridge {
         const userId = data.author.id;
         const channelId = data.channel_id;
 
-        // Allow messages from configured channel OR from threads we created
+        // Check if this message is in a thread we're tracking
         const isMainChannel = channelId === this.config.channelId;
         let isOurThread = this.threadSessions.has(channelId);
         // Try to recover thread from DB if not in memory (e.g. after server restart)
@@ -661,127 +715,25 @@ export class DiscordBridge {
             return;
         }
 
-        // Handle text commands (slash commands are handled via INTERACTION_CREATE)
-        if (text.startsWith('/')) {
-            const handled = await this.handleCommand(channelId, userId, text);
-            if (handled) return;
-        }
-
         // If this message is in a thread we're tracking, route to that thread's session
         if (isOurThread) {
             await this.routeToThread(channelId, userId, text);
             return;
         }
 
-        // Route based on mode
+        // Passive channel mode: only respond to @mentions in the main channel
+        const isBotMentioned = this.botUserId
+            ? data.mentions?.some(m => m.id === this.botUserId) ?? false
+            : false;
+
+        if (!isBotMentioned) return; // silently ignore regular channel messages
+
+        // Handle @mention as one-off reply or work intake
         if (this.mode === 'work_intake') {
             await this.handleWorkIntake(channelId, data.id, userId, text);
         } else {
-            await this.routeToChatAgent(channelId, userId, data.id, text);
+            await this.handleMentionReply(channelId, userId, data.id, text);
         }
-    }
-
-    // ── Command Handling ──────────────────────────────────────────────────
-
-    private async handleCommand(channelId: string, userId: string, text: string): Promise<boolean> {
-        const trimmed = text.trim();
-
-        if (trimmed === '/status') {
-            const info = this.userSessions.get(userId);
-            if (info) {
-                await this.sendMessage(channelId, `Agent: **${info.agentName}** | Session: \`${info.sessionId.slice(0, 8)}\``);
-            } else {
-                await this.sendMessage(channelId, 'No active session. Send a message to start one.');
-            }
-            return true;
-        }
-
-        if (trimmed === '/new') {
-            this.userSessions.delete(userId);
-            await this.sendMessage(channelId, 'Session cleared. Your next message will start a new session.');
-            return true;
-        }
-
-        if (trimmed === '/agents') {
-            const agents = listAgents(this.db);
-            if (agents.length === 0) {
-                await this.sendMessage(channelId, 'No agents configured.');
-                return true;
-            }
-            const lines = agents.map(a => `\u2022 **${a.name}** (${a.model || 'no model'})`);
-            await this.sendMessage(channelId, `Available agents:\n${lines.join('\n')}`);
-            return true;
-        }
-
-        if (trimmed.startsWith('/switch ')) {
-            const targetName = trimmed.slice('/switch '.length).trim();
-            if (!targetName) {
-                await this.sendMessage(channelId, 'Usage: `/switch <AgentName>`');
-                return true;
-            }
-            const agents = listAgents(this.db);
-            const targetAgent = agents.find(a =>
-                a.name.toLowerCase() === targetName.toLowerCase() ||
-                a.name.toLowerCase().replace(/\s+/g, '') === targetName.toLowerCase().replace(/\s+/g, '')
-            );
-            if (!targetAgent) {
-                const names = agents.map(a => a.name).join(', ');
-                await this.sendMessage(channelId, `Agent not found: "${targetName}". Available: ${names}`);
-                return true;
-            }
-            this.userSessions.delete(userId);
-            await this.sendMessage(channelId, `Switched to **${targetAgent.name}**. Your next message will start a new session with this agent.`);
-            // Store the preferred agent so routeToChatAgent picks it up
-            this.userPreferredAgent.set(userId, targetAgent.id);
-            return true;
-        }
-
-        if (trimmed.startsWith('/council ')) {
-            const topic = trimmed.slice('/council '.length).trim();
-            if (!topic) {
-                await this.sendMessage(channelId, 'Usage: `/council <topic>`');
-                return true;
-            }
-            const councils = listCouncils(this.db);
-            if (councils.length === 0) {
-                await this.sendMessage(channelId, 'No councils configured.');
-                return true;
-            }
-            const council = councils[0];
-            const projects = listProjects(this.db);
-            const project = projects[0];
-            if (!project) {
-                await this.sendMessage(channelId, 'No projects configured.');
-                return true;
-            }
-            try {
-                const result = launchCouncil(this.db, this.processManager, council.id, project.id, topic, null);
-                await this.sendMessage(channelId, `Council deliberation launched.\nCouncil: **${council.name}**\nLaunch ID: ${result.launchId}\nSessions: ${result.sessionIds.length}`);
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                await this.sendMessage(channelId, `Failed to launch council: ${msg}`);
-            }
-            return true;
-        }
-
-        if (trimmed === '/help') {
-            const helpText = [
-                '**Commands** (also available as slash commands):',
-                '`/status` — Show your current agent and session',
-                '`/new` — Start a new conversation thread',
-                '`/agents` — List all available agents',
-                '`/switch <AgentName>` — Switch to a different agent',
-                '`/council <topic>` — Launch a council deliberation',
-                '`/help` — Show this help message',
-                '',
-                'Each conversation gets its own thread. Anyone can reply in a thread to join the conversation.',
-            ].join('\n');
-            await this.sendMessage(channelId, helpText);
-            return true;
-        }
-
-        // Not a recognized command
-        return false;
     }
 
     // ── Work Intake Mode ─────────────────────────────────────────────────
@@ -919,11 +871,11 @@ export class DiscordBridge {
     // ── Chat Mode ────────────────────────────────────────────────────────
 
     /**
-     * Route a message from the main channel to an agent.
-     * Creates a Discord thread from the user's message for the conversation.
+     * Handle an @mention in the main channel with a one-off reply.
+     * No thread or persistent session is created.
      */
-    private async routeToChatAgent(channelId: string, userId: string, messageId: string, text: string): Promise<void> {
-        const agent = this.resolveAgent(userId);
+    private async handleMentionReply(channelId: string, _userId: string, messageId: string, text: string): Promise<void> {
+        const agent = this.resolveDefaultAgent();
         if (!agent) {
             await this.sendMessage(channelId, 'No agents configured. Create an agent first.');
             return;
@@ -939,33 +891,102 @@ export class DiscordBridge {
             return;
         }
 
-        // Create a Discord thread from the user's message
-        const threadName = `${agent.name} — ${text.slice(0, 80)}${text.length > 80 ? '...' : ''}`;
-        const threadId = await this.createThread(channelId, messageId, threadName);
-        if (!threadId) {
-            await this.sendMessage(channelId, 'Failed to create conversation thread.');
-            return;
-        }
+        // Strip bot mention from text
+        const cleanText = text.replace(/<@!?\d+>/g, '').trim();
+        if (!cleanText) return;
 
+        // Create an ephemeral session for the one-off reply
         const session = createSession(this.db, {
             projectId: project.id,
             agentId: agent.id,
-            name: `Discord thread:${threadId}`,
-            initialPrompt: text,
+            name: `Discord mention:${messageId}`,
+            initialPrompt: cleanText,
             source: 'discord' as SessionSource,
         });
 
-        // Track the session for both user and thread
-        this.userSessions.set(userId, { sessionId: session.id, threadId, agentName: agent.name });
-        this.threadSessions.set(threadId, {
-            sessionId: session.id,
-            agentName: agent.name,
-            agentModel: agent.model || 'unknown',
-            ownerUserId: userId,
-        });
+        this.processManager.startProcess(session, cleanText);
 
-        this.processManager.startProcess(session, text);
-        this.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
+        // Subscribe and send response inline (not in a thread)
+        this.subscribeForInlineResponse(session.id, channelId, messageId, agent.name, agent.model || 'unknown');
+    }
+
+    /**
+     * Subscribe for agent response and send it as an inline reply in the channel.
+     * Used for one-off @mention responses.
+     */
+    private subscribeForInlineResponse(
+        sessionId: string,
+        channelId: string,
+        replyToMessageId: string,
+        agentName: string,
+        agentModel: string,
+    ): void {
+        let buffer = '';
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        const color = this.agentColor(agentName);
+
+        const flush = async () => {
+            if (!buffer) return;
+            const text = buffer;
+            buffer = '';
+            await this.sendReplyEmbed(channelId, replyToMessageId, {
+                description: text.slice(0, 4096),
+                color,
+                footer: { text: `${agentName} · ${agentModel}` },
+            });
+        };
+
+        this.processManager.subscribe(sessionId, (_sid, event) => {
+            if (event.type === 'assistant' && event.message) {
+                const msg = event.message as { content?: unknown };
+                const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+                if (content) {
+                    buffer += content;
+                    if (debounceTimer) clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => flush(), 1500);
+                }
+            }
+
+            if (event.type === 'result') {
+                if (debounceTimer) clearTimeout(debounceTimer);
+                flush();
+            }
+        });
+    }
+
+    /**
+     * Send an embed as a reply to a specific message.
+     */
+    private async sendReplyEmbed(
+        channelId: string,
+        replyToMessageId: string,
+        embed: {
+            description?: string;
+            color?: number;
+            footer?: { text: string };
+        },
+    ): Promise<void> {
+        assertSnowflake(channelId, 'channel ID');
+        assertSnowflake(replyToMessageId, 'message ID');
+        const response = await fetch(
+            `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bot ${this.config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    embeds: [embed],
+                    message_reference: { message_id: replyToMessageId },
+                }),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            log.error('Failed to send Discord reply embed', { status: response.status, error: error.slice(0, 200) });
+        }
     }
 
     /**
@@ -987,7 +1008,7 @@ export class DiscordBridge {
         const session = getSession(this.db, sessionId);
         if (!session) {
             this.threadSessions.delete(threadId);
-            await this.sendMessage(threadId, 'This conversation has ended. Start a new one in the main channel.');
+            await this.sendMessage(threadId, 'This conversation has ended. Use /session to start a new one.');
             return;
         }
 
@@ -1034,21 +1055,13 @@ export class DiscordBridge {
     }
 
     /**
-     * Resolve which agent to use for a new session.
-     * Priority: user's preferred agent > config default > first agent.
+     * Resolve the default agent.
+     * Priority: config default > first agent.
      */
-    private resolveAgent(userId: string): import('../../shared/types').Agent | null {
+    private resolveDefaultAgent(): import('../../shared/types').Agent | null {
         const agents = listAgents(this.db);
         if (agents.length === 0) return null;
 
-        // Check user's preferred agent (set by /switch)
-        const preferredId = this.userPreferredAgent.get(userId);
-        if (preferredId) {
-            const preferred = agents.find(a => a.id === preferredId);
-            if (preferred) return preferred;
-        }
-
-        // Check config default agent
         if (this.config.defaultAgentId) {
             const defaultAgent = agents.find(a => a.id === this.config.defaultAgentId);
             if (defaultAgent) return defaultAgent;
@@ -1058,17 +1071,14 @@ export class DiscordBridge {
     }
 
     /**
-     * Create a Discord thread from a message.
-     * Returns the thread channel ID, or null on failure.
+     * Create a standalone Discord thread (not attached to a message).
+     * Used by /session command. Returns the thread channel ID, or null on failure.
      */
-    private async createThread(channelId: string, messageId: string, name: string): Promise<string | null> {
+    private async createStandaloneThread(channelId: string, name: string): Promise<string | null> {
         assertSnowflake(channelId, 'channel ID');
-        assertSnowflake(messageId, 'message ID');
-        // encodeURIComponent satisfies CodeQL SSRF taint analysis
         const safeChannelId = encodeURIComponent(channelId);
-        const safeMessageId = encodeURIComponent(messageId);
         const response = await fetch(
-            `https://discord.com/api/v10/channels/${safeChannelId}/messages/${safeMessageId}/threads`,
+            `https://discord.com/api/v10/channels/${safeChannelId}/threads`,
             {
                 method: 'POST',
                 headers: {
@@ -1076,7 +1086,8 @@ export class DiscordBridge {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    name: name.slice(0, 100), // Discord thread name limit
+                    name: name.slice(0, 100),
+                    type: 11, // GUILD_PUBLIC_THREAD
                     auto_archive_duration: 1440, // 24 hours
                 }),
             },
@@ -1084,7 +1095,7 @@ export class DiscordBridge {
 
         if (response.ok) {
             const thread = await response.json() as { id: string };
-            log.info('Discord thread created', { threadId: thread.id, name: name.slice(0, 60) });
+            log.info('Discord standalone thread created', { threadId: thread.id, name: name.slice(0, 60) });
             return thread.id;
         }
 
