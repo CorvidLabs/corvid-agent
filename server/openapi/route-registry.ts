@@ -549,6 +549,16 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
 
+    // ── Security Overview ─────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/security/overview',
+        summary: 'Security configuration overview',
+        description: 'Returns all security settings: protected paths, code scanner patterns, approved domains, governance tiers, and allowlist/blocklist counts.',
+        tags: ['Security'],
+        auth: 'required',
+        responses: { 200: { description: 'Security overview data' } },
+    },
+
     // ── Analytics ───────────────────────────────────────────────────────────
     {
         method: 'GET', path: '/api/analytics/overview',

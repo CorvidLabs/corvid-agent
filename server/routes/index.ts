@@ -33,6 +33,7 @@ import { handlePerformanceRoutes } from './performance';
 import { handleUsageRoutes } from './usage';
 import { handleFeedbackRoutes } from './feedback';
 import { handleOnboardingRoutes } from './onboarding';
+import { handleSecurityOverviewRoutes } from './security-overview';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -312,6 +313,9 @@ async function handleRoutes(
 
     const repoBlocklistResponse = handleRepoBlocklistRoutes(req, url, db);
     if (repoBlocklistResponse) return repoBlocklistResponse;
+
+    const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
+    if (securityOverviewResponse) return securityOverviewResponse;
 
     const dashboardResponse = handleDashboardRoutes(req, url, db, context);
     if (dashboardResponse) return dashboardResponse;

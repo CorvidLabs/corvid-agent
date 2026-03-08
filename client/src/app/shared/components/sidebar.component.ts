@@ -29,7 +29,7 @@ const SECTIONS: SidebarSection[] = [
     { key: 'integrations', label: 'Integrations', collapsible: true, defaultCollapsed: true, routes: ['/mcp-servers'] },
     { key: 'monitoring', label: 'Monitoring', collapsible: true, defaultCollapsed: false, routes: ['/feed', '/analytics', '/logs'] },
     { key: 'community', label: 'Community', collapsible: true, defaultCollapsed: true, routes: ['/reputation', '/marketplace'] },
-    { key: 'config', label: 'Config', collapsible: true, defaultCollapsed: true, routes: ['/allowlist', '/github-allowlist', '/repo-blocklist', '/wallets', '/spending', '/settings'] },
+    { key: 'config', label: 'Config', collapsible: true, defaultCollapsed: true, routes: ['/allowlist', '/github-allowlist', '/repo-blocklist', '/wallets', '/spending', '/settings', '/security'] },
 ];
 
 const STORAGE_KEY = 'sidebar_sections_collapsed';
@@ -342,6 +342,12 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                             <a class="sidebar__link" routerLink="/settings" routerLinkActive="sidebar__link--active" title="Settings">
                                 <span class="sidebar__label">Settings</span>
                                 <span class="sidebar__abbr">S</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/security" routerLinkActive="sidebar__link--active" title="Security">
+                                <span class="sidebar__label">Security</span>
+                                <span class="sidebar__abbr">Se</span>
                             </a>
                         </li>
                     </ul>
