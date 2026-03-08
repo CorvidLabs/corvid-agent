@@ -158,6 +158,11 @@ export const routes: Routes = [
             import('./features/settings/settings.component').then((m) => m.SettingsComponent),
     },
     {
+        path: 'security',
+        loadComponent: () =>
+            import('./features/security-overview/security-overview.component').then((m) => m.SecurityOverviewComponent),
+    },
+    {
         path: 'personas',
         loadComponent: () =>
             import('./features/personas/persona-manager.component').then((m) => m.PersonaManagerComponent),
