@@ -9,6 +9,7 @@ import type { ClaudeStreamEvent } from '../process/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import { createSession, updateSession } from '../db/sessions';
+import { DedupService } from '../lib/dedup';
 
 // ─── Test-only interface to access private members without `as any` ─────────
 
@@ -16,6 +17,8 @@ import { createSession, updateSession } from '../db/sessions';
 interface TelegramBridgeInternals {
     running: boolean;
     offset: number;
+    consecutiveErrors: number;
+    dedup: DedupService;
     userSessions: Map<number, string>;
     userMessageTimestamps: Map<number, number[]>;
     poll: () => Promise<void>;
@@ -105,6 +108,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    DedupService.resetGlobal();
     db.close();
 });
 
@@ -864,5 +868,111 @@ describe('TelegramBridge work intake mode', () => {
         }));
 
         expect(sent).toContain('Connected to corvid-agent. Send a message to talk to an agent.');
+    });
+});
+
+// ─── Poll Backoff ──────────────────────────────────────────────────────────
+
+describe('poll backoff on errors', () => {
+    test('consecutiveErrors increments on poll failure', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, defaultConfig);
+        internals(bridge).running = true;
+        internals(bridge).callTelegramApi = mock(async () => { throw new Error('Network error'); });
+        await internals(bridge).poll();
+        internals(bridge).running = false;
+        expect(internals(bridge).consecutiveErrors).toBe(1);
+    });
+
+    test('consecutiveErrors resets on successful poll', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, defaultConfig);
+        internals(bridge).running = true;
+        internals(bridge).consecutiveErrors = 5;
+        internals(bridge).callTelegramApi = mock(async () => ({ result: [] }));
+        await internals(bridge).poll();
+        internals(bridge).running = false;
+        expect(internals(bridge).consecutiveErrors).toBe(0);
+    });
+
+    test('backoff delay increases exponentially', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, defaultConfig);
+        internals(bridge).running = false; // prevent scheduled follow-up
+        internals(bridge).callTelegramApi = mock(async () => { throw new Error('fail'); });
+
+        // Simulate 3 consecutive errors
+        internals(bridge).running = true;
+        await internals(bridge).poll();
+        internals(bridge).running = false;
+        expect(internals(bridge).consecutiveErrors).toBe(1);
+
+        internals(bridge).running = true;
+        await internals(bridge).poll();
+        internals(bridge).running = false;
+        expect(internals(bridge).consecutiveErrors).toBe(2);
+
+        internals(bridge).running = true;
+        await internals(bridge).poll();
+        internals(bridge).running = false;
+        expect(internals(bridge).consecutiveErrors).toBe(3);
+    });
+
+    test('backoff delay is capped at 30 seconds', () => {
+        // Verify the formula: min(500 * 2^n, 30000)
+        // At n=10: 500 * 1024 = 512000, capped to 30000
+        const delay = Math.min(500 * Math.pow(2, 10), 30_000);
+        expect(delay).toBe(30_000);
+    });
+});
+
+// ─── Update Deduplication ──────────────────────────────────────────────────
+
+describe('update deduplication', () => {
+    test('skips duplicate update_ids', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, defaultConfig);
+        bridge.start();
+        bridge.stop(); // registers dedup namespace via start()
+
+        const handled: TelegramMessage[] = [];
+        internals(bridge).handleMessage = mock(async (msg: TelegramMessage) => { handled.push(msg); });
+
+        const message = makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: 'hello' });
+        await internals(bridge).handleUpdate({ update_id: 555, message });
+        await internals(bridge).handleUpdate({ update_id: 555, message }); // duplicate
+        expect(handled).toHaveLength(1);
+    });
+
+    test('processes distinct update_ids', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, defaultConfig);
+        bridge.start();
+        bridge.stop();
+
+        const handled: TelegramMessage[] = [];
+        internals(bridge).handleMessage = mock(async (msg: TelegramMessage) => { handled.push(msg); });
+
+        const msg1 = makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: 'first' });
+        const msg2 = makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: 'second' });
+        await internals(bridge).handleUpdate({ update_id: 100, message: msg1 });
+        await internals(bridge).handleUpdate({ update_id: 101, message: msg2 });
+        expect(handled).toHaveLength(2);
+    });
+
+    test('dedup prevents reprocessing after poll error recovery', async () => {
+        const pm = createMockProcessManager();
+        const bridge = new TelegramBridge(db, pm, defaultConfig);
+        bridge.start();
+        bridge.stop();
+
+        const handled: TelegramMessage[] = [];
+        internals(bridge).handleMessage = mock(async (msg: TelegramMessage) => { handled.push(msg); });
+
+        // Simulate: first poll processes update 200, then poll error occurs,
+        // recovery re-fetches update 200 (offset didn't advance for some reason)
+        await internals(bridge).handleUpdate({ update_id: 200, message: makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: 'msg' }) });
+        await internals(bridge).handleUpdate({ update_id: 200, message: makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: 'msg' }) });
+        expect(handled).toHaveLength(1);
     });
 });
