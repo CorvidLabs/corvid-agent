@@ -342,7 +342,8 @@ function handleClientMessage(
                     ws.send(JSON.stringify(serverMsg));
                 }
             }).catch((err) => {
-                sendError(ws, `Chat error: ${err instanceof Error ? err.message : String(err)}`);
+                log.error('Chat error', { error: err instanceof Error ? err.message : String(err) });
+                sendError(ws, 'Chat request failed', undefined, 'CHAT_ERROR');
             });
             break;
         }
@@ -393,7 +394,8 @@ function handleClientMessage(
                     processManager.subscribe(result.sessionId, invokeCallback);
                 }
             }).catch((err) => {
-                sendError(ws, `Invoke error: ${err instanceof Error ? err.message : String(err)}`);
+                log.error('Agent invoke error', { error: err instanceof Error ? err.message : String(err) });
+                sendError(ws, 'Agent invocation failed', undefined, 'INVOKE_ERROR');
             });
             break;
         }
@@ -428,7 +430,8 @@ function handleClientMessage(
                     safeSend(ws, updateMsg);
                 });
             }).catch((err) => {
-                sendError(ws, `Work task error: ${err instanceof Error ? err.message : String(err)}`);
+                log.error('Work task error', { error: err instanceof Error ? err.message : String(err) });
+                sendError(ws, 'Work task creation failed', undefined, 'WORK_TASK_ERROR');
             });
             break;
         }
@@ -461,7 +464,8 @@ function handleClientMessage(
                 };
                 safeSend(ws, balanceMsg);
             }).catch((err) => {
-                sendError(ws, `Reward error: ${err instanceof Error ? err.message : String(err)}`);
+                log.error('Agent reward error', { error: err instanceof Error ? err.message : String(err) });
+                sendError(ws, 'Agent reward failed', undefined, 'REWARD_ERROR');
             });
             break;
         }

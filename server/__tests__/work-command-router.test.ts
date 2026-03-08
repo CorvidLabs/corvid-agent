@@ -185,8 +185,7 @@ describe('handleSlashCommand()', () => {
         await new Promise((r) => setTimeout(r, 50));
 
         expect(responses.length).toBe(1);
-        expect(responses[0]).toContain('Work task error');
-        expect(responses[0]).toContain('git worktree error');
+        expect(responses[0]).toContain('Work task creation failed');
     });
 });
 

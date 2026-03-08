@@ -19,6 +19,9 @@ import {
     getAgentMessage,
 } from '../db/agent-messages';
 import { ValidationError, NotFoundError } from '../lib/errors';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('WorkCommandRouter');
 
 /** Parameters for handling an agent-to-agent [WORK] request. */
 export interface AgentWorkRequestParams {
@@ -103,7 +106,8 @@ export class WorkCommandRouter {
                 }
             });
         }).catch((err) => {
-            respond(`Work task error: ${err instanceof Error ? err.message : String(err)}`);
+            log.error('Slash command work task error', { error: err instanceof Error ? err.message : String(err) });
+            respond('Work task creation failed. Check server logs for details.');
         });
     }
 
@@ -178,7 +182,7 @@ export class WorkCommandRouter {
             };
         } catch (err) {
             updateAgentMessageStatus(this.db, agentMessage.id, 'failed', {
-                response: `Work task error: ${err instanceof Error ? err.message : String(err)}`,
+                response: 'Work task creation failed',
                 errorCode: 'WORK_TASK_ERROR',
             });
             emitMessageUpdate(agentMessage.id);
