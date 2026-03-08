@@ -306,6 +306,143 @@ describe('DiscordBridge', () => {
     });
 });
 
+describe('DiscordBridge thread subscription dedup', () => {
+    test('unsubscribes previous callback before re-subscribing for same thread', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        // Set up a tracked thread session
+        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        const { createSession } = await import('../db/sessions');
+        const session = createSession(db, {
+            projectId: (await import('../db/projects')).listProjects(db)[0].id,
+            agentId: (await import('../db/agents')).listAgents(db)[0].id,
+            name: 'Discord thread:400000000000000001',
+            initialPrompt: 'test',
+            source: 'discord',
+        });
+
+        threadSessions.set('400000000000000001', {
+            sessionId: session.id,
+            agentName: 'TestAgent',
+            agentModel: 'test-model',
+            ownerUserId: 'user-1',
+        });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            // First message — subscribes
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000010',
+                channel_id: '400000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'hello',
+                timestamp: new Date().toISOString(),
+            });
+
+            expect(pm.subscribe).toHaveBeenCalledTimes(1);
+            expect(pm.unsubscribe).not.toHaveBeenCalled();
+
+            // Second message — should unsubscribe old callback then re-subscribe
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000011',
+                channel_id: '400000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'hello again',
+                timestamp: new Date().toISOString(),
+            });
+
+            // unsubscribe called once (for the first callback)
+            expect(pm.unsubscribe).toHaveBeenCalledTimes(1);
+            // subscribe called twice total (once per message)
+            expect(pm.subscribe).toHaveBeenCalledTimes(2);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('threadCallbacks map tracks the latest subscription per thread', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        const threadCallbacks = (bridge as unknown as { threadCallbacks: Map<string, { sessionId: string; callback: unknown }> }).threadCallbacks;
+        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+
+        const { createSession } = await import('../db/sessions');
+        const session = createSession(db, {
+            projectId: (await import('../db/projects')).listProjects(db)[0].id,
+            agentId: (await import('../db/agents')).listAgents(db)[0].id,
+            name: 'Discord thread:500000000000000001',
+            initialPrompt: 'test',
+            source: 'discord',
+        });
+
+        threadSessions.set('500000000000000001', {
+            sessionId: session.id,
+            agentName: 'TestAgent',
+            agentModel: 'test-model',
+            ownerUserId: 'user-1',
+        });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            // Before any message, no threadCallbacks entry
+            expect(threadCallbacks.has('500000000000000001')).toBe(false);
+
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000020',
+                channel_id: '500000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'first',
+                timestamp: new Date().toISOString(),
+            });
+
+            // After first message, threadCallbacks should have an entry
+            expect(threadCallbacks.has('500000000000000001')).toBe(true);
+            const firstCallback = threadCallbacks.get('500000000000000001')!.callback;
+
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000021',
+                channel_id: '500000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'second',
+                timestamp: new Date().toISOString(),
+            });
+
+            // After second message, callback should be replaced
+            expect(threadCallbacks.has('500000000000000001')).toBe(true);
+            const secondCallback = threadCallbacks.get('500000000000000001')!.callback;
+            expect(secondCallback).not.toBe(firstCallback);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
+
 describe('DiscordBridge work_intake mode', () => {
     test('work_intake mode creates work task from @mention', async () => {
         const pm = createMockProcessManager();
