@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-5471%20unit%20%7C%20360%20E2E-brightgreen" alt="5471 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-5725%20unit%20%7C%20360%20E2E-brightgreen" alt="5725 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -20,12 +20,12 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 
 | Metric | Count |
 |--------|-------|
-| Unit tests | **5,471** across 214 files (15,544 assertions) |
+| Unit tests | **5,725** across 228 files (15,933 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **112** with automated validation |
-| MCP tools | **37** corvid_* tool handlers |
+| Module specs | **111** with automated validation |
+| MCP tools | **38** corvid_* tool handlers |
 | API endpoints | **~200** across 38 route modules |
-| DB migrations | **70** (81 tables) |
+| DB migrations | **21** (squashed baseline, 81 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.
@@ -302,7 +302,7 @@ OPENAI_API_KEY=sk-...
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  70 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  21 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -317,7 +317,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (70 migrations) and query modules
+  db/            SQLite schema (21 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -364,7 +364,7 @@ e2e/             Playwright end-to-end tests (31 spec files, 360 E2E tests)
 
 ---
 
-## MCP Tools (37)
+## MCP Tools (38)
 
 Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
 
@@ -373,7 +373,7 @@ Extensible tool system via [Model Context Protocol](https://github.com/modelcont
 | **Messaging** | `corvid_send_message`, `corvid_list_agents` |
 | **Memory** | `corvid_save_memory` (on-chain encrypted), `corvid_recall_memory` (FTS5) |
 | **GitHub** | `corvid_github_star_repo`, `corvid_github_fork_repo`, `corvid_github_list_prs`, `corvid_github_create_pr`, `corvid_github_review_pr`, `corvid_github_get_pr_diff`, `corvid_github_comment_on_pr`, `corvid_github_create_issue`, `corvid_github_list_issues`, `corvid_github_repo_info`, `corvid_github_unstar_repo`, `corvid_github_follow_user` |
-| **Automation** | `corvid_create_work_task`, `corvid_manage_schedule`, `corvid_manage_workflow` |
+| **Automation** | `corvid_create_work_task`, `corvid_manage_schedule`, `corvid_manage_workflow`, `corvid_launch_council` |
 | **Discovery** | `corvid_discover_agent`, `corvid_invoke_remote_agent` (A2A protocol) |
 | **Web** | `corvid_web_search` (Brave), `corvid_deep_research` (multi-angle) |
 | **Credits** | `corvid_check_credits`, `corvid_grant_credits`, `corvid_credit_config` |
@@ -413,6 +413,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Exam | `/api/exam` | Model examination and capability scoring |
 | MCP API | `/api/mcp` | Model Context Protocol endpoints |
 | MCP Servers | `/api/mcp-servers` | External MCP server configuration |
+| Providers | `/api/providers` | List LLM providers and models |
 | Ollama | `/api/ollama` | Ollama provider management and model pulls |
 | Plugins | `/api/plugins` | Plugin registry and capability management |
 | Permissions | `/api/permissions` | Capability broker — grant, revoke, and check agent tool access |
@@ -442,17 +443,17 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 5471+ server tests (~120s)
+bun test              # 5725 server tests (~120s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**5471 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**5,725 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**112 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**111 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
@@ -462,7 +463,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 70 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 21 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |

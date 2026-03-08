@@ -935,6 +935,31 @@ export function up(db: Database): void {
     )`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_gov_member_votes_vote ON governance_member_votes(governance_vote_id)`);
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_gov_member_votes_unique ON governance_member_votes(governance_vote_id, agent_id)`);
+
+    // ── v68: Council on-chain mode ────────────────────────────────────────
+    safeAlter(db, `ALTER TABLE councils ADD COLUMN on_chain_mode TEXT NOT NULL DEFAULT 'full'`);
+    safeAlter(db, `ALTER TABLE council_launches ADD COLUMN synthesis_txid TEXT DEFAULT NULL`);
+
+    // ── v69: USDC revenue tracking ────────────────────────────────────────
+    db.exec(`CREATE TABLE IF NOT EXISTS agent_usdc_revenue (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id       TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        amount_micro   INTEGER NOT NULL,
+        from_address   TEXT NOT NULL,
+        txid           TEXT NOT NULL UNIQUE,
+        forward_txid   TEXT DEFAULT NULL,
+        forward_status TEXT NOT NULL DEFAULT 'pending',
+        created_at     TEXT DEFAULT (datetime('now'))
+    )`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_agent ON agent_usdc_revenue(agent_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_usdc_revenue_status ON agent_usdc_revenue(forward_status)`);
+
+    // ── v70: Default agents/councils to AlgoChat-enabled (data-only) ──────
+    // UPDATE statements omitted — no schema change
+
+    // ── v71: Governance v2 quorum configuration ───────────────────────────
+    safeAlter(db, `ALTER TABLE councils ADD COLUMN quorum_type TEXT DEFAULT 'majority'`);
+    safeAlter(db, `ALTER TABLE councils ADD COLUMN quorum_threshold REAL DEFAULT NULL`);
 }
 
 /**
@@ -952,6 +977,7 @@ export function down(db: Database): void {
 
     // Drop tables in reverse dependency order
     const tables = [
+        'agent_usdc_revenue',
         'governance_member_votes',
         'governance_votes',
         'project_skills',
