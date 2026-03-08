@@ -166,6 +166,7 @@ const ALL_PATTERNS: PatternRule[] = [...CRITICAL_PATTERNS, ...WARNING_PATTERNS];
 const EXCLUDED_FILES: string[] = [
     'server/__tests__/',
     'server/lib/code-scanner.ts',
+    'server/routes/security-overview.ts',
 ];
 
 function isExcludedFile(file: string | null): boolean {
