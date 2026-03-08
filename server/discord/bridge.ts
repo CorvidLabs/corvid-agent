@@ -4,13 +4,11 @@ import type { SessionSource } from '../../shared/types';
 import type { WorkTaskService } from '../work/service';
 import type {
     DiscordBridgeConfig,
-    DiscordGatewayPayload,
-    DiscordHelloData,
-    DiscordReadyData,
     DiscordMessageData,
     DiscordInteractionData,
 } from './types';
-import { GatewayOp, GatewayIntent, InteractionType, InteractionCallbackType } from './types';
+import { InteractionType, InteractionCallbackType } from './types';
+import { DiscordGateway } from './gateway';
 import { listAgents } from '../db/agents';
 import { listCouncils, getCouncilLaunch } from '../db/councils';
 import { launchCouncil, onCouncilStageChange } from '../councils/discussion';
@@ -23,7 +21,6 @@ import { recordAudit } from '../db/audit';
 
 const log = createLogger('DiscordBridge');
 
-const GATEWAY_URL = 'wss://gateway.discord.gg/?v=10&encoding=json';
 const MAX_MESSAGE_LENGTH = 2000;
 
 /** Discord snowflake IDs are purely numeric strings. */
@@ -63,18 +60,10 @@ export class DiscordBridge {
     private processManager: ProcessManager;
     private workTaskService: WorkTaskService | null;
     private config: DiscordBridgeConfig;
+    private gateway: DiscordGateway;
 
-    private ws: WebSocket | null = null;
-    private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    private heartbeatAcked = true;
-    private sequence: number | null = null;
-    private sessionId: string | null = null;
-    // Note: resume_gateway_url from Discord READY is intentionally not stored
-    // to avoid SSRF risk. We always reconnect via the hardcoded gateway URL.
     private botUserId: string | null = null;
     private running = false;
-    private reconnectAttempts = 0;
-    private maxReconnectAttempts = 10;
 
     // Map Discord threadId → session info (for thread-based conversations)
     private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }> = new Map();
@@ -94,6 +83,24 @@ export class DiscordBridge {
         this.processManager = processManager;
         this.config = config;
         this.workTaskService = workTaskService ?? null;
+        this.gateway = new DiscordGateway(config, {
+            onMessage: (data) => {
+                this.handleMessage(data).catch(err => {
+                    log.error('Error handling Discord message', { error: err instanceof Error ? err.message : String(err) });
+                });
+            },
+            onInteraction: (data) => {
+                this.handleInteraction(data).catch(err => {
+                    log.error('Error handling Discord interaction', { error: err instanceof Error ? err.message : String(err) });
+                });
+            },
+            onReady: (sessionId, botUserId) => {
+                if (botUserId) {
+                    this.botUserId = botUserId;
+                }
+                log.info('Discord bridge received gateway ready', { sessionId, botUserId });
+            },
+        });
     }
 
     private get mode() {
@@ -104,7 +111,7 @@ export class DiscordBridge {
         if (this.running) return;
         this.running = true;
         log.info('Discord bridge starting', { channelId: this.config.channelId, mode: this.mode });
-        this.connect();
+        this.gateway.start();
 
         // Register slash commands if app ID is configured
         if (this.config.appId) {
@@ -118,192 +125,13 @@ export class DiscordBridge {
 
     stop(): void {
         this.running = false;
-        if (this.heartbeatTimer) {
-            clearInterval(this.heartbeatTimer);
-            this.heartbeatTimer = null;
-        }
-        if (this.ws) {
-            this.ws.close(1000, 'Shutting down');
-            this.ws = null;
-        }
+        this.gateway.stop();
         log.info('Discord bridge stopped');
-    }
-
-    private connect(): void {
-        // Always use the hardcoded gateway URL to prevent SSRF.
-        // Discord handles re-identification when we don't use the resume URL.
-        log.info('Connecting to Discord gateway');
-
-        this.ws = new WebSocket(GATEWAY_URL);
-
-        this.ws.onopen = () => {
-            log.info('Discord gateway connected');
-            this.reconnectAttempts = 0;
-        };
-
-        this.ws.onmessage = (event) => {
-            try {
-                const payload = JSON.parse(String(event.data)) as DiscordGatewayPayload;
-                this.handleGatewayMessage(payload);
-            } catch (err) {
-                log.error('Failed to parse gateway message', { error: err instanceof Error ? err.message : String(err) });
-            }
-        };
-
-        this.ws.onclose = (event) => {
-            log.warn('Discord gateway disconnected', { code: event.code, reason: event.reason });
-            if (this.heartbeatTimer) {
-                clearInterval(this.heartbeatTimer);
-                this.heartbeatTimer = null;
-            }
-            if (this.running) {
-                this.scheduleReconnect();
-            }
-        };
-
-        this.ws.onerror = (event) => {
-            log.error('Discord gateway error', { error: String(event) });
-        };
-    }
-
-    private handleGatewayMessage(payload: DiscordGatewayPayload): void {
-        // Update sequence number
-        if (payload.s !== null) {
-            this.sequence = payload.s;
-        }
-
-        switch (payload.op) {
-            case GatewayOp.HELLO: {
-                const data = payload.d as DiscordHelloData;
-                this.startHeartbeat(data.heartbeat_interval);
-                // If we have a session, try to resume; otherwise identify
-                if (this.sessionId) {
-                    this.resume();
-                } else {
-                    this.identify();
-                }
-                break;
-            }
-
-            case GatewayOp.HEARTBEAT_ACK:
-                this.heartbeatAcked = true;
-                break;
-
-            case GatewayOp.DISPATCH:
-                this.handleDispatch(payload);
-                break;
-
-            case GatewayOp.RECONNECT:
-                log.info('Discord requested reconnect');
-                this.ws?.close(4000, 'Reconnect requested');
-                break;
-
-            case GatewayOp.INVALID_SESSION: {
-                const resumable = payload.d as boolean;
-                log.warn('Discord invalid session', { resumable });
-                if (!resumable) {
-                    this.sessionId = null;
-                }
-                // Wait 1-5 seconds before re-identifying
-                setTimeout(() => {
-                    if (this.sessionId) {
-                        this.resume();
-                    } else {
-                        this.identify();
-                    }
-                }, 1000 + Math.random() * 4000);
-                break;
-            }
-        }
-    }
-
-    private handleDispatch(payload: DiscordGatewayPayload): void {
-        switch (payload.t) {
-            case 'READY': {
-                const data = payload.d as DiscordReadyData;
-                this.sessionId = data.session_id;
-                // resume_gateway_url intentionally not stored (SSRF prevention)
-                if (data.user?.id) {
-                    this.botUserId = data.user.id;
-                }
-                log.info('Discord gateway ready', { sessionId: this.sessionId, botUserId: this.botUserId });
-                break;
-            }
-
-            case 'RESUMED':
-                log.info('Discord session resumed');
-                break;
-
-            case 'MESSAGE_CREATE': {
-                const data = payload.d as DiscordMessageData;
-                this.handleMessage(data).catch(err => {
-                    log.error('Error handling Discord message', { error: err instanceof Error ? err.message : String(err) });
-                });
-                break;
-            }
-
-            case 'INTERACTION_CREATE': {
-                const data = payload.d as DiscordInteractionData;
-                this.handleInteraction(data).catch(err => {
-                    log.error('Error handling Discord interaction', { error: err instanceof Error ? err.message : String(err) });
-                });
-                break;
-            }
-        }
-    }
-
-    private identify(): void {
-        this.send({
-            op: GatewayOp.IDENTIFY,
-            d: {
-                token: this.config.botToken,
-                intents: GatewayIntent.GUILD_MESSAGES | GatewayIntent.MESSAGE_CONTENT,
-                properties: {
-                    os: 'linux',
-                    browser: 'corvid-agent',
-                    device: 'corvid-agent',
-                },
-                presence: this.buildPresence(),
-            },
-            s: null,
-            t: null,
-        });
-    }
-
-    /**
-     * Build the presence payload from DISCORD_STATUS and DISCORD_ACTIVITY_TYPE env vars.
-     * Activity types: 0=Playing, 1=Streaming, 2=Listening, 3=Watching, 5=Competing
-     */
-    private buildPresence(): Record<string, unknown> {
-        const statusText = process.env.DISCORD_STATUS ?? 'corvid-agent';
-        const activityType = parseInt(process.env.DISCORD_ACTIVITY_TYPE ?? '3', 10); // default: Watching
-        return {
-            status: 'online',
-            activities: [{
-                name: statusText,
-                type: activityType,
-            }],
-            since: null,
-            afk: false,
-        };
     }
 
     /** Update the bot's presence on the live gateway connection. */
     updatePresence(statusText?: string, activityType?: number): void {
-        this.send({
-            op: GatewayOp.PRESENCE_UPDATE,
-            d: {
-                status: 'online',
-                activities: [{
-                    name: statusText ?? process.env.DISCORD_STATUS ?? 'corvid-agent',
-                    type: activityType ?? parseInt(process.env.DISCORD_ACTIVITY_TYPE ?? '3', 10),
-                }],
-                since: null,
-                afk: false,
-            },
-            s: null,
-            t: null,
-        });
+        this.gateway.updatePresence(statusText, activityType);
     }
 
     // ── Slash Command Registration ─────────────────────────────────────
@@ -600,77 +428,6 @@ export class DiscordBridge {
                 error: error.slice(0, 200),
             });
         }
-    }
-
-    private resume(): void {
-        this.send({
-            op: GatewayOp.RESUME,
-            d: {
-                token: this.config.botToken,
-                session_id: this.sessionId,
-                seq: this.sequence,
-            },
-            s: null,
-            t: null,
-        });
-    }
-
-    private startHeartbeat(intervalMs: number): void {
-        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
-
-        // Use a fixed heartbeat interval (41.25s, Discord's typical default).
-        // The server-provided value is validated but we use a constant to prevent
-        // resource exhaustion from malicious/malformed gateway payloads.
-        const HEARTBEAT_MS = 41_250;
-        if (intervalMs < 10_000 || intervalMs > 120_000) {
-            log.warn('Discord heartbeat interval out of range, using default', { received: intervalMs });
-        }
-
-        // Send first heartbeat after jitter
-        setTimeout(() => this.heartbeat(), Math.random() * HEARTBEAT_MS);
-
-        this.heartbeatTimer = setInterval(() => {
-            if (!this.heartbeatAcked) {
-                log.warn('Discord heartbeat not acknowledged, reconnecting');
-                this.ws?.close(4000, 'Heartbeat timeout');
-                return;
-            }
-            this.heartbeat();
-        }, HEARTBEAT_MS);
-    }
-
-    private heartbeat(): void {
-        this.heartbeatAcked = false;
-        this.send({
-            op: GatewayOp.HEARTBEAT,
-            d: this.sequence,
-            s: null,
-            t: null,
-        });
-    }
-
-    private send(payload: DiscordGatewayPayload): void {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(payload));
-        }
-    }
-
-    private scheduleReconnect(): void {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            log.error('Max Discord reconnect attempts reached, giving up');
-            this.running = false;
-            return;
-        }
-
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 60000);
-        this.reconnectAttempts++;
-        log.info(`Reconnecting to Discord in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-        setTimeout(() => {
-            if (this.running) {
-                this.connect();
-            }
-        }, delay);
     }
 
     private checkRateLimit(userId: string): boolean {
