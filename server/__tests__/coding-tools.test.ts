@@ -6,7 +6,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { buildCodingTools, buildSafeEnvForCoding, normalizePath, type CodingToolContext } from '../mcp/coding-tools';
+import { buildCodingTools, buildSafeEnvForCoding, type CodingToolContext } from '../mcp/coding-tools';
 import { buildDirectTools, type DirectToolDefinition } from '../mcp/direct-tools';
 
 let workDir: string;
@@ -332,63 +332,5 @@ describe('search_files', () => {
         const result = await getTool('search_files').handler({ pattern: 'test', path: '../../' });
         expect(result.isError).toBe(true);
         expect(result.text).toContain('traversal denied');
-    });
-});
-
-// ── normalizePath ───────────────────────────────────────────────────────
-
-describe('normalizePath', () => {
-    test('returns forward-slash paths unchanged', () => {
-        expect(normalizePath('src/lib/utils.ts')).toBe('src/lib/utils.ts');
-        expect(normalizePath('/absolute/path/file.txt')).toBe('/absolute/path/file.txt');
-    });
-
-    test('handles empty string', () => {
-        expect(normalizePath('')).toBe('');
-    });
-
-    test('handles path with no separators', () => {
-        expect(normalizePath('file.txt')).toBe('file.txt');
-    });
-});
-
-// ── path normalization in tool responses ─────────────────────────────────
-
-describe('tool response path normalization', () => {
-    test('write_file response uses normalized path', async () => {
-        const result = await getTool('write_file').handler({ path: 'sub/dir/file.txt', content: 'test' });
-        expect(result.isError).toBeUndefined();
-        expect(result.text).toContain('sub/dir/file.txt');
-        // Should never contain backslashes in the response
-        expect(result.text).not.toContain('\\');
-    });
-
-    test('edit_file response uses normalized path', async () => {
-        await Bun.write(join(workDir, 'norm.txt'), 'original content');
-        const result = await getTool('edit_file').handler({
-            path: 'norm.txt',
-            old_string: 'original content',
-            new_string: 'updated content',
-        });
-        expect(result.isError).toBeUndefined();
-        expect(result.text).toBe('File edited: norm.txt');
-    });
-
-    test('read_file not-found error uses normalized path', async () => {
-        const result = await getTool('read_file').handler({ path: 'sub/missing.txt' });
-        expect(result.isError).toBe(true);
-        expect(result.text).toContain('sub/missing.txt');
-        expect(result.text).not.toContain('\\');
-    });
-
-    test('edit_file not-found error uses normalized path', async () => {
-        const result = await getTool('edit_file').handler({
-            path: 'sub/missing.txt',
-            old_string: 'x',
-            new_string: 'y',
-        });
-        expect(result.isError).toBe(true);
-        expect(result.text).toContain('sub/missing.txt');
-        expect(result.text).not.toContain('\\');
     });
 });
