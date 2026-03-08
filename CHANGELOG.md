@@ -2,6 +2,71 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.20.0] - 2026-03-07
+
+### Added
+- **Discord slash commands** — `/ask`, `/status`, `/help` commands with threaded conversations, session resume, and GitHub mention acknowledgment (#736)
+- **Telegram bridge work-intake mode** — submit work tasks directly from Telegram conversations (#698)
+- **One-line install script** — simplified onboarding for newcomers with a single curl command (#717)
+- **Work task retry button** — retry failed work tasks from the dashboard UI (#735)
+- **Governance tier in council edit** — configure governance tier directly from the council edit UI (#731)
+- **Graceful work task drain** — server shutdown waits for in-progress work tasks to complete before exiting (#721, #723)
+- **Wallet idle lock** — auto-lock wallet on tab focus when idle timeout exceeded (corvid-agent-chat#55)
+- **WCAG AA accessibility** — full accessibility compliance across the chat client (corvid-agent-chat#41)
+- **Client-side rate limiting** — message rate limiting in the chat client to prevent spam (corvid-agent-chat#35)
+
+### Security
+- **CodeQL alert remediation** — resolved 4 log-injection alerts (#701, #703)
+- **CVE fix** — override express-rate-limit >=8.2.2 for rate-limit bypass vulnerability (#696)
+
+### Fixed
+- Polling injection false positive and infinite retry loop (#737)
+- E2E test isolation from production database (#730, #732)
+- PR dedup check to prevent duplicate work tasks (#725)
+- Layer 0 governance violation in `waitForSessions` extraction (#722)
+- Heartbeat polling for council `waitForSessions` (#716)
+- DB-filter test lifecycle and marketplace spec enhancements (#711)
+- Test global state leaks from PR #699 (#702)
+- Deduplicate exports and fix inflated warning count in spec-check (#692)
+- Use `bun x` instead of `bunx` for work task validation (#684)
+- Prevent duplicate user messages in chat client (corvid-agent-chat#40)
+- Icon sizing consistency across 6 chat UI elements (corvid-agent-chat#45-54)
+- Wildcard route redirect in specl (specl#72)
+- Accessibility issues across 5 specl components (specl#66)
+- Standardize git author identity in corvid-reputation workflow (corvid-reputation#1)
+
+### Refactored
+- Extract repo map and symbol extraction into `repo-map.ts` (#693)
+- Extract WS event bus into `councils/events.ts` (#694)
+- Extract validation pipeline from work service (#695)
+- Remove unused `printPrompt` and `clearAgentCardCache` exports (#691)
+- Split `chat.ts` view into smaller components (corvid-agent-chat#57)
+
+### Tests
+- 6 untested modules covered with 66 new tests (#699)
+- Broadcasting, workflow service, and algochat init coverage (#697)
+- Toast, chat-messages, and chat-search coverage (+69 tests, corvid-agent-chat#58)
+- Device-name and wallet lifecycle coverage (+51 tests, corvid-agent-chat#56)
+- WelcomeComponent, GitHubOAuthService, FrontmatterEditor coverage (+26 tests, specl#73, #74)
+- SectionEditor, GithubConnect, TableEditor, SectionNav, SpecPreview coverage (specl#65, #67)
+
+### Documentation
+- Use case gallery and how-it-works guide (#712)
+- Document all undocumented exports — 23 to 0 warnings (#690)
+- Update stale test and spec counts across docs (#689)
+- Fix stale session endpoint, update route count (#687)
+- Add missing spec.md files for 4 specl modules (specl#68)
+
+### Dependencies
+- Angular 21.2.0 and minor dependency bumps (specl#60)
+
+### Stats
+- **5,704** unit tests across 228 files (15,958 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **111** module specs with automated validation
+- **37** MCP tools, **~200** API endpoints, **70** migrations, **81** tables
+- **52** PRs merged across 4 repositories this week
+
 ## [0.19.0] - 2026-03-06
 
 ### Security
