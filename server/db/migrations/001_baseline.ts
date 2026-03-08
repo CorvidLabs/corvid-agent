@@ -211,6 +211,8 @@ export function up(db: Database): void {
 
     // ── v9: Council discussions ──────────────────────────────────────────
     safeAlter(db, `ALTER TABLE councils ADD COLUMN discussion_rounds INTEGER DEFAULT 2`);
+    safeAlter(db, `ALTER TABLE councils ADD COLUMN quorum_type TEXT DEFAULT 'majority'`);
+    safeAlter(db, `ALTER TABLE councils ADD COLUMN quorum_threshold REAL DEFAULT NULL`);
     safeAlter(db, `ALTER TABLE council_launches ADD COLUMN current_discussion_round INTEGER DEFAULT 0`);
     safeAlter(db, `ALTER TABLE council_launches ADD COLUMN total_discussion_rounds INTEGER DEFAULT 0`);
     db.exec(`CREATE TABLE IF NOT EXISTS council_discussion_messages (
