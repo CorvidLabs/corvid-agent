@@ -22,12 +22,20 @@ import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import {
     SubscriptionManager,
     type LocalChatSendFn,
+    type LocalChatEvent,
     type LocalChatEventFn,
 } from '../algochat/subscription-manager';
 import type { ProcessManager } from '../process/manager';
 import type { ResponseFormatter } from '../algochat/response-formatter';
 import type { ClaudeStreamEvent } from '../process/types';
 import type { EventCallback } from '../process/interfaces';
+
+/** Extract typed LocalChatEvent[] from a mocked LocalChatEventFn's call args. */
+function eventCalls(fn: LocalChatEventFn): LocalChatEvent[] {
+    return (fn as ReturnType<typeof mock>).mock.calls.map(
+        (c: unknown[]) => c[0] as LocalChatEvent,
+    );
+}
 
 // ── Test constants ────────────────────────────────────────────────────────
 
@@ -802,9 +810,9 @@ describe('subscribeForLocalResponse', () => {
 
             pm._emit(SESSION_ID, assistantEvent('starting'));
 
-            const calls = (eventFn as ReturnType<typeof mock>).mock.calls;
-            expect(calls.some((c: any[]) =>
-                c[0].type === 'thinking' && (c[0] as { active: boolean }).active === true
+            const events = eventCalls(eventFn);
+            expect(events.some(e =>
+                e.type === 'thinking' && e.active === true
             )).toBe(true);
         });
 
@@ -817,10 +825,10 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, assistantEvent('first'));
             pm._emit(SESSION_ID, assistantEvent('second'));
 
-            const thinkingEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'thinking' && (c[0] as { active: boolean }).active === true
+            const activeThinking = eventCalls(eventFn).filter(
+                e => e.type === 'thinking' && e.active === true
             );
-            expect(thinkingEvents.length).toBe(1);
+            expect(activeThinking.length).toBe(1);
         });
 
         test('emits stream chunks for content_block_delta', () => {
@@ -832,12 +840,12 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, contentBlockDelta('chunk1'));
             pm._emit(SESSION_ID, contentBlockDelta('chunk2'));
 
-            const streamEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'stream' && !(c[0] as { done: boolean }).done
+            const streamEvents = eventCalls(eventFn).filter(
+                e => e.type === 'stream' && !e.done
             );
             expect(streamEvents.length).toBe(2);
-            expect((streamEvents[0][0] as { chunk: string }).chunk).toBe('chunk1');
-            expect((streamEvents[1][0] as { chunk: string }).chunk).toBe('chunk2');
+            expect((streamEvents[0] as Extract<LocalChatEvent, { type: 'stream' }>).chunk).toBe('chunk1');
+            expect((streamEvents[1] as Extract<LocalChatEvent, { type: 'stream' }>).chunk).toBe('chunk2');
         });
 
         test('emits stream done on result', () => {
@@ -849,8 +857,8 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, assistantEvent('text'));
             pm._emit(SESSION_ID, resultEvent());
 
-            const doneEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'stream' && (c[0] as { done: boolean }).done
+            const doneEvents = eventCalls(eventFn).filter(
+                e => e.type === 'stream' && e.done
             );
             expect(doneEvents.length).toBe(1);
         });
@@ -864,12 +872,12 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, assistantEvent('text'));
             pm._emit(SESSION_ID, resultEvent());
 
-            const calls = (eventFn as ReturnType<typeof mock>).mock.calls;
-            const lastThinking = [...calls].reverse().find(
-                (c: any[]) => c[0].type === 'thinking'
+            const events = eventCalls(eventFn);
+            const lastThinking = [...events].reverse().find(
+                e => e.type === 'thinking'
             );
             expect(lastThinking).toBeDefined();
-            expect((lastThinking![0] as { active: boolean }).active).toBe(false);
+            expect((lastThinking as Extract<LocalChatEvent, { type: 'thinking' }>).active).toBe(false);
         });
 
         test('emits tool_use events for content_block_start with tool_use', () => {
@@ -880,11 +888,9 @@ describe('subscribeForLocalResponse', () => {
 
             pm._emit(SESSION_ID, contentBlockStart('tool_use', 'Read', { file: 'test.ts' }));
 
-            const toolEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'tool_use'
-            );
+            const toolEvents = eventCalls(eventFn).filter(e => e.type === 'tool_use');
             expect(toolEvents.length).toBe(1);
-            expect((toolEvents[0][0] as { toolName: string }).toolName).toBe('Read');
+            expect((toolEvents[0] as Extract<LocalChatEvent, { type: 'tool_use' }>).toolName).toBe('Read');
         });
 
         test('emits tool_use for direct-mode tool_status events', () => {
@@ -895,12 +901,11 @@ describe('subscribeForLocalResponse', () => {
 
             pm._emit(SESSION_ID, toolStatusEvent('[Bash] Running npm test'));
 
-            const toolEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'tool_use'
-            );
+            const toolEvents = eventCalls(eventFn).filter(e => e.type === 'tool_use');
             expect(toolEvents.length).toBe(1);
-            expect((toolEvents[0][0] as { toolName: string }).toolName).toBe('Bash');
-            expect((toolEvents[0][0] as { input: string }).input).toBe('Running npm test');
+            const toolEvt = toolEvents[0] as Extract<LocalChatEvent, { type: 'tool_use' }>;
+            expect(toolEvt.toolName).toBe('Bash');
+            expect(toolEvt.input).toBe('Running npm test');
         });
 
         test('emits thinking events for direct-mode thinking signal', () => {
@@ -911,11 +916,9 @@ describe('subscribeForLocalResponse', () => {
 
             pm._emit(SESSION_ID, thinkingEvent(true));
 
-            const thinkingEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'thinking'
-            );
+            const thinkingEvents = eventCalls(eventFn).filter(e => e.type === 'thinking');
             expect(thinkingEvents.some(
-                (c: any[]) => (c[0] as { active: boolean }).active === true
+                e => (e as Extract<LocalChatEvent, { type: 'thinking' }>).active === true
             )).toBe(true);
         });
 
@@ -928,12 +931,11 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, assistantEvent('response text'));
             pm._emit(SESSION_ID, resultEvent());
 
-            const messageEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'message'
-            );
+            const messageEvents = eventCalls(eventFn).filter(e => e.type === 'message');
             expect(messageEvents.length).toBe(1);
-            expect((messageEvents[0][0] as { content: string }).content).toBe('response text');
-            expect((messageEvents[0][0] as { direction: string }).direction).toBe('outbound');
+            const msgEvt = messageEvents[0] as Extract<LocalChatEvent, { type: 'message' }>;
+            expect(msgEvt.content).toBe('response text');
+            expect(msgEvt.direction).toBe('outbound');
         });
 
         test('emits message event on session_exited with remaining buffer', () => {
@@ -945,11 +947,9 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, assistantEvent('final text'));
             pm._emit(SESSION_ID, sessionExitedEvent());
 
-            const messageEvents = (eventFn as ReturnType<typeof mock>).mock.calls.filter(
-                (c: any[]) => c[0].type === 'message'
-            );
+            const messageEvents = eventCalls(eventFn).filter(e => e.type === 'message');
             expect(messageEvents.length).toBe(1);
-            expect((messageEvents[0][0] as { content: string }).content).toBe('final text');
+            expect((messageEvents[0] as Extract<LocalChatEvent, { type: 'message' }>).content).toBe('final text');
         });
 
         test('emits thinking=false on session_exited', () => {
@@ -961,12 +961,10 @@ describe('subscribeForLocalResponse', () => {
             pm._emit(SESSION_ID, assistantEvent('text'));
             pm._emit(SESSION_ID, sessionExitedEvent());
 
-            const calls = (eventFn as ReturnType<typeof mock>).mock.calls;
-            const lastThinking = [...calls].reverse().find(
-                (c: any[]) => c[0].type === 'thinking'
-            );
+            const events = eventCalls(eventFn);
+            const lastThinking = [...events].reverse().find(e => e.type === 'thinking');
             expect(lastThinking).toBeDefined();
-            expect((lastThinking![0] as { active: boolean }).active).toBe(false);
+            expect((lastThinking as Extract<LocalChatEvent, { type: 'thinking' }>).active).toBe(false);
         });
 
         test('works without eventFn set (only sendFn)', () => {
@@ -1146,14 +1144,14 @@ describe('updateLocalEventFn', () => {
         pm._emit(SESSION_ID, contentBlockDelta('chunk2'));
 
         // eventFn1 should have chunk1, eventFn2 should have chunk2
-        const fn1StreamCalls = (eventFn1 as ReturnType<typeof mock>).mock.calls.filter(
-            (c: any[]) => c[0].type === 'stream' && (c[0] as { chunk: string }).chunk === 'chunk1'
+        const fn1Streams = eventCalls(eventFn1).filter(
+            e => e.type === 'stream' && (e as Extract<LocalChatEvent, { type: 'stream' }>).chunk === 'chunk1'
         );
-        const fn2StreamCalls = (eventFn2 as ReturnType<typeof mock>).mock.calls.filter(
-            (c: any[]) => c[0].type === 'stream' && (c[0] as { chunk: string }).chunk === 'chunk2'
+        const fn2Streams = eventCalls(eventFn2).filter(
+            e => e.type === 'stream' && (e as Extract<LocalChatEvent, { type: 'stream' }>).chunk === 'chunk2'
         );
-        expect(fn1StreamCalls.length).toBe(1);
-        expect(fn2StreamCalls.length).toBe(1);
+        expect(fn1Streams.length).toBe(1);
+        expect(fn2Streams.length).toBe(1);
     });
 
     test('can set eventFn before subscription exists', () => {
