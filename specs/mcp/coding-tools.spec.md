@@ -1,6 +1,6 @@
 ---
 module: coding-tools
-version: 1
+version: 2
 status: draft
 files:
   - server/mcp/coding-tools.ts
@@ -83,7 +83,7 @@ These are tool name strings returned by `buildCodingTools` and `buildDirectTools
 
 ## Invariants
 
-1. All file paths resolved by coding tools must stay within `workingDir`; any path traversal attempt (resolving outside the project root) throws `AuthorizationError`.
+1. All file paths resolved by coding tools must stay within `workingDir`; any path traversal attempt (resolving outside the project root) throws `AuthorizationError`. Leading slashes are stripped before resolution so that absolute paths from small models are treated as relative to `workingDir`.
 2. Protected paths (as defined by `isProtectedPath`) cannot be written to or edited.
 3. Protected bash commands (as defined by `isProtectedBashCommand`) and hardcoded dangerous patterns (sudo, rm -rf /, mkfs, dd to devices, shutdown, reboot, killall, chmod 777 /) are always blocked in `run_command`.
 4. Shell commands run with the safe allowlisted environment, not the full `process.env`.
@@ -102,6 +102,11 @@ These are tool name strings returned by `buildCodingTools` and `buildDirectTools
 - **Given** a `CodingToolContext` with `workingDir` set to `/home/user/project`
 - **When** `read_file` is called with `path: "src/index.ts"`
 - **Then** the file at `/home/user/project/src/index.ts` is read, lines are numbered, and output is returned (truncated if over 8000 chars)
+
+### Scenario: Agent passes an absolute path (small model quirk)
+- **Given** a `CodingToolContext` with `workingDir` set to `/home/user/project`
+- **When** `list_files` is called with `path: "/home/user/project/server"`
+- **Then** the leading slash is stripped, resolving to `/home/user/project/home/user/project/server`... but more importantly, `path: "/server"` becomes `server/` relative to `workingDir`, correctly resolving to `/home/user/project/server`
 
 ### Scenario: Agent attempts path traversal
 - **Given** a `CodingToolContext` with `workingDir` set to `/home/user/project`
@@ -166,3 +171,4 @@ These are tool name strings returned by `buildCodingTools` and `buildDirectTools
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-08 | corvid-agent | v2: Strip leading slashes from file paths in `resolveSafePath` to handle absolute paths from small models (e.g. qwen3:8b). Updated invariant #1 and added behavioral example |

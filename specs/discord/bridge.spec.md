@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 4
+version: 5
 status: active
 files:
   - server/discord/bridge.ts
@@ -104,19 +104,20 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 24. **Rich embed responses**: Agent responses are sent as Discord embeds with the message content in the description, agent name and model in the footer, and a consistent per-agent color derived from name hashing
 25. **Response debouncing**: Session events are buffered for 1500ms before being sent as embeds to the thread
-26. **Message chunking**: Discord has a 4096-character embed description limit. Long responses are truncated. Plain messages are chunked at 2000 characters
-27. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
+26. **Subscription deduplication**: Each thread maintains at most one active event subscription. When a new message is routed to a thread, the previous subscription callback is unsubscribed before a new one is created, preventing duplicate responses
+27. **Message chunking**: Discord has a 4096-character embed description limit. Long responses are truncated. Plain messages are chunked at 2000 characters
+28. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
 
 ### Commands
 
-28. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/agents`, `/status`, `/council`, `/help`
-29. **`/session` command**: Creates a new thread with an agent session. Required options: `agent` (dropdown of available agents, capped at 25), `topic` (string, used as thread name). The thread is created in the configured channel with the selected agent bound to it
-30. **`/agents` command**: Lists all available agents with their models. Does not create a session
-31. **`/status` command**: Shows the bot's current status and active sessions
-32. **`/council` command**: Launches a council discussion on a given topic
-33. **`/help` command**: Shows available commands and usage
-34. **Text commands deprecated**: Text commands (messages starting with `/`) are no longer parsed from regular channel messages. All commands use Discord's slash command system (requires `appId`)
-35. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
+29. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/agents`, `/status`, `/council`, `/help`
+30. **`/session` command**: Creates a new thread with an agent session. Required options: `agent` (dropdown of available agents, capped at 25), `topic` (string, used as thread name). The thread is created in the configured channel with the selected agent bound to it
+31. **`/agents` command**: Lists all available agents with their models. Does not create a session
+32. **`/status` command**: Shows the bot's current status and active sessions
+33. **`/council` command**: Launches a council discussion on a given topic
+34. **`/help` command**: Shows available commands and usage
+35. **Text commands deprecated**: Text commands (messages starting with `/`) are no longer parsed from regular channel messages. All commands use Discord's slash command system (requires `appId`)
+36. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
 
 ## Behavioral Examples
 
@@ -231,7 +232,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `ProcessManager` — startProcess, sendMessage, subscribe |
+| `server/process/manager.ts` | `ProcessManager` — startProcess, sendMessage, subscribe, unsubscribe |
 | `server/process/types.ts` | `extractContentText` — ContentBlock text extraction |
 | `server/db/agents.ts` | `listAgents` |
 | `server/db/sessions.ts` | `createSession`, `getSession` |
@@ -271,3 +272,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-07 | corvid-agent | v2: Slash commands (with agent dropdown), interaction handling, bot presence, prompt injection scanning, council launching, work intake mode, agent resolution priority, ContentBlock extraction |
 | 2026-03-07 | corvid-agent | v3: Thread-based conversations (shared sessions), rich embed responses with agent name/model, removed @AgentName routing (conflicts with Discord @), agent choices dropdown in /switch |
 | 2026-03-07 | corvid-agent | v4: Passive channel mode — bot no longer auto-responds to channel messages. Only responds to @mentions (one-off) and slash commands. Threads created exclusively via `/session` command with agent selection and topic. Removed `/switch` and `/new` commands (replaced by `/session`). Removed text command parsing (slash-only). Added `mentions` field to `DiscordMessageData` |
+| 2026-03-08 | corvid-agent | v5: Fix duplicate message bug — track active subscription per thread, unsubscribe previous callback before re-subscribing on each message. Added invariant #26 (subscription deduplication) |

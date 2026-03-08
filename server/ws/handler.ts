@@ -209,6 +209,7 @@ function subscribeToTopics(ws: ServerWebSocket<WsData>): void {
     ws.subscribe(tenantTopic('scheduler', tid));
     ws.subscribe(tenantTopic('ollama', tid));
     ws.subscribe(tenantTopic('owner', tid));
+    ws.subscribe(tenantTopic('sessions', tid));
 }
 
 function handleClientMessage(

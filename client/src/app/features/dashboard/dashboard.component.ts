@@ -563,8 +563,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
                 );
             }
             if (msg.type === 'session_status') {
-                // Refresh sessions to update the feed
-                this.sessionService.loadSessions();
+                // Update session status in-place; only full-refresh on lifecycle changes
+                const status = (msg as { status: string }).status;
+                if (status === 'idle' || status === 'error' || status === 'stopped' || status === 'running') {
+                    this.sessionService.loadSessions();
+                }
             }
         });
     }

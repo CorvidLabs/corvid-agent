@@ -702,6 +702,9 @@ export class ProcessManager {
             this.timerManager.startSessionTimeout(sessionId);
         }
 
+        // Broadcast granular activity status so the dashboard reflects what the agent is doing
+        this.broadcastActivityStatus(sessionId, event);
+
         if (event.type === 'assistant' && event.message?.content) {
             const text = extractContentText(event.message.content);
             if (text) {
@@ -778,6 +781,57 @@ export class ProcessManager {
         this.eventBus.emit(sessionId, event);
     }
 
+    /**
+     * Broadcast a session_status message when the agent's activity state changes.
+     * Maps SDK events to human-readable status so the dashboard accurately reflects
+     * whether an agent is thinking, using tools, or idle.
+     */
+    private broadcastActivityStatus(sessionId: string, event: ClaudeStreamEvent): void {
+        let status: string | null = null;
+
+        switch (event.type) {
+            case 'thinking':
+                status = (event as import('./types').ThinkingEvent).thinking ? 'thinking' : 'running';
+                break;
+            case 'content_block_start': {
+                const block = (event as import('./types').ContentBlockStartEvent).content_block;
+                if (block?.type === 'tool_use') {
+                    status = 'tool_use';
+                } else {
+                    status = 'running';
+                }
+                break;
+            }
+            case 'assistant':
+            case 'message_start':
+                status = 'running';
+                break;
+            case 'result':
+            case 'session_exited':
+                status = 'idle';
+                break;
+        }
+
+        if (!status) return;
+
+        // Update DB so page refreshes also show the correct status
+        if (status === 'thinking' || status === 'tool_use') {
+            updateSessionStatus(this.db, sessionId, 'running');
+        }
+
+        // Broadcast to all WS subscribers watching this session
+        if (this.broadcastFn) {
+            const msg = JSON.stringify({ type: 'session_status', sessionId, status });
+            this.broadcastFn('sessions', msg);
+        }
+
+        // Also emit directly to session subscribers (for the detail page)
+        this.eventBus.emit(sessionId, {
+            type: 'system',
+            statusMessage: `__status:${status}`,
+        } as ClaudeStreamEvent);
+    }
+
     private handleExit(sessionId: string, code: number | null): void {
         log.info(`Process exited for session ${sessionId}`, { code });
         const meta = this.sessionMeta.get(sessionId);
@@ -785,6 +839,20 @@ export class ProcessManager {
 
         const status = code === 0 ? 'idle' : 'error';
         updateSessionStatus(this.db, sessionId, status);
+
+        // Broadcast exit status to dashboard
+        if (this.broadcastFn) {
+            this.broadcastFn('sessions', JSON.stringify({ type: 'session_status', sessionId, status }));
+        }
+
+        // Log unexpected exits as system messages so the user can see what happened
+        if (code !== 0) {
+            addSessionMessage(this.db, sessionId, 'system',
+                `Session exited unexpectedly (code ${code}). Send a message to resume.`);
+        } else if (meta) {
+            // Clean exit — record it so the conversation shows the boundary
+            addSessionMessage(this.db, sessionId, 'system', 'Session completed.');
+        }
 
         if (code !== 0) {
             const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;

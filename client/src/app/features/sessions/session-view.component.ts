@@ -40,7 +40,7 @@ import { NotificationService } from '../../core/services/notification.service';
                             <button class="btn btn--secondary" (click)="onExportJson()">JSON</button>
                             <button class="btn btn--secondary" (click)="onExportMarkdown()">MD</button>
                         </div>
-                        @if (s.status === 'running' || s.status === 'loading') {
+                        @if (s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use') {
                             <button class="btn btn--danger" (click)="onStop()">Stop</button>
                         } @else {
                             <button class="btn btn--primary" (click)="onResume()">Resume</button>
@@ -49,11 +49,11 @@ import { NotificationService } from '../../core/services/notification.service';
                     </div>
                 </div>
 
-                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running' || s.status === 'loading'" [agentName]="agentName()" />
+                <app-session-output [messages]="messages()" [events]="events()" [isRunning]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use'" [agentName]="agentName()" />
 
                 <app-session-input
                     [disabled]="false"
-                    [placeholder]="s.status === 'running' || s.status === 'loading' ? 'Send message to session' : 'Send message to resume...'"
+                    [placeholder]="s.status === 'running' || s.status === 'loading' || s.status === 'thinking' || s.status === 'tool_use' ? 'Send message to session' : 'Send message to resume...'"
                     (messageSent)="onSendMessage($event)" />
             </div>
 
@@ -244,7 +244,7 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         if (!this.sessionId) return;
 
         const s = this.session();
-        if (s && s.status !== 'running') {
+        if (s && s.status !== 'running' && s.status !== 'thinking' && s.status !== 'tool_use') {
             // Session is idle/stopped — resume with the new message as prompt
             this.sessionService.resumeSession(this.sessionId, content);
             this.session.update((cur) => cur ? { ...cur, status: 'running' } : cur);
