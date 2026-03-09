@@ -139,10 +139,12 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 'corvid_create_work_task',
                 'Create a work task that spawns a new agent session on a dedicated branch. ' +
                 'The agent will implement the described changes, run validation, and open a PR. ' +
-                'Use this to propose code improvements or fixes to the codebase.',
+                'Use this to propose code improvements or fixes to the codebase. ' +
+                'Use priority to control scheduling: 0=critical, 1=high, 2=normal (default), 3=low. Higher-priority tasks can preempt lower-priority running tasks.',
                 {
                     description: z.string().describe('A clear description of the work to be done'),
                     project_id: z.string().optional().describe('Project ID to work on. Omit to use the agent default project.'),
+                    priority: z.number().int().min(0).max(3).optional().describe('Task priority: 0 (P0/critical), 1 (P1/high), 2 (P2/normal, default), 3 (P3/low).'),
                 },
                 async (args) => handleCreateWorkTask(ctx, args),
             ),

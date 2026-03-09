@@ -1,6 +1,9 @@
-export type WorkTaskStatus = 'pending' | 'branching' | 'running' | 'validating' | 'completed' | 'failed';
+export type WorkTaskStatus = 'pending' | 'queued' | 'branching' | 'running' | 'validating' | 'completed' | 'failed' | 'paused';
 export type WorkTaskSource = 'web' | 'algochat' | 'agent' | 'discord' | 'telegram';
 export type RetryBackoff = 'fixed' | 'linear' | 'exponential';
+
+/** P0 = critical (highest), P3 = low (lowest). Default is P2. */
+export type WorkTaskPriority = 0 | 1 | 2 | 3;
 
 export interface WorkTask {
     id: string;
@@ -13,6 +16,7 @@ export interface WorkTask {
     description: string;
     branchName: string | null;
     status: WorkTaskStatus;
+    priority: WorkTaskPriority;
     prUrl: string | null;
     summary: string | null;
     error: string | null;
@@ -23,6 +27,7 @@ export interface WorkTask {
     retryCount: number;
     retryBackoff: RetryBackoff;
     lastRetryAt: string | null;
+    preemptedBy: string | null;
     createdAt: string;
     completedAt: string | null;
 }
@@ -41,6 +46,7 @@ export interface CreateWorkTaskInput {
     source?: WorkTaskSource;
     sourceId?: string;
     requesterInfo?: Record<string, unknown>;
+    priority?: WorkTaskPriority;
     maxRetries?: number;
     retryBackoff?: RetryBackoff;
     dependsOn?: string[];

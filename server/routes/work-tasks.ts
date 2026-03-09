@@ -88,6 +88,7 @@ async function handleCreate(req: Request, workTaskService: WorkTaskService, tena
             source: data.source,
             sourceId: data.sourceId,
             requesterInfo: data.requesterInfo,
+            priority: data.priority as 0 | 1 | 2 | 3 | undefined,
         }, tenantId);
 
         return json(task, 201);

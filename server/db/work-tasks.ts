@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import type { WorkTask, WorkTaskStatus } from '../../shared/types';
+import type { WorkTask, WorkTaskStatus, WorkTaskPriority } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
 
@@ -14,11 +14,13 @@ interface WorkTaskRow {
     description: string;
     branch_name: string | null;
     status: string;
+    priority: number;
     pr_url: string | null;
     summary: string | null;
     error: string | null;
     original_branch: string | null;
     worktree_dir: string | null;
+    preempted_by: string | null;
     iteration_count: number;
     created_at: string;
     completed_at: string | null;
@@ -43,6 +45,7 @@ function rowToWorkTask(row: WorkTaskRow): WorkTask {
         description: row.description,
         branchName: row.branch_name,
         status: row.status as WorkTaskStatus,
+        priority: (row.priority ?? 2) as WorkTaskPriority,
         prUrl: row.pr_url,
         summary: row.summary,
         error: row.error,
@@ -53,6 +56,7 @@ function rowToWorkTask(row: WorkTaskRow): WorkTask {
         retryCount: (row as unknown as Record<string, unknown>).retry_count as number ?? 0,
         retryBackoff: ((row as unknown as Record<string, unknown>).retry_backoff as string ?? 'fixed') as WorkTask['retryBackoff'],
         lastRetryAt: (row as unknown as Record<string, unknown>).last_retry_at as string ?? null,
+        preemptedBy: row.preempted_by ?? null,
         createdAt: row.created_at,
         completedAt: row.completed_at,
     };
@@ -67,14 +71,16 @@ export function createWorkTask(
         source?: string;
         sourceId?: string;
         requesterInfo?: Record<string, unknown>;
+        priority?: WorkTaskPriority;
         tenantId?: string;
     },
 ): WorkTask {
     const id = crypto.randomUUID();
     const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
+    const priority = params.priority ?? 2;
     db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         params.agentId,
@@ -83,6 +89,7 @@ export function createWorkTask(
         params.source ?? 'web',
         params.sourceId ?? null,
         JSON.stringify(params.requesterInfo ?? {}),
+        priority,
         tenantId,
     );
 
@@ -102,6 +109,7 @@ export function createWorkTaskAtomic(
         source?: string;
         sourceId?: string;
         requesterInfo?: Record<string, unknown>;
+        priority?: WorkTaskPriority;
         tenantId?: string;
     },
 ): WorkTask | null {
@@ -109,11 +117,12 @@ export function createWorkTaskAtomic(
     const source = params.source ?? 'web';
     const sourceId = params.sourceId ?? null;
     const requesterInfo = JSON.stringify(params.requesterInfo ?? {});
+    const priority = params.priority ?? 2;
     const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
 
     const result = db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, tenant_id)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, tenant_id)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE NOT EXISTS (
              SELECT 1 FROM work_tasks
              WHERE project_id = ? AND status IN ('branching', 'running', 'validating')
@@ -126,6 +135,7 @@ export function createWorkTaskAtomic(
         source,
         sourceId,
         requesterInfo,
+        priority,
         tenantId,
         params.projectId,
     );
@@ -229,6 +239,11 @@ export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
              WHERE status IN ('branching', 'running', 'validating')`
         ).run();
 
+        // Also resume any paused tasks — the preempting task is now gone
+        db.query(
+            `UPDATE work_tasks SET status = 'pending', preempted_by = NULL WHERE status = 'paused'`
+        ).run();
+
         return staleRows.map(rowToWorkTask);
     });
 
@@ -259,9 +274,74 @@ export function resetWorkTaskForRetry(db: Database, id: string): void {
  */
 export function getActiveWorkTasks(db: Database): WorkTask[] {
     const rows = db.query(
-        `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
+        `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating', 'paused', 'queued')`
     ).all() as WorkTaskRow[];
     return rows.map(rowToWorkTask);
+}
+
+/**
+ * Dequeue the highest-priority pending task for a given project.
+ * Lower priority number = higher priority. Ties broken by created_at (FIFO).
+ */
+export function dequeueNextTask(db: Database, projectId: string): WorkTask | null {
+    const row = db.query(
+        `SELECT * FROM work_tasks
+         WHERE project_id = ? AND status IN ('pending', 'queued')
+         ORDER BY priority ASC, created_at ASC
+         LIMIT 1`
+    ).get(projectId) as WorkTaskRow | null;
+    return row ? rowToWorkTask(row) : null;
+}
+
+/**
+ * Find the currently active (branching/running/validating) task on a project.
+ */
+export function getActiveTaskForProject(db: Database, projectId: string): WorkTask | null {
+    const row = db.query(
+        `SELECT * FROM work_tasks
+         WHERE project_id = ? AND status IN ('branching', 'running', 'validating')
+         LIMIT 1`
+    ).get(projectId) as WorkTaskRow | null;
+    return row ? rowToWorkTask(row) : null;
+}
+
+/**
+ * Pause a running task so a higher-priority task can run.
+ * Records who preempted it.
+ */
+export function pauseWorkTask(db: Database, taskId: string, preemptedBy: string): void {
+    db.query(
+        `UPDATE work_tasks SET status = 'paused', preempted_by = ? WHERE id = ?`
+    ).run(preemptedBy, taskId);
+}
+
+/**
+ * Resume a paused task after the preempting task completes.
+ */
+export function resumePausedTask(db: Database, taskId: string): void {
+    db.query(
+        `UPDATE work_tasks SET status = 'pending', preempted_by = NULL WHERE id = ? AND status = 'paused'`
+    ).run(taskId);
+}
+
+/**
+ * Find tasks that were paused by a specific task (preemptedBy = taskId).
+ */
+export function getTasksPausedBy(db: Database, preemptingTaskId: string): WorkTask[] {
+    const rows = db.query(
+        `SELECT * FROM work_tasks WHERE preempted_by = ? AND status = 'paused' ORDER BY priority ASC, created_at ASC`
+    ).all(preemptingTaskId) as WorkTaskRow[];
+    return rows.map(rowToWorkTask);
+}
+
+/**
+ * Count pending/queued tasks for a project.
+ */
+export function countQueuedTasks(db: Database, projectId: string): number {
+    const row = db.query(
+        `SELECT COUNT(*) as cnt FROM work_tasks WHERE project_id = ? AND status IN ('pending', 'queued')`
+    ).get(projectId) as { cnt: number };
+    return row.cnt;
 }
 
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {

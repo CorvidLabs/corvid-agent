@@ -16,6 +16,12 @@ import {
     listWorkTasks as dbListWorkTasks,
     cleanupStaleWorkTasks,
     resetWorkTaskForRetry,
+    getActiveTaskForProject,
+    pauseWorkTask,
+    resumePausedTask,
+    getTasksPausedBy,
+    dequeueNextTask,
+    countQueuedTasks,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
@@ -317,7 +323,81 @@ export class WorkTaskService {
             }
         }
 
-        // Atomic insert — fails if a concurrent active task exists on this project
+        const priority = input.priority ?? 2;
+
+        // Check if there's an active task on this project
+        const activeTask = getActiveTaskForProject(this.db, projectId);
+
+        if (activeTask && activeTask.priority <= priority) {
+            // Active task has equal or higher priority — queue the new task
+            const task = createWorkTaskAtomic(this.db, {
+                agentId: input.agentId,
+                projectId,
+                description: input.description,
+                source: input.source,
+                sourceId: input.sourceId,
+                requesterInfo: input.requesterInfo,
+                priority,
+                tenantId,
+            });
+            if (!task) {
+                throw new ConflictError('Another task is already active on project', { projectId });
+            }
+
+            // Mark as queued (waiting for active task to finish)
+            updateWorkTaskStatus(this.db, task.id, 'queued');
+
+            log.info('Work task queued behind active task', {
+                taskId: task.id,
+                activeTaskId: activeTask.id,
+                taskPriority: priority,
+                activePriority: activeTask.priority,
+            });
+
+            this.emitCreationNotifications(task, input);
+            return getWorkTask(this.db, task.id) ?? task;
+        }
+
+        if (activeTask && priority < activeTask.priority) {
+            // New task has HIGHER priority — preempt the active task
+            log.info('Preempting lower-priority task', {
+                preemptingPriority: priority,
+                preemptedTaskId: activeTask.id,
+                preemptedPriority: activeTask.priority,
+            });
+
+            // Stop the running session if active
+            if (activeTask.sessionId && this.processManager.isRunning(activeTask.sessionId)) {
+                this.processManager.stopProcess(activeTask.sessionId);
+            }
+
+            // Create new task (we bypass atomic check since we're handling concurrency ourselves)
+            const { createWorkTask } = await import('../db/work-tasks');
+            const task = createWorkTask(this.db, {
+                agentId: input.agentId,
+                projectId,
+                description: input.description,
+                source: input.source,
+                sourceId: input.sourceId,
+                requesterInfo: input.requesterInfo,
+                priority,
+                tenantId,
+            });
+
+            // Pause the preempted task
+            pauseWorkTask(this.db, activeTask.id, task.id);
+
+            log.info('Work task created with preemption', {
+                taskId: task.id,
+                preemptedTaskId: activeTask.id,
+                priority,
+            });
+
+            this.emitCreationNotifications(task, input);
+            return this.executeTask(task, agent, project);
+        }
+
+        // No active task — run immediately
         const task = createWorkTaskAtomic(this.db, {
             agentId: input.agentId,
             projectId,
@@ -325,18 +405,25 @@ export class WorkTaskService {
             source: input.source,
             sourceId: input.sourceId,
             requesterInfo: input.requesterInfo,
+            priority,
             tenantId,
         });
         if (!task) {
             throw new ConflictError('Another task is already active on project', { projectId });
         }
 
-        log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId });
+        log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId, priority });
 
+        this.emitCreationNotifications(task, input);
+        return this.executeTask(task, agent, project);
+    }
+
+    private emitCreationNotifications(task: WorkTask, input: CreateWorkTaskInput): void {
         // Fire-and-forget AlgoChat notification for task creation
         if (this.agentMessenger) {
             const snippet = input.description.slice(0, 100);
-            this.agentMessenger.sendOnChainToSelf(input.agentId, `[WORK_TASK:created] ${snippet}`).catch(() => {});
+            const priorityLabel = ['P0', 'P1', 'P2', 'P3'][task.priority];
+            this.agentMessenger.sendOnChainToSelf(input.agentId, `[WORK_TASK:created:${priorityLabel}] ${snippet}`).catch(() => {});
         }
 
         recordAudit(
@@ -345,10 +432,8 @@ export class WorkTaskService {
             input.agentId,
             'work_task',
             task.id,
-            `Created work task: ${input.description.slice(0, 200)}`,
+            `Created work task (P${task.priority}): ${input.description.slice(0, 200)}`,
         );
-
-        return this.executeTask(task, agent, project);
     }
 
     /**
@@ -526,7 +611,19 @@ export class WorkTaskService {
         // Clean up worktree
         await this.cleanupWorktree(id);
 
-        return getWorkTask(this.db, id);
+        const cancelled = getWorkTask(this.db, id);
+
+        // Process queue — resume paused tasks and dequeue next
+        if (cancelled) {
+            this.processQueue(cancelled).catch((err) => {
+                log.error('Failed to process queue after cancel', {
+                    taskId: id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
+
+        return cancelled;
     }
 
     onComplete(taskId: string, callback: CompletionCallback): void {
@@ -753,7 +850,57 @@ export class WorkTaskService {
                 }
                 this.completionCallbacks.delete(taskId);
             }
+
+            // Resume paused tasks and process queue
+            this.processQueue(task).catch((err) => {
+                log.error('Failed to process queue after task completion', {
+                    taskId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
         }
+    }
+
+    /**
+     * After a task completes or fails, resume any tasks it paused
+     * and dequeue the next highest-priority task for the project.
+     */
+    private async processQueue(completedTask: WorkTask): Promise<void> {
+        if (this._shuttingDown) return;
+
+        // Resume tasks that were paused by this task
+        const pausedTasks = getTasksPausedBy(this.db, completedTask.id);
+        for (const paused of pausedTasks) {
+            resumePausedTask(this.db, paused.id);
+            log.info('Resumed paused task', { taskId: paused.id, resumedAfter: completedTask.id });
+        }
+
+        // Dequeue next task for this project (highest priority first)
+        const next = dequeueNextTask(this.db, completedTask.projectId);
+        if (!next) return;
+
+        const agent = getAgent(this.db, next.agentId);
+        const project = getProject(this.db, next.projectId);
+        if (!agent || !project || !project.workingDir) {
+            log.warn('Cannot dequeue task: agent or project missing', { taskId: next.id });
+            updateWorkTaskStatus(this.db, next.id, 'failed', {
+                error: 'Agent or project missing when dequeuing',
+            });
+            return;
+        }
+
+        log.info('Dequeuing next task from priority queue', {
+            taskId: next.id,
+            priority: next.priority,
+            queuedRemaining: countQueuedTasks(this.db, next.projectId),
+        });
+
+        this.executeTask(next, agent, project).catch((err) => {
+            log.error('Failed to execute dequeued task', {
+                taskId: next.id,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
     }
 
     private buildIterationPrompt(branchName: string, validationOutput: string): string {
