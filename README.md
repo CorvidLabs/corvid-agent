@@ -62,9 +62,13 @@ Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](ht
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
-bash scripts/dev-setup.sh    # guided setup: prerequisites, env, deps, build
-bun run dev
+corvid-agent init           # guided setup: env, deps, first agent
+bun run dev                 # → http://localhost:3000
 ```
+
+Or non-interactive: `corvid-agent init --yes`
+
+**MCP-only setup** (Claude Code / Cursor): `corvid-agent init --mcp`
 
 Or manually:
 

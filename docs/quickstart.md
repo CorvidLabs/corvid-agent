@@ -9,16 +9,15 @@ Get corvid-agent running and have an AI agent open a real PR on a test repo.
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
-bash scripts/dev-setup.sh
-```
-
-The setup script checks prerequisites (Bun 1.3+, Git), copies `.env.example`, prompts for API keys, installs dependencies, builds the dashboard, and verifies the server starts.
-
-Then start the server:
-
-```bash
+corvid-agent init       # guided setup: env, deps, first agent
 bun run dev
 ```
+
+The `init` command checks prerequisites (Bun 1.3+, Git), creates `.env`, prompts for API keys, installs dependencies, builds the dashboard, and creates your first agent.
+
+For non-interactive setup: `corvid-agent init --yes` (auto-detects Claude CLI / Ollama).
+
+For MCP-only (Claude Code / Cursor): `corvid-agent init --mcp`.
 
 Open **http://localhost:3000** — you should see the dashboard.
 
