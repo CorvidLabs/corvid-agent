@@ -31,6 +31,8 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `buildSafeGhEnv` | _(none)_ | `Record<string, string>` | Builds an allowlisted environment variable map safe for `gh` CLI subprocesses, preventing leakage of API keys, mnemonics, and secrets. |
+| `resolveExecutable` | `name: string` | `string` | Resolves a command name to its full executable path. Uses `Bun.which()` with Windows fallback to check common install locations. Results are cached. |
+| `resolveGhExecutable` | _(none)_ | `string` | Deprecated wrapper around `resolveExecutable('gh')`. |
 
 #### errors.ts
 | Function | Parameters | Returns | Description |

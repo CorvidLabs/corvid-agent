@@ -256,8 +256,16 @@ test.describe('Councils', () => {
             method: 'POST',
         });
 
-        // Wait briefly for auto-advance to settle if it's running
-        await new Promise((r) => setTimeout(r, 500));
+        // Poll until stage has advanced past 'responding' before sending the second review call
+        const deadline = Date.now() + 5_000;
+        while (Date.now() < deadline) {
+            const stageRes = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}`);
+            if (stageRes.ok) {
+                const data = await stageRes.json();
+                if (data.stage !== 'responding') break;
+            }
+            await new Promise((r) => setTimeout(r, 200));
+        }
 
         // Either way, the stage should no longer be 'responding' — a second call must fail
         const reviewRes2 = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/review`, {
@@ -280,9 +288,17 @@ test.describe('Councils', () => {
         });
         const launch = await launchRes.json();
 
-        // Wait for auto-advance to progress — the no-chairman path now uses
-        // a fallback synthesizer, so the launch will auto-advance past reviewing
-        await new Promise((r) => setTimeout(r, 2000));
+        // Poll until auto-advance progresses past 'reviewing' — the no-chairman
+        // path uses a fallback synthesizer, so the launch will auto-advance
+        const synthDeadline = Date.now() + 10_000;
+        while (Date.now() < synthDeadline) {
+            const stageRes = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}`);
+            if (stageRes.ok) {
+                const data = await stageRes.json();
+                if (data.stage !== 'responding' && data.stage !== 'discussing' && data.stage !== 'reviewing') break;
+            }
+            await new Promise((r) => setTimeout(r, 300));
+        }
 
         // A manual /synthesize call should fail because the stage has already
         // advanced past 'reviewing' (auto-advance handled synthesis via fallback)
@@ -330,8 +346,16 @@ test.describe('Councils', () => {
         const council = await api.seedCouncil([agent1.id], 'Abort Council');
         const launch = await api.launchCouncil(council.id, project.id, 'Abort test');
 
-        // Wait briefly for auto-advance
-        await new Promise((r) => setTimeout(r, 2000));
+        // Poll until auto-advance settles before attempting abort
+        const abortDeadline = Date.now() + 10_000;
+        while (Date.now() < abortDeadline) {
+            const stageRes = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}`);
+            if (stageRes.ok) {
+                const data = await stageRes.json();
+                if (data.stage === 'complete' || data.stage === 'aborted') break;
+            }
+            await new Promise((r) => setTimeout(r, 300));
+        }
 
         const res = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/abort`, {
             method: 'POST',

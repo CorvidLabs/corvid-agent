@@ -32,8 +32,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             // Stop the session
             await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
 
-            // Wait for status update via WS or poll, then verify stopped status
-            await page.waitForTimeout(1000);
+            // Reload the sessions page to pick up the stopped status
             await gotoWithRetry(page, '/sessions');
 
             // Session should still be in the list
@@ -144,7 +143,9 @@ test.describe('Optimistic Updates & Render Performance', () => {
             });
 
             await gotoWithRetry(page, `/sessions/${session.id}`);
-            await page.waitForTimeout(2000);
+
+            // Wait for session view to render before checking for errors
+            await expect(page.locator('.session-view__header, .terminal')).toBeVisible({ timeout: 10_000 }).catch(() => {});
 
             // Verify the session view rendered without Angular errors
             const angularErrors = errors.filter((e) =>
@@ -207,9 +208,6 @@ test.describe('Optimistic Updates & Render Performance', () => {
             const session = await res.json();
 
             await gotoWithRetry(page, `/sessions/${session.id}`);
-
-            // Wait for session view to fully render
-            await page.waitForTimeout(2000);
 
             // Meta section should be visible
             const meta = page.locator('.session-view__meta');
@@ -309,8 +307,8 @@ test.describe('Optimistic Updates & Render Performance', () => {
             const terminal = page.locator('.terminal');
             await expect(terminal).toBeVisible({ timeout: 10000 });
 
-            // Wait briefly for events to render
-            await page.waitForTimeout(3000);
+            // Wait for event lines to render (or timeout gracefully if no events yet)
+            await page.locator('.terminal .line').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
 
             // Should have at least one line entry
             const lines = terminal.locator('.line');
