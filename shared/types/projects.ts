@@ -5,6 +5,7 @@ export interface Project {
     workingDir: string;
     claudeMd: string;
     envVars: Record<string, string>;
+    maxConcurrency?: number;
     createdAt: string;
     updatedAt: string;
 }

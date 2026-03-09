@@ -49,6 +49,10 @@ function rowToWorkTask(row: WorkTaskRow): WorkTask {
         originalBranch: row.original_branch,
         worktreeDir: row.worktree_dir,
         iterationCount: row.iteration_count ?? 0,
+        maxRetries: (row as unknown as Record<string, unknown>).max_retries as number ?? 0,
+        retryCount: (row as unknown as Record<string, unknown>).retry_count as number ?? 0,
+        retryBackoff: ((row as unknown as Record<string, unknown>).retry_backoff as string ?? 'fixed') as WorkTask['retryBackoff'],
+        lastRetryAt: (row as unknown as Record<string, unknown>).last_retry_at as string ?? null,
         createdAt: row.created_at,
         completedAt: row.completed_at,
     };

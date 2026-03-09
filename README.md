@@ -25,7 +25,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 | Module specs | **113** with automated validation |
 | MCP tools | **38** corvid_* tool handlers |
 | API endpoints | **~200** across 38 route modules |
-| DB migrations | **23** (squashed baseline, 82 tables) |
+| DB migrations | **24** (squashed baseline, 82 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.
