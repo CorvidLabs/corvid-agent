@@ -17,7 +17,7 @@ The `init` command checks prerequisites (Bun 1.3+, Git), creates `.env`, prompts
 
 For non-interactive setup: `corvid-agent init --yes` (auto-detects Claude CLI / Ollama).
 
-For MCP-only (Claude Code / Cursor): `corvid-agent init --mcp`.
+For MCP + Agent Skills (Claude Code / Cursor / Copilot): `corvid-agent init --mcp`.
 
 Open **http://localhost:3000** — you should see the dashboard.
 
