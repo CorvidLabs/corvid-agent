@@ -167,6 +167,54 @@ select:focus-visible {
     color: var(--accent-cyan);
 }
 
+/* ── Accessibility utilities ── */
+
+/* Screen-reader only — visually hidden but accessible to assistive technology */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Skip-to-content link — visible on focus */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 9999;
+    padding: 0.5rem 1rem;
+    background: var(--accent-cyan);
+    color: var(--bg-deep);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    border-radius: var(--radius);
+    transition: top 0.15s ease;
+}
+.skip-link:focus {
+    top: 0.5rem;
+    outline: 2px solid var(--text-primary);
+    outline-offset: 2px;
+}
+
+/* Reduced motion — disable animations when user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 /* ── Typography utilities ── */
 
 .mono {

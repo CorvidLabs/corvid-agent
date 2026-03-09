@@ -2,6 +2,9 @@ import {
     Component,
     ChangeDetectionStrategy,
     inject,
+    AfterViewChecked,
+    ElementRef,
+    viewChild,
 } from '@angular/core';
 import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/keyboard-shortcuts.service';
 
@@ -17,7 +20,7 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
                 aria-modal="true"
                 (click)="onBackdropClick($event)"
                 (keydown.escape)="shortcuts.closeOverlay()">
-                <div class="shortcuts-panel">
+                <div class="shortcuts-panel" #panelEl (keydown)="onKeydown($event)">
                     <div class="shortcuts-panel__header">
                         <h2 id="shortcuts-title">Keyboard Shortcuts</h2>
                         <button
@@ -203,10 +206,14 @@ import { KeyboardShortcutsService, ShortcutEntry } from '../../core/services/key
         }
     `,
 })
-export class KeyboardShortcutsOverlayComponent {
+export class KeyboardShortcutsOverlayComponent implements AfterViewChecked {
     protected readonly shortcuts = inject(KeyboardShortcutsService);
 
     protected readonly categories = ['General', 'Navigation'];
+
+    private readonly panelEl = viewChild<ElementRef<HTMLElement>>('panelEl');
+    private previouslyFocused: HTMLElement | null = null;
+    private focusApplied = false;
 
     protected byCategory(category: string): ShortcutEntry[] {
         return this.shortcuts.shortcuts.filter((s) => s.category === category);
@@ -218,7 +225,50 @@ export class KeyboardShortcutsOverlayComponent {
 
     protected onBackdropClick(event: MouseEvent): void {
         if ((event.target as HTMLElement).classList.contains('shortcuts-overlay')) {
-            this.shortcuts.closeOverlay();
+            this.closeAndRestore();
         }
+    }
+
+    ngAfterViewChecked(): void {
+        const panel = this.panelEl()?.nativeElement;
+        if (this.shortcuts.overlayOpen() && panel && !this.focusApplied) {
+            this.previouslyFocused = document.activeElement as HTMLElement;
+            const closeBtn = panel.querySelector<HTMLElement>('.shortcuts-panel__close');
+            closeBtn?.focus();
+            this.focusApplied = true;
+        }
+        if (!this.shortcuts.overlayOpen() && this.focusApplied) {
+            this.focusApplied = false;
+        }
+    }
+
+    /** Trap focus within the dialog */
+    protected onKeydown(event: KeyboardEvent): void {
+        if (event.key !== 'Tab') return;
+
+        const panel = this.panelEl()?.nativeElement;
+        if (!panel) return;
+
+        const focusable = panel.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    private closeAndRestore(): void {
+        this.shortcuts.closeOverlay();
+        this.previouslyFocused?.focus();
+        this.previouslyFocused = null;
     }
 }

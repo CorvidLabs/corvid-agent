@@ -63,7 +63,8 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         class="sidebar__link"
                         routerLink="/dashboard"
                         routerLinkActive="sidebar__link--active"
-                        aria-current="page"
+                        [attr.aria-current]="rla_dashboard.isActive ? 'page' : null"
+                        #rla_dashboard="routerLinkActive"
                         title="Dashboard"
                         #firstLink>
                         <span class="sidebar__label">Dashboard</span>
@@ -71,7 +72,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                     </a>
                 </li>
                 <li>
-                    <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" title="Agents">
+                    <a class="sidebar__link" routerLink="/agents" routerLinkActive="sidebar__link--active" #rla_agents="routerLinkActive" [attr.aria-current]="rla_agents.isActive ? 'page' : null" title="Agents">
                         <span class="sidebar__label">Agents</span>
                         <span class="sidebar__abbr">A</span>
                     </a>

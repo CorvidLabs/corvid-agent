@@ -46,8 +46,8 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
                         aria-label="Switch to mainnet"
                     >MAINNET</button>
                 </div>
-                <div class="header__status">
-                    <span class="header__label">WS:</span>
+                <div class="header__status" role="status" aria-label="WebSocket connection status">
+                    <span class="header__label" aria-hidden="true">WS:</span>
                     <app-status-badge [status]="wsService.connectionStatus()" />
                 </div>
             </div>

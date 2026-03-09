@@ -34,7 +34,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
             <div class="app-layout__body">
                 <app-sidebar [(sidebarOpen)]="sidebarOpen" />
-                <main class="app-layout__content" role="main">
+                <main id="main-content" class="app-layout__content" role="main" tabindex="-1">
                     <app-breadcrumb />
                     <div class="app-layout__page page-enter">
                         <router-outlet />
