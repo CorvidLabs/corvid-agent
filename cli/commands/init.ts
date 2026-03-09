@@ -212,18 +212,36 @@ ${c.gray('Set up corvid-agent as an MCP server for Claude Code, Cursor, or other
         printSuccess(`MCP server added to ${c.gray(cursorMcpPath)}`);
     }
 
+    // Detect VibeKit and suggest side-by-side setup
+    let hasVibeKit = false;
+    try {
+        const proc = Bun.spawn(['vibekit', '--version'], { stdout: 'pipe', stderr: 'pipe' });
+        await proc.exited;
+        hasVibeKit = true;
+    } catch { /* not installed */ }
+
+    if (hasVibeKit) {
+        printHeader('VibeKit Integration');
+        console.log(`  ${c.green('✓')} VibeKit CLI detected — smart contract tools available`);
+        console.log(`  ${c.gray('Run')} ${c.cyan('vibekit init')} ${c.gray('to add blockchain MCP tools alongside corvid-agent')}`);
+    } else {
+        console.log(`\n  ${c.gray('Tip: Install VibeKit for Algorand smart contract MCP tools:')}`);
+        console.log(`  ${c.cyan('curl -fsSL https://getvibekit.ai/install | sh')}`);
+    }
+
     console.log(`
 ${c.bold}${c.green('MCP setup complete!')}${c.reset}
 
 ${c.bold}What you get:${c.reset}
   corvid_* tools available in your AI editor — agents, sessions,
   work tasks, projects, health checks, and more.
+  Agent Skills teach your AI assistant when and how to use each tool.
 
 ${c.bold}Next steps:${c.reset}
   1. ${projectRoot ? `Start the server: ${c.cyan('bun run dev')}` : 'Start your corvid-agent server'}
   2. Restart Claude Code / Cursor to pick up the new MCP config
   3. Ask your AI assistant: ${c.gray('"List my agents"')} or ${c.gray('"Create a work task"')}
-
+  ${hasVibeKit ? `4. Run ${c.cyan('vibekit init')} to add smart contract tools` : ''}
 ${c.gray('Config: ' + claudeConfigPath)}
 `);
 }

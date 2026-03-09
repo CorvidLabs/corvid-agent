@@ -1,4 +1,6 @@
 import { test, expect, describe } from 'bun:test';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import type { InitOptions } from '../../cli/commands/init';
 
 describe('CLI Init Command', () => {
@@ -39,6 +41,33 @@ describe('CLI Init Command', () => {
         const fullOpts: InitOptions = { full: true, yes: true };
         expect(fullOpts.full).toBe(true);
         expect(fullOpts.yes).toBe(true);
+    });
+});
+
+describe('VibeKit Integration', () => {
+    test('smart-contracts skill file exists with valid frontmatter', () => {
+        const skillPath = join(import.meta.dir, '..', '..', 'skills', 'smart-contracts', 'SKILL.md');
+        expect(existsSync(skillPath)).toBe(true);
+
+        const content = readFileSync(skillPath, 'utf-8');
+        expect(content.startsWith('---\n')).toBe(true);
+        expect(content).toContain('name: smart-contracts');
+        expect(content).toContain('description:');
+
+        // Should reference VibeKit tools
+        expect(content).toContain('appDeploy');
+        expect(content).toContain('createAsset');
+        expect(content).toContain('vibekit');
+    });
+
+    test('vibekit integration doc exists', () => {
+        const docPath = join(import.meta.dir, '..', '..', 'docs', 'vibekit-integration.md');
+        expect(existsSync(docPath)).toBe(true);
+
+        const content = readFileSync(docPath, 'utf-8');
+        expect(content).toContain('VibeKit');
+        expect(content).toContain('corvid-agent');
+        expect(content).toContain('mcpServers');
     });
 });
 
