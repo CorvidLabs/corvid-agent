@@ -44,6 +44,7 @@ beforeAll(() => {
             mcp_servers TEXT DEFAULT '[]',
             claude_md TEXT DEFAULT '',
             env_vars TEXT DEFAULT '{}',
+            max_concurrency INTEGER NOT NULL DEFAULT 1,
             tenant_id TEXT NOT NULL DEFAULT 'default',
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))

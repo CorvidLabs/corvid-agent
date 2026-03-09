@@ -203,6 +203,7 @@ export class ProcessManager {
             workingDir: process.cwd(),
             claudeMd: '',
             envVars: {},
+            maxConcurrency: 1,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -408,6 +409,7 @@ export class ProcessManager {
             workingDir: process.cwd(),
             claudeMd: '',
             envVars: {},
+            maxConcurrency: 1,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 72;
+const SCHEMA_VERSION = 73;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1353,6 +1353,23 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_governance_proposals_council ON governance_proposals(council_id)`,
         `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
         `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
+    ],
+    73: [
+        // Work pipeline v2 — parallel execution, dependencies, retry policies
+        `CREATE TABLE IF NOT EXISTS work_task_dependencies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id TEXT NOT NULL REFERENCES work_tasks(id) ON DELETE CASCADE,
+            depends_on_task_id TEXT NOT NULL REFERENCES work_tasks(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(task_id, depends_on_task_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_work_task_deps_task ON work_task_dependencies(task_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_task_deps_depends ON work_task_dependencies(depends_on_task_id)`,
+        `ALTER TABLE work_tasks ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE work_tasks ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE work_tasks ADD COLUMN retry_backoff TEXT NOT NULL DEFAULT 'fixed'`,
+        `ALTER TABLE work_tasks ADD COLUMN last_retry_at TEXT DEFAULT NULL`,
+        `ALTER TABLE projects ADD COLUMN max_concurrency INTEGER NOT NULL DEFAULT 1`,
     ],
 };
 

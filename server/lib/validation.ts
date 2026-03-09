@@ -80,6 +80,7 @@ export const CreateProjectSchema = z.object({
     description: z.string().optional(),
     allowedTools: z.array(z.string()).optional(),
     customInstructions: z.string().optional(),
+    maxConcurrency: z.number().int().min(1).max(10).optional(),
     mcpServers: z.array(z.object({
         name: z.string().min(1),
         command: z.string().min(1).optional(),
@@ -95,6 +96,7 @@ export const UpdateProjectSchema = z.object({
     description: z.string().optional(),
     allowedTools: z.array(z.string()).optional(),
     customInstructions: z.string().optional(),
+    maxConcurrency: z.number().int().min(1).max(10).optional(),
     mcpServers: z.array(z.object({
         name: z.string().min(1),
         command: z.string().min(1).optional(),
@@ -264,6 +266,13 @@ export const CreateWorkTaskSchema = z.object({
     source: z.enum(['web', 'algochat', 'agent']).optional().default('web'),
     sourceId: z.string().optional(),
     requesterInfo: z.record(z.string(), z.unknown()).optional(),
+    maxRetries: z.number().int().min(0).max(10).optional(),
+    retryBackoff: z.enum(['fixed', 'linear', 'exponential']).optional(),
+    dependsOn: z.array(z.string().min(1)).optional(),
+});
+
+export const AddTaskDependencySchema = z.object({
+    dependsOnTaskId: z.string().min(1, 'dependsOnTaskId is required'),
 });
 
 // ─── Allowlist ──────────────────────────────────────────────────────────────────

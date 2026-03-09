@@ -9,6 +9,7 @@ import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import {
+    createWorkTask as dbCreateWorkTask,
     createWorkTaskAtomic,
     getWorkTask,
     getActiveWorkTasks,
@@ -16,6 +17,12 @@ import {
     listWorkTasks as dbListWorkTasks,
     cleanupStaleWorkTasks,
     resetWorkTaskForRetry,
+    addTaskDependency,
+    removeTaskDependency,
+    getTaskDependencies,
+    getTaskDependents,
+    areDependenciesMet,
+    findReadyTasks,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
@@ -38,6 +45,12 @@ type CompletionCallback = (task: WorkTask) => void;
 const DRAIN_TIMEOUT_MS = parseInt(process.env.WORK_DRAIN_TIMEOUT_MS ?? '300000', 10); // 5 minutes
 const DRAIN_POLL_INTERVAL_MS = 10_000; // 10 seconds
 
+/** Base delay for retry backoff (ms). */
+const RETRY_BASE_DELAY_MS = parseInt(process.env.WORK_RETRY_BASE_DELAY_MS ?? '30000', 10); // 30s
+
+/** Interval for the ready-task poller (ms). */
+const READY_POLL_INTERVAL_MS = parseInt(process.env.WORK_READY_POLL_MS ?? '15000', 10);
+
 export class WorkTaskService {
     private db: Database;
     private processManager: ProcessManager;
@@ -45,6 +58,7 @@ export class WorkTaskService {
     private agentMessenger: AgentMessenger | null = null;
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
     private _shuttingDown = false;
+    private readyPollTimer: ReturnType<typeof setInterval> | null = null;
 
     /** True when the service is draining — no new tasks accepted. */
     get shuttingDown(): boolean {
@@ -60,6 +74,59 @@ export class WorkTaskService {
     /** Set the agent messenger (set after async AlgoChat init). */
     setAgentMessenger(messenger: AgentMessenger): void {
         this.agentMessenger = messenger;
+    }
+
+    /**
+     * Start the ready-task poller. Checks periodically for pending tasks
+     * whose dependencies are met and whose project has concurrency capacity.
+     */
+    startReadyTaskPoller(): void {
+        if (this.readyPollTimer) return;
+        this.readyPollTimer = setInterval(() => {
+            this.processReadyTasks().catch((err) => {
+                log.error('Ready-task poller error', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }, READY_POLL_INTERVAL_MS);
+    }
+
+    /** Stop the ready-task poller. */
+    stopReadyTaskPoller(): void {
+        if (this.readyPollTimer) {
+            clearInterval(this.readyPollTimer);
+            this.readyPollTimer = null;
+        }
+    }
+
+    /**
+     * Find pending tasks that are ready to execute (dependencies met,
+     * concurrency capacity available) and start them.
+     */
+    async processReadyTasks(): Promise<void> {
+        if (this._shuttingDown) return;
+
+        const ready = findReadyTasks(this.db);
+        for (const task of ready) {
+            // Skip tasks that are no longer pending (another poller iteration may have started them)
+            const current = getWorkTask(this.db, task.id);
+            if (!current || current.status !== 'pending') continue;
+
+            const agent = getAgent(this.db, task.agentId);
+            const project = getProject(this.db, task.projectId);
+            if (!agent || !project || !project.workingDir) {
+                log.warn('Cannot start ready task: agent or project missing', { taskId: task.id });
+                continue;
+            }
+
+            log.info('Starting ready task from poller', { taskId: task.id });
+            this.executeTask(current, agent, project).catch((err) => {
+                log.error('Failed to start ready task', {
+                    taskId: task.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
     }
 
     /**
@@ -193,6 +260,7 @@ export class WorkTaskService {
      */
     async drainRunningTasks(pollIntervalMs: number = DRAIN_POLL_INTERVAL_MS): Promise<void> {
         this._shuttingDown = true;
+        this.stopReadyTaskPoller();
 
         const activeTasks = getActiveWorkTasks(this.db);
         if (activeTasks.length === 0) {
@@ -317,7 +385,17 @@ export class WorkTaskService {
             }
         }
 
-        // Atomic insert — fails if a concurrent active task exists on this project
+        // Validate dependency task IDs exist
+        if (input.dependsOn?.length) {
+            for (const depId of input.dependsOn) {
+                const depTask = getWorkTask(this.db, depId);
+                if (!depTask) {
+                    throw new NotFoundError('WorkTask (dependency)', depId);
+                }
+            }
+        }
+
+        // Atomic insert — fails if the project's concurrency limit is exceeded
         const task = createWorkTaskAtomic(this.db, {
             agentId: input.agentId,
             projectId,
@@ -326,12 +404,41 @@ export class WorkTaskService {
             sourceId: input.sourceId,
             requesterInfo: input.requesterInfo,
             tenantId,
+            maxRetries: input.maxRetries,
+            retryBackoff: input.retryBackoff,
         });
-        if (!task) {
-            throw new ConflictError('Another task is already active on project', { projectId });
+
+        // If atomic insert failed but we have dependencies, the task should be
+        // queued as pending (it will be picked up by the ready-task poller later).
+        // Create it non-atomically if dependencies exist and concurrency is full.
+        let finalTask = task;
+        if (!task && input.dependsOn?.length) {
+            // Force-create as pending — it won't start until dependencies are met
+            finalTask = dbCreateWorkTask(this.db, {
+                agentId: input.agentId,
+                projectId,
+                description: input.description,
+                source: input.source,
+                sourceId: input.sourceId,
+                requesterInfo: input.requesterInfo,
+                tenantId,
+                maxRetries: input.maxRetries,
+                retryBackoff: input.retryBackoff,
+            });
         }
 
-        log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId });
+        if (!finalTask) {
+            throw new ConflictError('Project concurrency limit reached', { projectId });
+        }
+
+        // Wire up dependencies
+        if (input.dependsOn?.length) {
+            for (const depId of input.dependsOn) {
+                addTaskDependency(this.db, finalTask.id, depId);
+            }
+        }
+
+        log.info('Work task created', { taskId: finalTask.id, agentId: input.agentId, projectId });
 
         // Fire-and-forget AlgoChat notification for task creation
         if (this.agentMessenger) {
@@ -344,11 +451,20 @@ export class WorkTaskService {
             'work_task_create',
             input.agentId,
             'work_task',
-            task.id,
+            finalTask.id,
             `Created work task: ${input.description.slice(0, 200)}`,
         );
 
-        return this.executeTask(task, agent, project);
+        // Only execute immediately if dependencies are met
+        const depsOk = areDependenciesMet(this.db, finalTask.id);
+        if (depsOk && task) {
+            // task is non-null means atomic insert succeeded (capacity available)
+            return this.executeTask(finalTask, agent, project);
+        }
+
+        // Task is queued — the ready-task poller will pick it up
+        log.info('Work task queued (waiting for dependencies or capacity)', { taskId: finalTask.id });
+        return finalTask;
     }
 
     /**
@@ -463,6 +579,38 @@ export class WorkTaskService {
 
     listTasks(agentId?: string, tenantId?: string): WorkTask[] {
         return dbListWorkTasks(this.db, agentId, tenantId);
+    }
+
+    /** Get dependencies for a task. */
+    getTaskDependencies(taskId: string) {
+        return getTaskDependencies(this.db, taskId);
+    }
+
+    /** Get tasks that depend on a task (downstream). */
+    getTaskDependents(taskId: string) {
+        return getTaskDependents(this.db, taskId);
+    }
+
+    /** Add a dependency to a task. */
+    addDependency(taskId: string, dependsOnTaskId: string, tenantId?: string) {
+        const task = getWorkTask(this.db, taskId, tenantId);
+        if (!task) throw new NotFoundError('WorkTask', taskId);
+        if (task.status !== 'pending') {
+            throw new ValidationError('Dependencies can only be added to pending tasks', { taskId, status: task.status });
+        }
+        const dep = getWorkTask(this.db, dependsOnTaskId);
+        if (!dep) throw new NotFoundError('WorkTask (dependency)', dependsOnTaskId);
+        if (taskId === dependsOnTaskId) {
+            throw new ValidationError('A task cannot depend on itself');
+        }
+        return addTaskDependency(this.db, taskId, dependsOnTaskId);
+    }
+
+    /** Remove a dependency from a task. */
+    removeDependency(taskId: string, dependsOnTaskId: string, tenantId?: string) {
+        const task = getWorkTask(this.db, taskId, tenantId);
+        if (!task) throw new NotFoundError('WorkTask', taskId);
+        return removeTaskDependency(this.db, taskId, dependsOnTaskId);
     }
 
     /**
@@ -588,13 +736,8 @@ export class WorkTaskService {
         log.warn('Validation failed', { taskId, iteration, maxIterations: WORK_MAX_ITERATIONS });
 
         if (iteration >= WORK_MAX_ITERATIONS) {
-            // Max iterations reached — fail the task
-            updateWorkTaskStatus(this.db, taskId, 'failed', {
-                error: `Validation failed after ${iteration} iteration(s):\n${validation.output.slice(0, 2000)}`,
-                summary: sessionOutput.slice(-500).trim(),
-            });
-            await this.cleanupWorktree(taskId);
-            this.notifyCallbacks(taskId);
+            // Max iterations reached — check retry policy before failing
+            await this.handleTaskFailure(taskId, sessionOutput, `Validation failed after ${iteration} iteration(s):\n${validation.output.slice(0, 2000)}`);
             return;
         }
 
@@ -626,6 +769,83 @@ export class WorkTaskService {
         });
     }
 
+    /**
+     * Handle a task failure: apply retry policy if configured, otherwise mark as failed.
+     */
+    private async handleTaskFailure(taskId: string, sessionOutput: string, errorMsg: string): Promise<void> {
+        const task = getWorkTask(this.db, taskId);
+        if (!task) return;
+
+        // Check if we can auto-retry based on retry policy
+        if (task.maxRetries > 0 && task.retryCount < task.maxRetries) {
+            const delay = this.computeRetryDelay(task.retryBackoff, task.retryCount);
+            log.info('Scheduling auto-retry', {
+                taskId,
+                retryCount: task.retryCount + 1,
+                maxRetries: task.maxRetries,
+                backoff: task.retryBackoff,
+                delayMs: delay,
+            });
+
+            // Clean up current worktree before retry
+            await this.cleanupWorktree(taskId);
+
+            // Reset the task for retry after delay
+            setTimeout(async () => {
+                try {
+                    const current = getWorkTask(this.db, taskId);
+                    if (!current || current.status !== 'failed') return;
+
+                    const agent = getAgent(this.db, current.agentId);
+                    const project = getProject(this.db, current.projectId);
+                    if (!agent || !project || !project.workingDir) return;
+
+                    resetWorkTaskForRetry(this.db, taskId);
+                    const resetTask = getWorkTask(this.db, taskId);
+                    if (!resetTask) return;
+
+                    log.info('Auto-retrying work task', { taskId, retryCount: resetTask.retryCount });
+                    await this.executeTask(resetTask, agent, project);
+                } catch (err) {
+                    log.error('Auto-retry failed', {
+                        taskId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                }
+            }, delay);
+
+            // Mark as failed now (the timer will reset it to pending)
+            updateWorkTaskStatus(this.db, taskId, 'failed', {
+                error: `${errorMsg} (auto-retry scheduled: ${task.retryCount + 1}/${task.maxRetries})`,
+                summary: sessionOutput.slice(-500).trim(),
+            });
+            return;
+        }
+
+        // No retries left — permanent failure
+        updateWorkTaskStatus(this.db, taskId, 'failed', {
+            error: errorMsg,
+            summary: sessionOutput.slice(-500).trim(),
+        });
+        await this.cleanupWorktree(taskId);
+        this.notifyCallbacks(taskId);
+    }
+
+    /**
+     * Compute retry delay based on backoff strategy.
+     */
+    private computeRetryDelay(backoff: string, retryCount: number): number {
+        switch (backoff) {
+            case 'exponential':
+                return RETRY_BASE_DELAY_MS * Math.pow(2, retryCount);
+            case 'linear':
+                return RETRY_BASE_DELAY_MS * (retryCount + 1);
+            case 'fixed':
+            default:
+                return RETRY_BASE_DELAY_MS;
+        }
+    }
+
     private async finalizeTask(taskId: string, sessionOutput: string): Promise<void> {
         let prUrl = sessionOutput.match(PR_URL_REGEX)?.[0] ?? null;
 
@@ -654,6 +874,13 @@ export class WorkTaskService {
 
         // Notify callbacks
         this.notifyCallbacks(taskId);
+
+        // After completion, trigger the ready-task poller to start dependent tasks
+        this.processReadyTasks().catch((err) => {
+            log.error('Error processing ready tasks after completion', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
     }
 
     /**
