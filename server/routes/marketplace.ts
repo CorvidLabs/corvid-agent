@@ -5,15 +5,18 @@ import type { Database } from 'bun:sqlite';
 import { type MarketplaceService, VerificationGateError, InsufficientCreditsError, RateLimitExceededError } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
 import { SubscriptionService } from '../marketplace/subscriptions';
+import { TrialService } from '../marketplace/trials';
 import type { SubscriptionStatus } from '../marketplace/subscriptions';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
 import type {
     ListingCategory,
     PricingModel,
+    SearchSortBy,
+    VerificationBadge,
 } from '../marketplace/types';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
-import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema, CreateTierSchema, UpdateTierSchema, TierUseSchema, TierSubscribeSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema, CreateTierSchema, UpdateTierSchema, TierUseSchema, TierSubscribeSchema, StartTrialSchema } from '../lib/validation';
 
 export function handleMarketplaceRoutes(
     req: Request,
@@ -46,8 +49,18 @@ export function handleMarketplaceRoutes(
         const offsetParam = url.searchParams.get('offset');
         const offset = offsetParam !== null ? safeNumParam(offsetParam, 0) : undefined;
 
+        const sortBy = url.searchParams.get('sortBy') as SearchSortBy | undefined;
+        const badge = url.searchParams.get('badge') as VerificationBadge | undefined;
+        const minReviewsParam = url.searchParams.get('minReviews');
+        const minReviews = minReviewsParam !== null ? safeNumParam(minReviewsParam, 0) : undefined;
+        const minPriceParam = url.searchParams.get('minPrice');
+        const minPrice = minPriceParam !== null ? safeNumParam(minPriceParam, 0) : undefined;
+        const maxPriceParam = url.searchParams.get('maxPrice');
+        const maxPrice = maxPriceParam !== null ? safeNumParam(maxPriceParam, 0) : undefined;
+
         return json(marketplace.search({
             query, category, pricingModel, minRating, tags, limit, offset,
+            sortBy, badge, minReviews, minPrice, maxPrice,
         }));
     }
 
@@ -96,12 +109,46 @@ export function handleMarketplaceRoutes(
         }
     }
 
-    // Record a use (with per-use credit billing)
+    // ─── Badges & Quality Gates ────────────────────────────────────────────
+
+    const badgesMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/badges$/);
+    if (badgesMatch && method === 'GET') {
+        const listing = marketplace.getListing(badgesMatch[1]);
+        if (!listing) return notFound('Listing not found');
+        return json(marketplace.getListingBadges(badgesMatch[1]));
+    }
+
+    const gatesMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/quality-gates$/);
+    if (gatesMatch && method === 'GET') {
+        const listing = marketplace.getListing(gatesMatch[1]);
+        if (!listing) return notFound('Listing not found');
+        return json(marketplace.checkQualityGates(gatesMatch[1]));
+    }
+
+    // Record a use (with per-use credit billing, trial-aware)
     const useMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/use$/);
     if (useMatch && method === 'POST') {
         try {
             const buyerWallet = context?.walletAddress ?? context?.tenantId;
-            const result = marketplace.recordUse(useMatch[1], buyerWallet);
+            const listingId = useMatch[1];
+
+            // Check for active trial before billing
+            if (buyerWallet) {
+                const trials = new TrialService(_db);
+                const activeTrial = trials.getActiveTrial(listingId, buyerWallet);
+                if (activeTrial) {
+                    const consumed = trials.consumeTrialUse(activeTrial.id);
+                    if (consumed) {
+                        _db.query(
+                            "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
+                        ).run(listingId);
+                        const updated = trials.getTrialById(activeTrial.id);
+                        return json({ ok: true, creditsDeducted: 0, trial: true, trialUsesRemaining: updated?.usesRemaining ?? 0 });
+                    }
+                }
+            }
+
+            const result = marketplace.recordUse(listingId, buyerWallet);
             return json({ ok: true, creditsDeducted: result.creditsDeducted, escrowId: result.escrowId });
         } catch (err) {
             if (err instanceof InsufficientCreditsError) {
@@ -270,6 +317,26 @@ export function handleMarketplaceRoutes(
         return handleTierSubscribe(req, tierSubscribeMatch[1], _db, marketplace);
     }
 
+
+    // ─── Trials ───────────────────────────────────────────────────────────────
+
+    const trialMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/trial$/);
+    if (trialMatch) {
+        const listingId = trialMatch[1];
+
+        if (method === 'POST') {
+            return handleStartTrial(req, listingId, _db, marketplace);
+        }
+
+        if (method === 'GET') {
+            const tenantId = url.searchParams.get('tenantId');
+            if (!tenantId) return badRequest('tenantId query parameter is required');
+            const trials = new TrialService(_db);
+            const trial = trials.getTrial(listingId, tenantId);
+            return trial ? json(trial) : notFound('No trial found');
+        }
+    }
+
     return null;
 }
 
@@ -375,6 +442,18 @@ async function handleSubscribe(
         // Check for existing active subscription
         if (subscriptions.hasActiveSubscription(listingId, body.subscriberTenantId)) {
             return badRequest('Already subscribed to this listing');
+        }
+
+        // If listing has trial_days and buyer hasn't trialled before, start a trial
+        if (listing.trialDays) {
+            const trials = new TrialService(db);
+            const existingTrial = trials.getTrial(listingId, body.subscriberTenantId);
+            if (!existingTrial) {
+                const trial = trials.startTrial(listing, body.subscriberTenantId);
+                if (trial) {
+                    return json({ trial: true, ...trial }, 201);
+                }
+            }
         }
 
         const sub = subscriptions.subscribe(

@@ -52,17 +52,19 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `deleteTier` | `(tierId: string)` | `boolean` | Delete tier; syncs listing price to remaining minimum |
 | `checkTierRateLimit` | `(tierId: string, buyerWalletAddress: string)` | `boolean` | Check if buyer is within tier's hourly rate limit |
 | `recordTierUse` | `(listingId: string, tierId: string, buyerWalletAddress: string)` | `UseResult` | Record tier-based use with billing and rate limiting |
+| `getListingBadges` | `(listingId: string)` | `ListingBadges` | Compute verification badges (verified/trusted/official) for a listing |
+| `checkQualityGates` | `(listingId: string)` | `QualityGateResult` | Validate listing meets quality gates for publishing |
 
 ### Exported Types (from `types.ts`)
 
 | Type | Description |
 |------|-------------|
 | `ListingStatus` | `'draft' \| 'published' \| 'unlisted' \| 'suspended'` |
-| `ListingCategory` | `'coding' \| 'research' \| 'writing' \| 'data' \| 'devops' \| 'security' \| 'general'` |
+| `ListingCategory` | `'coding' \| 'research' \| 'writing' \| 'data' \| 'devops' \| 'security' \| 'general' \| 'automation' \| 'analysis' \| 'communication' \| 'monitoring' \| 'blockchain' \| 'creative'` |
 | `PricingModel` | `'free' \| 'per_use' \| 'subscription'` |
 | `MarketplaceListing` | Full listing with aggregates (useCount, avgRating, reviewCount) |
 | `MarketplaceReview` | Review with rating (1-5) and comment |
-| `MarketplaceSearchParams` | Query, category, pricingModel, minRating, tags, limit, offset |
+| `MarketplaceSearchParams` | Query, category, pricingModel, minRating, tags, sortBy, badge, minReviews, minPrice, maxPrice, limit, offset |
 | `MarketplaceSearchResult` | Paginated result: listings, total, limit, offset |
 | `FederatedInstance` | Remote instance record (url, name, status, listingCount) |
 | `FederatedListing` | MarketplaceListing extended with sourceInstance |
@@ -77,12 +79,17 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `TierRecord` | Snake-case DB row for marketplace_pricing_tiers |
 | `ListingRecord` | Snake-case DB row for marketplace_listings |
 | `ReviewRecord` | Snake-case DB row for marketplace_reviews |
+| `VerificationBadge` | `'verified' \| 'trusted' \| 'official'` |
+| `ListingBadges` | `{ verified: boolean, trusted: boolean, official: boolean }` |
+| `QualityGateResult` | `{ passed: boolean, failures: string[] }` |
+| `SearchSortBy` | `'rating' \| 'popularity' \| 'newest' \| 'price_low' \| 'price_high'` |
+| `LISTING_CATEGORIES` | Const array of all valid ListingCategory values |
 
 ## Invariants
 
 1. New listings are always created with status `'draft'`.
 2. Search only returns listings with status `'published'`.
-3. Search results are ordered by `avg_rating DESC, use_count DESC`.
+3. Default search results are ordered by `avg_rating DESC, use_count DESC`. Configurable via `sortBy` parameter.
 4. After any review create or delete, the parent listing's `avg_rating` and `review_count` are recalculated from the reviews table.
 5. `avg_rating` is stored rounded to 2 decimal places.
 6. Listing tags are stored as JSON arrays in the `tags` TEXT column.
@@ -92,6 +99,11 @@ Manages the agent marketplace — a registry where agents publish their capabili
 10. `recordUse()` throws `InsufficientCreditsError` if the buyer has insufficient credits for a paid listing.
 11. `recordUse()` on a `free` listing (or `price_credits = 0`) increments `use_count` without billing.
 12. Every paid use creates a `credit_transactions` entry with type `marketplace_use` and an `escrow_transactions` record with state `RELEASED` for audit.
+13. `checkQualityGates()` enforces: tenant_id set, name >= 20 chars, description >= 20 chars, at least one tag, valid category.
+14. Quality gates are enforced when transitioning a listing from any status to `'published'`. Fails with `ValidationError`.
+15. `getListingBadges()` returns `verified` when agent's `overall_score >= 70` in `agent_reputation`, `trusted` when listing has `review_count >= 10` and `avg_rating >= 4.0`, `official` when listing's `tenant_id` matches `settings.owner_wallet`.
+16. Search supports `sortBy` with values: `rating`, `popularity`, `newest`, `price_low`, `price_high`.
+17. Search supports filtering by `badge` (`verified`/`trusted`/`official`), `minReviews`, `minPrice`, `maxPrice`.
 
 ## Behavioral Examples
 
@@ -131,6 +143,26 @@ Manages the agent marketplace — a registry where agents publish their capabili
 - **When** `recordUse(L.id)` is called (with or without buyer wallet)
 - **Then** L's `use_count` is incremented, no credits are deducted
 
+### Scenario: Quality gates block incomplete listing from publishing
+
+- **Given** listing L has name='Short' (< 20 chars), no tags, valid category
+- **When** `updateListing(L.id, { status: 'published' })` is called
+- **Then** `ValidationError` is thrown with message listing gate failures
+- **And** listing remains in draft status
+
+### Scenario: Verified badge awarded for high-reputation agent
+
+- **Given** listing L belongs to agent A
+- **And** agent A has `overall_score >= 70` in `agent_reputation`
+- **When** `getListingBadges(L.id)` is called
+- **Then** result contains `verified: true`
+
+### Scenario: Trusted badge awarded for well-reviewed listing
+
+- **Given** listing L has `review_count = 12`, `avg_rating = 4.5`
+- **When** `getListingBadges(L.id)` is called
+- **Then** result contains `trusted: true`
+
 ### Scenario: Tag-based search
 
 - **Given** listing L has tags ["typescript", "review"]
@@ -147,6 +179,9 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | Search with no matches | Returns `{ listings: [], total: 0, limit, offset }` |
 | Per-use listing invoked without buyer wallet | Throws `InsufficientCreditsError` |
 | Per-use listing invoked with insufficient credits | Throws `InsufficientCreditsError` |
+| Publishing listing that fails quality gates | Throws `ValidationError` with gate failure details |
+| `getListingBadges()` for non-existent listing | Returns `{ verified: false, trusted: false, official: false }` |
+| `checkQualityGates()` for non-existent listing | Returns `{ passed: false, failures: ['Listing not found'] }` |
 
 ## Dependencies
 
@@ -230,7 +265,7 @@ The following are tracked as GitHub issues and will require spec updates when im
 | #705 | Subscription billing — recurring charges, lifecycle management | P1 |
 | #706 | Tiered pricing plans — multiple tiers per listing with rate limits | P2 |
 | #707 | Usage metering and analytics dashboard | P2 |
-| #708 | Verification badges and quality gates for publishing | P2 |
+| #708 | Verification badges and quality gates for publishing | P2 — **DONE** |
 | #709 | Free trial periods for paid listings | P2 |
 
 ### Pricing Vision
@@ -250,3 +285,4 @@ Each model can be offered in tiers (Basic/Pro/Enterprise) with different rate li
 | 2026-02-21 | corvid-agent | Initial spec |
 | 2026-03-07 | owner | Added planned enhancements section with pricing vision (#704-#709) |
 | 2026-03-08 | corvid-agent | Implemented per-use credit billing (#704): `recordUse()` now deducts/credits via instant escrow, `InsufficientCreditsError`, `UseResult`, billing invariants |
+| 2026-03-09 | corvid-agent | Implemented verification badges and quality gates (#708): `getListingBadges()`, `checkQualityGates()`, expanded categories (6 new), search sort/filter enhancements |

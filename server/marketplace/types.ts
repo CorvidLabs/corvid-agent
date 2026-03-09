@@ -1,7 +1,15 @@
 // ─── Marketplace Listing ────────────────────────────────────────────────────
 
 export type ListingStatus = 'draft' | 'published' | 'unlisted' | 'suspended';
-export type ListingCategory = 'coding' | 'research' | 'writing' | 'data' | 'devops' | 'security' | 'general';
+export type ListingCategory =
+    | 'coding' | 'research' | 'writing' | 'data' | 'devops' | 'security' | 'general'
+    | 'automation' | 'analysis' | 'communication' | 'monitoring' | 'blockchain' | 'creative';
+
+/** All valid listing categories. */
+export const LISTING_CATEGORIES: readonly ListingCategory[] = [
+    'coding', 'research', 'writing', 'data', 'devops', 'security', 'general',
+    'automation', 'analysis', 'communication', 'monitoring', 'blockchain', 'creative',
+] as const;
 export type PricingModel = 'free' | 'per_use' | 'subscription';
 
 export interface MarketplaceListing {
@@ -95,6 +103,29 @@ export interface TierRecord {
     created_at: string;
 }
 
+// ─── Verification Badges ────────────────────────────────────────────────────
+
+/** Badge types awarded to listings based on quality signals. */
+export type VerificationBadge = 'verified' | 'trusted' | 'official';
+
+export interface ListingBadges {
+    /** Agent has on-chain reputation score >= 70 */
+    verified: boolean;
+    /** Listing has >= 10 reviews with avg rating >= 4.0 */
+    trusted: boolean;
+    /** Listing is from the instance owner */
+    official: boolean;
+}
+
+/** Quality gate validation result. */
+export interface QualityGateResult {
+    passed: boolean;
+    failures: string[];
+}
+
+/** Sort options for marketplace search. */
+export type SearchSortBy = 'rating' | 'popularity' | 'newest' | 'price_low' | 'price_high';
+
 // ─── Search ─────────────────────────────────────────────────────────────────
 
 export interface MarketplaceSearchParams {
@@ -105,6 +136,16 @@ export interface MarketplaceSearchParams {
     tags?: string[];
     /** Filter listings to agents with at least this verification tier */
     minVerificationTier?: string;
+    /** Sort order for results */
+    sortBy?: SearchSortBy;
+    /** Filter by verification badge */
+    badge?: VerificationBadge;
+    /** Minimum number of reviews */
+    minReviews?: number;
+    /** Minimum price (credits) */
+    minPrice?: number;
+    /** Maximum price (credits) */
+    maxPrice?: number;
     limit?: number;
     offset?: number;
 }

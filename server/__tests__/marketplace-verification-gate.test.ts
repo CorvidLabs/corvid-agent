@@ -114,9 +114,10 @@ describe('Marketplace Verification Gate', () => {
 
         const listing = svc.createListing({
             agentId: 'gh-agent',
-            name: 'Verified Listing',
-            description: 'Desc',
+            name: 'Verified Code Review Agent',
+            description: 'Automated code review and analysis tool',
             category: 'coding',
+            tags: ['code-review'],
         });
 
         const published = svc.updateListing(listing.id, { status: 'published' });
@@ -129,9 +130,10 @@ describe('Marketplace Verification Gate', () => {
 
         const listing = svc.createListing({
             agentId: 'gh-agent',
-            name: 'Test',
-            description: 'Desc',
+            name: 'Test Verification Tier Agent',
+            description: 'A test agent for verification',
             category: 'general',
+            tags: ['test'],
         });
 
         const tier = svc.getListingVerificationTier(listing.id);
@@ -147,9 +149,10 @@ describe('Marketplace Verification Gate', () => {
         const lenientSvc = new MarketplaceService(db, 'UNVERIFIED');
         const listing = lenientSvc.createListing({
             agentId: 'any-agent',
-            name: 'Open Listing',
-            description: 'Desc',
+            name: 'Open Listing For Everyone',
+            description: 'A general-purpose listing available to all',
             category: 'general',
+            tags: ['open'],
         });
 
         const published = lenientSvc.updateListing(listing.id, { status: 'published' });
@@ -163,9 +166,10 @@ describe('Marketplace Verification Gate', () => {
 
         const l1 = svc.createListing({
             agentId: 'gh-agent',
-            name: 'Verified',
-            description: 'x',
+            name: 'Verified Agent Listing One',
+            description: 'A verified listing for testing purposes',
             category: 'coding',
+            tags: ['verified'],
         });
         // Publish directly by setting verified tier
         // Use a lenient service for setup
@@ -174,16 +178,17 @@ describe('Marketplace Verification Gate', () => {
 
         const l2 = setupSvc.createListing({
             agentId: 'no-verify',
-            name: 'Unverified',
-            description: 'x',
+            name: 'Unverified Agent Listing',
+            description: 'An unverified listing for testing purposes',
             category: 'coding',
+            tags: ['unverified'],
         });
         setupSvc.updateListing(l2.id, { status: 'published' });
 
         // Search with tier filter
         const filtered = svc.search({ minVerificationTier: 'GITHUB_VERIFIED' });
         expect(filtered.total).toBe(1);
-        expect(filtered.listings[0].name).toBe('Verified');
+        expect(filtered.listings[0].name).toBe('Verified Agent Listing One');
 
         // Search without filter returns both
         const all = svc.search({});
