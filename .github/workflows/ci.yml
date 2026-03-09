@@ -36,8 +36,8 @@ jobs:
         # use 30s per-test timeout there to avoid flaky failures (default 10s via bunfig).
         run: bun test ${{ matrix.os == 'windows-latest' && '--timeout 30000' || '' }}
 
-      - name: Spec check
-        run: bun run spec:check
+      - name: Spec check (strict — warnings fail the build)
+        run: bun run spec:check -- --strict
 
       - name: Version alignment check
         run: bun run version:check
