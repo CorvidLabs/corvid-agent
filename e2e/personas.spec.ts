@@ -49,7 +49,7 @@ test.describe('Personas', () => {
         await gotoPersonas(page, 'Persona Save Agent');
 
         await page.locator(`text=Persona Save Agent`).first().click();
-        await page.waitForSelector('.detail-header h3');
+        await page.locator('.detail-header h3').waitFor();
 
         // Fill form
         await page.locator('select').first().selectOption('technical');
@@ -70,7 +70,7 @@ test.describe('Personas', () => {
 
         // Agent should show "Configured" badge
         await page.locator(`text=Persona Persist Agent`).first().click();
-        await page.waitForSelector('.detail-header h3');
+        await page.locator('.detail-header h3').waitFor();
 
         // The archetype should be pre-filled
         const archetype = page.locator('select').first();
@@ -84,7 +84,7 @@ test.describe('Personas', () => {
         await gotoPersonas(page, 'Persona Delete Agent');
 
         await page.locator(`text=Persona Delete Agent`).first().click();
-        await page.waitForSelector('button:text("Delete Persona")');
+        await page.locator('button:text("Delete Persona")').waitFor();
 
         await page.locator('button:text("Delete Persona")').click();
         await expect(page.locator('text=Persona deleted').first()).toBeVisible({ timeout: 5000 });
@@ -108,7 +108,7 @@ test.describe('Personas', () => {
         await gotoPersonas(page, 'Archetype Agent');
 
         await page.locator(`text=Archetype Agent`).first().click();
-        await page.waitForSelector('select');
+        await page.locator('select').first().waitFor();
 
         const select = page.locator('select').first();
         const options = await select.locator('option').allTextContents();

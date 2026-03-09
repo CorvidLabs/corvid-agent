@@ -1,6 +1,4 @@
-import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect , authedFetch , gotoWithRetry , BASE_URL } from './fixtures';
 
 interface TestWindow extends Window {
     __TEST_WS_INSTANCES: WebSocket[];

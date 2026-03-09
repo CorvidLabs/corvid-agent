@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Optimistic Updates & Render Performance', () => {
     test.describe('Session optimistic updates', () => {
@@ -32,8 +30,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
             // Stop the session
             await authedFetch(`${BASE_URL}/api/sessions/${session.id}/stop`, { method: 'POST' });
 
-            // Wait for status update via WS or poll, then verify stopped status
-            await page.waitForTimeout(1000);
+            // Navigate to sessions to verify the stop took effect
             await gotoWithRetry(page, '/sessions');
 
             // Session should still be in the list
@@ -144,7 +141,8 @@ test.describe('Optimistic Updates & Render Performance', () => {
             });
 
             await gotoWithRetry(page, `/sessions/${session.id}`);
-            await page.waitForTimeout(2000);
+            // Wait for the session view to fully render before checking console errors
+            await page.locator('.session-view__header, .terminal').first().waitFor({ timeout: 10000 }).catch(() => {});
 
             // Verify the session view rendered without Angular errors
             const angularErrors = errors.filter((e) =>
@@ -208,10 +206,7 @@ test.describe('Optimistic Updates & Render Performance', () => {
 
             await gotoWithRetry(page, `/sessions/${session.id}`);
 
-            // Wait for session view to fully render
-            await page.waitForTimeout(2000);
-
-            // Meta section should be visible
+            // Meta section should be visible (wait for session view to fully render)
             const meta = page.locator('.session-view__meta');
             await expect(meta).toBeVisible({ timeout: 15000 });
 
@@ -309,11 +304,10 @@ test.describe('Optimistic Updates & Render Performance', () => {
             const terminal = page.locator('.terminal');
             await expect(terminal).toBeVisible({ timeout: 10000 });
 
-            // Wait briefly for events to render
-            await page.waitForTimeout(3000);
-
-            // Should have at least one line entry
+            // Wait for event lines to render (poll until at least one appears or timeout)
             const lines = terminal.locator('.line');
+            await lines.first().waitFor({ timeout: 10000 }).catch(() => {});
+
             if (await lines.count() > 0) {
                 // Lines should have prompt and text elements
                 const firstLine = lines.first();

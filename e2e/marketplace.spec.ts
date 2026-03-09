@@ -1,4 +1,4 @@
-import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry, BASE_URL } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -257,7 +257,6 @@ test.describe('Marketplace', () => {
     });
 
     test('API CRUD for marketplace listings', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('MP API Agent');
         const listingName = `API Listing ${Date.now()}`;
 
@@ -338,7 +337,6 @@ test.describe('Marketplace', () => {
     // ─── API-only tests ──────────────────────────────────────────────────
 
     test('search endpoint returns paginated results', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/search`);
         expect(res.ok).toBe(true);
@@ -349,7 +347,6 @@ test.describe('Marketplace', () => {
     });
 
     test('use listing increments use count', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Use Listing Agent');
         const listing = await api.seedMarketplaceListing(agent.id, { name: 'Use Target Listing' });
 
@@ -362,7 +359,6 @@ test.describe('Marketplace', () => {
     });
 
     test('get reviews for listing returns array', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Reviews List Agent');
         const listing = await api.seedMarketplaceListing(agent.id, { name: 'Reviews Listing' });
 
@@ -373,7 +369,6 @@ test.describe('Marketplace', () => {
     });
 
     test('delete review returns 404 for nonexistent', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/reviews/nonexistent`, {
             method: 'DELETE',
@@ -382,7 +377,6 @@ test.describe('Marketplace', () => {
     });
 
     test('federation instances list', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/federation/instances`);
         expect([200, 503]).toContain(res.status);
@@ -393,7 +387,6 @@ test.describe('Marketplace', () => {
     });
 
     test('federated listings', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/federated`);
         expect([200, 503]).toContain(res.status);
@@ -404,7 +397,6 @@ test.describe('Marketplace', () => {
     });
 
     test('federation register instance, sync, and remove', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         // Register instance
         const registerRes = await authedFetch(`${BASE_URL}/api/marketplace/federation/instances`, {
@@ -431,7 +423,6 @@ test.describe('Marketplace', () => {
     });
 
     test('federation sync returns result or 503', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/federation/sync`, {
             method: 'POST',
@@ -440,7 +431,6 @@ test.describe('Marketplace', () => {
     });
 
     test('federation delete instance returns 404 for nonexistent', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(
             `${BASE_URL}/api/marketplace/federation/instances/${encodeURIComponent('https://nonexistent.example.com')}`,

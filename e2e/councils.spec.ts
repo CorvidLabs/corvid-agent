@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Councils', () => {
     test('navigate to councils page from sidebar', async ({ page }) => {
@@ -257,7 +255,7 @@ test.describe('Councils', () => {
         });
 
         // Wait briefly for auto-advance to settle if it's running
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 1500));
 
         // Either way, the stage should no longer be 'responding' — a second call must fail
         const reviewRes2 = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/review`, {
@@ -282,7 +280,7 @@ test.describe('Councils', () => {
 
         // Wait for auto-advance to progress — the no-chairman path now uses
         // a fallback synthesizer, so the launch will auto-advance past reviewing
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
 
         // A manual /synthesize call should fail because the stage has already
         // advanced past 'reviewing' (auto-advance handled synthesis via fallback)
@@ -331,7 +329,7 @@ test.describe('Councils', () => {
         const launch = await api.launchCouncil(council.id, project.id, 'Abort test');
 
         // Wait briefly for auto-advance
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
 
         const res = await authedFetch(`${BASE_URL}/api/council-launches/${launch.launchId}/abort`, {
             method: 'POST',

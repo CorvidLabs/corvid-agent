@@ -1,4 +1,4 @@
-import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
+import { test, expect , authedFetch , gotoWithRetry, BASE_URL } from './fixtures';
 import type { Page } from '@playwright/test';
 
 /**
@@ -254,7 +254,6 @@ test.describe('Reputation', () => {
     });
 
     test('API endpoints for reputation', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Rep API Agent');
 
         // Create events
@@ -288,7 +287,6 @@ test.describe('Reputation', () => {
     // ─── Additional API coverage ─────────────────────────────────────────
 
     test('list all scores returns array', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         // Ensure at least one score exists
         const agent = await api.seedAgent('List Scores Agent');
@@ -306,7 +304,6 @@ test.describe('Reputation', () => {
     });
 
     test('create reputation event via API', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Event API Agent');
 
         const res = await authedFetch(`${BASE_URL}/api/reputation/events`, {
@@ -322,7 +319,6 @@ test.describe('Reputation', () => {
     });
 
     test('get attestation returns 404 for agent with no attestation', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('No Attestation Agent');
 
         const res = await authedFetch(`${BASE_URL}/api/reputation/attestation/${agent.id}`);
@@ -331,7 +327,6 @@ test.describe('Reputation', () => {
     });
 
     test('create attestation for agent', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Attestation Agent');
         await api.seedReputationEvent(agent.id, 'task_completed', 10);
         await api.computeScore(agent.id);

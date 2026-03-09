@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 // Council sessions require a working Claude API — skip in CI without it
 const skipNoKey = !!process.env.CI && !process.env.ANTHROPIC_API_KEY;

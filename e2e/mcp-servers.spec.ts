@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('MCP Servers', () => {
     test('navigate to mcp-servers page and verify empty state', async ({ page }) => {
@@ -37,7 +35,7 @@ test.describe('MCP Servers', () => {
         await page.locator('button:text("Test Connection")').click();
 
         // Wait for result (success or failure)
-        await page.waitForSelector('.test-result', { timeout: 10000 });
+        await page.locator('.test-result').waitFor({ timeout: 10000 });
     });
 
     test('edit config and toggle enabled', async ({ page, api }) => {
