@@ -39,6 +39,10 @@ jobs:
       - name: Spec check
         run: bun run spec:check
 
+      - name: Stats check
+        if: matrix.os == 'ubuntu-latest'
+        run: bun run stats:check -- --skip-tests
+
       - name: Build client
         run: bun run build:client
 
