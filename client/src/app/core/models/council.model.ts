@@ -32,6 +32,8 @@ export interface UpdateCouncilInput {
 
 export type CouncilStage = 'responding' | 'discussing' | 'reviewing' | 'synthesizing' | 'complete';
 
+export type GovernanceVoteType = 'standard' | 'governance';
+
 export interface CouncilLaunch {
     id: string;
     councilId: string;
@@ -43,6 +45,9 @@ export interface CouncilLaunch {
     currentDiscussionRound: number;
     totalDiscussionRounds: number;
     chatSessionId: string | null;
+    voteType: GovernanceVoteType;
+    governanceTier: number | null;
+    synthesisTxid: string | null;
     createdAt: string;
 }
 

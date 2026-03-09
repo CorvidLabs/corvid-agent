@@ -81,6 +81,9 @@ export type ServerWsMessage =
     | { type: 'workflow_node_update'; nodeExecution: import('./workflow.model').WorkflowNodeRun }
     | { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
     | { type: 'agent_question'; question: OwnerQuestionWire }
+    | { type: 'governance_vote_cast'; launchId: string; agentId: string; vote: string; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }
+    | { type: 'governance_vote_resolved'; launchId: string; status: string; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }
+    | { type: 'governance_quorum_reached'; launchId: string; weightedApprovalRatio: number; threshold: number }
     | { type: 'ping'; serverTime: string }
     | { type: 'welcome'; serverTime: string }
     | { type: 'error'; message: string };
