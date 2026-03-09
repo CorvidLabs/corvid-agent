@@ -30,7 +30,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Approval E2E Project', workingDir: '/tmp' }),
         });
-        expect(projectRes.ok).toBe(true);
+        expect(projectRes.ok, 'seedProject should succeed').toBe(true);
         const project = await projectRes.json();
         projectId = project.id;
 
@@ -42,7 +42,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
                 model: 'claude-sonnet-4-20250514',
             }),
         });
-        expect(agentRes.ok).toBe(true);
+        expect(agentRes.ok, 'seedAgent should succeed').toBe(true);
         const agent = await agentRes.json();
         agentId = agent.id;
 
@@ -56,9 +56,21 @@ test.describe.serial('Approval Dialog Critical Path', () => {
                 initialPrompt: 'Test prompt for approval flow',
             }),
         });
-        expect(sessionRes.ok).toBe(true);
+        expect(sessionRes.ok, 'seedSession should succeed').toBe(true);
         const session = await sessionRes.json();
         sessionId = session.id;
+    });
+
+    test.afterAll(async () => {
+        // Clean up seeded resources in reverse dependency order
+        const cleanup = async (path: string) => {
+            try {
+                await authedFetch(`${BASE_URL}${path}`, { method: 'DELETE' });
+            } catch { /* best-effort */ }
+        };
+        if (sessionId) await cleanup(`/api/sessions/${sessionId}`);
+        if (agentId) await cleanup(`/api/agents/${agentId}`);
+        if (projectId) await cleanup(`/api/projects/${projectId}`);
     });
 
     /**
@@ -165,8 +177,11 @@ test.describe.serial('Approval Dialog Critical Path', () => {
         await page.waitForLoadState('networkidle');
         // Wait for the session view to render
         await expect(page.locator('.session-view')).toBeVisible({ timeout: 10_000 });
-        // Give WebSocket time to connect through the patched constructor
-        await page.waitForTimeout(500);
+        // Wait for at least one WebSocket instance to be captured by the patched constructor
+        await page.waitForFunction(
+            () => ((window as unknown as { __TEST_WS_INSTANCES: WebSocket[] }).__TEST_WS_INSTANCES?.length ?? 0) > 0,
+            { timeout: 5_000 },
+        );
     }
 
     /* ------------------------------------------------------------------ */
@@ -235,7 +250,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             (m: Record<string, unknown>) => m.type === 'approval_response' && m.requestId === requestId,
         );
 
-        expect(approvalMsg).toBeTruthy();
+        expect(approvalMsg, 'should have sent an approval_response for the Allow action').toBeTruthy();
         expect(approvalMsg.type).toBe('approval_response');
         expect(approvalMsg.requestId).toBe(requestId);
         expect(approvalMsg.behavior).toBe('allow');
@@ -276,7 +291,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             (m: Record<string, unknown>) => m.type === 'approval_response' && m.requestId === requestId,
         );
 
-        expect(denyMsg).toBeTruthy();
+        expect(denyMsg, 'should have sent an approval_response for the Deny action').toBeTruthy();
         expect(denyMsg.type).toBe('approval_response');
         expect(denyMsg.requestId).toBe(requestId);
         expect(denyMsg.behavior).toBe('deny');
@@ -316,7 +331,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             (m: Record<string, unknown>) => m.type === 'approval_response' && m.requestId === requestId,
         );
 
-        expect(denyMsg).toBeTruthy();
+        expect(denyMsg, 'should have auto-sent a deny response on timeout').toBeTruthy();
         expect(denyMsg.behavior).toBe('deny');
     });
 

@@ -66,7 +66,7 @@ test.describe('System Logs', () => {
         await firstChip.click();
         // The "all" chip should toggle active
         const hasActive = await page.locator('.filter-chip--active').count() > 0;
-        expect(hasActive).toBe(true);
+        expect(hasActive, 'at least one filter chip should be active after click').toBe(true);
     });
 
     test('API returns logs', async ({}) => {

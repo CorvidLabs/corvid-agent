@@ -54,10 +54,11 @@ test.describe('Feed', () => {
     test('pagination controls', async ({ page }) => {
         await gotoWithRetry(page, '/feed', { isRendered: async (p) => (await p.locator('h2').count()) > 0 });
 
-        // Enter search text to trigger pagination rendering
+        // Enter search text to trigger pagination rendering; wait for debounce
         const search = page.locator('.feed__search');
         await search.fill('a');
-        await page.waitForTimeout(500);
+        // Wait for the search debounce to fire and the list/empty state to update
+        await expect(page.locator('.feed__list, .feed__empty').first()).toBeVisible({ timeout: 5_000 });
 
         const pagination = page.locator('.feed__pagination');
         if (await pagination.count() > 0) {

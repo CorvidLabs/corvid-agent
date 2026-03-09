@@ -31,8 +31,7 @@ test.describe('Agents', () => {
 
         // If AlgoChat is enabled on localnet, wallet address should be visible
         if (health.algochat) {
-            // Wait for potential wallet creation (async)
-            await page.waitForTimeout(2000);
+            // Reload to pick up async wallet creation
             await page.reload();
             await page.waitForLoadState('networkidle');
 
@@ -89,9 +88,7 @@ test.describe('Agents', () => {
         const searchInput = page.locator('.search-input');
         if (await searchInput.count() > 0) {
             await searchInput.fill(uniqueName.slice(0, 12));
-            await page.waitForTimeout(500);
-
-            // The target agent should be visible
+            // Wait for debounce to settle and verify the target agent is visible
             await expect(page.locator(`text=${uniqueName}`).first()).toBeVisible({ timeout: 5000 });
         }
     });

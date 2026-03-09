@@ -94,7 +94,7 @@ test.describe('Dashboard', () => {
             const hasNetworkClass = classes?.includes('network-badge--localnet')
                 || classes?.includes('network-badge--testnet')
                 || classes?.includes('network-badge--mainnet');
-            expect(hasNetworkClass).toBe(true);
+            expect(hasNetworkClass, 'network badge should have a localnet, testnet, or mainnet class').toBe(true);
         }
     });
 

@@ -521,11 +521,19 @@ export const test = base.extend<{ api: ApiHelpers }>({
         await use(helpers);
 
         // Cleanup: delete all entities created during the test (reverse dependency order)
-        const del = (path: string) =>
-            fetch(`${BASE_URL}${path}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${E2E_API_KEY}` },
-            }).catch(() => {});
+        const del = async (path: string) => {
+            try {
+                const res = await fetch(`${BASE_URL}${path}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${E2E_API_KEY}` },
+                });
+                if (!res.ok && res.status !== 404) {
+                    console.warn(`[e2e cleanup] DELETE ${path} → ${res.status}`);
+                }
+            } catch (err) {
+                console.warn(`[e2e cleanup] DELETE ${path} failed:`, (err as Error).message);
+            }
+        };
 
         for (const id of createdSessionIds) await del(`/api/sessions/${id}`);
         for (const id of createdCouncilIds) await del(`/api/councils/${id}`);
