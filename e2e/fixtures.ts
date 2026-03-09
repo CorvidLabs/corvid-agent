@@ -2,7 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+export const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 const E2E_API_KEY = process.env.API_KEY || 'e2e-test-key';
 
 /**

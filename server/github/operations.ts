@@ -4,7 +4,7 @@
  */
 
 import { createLogger } from '../lib/logger';
-import { buildSafeGhEnv } from '../lib/env';
+import { buildSafeGhEnv, resolveGhExecutable } from '../lib/env';
 
 const log = createLogger('GitHubOps');
 
@@ -18,7 +18,7 @@ async function runGh(args: string[], cwd?: string): Promise<{ ok: boolean; stdou
     }
 
     try {
-        const proc = Bun.spawn(['gh', ...args], {
+        const proc = Bun.spawn([resolveGhExecutable(), ...args], {
             cwd: cwd ?? process.cwd(),
             stdout: 'pipe',
             stderr: 'pipe',

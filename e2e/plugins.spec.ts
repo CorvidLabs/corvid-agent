@@ -1,6 +1,4 @@
-import { test, expect , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Plugin System API', () => {
     test('GET /api/plugins returns plugin list or 503 if unavailable', async ({}) => {

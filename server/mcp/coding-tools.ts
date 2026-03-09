@@ -250,7 +250,10 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     const timeoutSec = Math.min(typeof args.timeout === 'number' ? args.timeout : 30, 120);
                     const timeoutMs = timeoutSec * 1000;
 
-                    const proc = Bun.spawn(['sh', '-c', command], {
+                    const shellCmd = process.platform === 'win32'
+                        ? ['cmd.exe', '/c', command]
+                        : ['sh', '-c', command];
+                    const proc = Bun.spawn(shellCmd, {
                         cwd: ctx.workingDir,
                         env: ctx.env,
                         stdout: 'pipe',
@@ -330,21 +333,29 @@ export function buildCodingTools(ctx: CodingToolContext): DirectToolDefinition[]
                     // Plain directory listing
                     const absPath = resolveSafePath(ctx.workingDir, pathArg);
 
-                    const proc = Bun.spawn(['ls', '-la', absPath], {
-                        cwd: ctx.workingDir,
-                        stdout: 'pipe',
-                        stderr: 'pipe',
-                    });
-
-                    await proc.exited;
-                    const stdout = await new Response(proc.stdout).text();
-                    const stderr = await new Response(proc.stderr).text();
-
-                    if (stderr && !stdout) {
-                        return { text: stderr.trim(), isError: true };
+                    // Use Bun's native directory reading instead of shell commands
+                    const { readdirSync, statSync } = require('node:fs');
+                    const { join } = require('node:path');
+                    const entries = readdirSync(absPath, { withFileTypes: true }) as import('node:fs').Dirent[];
+                    const lines: string[] = [];
+                    for (const entry of entries) {
+                        const fullPath = join(absPath, entry.name);
+                        try {
+                            const stat = statSync(fullPath);
+                            const isDir = entry.isDirectory();
+                            const size = isDir ? '-' : String(stat.size);
+                            const modified = stat.mtime.toISOString().slice(0, 16).replace('T', ' ');
+                            lines.push(`${isDir ? 'd' : '-'}  ${size.padStart(10)}  ${modified}  ${entry.name}${isDir ? '/' : ''}`);
+                        } catch {
+                            lines.push(`?  ${entry.name}`);
+                        }
                     }
 
-                    return { text: truncateOutput(stdout.trim()) };
+                    if (lines.length === 0) {
+                        return { text: '(empty directory)' };
+                    }
+
+                    return { text: truncateOutput(lines.join('\n')) };
                 } catch (err) {
                     return { text: String(err instanceof Error ? err.message : err), isError: true };
                 }
