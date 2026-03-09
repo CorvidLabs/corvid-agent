@@ -4,6 +4,7 @@ version: 1
 status: active
 files:
   - server/algochat/bridge.ts
+  - server/algochat/init.ts
   - server/algochat/psk-contact-manager.ts
   - server/algochat/psk-discovery-poller.ts
   - server/algochat/message-router.ts
@@ -42,6 +43,15 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | `PSKContactManager` | Manages PSK (pre-shared key) encrypted contacts for agent-to-mobile communication |
 | `PSKDiscoveryPoller` | Polls blockchain for undiscovered PSK contact addresses via trial decryption |
 | `MessageRouter` | Routes incoming messages to appropriate handlers based on source and content |
+
+### Exported from init.ts
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `AlgoChatInitDeps` | Interface | Dependency bundle for AlgoChat initialization (db, services, config) |
+| `initAlgoChat` | Function | Initialize AlgoChat services: bridge, wallet, directory, messenger |
+| `switchNetwork` | Function | Switch AlgoChat to a different network (testnet/mainnet), tearing down and reinitializing |
+| `wirePostInit` | Function | Post-initialization wiring — messenger-dependent services and background service startup |
 
 #### AlgoChatBridge Constructor
 
