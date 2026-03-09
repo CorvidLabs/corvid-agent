@@ -1,9 +1,8 @@
 import type { WorkTaskService } from '../work/service';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
-import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema, AddTaskDependencySchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateWorkTaskSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
-import { NotFoundError } from '../lib/errors';
 
 export function handleWorkTaskRoutes(
     req: Request,
@@ -50,38 +49,6 @@ export function handleWorkTaskRoutes(
         return handleRetry(retryMatch[1], workTaskService, tenantId);
     }
 
-    // GET /api/work-tasks/:id/dependencies — list dependencies
-    const depsGetMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/dependencies$/);
-    if (depsGetMatch && method === 'GET') {
-        return handleGetDependencies(depsGetMatch[1], workTaskService, tenantId);
-    }
-
-    // POST /api/work-tasks/:id/dependencies — add dependency
-    const depsPostMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/dependencies$/);
-    if (depsPostMatch && method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleAddDependency(req, depsPostMatch[1], workTaskService, tenantId);
-    }
-
-    // DELETE /api/work-tasks/:id/dependencies/:depId — remove dependency
-    const depsDeleteMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/dependencies\/([^/]+)$/);
-    if (depsDeleteMatch && method === 'DELETE') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleRemoveDependency(depsDeleteMatch[1], depsDeleteMatch[2], workTaskService, tenantId);
-    }
-
-    // GET /api/work-tasks/:id/dependents — list tasks that depend on this task
-    const dependentsMatch = path.match(/^\/api\/work-tasks\/([^/]+)\/dependents$/);
-    if (dependentsMatch && method === 'GET') {
-        return handleGetDependents(dependentsMatch[1], workTaskService, tenantId);
-    }
-
     // GET /api/work-tasks/:id — get single
     const idMatch = path.match(/^\/api\/work-tasks\/([^/]+)$/);
     if (idMatch && method === 'GET') {
@@ -121,9 +88,6 @@ async function handleCreate(req: Request, workTaskService: WorkTaskService, tena
             source: data.source,
             sourceId: data.sourceId,
             requesterInfo: data.requesterInfo,
-            maxRetries: data.maxRetries,
-            retryBackoff: data.retryBackoff,
-            dependsOn: data.dependsOn,
         }, tenantId);
 
         return json(task, 201);
@@ -131,39 +95,4 @@ async function handleCreate(req: Request, workTaskService: WorkTaskService, tena
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         return handleRouteError(err);
     }
-}
-
-function handleGetDependencies(taskId: string, workTaskService: WorkTaskService, tenantId: string): Response {
-    const task = workTaskService.getTask(taskId, tenantId);
-    if (!task) return json({ error: 'Work task not found' }, 404);
-    return json(workTaskService.getTaskDependencies(taskId));
-}
-
-async function handleAddDependency(req: Request, taskId: string, workTaskService: WorkTaskService, tenantId: string): Promise<Response> {
-    try {
-        const data = await parseBodyOrThrow(req, AddTaskDependencySchema);
-        const dep = workTaskService.addDependency(taskId, data.dependsOnTaskId, tenantId);
-        return json(dep, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return json({ error: err.detail }, 400);
-        if (err instanceof NotFoundError) return json({ error: err.message }, 404);
-        return handleRouteError(err);
-    }
-}
-
-function handleRemoveDependency(taskId: string, dependsOnTaskId: string, workTaskService: WorkTaskService, tenantId: string): Response {
-    try {
-        const task = workTaskService.getTask(taskId, tenantId);
-        if (!task) return json({ error: 'Work task not found' }, 404);
-        workTaskService.removeDependency(taskId, dependsOnTaskId, tenantId);
-        return json({ ok: true });
-    } catch (err) {
-        return handleRouteError(err);
-    }
-}
-
-function handleGetDependents(taskId: string, workTaskService: WorkTaskService, tenantId: string): Response {
-    const task = workTaskService.getTask(taskId, tenantId);
-    if (!task) return json({ error: 'Work task not found' }, 404);
-    return json(workTaskService.getTaskDependents(taskId));
 }

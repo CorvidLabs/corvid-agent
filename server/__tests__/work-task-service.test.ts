@@ -889,7 +889,7 @@ describe('Task creation validation', () => {
                 description: 'Second task',
                 projectId: project.id,
             })
-        ).rejects.toThrow('Project concurrency limit reached');
+        ).rejects.toThrow('Another task is already active');
     });
 });
 

@@ -10,7 +10,6 @@ interface ProjectRow {
     working_dir: string;
     claude_md: string;
     env_vars: string;
-    max_concurrency: number;
     created_at: string;
     updated_at: string;
 }
@@ -23,7 +22,6 @@ function rowToProject(row: ProjectRow): Project {
         workingDir: row.working_dir,
         claudeMd: row.claude_md,
         envVars: JSON.parse(row.env_vars),
-        maxConcurrency: row.max_concurrency ?? 1,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -46,9 +44,9 @@ export function createProject(db: Database, input: CreateProjectInput, tenantId:
     const envVars = JSON.stringify(input.envVars ?? {});
 
     db.query(
-        `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars, max_concurrency, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, input.name, input.description ?? '', input.workingDir, input.claudeMd ?? '', envVars, input.maxConcurrency ?? 1, tenantId);
+        `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, input.name, input.description ?? '', input.workingDir, input.claudeMd ?? '', envVars, tenantId);
 
     return getProject(db, id) as Project;
 }
@@ -79,10 +77,6 @@ export function updateProject(db: Database, id: string, input: UpdateProjectInpu
     if (input.envVars !== undefined) {
         fields.push('env_vars = ?');
         values.push(JSON.stringify(input.envVars));
-    }
-    if (input.maxConcurrency !== undefined) {
-        fields.push('max_concurrency = ?');
-        values.push(input.maxConcurrency);
     }
 
     if (fields.length === 0) return existing;

@@ -5,7 +5,7 @@ export interface Project {
     workingDir: string;
     claudeMd: string;
     envVars: Record<string, string>;
-    maxConcurrency: number;
+    maxConcurrency?: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -16,7 +16,6 @@ export interface CreateProjectInput {
     workingDir: string;
     claudeMd?: string;
     envVars?: Record<string, string>;
-    maxConcurrency?: number;
 }
 
 export interface UpdateProjectInput {
@@ -25,5 +24,4 @@ export interface UpdateProjectInput {
     workingDir?: string;
     claudeMd?: string;
     envVars?: Record<string, string>;
-    maxConcurrency?: number;
 }
