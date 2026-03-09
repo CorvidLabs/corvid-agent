@@ -8,6 +8,7 @@ import { extractContentText } from '../process/types';
 import { getAgent } from '../db/agents';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
+import type { WorkTaskPriority } from '../../shared/types';
 import {
     createWorkTaskAtomic,
     getWorkTask,
@@ -19,8 +20,7 @@ import {
     getActiveTaskForProject,
     pauseWorkTask,
     resumePausedTask,
-    getTasksPausedBy,
-    dequeueNextTask,
+    getPendingTasksForProject,
     countQueuedTasks,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
@@ -52,6 +52,17 @@ export class WorkTaskService {
     private completionCallbacks: Map<string, Set<CompletionCallback>> = new Map();
     private _shuttingDown = false;
 
+    /**
+     * In-memory priority tracking. Priority is not yet persisted to DB
+     * (requires a Layer 0 schema migration). Maps taskId → priority.
+     */
+    private priorityMap = new Map<string, WorkTaskPriority>();
+
+    /**
+     * In-memory preemption tracking. Maps paused taskId → preempting taskId.
+     */
+    private preemptionMap = new Map<string, string>();
+
     /** True when the service is draining — no new tasks accepted. */
     get shuttingDown(): boolean {
         return this._shuttingDown;
@@ -66,6 +77,60 @@ export class WorkTaskService {
     /** Set the agent messenger (set after async AlgoChat init). */
     setAgentMessenger(messenger: AgentMessenger): void {
         this.agentMessenger = messenger;
+    }
+
+    /** Get the in-memory priority for a task (defaults to P2). */
+    private getTaskPriority(taskId: string): WorkTaskPriority {
+        return this.priorityMap.get(taskId) ?? 2;
+    }
+
+    /** Set in-memory priority for a task and update the task object. */
+    private setTaskPriority(task: WorkTask, priority: WorkTaskPriority): void {
+        this.priorityMap.set(task.id, priority);
+        task.priority = priority;
+    }
+
+    /** Apply in-memory priority/preemption to a task loaded from DB. */
+    private enrichTask(task: WorkTask): WorkTask {
+        task.priority = this.getTaskPriority(task.id);
+        task.preemptedBy = this.preemptionMap.get(task.id) ?? null;
+        return task;
+    }
+
+    /**
+     * Dequeue the highest-priority pending/queued task for a project.
+     * Uses in-memory priority map for ordering (DB stores creation order only).
+     */
+    private dequeueNextTask(projectId: string): WorkTask | null {
+        const pending = getPendingTasksForProject(this.db, projectId);
+        if (pending.length === 0) return null;
+
+        // Sort by in-memory priority (ascending), then by createdAt (FIFO)
+        pending.sort((a, b) => {
+            const pa = this.getTaskPriority(a.id);
+            const pb = this.getTaskPriority(b.id);
+            if (pa !== pb) return pa - pb;
+            return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+        });
+
+        const next = pending[0];
+        return this.enrichTask(next);
+    }
+
+    /**
+     * Find tasks paused by a specific preempting task.
+     */
+    private getTasksPausedBy(preemptingTaskId: string): WorkTask[] {
+        const results: WorkTask[] = [];
+        for (const [pausedId, preempterId] of this.preemptionMap) {
+            if (preempterId === preemptingTaskId) {
+                const task = getWorkTask(this.db, pausedId);
+                if (task && task.status === 'paused') {
+                    results.push(this.enrichTask(task));
+                }
+            }
+        }
+        return results.sort((a, b) => a.priority - b.priority || (a.createdAt < b.createdAt ? -1 : 1));
     }
 
     /**
@@ -323,12 +388,13 @@ export class WorkTaskService {
             }
         }
 
-        const priority = input.priority ?? 2;
+        const priority: WorkTaskPriority = (input.priority ?? 2) as WorkTaskPriority;
 
         // Check if there's an active task on this project
         const activeTask = getActiveTaskForProject(this.db, projectId);
+        const activePriority = activeTask ? this.getTaskPriority(activeTask.id) : 3;
 
-        if (activeTask && activeTask.priority <= priority) {
+        if (activeTask && activePriority <= priority) {
             // Active task has equal or higher priority — queue the new task
             const task = createWorkTaskAtomic(this.db, {
                 agentId: input.agentId,
@@ -347,23 +413,27 @@ export class WorkTaskService {
             // Mark as queued (waiting for active task to finish)
             updateWorkTaskStatus(this.db, task.id, 'queued');
 
+            // Track priority in memory
+            this.setTaskPriority(task, priority);
+
             log.info('Work task queued behind active task', {
                 taskId: task.id,
                 activeTaskId: activeTask.id,
                 taskPriority: priority,
-                activePriority: activeTask.priority,
+                activePriority,
             });
 
             this.emitCreationNotifications(task, input);
-            return getWorkTask(this.db, task.id) ?? task;
+            const enriched = getWorkTask(this.db, task.id) ?? task;
+            return this.enrichTask(enriched);
         }
 
-        if (activeTask && priority < activeTask.priority) {
+        if (activeTask && priority < activePriority) {
             // New task has HIGHER priority — preempt the active task
             log.info('Preempting lower-priority task', {
                 preemptingPriority: priority,
                 preemptedTaskId: activeTask.id,
-                preemptedPriority: activeTask.priority,
+                preemptedPriority: activePriority,
             });
 
             // Stop the running session if active
@@ -384,8 +454,12 @@ export class WorkTaskService {
                 tenantId,
             });
 
-            // Pause the preempted task
-            pauseWorkTask(this.db, activeTask.id, task.id);
+            // Track priority in memory
+            this.setTaskPriority(task, priority);
+
+            // Pause the preempted task and track preemption in memory
+            pauseWorkTask(this.db, activeTask.id);
+            this.preemptionMap.set(activeTask.id, task.id);
 
             log.info('Work task created with preemption', {
                 taskId: task.id,
@@ -405,12 +479,14 @@ export class WorkTaskService {
             source: input.source,
             sourceId: input.sourceId,
             requesterInfo: input.requesterInfo,
-            priority,
             tenantId,
         });
         if (!task) {
             throw new ConflictError('Another task is already active on project', { projectId });
         }
+
+        // Track priority in memory
+        this.setTaskPriority(task, priority);
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId, priority });
 
@@ -869,14 +945,18 @@ export class WorkTaskService {
         if (this._shuttingDown) return;
 
         // Resume tasks that were paused by this task
-        const pausedTasks = getTasksPausedBy(this.db, completedTask.id);
+        const pausedTasks = this.getTasksPausedBy(completedTask.id);
         for (const paused of pausedTasks) {
             resumePausedTask(this.db, paused.id);
+            this.preemptionMap.delete(paused.id);
             log.info('Resumed paused task', { taskId: paused.id, resumedAfter: completedTask.id });
         }
 
-        // Dequeue next task for this project (highest priority first)
-        const next = dequeueNextTask(this.db, completedTask.projectId);
+        // Clean up priority tracking for completed task
+        this.priorityMap.delete(completedTask.id);
+
+        // Dequeue next task for this project (highest priority first, using in-memory priority)
+        const next = this.dequeueNextTask(completedTask.projectId);
         if (!next) return;
 
         const agent = getAgent(this.db, next.agentId);

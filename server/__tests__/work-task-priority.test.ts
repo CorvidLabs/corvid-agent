@@ -9,7 +9,8 @@ import {
     getActiveTaskForProject,
     pauseWorkTask,
     resumePausedTask,
-    getTasksPausedBy,
+    getPausedTasks,
+    getPendingTasksForProject,
     countQueuedTasks,
     cleanupStaleWorkTasks,
     getActiveWorkTasks,
@@ -43,7 +44,7 @@ describe('priority field', () => {
         expect(task.priority).toBe(2);
     });
 
-    test('accepts explicit priority values P0-P3', () => {
+    test('accepts explicit priority values P0-P3 (in-memory)', () => {
         for (const p of [0, 1, 2, 3] as const) {
             const task = createWorkTask(db, {
                 agentId: AGENT_ID,
@@ -51,19 +52,23 @@ describe('priority field', () => {
                 description: `Priority ${p} task`,
                 priority: p,
             });
+            // Priority is set in-memory on the returned object
             expect(task.priority).toBe(p);
         }
     });
 
-    test('persists priority through get', () => {
+    test('DB does not persist priority (returns default P2 on re-fetch)', () => {
         const task = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'P0 critical',
             priority: 0,
         });
+        // The returned task has in-memory priority
+        expect(task.priority).toBe(0);
+        // But re-fetching from DB returns default P2 (no column yet)
         const fetched = getWorkTask(db, task.id)!;
-        expect(fetched.priority).toBe(0);
+        expect(fetched.priority).toBe(2);
     });
 });
 
@@ -85,43 +90,16 @@ describe('dequeueNextTask', () => {
         expect(dequeued!.id).toBe(task.id);
     });
 
-    test('returns highest priority (lowest number) first', () => {
-        createWorkTask(db, {
-            agentId: AGENT_ID,
-            projectId: PROJECT_ID,
-            description: 'Low priority',
-            priority: 3,
-        });
-        const high = createWorkTask(db, {
-            agentId: AGENT_ID,
-            projectId: PROJECT_ID,
-            description: 'High priority',
-            priority: 0,
-        });
-        createWorkTask(db, {
-            agentId: AGENT_ID,
-            projectId: PROJECT_ID,
-            description: 'Normal priority',
-            priority: 2,
-        });
-
-        const dequeued = dequeueNextTask(db, PROJECT_ID);
-        expect(dequeued!.id).toBe(high.id);
-        expect(dequeued!.priority).toBe(0);
-    });
-
-    test('uses FIFO ordering for same priority', () => {
+    test('uses FIFO ordering (priority ordering is at service layer)', () => {
         const first = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
-            description: 'First P2',
-            priority: 2,
+            description: 'First task',
         });
         createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
-            description: 'Second P2',
-            priority: 2,
+            description: 'Second task',
         });
 
         const dequeued = dequeueNextTask(db, PROJECT_ID);
@@ -133,7 +111,6 @@ describe('dequeueNextTask', () => {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'Queued task',
-            priority: 1,
         });
         updateWorkTaskStatus(db, task.id, 'queued');
 
@@ -150,7 +127,7 @@ describe('dequeueNextTask', () => {
         updateWorkTaskStatus(db, t1.id, 'running');
         updateWorkTaskStatus(db, t2.id, 'completed');
         updateWorkTaskStatus(db, t3.id, 'failed');
-        pauseWorkTask(db, t4.id, 'some-task');
+        pauseWorkTask(db, t4.id);
 
         expect(dequeueNextTask(db, PROJECT_ID)).toBeNull();
     });
@@ -163,10 +140,35 @@ describe('dequeueNextTask', () => {
             agentId: AGENT_ID,
             projectId: proj2,
             description: 'Other project task',
-            priority: 0,
         });
 
         expect(dequeueNextTask(db, PROJECT_ID)).toBeNull();
+    });
+});
+
+// ── getPendingTasksForProject ───────────────────────────────────────
+
+describe('getPendingTasksForProject', () => {
+    test('returns all pending/queued tasks', () => {
+        const t1 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'First' });
+        const t2 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Second' });
+        updateWorkTaskStatus(db, t2.id, 'queued');
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Third' });
+
+        const pending = getPendingTasksForProject(db, PROJECT_ID);
+        expect(pending).toHaveLength(3);
+        const ids = pending.map(t => t.id);
+        expect(ids).toContain(t1.id);
+        expect(ids).toContain(t2.id);
+    });
+
+    test('excludes running/completed/paused tasks', () => {
+        const t1 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Running' });
+        updateWorkTaskStatus(db, t1.id, 'running');
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Pending' });
+
+        const pending = getPendingTasksForProject(db, PROJECT_ID);
+        expect(pending).toHaveLength(1);
     });
 });
 
@@ -221,7 +223,7 @@ describe('getActiveTaskForProject', () => {
 // ── Pause/Resume ────────────────────────────────────────────────────
 
 describe('pauseWorkTask', () => {
-    test('sets status to paused and records preemptedBy', () => {
+    test('sets status to paused', () => {
         const task = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
@@ -229,28 +231,26 @@ describe('pauseWorkTask', () => {
         });
         updateWorkTaskStatus(db, task.id, 'running');
 
-        pauseWorkTask(db, task.id, 'preempting-task-id');
+        pauseWorkTask(db, task.id);
 
         const paused = getWorkTask(db, task.id)!;
         expect(paused.status).toBe('paused');
-        expect(paused.preemptedBy).toBe('preempting-task-id');
     });
 });
 
 describe('resumePausedTask', () => {
-    test('resumes paused task to pending and clears preemptedBy', () => {
+    test('resumes paused task to pending', () => {
         const task = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'Paused task',
         });
-        pauseWorkTask(db, task.id, 'other-task');
+        pauseWorkTask(db, task.id);
 
         resumePausedTask(db, task.id);
 
         const resumed = getWorkTask(db, task.id)!;
         expect(resumed.status).toBe('pending');
-        expect(resumed.preemptedBy).toBeNull();
     });
 
     test('only resumes paused tasks (no-op for other statuses)', () => {
@@ -268,39 +268,28 @@ describe('resumePausedTask', () => {
     });
 });
 
-describe('getTasksPausedBy', () => {
-    test('returns tasks paused by a specific task', () => {
-        const preempting = createWorkTask(db, {
-            agentId: AGENT_ID,
-            projectId: PROJECT_ID,
-            description: 'Preempting task',
-            priority: 0,
-        });
-        const paused1 = createWorkTask(db, {
+describe('getPausedTasks', () => {
+    test('returns paused tasks for a project', () => {
+        const t1 = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'Paused 1',
-            priority: 2,
         });
-        const paused2 = createWorkTask(db, {
+        const t2 = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'Paused 2',
-            priority: 3,
         });
 
-        pauseWorkTask(db, paused1.id, preempting.id);
-        pauseWorkTask(db, paused2.id, preempting.id);
+        pauseWorkTask(db, t1.id);
+        pauseWorkTask(db, t2.id);
 
-        const results = getTasksPausedBy(db, preempting.id);
+        const results = getPausedTasks(db, PROJECT_ID);
         expect(results).toHaveLength(2);
-        // Ordered by priority ASC
-        expect(results[0].priority).toBe(2);
-        expect(results[1].priority).toBe(3);
     });
 
-    test('returns empty array when no tasks paused by given id', () => {
-        expect(getTasksPausedBy(db, 'nonexistent')).toEqual([]);
+    test('returns empty array when no paused tasks', () => {
+        expect(getPausedTasks(db, PROJECT_ID)).toEqual([]);
     });
 });
 
@@ -322,15 +311,14 @@ describe('countQueuedTasks', () => {
     });
 });
 
-// ── cleanupStaleWorkTasks with priority ─────────────────────────────
+// ── cleanupStaleWorkTasks with paused tasks ─────────────────────────
 
-describe('cleanupStaleWorkTasks with priority', () => {
+describe('cleanupStaleWorkTasks with paused tasks', () => {
     test('resumes paused tasks when stale active tasks are cleaned up', () => {
         const active = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'Active task',
-            priority: 0,
         });
         updateWorkTaskStatus(db, active.id, 'running');
 
@@ -338,15 +326,13 @@ describe('cleanupStaleWorkTasks with priority', () => {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'Paused task',
-            priority: 2,
         });
-        pauseWorkTask(db, paused.id, active.id);
+        pauseWorkTask(db, paused.id);
 
         cleanupStaleWorkTasks(db);
 
         const resumed = getWorkTask(db, paused.id)!;
         expect(resumed.status).toBe('pending');
-        expect(resumed.preemptedBy).toBeNull();
     });
 });
 
@@ -358,7 +344,7 @@ describe('getActiveWorkTasks includes new statuses', () => {
         updateWorkTaskStatus(db, t1.id, 'queued');
 
         const t2 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Paused' });
-        pauseWorkTask(db, t2.id, 'some-task');
+        pauseWorkTask(db, t2.id);
 
         const t3 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Running' });
         updateWorkTaskStatus(db, t3.id, 'running');
@@ -368,16 +354,15 @@ describe('getActiveWorkTasks includes new statuses', () => {
     });
 });
 
-// ── Priority queue ordering integration ─────────────────────────────
+// ── FIFO queue ordering at DB level ─────────────────────────────────
 
-describe('priority queue ordering', () => {
-    test('dequeues in priority order then FIFO', () => {
-        // Create tasks in mixed order
-        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'P3 low', priority: 3 });
-        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'P1 first', priority: 1 });
-        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'P0 critical', priority: 0 });
-        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'P1 second', priority: 1 });
-        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'P2 normal', priority: 2 });
+describe('FIFO queue ordering at DB level', () => {
+    test('dequeues in creation order (FIFO)', () => {
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'First' });
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Second' });
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Third' });
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Fourth' });
+        createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Fifth' });
 
         // Dequeue one by one (simulating processing)
         const order: string[] = [];
@@ -390,11 +375,11 @@ describe('priority queue ordering', () => {
         }
 
         expect(order).toEqual([
-            'P0 critical',
-            'P1 first',
-            'P1 second',
-            'P2 normal',
-            'P3 low',
+            'First',
+            'Second',
+            'Third',
+            'Fourth',
+            'Fifth',
         ]);
     });
 });

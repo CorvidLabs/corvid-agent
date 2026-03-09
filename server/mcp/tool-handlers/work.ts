@@ -16,7 +16,7 @@ function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
 
 export async function handleCreateWorkTask(
     ctx: McpToolContext,
-    args: { description: string; project_id?: string; priority?: number },
+    args: { description: string; project_id?: string },
 ): Promise<CallToolResult> {
     if (!ctx.workTaskService) {
         return errorResult('Work task service is not available.');
@@ -24,14 +24,6 @@ export async function handleCreateWorkTask(
 
     if (!checkWorkTaskRateLimit(ctx.db, ctx.agentId)) {
         return errorResult(`Rate limit exceeded: maximum ${WORK_TASK_MAX_PER_DAY} work tasks per day.`);
-    }
-
-    // Validate priority if provided
-    const priority = args.priority !== undefined
-        ? (Number.isInteger(args.priority) && args.priority >= 0 && args.priority <= 3 ? args.priority as 0 | 1 | 2 | 3 : undefined)
-        : undefined;
-    if (args.priority !== undefined && priority === undefined) {
-        return errorResult('Invalid priority: must be 0 (P0/critical), 1 (P1/high), 2 (P2/normal), or 3 (P3/low).');
     }
 
     try {
@@ -42,22 +34,18 @@ export async function handleCreateWorkTask(
             description: args.description,
             projectId: args.project_id,
             source: 'agent',
-            priority,
         });
 
-        const priorityLabel = ['P0 (critical)', 'P1 (high)', 'P2 (normal)', 'P3 (low)'][task.priority];
         log.info('MCP create_work_task succeeded', {
             agentId: ctx.agentId,
             taskId: task.id,
             status: task.status,
-            priority: task.priority,
         });
 
         return textResult(
             `Work task created.\n` +
             `  ID: ${task.id}\n` +
             `  Status: ${task.status}\n` +
-            `  Priority: ${priorityLabel}\n` +
             `  Branch: ${task.branchName ?? '(pending)'}`,
         );
     } catch (err) {

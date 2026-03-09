@@ -240,20 +240,19 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
     if (ctx.workTaskService) {
         tools.push({
             name: 'corvid_create_work_task',
-            description: 'Create a work task that spawns a new agent session on a dedicated branch. Use priority to control scheduling order: 0=critical, 1=high, 2=normal (default), 3=low. Higher-priority tasks can preempt lower-priority running tasks.',
+            description: 'Create a work task that spawns a new agent session on a dedicated branch.',
             parameters: {
                 type: 'object',
                 properties: {
                     description: { type: 'string', description: 'A clear description of the work to be done' },
                     project_id: { type: 'string', description: 'Project ID to work on. Omit to use agent default.' },
-                    priority: { type: 'number', description: 'Task priority: 0 (P0/critical), 1 (P1/high), 2 (P2/normal, default), 3 (P3/low).' },
                 },
                 required: ['description'],
             },
             handler: async (args) => {
                 const err = validateRequired('corvid_create_work_task', args, ['description']);
                 if (err) return err;
-                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; priority?: number }));
+                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string }));
             },
         });
     }

@@ -264,7 +264,6 @@ export const CreateWorkTaskSchema = z.object({
     source: z.enum(['web', 'algochat', 'agent']).optional().default('web'),
     sourceId: z.string().optional(),
     requesterInfo: z.record(z.string(), z.unknown()).optional(),
-    priority: z.number().int().min(0).max(3).optional().default(2),
 });
 
 // ─── Allowlist ──────────────────────────────────────────────────────────────────
