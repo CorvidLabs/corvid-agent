@@ -13,7 +13,7 @@ Store and retrieve encrypted memories on the Algorand blockchain. Memories persi
 ## MCP Tools
 
 - `corvid_save_memory` — Save a memory with a key and value
-  - Parameters: `key` (descriptive name), `value` (content to store)
+  - Parameters: `key` (descriptive name), `content` (content to store)
 - `corvid_recall_memory` — Retrieve memories
   - Parameters: `key` (exact lookup), `query` (search), or `action: "list"` (recent entries)
 

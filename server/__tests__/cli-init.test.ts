@@ -65,7 +65,7 @@ describe('Agent Skills', () => {
         const skillsDir = join(import.meta.dir, '..', '..', 'skills');
 
         for (const name of skillNames) {
-            const content = readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf-8');
+            const content = readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
             // Check frontmatter delimiters
             expect(content.startsWith('---\n')).toBe(true);
             const endIdx = content.indexOf('---', 4);
@@ -82,7 +82,7 @@ describe('Agent Skills', () => {
         const skillsDir = join(import.meta.dir, '..', '..', 'skills');
 
         for (const name of skillNames) {
-            const content = readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf-8');
+            const content = readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
             const endIdx = content.indexOf('---', 4);
             const frontmatter = content.slice(4, endIdx);
             const descMatch = frontmatter.match(/description:\s*(.+)/);
