@@ -27,10 +27,15 @@ bun run dev                 # → http://localhost:3000
 <p>
   <img src="https://img.shields.io/badge/Claude_Code-works-00e5ff?logo=anthropic" alt="Claude Code">
   <img src="https://img.shields.io/badge/Cursor-works-00e5ff" alt="Cursor">
+  <img src="https://img.shields.io/badge/GitHub_Copilot-works-00e5ff" alt="GitHub Copilot">
+  <img src="https://img.shields.io/badge/OpenCode-works-00e5ff" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Codex_CLI-works-00e5ff" alt="Codex CLI">
   <img src="https://img.shields.io/badge/Ollama-works-00e5ff" alt="Ollama">
   <img src="https://img.shields.io/badge/MCP-38_tools-ff66c4" alt="MCP">
   <img src="https://img.shields.io/badge/A2A_Protocol-compatible-00ff88" alt="A2A">
 </p>
+
+Any MCP-compatible AI assistant can connect. See **[MCP setup guide](docs/mcp-setup.md)** for per-client instructions.
 
 ---
 
@@ -66,7 +71,7 @@ corvid-agent init --yes     # auto-detect Claude CLI / Ollama, skip prompts
 **Just want MCP tools in your editor?**
 
 ```bash
-corvid-agent init --mcp     # adds corvid-agent to Claude Code / Cursor
+corvid-agent init --mcp     # adds corvid-agent to Claude Code, Cursor, Copilot, etc.
 ```
 
 Server starts at `http://localhost:3000`. Dashboard included.
