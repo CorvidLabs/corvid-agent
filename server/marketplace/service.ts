@@ -106,8 +106,8 @@ function recordToListing(row: ListingRecord): MarketplaceListing {
         avgRating: row.avg_rating,
         reviewCount: row.review_count,
         tenantId: row.tenant_id,
-        trialUses: row.trial_uses,
-        trialDays: row.trial_days,
+        trialUses: row.trial_uses ?? null,
+        trialDays: row.trial_days ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -249,8 +249,8 @@ export class MarketplaceService {
         this.db.query(`
             INSERT INTO marketplace_listings
                 (id, agent_id, name, description, long_description, category,
-                 tags, pricing_model, price_credits, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+                 tags, pricing_model, price_credits, trial_uses, trial_days, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')
         `).run(
             id,
             input.agentId,
@@ -261,6 +261,8 @@ export class MarketplaceService {
             tags,
             input.pricingModel ?? 'free',
             input.priceCredits ?? 0,
+            input.trialUses ?? null,
+            input.trialDays ?? null,
         );
 
         log.info('Created marketplace listing', { id, name: input.name, agentId: input.agentId });
@@ -308,6 +310,8 @@ export class MarketplaceService {
         if (input.pricingModel !== undefined) { updates.push('pricing_model = ?'); values.push(input.pricingModel); }
         if (input.priceCredits !== undefined) { updates.push('price_credits = ?'); values.push(input.priceCredits); }
         if (input.status !== undefined) { updates.push('status = ?'); values.push(input.status); }
+        if (input.trialUses !== undefined) { updates.push('trial_uses = ?'); values.push(input.trialUses); }
+        if (input.trialDays !== undefined) { updates.push('trial_days = ?'); values.push(input.trialDays); }
 
         if (updates.length === 0) return existing;
 
