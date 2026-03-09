@@ -191,6 +191,26 @@ export function copySkills(cwd: string): void {
     }
 }
 
+// ─── MCP Config Writer ──────────────────────────────────────────────────────
+
+function writeMcpConfig(filePath: string, mcpConfig: Record<string, unknown>): void {
+    let existing: Record<string, unknown> = {};
+    if (existsSync(filePath)) {
+        try {
+            existing = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+        } catch { /* will overwrite */ }
+    }
+    const servers = (existing.mcpServers ?? {}) as Record<string, unknown>;
+    const merged = { ...existing, mcpServers: { ...servers, ...mcpConfig } };
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
+    const tmpPath = `${filePath}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(merged, null, 2) + '\n', { mode: 0o600 });
+    renameSync(tmpPath, filePath);
+}
+
 // ─── MCP-Only Init ──────────────────────────────────────────────────────────
 
 async function initMcpOnly(_opts: { yes: boolean }): Promise<void> {
@@ -291,6 +311,22 @@ ${c.gray('Set up corvid-agent as an MCP server for Claude Code, Cursor, or other
         printSuccess(`MCP server added to ${c.gray(cursorMcpPath)}`);
     }
 
+    // Write VS Code / GitHub Copilot config if .vscode exists in cwd
+    const vscodeMcpPath = join(process.cwd(), '.vscode', 'mcp.json');
+    const vscodeDir = join(process.cwd(), '.vscode');
+    if (existsSync(vscodeDir)) {
+        writeMcpConfig(vscodeMcpPath, mcpConfig);
+        printSuccess(`MCP server added to ${c.gray(vscodeMcpPath)} (GitHub Copilot)`);
+    }
+
+    // Write OpenCode config if ~/.config/opencode exists
+    const openCodeConfigDir = join(homeDir, '.config', 'opencode');
+    if (existsSync(openCodeConfigDir)) {
+        const openCodeMcpPath = join(openCodeConfigDir, 'config.json');
+        writeMcpConfig(openCodeMcpPath, mcpConfig);
+        printSuccess(`MCP server added to ${c.gray(openCodeMcpPath)} (OpenCode)`);
+    }
+
     // Copy Agent Skills to project
     printHeader('Agent Skills');
     copySkills(process.cwd());
@@ -312,6 +348,19 @@ ${c.gray('Set up corvid-agent as an MCP server for Claude Code, Cursor, or other
         console.log(`  ${c.cyan('curl -fsSL https://getvibekit.ai/install | sh')}`);
     }
 
+    // Print manual setup snippets for clients we didn't auto-detect
+    const mcpSnippet = JSON.stringify(mcpConfig, null, 2);
+    const manualClients: string[] = [];
+    if (!existsSync(vscodeDir)) manualClients.push('VS Code / Copilot');
+    if (!existsSync(openCodeConfigDir)) manualClients.push('OpenCode');
+
+    if (manualClients.length > 0) {
+        printHeader('Other MCP Clients');
+        console.log(`  ${c.gray(`For ${manualClients.join(', ')} — add the following to your MCP config:`)}`);
+        console.log(`  ${c.gray('See docs/mcp-setup.md for per-client paths and details.')}\n`);
+        console.log(`  ${c.cyan(mcpSnippet.split('\n').join('\n  '))}\n`);
+    }
+
     console.log(`
 ${c.bold}${c.green('MCP setup complete!')}${c.reset}
 
@@ -322,10 +371,11 @@ ${c.bold}What you get:${c.reset}
 
 ${c.bold}Next steps:${c.reset}
   1. ${projectRoot ? `Start the server: ${c.cyan('bun run dev')}` : 'Start your corvid-agent server'}
-  2. Restart Claude Code / Cursor to pick up the new MCP config
+  2. Restart your editor to pick up the new MCP config
   3. Ask your AI assistant: ${c.gray('"List my agents"')} or ${c.gray('"Create a work task"')}
   ${hasVibeKit ? `4. Run ${c.cyan('vibekit init')} to add smart contract tools` : ''}
 ${c.gray('Config: ' + claudeConfigPath)}
+${c.gray('Setup guide: docs/mcp-setup.md')}
 `);
 }
 
@@ -663,7 +713,7 @@ ${c.bold}Next steps:${c.reset}
   ${c.cyan('corvid-agent demo')}    Run a self-contained demo
 
 ${c.bold}Use with AI editors:${c.reset}
-  ${c.cyan('corvid-agent init --mcp')}   Add MCP tools + Agent Skills to Claude Code / Cursor
+  ${c.cyan('corvid-agent init --mcp')}   Add MCP tools + Agent Skills to Claude Code, Cursor, Copilot, etc.
 
 ${c.gray('Docs: docs/quickstart.md  •  Dashboard: http://127.0.0.1:3000')}
 `);
