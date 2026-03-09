@@ -6,8 +6,9 @@
  *   2. API Surface:  Exported symbols match spec's Public API tables
  *   3. Dependencies: Referenced specs and consumed-by files exist
  *
- * Usage: bun scripts/spec-check.ts
- * Exit code 0 = all passed (warnings OK), 1 = errors found
+ * Usage: bun scripts/spec-check.ts [--strict]
+ * Exit code 0 = all passed (warnings OK unless --strict), 1 = errors found
+ * With --strict: exit code 1 if any warnings are present (used in CI)
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
@@ -393,6 +394,7 @@ function validateSpec(specPath: string, schemaTables: Set<string>): ValidationRe
 // ─── Main ────────────────────────────────────────────────────────────────
 
 function main(): void {
+    const strict = process.argv.includes('--strict');
     const specFiles = findSpecFiles(SPECS_DIR);
 
     if (specFiles.length === 0) {
@@ -491,6 +493,11 @@ function main(): void {
     );
 
     if (totalErrors > 0) {
+        process.exit(1);
+    }
+
+    if (strict && totalWarnings > 0) {
+        console.log(`\n--strict mode: ${totalWarnings} warning(s) treated as errors`);
         process.exit(1);
     }
 }
