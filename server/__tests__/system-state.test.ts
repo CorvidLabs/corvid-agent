@@ -71,7 +71,7 @@ describe('priority-rules', () => {
 
 describe('SystemStateDetector', () => {
     it('returns healthy by default', async () => {
-        const d = new SystemStateDetector(db, { cacheTtlMs: 0 });
+        const d = new SystemStateDetector(db, { cacheTtlMs: 0, diskPressureThreshold: 1.0 });
         const r = await d.evaluate();
         expect(r.states).toContain('healthy');
         expect(r.cached).toBe(false);
