@@ -22,6 +22,16 @@ Role-based access levels:
 - [Marketplace](#marketplace)
 - [Reputation](#reputation)
 - [Billing](#billing)
+- [Agents](#agents)
+- [Sessions](#sessions)
+- [Schedules](#schedules)
+- [Work Tasks](#work-tasks)
+- [Permissions](#permissions)
+- [Sandbox](#sandbox)
+- [Ollama](#ollama)
+- [Webhooks](#webhooks)
+- [Mention Polling](#mention-polling)
+- [Auth Flow](#auth-flow)
 
 ---
 
@@ -533,14 +543,737 @@ curl "http://localhost:3000/api/billing/calculate?credits=1000" \
 
 ---
 
+## Agents
+
+Agent lifecycle management, wallet integration, inter-agent invocation, spending caps, and A2A agent cards.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/agents` | List all agents | any |
+| POST | `/api/agents` | Create agent | operator |
+| GET | `/api/agents/{id}` | Get agent by ID | any |
+| PUT | `/api/agents/{id}` | Update agent | operator |
+| DELETE | `/api/agents/{id}` | Delete agent | operator |
+| GET | `/api/agents/{id}/balance` | Get wallet balance | any |
+| POST | `/api/agents/{id}/fund` | Fund wallet (localnet only) | operator |
+| POST | `/api/agents/{id}/invoke` | Invoke another agent | operator |
+| GET | `/api/agents/{id}/messages` | List AlgoChat messages | any |
+| GET | `/api/agents/{id}/spending` | Get daily spending & cap | any |
+| PUT | `/api/agents/{id}/spending-cap` | Set spending cap | operator |
+| DELETE | `/api/agents/{id}/spending-cap` | Remove spending cap | operator |
+| GET | `/api/agents/{id}/agent-card` | Get A2A agent card | any |
+
+### Create Agent
+
+```bash
+curl -X POST http://localhost:3000/api/agents \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "code-reviewer",
+    "description": "Automated code review agent",
+    "model": "claude-sonnet-4-20250514",
+    "provider": "anthropic",
+    "systemPrompt": "You are a code review specialist.",
+    "permissionMode": "plan",
+    "algochatEnabled": true
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "agent-abc123",
+  "name": "code-reviewer",
+  "description": "Automated code review agent",
+  "model": "claude-sonnet-4-20250514",
+  "provider": "anthropic",
+  "permissionMode": "plan",
+  "algochatEnabled": true,
+  "createdAt": "2026-03-08T10:00:00Z"
+}
+```
+
+### Request Body: Create Agent
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Agent name (min 1 char) |
+| `description` | string | no | Description |
+| `model` | string | no | Model identifier |
+| `provider` | string | no | LLM provider |
+| `systemPrompt` | string | no | System prompt |
+| `appendPrompt` | string | no | Appended to system prompt |
+| `allowedTools` | string | no | Comma-separated tool list |
+| `disallowedTools` | string | no | Comma-separated tool list |
+| `permissionMode` | enum | no | `default`, `plan`, `auto-edit`, `full-auto` |
+| `maxBudgetUsd` | number \| null | no | Max budget in USD |
+| `algochatEnabled` | boolean | no | Enable AlgoChat |
+| `algochatAuto` | boolean | no | Auto-respond to messages |
+| `customFlags` | object | no | Key-value custom flags |
+| `defaultProjectId` | string \| null | no | Default project |
+| `mcpToolPermissions` | string[] \| null | no | MCP tool permissions |
+| `voiceEnabled` | boolean | no | Enable voice |
+| `voicePreset` | enum | no | `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer` |
+
+### Invoke Another Agent
+
+```bash
+curl -X POST http://localhost:3000/api/agents/agent-1/invoke \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "toAgentId": "agent-2",
+    "content": "Please review the latest PR",
+    "paymentMicro": 100000,
+    "projectId": "proj-1"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "messageId": "msg-xyz",
+  "txid": "ALGO_TX_ID",
+  "sessionId": "session-abc"
+}
+```
+
+### Get Wallet Balance
+
+```bash
+curl http://localhost:3000/api/agents/agent-1/balance \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "balance": 5000000,
+  "address": "ALGO_ADDRESS_HERE"
+}
+```
+
+### Set Spending Cap
+
+```bash
+curl -X PUT http://localhost:3000/api/agents/agent-1/spending-cap \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dailyLimitMicroalgos": 10000000,
+    "dailyLimitUsdc": 5000000
+  }'
+```
+
+---
+
+## Sessions
+
+Interactive agent sessions with project context. Sessions run agent processes and collect message history.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/sessions` | List sessions | any |
+| POST | `/api/sessions` | Create session | operator |
+| GET | `/api/sessions/{id}` | Get session by ID | any |
+| PUT | `/api/sessions/{id}` | Update session | operator |
+| DELETE | `/api/sessions/{id}` | Delete session | operator |
+| GET | `/api/sessions/{id}/messages` | Get session messages | any |
+| POST | `/api/sessions/{id}/stop` | Stop running session | operator |
+| POST | `/api/sessions/{id}/resume` | Resume session | operator |
+
+### Create Session
+
+```bash
+curl -X POST http://localhost:3000/api/sessions \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "proj-1",
+    "agentId": "agent-1",
+    "name": "Fix login bug",
+    "initialPrompt": "Fix the authentication timeout issue in auth.ts"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "session-abc123",
+  "projectId": "proj-1",
+  "agentId": "agent-1",
+  "name": "Fix login bug",
+  "status": "running",
+  "createdAt": "2026-03-08T10:00:00Z"
+}
+```
+
+### Request Body: Create Session
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `projectId` | string | yes | Target project |
+| `agentId` | string | no | Agent to use |
+| `name` | string | no | Session name |
+| `initialPrompt` | string | no | If provided, agent starts immediately |
+| `councilLaunchId` | string | no | Link to council launch |
+| `councilRole` | enum | no | `member`, `reviewer`, `chairman`, `discusser` |
+
+### Resume Session
+
+```bash
+curl -X POST http://localhost:3000/api/sessions/session-abc123/resume \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "prompt": "Now add unit tests for the fix" }'
+```
+
+### Stop Session
+
+```bash
+curl -X POST http://localhost:3000/api/sessions/session-abc123/stop \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response:** `{ "ok": true }`
+
+---
+
+## Schedules
+
+Cron-based and event-driven scheduling with approval policies, bulk operations, and execution history.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/schedules` | List schedules | any |
+| POST | `/api/schedules` | Create schedule | operator |
+| GET | `/api/schedules/{id}` | Get schedule by ID | any |
+| PUT | `/api/schedules/{id}` | Update schedule | operator |
+| DELETE | `/api/schedules/{id}` | Delete schedule | operator |
+| POST | `/api/schedules/bulk` | Bulk pause/resume/delete | operator |
+| POST | `/api/schedules/{id}/trigger` | Trigger immediately | operator |
+| GET | `/api/schedules/{id}/executions` | List executions for schedule | any |
+| GET | `/api/schedule-executions` | List all executions | any |
+| GET | `/api/schedule-executions/{id}` | Get execution by ID | any |
+| POST | `/api/schedule-executions/{id}/cancel` | Cancel execution | operator |
+| POST | `/api/schedule-executions/{id}/resolve` | Approve/deny execution | operator |
+| GET | `/api/scheduler/health` | Scheduler health | any |
+| GET | `/api/scheduler/system-state` | Live system state | any |
+| GET | `/api/github/status` | GitHub integration status | any |
+
+### Create Schedule
+
+```bash
+curl -X POST http://localhost:3000/api/schedules \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "name": "Nightly Code Review",
+    "cronExpression": "0 2 * * *",
+    "approvalPolicy": "auto",
+    "actions": [
+      {
+        "type": "review_prs",
+        "repos": ["CorvidLabs/corvid-agent"],
+        "maxPrs": 10
+      }
+    ]
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "sched-abc123",
+  "agentId": "agent-1",
+  "name": "Nightly Code Review",
+  "cronExpression": "0 2 * * *",
+  "status": "active",
+  "approvalPolicy": "auto",
+  "actions": [...],
+  "createdAt": "2026-03-08T10:00:00Z"
+}
+```
+
+### Request Body: Create Schedule
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agentId` | string | yes | Agent to run |
+| `name` | string | yes | Schedule name |
+| `description` | string | no | Description |
+| `cronExpression` | string | no | Cron expression (at least one of cron/interval/triggerEvents required) |
+| `intervalMs` | number | no | Interval in ms (min 60000) |
+| `actions` | ScheduleAction[] | yes | At least 1 action |
+| `approvalPolicy` | enum | no | `auto`, `owner_approve`, `council_approve` |
+| `maxExecutions` | number | no | Max total executions |
+| `maxBudgetPerRun` | number | no | Budget cap per run |
+| `notifyAddress` | string | no | Notification address |
+| `triggerEvents` | TriggerEvent[] | no | Event-based triggers |
+
+**ScheduleAction types:** `star_repo`, `fork_repo`, `review_prs`, `work_task`, `council_launch`, `send_message`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `memory_maintenance`, `reputation_attestation`, `outcome_analysis`, `daily_review`, `custom`
+
+### Bulk Operations
+
+```bash
+curl -X POST http://localhost:3000/api/schedules/bulk \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "pause",
+    "ids": ["sched-1", "sched-2", "sched-3"]
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "results": [
+    { "id": "sched-1", "ok": true },
+    { "id": "sched-2", "ok": true },
+    { "id": "sched-3", "ok": true }
+  ]
+}
+```
+
+### Approve/Deny Execution
+
+```bash
+curl -X POST http://localhost:3000/api/schedule-executions/exec-123/resolve \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "approved": true }'
+```
+
+### Scheduler Health
+
+```bash
+curl http://localhost:3000/api/scheduler/health \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "running": true,
+  "activeSchedules": 12,
+  "pausedSchedules": 3,
+  "runningExecutions": 2,
+  "maxConcurrent": 5,
+  "recentFailures": 0
+}
+```
+
+---
+
+## Work Tasks
+
+Standalone work units dispatched to agents. Supports retry and cancellation.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/work-tasks` | List work tasks | any |
+| POST | `/api/work-tasks` | Create work task | operator |
+| GET | `/api/work-tasks/{id}` | Get work task by ID | any |
+| POST | `/api/work-tasks/{id}/cancel` | Cancel work task | operator |
+| POST | `/api/work-tasks/{id}/retry` | Retry failed task | operator |
+
+### Create Work Task
+
+```bash
+curl -X POST http://localhost:3000/api/work-tasks \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "description": "Fix the broken login flow in auth.ts",
+    "projectId": "proj-1",
+    "source": "web"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "task-abc123",
+  "agentId": "agent-1",
+  "description": "Fix the broken login flow in auth.ts",
+  "projectId": "proj-1",
+  "status": "pending",
+  "source": "web",
+  "createdAt": "2026-03-08T10:00:00Z"
+}
+```
+
+### Request Body: Create Work Task
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agentId` | string | yes | Agent to assign |
+| `description` | string | yes | Task description (min 1 char) |
+| `projectId` | string | no | Target project |
+| `source` | enum | no | `web`, `algochat`, `agent` (default: `web`) |
+| `sourceId` | string | no | Source reference ID |
+| `requesterInfo` | object | no | Metadata about requester |
+
+### Cancel Work Task
+
+```bash
+curl -X POST http://localhost:3000/api/work-tasks/task-abc123/cancel \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+### Retry Failed Task
+
+```bash
+curl -X POST http://localhost:3000/api/work-tasks/task-abc123/retry \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+---
+
+## Permissions
+
+Capability-based permission management. Grant, revoke, and check agent permissions for tools and actions. Requires admin API key authentication.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/permissions/grant` | Grant permission | admin |
+| POST | `/api/permissions/revoke` | Revoke permission | admin |
+| POST | `/api/permissions/emergency-revoke` | Emergency revoke all | admin |
+| POST | `/api/permissions/check` | Check tool permission | admin |
+| GET | `/api/permissions/actions` | List action taxonomy | admin |
+| GET | `/api/permissions/{agentId}` | List grants for agent | admin |
+
+### Grant Permission
+
+```bash
+curl -X POST http://localhost:3000/api/permissions/grant \
+  -H "Authorization: Bearer $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "agent-1",
+    "action": "file:write",
+    "granted_by": "owner",
+    "reason": "Needs write access for code generation"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "grant": {
+    "id": "grant-abc",
+    "agent_id": "agent-1",
+    "action": "file:write",
+    "granted_by": "owner",
+    "reason": "Needs write access for code generation",
+    "created_at": "2026-03-08T10:00:00Z"
+  }
+}
+```
+
+### Emergency Revoke
+
+```bash
+curl -X POST http://localhost:3000/api/permissions/emergency-revoke \
+  -H "Authorization: Bearer $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "agent-1",
+    "reason": "Security incident"
+  }'
+```
+
+**Response:** `{ "affected": 5, "emergency": true }`
+
+### Check Permission
+
+```bash
+curl -X POST http://localhost:3000/api/permissions/check \
+  -H "Authorization: Bearer $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_id": "agent-1",
+    "tool_name": "bash"
+  }'
+```
+
+---
+
+## Sandbox
+
+Container-based sandboxing for agent sessions. Manage container pool, policies, and assignments.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/sandbox/stats` | Get pool statistics | any |
+| GET | `/api/sandbox/policies` | List all policies | any |
+| GET | `/api/sandbox/policies/{agentId}` | Get policy for agent | any |
+| PUT | `/api/sandbox/policies/{agentId}` | Set policy | operator |
+| DELETE | `/api/sandbox/policies/{agentId}` | Remove policy | operator |
+| POST | `/api/sandbox/assign` | Assign container | operator |
+| POST | `/api/sandbox/release/{sessionId}` | Release container | operator |
+
+### Set Sandbox Policy
+
+```bash
+curl -X PUT http://localhost:3000/api/sandbox/policies/agent-1 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cpuLimit": 2,
+    "memoryLimitMb": 1024,
+    "networkPolicy": "restricted",
+    "timeoutSeconds": 3600
+  }'
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cpuLimit` | number | CPU cores (0.1–16) |
+| `memoryLimitMb` | integer | Memory in MB (64–65536) |
+| `networkPolicy` | enum | `none`, `host`, `restricted` |
+| `timeoutSeconds` | integer | Timeout in seconds (1–86400) |
+
+### Assign Container
+
+```bash
+curl -X POST http://localhost:3000/api/sandbox/assign \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "sessionId": "session-abc"
+  }'
+```
+
+**Response (201):** `{ "containerId": "container-xyz" }`
+
+---
+
+## Ollama
+
+Local LLM management via Ollama. Check status, browse models, pull/delete, and monitor GPU usage.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/ollama/status` | Server status & active pulls | any |
+| GET | `/api/ollama/models` | List installed models | any |
+| GET | `/api/ollama/models/running` | List loaded models | any |
+| POST | `/api/ollama/models/pull` | Pull a model (async) | any |
+| DELETE | `/api/ollama/models` | Delete a model | any |
+| GET | `/api/ollama/models/pull/status` | Get pull progress | any |
+| GET | `/api/ollama/library` | Browse model library | any |
+
+### Pull a Model
+
+```bash
+curl -X POST http://localhost:3000/api/ollama/models/pull \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "llama3:8b" }'
+```
+
+**Response (202):**
+
+```json
+{
+  "message": "Pull started for model: llama3:8b",
+  "status": { "model": "llama3:8b", "status": "pulling", "progress": 0 }
+}
+```
+
+### Browse Library
+
+```bash
+curl "http://localhost:3000/api/ollama/library?category=coding" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Query params:** `q` (search), `category` (`all`, `cloud`, `recommended`, `coding`, `small`, `large`, `vision`)
+
+---
+
+## Webhooks
+
+GitHub webhook registration and delivery tracking. Incoming webhooks are authenticated via HMAC signature.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/webhooks/github` | Receive GitHub webhook | HMAC signature |
+| GET | `/api/webhooks` | List registrations | any |
+| POST | `/api/webhooks` | Create registration | operator |
+| GET | `/api/webhooks/{id}` | Get registration | any |
+| PUT | `/api/webhooks/{id}` | Update registration | operator |
+| DELETE | `/api/webhooks/{id}` | Delete registration | operator |
+| GET | `/api/webhooks/deliveries` | List all deliveries | any |
+| GET | `/api/webhooks/{id}/deliveries` | List deliveries for registration | any |
+
+### Create Registration
+
+```bash
+curl -X POST http://localhost:3000/api/webhooks \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "repo": "CorvidLabs/corvid-agent",
+    "events": ["issue_comment", "issues"],
+    "mentionUsername": "corvid-agent"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "wh-abc123",
+  "agentId": "agent-1",
+  "repo": "CorvidLabs/corvid-agent",
+  "events": ["issue_comment", "issues"],
+  "mentionUsername": "corvid-agent",
+  "status": "active"
+}
+```
+
+**Event types:** `issue_comment`, `issues`, `pull_request_review_comment`, `issue_comment_pr`
+
+---
+
+## Mention Polling
+
+Poll GitHub for @mentions and automatically trigger agent sessions.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/mention-polling` | List configs | any |
+| POST | `/api/mention-polling` | Create config | operator |
+| GET | `/api/mention-polling/stats` | Polling service stats | any |
+| GET | `/api/mention-polling/{id}` | Get config | any |
+| PUT | `/api/mention-polling/{id}` | Update config | operator |
+| DELETE | `/api/mention-polling/{id}` | Delete config | operator |
+| GET | `/api/mention-polling/{id}/activity` | Recent triggered sessions | any |
+
+### Create Polling Config
+
+```bash
+curl -X POST http://localhost:3000/api/mention-polling \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "repo": "CorvidLabs/corvid-agent",
+    "mentionUsername": "corvid-agent",
+    "intervalSeconds": 120,
+    "eventFilter": ["issue_comment", "issues"]
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "poll-abc123",
+  "agentId": "agent-1",
+  "repo": "CorvidLabs/corvid-agent",
+  "mentionUsername": "corvid-agent",
+  "intervalSeconds": 120,
+  "status": "active"
+}
+```
+
+---
+
+## Auth Flow
+
+OAuth 2.0 Device Authorization Grant (RFC 8628) for CLI login. All endpoints are unauthenticated.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/auth/device` | Start device auth flow | none |
+| POST | `/api/auth/device/token` | Poll for access token | none |
+| POST | `/api/auth/device/authorize` | Approve/deny device code | none |
+| GET | `/api/auth/verify` | Render verification page | none |
+
+### Start Device Auth
+
+```bash
+curl -X POST http://localhost:3000/api/auth/device
+```
+
+**Response:**
+
+```json
+{
+  "deviceCode": "uuid-device-code",
+  "userCode": "ABCD1234",
+  "verificationUrl": "http://localhost:3000/api/auth/verify?code=ABCD1234",
+  "expiresIn": 600,
+  "interval": 2
+}
+```
+
+### Poll for Token
+
+```bash
+curl -X POST http://localhost:3000/api/auth/device/token \
+  -H "Content-Type: application/json" \
+  -d '{ "deviceCode": "uuid-device-code" }'
+```
+
+**Response (pending):** `{ "error": "authorization_pending" }` (400)
+
+**Response (success):**
+
+```json
+{
+  "accessToken": "ca_your_token_here",
+  "tenantId": "default",
+  "tenantName": "Default",
+  "email": "user@example.com"
+}
+```
+
+---
+
 ## Additional Modules
 
 The following modules are fully documented in the interactive API explorer at `/api/docs`. Each module has OpenAPI metadata including summaries, auth requirements, and request body schemas.
 
 | Module | Base Path | Endpoints |
 |--------|-----------|-----------|
-| Webhooks | `/api/webhooks/*` | GitHub webhook registrations & deliveries |
-| Mention Polling | `/api/mention-polling/*` | GitHub @mention detection |
 | MCP Servers | `/api/mcp-servers/*` | MCP server configurations |
 | Skill Bundles | `/api/skill-bundles/*` | Skill management |
 | Analytics | `/api/analytics/*` | Overview, spending, session stats |
@@ -552,7 +1285,6 @@ The following modules are fully documented in the interactive API explorer at `/
 | Wallets | `/api/wallets/*` | Summary, messages, credits |
 | Feed | `/api/feed/history` | Activity feed |
 | Escalation | `/api/escalation-queue` | Escalation queue management |
-| Auth | `/api/auth/device/*` | Device authorization flow |
 | A2A | `/api/a2a/*` | Agent-to-Agent protocol |
 
 ---
