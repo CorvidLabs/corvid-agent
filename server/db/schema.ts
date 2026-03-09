@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 72;
+const SCHEMA_VERSION = 73;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1354,6 +1354,9 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_governance_proposals_status ON governance_proposals(status)`,
         `CREATE INDEX IF NOT EXISTS idx_governance_proposals_tenant ON governance_proposals(tenant_id)`,
     ],
+
+    // 73: Encrypt env_vars at rest (data migration — handled by file-based
+    // migration 073_encrypt_env_vars.ts; no DDL changes needed).
 };
 
 /** Allowlist pattern for valid SQL identifiers (table/column names). */

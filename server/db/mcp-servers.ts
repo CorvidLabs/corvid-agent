@@ -3,6 +3,7 @@ import type { McpServerConfig, CreateMcpServerConfigInput, UpdateMcpServerConfig
 import { NotFoundError } from '../lib/errors';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
+import { encryptEnvVars, decryptEnvVars } from '../lib/env-encryption';
 
 interface McpServerConfigRow {
     id: string;
@@ -24,7 +25,7 @@ function rowToConfig(row: McpServerConfigRow): McpServerConfig {
         name: row.name,
         command: row.command,
         args: JSON.parse(row.args),
-        envVars: JSON.parse(row.env_vars),
+        envVars: JSON.parse(decryptEnvVars(row.env_vars)),
         cwd: row.cwd,
         enabled: row.enabled === 1,
         createdAt: row.created_at,
@@ -74,7 +75,7 @@ export function createMcpServerConfig(db: Database, input: CreateMcpServerConfig
         input.name,
         input.command,
         JSON.stringify(input.args ?? []),
-        JSON.stringify(input.envVars ?? {}),
+        encryptEnvVars(JSON.stringify(input.envVars ?? {})),
         input.cwd ?? null,
         input.enabled !== false ? 1 : 0,
         tenantId,
@@ -107,7 +108,7 @@ export function updateMcpServerConfig(db: Database, id: string, input: UpdateMcp
     }
     if (input.envVars !== undefined) {
         fields.push('env_vars = ?');
-        values.push(JSON.stringify(input.envVars));
+        values.push(encryptEnvVars(JSON.stringify(input.envVars)));
     }
     if (input.cwd !== undefined) {
         fields.push('cwd = ?');
