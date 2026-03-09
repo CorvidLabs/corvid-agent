@@ -236,4 +236,61 @@ button:active:not(:disabled) {
 @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
+
+/* ── Reduced motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .page-enter {
+        animation: none;
+    }
+
+    .card-hover:hover {
+        transform: none;
+    }
+
+    button:active:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* ── Screen-reader only utility ── */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── Skip navigation link ── */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 10000;
+    padding: 0.5rem 1rem;
+    background: var(--accent-cyan);
+    color: var(--bg-deep);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    border-radius: var(--radius);
+    transition: top 0.15s;
+}
+.skip-link:focus {
+    top: 0.5rem;
+    outline: 2px solid var(--text-primary);
+    outline-offset: 2px;
 }

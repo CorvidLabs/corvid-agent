@@ -147,7 +147,7 @@ export class CIRetryService {
         failedChecks: string[], agentId: string, projectId: string,
     ): Promise<void> {
         const repoName = repo.split('/')[1];
-        const workDir = `/tmp/${repoName}-pr-${prNumber}`;
+        const workDir = `${require('node:os').tmpdir()}/${repoName}-pr-${prNumber}`;
         const isHomeRepo = repo === 'CorvidLabs/corvid-agent';
 
         const cloneStep = isHomeRepo

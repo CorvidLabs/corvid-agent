@@ -8,6 +8,7 @@
 
 import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
+import { resolveExecutable } from '../lib/env';
 import { queryCount } from '../db/types';
 
 const log = createLogger('AutoUpdate');
@@ -48,14 +49,14 @@ export class AutoUpdateService {
 
         try {
             // Fetch latest from origin
-            const fetchResult = Bun.spawnSync(['git', 'fetch', 'origin', 'main'], {
+            const fetchResult = Bun.spawnSync([resolveExecutable('git'), 'fetch', 'origin', 'main'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe', stderr: 'pipe',
             });
             if (fetchResult.exitCode !== 0) return;
 
             // Only auto-update if we're on the main branch
-            const currentBranch = Bun.spawnSync(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], {
+            const currentBranch = Bun.spawnSync([resolveExecutable('git'), 'rev-parse', '--abbrev-ref', 'HEAD'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe',
             }).stdout.toString().trim();
@@ -66,12 +67,12 @@ export class AutoUpdateService {
             }
 
             // Compare local main with origin/main
-            const localHash = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], {
+            const localHash = Bun.spawnSync([resolveExecutable('git'), 'rev-parse', 'HEAD'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe',
             }).stdout.toString().trim();
 
-            const remoteHash = Bun.spawnSync(['git', 'rev-parse', 'origin/main'], {
+            const remoteHash = Bun.spawnSync([resolveExecutable('git'), 'rev-parse', 'origin/main'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe',
             }).stdout.toString().trim();
@@ -90,7 +91,7 @@ export class AutoUpdateService {
             // No active sessions — pull and restart
             log.info('No active sessions — pulling and restarting');
 
-            const pullResult = Bun.spawnSync(['git', 'pull', '--rebase', 'origin', 'main'], {
+            const pullResult = Bun.spawnSync([resolveExecutable('git'), 'pull', '--rebase', 'origin', 'main'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe', stderr: 'pipe',
             });
@@ -110,7 +111,7 @@ export class AutoUpdateService {
             if (changedFiles) {
                 log.info('Dependencies changed — running bun install', { changedFiles });
                 const installResult = Bun.spawnSync(
-                    ['bun', 'install', '--frozen-lockfile', '--ignore-scripts'],
+                    [resolveExecutable('bun'), 'install', '--frozen-lockfile', '--ignore-scripts'],
                     { cwd: import.meta.dir + '/..', stdout: 'pipe', stderr: 'pipe' },
                 );
                 if (installResult.exitCode !== 0) {
@@ -118,7 +119,7 @@ export class AutoUpdateService {
                         stderr: installResult.stderr.toString().trim(),
                     });
                     // Roll back to the known-good commit so we don't run with mismatched code + deps
-                    Bun.spawnSync(['git', 'reset', '--hard', localHash], {
+                    Bun.spawnSync([resolveExecutable('git'), 'reset', '--hard', localHash], {
                         cwd: import.meta.dir + '/..',
                         stdout: 'pipe', stderr: 'pipe',
                     });
@@ -128,7 +129,7 @@ export class AutoUpdateService {
             }
 
             // Verify pull actually advanced HEAD to origin/main
-            const newLocalHash = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], {
+            const newLocalHash = Bun.spawnSync([resolveExecutable('git'), 'rev-parse', 'HEAD'], {
                 cwd: import.meta.dir + '/..',
                 stdout: 'pipe',
             }).stdout.toString().trim();

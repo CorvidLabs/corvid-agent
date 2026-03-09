@@ -2,6 +2,7 @@ import { createLogger } from '../lib/logger';
 import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
 import { assessImpact } from '../councils/governance';
+import { resolveExecutable } from '../lib/env';
 
 const log = createLogger('WorkValidation');
 
@@ -11,7 +12,7 @@ const log = createLogger('WorkValidation');
  * protected-file checks. Non-fatal — callers decide how to handle errors.
  */
 export async function runBunInstall(cwd: string): Promise<void> {
-    const installProc = Bun.spawn(['bun', 'install', '--frozen-lockfile', '--ignore-scripts'], {
+    const installProc = Bun.spawn([resolveExecutable('bun'), 'install', '--frozen-lockfile', '--ignore-scripts'], {
         cwd,
         stdout: 'pipe',
         stderr: 'pipe',
@@ -25,7 +26,7 @@ export async function runBunInstall(cwd: string): Promise<void> {
             cwd,
             stderr: installStderr.trim(),
         });
-        const retryProc = Bun.spawn(['bun', 'install', '--ignore-scripts'], {
+        const retryProc = Bun.spawn([resolveExecutable('bun'), 'install', '--ignore-scripts'], {
             cwd,
             stdout: 'pipe',
             stderr: 'pipe',
@@ -58,7 +59,7 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
 
     // Run TypeScript check
     try {
-        const tscProc = Bun.spawn(['bun', 'x', 'tsc', '--noEmit', '--skipLibCheck'], {
+        const tscProc = Bun.spawn([resolveExecutable('bun'), 'x', 'tsc', '--noEmit', '--skipLibCheck'], {
             cwd: workingDir,
             stdout: 'pipe',
             stderr: 'pipe',
@@ -81,7 +82,7 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
 
     // Run tests
     try {
-        const testProc = Bun.spawn(['bun', 'test'], {
+        const testProc = Bun.spawn([resolveExecutable('bun'), 'test'], {
             cwd: workingDir,
             stdout: 'pipe',
             stderr: 'pipe',
@@ -104,7 +105,7 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
 
     // Security scan: check git diff for unapproved external fetch calls and malicious patterns
     try {
-        const diffProc = Bun.spawn(['git', 'diff', 'main...HEAD'], {
+        const diffProc = Bun.spawn([resolveExecutable('git'), 'diff', 'main...HEAD'], {
             cwd: workingDir,
             stdout: 'pipe',
             stderr: 'pipe',
