@@ -35,6 +35,7 @@ import {
     handleGitHubFollowUser,
     handleCodeSymbols,
     handleFindReferences,
+    handleFlockDirectory,
 } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
@@ -83,6 +84,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_code_symbols',
     'corvid_find_references',
     'corvid_repo_blocklist',
+    'corvid_flock_directory',
 ]);
 
 // Scheduler tool gating is now handled by scheduler-tool-gating.ts (tiered by action type).
@@ -635,6 +637,34 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 const err = validateRequired('corvid_repo_blocklist', args, ['action']);
                 if (err) return err;
                 return unwrapResult(await handleManageRepoBlocklist(ctx, args as Parameters<typeof handleManageRepoBlocklist>[1]));
+            },
+        });
+
+        // ─── Flock Directory ────────────────────────────────────────────
+        tools.push({
+            name: 'corvid_flock_directory',
+            description: 'Manage the Flock Directory — on-chain agent registry for discovery and reputation. Actions: register, deregister, heartbeat, lookup, search, list, stats.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    action: { type: 'string', enum: ['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats'], description: 'Operation to perform' },
+                    agent_id: { type: 'string', description: 'Agent ID (for deregister, heartbeat, lookup)' },
+                    address: { type: 'string', description: 'Algorand address (for register, lookup)' },
+                    name: { type: 'string', description: 'Agent name (for register)' },
+                    description: { type: 'string', description: 'Agent description (for register)' },
+                    instance_url: { type: 'string', description: 'Agent instance URL (for register)' },
+                    capabilities: { type: 'string', description: 'Comma-separated capabilities (for register)' },
+                    query: { type: 'string', description: 'Search query (for search)' },
+                    capability: { type: 'string', description: 'Filter by capability (for search)' },
+                    min_reputation: { type: 'number', description: 'Minimum reputation score (for search)' },
+                    limit: { type: 'number', description: 'Max results (default 20)' },
+                },
+                required: ['action'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_flock_directory', args, ['action']);
+                if (err) return err;
+                return unwrapResult(await handleFlockDirectory(ctx, args as Parameters<typeof handleFlockDirectory>[1]));
             },
         });
     }

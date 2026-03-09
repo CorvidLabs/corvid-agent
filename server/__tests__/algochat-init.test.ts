@@ -110,6 +110,7 @@ function createMockDeps(overrides: Partial<AlgoChatInitDeps> = {}): AlgoChatInit
             start: mock(() => {}),
             onEvent: mock(() => {}),
         } as any,
+        flockDirectoryService: {} as any,
         ...overrides,
     };
 }

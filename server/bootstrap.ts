@@ -53,6 +53,7 @@ import { AnthropicProvider } from './providers/anthropic/provider';
 import { OllamaProvider } from './providers/ollama/provider';
 import { AstParserService } from './ast/service';
 import { PermissionBroker } from './permissions/broker';
+import { FlockDirectoryService } from './flock-directory/service';
 import { listProjects, createProject } from './db/projects';
 import { initObservability } from './observability/index';
 
@@ -129,6 +130,9 @@ export interface ServiceContainer {
 
     // Security
     permissionBroker: PermissionBroker;
+
+    // Agent directory
+    flockDirectoryService: FlockDirectoryService;
 }
 
 /**
@@ -249,6 +253,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
 
     const marketplaceService = new MarketplaceService(db);
     const marketplaceFederation = new MarketplaceFederation(db);
+    const flockDirectoryService = new FlockDirectoryService(db);
 
     const reputationScorer = new ReputationScorer(db);
     const reputationAttestation = new ReputationAttestation(db);
@@ -432,5 +437,6 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         discordBridge,
         slackBridge,
         permissionBroker,
+        flockDirectoryService,
     };
 }

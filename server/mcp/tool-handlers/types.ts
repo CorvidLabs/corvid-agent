@@ -14,6 +14,7 @@ import type { ReputationVerifier } from '../../reputation/verifier';
 import type { AstParserService } from '../../ast/service';
 import type { PermissionBroker } from '../../permissions/broker';
 import type { ProcessManager } from '../../process/manager';
+import type { FlockDirectoryService } from '../../flock-directory/service';
 import type { ScheduleActionType } from '../../../shared/types/schedules';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
@@ -71,6 +72,8 @@ export interface McpToolContext {
     permissionBroker?: PermissionBroker;
     /** Process manager for launching council sessions. */
     processManager?: ProcessManager;
+    /** Flock Directory service for agent registry operations. */
+    flockDirectoryService?: FlockDirectoryService;
 }
 
 export function textResult(text: string): CallToolResult {

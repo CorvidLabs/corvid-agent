@@ -38,6 +38,7 @@ import { publishToTenant } from '../events/broadcasting';
 import { resolveAgentTenant } from '../tenant/resolve';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import { createKeyProvider } from '../lib/key-provider';
+import type { FlockDirectoryService } from '../flock-directory/service';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -64,6 +65,7 @@ export interface AlgoChatInitDeps {
     usageMeter: UsageMeter;
     healthMonitorService: HealthMonitorService;
     mentionPollingService: MentionPollingService;
+    flockDirectoryService: FlockDirectoryService;
 }
 
 /**
@@ -74,7 +76,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     const { db, server, processManager, algochatConfig, algochatState, workTaskService,
         schedulerService, workflowService, notificationService, questionDispatcher,
         reputationScorer, reputationAttestation, reputationVerifier, astParserService,
-        permissionBroker, shutdownCoordinator } = deps;
+        permissionBroker, shutdownCoordinator, flockDirectoryService } = deps;
 
     if (!algochatConfig.enabled) {
         log.info('AlgoChat disabled');
@@ -150,6 +152,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
         astParserService,
         permissionBroker,
         processManager,
+        flockDirectoryService,
     });
 
     // Forward AlgoChat events to WebSocket clients
