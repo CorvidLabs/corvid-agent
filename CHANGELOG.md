@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0] - 2026-03-08
+
+### Added
+- **Work pipeline v2** — parallel execution, task dependencies, and retry policies for work tasks (#793, #632)
+- **Governance v2** — proposals with weighted voting and quorum rules (#789, #633)
+- **Encryption at rest** — encrypt env_vars using AES-256-GCM (#791)
+- **Container sandboxing** — integrate SandboxManager into ProcessManager with resource limits and network isolation (#786, #382)
+- **KeyProvider abstraction** — wallet encryption via pluggable KeyProvider interface (#772, #383)
+- **Bridge delivery receipts** — message delivery receipt tracking for bridge hardening (#780, #631)
+- **Security Overview dashboard** — new dashboard page for security posture visibility (#779)
+- **Stats automation** — automated stats collection and drift detection (#792, #537)
+- **GH_TOKEN scope validation** — OAuth scope validation on server startup (#787)
+- **Discord passive channel mode** — threads via `/session` only, no unsolicited replies (#761)
+- **Council Discord notifications** — post council synthesis to Discord on completion (#766)
+- **Real-time session status** — live session status updates with silent death prevention (#775)
+- **Telegram bridge hardening** — poll backoff and message deduplication (#762)
+
+### Security
+- **Error message sanitization** — sanitize error messages in WS and AlgoChat handlers to prevent info leakage (#763)
+
+### Fixed
+- Document 7 undocumented exports in security and infra specs (#790)
+- Prevent duplicate Discord messages and normalize coding-tool paths (#788)
+- Relax protected files and stop auto-closing PRs (#784)
+- Remove duplicate properties in playwright config (#770)
+- Discord slash commands failing due to interaction token too short (#765)
+- Eliminate `any` types in subscription manager tests (#744)
+
+### Refactored
+- Extract Discord gateway into dedicated module (#769)
+- Extract scheduler service into handler modules (#759)
+
+### Tests
+- Wait-sessions, tenant middleware, and plugin permissions coverage (#773)
+
+### Documentation
+- TaskQueue design doc — prerequisite for work pipeline (#771)
+- Document all 17 remaining undocumented exports (#768)
+- Sync stale stats across README and doc files (#767)
+- Discord passive channel mode spec (#760)
+- Update version references to 0.20.0 (#745)
+
+### Cross-Repo
+- **corvid-agent-chat:** toast, chat-messages, search coverage (+69 tests, #58); split chat.ts view (#57); device-name and wallet lifecycle coverage (+51, #56); wallet idle lock (#55); icon sizing fixes (#49, #52, #54)
+- **specl:** WelcomeComponent tests (#74); GitHubOAuthService and FrontmatterEditor coverage (+26, #73); wildcard route redirect (#72); missing spec.md files (#68)
+- **corvid-reputation:** standardize git author identity in generate workflow (#1)
+
+### Stats
+- **5,802** unit tests across 235 files (16,167 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **112** module specs with automated validation
+- **38** MCP tools, **~200** API endpoints, **81** tables
+- **42** PRs merged across 4 repositories this week
+
 ## [0.20.0] - 2026-03-07
 
 ### Added
