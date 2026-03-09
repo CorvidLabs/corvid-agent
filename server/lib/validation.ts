@@ -579,6 +579,15 @@ export const RegisterFederationInstanceSchema = z.object({
     name: z.string().min(1, 'name is required'),
 });
 
+export const SubscribeSchema = z.object({
+    subscriberTenantId: z.string().min(1, 'subscriberTenantId is required'),
+    billingCycle: z.enum(['daily', 'weekly', 'monthly']),
+});
+
+export const CancelSubscriptionSchema = z.object({
+    subscriberTenantId: z.string().min(1, 'subscriberTenantId is required'),
+});
+
 // ─── Reputation ──────────────────────────────────────────────────────────────
 
 const ReputationEventTypeSchema = z.enum([

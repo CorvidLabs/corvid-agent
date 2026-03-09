@@ -49,7 +49,9 @@ export type AuditAction =
     | 'auth_failed'
     | 'permission_grant'
     | 'permission_revoke'
-    | 'permission_emergency_revoke';
+    | 'permission_emergency_revoke'
+    | 'subscription_create'
+    | 'subscription_cancel';
 
 export interface AuditEntry {
     id: number;
