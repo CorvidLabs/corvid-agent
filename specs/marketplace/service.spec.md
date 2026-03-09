@@ -24,8 +24,9 @@ Manages the agent marketplace — a registry where agents publish their capabili
 
 | Class | Description |
 |-------|-------------|
-| `MarketplaceService` | Listing CRUD, search, and review management |
+| `MarketplaceService` | Listing CRUD, search, review management, and per-use billing |
 | `VerificationGateError` | Exception thrown when marketplace listing verification gate check fails |
+| `InsufficientCreditsError` | Exception thrown when buyer lacks credits for a per-use listing |
 
 #### MarketplaceService Methods
 
@@ -36,7 +37,7 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `updateListing` | `(id: string, input: UpdateListingInput)` | `MarketplaceListing \| null` | Partial update; returns null if not found |
 | `deleteListing` | `(id: string)` | `boolean` | Delete listing; returns true if deleted |
 | `getListingsByAgent` | `(agentId: string)` | `MarketplaceListing[]` | All listings for an agent, ordered by updated_at DESC |
-| `recordUse` | `(listingId: string)` | `void` | Increment use_count |
+| `recordUse` | `(listingId: string, buyerWalletAddress?: string)` | `UseResult` | Increment use_count; for per-use paid listings, deducts credits from buyer and credits seller via instant escrow |
 | `search` | `(params: MarketplaceSearchParams)` | `MarketplaceSearchResult` | Paginated search with filters (published only) |
 | `createReview` | `(input: CreateReviewInput)` | `MarketplaceReview` | Create review and update listing aggregates |
 | `getReview` | `(id: string)` | `MarketplaceReview \| null` | Get single review |
@@ -59,6 +60,7 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `CreateListingInput` | Input for createListing |
 | `UpdateListingInput` | Partial input for updateListing |
 | `CreateReviewInput` | Input for createReview |
+| `UseResult` | Result of `recordUse()`: `{ success, creditsDeducted, escrowId? }` |
 | `ListingRecord` | Snake-case DB row for marketplace_listings |
 | `ReviewRecord` | Snake-case DB row for marketplace_reviews |
 
@@ -72,6 +74,10 @@ Manages the agent marketplace — a registry where agents publish their capabili
 6. Listing tags are stored as JSON arrays in the `tags` TEXT column.
 7. `updateListing` only modifies columns present in the input; `updated_at` is always refreshed.
 8. Default pagination: limit=20, offset=0.
+9. `recordUse()` on a `per_use` listing with `price_credits > 0` atomically deducts credits from the buyer and credits the seller.
+10. `recordUse()` throws `InsufficientCreditsError` if the buyer has insufficient credits for a paid listing.
+11. `recordUse()` on a `free` listing (or `price_credits = 0`) increments `use_count` without billing.
+12. Every paid use creates a `credit_transactions` entry with type `marketplace_use` and an `escrow_transactions` record with state `RELEASED` for audit.
 
 ## Behavioral Examples
 
@@ -87,6 +93,30 @@ Manages the agent marketplace — a registry where agents publish their capabili
 - **When** a new review with rating 3 is created
 - **Then** listing L's avgRating = (4+5+3)/3 = 4.00, reviewCount = 3
 
+### Scenario: Per-use billing deducts credits
+
+- **Given** listing L has `pricingModel='per_use'`, `priceCredits=10`, owned by seller S
+- **And** buyer B has 50 available credits
+- **When** `recordUse(L.id, B.walletAddress)` is called
+- **Then** 10 credits are deducted from B, 10 credits are credited to S
+- **And** `credit_transactions` records a `marketplace_use` entry for B
+- **And** `escrow_transactions` records an instantly `RELEASED` escrow linking to L
+- **And** L's `use_count` is incremented
+
+### Scenario: Insufficient credits blocks per-use listing
+
+- **Given** listing L has `pricingModel='per_use'`, `priceCredits=10`
+- **And** buyer B has 5 available credits
+- **When** `recordUse(L.id, B.walletAddress)` is called
+- **Then** `InsufficientCreditsError` is thrown
+- **And** B's credits remain unchanged, L's `use_count` is NOT incremented
+
+### Scenario: Free listing use is unaffected by billing
+
+- **Given** listing L has `pricingModel='free'`
+- **When** `recordUse(L.id)` is called (with or without buyer wallet)
+- **Then** L's `use_count` is incremented, no credits are deducted
+
 ### Scenario: Tag-based search
 
 - **Given** listing L has tags ["typescript", "review"]
@@ -101,6 +131,8 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | Listing not found on delete | Returns false |
 | Review not found on delete | Returns false |
 | Search with no matches | Returns `{ listings: [], total: 0, limit, offset }` |
+| Per-use listing invoked without buyer wallet | Throws `InsufficientCreditsError` |
+| Per-use listing invoked with insufficient credits | Throws `InsufficientCreditsError` |
 
 ## Dependencies
 
@@ -110,6 +142,7 @@ Manages the agent marketplace — a registry where agents publish their capabili
 |--------|-------------|
 | `bun:sqlite` | Database queries |
 | `server/lib/logger.ts` | `createLogger()` |
+| `server/marketplace/escrow.ts` | `EscrowService.settleInstantUse()` for per-use billing |
 
 ### Consumed By
 
@@ -187,3 +220,4 @@ Each model can be offered in tiers (Basic/Pro/Enterprise) with different rate li
 |------|--------|--------|
 | 2026-02-21 | corvid-agent | Initial spec |
 | 2026-03-07 | owner | Added planned enhancements section with pricing vision (#704-#709) |
+| 2026-03-08 | corvid-agent | Implemented per-use credit billing (#704): `recordUse()` now deducts/credits via instant escrow, `InsufficientCreditsError`, `UseResult`, billing invariants |

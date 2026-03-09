@@ -22,10 +22,10 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |--------|-------|
 | Unit tests | **5,838** across 237 files (16,222 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **113** with automated validation |
+| Module specs | **114** with automated validation |
 | MCP tools | **38** corvid_* tool handlers |
 | API endpoints | **~200** across 42 route modules |
-| DB migrations | **24** (squashed baseline, 82 tables) |
+| DB migrations | **25** (squashed baseline, 83 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.

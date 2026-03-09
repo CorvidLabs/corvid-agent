@@ -68,6 +68,88 @@ export class EscrowService {
     }
 
     /**
+     * Instant-settle a per-use marketplace invocation.
+     * Atomically deducts from buyer and credits seller — no delivery step needed.
+     * Returns null if buyer has insufficient credits.
+     */
+    settleInstantUse(
+        listingId: string,
+        buyerWalletAddress: string,
+        sellerWalletAddress: string,
+        amountCredits: number,
+    ): EscrowTransaction | null {
+        const id = crypto.randomUUID();
+
+        const settled = this.db.transaction(() => {
+            // Atomic debit buyer with balance guard
+            const updated = this.db.query(`
+                UPDATE credit_ledger
+                SET credits = credits - ?,
+                    total_consumed = total_consumed + ?,
+                    updated_at = datetime('now')
+                WHERE wallet_address = ? AND (credits - reserved) >= ?
+            `).run(amountCredits, amountCredits, buyerWalletAddress, amountCredits);
+
+            if (updated.changes === 0) {
+                return false;
+            }
+
+            // Record buyer deduction
+            const buyerBalance = getBalance(this.db, buyerWalletAddress);
+            this.db.query(`
+                INSERT INTO credit_transactions
+                    (wallet_address, type, amount, balance_after, reference)
+                VALUES (?, 'marketplace_use', ?, ?, ?)
+            `).run(buyerWalletAddress, amountCredits, buyerBalance.credits, `listing:${listingId}`);
+
+            // Credit seller
+            this.db.query(`
+                INSERT OR IGNORE INTO credit_ledger
+                    (wallet_address, credits, reserved, total_purchased, total_consumed)
+                VALUES (?, 0, 0, 0, 0)
+            `).run(sellerWalletAddress);
+
+            this.db.query(`
+                UPDATE credit_ledger
+                SET credits = credits + ?,
+                    updated_at = datetime('now')
+                WHERE wallet_address = ?
+            `).run(amountCredits, sellerWalletAddress);
+
+            const sellerBalance = getBalance(this.db, sellerWalletAddress);
+            this.db.query(`
+                INSERT INTO credit_transactions
+                    (wallet_address, type, amount, balance_after, reference)
+                VALUES (?, 'grant', ?, ?, ?)
+            `).run(sellerWalletAddress, amountCredits, sellerBalance.credits, `marketplace_sale:${listingId}`);
+
+            // Create escrow record as instantly RELEASED for audit trail
+            this.db.query(`
+                INSERT INTO escrow_transactions
+                    (id, listing_id, buyer_tenant_id, seller_tenant_id, amount_credits, state, delivered_at, released_at)
+                VALUES (?, ?, ?, ?, ?, 'RELEASED', datetime('now'), datetime('now'))
+            `).run(id, listingId, buyerWalletAddress, sellerWalletAddress, amountCredits);
+
+            return true;
+        })();
+
+        if (!settled) {
+            log.warn('Per-use billing failed: insufficient credits', {
+                buyer: buyerWalletAddress,
+                listing: listingId,
+                required: amountCredits,
+            });
+            return null;
+        }
+
+        recordAudit(this.db, 'credit_deduction', buyerWalletAddress, 'escrow_transactions', id,
+            `Per-use billing: ${amountCredits} credits for listing ${listingId}`);
+
+        log.info('Per-use billing settled', { id, listingId, buyer: buyerWalletAddress, seller: sellerWalletAddress, amount: amountCredits });
+        return this.getTransaction(id)!;
+    }
+
+    /**
      * Create a funded escrow — debits credits from buyer's balance.
      * Returns null if buyer has insufficient funds.
      */

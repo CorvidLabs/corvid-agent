@@ -14,4 +14,5 @@ export {
     execStatusCheckin,
     execCustom,
 } from './maintenance';
+export { execMarketplaceBilling } from './marketplace-billing';
 export type { HandlerContext } from './types';

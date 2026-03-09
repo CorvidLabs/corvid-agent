@@ -1,9 +1,11 @@
 /**
- * Marketplace routes — Listing CRUD, search, reviews, federation.
+ * Marketplace routes — Listing CRUD, search, reviews, federation, subscriptions.
  */
 import type { Database } from 'bun:sqlite';
-import { type MarketplaceService, VerificationGateError } from '../marketplace/service';
+import { type MarketplaceService, VerificationGateError, InsufficientCreditsError } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
+import { SubscriptionService } from '../marketplace/subscriptions';
+import type { SubscriptionStatus } from '../marketplace/subscriptions';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
 import type {
@@ -11,7 +13,7 @@ import type {
     PricingModel,
 } from '../marketplace/types';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
-import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema } from '../lib/validation';
 
 export function handleMarketplaceRoutes(
     req: Request,
@@ -94,11 +96,19 @@ export function handleMarketplaceRoutes(
         }
     }
 
-    // Record a use
+    // Record a use (with per-use credit billing)
     const useMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/use$/);
     if (useMatch && method === 'POST') {
-        marketplace.recordUse(useMatch[1]);
-        return json({ ok: true });
+        try {
+            const buyerWallet = context?.walletAddress ?? context?.tenantId;
+            const result = marketplace.recordUse(useMatch[1], buyerWallet);
+            return json({ ok: true, creditsDeducted: result.creditsDeducted, escrowId: result.escrowId });
+        } catch (err) {
+            if (err instanceof InsufficientCreditsError) {
+                return json({ error: 'Insufficient credits', required: err.required }, 402);
+            }
+            return handleRouteError(err);
+        }
     }
 
     // ─── Reviews ─────────────────────────────────────────────────────────────
@@ -162,6 +172,40 @@ export function handleMarketplaceRoutes(
     if (federatedMatch && method === 'GET') {
         const limit = safeNumParam(url.searchParams.get('limit'), 50);
         return json(federation?.getFederatedListings(limit) ?? []);
+    }
+
+    // ─── Subscriptions ───────────────────────────────────────────────────────
+
+    const subscribeMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/subscribe$/);
+    if (subscribeMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleSubscribe(req, subscribeMatch[1], _db, marketplace);
+    }
+
+    const cancelSubMatch = path.match(/^\/api\/marketplace\/subscriptions\/([^/]+)\/cancel$/);
+    if (cancelSubMatch && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleCancelSubscription(req, cancelSubMatch[1], _db);
+    }
+
+    if (path === '/api/marketplace/subscriptions' && method === 'GET') {
+        const tenantId = url.searchParams.get('tenantId');
+        if (!tenantId) return badRequest('tenantId query parameter is required');
+        const status = url.searchParams.get('status') as SubscriptionStatus | null;
+        const subs = new SubscriptionService(_db);
+        return json(subs.getBySubscriber(tenantId, status ?? undefined));
+    }
+
+    const subscribersMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/subscribers$/);
+    if (subscribersMatch && method === 'GET') {
+        const subs = new SubscriptionService(_db);
+        return json(subs.getSubscribers(subscribersMatch[1]));
     }
 
     return null;
@@ -242,6 +286,68 @@ async function handleSyncAll(
         const result = await federation.syncAll();
         return json(result);
     } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleSubscribe(
+    req: Request,
+    listingId: string,
+    db: Database,
+    marketplace?: MarketplaceService | null,
+): Promise<Response> {
+    if (!marketplace) return json({ error: 'Marketplace not available' }, 503);
+
+    const subscriptions = new SubscriptionService(db);
+
+    try {
+        const body = await parseBodyOrThrow(req, SubscribeSchema);
+
+        // Validate listing exists and uses subscription pricing
+        const listing = marketplace.getListing(listingId);
+        if (!listing) return notFound('Listing not found');
+        if (listing.pricingModel !== 'subscription') {
+            return badRequest('Listing does not use subscription pricing');
+        }
+
+        // Check for existing active subscription
+        if (subscriptions.hasActiveSubscription(listingId, body.subscriberTenantId)) {
+            return badRequest('Already subscribed to this listing');
+        }
+
+        const sub = subscriptions.subscribe(
+            listingId,
+            body.subscriberTenantId,
+            listing.tenantId, // seller wallet for billing
+            listing.priceCredits,
+            body.billingCycle,
+        );
+
+        if (!sub) {
+            return json({ error: 'Insufficient credits' }, 402);
+        }
+
+        return json(sub, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return badRequest(err.detail);
+        return handleRouteError(err);
+    }
+}
+
+async function handleCancelSubscription(
+    req: Request,
+    subscriptionId: string,
+    db: Database,
+): Promise<Response> {
+    const subscriptions = new SubscriptionService(db);
+
+    try {
+        const body = await parseBodyOrThrow(req, CancelSubscriptionSchema);
+        const sub = subscriptions.cancel(subscriptionId, body.subscriberTenantId);
+        if (!sub) return notFound('Subscription not found or not owned by tenant');
+        return json(sub);
+    } catch (err) {
+        if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
 }

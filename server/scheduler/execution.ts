@@ -36,6 +36,7 @@ import {
     execOutcomeAnalysis,
     execDailyReview,
     execStatusCheckin,
+    execMarketplaceBilling,
     execCustom,
 } from './handlers';
 
@@ -72,6 +73,7 @@ async function dispatchAction(
         case 'outcome_analysis':       await execOutcomeAnalysis(hctx, executionId, schedule); break;
         case 'daily_review':           execDailyReview(hctx, executionId, schedule); break;
         case 'status_checkin':         await execStatusCheckin(hctx, executionId, schedule); break;
+        case 'marketplace_billing':    execMarketplaceBilling(hctx, executionId); break;
         case 'custom':                 await execCustom(hctx, executionId, schedule, action); break;
         default:
             updateExecutionStatus(db, executionId, 'failed', {
