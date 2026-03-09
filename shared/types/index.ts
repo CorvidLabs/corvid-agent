@@ -15,3 +15,4 @@ export * from './skill-bundles';
 export * from './a2a';
 export * from './reputation';
 export * from './marketplace';
+export * from './flock-directory';

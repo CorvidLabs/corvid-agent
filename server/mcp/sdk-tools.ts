@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { getAgent } from '../db/agents';
@@ -44,6 +44,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_find_references',
     'corvid_repo_blocklist',
     'corvid_launch_council',
+    'corvid_flock_directory',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -494,6 +495,28 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 async (args) => handleLaunchCouncil(ctx, args),
             ),
         ] : []),
+
+        // ─── Flock Directory ────────────────────────────────────────────
+        tool(
+            'corvid_flock_directory',
+            'Manage the Flock Directory — an on-chain agent registry for discovery and reputation. ' +
+            'Actions: register, deregister, heartbeat, lookup, search, list, stats.',
+            {
+                action: z.enum(['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats'])
+                    .describe('Operation to perform'),
+                agent_id: z.string().optional().describe('Agent ID (for deregister, heartbeat, lookup)'),
+                address: z.string().optional().describe('Algorand address (for register, lookup)'),
+                name: z.string().optional().describe('Agent name (for register)'),
+                description: z.string().optional().describe('Agent description (for register)'),
+                instance_url: z.string().optional().describe('Agent instance URL (for register)'),
+                capabilities: z.string().optional().describe('Comma-separated capabilities (for register)'),
+                query: z.string().optional().describe('Search query (for search)'),
+                capability: z.string().optional().describe('Filter by capability (for search)'),
+                min_reputation: z.number().optional().describe('Minimum reputation score (for search)'),
+                limit: z.number().optional().describe('Max results to return (default 20)'),
+            },
+            async (args) => handleFlockDirectory(ctx, args),
+        ),
     ];
 
     // Merge plugin tools if provided

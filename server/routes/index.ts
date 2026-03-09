@@ -36,6 +36,7 @@ import { handleFeedbackRoutes } from './feedback';
 import { handleOnboardingRoutes } from './onboarding';
 import { handleSecurityOverviewRoutes } from './security-overview';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
+import { handleFlockDirectoryRoutes } from './flock-directory';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -83,6 +84,7 @@ import type { BillingService } from '../billing/service';
 import type { UsageMeter } from '../billing/meter';
 import type { PerformanceCollector } from '../performance/collector';
 import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
+import type { FlockDirectoryService } from '../flock-directory/service';
 
 // Load auth config once at module level
 let authConfig: AuthConfig | null = null;
@@ -148,6 +150,7 @@ export interface RouteServices {
     tenantService?: TenantService | null;
     performanceCollector?: PerformanceCollector | null;
     outcomeTracker?: OutcomeTrackerService | null;
+    flockDirectory?: FlockDirectoryService | null;
 }
 
 export async function handleRequest(
@@ -175,6 +178,7 @@ export async function handleRequest(
     tenantService?: TenantService | null,
     performanceCollector?: PerformanceCollector | null,
     outcomeTracker?: OutcomeTrackerService | null,
+    flockDirectory?: FlockDirectoryService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
     const config = getAuthConfig();
@@ -232,7 +236,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -275,6 +279,7 @@ async function handleRoutes(
     tenantService?: TenantService | null,
     performanceCollector?: PerformanceCollector | null,
     outcomeTracker?: OutcomeTrackerService | null,
+    flockDirectory?: FlockDirectoryService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -384,6 +389,10 @@ async function handleRoutes(
     // Reputation routes
     const reputationResponse = handleReputationRoutes(req, url, db, reputationScorer, reputationAttestation, context);
     if (reputationResponse) return reputationResponse;
+
+    // Flock Directory routes
+    const flockDirResponse = handleFlockDirectoryRoutes(req, url, db, flockDirectory, context);
+    if (flockDirResponse) return flockDirResponse;
 
     // Billing routes
     const billingResponse = await handleBillingRoutes(req, url, db, billing, usageMeter, context);
