@@ -1,16 +1,20 @@
 /**
- * Migration 078: Add trial support for marketplace listings.
+ * Migration 078: Add marketplace_trials table and trial config columns on listings.
  *
- * Adds trial_uses and trial_days columns to marketplace_listings,
- * and creates the marketplace_trials table for tracking active trials.
+ * Enables free trial periods for paid marketplace listings:
+ * - trial_uses: number of free uses before per-use billing kicks in
+ * - trial_days: days of free access before subscription billing starts
+ * - marketplace_trials: tracks per buyer-listing trial state
  */
 
 import { Database } from 'bun:sqlite';
 
 export function up(db: Database): void {
-    db.exec('ALTER TABLE marketplace_listings ADD COLUMN trial_uses INTEGER DEFAULT NULL');
-    db.exec('ALTER TABLE marketplace_listings ADD COLUMN trial_days INTEGER DEFAULT NULL');
+    // Add trial configuration columns to marketplace_listings
+    db.exec(`ALTER TABLE marketplace_listings ADD COLUMN trial_uses INTEGER DEFAULT NULL`);
+    db.exec(`ALTER TABLE marketplace_listings ADD COLUMN trial_days INTEGER DEFAULT NULL`);
 
+    // Create trial tracking table
     db.exec(`
         CREATE TABLE IF NOT EXISTS marketplace_trials (
             id              TEXT PRIMARY KEY,
@@ -30,4 +34,7 @@ export function up(db: Database): void {
 
 export function down(db: Database): void {
     db.exec('DROP TABLE IF EXISTS marketplace_trials');
+    // SQLite doesn't support DROP COLUMN in older versions, but Bun's SQLite does
+    db.exec('ALTER TABLE marketplace_listings DROP COLUMN trial_uses');
+    db.exec('ALTER TABLE marketplace_listings DROP COLUMN trial_days');
 }
