@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'bun:test';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 import type { InitOptions } from '../../cli/commands/init';
 
 describe('CLI Init Command', () => {
@@ -41,6 +42,78 @@ describe('CLI Init Command', () => {
         const fullOpts: InitOptions = { full: true, yes: true };
         expect(fullOpts.full).toBe(true);
         expect(fullOpts.yes).toBe(true);
+    });
+});
+
+describe('Agent Skills', () => {
+    const skillNames = [
+        'algochat', 'work-tasks', 'scheduling', 'memory',
+        'github', 'reputation', 'orchestration', 'flock-directory',
+    ];
+
+    test('skills directory exists with all skill subdirectories', () => {
+        const skillsDir = join(import.meta.dir, '..', '..', 'skills');
+        expect(existsSync(skillsDir)).toBe(true);
+
+        for (const name of skillNames) {
+            const skillPath = join(skillsDir, name, 'SKILL.md');
+            expect(existsSync(skillPath)).toBe(true);
+        }
+    });
+
+    test('each SKILL.md has required YAML frontmatter', () => {
+        const skillsDir = join(import.meta.dir, '..', '..', 'skills');
+
+        for (const name of skillNames) {
+            const content = readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
+            // Check frontmatter delimiters
+            expect(content.startsWith('---\n')).toBe(true);
+            const endIdx = content.indexOf('---', 4);
+            expect(endIdx).toBeGreaterThan(4);
+
+            const frontmatter = content.slice(4, endIdx);
+            // Required fields
+            expect(frontmatter).toContain(`name: ${name}`);
+            expect(frontmatter).toContain('description:');
+        }
+    });
+
+    test('SKILL.md descriptions are substantive (>50 chars)', () => {
+        const skillsDir = join(import.meta.dir, '..', '..', 'skills');
+
+        for (const name of skillNames) {
+            const content = readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf-8').replace(/\r\n/g, '\n');
+            const endIdx = content.indexOf('---', 4);
+            const frontmatter = content.slice(4, endIdx);
+            const descMatch = frontmatter.match(/description:\s*(.+)/);
+            expect(descMatch).toBeTruthy();
+            expect(descMatch![1].length).toBeGreaterThan(50);
+        }
+    });
+
+    test('copySkills copies to .claude/skills/', () => {
+        const { copySkills } = require('../../cli/commands/init');
+        const tmpDir = join(tmpdir(), `corvid-skills-test-${Date.now()}`);
+        mkdirSync(join(tmpDir, '.claude'), { recursive: true });
+
+        try {
+            copySkills(tmpDir);
+
+            // Verify skills were copied
+            for (const name of skillNames) {
+                const skillPath = join(tmpDir, '.claude', 'skills', name, 'SKILL.md');
+                expect(existsSync(skillPath)).toBe(true);
+            }
+        } finally {
+            rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('skills README exists', () => {
+        const readmePath = join(import.meta.dir, '..', '..', 'skills', 'README.md');
+        expect(existsSync(readmePath)).toBe(true);
+        const content = readFileSync(readmePath, 'utf-8');
+        expect(content).toContain('Agent Skills');
     });
 });
 

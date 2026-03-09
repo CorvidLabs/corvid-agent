@@ -1,5 +1,5 @@
 import { createInterface } from 'readline';
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { c, printError, printSuccess, printWarning, printHeader, Spinner } from '../render';
 
@@ -112,6 +112,85 @@ async function checkPrerequisites(): Promise<CheckResult[]> {
     return results;
 }
 
+// ─── Skills Copy ─────────────────────────────────────────────────────────────
+
+function findSkillsSource(): string | null {
+    // From project root (dev mode)
+    const projectRoot = findProjectRoot();
+    if (projectRoot) {
+        const devPath = join(projectRoot, 'skills');
+        if (existsSync(devPath)) return devPath;
+    }
+
+    // From installed package (npx / npm)
+    const pkgPath = join(dirname(dirname(__dirname)), 'skills');
+    if (existsSync(pkgPath)) return pkgPath;
+
+    return null;
+}
+
+function copySkillsToDir(source: string, targetDir: string): number {
+    let count = 0;
+    const entries = readdirSync(source, { withFileTypes: true });
+    for (const entry of entries) {
+        if (entry.isDirectory()) {
+            const skillDir = join(source, entry.name);
+            const skillFile = join(skillDir, 'SKILL.md');
+            if (existsSync(skillFile)) {
+                const destDir = join(targetDir, entry.name);
+                mkdirSync(destDir, { recursive: true });
+                copyFileSync(skillFile, join(destDir, 'SKILL.md'));
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+export function copySkills(cwd: string): void {
+    const source = findSkillsSource();
+    if (!source) {
+        printWarning('Skills directory not found — skipping skill installation.');
+        return;
+    }
+
+    let installed = false;
+
+    // Claude Code: .claude/skills/ in project dir
+    const claudeSkillsDir = join(cwd, '.claude', 'skills');
+    const count = copySkillsToDir(source, claudeSkillsDir);
+    if (count > 0) {
+        printSuccess(`${count} skills installed to ${claudeSkillsDir}`);
+        installed = true;
+    }
+
+    // Cursor: .cursor/rules/ in project dir (if .cursor exists)
+    const cursorDir = join(cwd, '.cursor');
+    if (existsSync(cursorDir)) {
+        const cursorRulesDir = join(cursorDir, 'rules');
+        const cursorCount = copySkillsToDir(source, cursorRulesDir);
+        if (cursorCount > 0) {
+            printSuccess(`${cursorCount} skills installed to ${cursorRulesDir}`);
+            installed = true;
+        }
+    }
+
+    // VS Code Copilot: .github/skills/ in project dir (if .github exists)
+    const githubDir = join(cwd, '.github');
+    if (existsSync(githubDir)) {
+        const githubSkillsDir = join(githubDir, 'skills');
+        const ghCount = copySkillsToDir(source, githubSkillsDir);
+        if (ghCount > 0) {
+            printSuccess(`${ghCount} skills installed to ${githubSkillsDir}`);
+            installed = true;
+        }
+    }
+
+    if (!installed) {
+        printWarning('No skills were installed.');
+    }
+}
+
 // ─── MCP-Only Init ──────────────────────────────────────────────────────────
 
 async function initMcpOnly(_opts: { yes: boolean }): Promise<void> {
@@ -211,6 +290,10 @@ ${c.gray('Set up corvid-agent as an MCP server for Claude Code, Cursor, or other
         renameSync(tmpCursorPath, cursorMcpPath);
         printSuccess(`MCP server added to ${c.gray(cursorMcpPath)}`);
     }
+
+    // Copy Agent Skills to project
+    printHeader('Agent Skills');
+    copySkills(process.cwd());
 
     // Detect VibeKit and suggest side-by-side setup
     let hasVibeKit = false;
@@ -580,7 +663,7 @@ ${c.bold}Next steps:${c.reset}
   ${c.cyan('corvid-agent demo')}    Run a self-contained demo
 
 ${c.bold}Use with AI editors:${c.reset}
-  ${c.cyan('corvid-agent init --mcp')}   Add corvid-agent tools to Claude Code / Cursor
+  ${c.cyan('corvid-agent init --mcp')}   Add MCP tools + Agent Skills to Claude Code / Cursor
 
 ${c.gray('Docs: docs/quickstart.md  •  Dashboard: http://127.0.0.1:3000')}
 `);
