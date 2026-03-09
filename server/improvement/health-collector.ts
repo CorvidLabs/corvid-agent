@@ -133,17 +133,32 @@ export function parseTestOutput(output: string, exitCode: number): { passed: boo
 // ─── TODO/FIXME/HACK Counting ────────────────────────────────────────────────
 
 export function parseTodoOutput(output: string): { todoCount: number; fixmeCount: number; hackCount: number; samples: string[] } {
+    // grep output is file:line:content — extract the content portion for analysis
     const lines = output.split('\n').filter((l) => l.trim().length > 0);
     let todoCount = 0;
     let fixmeCount = 0;
     let hackCount = 0;
     const samples: string[] = [];
 
+    // Match TODO/FIXME/HACK only when they appear as comment markers, not inside
+    // strings that reference the feature (e.g. 'TODO collection failed' or
+    // `if (/TODO/i.test(line))`). We look for the keyword preceded by comment
+    // syntax or at the start of the content after the grep file:line: prefix.
+    const COMMENT_TODO  = /(?:\/\/|\/\*|\*)\s*TODO\b/i;
+    const COMMENT_FIXME = /(?:\/\/|\/\*|\*)\s*FIXME\b/i;
+    const COMMENT_HACK  = /(?:\/\/|\/\*|\*)\s*HACK\b/i;
+
     for (const line of lines) {
-        if (/TODO/i.test(line)) todoCount++;
-        if (/FIXME/i.test(line)) fixmeCount++;
-        if (/HACK/i.test(line)) hackCount++;
-        if (samples.length < 10) {
+        // Extract the content portion after the grep prefix (file:linenum:)
+        const content = line.replace(/^[^:]+:\d+:/, '');
+        const isTodo  = COMMENT_TODO.test(content);
+        const isFixme = COMMENT_FIXME.test(content);
+        const isHack  = COMMENT_HACK.test(content);
+
+        if (isTodo)  todoCount++;
+        if (isFixme) fixmeCount++;
+        if (isHack)  hackCount++;
+        if ((isTodo || isFixme || isHack) && samples.length < 10) {
             samples.push(line.trim().slice(0, 200));
         }
     }
@@ -280,7 +295,9 @@ export class CodebaseHealthCollector {
         const files: LargeFile[] = [];
         const THRESHOLD = 500;
 
-        for await (const match of glob.scan({ cwd, dot: false })) {
+        for await (const match of glob.scan({ cwd, dot: false, followSymlinks: false })) {
+            // Skip files inside node_modules or other dependency directories
+            if (match.includes('node_modules') || match.includes('.angular')) continue;
             try {
                 const content = readFileSync(join(cwd, match), 'utf-8');
                 const lineCount = content.split('\n').length;
