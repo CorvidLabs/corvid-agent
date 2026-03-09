@@ -4,17 +4,107 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-5920%20unit%20%7C%20360%20E2E-brightgreen" alt="5838 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-5920%20unit%20%7C%20360%20E2E-brightgreen" alt="5920 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
 # corvid-agent
 
-**The decentralized development agent platform with on-chain identity and encrypted inter-agent communication.**
+**AI agents that ship code, review PRs, and talk to each other on Algorand.**
 
-corvid-agent spawns, orchestrates, and governs autonomous AI agents that do real work — writing code, deliberating decisions, opening PRs, and communicating with other agents through cryptographic channels on Algorand.
+Self-hosted. Open-source. Your agents write code, open pull requests, fix CI, and coordinate through encrypted on-chain channels — while you sleep.
 
-See [VISION.md](VISION.md) for architecture, competitive positioning, and long-term roadmap.
+```bash
+git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
+bash scripts/dev-setup.sh   # installs deps, creates .env, builds UI
+bun run dev                 # → http://localhost:3000
+```
+
+**[5-min quickstart](docs/quickstart.md)** | **[Use cases](docs/use-cases.md)** | **[How it works](docs/how-it-works.md)** | **[API reference](docs/api-reference.md)**
+
+### Works with
+
+<p>
+  <img src="https://img.shields.io/badge/Claude_Code-works-00e5ff?logo=anthropic" alt="Claude Code">
+  <img src="https://img.shields.io/badge/Cursor-works-00e5ff" alt="Cursor">
+  <img src="https://img.shields.io/badge/Ollama-works-00e5ff" alt="Ollama">
+  <img src="https://img.shields.io/badge/MCP-38_tools-ff66c4" alt="MCP">
+  <img src="https://img.shields.io/badge/A2A_Protocol-compatible-00ff88" alt="A2A">
+</p>
+
+---
+
+## What can it do?
+
+| Scenario | What happens |
+|----------|-------------|
+| **Review PRs daily** | Schedule an agent to review every open PR at 8am. It reads diffs, flags bugs, and posts review comments. |
+| **Fix CI failures** | When CI goes red, a work task clones the branch, diagnoses the failure, writes a fix, and opens a PR. |
+| **Write tests** | Point an agent at untested code. It generates test suites following your existing patterns. |
+| **Triage issues** | New issues get auto-labeled, prioritized, and assigned — or the agent picks them up itself. |
+| **Multi-agent councils** | Assemble agents with different expertise to deliberate on architecture decisions together. |
+
+See **[use cases](docs/use-cases.md)** for copy-paste API examples for each scenario.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/CorvidLabs/corvid-agent.git
+cd corvid-agent
+corvid-agent init           # guided setup: env, deps, first agent
+bun run dev                 # → http://localhost:3000
+```
+
+Or non-interactive with defaults:
+
+```bash
+corvid-agent init --yes     # auto-detect Claude CLI / Ollama, skip prompts
+```
+
+**Just want MCP tools in your editor?**
+
+```bash
+corvid-agent init --mcp     # adds corvid-agent to Claude Code / Cursor
+```
+
+Server starts at `http://localhost:3000`. Dashboard included.
+
+### Minimum `.env`
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...          # or use Claude Code CLI (no key needed)
+OLLAMA_HOST=http://localhost:11434    # optional — local models via Ollama
+GH_TOKEN=ghp_...                     # optional — enables PR creation and reviews
+```
+
+> **On-chain features are optional.** Add `ALGOCHAT_MNEMONIC` to enable Algorand identity and encrypted messaging. Everything else works without it.
+
+### Optional: Messaging Bridges
+
+```bash
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...  # talk to agents from Telegram
+DISCORD_BOT_TOKEN=your-bot-token      # talk to agents from Discord
+SLACK_BOT_TOKEN=xoxb-your-bot-token   # talk to agents from Slack
+```
+
+See `.env.example` for the full list of 30+ configuration options.
+
+---
+
+## Why corvid-agent?
+
+| | corvid-agent | Cloud coding agents | Local-only tools |
+|---|---|---|---|
+| **Self-hosted** | You own it | Vendor-hosted | You own it |
+| **Multi-agent** | Councils, delegation, coordination | Single agent | Single agent |
+| **On-chain identity** | Algorand wallets, encrypted messaging | None | None |
+| **PR automation** | Work tasks → branch → validate → PR | Manual | Some |
+| **Scheduling** | Built-in cron with approval policies | None | None |
+| **Open source** | MIT | Proprietary | Varies |
+
+---
 
 ## At a Glance
 
@@ -28,94 +118,9 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 | DB migrations | **26** (squashed baseline, 84 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
-Cross-platform CI: Ubuntu, macOS, Windows.
+Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
 
----
-
-## Why This Exists
-
-Every agent platform assumes agents operate in isolation on a single machine. corvid-agent assumes agents need to **interoperate** — across teams, across servers, across trust boundaries.
-
-The moment Agent A (on your infrastructure) needs to delegate work to Agent B (on someone else's), you need answers to:
-
-- **Identity** — How does Agent A know Agent B is who it claims to be?
-- **Communication** — How do they exchange messages without a centralized broker?
-- **Verification** — How does Agent A verify that Agent B completed the work?
-- **Accountability** — How do you audit what happened if something goes wrong?
-
-Algorand provides the answers. On-chain wallets give agents verifiable identity. AlgoChat gives them encrypted P2P messaging. Transaction history provides an immutable audit trail. This isn't bolted on — it's native to the platform.
-
-## What This Is Not
-
-corvid-agent is **not** a personal life automation tool like OpenClaw. It doesn't send your emails or control your smart home.
-
-It is **not** a cloud-hosted coding agent like Devin. You own and operate it.
-
-It is a **self-hosted, open-source agent runtime** purpose-built for development workflows, with the only native on-chain identity and inter-agent communication layer in the ecosystem.
-
-Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
-
----
-
-## Quick Start
-
-```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git
-cd corvid-agent
-corvid-agent init           # guided setup: env, deps, first agent
-bun run dev                 # → http://localhost:3000
-```
-
-Or non-interactive: `corvid-agent init --yes`
-
-**MCP-only setup** (Claude Code / Cursor): `corvid-agent init --mcp`
-
-Or manually:
-
-```bash
-bun install
-cp .env.example .env   # add API key, or leave blank if using Claude Code CLI
-bun run build:client
-bun run dev
-```
-
-Server starts at `http://localhost:3000`. See `.env.example` for all configuration options.
-
-**New here?** Follow the **[5-minute quickstart](docs/quickstart.md)** to create your first agent and have it open a PR. Then see **[use cases](docs/use-cases.md)** for practical examples and **[how it works](docs/how-it-works.md)** for the architecture.
-
-### Minimum `.env`
-
-```bash
-# Claude access — pick one (or skip both for Ollama-only mode):
-ANTHROPIC_API_KEY=sk-ant-...          # Option A: Anthropic API key
-# (or install Claude Code CLI)        # Option B: uses your Claude subscription
-ALGOCHAT_MNEMONIC=your 25 words ...   # Optional — on-chain identity & messaging
-ALGORAND_NETWORK=localnet             # Localnet for local agents (default)
-OLLAMA_HOST=http://localhost:11434    # Optional — local model inference
-```
-
-> **Algorand network topology:** `localnet` is always used for agents on the same machine (requires Docker + `algokit localnet start`). `testnet` and `mainnet` are for communicating with external users or other corvid-agent instances.
-
-### Optional: Enable Messaging Bridges
-
-```bash
-# Telegram — talk to agents from your phone
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TELEGRAM_CHAT_ID=123456789
-TELEGRAM_ALLOWED_USER_IDS=111222333   # comma-separated, empty = allow all
-
-# Discord — talk to agents from Discord
-DISCORD_BOT_TOKEN=your-bot-token
-DISCORD_CHANNEL_ID=channel-id
-
-# Slack — talk to agents from Slack channels
-SLACK_BOT_TOKEN=xoxb-your-bot-token
-SLACK_CHANNEL_ID=C0123456789
-SLACK_SIGNING_SECRET=your-signing-secret
-
-# Voice — TTS/STT for Telegram voice notes and audio responses
-OPENAI_API_KEY=sk-...
-```
+See [VISION.md](VISION.md) for architecture, competitive positioning, and long-term roadmap.
 
 ---
 

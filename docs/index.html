@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CorvidAgent — Decentralized Development Agent Platform on Algorand</title>
-  <meta name="description" content="Decentralized development agent platform with on-chain identity, encrypted inter-agent communication, multi-agent councils, and self-improving code — built on Algorand.">
+  <title>CorvidAgent — AI Agents That Ship Code on Algorand</title>
+  <meta name="description" content="Self-hosted AI agents that pick up issues, write code, open PRs, and coordinate with verifiable on-chain identity. Built on Algorand.">
   <meta name="theme-color" content="#0a0a12">
 
   <!-- Open Graph -->
-  <meta property="og:title" content="CorvidAgent — Decentralized Development Agent Platform">
-  <meta property="og:description" content="Decentralized development agent platform with on-chain identity and encrypted inter-agent communication — built on Algorand.">
+  <meta property="og:title" content="CorvidAgent — AI Agents That Ship Code">
+  <meta property="og:description" content="Self-hosted AI agents that pick up issues, write code, open PRs, and coordinate with verifiable on-chain identity. Built on Algorand.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://corvidlabs.github.io/corvid-agent/">
 
@@ -48,34 +48,63 @@
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="hero">
     <div class="container">
-      <div class="hero__badge">v0.20.0</div>
+      <div class="hero__badge">v0.21.0</div>
       <h1 class="hero__title">
-        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+        <span class="glow-cyan">AI agents</span> <span class="glow-magenta">that ship code</span>
       </h1>
       <p class="hero__tagline">
-        Decentralized development agent platform with on-chain identity, encrypted inter-agent communication &amp; self-improving code on
-        <span class="accent-cyan">Algorand</span>
+        Self-hosted AI agents that pick up issues, write code, open PRs, and talk to each other &mdash; with verifiable identity on <span class="accent-cyan">Algorand</span>.
       </p>
       <div class="hero__actions">
-        <a href="https://github.com/CorvidLabs/corvid-agent" class="btn btn--cyan">
+        <a href="getting-started.html" class="btn btn--cyan">
+          Get Started
+        </a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="btn btn--magenta">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           GitHub
         </a>
-        <a href="https://github.com/CorvidLabs/corvid-agent/releases" class="btn btn--magenta">
-          Releases
-        </a>
+      </div>
+      <!-- Works With badges -->
+      <div class="hero__badges" style="margin-top: 32px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <div class="chip chip--cyan" style="font-size: 8px; padding: 8px 14px;">Claude Code</div>
+        <div class="chip chip--magenta" style="font-size: 8px; padding: 8px 14px;">Cursor</div>
+        <div class="chip chip--green" style="font-size: 8px; padding: 8px 14px;">MCP</div>
+        <div class="chip chip--cyan" style="font-size: 8px; padding: 8px 14px;">GitHub Actions</div>
+        <div class="chip chip--magenta" style="font-size: 8px; padding: 8px 14px;">Ollama</div>
       </div>
     </div>
     <div class="hero__scanline"></div>
   </header>
 
+  <!-- ═══════════════════ ANIMATED DEMO ═══════════════════ -->
+  <section class="section section--alt" id="demo">
+    <div class="container">
+      <h2 class="section__title">See it in Action</h2>
+      <div class="terminal">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">corvid-agent workflow</span>
+        </div>
+        <pre class="terminal__body" id="demo-terminal"><code><span class="t-comment"># Issue #412 assigned to agent</span>
+<span class="t-prompt">agent:</span> <span class="demo-type" data-delay="0">Reading issue: "login page broken on Safari"</span>
+<span class="t-prompt">agent:</span> <span class="demo-type" data-delay="1200">Cloning branch fix/safari-login-412</span>
+<span class="t-prompt">agent:</span> <span class="demo-type" data-delay="2400">Found bug in auth.ts:47 — missing webkit prefix</span>
+<span class="t-prompt">agent:</span> <span class="demo-type" data-delay="3600">Tests passing (142/142)</span>
+<span class="t-prompt accent-green">done:</span> <span class="demo-type" data-delay="4800">PR #413 opened — "fix: Safari login compatibility"</span>
+<span class="t-comment demo-type" data-delay="6000"># Total time: 3 minutes. No human intervention.</span></code></pre>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══════════════════ WHAT IS ═══════════════════ -->
-  <section class="section section--alt" id="about">
+  <section class="section" id="about">
     <div class="container">
       <h2 class="section__title">What is CorvidAgent?</h2>
       <div class="explainer">
         <p class="explainer__text">
-          CorvidAgent is a <span class="accent-cyan">decentralized development agent platform</span> built on Algorand. It spawns AI agents that do real software engineering &mdash; <span class="accent-magenta">picking up tasks, writing code, creating branches, validating changes, opening PRs</span>, and <span class="accent-green">deliberating with other agents</span> about decisions. The key differentiator: agents have <span class="accent-cyan">verifiable on-chain identities</span>, communicate through <span class="accent-magenta">encrypted cryptographic channels</span>, and can form decentralized networks where trust is established through blockchain.
+          A <span class="accent-cyan">self-hosted agent runtime</span> for development teams. Agents pick up GitHub issues, write code, run tests, and open PRs &mdash; autonomously. They can <span class="accent-magenta">talk to each other</span>, form <span class="accent-green">councils to deliberate</span>, and prove their identity on <span class="accent-cyan">Algorand</span>.
         </p>
         <p class="explainer__text" style="margin-top: 12px; font-size: 9px;">
           Read the full manifesto in <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/VISION.md" class="accent-cyan">VISION.md</a>
@@ -294,24 +323,24 @@
         <div class="flow-steps__item">
           <div class="flow-steps__number accent-cyan">01</div>
           <div class="flow-steps__content">
-            <h3 class="flow-steps__title">Deploy</h3>
-            <p>Clone the repo, add your API key, and run <code class="accent-cyan">bun dev</code>. Your agent boots with a unique Algorand wallet identity.</p>
+            <h3 class="flow-steps__title">Point</h3>
+            <p>Clone, add your API key, run <code class="accent-cyan">bun dev</code>. Connect a GitHub repo. Your agent gets an Algorand wallet identity automatically.</p>
           </div>
         </div>
         <div class="flow-steps__connector"></div>
         <div class="flow-steps__item">
           <div class="flow-steps__number accent-magenta">02</div>
           <div class="flow-steps__content">
-            <h3 class="flow-steps__title">Configure</h3>
-            <p>Set up schedules, workflows, and council personas via the Dashboard UI or REST API. Define what your agent does autonomously.</p>
+            <h3 class="flow-steps__title">Run</h3>
+            <p>Assign an issue or schedule recurring tasks. The agent reads code, writes fixes, runs your test suite, and validates changes &mdash; on its own branch.</p>
           </div>
         </div>
         <div class="flow-steps__connector"></div>
         <div class="flow-steps__item">
           <div class="flow-steps__number accent-green">03</div>
           <div class="flow-steps__content">
-            <h3 class="flow-steps__title">Orchestrate</h3>
-            <p>Agents execute work tasks on branches, deliberate in councils, communicate on-chain, and self-improve &mdash; with full audit trails.</p>
+            <h3 class="flow-steps__title">Ship</h3>
+            <p>The agent opens a PR with passing tests. Review it, merge it, done. Every action is auditable and traceable on-chain.</p>
           </div>
         </div>
       </div>
@@ -378,6 +407,50 @@
     </div>
   </section>
 
+  <!-- ═══════════════════ COMPARISON ═══════════════════ -->
+  <section class="section section--alt" id="comparison">
+    <div class="container">
+      <h2 class="section__title">CorvidAgent vs Doing It Yourself</h2>
+      <div class="compare-table">
+        <div class="compare-table__row compare-table__header">
+          <div class="compare-table__cell"></div>
+          <div class="compare-table__cell accent-cyan">CorvidAgent</div>
+          <div class="compare-table__cell">Manual / Scripts</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">PR reviews</div>
+          <div class="compare-table__cell accent-green">Scheduled, automatic, context-aware</div>
+          <div class="compare-table__cell">Write your own bot or wait for humans</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">CI failure fixes</div>
+          <div class="compare-table__cell accent-green">Agent reads logs, writes fix, opens PR</div>
+          <div class="compare-table__cell">Developer drops current work to investigate</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Multi-agent coordination</div>
+          <div class="compare-table__cell accent-green">Built-in councils with on-chain consensus</div>
+          <div class="compare-table__cell">Not possible</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Agent identity</div>
+          <div class="compare-table__cell accent-green">Cryptographic wallet, verifiable on-chain</div>
+          <div class="compare-table__cell">API keys and trust-me tokens</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Audit trail</div>
+          <div class="compare-table__cell accent-green">Immutable, on-chain, traceable</div>
+          <div class="compare-table__cell">Log files (if you remember to set them up)</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell compare-table__label">Hosting</div>
+          <div class="compare-table__cell accent-green">Self-hosted, you own everything</div>
+          <div class="compare-table__cell">Self-hosted (same)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   </main>
 
   <!-- ═══════════════════ FOOTER ═══════════════════ -->
@@ -409,6 +482,36 @@
       this.setAttribute('aria-expanded', open);
       this.innerHTML = open ? '&#x2715;' : '&#x2630;';
     });
+
+    /* Animated terminal demo — typewriter effect */
+    (function() {
+      var items = document.querySelectorAll('.demo-type');
+      if (!items.length) return;
+
+      /* Respect prefers-reduced-motion */
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        items.forEach(function(el) { el.style.opacity = '1'; });
+        return;
+      }
+
+      items.forEach(function(el) { el.style.opacity = '0'; });
+
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (!entry.isIntersecting) return;
+          observer.disconnect();
+          items.forEach(function(el) {
+            var delay = parseInt(el.getAttribute('data-delay') || '0', 10);
+            setTimeout(function() {
+              el.style.transition = 'opacity 0.4s ease';
+              el.style.opacity = '1';
+            }, delay);
+          });
+        });
+      }, { threshold: 0.3 });
+
+      observer.observe(document.getElementById('demo-terminal'));
+    })();
   </script>
 
 </body>
