@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 74;
+const SCHEMA_VERSION = 75;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1378,6 +1378,13 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_seller ON marketplace_subscriptions(seller_tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_status ON marketplace_subscriptions(status)`,
         `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_period_end ON marketplace_subscriptions(current_period_end)`,
+    ],
+
+    75: [
+        // Work task priority queue and preemption
+        `ALTER TABLE work_tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2`,
+        `ALTER TABLE work_tasks ADD COLUMN preempted_by TEXT DEFAULT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_priority ON work_tasks(status, priority, created_at)`,
     ],
 };
 

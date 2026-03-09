@@ -679,6 +679,8 @@ describe('TelegramBridge work intake mode', () => {
                 retryCount: 0,
                 retryBackoff: 'fixed' as const,
                 lastRetryAt: null,
+            priority: 2 as const,
+            preemptedBy: null,
                 createdAt: new Date().toISOString(),
                 completedAt: null,
             })),
@@ -787,6 +789,8 @@ describe('TelegramBridge work intake mode', () => {
             retryCount: 0,
             retryBackoff: 'fixed' as const,
             lastRetryAt: null,
+            priority: 2 as const,
+            preemptedBy: null,
             createdAt: new Date().toISOString(),
             completedAt: new Date().toISOString(),
         });
@@ -823,6 +827,8 @@ describe('TelegramBridge work intake mode', () => {
             retryCount: 0,
             retryBackoff: 'fixed' as const,
             lastRetryAt: null,
+            priority: 2 as const,
+            preemptedBy: null,
             createdAt: new Date().toISOString(),
             completedAt: new Date().toISOString(),
         });
