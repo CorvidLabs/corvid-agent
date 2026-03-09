@@ -49,7 +49,7 @@ describe('VibeKit Integration', () => {
         const skillPath = join(import.meta.dir, '..', '..', 'skills', 'smart-contracts', 'SKILL.md');
         expect(existsSync(skillPath)).toBe(true);
 
-        const content = readFileSync(skillPath, 'utf-8');
+        const content = readFileSync(skillPath, 'utf-8').replaceAll('\r\n', '\n');
         expect(content.startsWith('---\n')).toBe(true);
         expect(content).toContain('name: smart-contracts');
         expect(content).toContain('description:');
