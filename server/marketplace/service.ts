@@ -19,9 +19,34 @@ import type {
 } from './types';
 import { IdentityVerification } from '../reputation/identity-verification';
 import type { VerificationTier } from '../reputation/identity-verification';
+import { EscrowService } from './escrow';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('Marketplace');
+
+/**
+ * Error thrown when a buyer has insufficient credits for a per-use listing.
+ */
+export class InsufficientCreditsError extends Error {
+    listingId: string;
+    required: number;
+
+    constructor(listingId: string, required: number) {
+        super(`Insufficient credits: listing ${listingId} requires ${required} credits`);
+        this.name = 'InsufficientCreditsError';
+        this.listingId = listingId;
+        this.required = required;
+    }
+}
+
+/**
+ * Result of recording a listing use, including billing outcome.
+ */
+export interface UseResult {
+    success: boolean;
+    creditsDeducted: number;
+    escrowId?: string;
+}
 
 /**
  * Error thrown when a listing update is blocked by the verification gate.
@@ -56,6 +81,7 @@ function recordToListing(row: ListingRecord): MarketplaceListing {
         useCount: row.use_count,
         avgRating: row.avg_rating,
         reviewCount: row.review_count,
+        tenantId: row.tenant_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -81,11 +107,13 @@ const DEFAULT_MIN_LISTING_TIER: VerificationTier = 'GITHUB_VERIFIED';
 export class MarketplaceService {
     private db: Database;
     private identity: IdentityVerification;
+    private escrow: EscrowService;
     private minListingTier: VerificationTier;
 
     constructor(db: Database, minListingTier: VerificationTier = DEFAULT_MIN_LISTING_TIER) {
         this.db = db;
         this.identity = new IdentityVerification(db);
+        this.escrow = new EscrowService(db);
         this.minListingTier = minListingTier;
     }
 
@@ -199,12 +227,61 @@ export class MarketplaceService {
     }
 
     /**
-     * Record a use of a listing (increment use count).
+     * Record a use of a listing. For per-use paid listings, deducts credits
+     * from the buyer and credits the seller via instant escrow settlement.
+     *
+     * @param listingId The listing being used
+     * @param buyerWalletAddress Buyer's wallet (required for paid listings)
+     * @throws InsufficientCreditsError if buyer lacks credits for a paid listing
      */
-    recordUse(listingId: string): void {
+    recordUse(listingId: string, buyerWalletAddress?: string): UseResult {
+        const listing = this.getListing(listingId);
+        if (!listing) {
+            // Listing not found — increment anyway for backwards compat
+            this.db.query(
+                "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
+            ).run(listingId);
+            return { success: true, creditsDeducted: 0 };
+        }
+
+        const isPaid = listing.pricingModel === 'per_use' && listing.priceCredits > 0;
+
+        if (isPaid) {
+            if (!buyerWalletAddress) {
+                throw new InsufficientCreditsError(listingId, listing.priceCredits);
+            }
+
+            const escrowTx = this.escrow.settleInstantUse(
+                listingId,
+                buyerWalletAddress,
+                listing.tenantId,
+                listing.priceCredits,
+            );
+
+            if (!escrowTx) {
+                throw new InsufficientCreditsError(listingId, listing.priceCredits);
+            }
+
+            // Increment use count after successful billing
+            this.db.query(
+                "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
+            ).run(listingId);
+
+            log.info('Paid listing use recorded', {
+                listingId,
+                buyer: buyerWalletAddress,
+                credits: listing.priceCredits,
+                escrowId: escrowTx.id,
+            });
+
+            return { success: true, creditsDeducted: listing.priceCredits, escrowId: escrowTx.id };
+        }
+
+        // Free listing — just increment use count
         this.db.query(
             "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
         ).run(listingId);
+        return { success: true, creditsDeducted: 0 };
     }
 
     // ─── Search ──────────────────────────────────────────────────────────────

@@ -238,6 +238,7 @@ export class MarketplaceFederation {
             useCount: row.use_count,
             avgRating: row.avg_rating,
             reviewCount: row.review_count,
+            tenantId: row.tenant_id,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
             sourceInstance: row.instance_url!,

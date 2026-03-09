@@ -27,6 +27,8 @@ export interface MarketplaceListing {
     avgRating: number;
     /** Total reviews */
     reviewCount: number;
+    /** Owning tenant (seller wallet address for billing) */
+    tenantId: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -125,6 +127,7 @@ export interface ListingRecord {
     use_count: number;
     avg_rating: number;
     review_count: number;
+    tenant_id: string;
     created_at: string;
     updated_at: string;
 }
