@@ -28,6 +28,13 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | `cleanupStaleWorkTasks` | `db: Database` | `WorkTask[]` | Marks all active tasks (branching/running/validating) as failed with error 'Interrupted by server restart'; returns the affected tasks for branch restoration; runs in a transaction |
 | `resetWorkTaskForRetry` | `db: Database, id: string` | `void` | Reset a failed work task back to pending for retry; clears session_id, branch_name, worktree_dir, error, completed_at and resets iteration_count to 0 |
 | `getActiveWorkTasks` | `db: Database` | `WorkTask[]` | Return all work tasks currently in an active state (branching, running, validating) |
+| `dequeueNextTask` | `db: Database, projectId: string` | `WorkTask \| null` | Get the next pending/queued task for a project, ordered by creation time (FIFO) |
+| `getPendingTasksForProject` | `db: Database, projectId: string` | `WorkTask[]` | Get all pending/queued tasks for a project, ordered by creation time |
+| `getActiveTaskForProject` | `db: Database, projectId: string` | `WorkTask \| null` | Find the currently active (branching/running/validating) task on a project |
+| `pauseWorkTask` | `db: Database, taskId: string` | `void` | Pause a running task so a higher-priority task can run; sets status to 'paused' |
+| `resumePausedTask` | `db: Database, taskId: string` | `void` | Resume a paused task by setting status back to 'pending'; only acts on paused tasks |
+| `getPausedTasks` | `db: Database, projectId: string` | `WorkTask[]` | Get all paused tasks for a project, ordered by created_at ASC |
+| `countQueuedTasks` | `db: Database, projectId: string` | `number` | Count pending/queued tasks for a project |
 | `listWorkTasks` | `db: Database, agentId?: string, tenantId?: string` | `WorkTask[]` | Lists work tasks, optionally filtered by agent ID, ordered by created_at DESC |
 
 ### Exported Types
@@ -42,7 +49,7 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 4. `completed_at` is automatically set to `datetime('now')` when status transitions to `'completed'` or `'failed'`.
 5. The `requester_info` column stores a JSON-serialized object; parsing failures default to an empty object `{}`.
 6. The `source` field defaults to `'web'` if not specified.
-7. Valid statuses are: `'pending'`, `'branching'`, `'running'`, `'validating'`, `'completed'`, `'failed'`.
+7. Valid statuses are: `'pending'`, `'queued'`, `'branching'`, `'running'`, `'validating'`, `'paused'`, `'completed'`, `'failed'`.
 8. Tenant ownership is validated via `validateTenantOwnership` before returning data in `getWorkTask`.
 
 ## Behavioral Examples
@@ -86,7 +93,7 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 ### Consumed By
 | Module | What is used |
 |--------|-------------|
-| `server/work/service.ts` | `createWorkTask`, `createWorkTaskAtomic`, `getWorkTask`, `getWorkTaskBySessionId`, `updateWorkTaskStatus`, `cleanupStaleWorkTasks`, `listWorkTasks` |
+| `server/work/service.ts` | `createWorkTask`, `createWorkTaskAtomic`, `getWorkTask`, `getWorkTaskBySessionId`, `updateWorkTaskStatus`, `cleanupStaleWorkTasks`, `listWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks` |
 | `server/feedback/outcome-tracker.ts` | `listWorkTasks` |
 | `server/routes/work-tasks.ts` (implied) | Work task listing and retrieval via routes |
 
@@ -103,7 +110,7 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | requester_info | TEXT | DEFAULT '{}' | JSON object with requester metadata |
 | description | TEXT | NOT NULL | Human-readable description of the work to do |
 | branch_name | TEXT | DEFAULT NULL | Git branch created for this task |
-| status | TEXT | DEFAULT 'pending' | Lifecycle status: pending, branching, running, validating, completed, failed |
+| status | TEXT | DEFAULT 'pending' | Lifecycle status: pending, queued, branching, running, validating, paused, completed, failed |
 | pr_url | TEXT | DEFAULT NULL | URL of the pull request created on completion |
 | summary | TEXT | DEFAULT NULL | Agent-generated summary of work done |
 | error | TEXT | DEFAULT NULL | Error message if task failed |
@@ -121,3 +128,4 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-08 | corvid-agent | Documented `resetWorkTaskForRetry` and `getActiveWorkTasks` |
+| 2026-03-09 | corvid-agent | Documented priority queue exports: `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`; added 'paused' and 'queued' statuses |

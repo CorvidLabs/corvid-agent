@@ -174,7 +174,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `server/db/sessions.ts` | `createSession` |
 | `server/db/agents.ts` | `getAgent` |
 | `server/db/projects.ts` | `getProject` |
-| `server/db/work-tasks.ts` | `createWorkTaskAtomic`, `getWorkTask`, `updateWorkTaskStatus`, `listWorkTasks`, `cleanupStaleWorkTasks` |
+| `server/db/work-tasks.ts` | `createWorkTaskAtomic`, `getWorkTask`, `updateWorkTaskStatus`, `listWorkTasks`, `cleanupStaleWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks` |
 | `server/db/audit.ts` | `recordAudit` |
 | `server/process/types.ts` | `ClaudeStreamEvent`, `extractContentText` |
 | `server/work/validation.ts` | `runBunInstall`, `runValidation` |
