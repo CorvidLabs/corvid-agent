@@ -36,6 +36,56 @@ echo -e "${NC}"
 
 INSTALL_DIR="${CORVID_INSTALL_DIR:-$HOME/corvid-agent}"
 
+# ─── Step 0: System check ─────────────────────────────────────────────────
+
+step "Checking system resources"
+
+get_total_ram_mb() {
+    case "$(uname -s)" in
+        Darwin)
+            sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1048576)}'
+            ;;
+        Linux)
+            grep MemTotal /proc/meminfo 2>/dev/null | awk '{print int($2/1024)}'
+            ;;
+        *)
+            echo 0
+            ;;
+    esac
+}
+
+TOTAL_RAM_MB=$(get_total_ram_mb)
+TOTAL_RAM_GB=$((TOTAL_RAM_MB / 1024))
+
+if [[ "$TOTAL_RAM_MB" -gt 0 ]]; then
+    info "Detected ${TOTAL_RAM_GB} GB RAM"
+
+    if [[ "$TOTAL_RAM_GB" -lt 8 ]]; then
+        warn "Less than 8 GB RAM — corvid-agent may struggle"
+        warn "Recommendation: CLI-only mode with Claude API, lightweight editor, no Docker"
+    elif [[ "$TOTAL_RAM_GB" -lt 16 ]]; then
+        warn "8 GB RAM — tight for full-stack development"
+        warn "Recommendation: Skip Docker/localnet, skip Ollama, use a lightweight editor"
+    elif [[ "$TOTAL_RAM_GB" -lt 32 ]]; then
+        info "16 GB RAM — good for single agent + IDE"
+        info "Tip: Use TestNet instead of localnet to save ~1 GB. Skip Ollama."
+    elif [[ "$TOTAL_RAM_GB" -lt 64 ]]; then
+        info "32 GB RAM — comfortable for full stack"
+    else
+        info "64 GB+ RAM — all features available including Ollama"
+    fi
+
+    # WSL2 detection
+    if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+        warn "WSL2 detected — Windows has higher memory overhead"
+        warn "See docs/system-requirements.md for .wslconfig tuning tips"
+    fi
+
+    echo "  See docs/system-requirements.md for detailed tier guidance"
+else
+    warn "Could not detect system RAM"
+fi
+
 # ─── Step 1: Prerequisites ──────────────────────────────────────────────────
 
 step "Checking prerequisites"

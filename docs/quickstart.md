@@ -21,6 +21,10 @@ For MCP-only (Claude Code / Cursor): `corvid-agent init --mcp`.
 
 Open **http://localhost:3000** — you should see the dashboard.
 
+### System requirements
+
+See the [System Requirements](system-requirements.md) guide for detailed hardware tiers. In short: 8 GB RAM minimum (CLI + Claude API only), 16 GB recommended (agent + IDE), 32 GB for the full stack with Docker.
+
 ### What you need
 
 | Mode | What to set | What you get |

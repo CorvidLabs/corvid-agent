@@ -4,6 +4,7 @@ This guide covers deploying corvid-agent on your own infrastructure. corvid-agen
 
 ## Prerequisites
 
+- **RAM**: 8 GB minimum, 16 GB recommended. See [System Requirements](system-requirements.md) for detailed tier guidance.
 - **Bun** v1.3.8+ (runtime for the server)
 - **Node.js 18+** (only required if building the Angular client from source)
 - **Git** (for cloning the repository and work task worktrees)
