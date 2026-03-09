@@ -6,8 +6,9 @@
 import { test, expect, describe, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
-import { MarketplaceService } from '../marketplace/service';
+import { MarketplaceService, InsufficientCreditsError } from '../marketplace/service';
 import { MarketplaceFederation } from '../marketplace/federation';
+import { grantCredits, getBalance } from '../db/credits';
 
 // ─── DB Setup ───────────────────────────────────────────────────────────────
 
@@ -34,8 +35,25 @@ function setupDb(): Database {
             use_count INTEGER DEFAULT 0,
             avg_rating REAL DEFAULT 0,
             review_count INTEGER DEFAULT 0,
+            tenant_id TEXT NOT NULL DEFAULT 'default',
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
+        )
+    `);
+
+    d.exec(`
+        CREATE TABLE IF NOT EXISTS escrow_transactions (
+            id                TEXT PRIMARY KEY,
+            listing_id        TEXT NOT NULL,
+            buyer_tenant_id   TEXT NOT NULL,
+            seller_tenant_id  TEXT NOT NULL,
+            amount_credits    INTEGER NOT NULL,
+            state             TEXT NOT NULL DEFAULT 'FUNDED',
+            created_at        TEXT DEFAULT (datetime('now')),
+            delivered_at      TEXT DEFAULT NULL,
+            released_at       TEXT DEFAULT NULL,
+            disputed_at       TEXT DEFAULT NULL,
+            resolved_at       TEXT DEFAULT NULL
         )
     `);
 
@@ -326,6 +344,121 @@ describe('MarketplaceService', () => {
 
         const fetched = svc.getListing(listing.id);
         expect(fetched!.tags).toEqual(['typescript', 'bun', 'fast']);
+    });
+
+    // ─── Per-Use Billing ────────────────────────────────────────────────────
+
+    test('recordUse deducts credits from buyer and credits seller for per_use listing', () => {
+        const BUYER = 'BUYER_WALLET';
+        const SELLER = 'SELLER_WALLET';
+
+        // Create a paid listing owned by SELLER
+        const listing = svc.createListing({
+            agentId: 'a1',
+            name: 'Paid Agent',
+            description: 'costs credits',
+            category: 'coding',
+            pricingModel: 'per_use',
+            priceCredits: 50,
+        });
+        db.query("UPDATE marketplace_listings SET tenant_id = ? WHERE id = ?").run(SELLER, listing.id);
+
+        // Fund buyer
+        grantCredits(db, BUYER, 200, 'test_setup');
+
+        const result = svc.recordUse(listing.id, BUYER);
+        expect(result.success).toBe(true);
+        expect(result.creditsDeducted).toBe(50);
+        expect(result.escrowId).toBeTruthy();
+
+        // Verify buyer debited
+        const buyerBalance = getBalance(db, BUYER);
+        expect(buyerBalance.credits).toBe(150);
+
+        // Verify seller credited
+        const sellerBalance = getBalance(db, SELLER);
+        expect(sellerBalance.credits).toBe(50);
+    });
+
+    test('recordUse throws InsufficientCreditsError when buyer lacks credits', () => {
+        const BUYER = 'POOR_BUYER';
+        const SELLER = 'SELLER_WALLET2';
+
+        const listing = svc.createListing({
+            agentId: 'a1',
+            name: 'Expensive Agent',
+            description: 'costs credits',
+            category: 'coding',
+            pricingModel: 'per_use',
+            priceCredits: 100,
+        });
+        db.query("UPDATE marketplace_listings SET tenant_id = ? WHERE id = ?").run(SELLER, listing.id);
+
+        // Give buyer only 10 credits
+        grantCredits(db, BUYER, 10, 'test_setup');
+
+        expect(() => svc.recordUse(listing.id, BUYER)).toThrow(InsufficientCreditsError);
+
+        // Balance unchanged
+        const buyerBalance = getBalance(db, BUYER);
+        expect(buyerBalance.credits).toBe(10);
+    });
+
+    test('recordUse does not charge for free listings', () => {
+        const BUYER = 'FREE_BUYER';
+
+        const listing = svc.createListing({
+            agentId: 'a1',
+            name: 'Free Agent',
+            description: 'no cost',
+            category: 'general',
+        });
+
+        const result = svc.recordUse(listing.id, BUYER);
+        expect(result.success).toBe(true);
+        expect(result.creditsDeducted).toBe(0);
+        expect(result.escrowId).toBeUndefined();
+
+        // Use count incremented
+        const updated = svc.getListing(listing.id);
+        expect(updated!.useCount).toBe(1);
+    });
+
+    test('recordUse creates credit_transactions and escrow_transactions records', () => {
+        const BUYER = 'AUDIT_BUYER';
+        const SELLER = 'AUDIT_SELLER';
+
+        const listing = svc.createListing({
+            agentId: 'a1',
+            name: 'Audited Agent',
+            description: 'tracks transactions',
+            category: 'coding',
+            pricingModel: 'per_use',
+            priceCredits: 25,
+        });
+        db.query("UPDATE marketplace_listings SET tenant_id = ? WHERE id = ?").run(SELLER, listing.id);
+
+        grantCredits(db, BUYER, 100, 'test_setup');
+
+        const result = svc.recordUse(listing.id, BUYER);
+        expect(result.success).toBe(true);
+
+        // Verify credit_transactions recorded for buyer
+        const buyerTxns = db.query(
+            "SELECT * FROM credit_transactions WHERE wallet_address = ? AND type = 'marketplace_use'",
+        ).all(BUYER) as { amount: number; reference: string }[];
+        expect(buyerTxns.length).toBe(1);
+        expect(buyerTxns[0].amount).toBe(25);
+        expect(buyerTxns[0].reference).toBe(`listing:${listing.id}`);
+
+        // Verify escrow_transactions recorded as RELEASED
+        const escrowTxns = db.query(
+            "SELECT * FROM escrow_transactions WHERE listing_id = ?",
+        ).all(listing.id) as { state: string; buyer_tenant_id: string; seller_tenant_id: string }[];
+        expect(escrowTxns.length).toBe(1);
+        expect(escrowTxns[0].state).toBe('RELEASED');
+        expect(escrowTxns[0].buyer_tenant_id).toBe(BUYER);
+        expect(escrowTxns[0].seller_tenant_id).toBe(SELLER);
     });
 });
 

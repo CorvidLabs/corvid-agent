@@ -126,7 +126,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `UpdateListingSchema` | Marketplace | Validates marketplace listing update. All fields optional. |
 | `CreateReviewSchema` | Marketplace | Validates review creation: `rating` (1..5), `comment` (required). |
 | `RegisterFederationInstanceSchema` | Marketplace | Validates federation instance: `url`, `name` (required). |
-| `SubscribeSchema` | Marketplace | Validates marketplace subscription: `subscriberTenantId` (required), `billingCycle` (`daily`/`weekly`/`monthly`). |
+| `SubscribeSchema` | Marketplace | Validates marketplace subscription: `subscriberTenantId` (required), `billingCycle` (daily/weekly/monthly). |
 | `CancelSubscriptionSchema` | Marketplace | Validates subscription cancellation: `subscriberTenantId` (required). |
 | `RecordReputationEventSchema` | Reputation | Validates reputation event: `agentId`, `eventType`, `scoreImpact` (required). |
 | `CreateSubscriptionSchema` | Billing | Validates subscription creation: `tenantId`, `stripeSubscriptionId`, `plan`, `periodStart`, `periodEnd` (required). |
