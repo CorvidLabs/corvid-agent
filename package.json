@@ -33,7 +33,8 @@
     "lint:sql": "bash scripts/check-sql-injection.sh",
     "security:scan": "bun scripts/ci-security-scan.ts",
     "stats:check": "bun scripts/collect-stats.ts",
-    "stats:update": "bun scripts/collect-stats.ts --update"
+    "stats:update": "bun scripts/collect-stats.ts --update",
+    "version:check": "bun scripts/version-check.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"

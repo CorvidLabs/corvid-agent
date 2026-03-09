@@ -389,7 +389,11 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 38 route modules:
+~200 REST endpoints and a WebSocket interface across 38 route modules.
+
+**[API Reference](docs/api-reference.md)** — detailed docs with request/response examples for workflows, councils, marketplace, reputation, and billing.
+
+**Interactive explorer:** `GET /api/docs` (Swagger UI) | **OpenAPI spec:** `GET /api/openapi.json`
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|

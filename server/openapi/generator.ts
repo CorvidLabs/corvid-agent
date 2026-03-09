@@ -8,6 +8,8 @@
 import { z } from 'zod';
 import { routes, type HttpMethod } from './route-registry';
 
+const APP_VERSION: string = (require('../../package.json') as { version: string }).version;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface OpenApiInfo {
@@ -264,7 +266,7 @@ export function generateOpenApiSpec(options: GeneratorOptions = {}): OpenApiSpec
         openapi: '3.0.3',
         info: {
             title: 'Corvid Agent API',
-            version: '0.13.0',
+            version: APP_VERSION,
             description: 'AI agent framework with on-chain identity and messaging via AlgoChat on Algorand. Provides multi-agent orchestration, GitHub automation, workflow pipelines, and an agent marketplace.',
             license: {
                 name: 'MIT',
