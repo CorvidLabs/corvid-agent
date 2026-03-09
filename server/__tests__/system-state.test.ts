@@ -70,6 +70,10 @@ describe('priority-rules', () => {
 });
 
 describe('SystemStateDetector', () => {
+    let savedGhToken: string | undefined;
+    beforeEach(() => { savedGhToken = process.env.GH_TOKEN; delete process.env.GH_TOKEN; });
+    afterEach(() => { if (savedGhToken !== undefined) process.env.GH_TOKEN = savedGhToken; });
+
     it('returns healthy by default', async () => {
         const d = new SystemStateDetector(db, { cacheTtlMs: 0 });
         const r = await d.evaluate();
