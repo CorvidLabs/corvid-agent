@@ -58,6 +58,9 @@ ${c.bold}Getting Started:${c.reset}
 ${c.bold}Commands:${c.reset}
   ${c.cyan('(no args)')}                         Interactive chat REPL
   ${c.cyan('init')}                             Interactive project setup
+  ${c.cyan('init --mcp')}                       MCP-only setup (for Claude Code / Cursor)
+  ${c.cyan('init --full')}                      Full setup (includes dashboard build)
+  ${c.cyan('init --yes')}                       Non-interactive with sensible defaults
   ${c.cyan('demo')}                             Run a self-contained demo
   ${c.cyan('status')}                           Check server health
   ${c.cyan('chat')} <prompt>                     Send a message to an agent
@@ -75,6 +78,8 @@ ${c.bold}Global Options:${c.reset}
 ${c.bold}Examples:${c.reset}
   ${c.gray('# First time? Start here:')}
   corvid-agent init                               ${c.gray('# guided setup')}
+  corvid-agent init --mcp                         ${c.gray('# just add MCP tools to your editor')}
+  corvid-agent init --full --yes                  ${c.gray('# full unattended setup')}
   corvid-agent demo                               ${c.gray('# see it in action')}
 
   ${c.gray('# Daily usage:')}
@@ -121,7 +126,11 @@ async function main(): Promise<void> {
 
     switch (command) {
         case 'init':
-            await initCommand();
+            await initCommand({
+                mcp: args.includes('--mcp'),
+                full: args.includes('--full'),
+                yes: args.includes('--yes') || args.includes('-y'),
+            });
             break;
 
         case 'demo':

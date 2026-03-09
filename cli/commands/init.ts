@@ -1,11 +1,19 @@
 import { createInterface } from 'readline';
-import { existsSync, readFileSync, writeFileSync, renameSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { c, printError, printSuccess, printWarning, printHeader, Spinner } from '../render';
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface InitOptions {
+    mcp?: boolean;
+    full?: boolean;
+    yes?: boolean;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function findProjectRoot(): string {
+function findProjectRoot(): string | null {
     let dir = process.cwd();
     for (let i = 0; i < 10; i++) {
         const pkgPath = join(dir, 'package.json');
@@ -19,7 +27,7 @@ function findProjectRoot(): string {
         if (parent === dir) break;
         dir = parent;
     }
-    return process.cwd();
+    return null;
 }
 
 async function prompt(rl: ReturnType<typeof createInterface>, question: string, defaultValue?: string): Promise<string> {
@@ -104,15 +112,185 @@ async function checkPrerequisites(): Promise<CheckResult[]> {
     return results;
 }
 
-// ─── Init Command ───────────────────────────────────────────────────────────
+// ─── MCP-Only Init ──────────────────────────────────────────────────────────
 
-export async function initCommand(): Promise<void> {
+async function initMcpOnly(_opts: { yes: boolean }): Promise<void> {
+    console.log(`
+${c.bold}corvid-agent init --mcp${c.reset}
+${c.gray('Set up corvid-agent as an MCP server for Claude Code, Cursor, or other AI tools.')}
+`);
+
+    printHeader('MCP Server Setup');
+
+    // Detect corvid-agent server
     const projectRoot = findProjectRoot();
+    const serverUrl = process.env.CORVID_AGENT_URL ?? 'http://localhost:3000';
+    const apiKey = process.env.CORVID_AGENT_API_KEY ?? '';
+
+    if (projectRoot) {
+        console.log(`  ${c.green('✓')} corvid-agent repo found at ${c.gray(projectRoot)}`);
+    } else {
+        console.log(`  ${c.yellow('○')} Not in corvid-agent repo — will connect to server at ${c.gray(serverUrl)}`);
+    }
+
+    // Determine Claude Code config path
+    const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '';
+    const claudeConfigDir = join(homeDir, '.claude');
+    const claudeConfigPath = join(claudeConfigDir, 'claude_desktop_config.json');
+
+    // Build MCP server config
+    let mcpConfig: Record<string, unknown>;
+
+    if (projectRoot) {
+        // Local mode: run the built-in MCP stdio server directly
+        mcpConfig = {
+            'corvid-agent': {
+                command: 'bun',
+                args: [join(projectRoot, 'server', 'mcp', 'stdio-server.ts')],
+                env: {
+                    CORVID_API_URL: `http://127.0.0.1:${process.env.PORT ?? '3000'}`,
+                },
+            },
+        };
+    } else {
+        // Remote mode: use the standalone MCP package
+        mcpConfig = {
+            'corvid-agent': {
+                command: 'npx',
+                args: ['-y', 'corvid-agent-mcp'],
+                env: {
+                    CORVID_AGENT_URL: serverUrl,
+                    ...(apiKey ? { CORVID_AGENT_API_KEY: apiKey } : {}),
+                },
+            },
+        };
+    }
+
+    // Write or merge into Claude Code config
+    let existingConfig: Record<string, unknown> = {};
+    if (existsSync(claudeConfigPath)) {
+        try {
+            existingConfig = JSON.parse(readFileSync(claudeConfigPath, 'utf-8')) as Record<string, unknown>;
+        } catch {
+            printWarning('Could not parse existing Claude config — will create a new one.');
+        }
+    }
+
+    const mcpServers = (existingConfig.mcpServers ?? {}) as Record<string, unknown>;
+    const mergedConfig = {
+        ...existingConfig,
+        mcpServers: { ...mcpServers, ...mcpConfig },
+    };
+
+    if (!existsSync(claudeConfigDir)) {
+        mkdirSync(claudeConfigDir, { recursive: true, mode: 0o700 });
+    }
+
+    const tmpPath = `${claudeConfigPath}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(mergedConfig, null, 2) + '\n', { mode: 0o600 });
+    renameSync(tmpPath, claudeConfigPath);
+    printSuccess(`MCP server added to ${c.gray(claudeConfigPath)}`);
+
+    // Also write Cursor config if ~/.cursor exists
+    const cursorConfigDir = join(homeDir, '.cursor');
+    if (existsSync(cursorConfigDir)) {
+        const cursorMcpPath = join(cursorConfigDir, 'mcp.json');
+        let cursorConfig: Record<string, unknown> = {};
+        if (existsSync(cursorMcpPath)) {
+            try {
+                cursorConfig = JSON.parse(readFileSync(cursorMcpPath, 'utf-8')) as Record<string, unknown>;
+            } catch { /* will overwrite */ }
+        }
+        const cursorServers = (cursorConfig.mcpServers ?? {}) as Record<string, unknown>;
+        const mergedCursorConfig = {
+            ...cursorConfig,
+            mcpServers: { ...cursorServers, ...mcpConfig },
+        };
+        const tmpCursorPath = `${cursorMcpPath}.${process.pid}.tmp`;
+        writeFileSync(tmpCursorPath, JSON.stringify(mergedCursorConfig, null, 2) + '\n', { mode: 0o600 });
+        renameSync(tmpCursorPath, cursorMcpPath);
+        printSuccess(`MCP server added to ${c.gray(cursorMcpPath)}`);
+    }
+
+    console.log(`
+${c.bold}${c.green('MCP setup complete!')}${c.reset}
+
+${c.bold}What you get:${c.reset}
+  corvid_* tools available in your AI editor — agents, sessions,
+  work tasks, projects, health checks, and more.
+
+${c.bold}Next steps:${c.reset}
+  1. ${projectRoot ? `Start the server: ${c.cyan('bun run dev')}` : 'Start your corvid-agent server'}
+  2. Restart Claude Code / Cursor to pick up the new MCP config
+  3. Ask your AI assistant: ${c.gray('"List my agents"')} or ${c.gray('"Create a work task"')}
+
+${c.gray('Config: ' + claudeConfigPath)}
+`);
+}
+
+// ─── Full Init Command ──────────────────────────────────────────────────────
+
+export async function initCommand(opts: InitOptions = {}): Promise<void> {
+    const autoYes = opts.yes ?? false;
+    const fullMode = opts.full ?? false;
+
+    // MCP-only mode
+    if (opts.mcp) {
+        await initMcpOnly({ yes: autoYes });
+        return;
+    }
+
+    let projectRoot = findProjectRoot();
 
     console.log(`
 ${c.bold}corvid-agent init${c.reset}
 ${c.gray('Interactive setup — creates .env, installs deps, and gets you running.')}
 `);
+
+    // ── Step 0: Clone if not in repo ──
+    if (!projectRoot) {
+        printHeader('0/5  Project setup');
+        console.log(`  ${c.yellow('!')} Not in a corvid-agent directory.`);
+
+        const shouldClone = autoYes || await (async () => {
+            const rl = createInterface({ input: process.stdin, output: process.stdout });
+            try {
+                return await confirm(rl, 'Clone corvid-agent here?', true);
+            } finally {
+                rl.close();
+            }
+        })();
+
+        if (shouldClone) {
+            const targetDir = join(process.cwd(), 'corvid-agent');
+            const spinner = new Spinner('Cloning corvid-agent...');
+            spinner.start();
+            try {
+                const proc = Bun.spawn(
+                    ['git', 'clone', 'https://github.com/CorvidLabs/corvid-agent.git', targetDir],
+                    { stdout: 'pipe', stderr: 'pipe' },
+                );
+                const exitCode = await proc.exited;
+                spinner.stop();
+                if (exitCode === 0) {
+                    printSuccess(`Cloned to ${targetDir}`);
+                    projectRoot = targetDir;
+                    process.chdir(targetDir);
+                } else {
+                    const stderr = await new Response(proc.stderr).text();
+                    printError(`Clone failed: ${stderr.slice(0, 200)}`);
+                    process.exit(1);
+                }
+            } catch (err) {
+                spinner.stop();
+                printError(`Clone failed: ${err instanceof Error ? err.message : String(err)}`);
+                process.exit(1);
+            }
+        } else {
+            printError('Run this command inside the corvid-agent directory, or let init clone it for you.');
+            process.exit(1);
+        }
+    }
 
     // ── Step 1: Prerequisites ──
     printHeader('1/5  Checking prerequisites');
@@ -148,11 +326,11 @@ ${c.gray('Interactive setup — creates .env, installs deps, and gets you runnin
     const rl = createInterface({ input: process.stdin, output: process.stdout });
 
     try {
-        if (existsSync(envPath)) {
+        if (existsSync(envPath) && !autoYes) {
             const overwrite = await confirm(rl, '.env already exists. Overwrite?', false);
             if (!overwrite) {
                 printSuccess('.env unchanged');
-                await runRemainingSteps(rl, projectRoot);
+                await runRemainingSteps(rl, projectRoot, autoYes, fullMode);
                 return;
             }
         }
@@ -168,48 +346,64 @@ ${c.gray('Interactive setup — creates .env, installs deps, and gets you runnin
             '',
         ];
 
-        // AI provider
-        console.log(`\n  ${c.bold}AI Provider${c.reset}`);
-        if (hasClaude) {
-            console.log(`  ${c.green('✓')} Claude CLI detected — will use your subscription automatically.`);
-        }
-
-        const anthropicKey = await prompt(rl, 'Anthropic API key (optional, press Enter to skip)');
-        if (anthropicKey) {
-            envLines.push(`ANTHROPIC_API_KEY=${anthropicKey}`);
-        }
-
-        if (hasOllama) {
-            const ollamaHost = await prompt(rl, 'Ollama host', 'http://localhost:11434');
-            envLines.push(`OLLAMA_HOST=${ollamaHost}`);
-
-            if (!anthropicKey && !hasClaude) {
-                envLines.push('ENABLED_PROVIDERS=ollama');
-                printSuccess('Running in 100% local mode with Ollama.');
+        if (autoYes) {
+            // Non-interactive: sensible defaults
+            if (hasClaude) {
+                console.log(`  ${c.green('✓')} Claude CLI detected — using your subscription.`);
             }
-        } else if (!anthropicKey && !hasClaude) {
-            printWarning('No AI provider configured. Run `bun run try` for a demo without AI.');
-        }
+            if (hasOllama) {
+                envLines.push('OLLAMA_HOST=http://localhost:11434');
+                if (!hasClaude) {
+                    envLines.push('ENABLED_PROVIDERS=ollama');
+                }
+            }
+            envLines.push('BIND_HOST=127.0.0.1');
+            envLines.push('ALGORAND_NETWORK=localnet');
+        } else {
+            // Interactive mode
+            // AI provider
+            console.log(`\n  ${c.bold}AI Provider${c.reset}`);
+            if (hasClaude) {
+                console.log(`  ${c.green('✓')} Claude CLI detected — will use your subscription automatically.`);
+            }
 
-        // Server
-        console.log(`\n  ${c.bold}Server${c.reset}`);
-        const port = await prompt(rl, 'Port', '3000');
-        if (port !== '3000') {
-            envLines.push(`PORT=${port}`);
-        }
-        envLines.push('BIND_HOST=127.0.0.1');
+            const anthropicKey = await prompt(rl, 'Anthropic API key (optional, press Enter to skip)');
+            if (anthropicKey) {
+                envLines.push(`ANTHROPIC_API_KEY=${anthropicKey}`);
+            }
 
-        // GitHub
-        console.log(`\n  ${c.bold}GitHub Integration${c.reset} ${c.gray('(for work tasks, PRs, webhooks)')}`);
-        const ghToken = await prompt(rl, 'GitHub token (optional, press Enter to skip)');
-        if (ghToken) {
-            envLines.push(`GH_TOKEN=${ghToken}`);
-        }
+            if (hasOllama) {
+                const ollamaHost = await prompt(rl, 'Ollama host', 'http://localhost:11434');
+                envLines.push(`OLLAMA_HOST=${ollamaHost}`);
 
-        // Network
-        console.log(`\n  ${c.bold}Algorand Network${c.reset}`);
-        const network = await prompt(rl, 'Network (localnet/testnet/mainnet)', 'localnet');
-        envLines.push(`ALGORAND_NETWORK=${network}`);
+                if (!anthropicKey && !hasClaude) {
+                    envLines.push('ENABLED_PROVIDERS=ollama');
+                    printSuccess('Running in 100% local mode with Ollama.');
+                }
+            } else if (!anthropicKey && !hasClaude) {
+                printWarning('No AI provider configured. Run `bun run try` for a demo without AI.');
+            }
+
+            // Server
+            console.log(`\n  ${c.bold}Server${c.reset}`);
+            const port = await prompt(rl, 'Port', '3000');
+            if (port !== '3000') {
+                envLines.push(`PORT=${port}`);
+            }
+            envLines.push('BIND_HOST=127.0.0.1');
+
+            // GitHub
+            console.log(`\n  ${c.bold}GitHub Integration${c.reset} ${c.gray('(for work tasks, PRs, webhooks)')}`);
+            const ghToken = await prompt(rl, 'GitHub token (optional, press Enter to skip)');
+            if (ghToken) {
+                envLines.push(`GH_TOKEN=${ghToken}`);
+            }
+
+            // Network
+            console.log(`\n  ${c.bold}Algorand Network${c.reset}`);
+            const network = await prompt(rl, 'Network (localnet/testnet/mainnet)', 'localnet');
+            envLines.push(`ALGORAND_NETWORK=${network}`);
+        }
 
         // Write .env atomically via temp file to avoid TOCTOU race
         envLines.push('');
@@ -218,13 +412,18 @@ ${c.gray('Interactive setup — creates .env, installs deps, and gets you runnin
         renameSync(tmpEnvPath, envPath);
         printSuccess('.env created');
 
-        await runRemainingSteps(rl, projectRoot);
+        await runRemainingSteps(rl, projectRoot, autoYes, fullMode);
     } finally {
         rl.close();
     }
 }
 
-async function runRemainingSteps(rl: ReturnType<typeof createInterface>, projectRoot: string): Promise<void> {
+async function runRemainingSteps(
+    rl: ReturnType<typeof createInterface>,
+    projectRoot: string,
+    autoYes: boolean,
+    fullMode: boolean = false,
+): Promise<void> {
     // ── Step 3: Install Dependencies ──
     printHeader('3/5  Installing dependencies');
 
@@ -250,46 +449,53 @@ async function runRemainingSteps(rl: ReturnType<typeof createInterface>, project
     }
 
     // ── Step 4: Build Dashboard ──
-    printHeader('4/5  Building dashboard');
+    if (fullMode) {
+        printHeader('4/5  Building dashboard');
 
-    const clientDist = join(projectRoot, 'client', 'dist', 'client', 'browser', 'index.html');
-    if (existsSync(clientDist)) {
-        printSuccess('Dashboard already built');
-    } else {
-        const buildSpin = new Spinner('Building Angular dashboard...');
-        buildSpin.start();
-        try {
-            const proc = Bun.spawn(['bun', 'run', 'build:client'], {
-                cwd: projectRoot,
-                stdout: 'pipe',
-                stderr: 'pipe',
-            });
-            const exitCode = await proc.exited;
-            buildSpin.stop();
-            if (exitCode === 0) {
-                printSuccess('Dashboard built');
-            } else {
-                printWarning('Dashboard build failed. Run `bun run build:client` manually.');
+        const clientDist = join(projectRoot, 'client', 'dist', 'client', 'browser', 'index.html');
+        if (existsSync(clientDist)) {
+            printSuccess('Dashboard already built');
+        } else {
+            const buildSpin = new Spinner('Building Angular dashboard...');
+            buildSpin.start();
+            try {
+                const proc = Bun.spawn(['bun', 'run', 'build:client'], {
+                    cwd: projectRoot,
+                    stdout: 'pipe',
+                    stderr: 'pipe',
+                });
+                const exitCode = await proc.exited;
+                buildSpin.stop();
+                if (exitCode === 0) {
+                    printSuccess('Dashboard built');
+                } else {
+                    printWarning('Dashboard build failed. Run `bun run build:client` manually.');
+                }
+            } catch {
+                buildSpin.stop();
+                printWarning('Could not build dashboard. Run `bun run build:client` manually.');
             }
-        } catch {
-            buildSpin.stop();
-            printWarning('Could not build dashboard. Run `bun run build:client` manually.');
         }
+    } else {
+        printHeader('4/5  Dashboard');
+        console.log(`  ${c.gray('Skipped — run')} ${c.cyan('bun run build:client')} ${c.gray('to build the dashboard')}`);
+        console.log(`  ${c.gray('Or use')} ${c.cyan('corvid-agent init --full')} ${c.gray('to include this step')}`);
     }
 
     // ── Step 5: Create Default Agent ──
     printHeader('5/5  Creating default agent');
 
-    const skipAgent = await confirm(rl, 'Create a default agent now?', true);
-    if (skipAgent) {
-        const agentName = await prompt(rl, 'Agent name', 'Assistant');
+    const shouldCreate = autoYes || await confirm(rl, 'Create a default agent now?', true);
+    if (shouldCreate) {
+        const agentName = autoYes ? 'Assistant' : await prompt(rl, 'Agent name', 'Assistant');
 
         // Check if server is running, start it temporarily if not
         let serverStarted = false;
         let serverProc: ReturnType<typeof Bun.spawn> | null = null;
+        const port = process.env.PORT ?? '3000';
 
         try {
-            const healthRes = await fetch(`http://127.0.0.1:${process.env.PORT ?? '3000'}/api/health`, {
+            const healthRes = await fetch(`http://127.0.0.1:${port}/api/health`, {
                 signal: AbortSignal.timeout(2_000),
             });
             if (!healthRes.ok) throw new Error('not ok');
@@ -308,7 +514,7 @@ async function runRemainingSteps(rl: ReturnType<typeof createInterface>, project
             const maxWait = Date.now() + 15_000;
             while (Date.now() < maxWait) {
                 try {
-                    const res = await fetch(`http://127.0.0.1:${process.env.PORT ?? '3000'}/api/health`, {
+                    const res = await fetch(`http://127.0.0.1:${port}/api/health`, {
                         signal: AbortSignal.timeout(2_000),
                     });
                     if (res.ok) break;
@@ -318,14 +524,13 @@ async function runRemainingSteps(rl: ReturnType<typeof createInterface>, project
         }
 
         try {
-            const port = process.env.PORT ?? '3000';
             const res = await fetch(`http://127.0.0.1:${port}/api/agents`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: agentName,
-                    description: `Created by corvid-agent init`,
-                    model: 'claude-sonnet-4-20250514',
+                    description: 'Created by corvid-agent init',
+                    model: 'claude-sonnet-4-6',
                 }),
             });
             if (res.ok) {
@@ -355,6 +560,9 @@ ${c.bold}Next steps:${c.reset}
   ${c.cyan('bun run try')}          Try sandbox mode (no config needed)
   ${c.cyan('corvid-agent')}         Launch the interactive CLI
   ${c.cyan('corvid-agent demo')}    Run a self-contained demo
+
+${c.bold}Use with AI editors:${c.reset}
+  ${c.cyan('corvid-agent init --mcp')}   Add corvid-agent tools to Claude Code / Cursor
 
 ${c.gray('Docs: docs/quickstart.md  •  Dashboard: http://127.0.0.1:3000')}
 `);
