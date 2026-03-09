@@ -48,9 +48,11 @@ describe('bin/corvid-agent.mjs shim', () => {
         const { join } = await import('path');
         const shimPath = join(import.meta.dir, '..', '..', 'bin', 'corvid-agent.mjs');
         expect(existsSync(shimPath)).toBe(true);
-        const stat = statSync(shimPath);
-        // Check executable bit (owner)
-        expect(stat.mode & 0o100).toBeTruthy();
+        // Check executable bit (owner) — skip on Windows where Unix permissions don't apply
+        if (process.platform !== 'win32') {
+            const stat = statSync(shimPath);
+            expect(stat.mode & 0o100).toBeTruthy();
+        }
     });
 
     test('shim has correct shebang', async () => {
