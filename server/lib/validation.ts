@@ -588,39 +588,6 @@ export const CancelSubscriptionSchema = z.object({
     subscriberTenantId: z.string().min(1, 'subscriberTenantId is required'),
 });
 
-// ─── Pricing Tiers ──────────────────────────────────────────────────────────
-
-const TierBillingCycleSchema = z.enum(['one_time', 'daily', 'weekly', 'monthly']);
-
-export const CreateTierSchema = z.object({
-    name: z.string().min(1, 'name is required'),
-    description: z.string().optional(),
-    priceCredits: z.number().int().min(0, 'priceCredits must be non-negative'),
-    billingCycle: TierBillingCycleSchema.optional(),
-    rateLimit: z.number().int().min(0).optional(),
-    features: z.array(z.string()).optional(),
-    sortOrder: z.number().int().min(0).optional(),
-});
-
-export const UpdateTierSchema = z.object({
-    name: z.string().min(1).optional(),
-    description: z.string().optional(),
-    priceCredits: z.number().int().min(0).optional(),
-    billingCycle: TierBillingCycleSchema.optional(),
-    rateLimit: z.number().int().min(0).optional(),
-    features: z.array(z.string()).optional(),
-    sortOrder: z.number().int().min(0).optional(),
-});
-
-export const TierUseSchema = z.object({
-    tierId: z.string().min(1, 'tierId is required'),
-});
-
-export const TierSubscribeSchema = z.object({
-    tierId: z.string().min(1, 'tierId is required'),
-    subscriberTenantId: z.string().min(1, 'subscriberTenantId is required'),
-});
-
 // ─── Reputation ──────────────────────────────────────────────────────────────
 
 const ReputationEventTypeSchema = z.enum([

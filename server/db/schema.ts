@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 76;
+const SCHEMA_VERSION = 75;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1401,23 +1401,6 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_flock_agents_status ON flock_agents(status)`,
         `CREATE INDEX IF NOT EXISTS idx_flock_agents_address ON flock_agents(address)`,
         `CREATE INDEX IF NOT EXISTS idx_flock_agents_name ON flock_agents(name)`,
-    ],
-
-    76: [
-        // Marketplace pricing tiers — multiple pricing plans per listing
-        `CREATE TABLE IF NOT EXISTS marketplace_pricing_tiers (
-            id              TEXT PRIMARY KEY,
-            listing_id      TEXT NOT NULL,
-            name            TEXT NOT NULL,
-            description     TEXT NOT NULL DEFAULT '',
-            price_credits   INTEGER NOT NULL DEFAULT 0,
-            billing_cycle   TEXT NOT NULL DEFAULT 'one_time' CHECK (billing_cycle IN ('one_time', 'daily', 'weekly', 'monthly')),
-            rate_limit      INTEGER NOT NULL DEFAULT 0,
-            features        TEXT NOT NULL DEFAULT '[]',
-            sort_order      INTEGER NOT NULL DEFAULT 0,
-            created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-        )`,
-        `CREATE INDEX IF NOT EXISTS idx_marketplace_pricing_tiers_listing ON marketplace_pricing_tiers(listing_id)`,
     ],
 };
 

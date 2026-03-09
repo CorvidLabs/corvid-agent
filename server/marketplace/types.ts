@@ -43,58 +43,6 @@ export interface MarketplaceReview {
     createdAt: string;
 }
 
-// ─── Pricing Tiers ──────────────────────────────────────────────────────────
-
-export type TierBillingCycle = 'one_time' | 'daily' | 'weekly' | 'monthly';
-
-export interface PricingTier {
-    id: string;
-    listingId: string;
-    name: string;
-    description: string;
-    priceCredits: number;
-    billingCycle: TierBillingCycle;
-    /** Max uses per hour (0 = unlimited) */
-    rateLimit: number;
-    /** Feature strings included in this tier */
-    features: string[];
-    sortOrder: number;
-    createdAt: string;
-}
-
-export interface CreateTierInput {
-    name: string;
-    description?: string;
-    priceCredits: number;
-    billingCycle?: TierBillingCycle;
-    rateLimit?: number;
-    features?: string[];
-    sortOrder?: number;
-}
-
-export interface UpdateTierInput {
-    name?: string;
-    description?: string;
-    priceCredits?: number;
-    billingCycle?: TierBillingCycle;
-    rateLimit?: number;
-    features?: string[];
-    sortOrder?: number;
-}
-
-export interface TierRecord {
-    id: string;
-    listing_id: string;
-    name: string;
-    description: string;
-    price_credits: number;
-    billing_cycle: string;
-    rate_limit: number;
-    features: string;
-    sort_order: number;
-    created_at: string;
-}
-
 // ─── Search ─────────────────────────────────────────────────────────────────
 
 export interface MarketplaceSearchParams {

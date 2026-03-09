@@ -2,7 +2,7 @@
  * Marketplace routes — Listing CRUD, search, reviews, federation, subscriptions.
  */
 import type { Database } from 'bun:sqlite';
-import { type MarketplaceService, VerificationGateError, InsufficientCreditsError, RateLimitExceededError } from '../marketplace/service';
+import { type MarketplaceService, VerificationGateError, InsufficientCreditsError } from '../marketplace/service';
 import type { MarketplaceFederation } from '../marketplace/federation';
 import { SubscriptionService } from '../marketplace/subscriptions';
 import type { SubscriptionStatus } from '../marketplace/subscriptions';
@@ -13,7 +13,7 @@ import type {
     PricingModel,
 } from '../marketplace/types';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
-import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema, CreateTierSchema, UpdateTierSchema, TierUseSchema, TierSubscribeSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema } from '../lib/validation';
 
 export function handleMarketplaceRoutes(
     req: Request,
@@ -208,68 +208,6 @@ export function handleMarketplaceRoutes(
         return json(subs.getSubscribers(subscribersMatch[1]));
     }
 
-    // ─── Pricing Tiers ───────────────────────────────────────────────────
-
-    const tiersMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/tiers$/);
-    if (tiersMatch) {
-        const listingId = tiersMatch[1];
-
-        if (method === 'GET') {
-            return json(marketplace.getTiersForListing(listingId));
-        }
-
-        if (method === 'POST') {
-            if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (denied) return denied;
-            }
-            return handleCreateTier(req, listingId, marketplace);
-        }
-    }
-
-    const tierMatch = path.match(/^\/api\/marketplace\/tiers\/([^/]+)$/);
-    if (tierMatch) {
-        const tierId = tierMatch[1];
-
-        if (method === 'GET') {
-            const tier = marketplace.getTier(tierId);
-            return tier ? json(tier) : notFound('Tier not found');
-        }
-
-        if (method === 'PUT') {
-            if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (denied) return denied;
-            }
-            return handleUpdateTier(req, tierId, marketplace);
-        }
-
-        if (method === 'DELETE') {
-            if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-                if (denied) return denied;
-            }
-            const deleted = marketplace.deleteTier(tierId);
-            return deleted ? json({ ok: true }) : notFound('Tier not found');
-        }
-    }
-
-    // Tier-based use (per-use billing with specific tier)
-    const tierUseMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/tier-use$/);
-    if (tierUseMatch && method === 'POST') {
-        return handleTierUse(req, tierUseMatch[1], marketplace, context);
-    }
-
-    // Tier-based subscribe (subscription billing with specific tier)
-    const tierSubscribeMatch = path.match(/^\/api\/marketplace\/listings\/([^/]+)\/tier-subscribe$/);
-    if (tierSubscribeMatch && method === 'POST') {
-        if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
-            if (denied) return denied;
-        }
-        return handleTierSubscribe(req, tierSubscribeMatch[1], _db, marketplace);
-    }
-
     return null;
 }
 
@@ -408,109 +346,6 @@ async function handleCancelSubscription(
         const sub = subscriptions.cancel(subscriptionId, body.subscriberTenantId);
         if (!sub) return notFound('Subscription not found or not owned by tenant');
         return json(sub);
-    } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        return handleRouteError(err);
-    }
-}
-
-// ─── Pricing Tier Handlers ──────────────────────────────────────────────────
-
-async function handleCreateTier(
-    req: Request,
-    listingId: string,
-    marketplace: MarketplaceService,
-): Promise<Response> {
-    try {
-        const body = await parseBodyOrThrow(req, CreateTierSchema);
-        const tier = marketplace.createTier(listingId, body);
-        return json(tier, 201);
-    } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        return handleRouteError(err);
-    }
-}
-
-async function handleUpdateTier(
-    req: Request,
-    tierId: string,
-    marketplace: MarketplaceService,
-): Promise<Response> {
-    try {
-        const body = await parseBodyOrThrow(req, UpdateTierSchema);
-        const tier = marketplace.updateTier(tierId, body);
-        return tier ? json(tier) : notFound('Tier not found');
-    } catch (err) {
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        return handleRouteError(err);
-    }
-}
-
-async function handleTierUse(
-    req: Request,
-    listingId: string,
-    marketplace: MarketplaceService,
-    context?: RequestContext,
-): Promise<Response> {
-    try {
-        const body = await parseBodyOrThrow(req, TierUseSchema);
-        const buyerWallet = context?.walletAddress ?? context?.tenantId;
-        if (!buyerWallet) return badRequest('Buyer wallet address required');
-
-        const result = marketplace.recordTierUse(listingId, body.tierId, buyerWallet);
-        if (!result.success) return notFound('Listing or tier not found');
-        return json({ ok: true, creditsDeducted: result.creditsDeducted, escrowId: result.escrowId });
-    } catch (err) {
-        if (err instanceof InsufficientCreditsError) {
-            return json({ error: 'Insufficient credits', required: err.required }, 402);
-        }
-        if (err instanceof RateLimitExceededError) {
-            return json({ error: 'Rate limit exceeded', limit: err.limit }, 429);
-        }
-        if (err instanceof ValidationError) return badRequest(err.detail);
-        return handleRouteError(err);
-    }
-}
-
-async function handleTierSubscribe(
-    req: Request,
-    listingId: string,
-    db: Database,
-    marketplace: MarketplaceService,
-): Promise<Response> {
-    const subscriptions = new SubscriptionService(db);
-
-    try {
-        const body = await parseBodyOrThrow(req, TierSubscribeSchema);
-
-        const listing = marketplace.getListing(listingId);
-        if (!listing) return notFound('Listing not found');
-
-        const tier = marketplace.getTier(body.tierId);
-        if (!tier || tier.listingId !== listingId) return notFound('Tier not found for this listing');
-
-        if (tier.billingCycle === 'one_time') {
-            return badRequest('Tier uses one-time billing, not subscription. Use tier-use endpoint instead.');
-        }
-
-        // Check for existing active subscription
-        if (subscriptions.hasActiveSubscription(listingId, body.subscriberTenantId)) {
-            return badRequest('Already subscribed to this listing');
-        }
-
-        const sub = subscriptions.subscribe(
-            listingId,
-            body.subscriberTenantId,
-            listing.tenantId,
-            tier.priceCredits,
-            tier.billingCycle as 'daily' | 'weekly' | 'monthly',
-        );
-
-        if (!sub) {
-            return json({ error: 'Insufficient credits' }, 402);
-        }
-
-        return json(sub, 201);
     } catch (err) {
         if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
