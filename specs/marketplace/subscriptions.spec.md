@@ -36,6 +36,7 @@ Recurring subscription billing for marketplace listings with `pricing_model: 'su
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `SubscriptionService` | class | — | Service managing marketplace subscription billing |
+| `execMarketplaceBilling` | `(ctx: HandlerContext, executionId: string)` | `void` | Scheduler handler that processes marketplace subscription renewals, past_due expiries, and cancelled subscription expiries. |
 
 ### `SubscriptionService` Methods
 
