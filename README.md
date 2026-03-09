@@ -115,7 +115,7 @@ See `.env.example` for the full list of 30+ configuration options.
 | Module specs | **116** with automated validation |
 | MCP tools | **39** corvid_* tool handlers |
 | API endpoints | **~200** across 42 route modules |
-| DB migrations | **26** (squashed baseline, 84 tables) |
+| DB migrations | **27** (squashed baseline, 85 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
