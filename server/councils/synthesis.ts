@@ -23,7 +23,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { CouncilDiscussionMessage, CouncilOnChainMode } from '../../shared/types';
 import { createLogger } from '../lib/logger';
-import { broadcastAgentError } from './discussion';
+import { broadcastAgentError, broadcastGovernanceVoteResolved, broadcastGovernanceQuorumReached } from './discussion';
 import { evaluateWeightedVote, type GovernanceTier, type WeightedVoteRecord } from './governance';
 
 const log = createLogger('CouncilSynthesis');
@@ -398,10 +398,34 @@ function resolveGovernanceVote(
         updateGovernanceVoteStatus(db, governanceVote.id, 'approved', new Date().toISOString());
         emitLog(db, launchId, 'stage', 'Governance vote approved',
             `${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval (threshold: ${(check.requiredThreshold * 100).toFixed(0)}%)`);
+        broadcastGovernanceQuorumReached({
+            launchId,
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            threshold: check.requiredThreshold,
+        });
+        broadcastGovernanceVoteResolved({
+            launchId,
+            status: 'approved',
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            effectiveThreshold: check.requiredThreshold,
+            reason: check.reason,
+        });
     } else if (check.awaitingHumanApproval) {
         updateGovernanceVoteStatus(db, governanceVote.id, 'awaiting_human');
         emitLog(db, launchId, 'info', 'Governance vote passed — awaiting human approval',
             `${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval`);
+        broadcastGovernanceQuorumReached({
+            launchId,
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            threshold: check.requiredThreshold,
+        });
+        broadcastGovernanceVoteResolved({
+            launchId,
+            status: 'awaiting_human',
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            effectiveThreshold: check.requiredThreshold,
+            reason: check.reason,
+        });
     } else {
         // If all members voted and it didn't pass, reject
         const allVoted = weightedVotes.length >= totalMembers;
@@ -409,6 +433,13 @@ function resolveGovernanceVote(
             updateGovernanceVoteStatus(db, governanceVote.id, 'rejected', new Date().toISOString());
             emitLog(db, launchId, 'warn', 'Governance vote rejected',
                 `${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval below ${(check.requiredThreshold * 100).toFixed(0)}% threshold`);
+            broadcastGovernanceVoteResolved({
+                launchId,
+                status: 'rejected',
+                weightedApprovalRatio: check.weightedApprovalRatio,
+                effectiveThreshold: check.requiredThreshold,
+                reason: check.reason,
+            });
         } else {
             emitLog(db, launchId, 'info', 'Governance vote pending',
                 `${weightedVotes.length}/${totalMembers} votes cast, ${(check.weightedApprovalRatio * 100).toFixed(0)}% weighted approval`);

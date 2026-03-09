@@ -33,6 +33,9 @@ import {
     onCouncilLog,
     onCouncilDiscussionMessage,
     onCouncilAgentError,
+    broadcastGovernanceVoteCast,
+    broadcastGovernanceVoteResolved,
+    broadcastGovernanceQuorumReached,
 } from '../councils/discussion';
 import type { LaunchCouncilResult } from '../councils/discussion';
 import { evaluateWeightedVote, type GovernanceTier, type WeightedVoteRecord } from '../councils/governance';
@@ -404,16 +407,61 @@ async function handleCastVote(
         council.quorumThreshold,
     );
 
+    // Find the weight for the agent who just voted
+    const castVoteWeight = weightedVotes.find((v) => v.agentId === body.agentId)?.weight ?? 50;
+
+    // Broadcast vote cast event
+    broadcastGovernanceVoteCast({
+        launchId,
+        agentId: body.agentId,
+        vote: body.vote,
+        weight: castVoteWeight,
+        weightedApprovalRatio: check.weightedApprovalRatio,
+        totalVotesCast: weightedVotes.length,
+        totalMembers,
+    });
+
     // Auto-resolve the vote if enough votes are in
     if (check.passed) {
         updateGovernanceVoteStatus(db, governanceVote.id, 'approved', new Date().toISOString());
+        broadcastGovernanceQuorumReached({
+            launchId,
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            threshold: check.requiredThreshold,
+        });
+        broadcastGovernanceVoteResolved({
+            launchId,
+            status: 'approved',
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            effectiveThreshold: check.requiredThreshold,
+            reason: check.reason,
+        });
     } else if (check.awaitingHumanApproval) {
         updateGovernanceVoteStatus(db, governanceVote.id, 'awaiting_human');
+        broadcastGovernanceQuorumReached({
+            launchId,
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            threshold: check.requiredThreshold,
+        });
+        broadcastGovernanceVoteResolved({
+            launchId,
+            status: 'awaiting_human',
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            effectiveThreshold: check.requiredThreshold,
+            reason: check.reason,
+        });
     } else {
         // Check if all members have voted and the vote failed
         const allVoted = weightedVotes.length === totalMembers;
         if (allVoted && !check.passed) {
             updateGovernanceVoteStatus(db, governanceVote.id, 'rejected', new Date().toISOString());
+            broadcastGovernanceVoteResolved({
+                launchId,
+                status: 'rejected',
+                weightedApprovalRatio: check.weightedApprovalRatio,
+                effectiveThreshold: check.requiredThreshold,
+                reason: check.reason,
+            });
         }
     }
 
@@ -464,6 +512,13 @@ async function handleHumanApproval(
 
     if (check.passed) {
         updateGovernanceVoteStatus(db, governanceVote.id, 'approved', new Date().toISOString());
+        broadcastGovernanceVoteResolved({
+            launchId,
+            status: 'approved',
+            weightedApprovalRatio: check.weightedApprovalRatio,
+            effectiveThreshold: check.requiredThreshold,
+            reason: check.reason,
+        });
     }
 
     return json({

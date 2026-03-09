@@ -103,6 +103,74 @@ export function broadcastAgentError(error: CouncilAgentError): void {
     }
 }
 
+// ─── Governance vote event callbacks ──────────────────────────────────────────
+
+export interface GovernanceVoteCastEvent {
+    launchId: string;
+    agentId: string;
+    vote: 'approve' | 'reject' | 'abstain';
+    weight: number;
+    weightedApprovalRatio: number;
+    totalVotesCast: number;
+    totalMembers: number;
+}
+
+export interface GovernanceVoteResolvedEvent {
+    launchId: string;
+    status: 'approved' | 'rejected' | 'awaiting_human';
+    weightedApprovalRatio: number;
+    effectiveThreshold: number;
+    reason: string;
+}
+
+export interface GovernanceQuorumReachedEvent {
+    launchId: string;
+    weightedApprovalRatio: number;
+    threshold: number;
+}
+
+type GovernanceVoteCastCallback = (event: GovernanceVoteCastEvent) => void;
+const governanceVoteCastListeners = new Set<GovernanceVoteCastCallback>();
+
+export function onGovernanceVoteCast(cb: GovernanceVoteCastCallback): () => void {
+    governanceVoteCastListeners.add(cb);
+    return () => { governanceVoteCastListeners.delete(cb); };
+}
+
+export function broadcastGovernanceVoteCast(event: GovernanceVoteCastEvent): void {
+    for (const cb of governanceVoteCastListeners) {
+        try { cb(event); } catch { /* ignore */ }
+    }
+}
+
+type GovernanceVoteResolvedCallback = (event: GovernanceVoteResolvedEvent) => void;
+const governanceVoteResolvedListeners = new Set<GovernanceVoteResolvedCallback>();
+
+export function onGovernanceVoteResolved(cb: GovernanceVoteResolvedCallback): () => void {
+    governanceVoteResolvedListeners.add(cb);
+    return () => { governanceVoteResolvedListeners.delete(cb); };
+}
+
+export function broadcastGovernanceVoteResolved(event: GovernanceVoteResolvedEvent): void {
+    for (const cb of governanceVoteResolvedListeners) {
+        try { cb(event); } catch { /* ignore */ }
+    }
+}
+
+type GovernanceQuorumReachedCallback = (event: GovernanceQuorumReachedEvent) => void;
+const governanceQuorumReachedListeners = new Set<GovernanceQuorumReachedCallback>();
+
+export function onGovernanceQuorumReached(cb: GovernanceQuorumReachedCallback): () => void {
+    governanceQuorumReachedListeners.add(cb);
+    return () => { governanceQuorumReachedListeners.delete(cb); };
+}
+
+export function broadcastGovernanceQuorumReached(event: GovernanceQuorumReachedEvent): void {
+    for (const cb of governanceQuorumReachedListeners) {
+        try { cb(event); } catch { /* ignore */ }
+    }
+}
+
 /** Persist a log entry and broadcast it to WS clients. */
 function emitLog(db: Database, launchId: string, level: CouncilLogLevel, message: string, detail?: string): void {
     const entry = addCouncilLaunchLog(db, launchId, level, message, detail);
