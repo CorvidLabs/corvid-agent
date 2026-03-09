@@ -302,7 +302,7 @@ OPENAI_API_KEY=sk-...
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  21 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  25 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -317,7 +317,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (21 migrations) and query modules
+  db/            SQLite schema (25 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -328,7 +328,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 37 corvid_* tool handlers
+  mcp/           MCP tool server and 38 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -342,7 +342,7 @@ server/          Bun HTTP + WebSocket server
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (38 route modules)
+  routes/        REST API routes (42 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -389,7 +389,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 38 route modules.
+~200 REST endpoints and a WebSocket interface across 42 route modules.
 
 **[API Reference](docs/api-reference.md)** — detailed docs with request/response examples for workflows, councils, marketplace, reputation, and billing.
 
@@ -447,17 +447,17 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 5725 server tests (~120s)
+bun test              # 5842 server tests (~120s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**5,725 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**5,842 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**111 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**113 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
