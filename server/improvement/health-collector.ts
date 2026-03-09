@@ -7,6 +7,7 @@
  */
 
 import { createLogger } from '../lib/logger';
+import { resolveExecutable } from '../lib/env';
 
 const log = createLogger('HealthCollector');
 
@@ -58,7 +59,9 @@ async function spawnAndCapture(
     cwd: string,
     timeoutMs: number = SPAWN_TIMEOUT_MS,
 ): Promise<{ stdout: string; exitCode: number }> {
-    const proc = Bun.spawn(cmd, {
+    // Resolve the executable path (Bun.which is broken on Windows)
+    const resolvedCmd = [resolveExecutable(cmd[0]), ...cmd.slice(1)];
+    const proc = Bun.spawn(resolvedCmd, {
         cwd,
         stdout: 'pipe',
         stderr: 'pipe',
@@ -108,12 +111,22 @@ export function parseTestOutput(output: string, exitCode: number): { passed: boo
     // Search entire output for bun test summary line (stdout may not be at the end
     // when stderr is appended after it)
     const failMatch = output.match(/^\s*(\d+)\s+fail\b/im);
+    const passMatch = output.match(/^\s*(\d+)\s+pass\b/im);
     const failureCount = failMatch ? parseInt(failMatch[1], 10) : 0;
 
+    // When the test runner produces a clear "X pass / Y fail" summary, trust it
+    // over the exit code. Non-zero exit codes can occur on some platforms due to
+    // stderr output or signal handling even when all tests pass.
+    const hasTestSummary = failMatch !== null && passMatch !== null;
+
     return {
-        passed: exitCode === 0 && failureCount === 0,
+        passed: hasTestSummary
+            ? failureCount === 0
+            : exitCode === 0 && failureCount === 0,
         summary: last50.trim(),
-        failureCount: exitCode !== 0 ? Math.max(failureCount, 1) : failureCount,
+        failureCount: hasTestSummary
+            ? failureCount
+            : (exitCode !== 0 ? Math.max(failureCount, 1) : failureCount),
     };
 }
 
@@ -253,27 +266,33 @@ export class CodebaseHealthCollector {
 
     private async countTodos(cwd: string): Promise<{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }> {
         const { stdout } = await spawnAndCapture(
-            ['grep', '-rn', 'TODO\\|FIXME\\|HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
+            ['grep', '-rn', '--exclude-dir=node_modules', '--exclude-dir=__tests__', 'TODO\\|FIXME\\|HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
             cwd,
         );
         return parseTodoOutput(stdout);
     }
 
     private async findLargeFiles(cwd: string): Promise<LargeFile[]> {
-        // Find all .ts files and count their lines
-        const { stdout: findOutput } = await spawnAndCapture(
-            ['find', 'server/', 'client/', 'shared/', '-name', '*.ts', '-type', 'f'],
-            cwd,
-        );
+        // Use Bun's Glob API instead of `find` + `wc` (cross-platform)
+        const { join } = require('node:path');
+        const { readFileSync } = require('node:fs');
+        const glob = new Bun.Glob('{server,client,shared}/**/*.ts');
+        const files: LargeFile[] = [];
+        const THRESHOLD = 500;
 
-        const tsFiles = findOutput.split('\n').filter((f) => f.trim().length > 0);
-        if (tsFiles.length === 0) return [];
+        for await (const match of glob.scan({ cwd, dot: false })) {
+            try {
+                const content = readFileSync(join(cwd, match), 'utf-8');
+                const lineCount = content.split('\n').length;
+                if (lineCount > THRESHOLD) {
+                    files.push({ file: match, lines: lineCount });
+                }
+            } catch {
+                // Skip unreadable files
+            }
+        }
 
-        const { stdout } = await spawnAndCapture(
-            ['wc', '-l', ...tsFiles],
-            cwd,
-        );
-        return parseLargeFiles(stdout);
+        return files.sort((a, b) => b.lines - a.lines);
     }
 
     private async checkOutdated(cwd: string): Promise<OutdatedDep[]> {
