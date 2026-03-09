@@ -17,7 +17,6 @@
  * @see https://github.com/CorvidLabs/corvid-agent/issues/747
  */
 
-import { execSync } from "child_process";
 import { existsSync, statSync, readdirSync } from "fs";
 import { join } from "path";
 
@@ -54,7 +53,8 @@ interface BenchmarkResult {
 
 function exec(cmd: string): string {
   try {
-    return execSync(cmd, { encoding: "utf-8", timeout: 10_000 }).trim();
+    const result = Bun.spawnSync(["sh", "-c", cmd], { timeout: 10_000 });
+    return result.stdout.toString().trim();
   } catch {
     return "";
   }
