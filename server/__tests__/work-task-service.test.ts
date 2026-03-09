@@ -416,7 +416,7 @@ describe('bun install retry logic', () => {
         });
 
         // Find bun install calls
-        const installCalls = spawnCalls.filter(c => c.cmd[0] === 'bun' && c.cmd[1] === 'install');
+        const installCalls = spawnCalls.filter(c => (c.cmd[0] === 'bun' || c.cmd[0].endsWith('/bun') || c.cmd[0].endsWith('\\bun.exe') || c.cmd[0].endsWith('\\bun')) && c.cmd[1] === 'install');
         // Only one install call should have been made (the frozen-lockfile one)
         expect(installCalls).toHaveLength(1);
         expect(installCalls[0].cmd).toContain('--frozen-lockfile');
@@ -436,7 +436,7 @@ describe('bun install retry logic', () => {
             projectId: project.id,
         });
 
-        const installCalls = spawnCalls.filter(c => c.cmd[0] === 'bun' && c.cmd[1] === 'install');
+        const installCalls = spawnCalls.filter(c => (c.cmd[0] === 'bun' || c.cmd[0].endsWith('/bun') || c.cmd[0].endsWith('\\bun.exe') || c.cmd[0].endsWith('\\bun')) && c.cmd[1] === 'install');
         expect(installCalls).toHaveLength(2);
         expect(installCalls[0].cmd).toContain('--frozen-lockfile');
         expect(installCalls[1].cmd).not.toContain('--frozen-lockfile');
@@ -474,7 +474,7 @@ describe('bun install retry logic', () => {
         (Bun.spawn as unknown as { mockImplementation: (fn: (...args: unknown[]) => unknown) => void }).mockImplementation((...args: unknown[]) => {
             callCount++;
             const cmd = args[0] as string[];
-            if (cmd[0] === 'bun' && cmd[1] === 'install') {
+            if ((cmd[0] === 'bun' || cmd[0].endsWith('/bun') || cmd[0].endsWith('\\bun.exe') || cmd[0].endsWith('\\bun')) && cmd[1] === 'install') {
                 throw new Error('spawn failed: command not found');
             }
             // For non-install commands, use the normal mock behavior
