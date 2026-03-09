@@ -24,7 +24,9 @@ export class CorvidClient {
   private headers: Record<string, string>;
 
   constructor(config: CorvidClientConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/+$/, '');
+    let url = config.baseUrl;
+    while (url.endsWith('/')) url = url.slice(0, -1);
+    this.baseUrl = url;
     this.headers = {
       'Content-Type': 'application/json',
     };
