@@ -136,8 +136,70 @@
     </div>
   </section>
 
+  <!-- ═══════════════════ QUALITY ═══════════════════ -->
+  <section class="section" id="quality">
+    <div class="container">
+      <h2 class="section__title">Built to Be Trusted</h2>
+      <div class="explainer">
+        <p class="explainer__text">
+          corvid-agent has a <span class="accent-cyan" style="font-weight: bold;">1.14&times; test-to-code ratio</span> &mdash; more lines of tests than production code. When agents run autonomously, bugs don't just break features &mdash; they break the agents that ship your code.
+        </p>
+      </div>
+      <div class="grid grid--2" style="margin-top: 32px;">
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">5,920 Unit Tests</h3>
+          <p>16,378 assertions across 240 files. Credit systems, encryption, scheduling, bash security &mdash; every critical path is independently verified.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-magenta">360 E2E Tests</h3>
+          <p>31 Playwright specs covering 198 of 202 testable API endpoints and all 37 Angular UI routes. Real HTTP, real database, real assertions.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-green">116 Module Specs</h3>
+          <p>YAML specs for every server module, validated in CI. Checks exported symbols, file existence, database references, and dependency graphs.</p>
+        </div>
+        <div class="card card--outline">
+          <h3 class="card__title accent-cyan">Zero-Warning CI Gate</h3>
+          <p>Spec validation runs on every commit. Zero warnings allowed. If a module's spec drifts from reality, CI fails.</p>
+        </div>
+      </div>
+      <div class="compare-table" style="margin-top: 32px;">
+        <div class="compare-table__row compare-table__header">
+          <div class="compare-table__cell">Platform</div>
+          <div class="compare-table__cell">Test counts published?</div>
+          <div class="compare-table__cell">Test:code ratio?</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell">AutoGPT</div>
+          <div class="compare-table__cell">No</div>
+          <div class="compare-table__cell">No</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell">CrewAI</div>
+          <div class="compare-table__cell">No</div>
+          <div class="compare-table__cell">No</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell">LangGraph</div>
+          <div class="compare-table__cell">No</div>
+          <div class="compare-table__cell">No</div>
+        </div>
+        <div class="compare-table__row">
+          <div class="compare-table__cell accent-cyan">corvid-agent</div>
+          <div class="compare-table__cell accent-green">5,920 unit + 360 E2E</div>
+          <div class="compare-table__cell accent-green">1.14&times;</div>
+        </div>
+      </div>
+      <div class="explainer" style="margin-top: 24px;">
+        <p class="explainer__text" style="font-size: 9px;">
+          <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/docs/blog/why-more-test-than-production-code.md" class="accent-cyan">Read the full blog post: "Why we have more test code than production code" &rarr;</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══════════════════ WHAT IT IS NOT ═══════════════════ -->
-  <section class="section" id="what-it-is-not">
+  <section class="section section--alt" id="what-it-is-not">
     <div class="container">
       <h2 class="section__title">What It's Not</h2>
       <div class="grid grid--3">

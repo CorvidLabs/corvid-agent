@@ -111,13 +111,37 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## At a Glance
+## The Most Tested AI Agent Platform
 
-| Metric | Count |
+> **1.14× test-to-code ratio** — more lines of tests than production code. No other open-source agent platform publishes these numbers.
+
+| Metric | Value |
 |--------|-------|
 | Unit tests | **5,920** across 240 files (16,378 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **116** with automated validation |
+| Test:code ratio | **1.14×** |
+
+When agents ship code autonomously, the platform they run on must be bulletproof. Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
+
+**[Read: Why we have more test code than production code](docs/blog/why-more-test-than-production-code.md)**
+
+### How we compare
+
+| Platform | Test count published? | Test:code ratio? | Open source? |
+|----------|----------------------|-------------------|-------------|
+| AutoGPT | No | No | Yes |
+| CrewAI | No | No | Yes |
+| LangGraph | No | No | Yes |
+| MetaGPT | No | No | Yes |
+| **corvid-agent** | **5,920 unit + 360 E2E** | **1.14×** | **MIT** |
+
+---
+
+## At a Glance
+
+| Metric | Count |
+|--------|-------|
 | MCP tools | **39** corvid_* tool handlers |
 | API endpoints | **~200** across 42 route modules |
 | DB migrations | **27** (squashed baseline, 85 tables) |
