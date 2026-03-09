@@ -9,13 +9,15 @@
 import { z } from 'zod';
 import {
     CreateProjectSchema, UpdateProjectSchema,
-    CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema,
+    CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema,
     CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema,
-    CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema,
+    CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema, CastVoteSchema, HumanApprovalSchema,
     CreateWorkTaskSchema,
     McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema,
     AddAllowlistSchema, UpdateAllowlistSchema,
-    CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema,
+    AddGitHubAllowlistSchema, UpdateGitHubAllowlistSchema,
+    AddRepoBlocklistSchema,
+    CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema, BulkScheduleActionSchema,
     CreateWebhookRegistrationSchema, UpdateWebhookRegistrationSchema,
     CreateMentionPollingSchema, UpdateMentionPollingSchema,
     CreateWorkflowSchema, UpdateWorkflowSchema, TriggerWorkflowSchema, WorkflowRunActionSchema,
@@ -27,6 +29,13 @@ import {
     CreateMcpServerConfigSchema, UpdateMcpServerConfigSchema,
     EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema,
     OllamaPullModelSchema, OllamaDeleteModelSchema,
+    LoadPluginSchema, PluginCapabilityActionSchema,
+    SetSandboxPolicySchema, AssignSandboxSchema,
+    DeviceTokenSchema, DeviceAuthorizeSchema,
+    UpdateCreditConfigSchema,
+    PSKContactNicknameSchema, CreditGrantSchema,
+    RunExamSchema,
+    SendA2ATaskSchema,
 } from '../lib/validation';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -253,6 +262,25 @@ export const routes: RouteEntry[] = [
         requestBody: InvokeAgentSchema,
     },
     {
+        method: 'GET', path: '/api/agents/{id}/spending',
+        summary: 'Get agent daily spending',
+        tags: ['Agents', 'Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'PUT', path: '/api/agents/{id}/spending-cap',
+        summary: 'Set agent spending cap',
+        tags: ['Agents'],
+        auth: 'required',
+        requestBody: SetSpendingCapSchema,
+    },
+    {
+        method: 'DELETE', path: '/api/agents/{id}/spending-cap',
+        summary: 'Remove agent spending cap',
+        tags: ['Agents'],
+        auth: 'required',
+    },
+    {
         method: 'GET', path: '/api/agents/{id}/messages',
         summary: 'Get agent messages',
         tags: ['Agents'],
@@ -454,6 +482,27 @@ export const routes: RouteEntry[] = [
         summary: 'Continue chat on completed council',
         tags: ['Councils'],
         auth: 'required',
+        requestBody: CouncilChatSchema,
+    },
+    {
+        method: 'GET', path: '/api/council-launches/{id}/vote',
+        summary: 'Get governance vote status',
+        tags: ['Councils'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/council-launches/{id}/vote',
+        summary: 'Cast governance vote',
+        tags: ['Councils'],
+        auth: 'required',
+        requestBody: CastVoteSchema,
+    },
+    {
+        method: 'POST', path: '/api/council-launches/{id}/vote/approve',
+        summary: 'Human approval for governance vote',
+        tags: ['Councils'],
+        auth: 'required',
+        requestBody: HumanApprovalSchema,
     },
 
     // ── Work Tasks ──────────────────────────────────────────────────────────
@@ -549,6 +598,57 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
 
+    // ── GitHub Allowlist ────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/github-allowlist',
+        summary: 'List GitHub allowlist entries',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/github-allowlist',
+        summary: 'Add GitHub user to allowlist',
+        tags: ['Allowlist'],
+        auth: 'required',
+        requestBody: AddGitHubAllowlistSchema,
+        responses: { 201: { description: 'Created allowlist entry' } },
+    },
+    {
+        method: 'PUT', path: '/api/github-allowlist/{username}',
+        summary: 'Update GitHub allowlist entry',
+        tags: ['Allowlist'],
+        auth: 'required',
+        requestBody: UpdateGitHubAllowlistSchema,
+    },
+    {
+        method: 'DELETE', path: '/api/github-allowlist/{username}',
+        summary: 'Remove GitHub user from allowlist',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+
+    // ── Repo Blocklist ─────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/repo-blocklist',
+        summary: 'List repo blocklist entries',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/repo-blocklist',
+        summary: 'Add repo to blocklist',
+        tags: ['Allowlist'],
+        auth: 'required',
+        requestBody: AddRepoBlocklistSchema,
+        responses: { 201: { description: 'Created blocklist entry' } },
+    },
+    {
+        method: 'DELETE', path: '/api/repo-blocklist/{owner}/{repo}',
+        summary: 'Remove repo from blocklist',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+
     // ── Bridge Delivery ───────────────────────────────────────────────────
     {
         method: 'GET', path: '/api/bridges/delivery',
@@ -616,6 +716,7 @@ export const routes: RouteEntry[] = [
         summary: 'Update credit configuration',
         tags: ['Settings'],
         auth: 'required',
+        requestBody: UpdateCreditConfigSchema,
     },
 
     // ── Schedules ───────────────────────────────────────────────────────────
@@ -685,8 +786,21 @@ export const routes: RouteEntry[] = [
         requestBody: ScheduleApprovalSchema,
     },
     {
+        method: 'POST', path: '/api/schedules/bulk',
+        summary: 'Bulk enable/disable/delete schedules',
+        tags: ['Schedules'],
+        auth: 'required',
+        requestBody: BulkScheduleActionSchema,
+    },
+    {
         method: 'GET', path: '/api/scheduler/health',
         summary: 'Scheduler health and stats',
+        tags: ['Schedules'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/scheduler/system-state',
+        summary: 'Scheduler internal system state',
         tags: ['Schedules'],
         auth: 'required',
     },
@@ -904,6 +1018,7 @@ export const routes: RouteEntry[] = [
         summary: 'Set sandbox policy for agent',
         tags: ['Sandbox'],
         auth: 'required',
+        requestBody: SetSandboxPolicySchema,
     },
     {
         method: 'DELETE', path: '/api/sandbox/policies/{agentId}',
@@ -916,6 +1031,7 @@ export const routes: RouteEntry[] = [
         summary: 'Assign container to session',
         tags: ['Sandbox'],
         auth: 'required',
+        requestBody: AssignSandboxSchema,
     },
     {
         method: 'POST', path: '/api/sandbox/release/{sessionId}',
@@ -1135,12 +1251,14 @@ export const routes: RouteEntry[] = [
         summary: 'Poll for access token',
         tags: ['Auth'],
         auth: 'none',
+        requestBody: DeviceTokenSchema,
     },
     {
         method: 'POST', path: '/api/auth/device/authorize',
         summary: 'Authorize device from web UI',
         tags: ['Auth'],
         auth: 'none',
+        requestBody: DeviceAuthorizeSchema,
     },
     {
         method: 'GET', path: '/api/auth/verify',
@@ -1155,6 +1273,7 @@ export const routes: RouteEntry[] = [
         summary: 'Create and start A2A task',
         tags: ['A2A'],
         auth: 'none',
+        requestBody: SendA2ATaskSchema,
     },
     {
         method: 'GET', path: '/a2a/tasks/{id}',
@@ -1175,6 +1294,7 @@ export const routes: RouteEntry[] = [
         summary: 'Load a plugin',
         tags: ['Plugins'],
         auth: 'required',
+        requestBody: LoadPluginSchema,
     },
     {
         method: 'POST', path: '/api/plugins/{name}/unload',
@@ -1187,12 +1307,14 @@ export const routes: RouteEntry[] = [
         summary: 'Grant capability to plugin',
         tags: ['Plugins'],
         auth: 'required',
+        requestBody: PluginCapabilityActionSchema,
     },
     {
         method: 'POST', path: '/api/plugins/{name}/revoke',
         summary: 'Revoke capability from plugin',
         tags: ['Plugins'],
         auth: 'required',
+        requestBody: PluginCapabilityActionSchema,
     },
 
     // ── Skill Bundles ───────────────────────────────────────────────────────
@@ -1272,6 +1394,7 @@ export const routes: RouteEntry[] = [
         summary: 'Trigger live model exam',
         tags: ['Exam'],
         auth: 'required',
+        requestBody: RunExamSchema,
     },
     {
         method: 'GET', path: '/api/exam/categories',
@@ -1362,12 +1485,14 @@ export const routes: RouteEntry[] = [
         summary: 'Create PSK contact',
         tags: ['AlgoChat'],
         auth: 'required',
+        requestBody: PSKContactNicknameSchema,
     },
     {
         method: 'PATCH', path: '/api/algochat/psk-contacts/{id}',
         summary: 'Rename PSK contact',
         tags: ['AlgoChat'],
         auth: 'required',
+        requestBody: PSKContactNicknameSchema,
     },
     {
         method: 'DELETE', path: '/api/algochat/psk-contacts/{id}',
@@ -1417,6 +1542,13 @@ export const routes: RouteEntry[] = [
         summary: 'Get messages for a wallet',
         tags: ['Wallets'],
         auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/wallets/{address}/credits',
+        summary: 'Grant credits to wallet',
+        tags: ['Wallets'],
+        auth: 'required',
+        requestBody: CreditGrantSchema,
     },
 
     // ── Slack ───────────────────────────────────────────────────────────────

@@ -350,6 +350,13 @@ export const OllamaDeleteModelSchema = z.object({
     model: z.string().min(1, 'model name is required'),
 });
 
+// ─── Exam ────────────────────────────────────────────────────────────────────
+
+export const RunExamSchema = z.object({
+    model: z.string().min(1, 'model name is required'),
+    categories: z.array(z.enum(['coding', 'context', 'tools', 'algochat', 'council', 'instruction'])).optional(),
+});
+
 // ─── Schedules ───────────────────────────────────────────────────────────────
 
 const ScheduleActionSchema = z.object({
