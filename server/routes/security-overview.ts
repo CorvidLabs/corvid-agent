@@ -8,6 +8,7 @@
  * - Governance tiers (Layer 0/1/2)
  * - GitHub allowlist count
  * - Repo blocklist count
+ * - Branch protection configuration
  */
 
 import type { Database } from 'bun:sqlite';
@@ -64,6 +65,19 @@ export function handleSecurityOverviewRoutes(
             layer1: { basenames: [...LAYER_1_BASENAMES], substrings: [...LAYER_1_SUBSTRINGS] },
         },
         autoMergeEnabled: true,
+        branchProtection: {
+            enforced: true,
+            requiredReviews: 1,
+            dismissStaleReviews: true,
+            blockForcePushes: true,
+            blockDeletions: true,
+            enforceAdmins: true,
+            requiredStatusChecks: [
+                'Build & Test (ubuntu-latest)',
+                'Build & Test (macos-latest)',
+                'Build & Test (windows-latest)',
+            ],
+        },
         allowlistCount,
         blocklistCount,
     });
