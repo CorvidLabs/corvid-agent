@@ -7,6 +7,7 @@ import { SessionService } from '../../core/services/session.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { SessionOutputComponent } from '../sessions/session-output.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { GovernanceVotePanelComponent } from './governance-vote-panel.component';
 import type { CouncilLaunch, CouncilLaunchLog, CouncilDiscussionMessage } from '../../core/models/council.model';
 import type { Session } from '../../core/models/session.model';
 import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.model';
@@ -14,7 +15,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
 @Component({
     selector: 'app-council-launch-view',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DatePipe, SessionOutputComponent, StatusBadgeComponent],
+    imports: [RouterLink, DatePipe, SessionOutputComponent, StatusBadgeComponent, GovernanceVotePanelComponent],
     template: `
         @if (launch(); as l) {
             <div class="page">
@@ -277,6 +278,15 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                             </div>
                         }
                     </div>
+                }
+
+                @if (l.voteType === 'governance') {
+                    <app-governance-vote-panel
+                        [launchId]="l.id"
+                        [agentNames]="agentNameMap"
+                        [agentColors]="agentColorRecord()"
+                        [councilAgentIds]="councilAgentIds()"
+                    />
                 }
 
                 @if (l.stage === 'complete') {
@@ -542,7 +552,7 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected readonly chatSending = signal(false);
     protected readonly chatRunning = signal(false);
 
-    private agentNameMap: Record<string, string> = {};
+    protected agentNameMap: Record<string, string> = {};
     private agentIdBySession: Record<string, string> = {};
     private agentColorMap: Record<string, number> = {};
     private nextColorIndex = 0;
@@ -586,6 +596,23 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected readonly explorerNetwork = computed(() => {
         const status = this.sessionService.algochatStatus();
         return status?.network ?? 'testnet';
+    });
+
+    protected readonly agentColorRecord = computed(() => {
+        const record: Record<string, string> = {};
+        for (const [key, idx] of Object.entries(this.agentColorMap)) {
+            record[key] = CouncilLaunchViewComponent.AGENT_COLORS[idx % CouncilLaunchViewComponent.AGENT_COLORS.length];
+        }
+        return record;
+    });
+
+    protected readonly councilAgentIds = computed(() => {
+        const sessions = this.allSessions();
+        const ids = new Set<string>();
+        for (const s of sessions) {
+            if (s.agentId) ids.add(s.agentId);
+        }
+        return Array.from(ids);
     });
 
     async ngOnInit(): Promise<void> {
