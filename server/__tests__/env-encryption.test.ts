@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { encryptEnvVars, decryptEnvVars, isEncrypted, ENCRYPTED_PREFIX } from '../lib/env-encryption';
@@ -9,8 +9,20 @@ import {
     updateMcpServerConfig,
 } from '../db/mcp-servers';
 
-// Ensure a key is available for tests
-process.env.WALLET_ENCRYPTION_KEY = 'test-key-for-env-encryption-at-least-32-chars-long';
+// Save/restore WALLET_ENCRYPTION_KEY to avoid leaking into other test files
+const originalWalletKey = process.env.WALLET_ENCRYPTION_KEY;
+
+beforeAll(() => {
+    process.env.WALLET_ENCRYPTION_KEY = 'test-key-for-env-encryption-at-least-32-chars-long';
+});
+
+afterAll(() => {
+    if (originalWalletKey !== undefined) {
+        process.env.WALLET_ENCRYPTION_KEY = originalWalletKey;
+    } else {
+        delete process.env.WALLET_ENCRYPTION_KEY;
+    }
+});
 
 // ── Unit tests: encryptEnvVars / decryptEnvVars ──────────────────────
 
