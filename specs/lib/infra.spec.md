@@ -128,6 +128,10 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `RegisterFederationInstanceSchema` | Marketplace | Validates federation instance: `url`, `name` (required). |
 | `SubscribeSchema` | Marketplace | Validates marketplace subscription: `subscriberTenantId` (required), `billingCycle` (daily/weekly/monthly). |
 | `CancelSubscriptionSchema` | Marketplace | Validates subscription cancellation: `subscriberTenantId` (required). |
+| `CreateTierSchema` | Marketplace | Validates pricing tier creation: `name`, `priceCredits` (required), optional `description`, `billingCycle`, `rateLimit`, `features`, `sortOrder`. |
+| `UpdateTierSchema` | Marketplace | Validates pricing tier update. All fields optional. |
+| `TierUseSchema` | Marketplace | Validates tier use: `tierId` (required). |
+| `TierSubscribeSchema` | Marketplace | Validates tier subscription: `tierId`, `subscriberTenantId` (required). |
 | `RecordReputationEventSchema` | Reputation | Validates reputation event: `agentId`, `eventType`, `scoreImpact` (required). |
 | `CreateSubscriptionSchema` | Billing | Validates subscription creation: `tenantId`, `stripeSubscriptionId`, `plan`, `periodStart`, `periodEnd` (required). |
 | `UpsertPersonaSchema` | Personas | Validates persona upsert: optional `archetype`, `traits` (max 20), `voiceGuidelines`, `background`, `exampleMessages` (max 10). |

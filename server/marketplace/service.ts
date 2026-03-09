@@ -16,10 +16,15 @@ import type {
     CreateReviewInput,
     ListingRecord,
     ReviewRecord,
+    PricingTier,
+    CreateTierInput,
+    UpdateTierInput,
+    TierRecord,
 } from './types';
 import { IdentityVerification } from '../reputation/identity-verification';
 import type { VerificationTier } from '../reputation/identity-verification';
 import { EscrowService } from './escrow';
+import { ValidationError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('Marketplace');
@@ -46,6 +51,21 @@ export interface UseResult {
     success: boolean;
     creditsDeducted: number;
     escrowId?: string;
+}
+
+/**
+ * Error thrown when a tier's rate limit is exceeded.
+ */
+export class RateLimitExceededError extends Error {
+    tierId: string;
+    limit: number;
+
+    constructor(tierId: string, limit: number) {
+        super(`Rate limit exceeded: tier ${tierId} allows ${limit} uses per hour`);
+        this.name = 'RateLimitExceededError';
+        this.tierId = tierId;
+        this.limit = limit;
+    }
 }
 
 /**
@@ -95,6 +115,21 @@ function recordToReview(row: ReviewRecord): MarketplaceReview {
         reviewerAddress: row.reviewer_address,
         rating: row.rating,
         comment: row.comment,
+        createdAt: row.created_at,
+    };
+}
+
+function recordToTier(row: TierRecord): PricingTier {
+    return {
+        id: row.id,
+        listingId: row.listing_id,
+        name: row.name,
+        description: row.description,
+        priceCredits: row.price_credits,
+        billingCycle: row.billing_cycle as PricingTier['billingCycle'],
+        rateLimit: row.rate_limit,
+        features: row.features ? JSON.parse(row.features) : [],
+        sortOrder: row.sort_order,
         createdAt: row.created_at,
     };
 }
@@ -408,7 +443,204 @@ export class MarketplaceService {
         return false;
     }
 
+    // ─── Pricing Tiers ─────────────────────────────────────────────────────
+
+    /** Maximum number of pricing tiers per listing. */
+    static readonly MAX_TIERS_PER_LISTING = 5;
+
+    getTiersForListing(listingId: string): PricingTier[] {
+        const rows = this.db.query(
+            'SELECT * FROM marketplace_pricing_tiers WHERE listing_id = ? ORDER BY sort_order ASC',
+        ).all(listingId) as TierRecord[];
+
+        return rows.map(recordToTier);
+    }
+
+    getTier(tierId: string): PricingTier | null {
+        const row = this.db.query(
+            'SELECT * FROM marketplace_pricing_tiers WHERE id = ?',
+        ).get(tierId) as TierRecord | null;
+
+        return row ? recordToTier(row) : null;
+    }
+
+    createTier(listingId: string, input: CreateTierInput): PricingTier {
+        const listing = this.getListing(listingId);
+        if (!listing) {
+            throw new Error(`Listing ${listingId} not found`);
+        }
+
+        const existing = this.getTiersForListing(listingId);
+        if (existing.length >= MarketplaceService.MAX_TIERS_PER_LISTING) {
+            throw new ValidationError(`Maximum of ${MarketplaceService.MAX_TIERS_PER_LISTING} tiers per listing`);
+        }
+
+        const id = crypto.randomUUID();
+        const features = JSON.stringify(input.features ?? []);
+
+        this.db.query(`
+            INSERT INTO marketplace_pricing_tiers
+                (id, listing_id, name, description, price_credits, billing_cycle,
+                 rate_limit, features, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            id,
+            listingId,
+            input.name,
+            input.description ?? '',
+            input.priceCredits,
+            input.billingCycle ?? 'one_time',
+            input.rateLimit ?? 0,
+            features,
+            input.sortOrder ?? existing.length,
+        );
+
+        // Update listing price_credits to reflect minimum tier price ("starting at")
+        this.syncListingPrice(listingId);
+
+        log.info('Created pricing tier', { id, listingId, name: input.name });
+        return this.getTier(id)!;
+    }
+
+    updateTier(tierId: string, input: UpdateTierInput): PricingTier | null {
+        const existing = this.getTier(tierId);
+        if (!existing) return null;
+
+        const updates: string[] = [];
+        const values: SQLQueryBindings[] = [];
+
+        if (input.name !== undefined) { updates.push('name = ?'); values.push(input.name); }
+        if (input.description !== undefined) { updates.push('description = ?'); values.push(input.description); }
+        if (input.priceCredits !== undefined) { updates.push('price_credits = ?'); values.push(input.priceCredits); }
+        if (input.billingCycle !== undefined) { updates.push('billing_cycle = ?'); values.push(input.billingCycle); }
+        if (input.rateLimit !== undefined) { updates.push('rate_limit = ?'); values.push(input.rateLimit); }
+        if (input.features !== undefined) { updates.push('features = ?'); values.push(JSON.stringify(input.features)); }
+        if (input.sortOrder !== undefined) { updates.push('sort_order = ?'); values.push(input.sortOrder); }
+
+        if (updates.length === 0) return existing;
+
+        values.push(tierId);
+        this.db.query(
+            `UPDATE marketplace_pricing_tiers SET ${updates.join(', ')} WHERE id = ?`,
+        ).run(...values);
+
+        // Sync "starting at" price
+        this.syncListingPrice(existing.listingId);
+
+        log.info('Updated pricing tier', { id: tierId });
+        return this.getTier(tierId);
+    }
+
+    deleteTier(tierId: string): boolean {
+        const tier = this.getTier(tierId);
+        if (!tier) return false;
+
+        const result = this.db.query('DELETE FROM marketplace_pricing_tiers WHERE id = ?').run(tierId);
+        if (result.changes > 0) {
+            this.syncListingPrice(tier.listingId);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check tier-based rate limit for a buyer on a specific tier.
+     * Returns true if the buyer is within the rate limit (or tier has no limit).
+     */
+    checkTierRateLimit(tierId: string, buyerWalletAddress: string): boolean {
+        const tier = this.getTier(tierId);
+        if (!tier || tier.rateLimit === 0) return true; // No limit
+
+        // Count uses in the last hour via credit_transactions referencing this tier
+        const row = this.db.query(`
+            SELECT COUNT(*) as cnt FROM credit_transactions
+            WHERE wallet_address = ?
+              AND reference LIKE ?
+              AND created_at >= datetime('now', '-1 hour')
+        `).get(buyerWalletAddress, `tier_use:${tierId}:%`) as { cnt: number };
+
+        return row.cnt < tier.rateLimit;
+    }
+
+    /**
+     * Record a tier-based use of a listing. Deducts the tier's price_credits
+     * from the buyer, enforces rate limits, and credits the seller.
+     */
+    recordTierUse(listingId: string, tierId: string, buyerWalletAddress: string): UseResult {
+        const listing = this.getListing(listingId);
+        if (!listing) {
+            return { success: false, creditsDeducted: 0 };
+        }
+
+        const tier = this.getTier(tierId);
+        if (!tier || tier.listingId !== listingId) {
+            return { success: false, creditsDeducted: 0 };
+        }
+
+        // Check rate limit
+        if (!this.checkTierRateLimit(tierId, buyerWalletAddress)) {
+            throw new RateLimitExceededError(tierId, tier.rateLimit);
+        }
+
+        if (tier.priceCredits > 0) {
+            const escrowTx = this.escrow.settleInstantUse(
+                listingId,
+                buyerWalletAddress,
+                listing.tenantId,
+                tier.priceCredits,
+            );
+
+            if (!escrowTx) {
+                throw new InsufficientCreditsError(listingId, tier.priceCredits);
+            }
+
+            // Record tier-specific transaction reference for rate limiting
+            this.db.query(`
+                INSERT INTO credit_transactions
+                    (wallet_address, type, amount, balance_after, reference)
+                VALUES (?, 'tier_use_tracking', 0, 0, ?)
+            `).run(buyerWalletAddress, `tier_use:${tierId}:${crypto.randomUUID()}`);
+
+            // Increment use count
+            this.db.query(
+                "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
+            ).run(listingId);
+
+            log.info('Tier-based paid use recorded', {
+                listingId, tierId, buyer: buyerWalletAddress, credits: tier.priceCredits,
+            });
+
+            return { success: true, creditsDeducted: tier.priceCredits, escrowId: escrowTx.id };
+        }
+
+        // Free tier use
+        this.db.query(
+            "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
+        ).run(listingId);
+        return { success: true, creditsDeducted: 0 };
+    }
+
     // ─── Private ─────────────────────────────────────────────────────────────
+
+    /**
+     * Sync listing.price_credits to the minimum tier price ("starting at").
+     * If no tiers exist, leaves price_credits unchanged.
+     */
+    private syncListingPrice(listingId: string): void {
+        const row = this.db.query(`
+            SELECT MIN(price_credits) as min_price
+            FROM marketplace_pricing_tiers
+            WHERE listing_id = ?
+        `).get(listingId) as { min_price: number | null };
+
+        if (row.min_price !== null) {
+            this.db.query(`
+                UPDATE marketplace_listings
+                SET price_credits = ?, updated_at = datetime('now')
+                WHERE id = ?
+            `).run(row.min_price, listingId);
+        }
+    }
 
     private updateListingRating(listingId: string): void {
         const stats = this.db.query(`

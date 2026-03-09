@@ -17,9 +17,13 @@ The `init` command checks prerequisites (Bun 1.3+, Git), creates `.env`, prompts
 
 For non-interactive setup: `corvid-agent init --yes` (auto-detects Claude CLI / Ollama).
 
-For MCP-only (Claude Code / Cursor): `corvid-agent init --mcp`.
+For MCP + Agent Skills (Claude Code / Cursor / Copilot): `corvid-agent init --mcp`.
 
 Open **http://localhost:3000** — you should see the dashboard.
+
+### System requirements
+
+See the [System Requirements](system-requirements.md) guide for detailed hardware tiers. In short: 8 GB RAM minimum (CLI + Claude API only), 16 GB recommended (agent + IDE), 32 GB for the full stack with Docker.
 
 ### What you need
 

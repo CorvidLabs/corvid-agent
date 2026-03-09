@@ -1,5 +1,5 @@
 import { createInterface } from 'readline';
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, readdirSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { c, printError, printSuccess, printWarning, printHeader, Spinner } from '../render';
 
@@ -112,6 +112,105 @@ async function checkPrerequisites(): Promise<CheckResult[]> {
     return results;
 }
 
+// ─── Skills Copy ─────────────────────────────────────────────────────────────
+
+function findSkillsSource(): string | null {
+    // From project root (dev mode)
+    const projectRoot = findProjectRoot();
+    if (projectRoot) {
+        const devPath = join(projectRoot, 'skills');
+        if (existsSync(devPath)) return devPath;
+    }
+
+    // From installed package (npx / npm)
+    const pkgPath = join(dirname(dirname(__dirname)), 'skills');
+    if (existsSync(pkgPath)) return pkgPath;
+
+    return null;
+}
+
+function copySkillsToDir(source: string, targetDir: string): number {
+    let count = 0;
+    const entries = readdirSync(source, { withFileTypes: true });
+    for (const entry of entries) {
+        if (entry.isDirectory()) {
+            const skillDir = join(source, entry.name);
+            const skillFile = join(skillDir, 'SKILL.md');
+            if (existsSync(skillFile)) {
+                const destDir = join(targetDir, entry.name);
+                mkdirSync(destDir, { recursive: true });
+                copyFileSync(skillFile, join(destDir, 'SKILL.md'));
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+export function copySkills(cwd: string): void {
+    const source = findSkillsSource();
+    if (!source) {
+        printWarning('Skills directory not found — skipping skill installation.');
+        return;
+    }
+
+    let installed = false;
+
+    // Claude Code: .claude/skills/ in project dir
+    const claudeSkillsDir = join(cwd, '.claude', 'skills');
+    const count = copySkillsToDir(source, claudeSkillsDir);
+    if (count > 0) {
+        printSuccess(`${count} skills installed to ${claudeSkillsDir}`);
+        installed = true;
+    }
+
+    // Cursor: .cursor/rules/ in project dir (if .cursor exists)
+    const cursorDir = join(cwd, '.cursor');
+    if (existsSync(cursorDir)) {
+        const cursorRulesDir = join(cursorDir, 'rules');
+        const cursorCount = copySkillsToDir(source, cursorRulesDir);
+        if (cursorCount > 0) {
+            printSuccess(`${cursorCount} skills installed to ${cursorRulesDir}`);
+            installed = true;
+        }
+    }
+
+    // VS Code Copilot: .github/skills/ in project dir (if .github exists)
+    const githubDir = join(cwd, '.github');
+    if (existsSync(githubDir)) {
+        const githubSkillsDir = join(githubDir, 'skills');
+        const ghCount = copySkillsToDir(source, githubSkillsDir);
+        if (ghCount > 0) {
+            printSuccess(`${ghCount} skills installed to ${githubSkillsDir}`);
+            installed = true;
+        }
+    }
+
+    if (!installed) {
+        printWarning('No skills were installed.');
+    }
+}
+
+// ─── MCP Config Writer ──────────────────────────────────────────────────────
+
+function writeMcpConfig(filePath: string, mcpConfig: Record<string, unknown>): void {
+    let existing: Record<string, unknown> = {};
+    if (existsSync(filePath)) {
+        try {
+            existing = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+        } catch { /* will overwrite */ }
+    }
+    const servers = (existing.mcpServers ?? {}) as Record<string, unknown>;
+    const merged = { ...existing, mcpServers: { ...servers, ...mcpConfig } };
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
+    const tmpPath = `${filePath}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(merged, null, 2) + '\n', { mode: 0o600 });
+    renameSync(tmpPath, filePath);
+}
+
 // ─── MCP-Only Init ──────────────────────────────────────────────────────────
 
 async function initMcpOnly(_opts: { yes: boolean }): Promise<void> {
@@ -212,19 +311,71 @@ ${c.gray('Set up corvid-agent as an MCP server for Claude Code, Cursor, or other
         printSuccess(`MCP server added to ${c.gray(cursorMcpPath)}`);
     }
 
+    // Write VS Code / GitHub Copilot config if .vscode exists in cwd
+    const vscodeMcpPath = join(process.cwd(), '.vscode', 'mcp.json');
+    const vscodeDir = join(process.cwd(), '.vscode');
+    if (existsSync(vscodeDir)) {
+        writeMcpConfig(vscodeMcpPath, mcpConfig);
+        printSuccess(`MCP server added to ${c.gray(vscodeMcpPath)} (GitHub Copilot)`);
+    }
+
+    // Write OpenCode config if ~/.config/opencode exists
+    const openCodeConfigDir = join(homeDir, '.config', 'opencode');
+    if (existsSync(openCodeConfigDir)) {
+        const openCodeMcpPath = join(openCodeConfigDir, 'config.json');
+        writeMcpConfig(openCodeMcpPath, mcpConfig);
+        printSuccess(`MCP server added to ${c.gray(openCodeMcpPath)} (OpenCode)`);
+    }
+
+    // Copy Agent Skills to project
+    printHeader('Agent Skills');
+    copySkills(process.cwd());
+
+    // Detect VibeKit and suggest side-by-side setup
+    let hasVibeKit = false;
+    try {
+        const proc = Bun.spawn(['vibekit', '--version'], { stdout: 'pipe', stderr: 'pipe' });
+        await proc.exited;
+        hasVibeKit = true;
+    } catch { /* not installed */ }
+
+    if (hasVibeKit) {
+        printHeader('VibeKit Integration');
+        console.log(`  ${c.green('✓')} VibeKit CLI detected — smart contract tools available`);
+        console.log(`  ${c.gray('Run')} ${c.cyan('vibekit init')} ${c.gray('to add blockchain MCP tools alongside corvid-agent')}`);
+    } else {
+        console.log(`\n  ${c.gray('Tip: Install VibeKit for Algorand smart contract MCP tools:')}`);
+        console.log(`  ${c.cyan('curl -fsSL https://getvibekit.ai/install | sh')}`);
+    }
+
+    // Print manual setup snippets for clients we didn't auto-detect
+    const mcpSnippet = JSON.stringify(mcpConfig, null, 2);
+    const manualClients: string[] = [];
+    if (!existsSync(vscodeDir)) manualClients.push('VS Code / Copilot');
+    if (!existsSync(openCodeConfigDir)) manualClients.push('OpenCode');
+
+    if (manualClients.length > 0) {
+        printHeader('Other MCP Clients');
+        console.log(`  ${c.gray(`For ${manualClients.join(', ')} — add the following to your MCP config:`)}`);
+        console.log(`  ${c.gray('See docs/mcp-setup.md for per-client paths and details.')}\n`);
+        console.log(`  ${c.cyan(mcpSnippet.split('\n').join('\n  '))}\n`);
+    }
+
     console.log(`
 ${c.bold}${c.green('MCP setup complete!')}${c.reset}
 
 ${c.bold}What you get:${c.reset}
   corvid_* tools available in your AI editor — agents, sessions,
   work tasks, projects, health checks, and more.
+  Agent Skills teach your AI assistant when and how to use each tool.
 
 ${c.bold}Next steps:${c.reset}
   1. ${projectRoot ? `Start the server: ${c.cyan('bun run dev')}` : 'Start your corvid-agent server'}
-  2. Restart Claude Code / Cursor to pick up the new MCP config
+  2. Restart your editor to pick up the new MCP config
   3. Ask your AI assistant: ${c.gray('"List my agents"')} or ${c.gray('"Create a work task"')}
-
+  ${hasVibeKit ? `4. Run ${c.cyan('vibekit init')} to add smart contract tools` : ''}
 ${c.gray('Config: ' + claudeConfigPath)}
+${c.gray('Setup guide: docs/mcp-setup.md')}
 `);
 }
 
@@ -562,7 +713,7 @@ ${c.bold}Next steps:${c.reset}
   ${c.cyan('corvid-agent demo')}    Run a self-contained demo
 
 ${c.bold}Use with AI editors:${c.reset}
-  ${c.cyan('corvid-agent init --mcp')}   Add corvid-agent tools to Claude Code / Cursor
+  ${c.cyan('corvid-agent init --mcp')}   Add MCP tools + Agent Skills to Claude Code, Cursor, Copilot, etc.
 
 ${c.gray('Docs: docs/quickstart.md  •  Dashboard: http://127.0.0.1:3000')}
 `);

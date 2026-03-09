@@ -37,7 +37,10 @@ export type ServerMessage =
     | { type: 'welcome'; serverTime: string }
     | { type: 'error'; message: string; severity?: ErrorSeverity; errorCode?: string }
     | { type: 'session_error'; sessionId: string; error: SessionErrorInfo }
-    | { type: 'council_agent_error'; launchId: string; agentId: string; agentName: string; error: CouncilAgentErrorInfo };
+    | { type: 'council_agent_error'; launchId: string; agentId: string; agentName: string; error: CouncilAgentErrorInfo }
+    | { type: 'governance_vote_cast'; launchId: string; agentId: string; vote: 'approve' | 'reject' | 'abstain'; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }
+    | { type: 'governance_vote_resolved'; launchId: string; status: 'approved' | 'rejected' | 'awaiting_human'; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }
+    | { type: 'governance_quorum_reached'; launchId: string; weightedApprovalRatio: number; threshold: number };
 
 /** Error severity level for structured WebSocket error messages. */
 export type ErrorSeverity = 'info' | 'warning' | 'error' | 'fatal';
