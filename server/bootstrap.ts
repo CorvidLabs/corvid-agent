@@ -4,6 +4,8 @@
  * Extracted from server/index.ts to keep the composition root thin.
  * See issue #442 for the decomposition roadmap.
  */
+// Side-effect import: patches process.env (removes CLAUDECODE, fixes PATH on Windows)
+import './lib/env';
 import type { Database } from 'bun:sqlite';
 import { closeDb } from './db/connection';
 import { PerformanceCollector } from './performance/collector';
