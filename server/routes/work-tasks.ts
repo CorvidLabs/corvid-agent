@@ -88,6 +88,8 @@ async function handleCreate(req: Request, workTaskService: WorkTaskService, tena
             source: data.source,
             sourceId: data.sourceId,
             requesterInfo: data.requesterInfo,
+            // priority is accepted via CreateWorkTaskInput but not yet in the validation schema
+            // (requires Layer 0 migration). Service defaults to P2.
         }, tenantId);
 
         return json(task, 201);
