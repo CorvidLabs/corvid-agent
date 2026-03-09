@@ -55,6 +55,15 @@ describe('Security Overview Routes', () => {
         expect(data.governancePaths.layer0.basenames.length).toBeGreaterThan(0);
         expect(data.governancePaths.layer1.basenames.length).toBeGreaterThan(0);
 
+        // Branch protection
+        expect(data.branchProtection).toBeDefined();
+        expect(data.branchProtection.enforced).toBe(true);
+        expect(data.branchProtection.requiredReviews).toBe(1);
+        expect(data.branchProtection.blockForcePushes).toBe(true);
+        expect(data.branchProtection.blockDeletions).toBe(true);
+        expect(data.branchProtection.enforceAdmins).toBe(true);
+        expect(data.branchProtection.requiredStatusChecks.length).toBeGreaterThan(0);
+
         // Counts (both 0 in fresh DB)
         expect(data.allowlistCount).toBe(0);
         expect(data.blocklistCount).toBe(0);

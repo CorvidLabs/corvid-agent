@@ -1,0 +1,66 @@
+name: Branch Protection Check
+
+on:
+  # Run weekly to detect if protection is disabled
+  schedule:
+    - cron: '0 6 * * 1'  # Monday at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify branch protection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Check main branch protection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          BRANCH="main"
+
+          echo "Checking branch protection on $REPO ($BRANCH)..."
+
+          RESULT=$(gh api "repos/$REPO/branches/$BRANCH/protection" 2>&1) || {
+            echo "FAIL: No branch protection on $REPO/$BRANCH"
+            echo "Run: ./scripts/enable-branch-protection.sh"
+            exit 1
+          }
+
+          PR_REVIEWS=$(echo "$RESULT" | jq -r '.required_pull_request_reviews.required_approving_review_count // "none"')
+          FORCE_PUSH=$(echo "$RESULT" | jq -r '.allow_force_pushes.enabled // false')
+          DELETIONS=$(echo "$RESULT" | jq -r '.allow_deletions.enabled // false')
+          STATUS_CHECKS=$(echo "$RESULT" | jq -r '.required_status_checks.contexts // [] | length')
+
+          echo "PR reviews required:  $PR_REVIEWS"
+          echo "Force push allowed:   $FORCE_PUSH"
+          echo "Deletions allowed:    $DELETIONS"
+          echo "Status check count:   $STATUS_CHECKS"
+
+          FAIL=0
+          if [ "$PR_REVIEWS" = "none" ] || [ "$PR_REVIEWS" = "0" ]; then
+            echo "::error::PR reviews not required on main branch"
+            FAIL=1
+          fi
+          if [ "$FORCE_PUSH" = "true" ]; then
+            echo "::error::Force push allowed on main branch"
+            FAIL=1
+          fi
+          if [ "$DELETIONS" = "true" ]; then
+            echo "::error::Branch deletion allowed on main branch"
+            FAIL=1
+          fi
+          if [ "$STATUS_CHECKS" = "0" ]; then
+            echo "::warning::No required status checks on main branch"
+          fi
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "FAIL: Branch protection misconfigured. Run: ./scripts/enable-branch-protection.sh"
+            exit 1
+          fi
+
+          echo "OK: Branch protection verified on $REPO/$BRANCH"

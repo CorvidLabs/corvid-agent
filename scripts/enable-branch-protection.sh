@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enable branch protection on unprotected public repos (issue #463).
+# Enable branch protection on repos (issues #428, #463).
 # Uses the GitHub REST API via `gh api`.
 #
 # Protection rules applied:
@@ -8,6 +8,7 @@
 #   - Block force pushes
 #   - Block branch deletion
 #   - Require status checks to pass (where CI exists)
+#   - For corvid-agent: require CI build status check
 #
 # Usage: ./scripts/enable-branch-protection.sh [--dry-run] [--verify-only]
 
@@ -24,8 +25,12 @@ for arg in "$@"; do
   esac
 done
 
+# Primary repo — requires CI status checks (#428)
+PRIMARY_REPO="CorvidLabs/corvid-agent"
+
 # Repos identified in issue #463 security audit
 REPOS=(
+  "$PRIMARY_REPO"
   "CorvidLabs/rs-algochat"
   "CorvidLabs/kt-algochat"
   "CorvidLabs/go-algochat"
@@ -37,14 +42,36 @@ REPOS=(
 BRANCH="main"
 FAILURES=0
 
-apply_protection() {
+build_payload() {
   local repo="$1"
 
-  echo "--- Configuring branch protection: $repo ($BRANCH) ---"
-
-  # Build the protection payload
-  local payload
-  payload=$(cat <<'ENDJSON'
+  if [ "$repo" = "$PRIMARY_REPO" ]; then
+    # Stricter rules for the main corvid-agent repo (#428):
+    # - Required CI status checks (build job must pass)
+    # - Enforce rules for admins too
+    cat <<'ENDJSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "Build & Test (ubuntu-latest)",
+      "Build & Test (macos-latest)",
+      "Build & Test (windows-latest)"
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "required_approving_review_count": 1
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+ENDJSON
+  else
+    cat <<'ENDJSON'
 {
   "required_status_checks": null,
   "enforce_admins": false,
@@ -58,7 +85,17 @@ apply_protection() {
   "allow_deletions": false
 }
 ENDJSON
-)
+  fi
+}
+
+apply_protection() {
+  local repo="$1"
+
+  echo "--- Configuring branch protection: $repo ($BRANCH) ---"
+
+  # Build the protection payload
+  local payload
+  payload=$(build_payload "$repo")
 
   if [ "$DRY_RUN" = true ]; then
     echo "[dry-run] Would apply to $repo/$BRANCH:"
@@ -100,14 +137,18 @@ verify_protection() {
     return 1
   fi
 
-  local pr_reviews force_push deletions
+  local pr_reviews force_push deletions status_checks enforce_admins
   pr_reviews=$(echo "$result" | jq -r '.required_pull_request_reviews.required_approving_review_count // "none"')
   force_push=$(echo "$result" | jq -r '.allow_force_pushes.enabled // false')
   deletions=$(echo "$result" | jq -r '.allow_deletions.enabled // false')
+  status_checks=$(echo "$result" | jq -r '.required_status_checks.contexts // [] | length')
+  enforce_admins=$(echo "$result" | jq -r '.enforce_admins.enabled // false')
 
-  echo "  PR reviews required: $pr_reviews"
-  echo "  Force push allowed:  $force_push"
-  echo "  Deletions allowed:   $deletions"
+  echo "  PR reviews required:  $pr_reviews"
+  echo "  Force push allowed:   $force_push"
+  echo "  Deletions allowed:    $deletions"
+  echo "  Status check count:   $status_checks"
+  echo "  Enforce admins:       $enforce_admins"
 
   if [ "$pr_reviews" = "none" ] || [ "$pr_reviews" = "0" ]; then
     echo "  WARN: PR reviews not required"
@@ -120,6 +161,16 @@ verify_protection() {
   if [ "$deletions" = "true" ]; then
     echo "  WARN: Branch deletion is still allowed"
     FAILURES=$((FAILURES + 1))
+  fi
+  if [ "$repo" = "$PRIMARY_REPO" ]; then
+    if [ "$status_checks" = "0" ]; then
+      echo "  WARN: No required status checks on primary repo"
+      FAILURES=$((FAILURES + 1))
+    fi
+    if [ "$enforce_admins" != "true" ]; then
+      echo "  WARN: Admin enforcement not enabled on primary repo"
+      FAILURES=$((FAILURES + 1))
+    fi
   fi
 
   echo "  OK"
