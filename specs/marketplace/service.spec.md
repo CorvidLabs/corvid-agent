@@ -8,6 +8,7 @@ files:
 db_tables:
   - marketplace_listings
   - marketplace_reviews
+  - marketplace_pricing_tiers
 depends_on:
   - specs/db/schema.spec.md
 ---
@@ -27,6 +28,7 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `MarketplaceService` | Listing CRUD, search, review management, and per-use billing |
 | `VerificationGateError` | Exception thrown when marketplace listing verification gate check fails |
 | `InsufficientCreditsError` | Exception thrown when buyer lacks credits for a per-use listing |
+| `RateLimitExceededError` | Exception thrown when a tier's per-hour rate limit is exceeded. Carries `tierId` and `limit` fields |
 
 #### MarketplaceService Methods
 
@@ -43,6 +45,13 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `getReview` | `(id: string)` | `MarketplaceReview \| null` | Get single review |
 | `getReviewsForListing` | `(listingId: string)` | `MarketplaceReview[]` | All reviews for a listing, ordered by created_at DESC |
 | `deleteReview` | `(id: string)` | `boolean` | Delete review and update listing aggregates |
+| `getTiersForListing` | `(listingId: string)` | `PricingTier[]` | All pricing tiers for a listing, sorted by sort_order ASC |
+| `getTier` | `(tierId: string)` | `PricingTier \| null` | Get single pricing tier by ID |
+| `createTier` | `(listingId: string, input: CreateTierInput)` | `PricingTier` | Create a pricing tier; max 5 per listing; syncs listing price to min tier |
+| `updateTier` | `(tierId: string, input: UpdateTierInput)` | `PricingTier \| null` | Partial update; syncs listing price; returns null if not found |
+| `deleteTier` | `(tierId: string)` | `boolean` | Delete tier; syncs listing price to remaining minimum |
+| `checkTierRateLimit` | `(tierId: string, buyerWalletAddress: string)` | `boolean` | Check if buyer is within tier's hourly rate limit |
+| `recordTierUse` | `(listingId: string, tierId: string, buyerWalletAddress: string)` | `UseResult` | Record tier-based use with billing and rate limiting |
 
 ### Exported Types (from `types.ts`)
 
@@ -61,6 +70,11 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `UpdateListingInput` | Partial input for updateListing |
 | `CreateReviewInput` | Input for createReview |
 | `UseResult` | Result of `recordUse()`: `{ success, creditsDeducted, escrowId? }` |
+| `TierBillingCycle` | `'one_time' \| 'daily' \| 'weekly' \| 'monthly'` |
+| `PricingTier` | Full pricing tier with billingCycle, rateLimit, features, sortOrder |
+| `CreateTierInput` | Input for createTier: name, priceCredits required; optional description, billingCycle, rateLimit, features, sortOrder |
+| `UpdateTierInput` | Partial input for updateTier |
+| `TierRecord` | Snake-case DB row for marketplace_pricing_tiers |
 | `ListingRecord` | Snake-case DB row for marketplace_listings |
 | `ReviewRecord` | Snake-case DB row for marketplace_reviews |
 
@@ -185,6 +199,21 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | reviewer_address | TEXT | | AlgoChat address of reviewer |
 | rating | INTEGER | NOT NULL | 1-5 star rating |
 | comment | TEXT | NOT NULL | Review text |
+| created_at | TEXT | NOT NULL DEFAULT current_timestamp | ISO 8601 |
+
+### marketplace_pricing_tiers
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | TEXT | PRIMARY KEY | UUID |
+| listing_id | TEXT | NOT NULL | References marketplace_listings.id |
+| name | TEXT | NOT NULL | Tier display name |
+| description | TEXT | NOT NULL DEFAULT '' | Tier description |
+| price_credits | INTEGER | NOT NULL DEFAULT 0 | Credits per use/period |
+| billing_cycle | TEXT | NOT NULL DEFAULT 'one_time' | CHECK (one_time, daily, weekly, monthly) |
+| rate_limit | INTEGER | NOT NULL DEFAULT 0 | Max uses per hour (0 = unlimited) |
+| features | TEXT | NOT NULL DEFAULT '[]' | JSON array of feature strings |
+| sort_order | INTEGER | NOT NULL DEFAULT 0 | Display order |
 | created_at | TEXT | NOT NULL DEFAULT current_timestamp | ISO 8601 |
 
 ## Configuration
