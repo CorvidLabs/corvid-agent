@@ -111,9 +111,9 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## The Most Tested AI Agent Platform
+## 6,000+ Tests. 1.14× Test-to-Code Ratio. Open Source.
 
-> **1.14× test-to-code ratio** — more lines of tests than production code. No other open-source agent platform publishes these numbers.
+> More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
 
 | Metric | Value |
 |--------|-------|
@@ -122,19 +122,9 @@ See `.env.example` for the full list of 30+ configuration options.
 | Module specs | **116** with automated validation |
 | Test:code ratio | **1.14×** |
 
-When agents ship code autonomously, the platform they run on must be bulletproof. Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
+Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
 
 **[Read: Why we have more test code than production code](docs/blog/why-more-test-than-production-code.md)**
-
-### How we compare
-
-| Platform | Test count published? | Test:code ratio? | Open source? |
-|----------|----------------------|-------------------|-------------|
-| AutoGPT | No | No | Yes |
-| CrewAI | No | No | Yes |
-| LangGraph | No | No | Yes |
-| MetaGPT | No | No | Yes |
-| **corvid-agent** | **5,920 unit + 360 E2E** | **1.14×** | **MIT** |
 
 ---
 

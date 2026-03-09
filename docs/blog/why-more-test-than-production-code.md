@@ -1,6 +1,6 @@
 # Why We Have More Test Code Than Production Code
 
-**TL;DR:** corvid-agent has a 1.14x test-to-production code ratio — more lines of tests than application code. This isn't an accident. It's the core quality strategy for an autonomous agent platform where bugs don't just break features, they break the agents that ship your code.
+**TL;DR:** corvid-agent has a 1.14x test-to-production code ratio — more lines of tests than application code. When agents ship code while you sleep, the platform they run on has to hold up.
 
 ---
 
@@ -30,20 +30,9 @@ This is why we test more than we code:
 - **Work task pipeline** — Branch creation, validation loops, PR submission, retry logic. Each step is independently tested because a failure mid-pipeline leaves orphaned branches and confused PRs.
 - **Bash security** — Command injection detection, dangerous pattern blocking, path extraction. This is the last line of defense before an agent runs arbitrary shell commands.
 
-## What competitors publish
+## Why we publish these numbers
 
-We looked at the major open-source agent platforms. Here's what their READMEs say about testing:
-
-| Platform | Test count published? | Test:code ratio published? |
-|----------|----------------------|---------------------------|
-| AutoGPT | No | No |
-| CrewAI | No | No |
-| LangGraph | No | No |
-| MetaGPT | No | No |
-| OpenDevin | No | No |
-| **corvid-agent** | **Yes (5,920 unit + 360 E2E)** | **Yes (1.14x)** |
-
-This isn't a criticism of those projects. Testing is hard and publishing metrics takes confidence. But if you're choosing a platform to run autonomous agents on your codebase, the test coverage of that platform should matter to you.
+Most open-source agent platforms don't publish test metrics in their READMEs. That's fine — testing is hard, and every project has different priorities. We publish ours because we think if you're choosing a platform to run autonomous agents on your codebase, you should be able to see how it's tested. The numbers are right there in the repo. Run `bun test` and verify them yourself.
 
 ## How we maintain it
 
