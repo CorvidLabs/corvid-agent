@@ -49,7 +49,7 @@ DAG-based workflow orchestration. Define multi-step pipelines with agent session
 ### Create Workflow
 
 ```bash
-curl -X POST http://localhost:7777/api/workflows \
+curl -X POST http://localhost:3000/api/workflows \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -130,7 +130,7 @@ curl -X POST http://localhost:7777/api/workflows \
 ### Trigger Workflow
 
 ```bash
-curl -X POST http://localhost:7777/api/workflows/wf-abc123/trigger \
+curl -X POST http://localhost:3000/api/workflows/wf-abc123/trigger \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "input": { "branch": "feature/new-ui" } }'
@@ -152,7 +152,7 @@ curl -X POST http://localhost:7777/api/workflows/wf-abc123/trigger \
 
 ```bash
 # Pause a running workflow
-curl -X POST http://localhost:7777/api/workflow-runs/run-xyz789/action \
+curl -X POST http://localhost:3000/api/workflow-runs/run-xyz789/action \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "action": "pause" }'
@@ -192,7 +192,7 @@ Multi-agent deliberation with optional on-chain governance voting. Agents discus
 ### Create Council
 
 ```bash
-curl -X POST http://localhost:7777/api/councils \
+curl -X POST http://localhost:3000/api/councils \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -236,7 +236,7 @@ curl -X POST http://localhost:7777/api/councils \
 ### Launch Council Discussion
 
 ```bash
-curl -X POST http://localhost:7777/api/councils/council-abc/launch \
+curl -X POST http://localhost:3000/api/councils/council-abc/launch \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -260,7 +260,7 @@ curl -X POST http://localhost:7777/api/councils/council-abc/launch \
 ### Cast Governance Vote
 
 ```bash
-curl -X POST http://localhost:7777/api/council-launches/launch-xyz/vote \
+curl -X POST http://localhost:3000/api/council-launches/launch-xyz/vote \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -306,11 +306,15 @@ Agent marketplace with listings, reviews, usage tracking, and cross-instance fed
 | DELETE | `/api/marketplace/federation/instances/{url}` | Remove federation instance | owner |
 | POST | `/api/marketplace/federation/sync` | Sync federation instances | operator |
 | GET | `/api/marketplace/federated` | Get federated listings | any |
+| POST | `/api/marketplace/listings/{id}/subscribe` | Subscribe to listing | operator |
+| POST | `/api/marketplace/subscriptions/{id}/cancel` | Cancel subscription | operator |
+| GET | `/api/marketplace/subscriptions` | Get subscriptions by tenant | any |
+| GET | `/api/marketplace/listings/{id}/subscribers` | Get listing subscribers | any |
 
 ### Search Listings
 
 ```bash
-curl "http://localhost:7777/api/marketplace/search?q=security&category=security&minRating=4&limit=10" \
+curl "http://localhost:3000/api/marketplace/search?q=security&category=security&minRating=4&limit=10" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -329,7 +333,7 @@ curl "http://localhost:7777/api/marketplace/search?q=security&category=security&
 ### Create Listing
 
 ```bash
-curl -X POST http://localhost:7777/api/marketplace/listings \
+curl -X POST http://localhost:3000/api/marketplace/listings \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -364,7 +368,7 @@ curl -X POST http://localhost:7777/api/marketplace/listings \
 ### Create Review
 
 ```bash
-curl -X POST http://localhost:7777/api/marketplace/listings/listing-abc/reviews \
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/reviews \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -398,7 +402,7 @@ Agent reputation scoring, event tracking, identity verification, and on-chain at
 ### Get Agent Score
 
 ```bash
-curl "http://localhost:7777/api/reputation/scores/agent-1?refresh=true" \
+curl "http://localhost:3000/api/reputation/scores/agent-1?refresh=true" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -417,7 +421,7 @@ curl "http://localhost:7777/api/reputation/scores/agent-1?refresh=true" \
 ### Record Reputation Event
 
 ```bash
-curl -X POST http://localhost:7777/api/reputation/events \
+curl -X POST http://localhost:3000/api/reputation/events \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -433,7 +437,7 @@ curl -X POST http://localhost:7777/api/reputation/events \
 ### Set Identity Verification Tier
 
 ```bash
-curl -X PUT http://localhost:7777/api/reputation/identity/agent-1 \
+curl -X PUT http://localhost:3000/api/reputation/identity/agent-1 \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "tier": "GITHUB_VERIFIED", "dataHash": "abc123..." }'
@@ -462,7 +466,7 @@ Subscription management, usage tracking, invoices, and Stripe integration.
 ### Create Subscription
 
 ```bash
-curl -X POST http://localhost:7777/api/billing/subscription \
+curl -X POST http://localhost:3000/api/billing/subscription \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -490,7 +494,7 @@ curl -X POST http://localhost:7777/api/billing/subscription \
 ### Get Usage
 
 ```bash
-curl "http://localhost:7777/api/billing/usage/tenant-1" \
+curl "http://localhost:3000/api/billing/usage/tenant-1" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -514,7 +518,7 @@ curl "http://localhost:7777/api/billing/usage/tenant-1" \
 ### Calculate Cost
 
 ```bash
-curl "http://localhost:7777/api/billing/calculate?credits=1000" \
+curl "http://localhost:3000/api/billing/calculate?credits=1000" \
   -H "Authorization: Bearer $API_KEY"
 ```
 

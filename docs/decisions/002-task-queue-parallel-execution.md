@@ -275,7 +275,7 @@ Emitted when queue ordering changes (task completes, freeing a slot; new task en
 
 The `GET /api/work-tasks` response already returns an array. No structural change needed. Clients that assume only one active task per project need updating — but the API contract is already correct.
 
-### Queue Status Endpoint (new)
+### Queue Status Endpoint (proposed, not yet implemented)
 
 ```
 GET /api/work-tasks/queue-status → {
