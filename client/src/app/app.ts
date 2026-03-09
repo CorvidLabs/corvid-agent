@@ -23,18 +23,19 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterOutlet, HeaderComponent, SidebarComponent, BreadcrumbComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
     template: `
+        <a class="skip-link" href="#main-content">Skip to main content</a>
         <div class="app-layout">
             <app-header
                 [sidebarOpen]="sidebarOpen()"
                 (hamburgerClick)="toggleSidebar()" />
             @if (!wsService.connected()) {
-                <div class="app-layout__banner" role="alert">
+                <div class="app-layout__banner" role="alert" aria-live="assertive">
                     Connection lost — reconnecting...
                 </div>
             }
             <div class="app-layout__body">
                 <app-sidebar [(sidebarOpen)]="sidebarOpen" />
-                <main class="app-layout__content" role="main">
+                <main class="app-layout__content" role="main" id="main-content" tabindex="-1">
                     <app-breadcrumb />
                     <div class="app-layout__page page-enter">
                         <router-outlet />

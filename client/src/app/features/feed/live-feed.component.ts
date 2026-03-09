@@ -33,11 +33,11 @@ interface FeedEntry {
                 <h2>Feed</h2>
                 <div class="page__actions">
                     <span class="feed__count">{{ totalMessages() }} messages</span>
-                    <button class="btn btn--secondary" (click)="toggleAutoScroll()">
+                    <button class="btn btn--secondary" (click)="toggleAutoScroll()" [attr.aria-pressed]="autoScroll()">
                         Auto-scroll: {{ autoScroll() ? 'ON' : 'OFF' }}
                     </button>
-                    <button class="btn btn--secondary" (click)="collapseAll()">Collapse all</button>
-                    <button class="btn btn--danger" (click)="onClear()">Clear</button>
+                    <button class="btn btn--secondary" (click)="collapseAll()" aria-label="Collapse all expanded messages">Collapse all</button>
+                    <button class="btn btn--danger" (click)="onClear()" aria-label="Clear all messages from feed">Clear</button>
                 </div>
             </div>
 
@@ -51,18 +51,19 @@ interface FeedEntry {
                     aria-label="Search messages"
                 />
                 @if (activeThreadFilter()) {
-                    <button class="btn btn--filter" (click)="clearThreadFilter()">
+                    <button class="btn btn--filter" (click)="clearThreadFilter()" aria-label="Clear thread filter">
                         thread:{{ activeThreadFilter()!.slice(0, 6) }} ✕
                     </button>
                 }
-                <button class="btn btn--secondary" (click)="onExportFeed()">Export</button>
+                <button class="btn btn--secondary" (click)="onExportFeed()" aria-label="Export feed as text file">Export</button>
             </div>
 
-            <div class="feed__direction-filters">
+            <div class="feed__direction-filters" role="group" aria-label="Filter by message direction">
                 @for (dir of directionFilters; track dir.value) {
                     <button
                         class="dir-chip"
                         [class.dir-chip--active]="directionFilter() === dir.value"
+                        [attr.aria-pressed]="directionFilter() === dir.value"
                         (click)="setDirectionFilter(dir.value)"
                     >{{ dir.label }}</button>
                 }
@@ -90,32 +91,39 @@ interface FeedEntry {
                     }
                 </div>
             } @else {
-                <div class="feed__list" #feedList>
+                <div class="feed__list" #feedList role="list" aria-label="Message feed">
                     @for (entry of entries(); track entry.id) {
                         <div class="feed__entry"
+                             role="listitem"
                              [attr.data-direction]="entry.direction"
                              [class.feed__entry--expanded]="expandedIds().has(entry.id)"
                              [style.border-left-color]="agentColor(entry.colorIndex)"
-                             (click)="entry.direction !== 'agent-processing' && toggleExpand(entry.id)">
+                             [attr.tabindex]="entry.direction !== 'agent-processing' ? 0 : null"
+                             [attr.role]="entry.direction !== 'agent-processing' ? 'button' : null"
+                             [attr.aria-expanded]="entry.direction !== 'agent-processing' ? expandedIds().has(entry.id) : null"
+                             [attr.aria-label]="directionLabel(entry.direction) + ': ' + (entry.agentName ?? '') + ' to ' + recipientFrom(entry.participantLabel)"
+                             (click)="entry.direction !== 'agent-processing' && toggleExpand(entry.id)"
+                             (keydown.enter)="entry.direction !== 'agent-processing' && toggleExpand(entry.id)"
+                             (keydown.space)="entry.direction !== 'agent-processing' && toggleExpand(entry.id); $event.preventDefault()">
                             <div class="feed__meta">
                                 <span class="feed__time">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
                                 <span class="feed__direction" [attr.data-dir]="entry.direction">
                                     {{ directionLabel(entry.direction) }}
                                 </span>
                                 <span class="feed__sender" [style.color]="agentColor(entry.colorIndex)">{{ entry.agentName }}</span>
-                                <span class="feed__arrow">-></span>
+                                <span class="feed__arrow" aria-hidden="true">-></span>
                                 <span class="feed__participant" [title]="entry.participant">{{ recipientFrom(entry.participantLabel) }}</span>
                                 @if (entry.threadId) {
-                                    <button class="feed__thread" [title]="entry.threadId" (click)="filterByThread(entry.threadId!); $event.stopPropagation()">thread:{{ entry.threadId.slice(0, 6) }}</button>
+                                    <button class="feed__thread" [title]="entry.threadId" [attr.aria-label]="'Filter by thread ' + entry.threadId.slice(0, 6)" (click)="filterByThread(entry.threadId!); $event.stopPropagation()">thread:{{ entry.threadId.slice(0, 6) }}</button>
                                 }
                                 @if (entry.fee !== null && entry.fee > 0) {
                                     <span class="feed__fee">{{ (entry.fee / 1000000).toFixed(4) }} ALGO</span>
                                 }
                                 @if (entry.direction === 'agent-processing') {
-                                    <span class="feed__processing-indicator"><span class="feed__processing-dot"></span> processing...</span>
+                                    <span class="feed__processing-indicator" role="status"><span class="feed__processing-dot" aria-hidden="true"></span> processing...</span>
                                 } @else {
                                     <span class="feed__preview" [class.feed__preview--hidden]="expandedIds().has(entry.id)">{{ previewText(entry.content) }}</span>
-                                    <span class="feed__toggle">{{ expandedIds().has(entry.id) ? '▾' : '▸' }}</span>
+                                    <span class="feed__toggle" aria-hidden="true">{{ expandedIds().has(entry.id) ? '▾' : '▸' }}</span>
                                 }
                             </div>
                             @if (expandedIds().has(entry.id)) {
@@ -184,6 +192,7 @@ interface FeedEntry {
             cursor: pointer; transition: background 0.1s;
         }
         .feed__entry:hover { background: var(--bg-hover); }
+        .feed__entry:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
         .feed__entry--expanded { background: var(--bg-raised); }
         .feed__entry--expanded:hover { background: var(--bg-raised); }
         .feed__entry[data-direction="inbound"] { border-left-color: var(--accent-cyan); }

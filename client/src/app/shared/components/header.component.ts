@@ -35,6 +35,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
                         [class.network-btn--testnet]="currentNetwork() === 'testnet'"
                         [disabled]="switching()"
                         (click)="switchNetwork('testnet')"
+                        [attr.aria-pressed]="currentNetwork() === 'testnet'"
                         aria-label="Switch to testnet"
                     >TESTNET</button>
                     <button
@@ -43,6 +44,7 @@ import type { AlgoChatNetwork } from '../../core/models/session.model';
                         [class.network-btn--mainnet]="currentNetwork() === 'mainnet'"
                         [disabled]="switching()"
                         (click)="switchNetwork('mainnet')"
+                        [attr.aria-pressed]="currentNetwork() === 'mainnet'"
                         aria-label="Switch to mainnet"
                     >MAINNET</button>
                 </div>
