@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 73;
+const SCHEMA_VERSION = 74;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1357,6 +1357,28 @@ const MIGRATIONS: Record<number, string[]> = {
 
     // 73: Encrypt env_vars at rest (data migration — handled by file-based
     // migration 073_encrypt_env_vars.ts; no DDL changes needed).
+
+    74: [
+        // Marketplace subscription billing
+        `CREATE TABLE IF NOT EXISTS marketplace_subscriptions (
+            id                      TEXT PRIMARY KEY,
+            listing_id              TEXT NOT NULL,
+            subscriber_tenant_id    TEXT NOT NULL,
+            seller_tenant_id        TEXT NOT NULL,
+            price_credits           INTEGER NOT NULL,
+            billing_cycle           TEXT NOT NULL CHECK (billing_cycle IN ('daily', 'weekly', 'monthly')),
+            status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired', 'past_due')),
+            current_period_start    TEXT NOT NULL,
+            current_period_end      TEXT NOT NULL,
+            cancelled_at            TEXT DEFAULT NULL,
+            created_at              TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_listing ON marketplace_subscriptions(listing_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_subscriber ON marketplace_subscriptions(subscriber_tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_seller ON marketplace_subscriptions(seller_tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_status ON marketplace_subscriptions(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_subscriptions_period_end ON marketplace_subscriptions(current_period_end)`,
+    ],
 };
 
 /** Allowlist pattern for valid SQL identifiers (table/column names). */

@@ -23,6 +23,7 @@ const ACTION_CATEGORY_MAP: Record<ScheduleActionType, ActionCategory> = {
     daily_review: 'review',
     status_checkin: 'lightweight',
     star_repo: 'lightweight',
+    marketplace_billing: 'maintenance',
     custom: 'feature_work',
 };
 
