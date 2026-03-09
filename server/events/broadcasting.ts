@@ -14,6 +14,7 @@ import type { WorkflowService } from '../workflow/service';
 import type { NotificationService } from '../notifications/service';
 import type { ProcessManager } from '../process/manager';
 import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError } from '../routes/councils';
+import { onGovernanceVoteCast, onGovernanceVoteResolved, onGovernanceQuorumReached } from '../councils/discussion';
 import { tenantTopic } from '../ws/handler';
 import { resolveAgentTenant, resolveCouncilTenant } from '../tenant/resolve';
 
@@ -112,6 +113,22 @@ export function wireEventBroadcasting(deps: BroadcastDeps): void {
             },
         });
         publish('council', msg, resolveCouncil(error.launchId));
+    });
+
+    // Broadcast governance vote events
+    onGovernanceVoteCast((event) => {
+        const msg = JSON.stringify({ type: 'governance_vote_cast', ...event });
+        publish('council', msg, resolveCouncil(event.launchId));
+    });
+
+    onGovernanceVoteResolved((event) => {
+        const msg = JSON.stringify({ type: 'governance_vote_resolved', ...event });
+        publish('council', msg, resolveCouncil(event.launchId));
+    });
+
+    onGovernanceQuorumReached((event) => {
+        const msg = JSON.stringify({ type: 'governance_quorum_reached', ...event });
+        publish('council', msg, resolveCouncil(event.launchId));
     });
 
     // Broadcast schedule events

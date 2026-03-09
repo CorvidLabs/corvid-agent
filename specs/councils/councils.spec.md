@@ -32,6 +32,12 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `onCouncilDiscussionMessage` | `cb: (message: CouncilDiscussionMessage) => void` | `() => void` | Register a callback for council discussion messages. Returns an unsubscribe function. |
 | `onCouncilAgentError` | `cb: (error: CouncilAgentError) => void` | `() => void` | Register a callback for council agent error events. Returns an unsubscribe function. |
 | `broadcastAgentError` | `error: CouncilAgentError` | `void` | Broadcast an agent error to all registered error listeners. |
+| `onGovernanceVoteCast` | `cb: (event: GovernanceVoteCastEvent) => void` | `() => void` | Register a callback for governance vote cast events. Returns an unsubscribe function. |
+| `broadcastGovernanceVoteCast` | `event: GovernanceVoteCastEvent` | `void` | Broadcast a governance vote cast event to all registered listeners. |
+| `onGovernanceVoteResolved` | `cb: (event: GovernanceVoteResolvedEvent) => void` | `() => void` | Register a callback for governance vote resolved events. Returns an unsubscribe function. |
+| `broadcastGovernanceVoteResolved` | `event: GovernanceVoteResolvedEvent` | `void` | Broadcast a governance vote resolved event to all registered listeners. |
+| `onGovernanceQuorumReached` | `cb: (event: GovernanceQuorumReachedEvent) => void` | `() => void` | Register a callback for governance quorum reached events. Returns an unsubscribe function. |
+| `broadcastGovernanceQuorumReached` | `event: GovernanceQuorumReachedEvent` | `void` | Broadcast a governance quorum reached event to all registered listeners. |
 | `launchCouncil` | `db: Database, processManager: ProcessManager, councilId: string, projectId: string, prompt: string, agentMessenger: AgentMessenger \| null` | `LaunchCouncilResult` | Core council launch: validates council/project, creates launch record, starts member sessions, and sets up auto-advance watcher. |
 | `triggerReview` | `db: Database, processManager: ProcessManager, launchId: string` | `{ ok: true; reviewSessionIds: string[] } \| { ok: false; error: string; status: number }` | Trigger peer review stage — delegates to synthesis module with injected infrastructure callbacks. |
 | `finishWithAggregatedSynthesis` | `db: Database, launchId: string` | `void` | Finish a council by aggregating all session responses into a combined synthesis (no chairman). |
@@ -57,6 +63,9 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `EmitLogFn` | `(db: Database, launchId: string, level: CouncilLogLevel, message: string, detail?: string) => void` — callback type for structured log emission. |
 | `BroadcastStageChangeFn` | `(launchId: string, stage: string, sessionIds?: string[]) => void` — callback type for broadcasting stage transitions to WS clients. |
 | `WatchAutoAdvanceFn` | `(db: Database, processManager: ProcessManager, launchId: string, sessionIds: string[], role: 'member' \| 'reviewer') => void` — callback type for auto-advance watcher injection. |
+| `GovernanceVoteCastEvent` | `{ launchId: string; agentId: string; vote: 'approve' \| 'reject' \| 'abstain'; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }` — emitted when an agent casts a governance vote. |
+| `GovernanceVoteResolvedEvent` | `{ launchId: string; status: 'approved' \| 'rejected' \| 'awaiting_human'; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }` — emitted when a governance vote is resolved. |
+| `GovernanceQuorumReachedEvent` | `{ launchId: string; weightedApprovalRatio: number; threshold: number }` — emitted when a governance vote reaches quorum. |
 
 ### Exported Classes
 
@@ -194,6 +203,7 @@ _(none)_
 |--------|-------------|
 | `routes` | `routes/councils.ts` delegates HTTP API calls to `launchCouncil`, `triggerReview`, `triggerSynthesis`, `abortCouncil`, `startCouncilChat` |
 | `ws` | WebSocket handler subscribes via `onCouncilStageChange`, `onCouncilLog`, `onCouncilDiscussionMessage` to broadcast real-time updates to clients |
+| `event-broadcasting` | `wireEventBroadcasting` subscribes via `onGovernanceVoteCast`, `onGovernanceVoteResolved`, `onGovernanceQuorumReached` to broadcast governance vote events to WS clients |
 | `algochat` | AlgoChat `/council` command uses `launchCouncil` directly |
 
 ## Change Log
@@ -203,3 +213,4 @@ _(none)_
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Added on-chain mode (off/attestation/full) for council communication |
 | 2026-03-08 | corvid-agent | Governance v2: weighted voting, quorum config, vote resolution on synthesis completion |
+| 2026-03-09 | corvid-agent | Governance v2 WS events: vote cast, vote resolved, quorum reached listener/broadcaster pattern |

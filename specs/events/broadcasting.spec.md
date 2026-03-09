@@ -34,7 +34,7 @@ Wires service-level events (councils, schedules, webhooks, workflows, mentions, 
 
 1. `publishToTenant` delegates to `tenantTopic(baseTopic, tid)` for topic scoping — single-tenant mode uses flat topics (tid is undefined).
 2. `wireEventBroadcasting` must be called exactly once after all services are initialized.
-3. Council events (stage change, log, discussion message) resolve tenant via `resolveCouncilTenant` or `resolveAgentTenant` before publishing.
+3. Council events (stage change, log, discussion message, governance vote cast/resolved/quorum reached) resolve tenant via `resolveCouncilTenant` or `resolveAgentTenant` before publishing.
 4. Schedule, webhook, and mention events resolve tenant from the event's `agentId` field when present; publish to flat topic otherwise.
 5. Workflow events currently publish to flat topic (no agentId in workflow events yet).
 6. `processManager.setBroadcast` is wired so MCP tools can publish to WS clients.
@@ -72,6 +72,7 @@ And: message is published to flat topic "council" (no tenant prefix)
 | `server/ws/handler.ts` | `tenantTopic()` for scoping topics |
 | `server/tenant/resolve.ts` | `resolveAgentTenant`, `resolveCouncilTenant` for tenant lookup |
 | `server/routes/councils.ts` | `onCouncilStageChange`, `onCouncilLog`, `onCouncilDiscussionMessage` callbacks |
+| `server/councils/discussion.ts` | `onGovernanceVoteCast`, `onGovernanceVoteResolved`, `onGovernanceQuorumReached` callbacks |
 
 ## Change Log
 
