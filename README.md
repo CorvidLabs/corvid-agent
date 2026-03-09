@@ -111,13 +111,27 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## At a Glance
+## 6,000+ Tests. 1.14× Test-to-Code Ratio. Open Source.
 
-| Metric | Count |
+> More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
+
+| Metric | Value |
 |--------|-------|
 | Unit tests | **5,920** across 240 files (16,378 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **116** with automated validation |
+| Test:code ratio | **1.14×** |
+
+Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
+
+**[Read: Why we have more test code than production code](docs/blog/why-more-test-than-production-code.md)**
+
+---
+
+## At a Glance
+
+| Metric | Count |
+|--------|-------|
 | MCP tools | **39** corvid_* tool handlers |
 | API endpoints | **~200** across 42 route modules |
 | DB migrations | **27** (squashed baseline, 85 tables) |
