@@ -20,6 +20,7 @@ export type CreditTransactionType =
     | 'purchase'        // ALGO payment → credits
     | 'deduction'       // Per-turn deduction
     | 'agent_message'   // Agent-to-agent message cost
+    | 'marketplace_use' // Per-use marketplace listing invocation
     | 'reserve'         // Reserved for group messages
     | 'release'         // Released from reserve
     | 'grant'           // Free credits (first message, admin grant)

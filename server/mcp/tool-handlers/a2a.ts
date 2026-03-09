@@ -2,6 +2,8 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import { invokeRemoteAgent, discoverAgent } from '../../a2a/client';
+import { MarketplaceService, InsufficientCreditsError } from '../../marketplace/service';
+import { getBalance } from '../../db/credits';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('McpToolHandlers');
@@ -72,6 +74,7 @@ export async function handleInvokeRemoteAgent(
         skill?: string;
         timeout_minutes?: number;
         min_trust?: string;
+        listing_id?: string;
     },
 ): Promise<CallToolResult> {
     if (!args.agent_url?.trim() || !args.message?.trim()) {
@@ -79,6 +82,36 @@ export async function handleInvokeRemoteAgent(
     }
 
     try {
+        // Pre-invocation credit check for marketplace listings
+        if (args.listing_id) {
+            const marketplace = new MarketplaceService(ctx.db);
+            const listing = marketplace.getListing(args.listing_id);
+
+            if (listing && listing.pricingModel === 'per_use' && listing.priceCredits > 0) {
+                const balance = getBalance(ctx.db, ctx.agentId);
+                if (balance.available < listing.priceCredits) {
+                    return errorResult(
+                        `Insufficient credits to invoke this listing. ` +
+                        `Required: ${listing.priceCredits}, available: ${balance.available}`,
+                    );
+                }
+
+                ctx.emitStatus?.(`Billing ${listing.priceCredits} credits for listing "${listing.name}"...`);
+
+                try {
+                    marketplace.recordUse(args.listing_id, ctx.agentId);
+                } catch (err) {
+                    if (err instanceof InsufficientCreditsError) {
+                        return errorResult(
+                            `Insufficient credits to invoke listing "${listing.name}". ` +
+                            `Required: ${listing.priceCredits} credits.`,
+                        );
+                    }
+                    throw err;
+                }
+            }
+        }
+
         ctx.emitStatus?.(`Invoking remote agent at ${args.agent_url}...`);
 
         const timeoutMs = (args.timeout_minutes ?? 5) * 60 * 1000;
