@@ -42,8 +42,15 @@ jobs:
         with:
           bun-version: "1.3.8"
 
+      # Skip --frozen-lockfile for Dependabot PRs: the lockfile-sync workflow
+      # pushes an updated lockfile but GITHUB_TOKEN pushes don't re-trigger CI.
       - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+        run: |
+          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
+            bun install --ignore-scripts
+          else
+            bun install --frozen-lockfile --ignore-scripts
+          fi
 
       - name: Run security scanners
         run: bun scripts/ci-security-scan.ts
@@ -59,7 +66,12 @@ jobs:
           bun-version: "1.3.8"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+        run: |
+          if [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
+            bun install --ignore-scripts
+          else
+            bun install --frozen-lockfile --ignore-scripts
+          fi
 
       - name: Audit dependencies
         run: bun x npm-audit-ci --moderate
