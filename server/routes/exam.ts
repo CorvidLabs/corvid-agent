@@ -1,10 +1,16 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import { ExamRunner } from '../exam/runner';
-import { parseBodyOrThrow, ValidationError, RunExamSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
+import { z } from 'zod';
 import type { ExamCategory } from '../exam/types';
 import { EXAM_CATEGORIES } from '../exam/types';
+
+export const RunExamSchema = z.object({
+    model: z.string().min(1, 'model name is required'),
+    categories: z.array(z.enum(['coding', 'context', 'tools', 'algochat', 'council', 'instruction'])).optional(),
+});
 
 export function handleExamRoutes(
     req: Request,

@@ -34,9 +34,9 @@ import {
     DeviceTokenSchema, DeviceAuthorizeSchema,
     UpdateCreditConfigSchema,
     PSKContactNicknameSchema, CreditGrantSchema,
-    RunExamSchema,
     SendA2ATaskSchema,
 } from '../lib/validation';
+import { RunExamSchema } from '../routes/exam';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
