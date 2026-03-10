@@ -4,6 +4,7 @@ version: 1
 status: draft
 files:
   - server/db/connection.ts
+  - server/db/pool.ts
   - server/db/types.ts
   - server/db/json-utils.ts
 db_tables: []
@@ -34,12 +35,25 @@ Provides the singleton SQLite database connection, shared query utility types/fu
 | `queryCount` | `db: Database, sql: string, ...params: SQLQueryBindings[]` | `number` | Executes a `SELECT COUNT(*) as cnt` query and returns the numeric count (0 if no row) |
 | `queryExists` | `db: Database, sql: string, ...params: SQLQueryBindings[]` | `boolean` | Returns `true` when the count query yields > 0 rows; convenience wrapper around `queryCount` |
 
+#### From `server/db/pool.ts`
+| Function / Class | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `isSqliteBusy` | `err: unknown` | `boolean` | Returns `true` if the error is a SQLITE_BUSY / "database is locked" error. |
+| `writeTransaction` | `db: Database, fn: (db: Database) => T, options?: WriteTransactionOptions` | `T` | Executes `fn` inside a BEGIN IMMEDIATE transaction. Retries on SQLITE_BUSY with exponential backoff (default 3 retries, 50ms base delay). Rolls back on non-BUSY errors. |
+| `DbPool` (class) | `options: DbPoolOptions` | `DbPool` | Connection pool with 1 write connection (BEGIN IMMEDIATE + retry) and N read-only connections (round-robin). Methods: `write(fn)`, `read(fn)`, `getWriteDb()`, `getReadDb()`, `close()`, `readConnectionCount` (getter). |
+
 #### From `server/db/json-utils.ts`
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `safeJsonParse` | `json: string, defaultValue: T, context?: string` | `T` | Generic function. Safely parses a JSON string, returning `defaultValue` on failure. Logs a structured warning with a preview of the failed input. |
 
 ### Exported Types
+
+#### From `server/db/pool.ts`
+| Type | Description |
+|------|-------------|
+| `WriteTransactionOptions` | `{ maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number }` — retry configuration for write transactions |
+| `DbPoolOptions` | `{ path: string; maxReadConnections?: number; busyTimeoutMs?: number; writeRetry?: WriteTransactionOptions }` — pool constructor options |
 
 #### From `server/db/types.ts`
 | Type | Description |

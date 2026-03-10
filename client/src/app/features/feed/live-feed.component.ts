@@ -4,7 +4,7 @@ import { WebSocketService } from '../../core/services/websocket.service';
 import { AgentService } from '../../core/services/agent.service';
 import { ApiService } from '../../core/services/api.service';
 import { firstValueFrom } from 'rxjs';
-import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
 

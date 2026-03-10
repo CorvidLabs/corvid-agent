@@ -9,7 +9,7 @@ import {
     ElementRef,
     viewChild,
 } from '@angular/core';
-import type { ApprovalRequestWire } from '../../core/models/ws-message.model';
+import type { ApprovalRequestWire } from '@shared/ws-protocol';
 
 export interface ApprovalDecision {
     requestId: string;

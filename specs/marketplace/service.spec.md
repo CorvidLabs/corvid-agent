@@ -88,6 +88,9 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `DailyBucket` | Single day aggregation: `date`, `uses`, `revenue` |
 | `TopUser` | Per-user usage summary: `userTenantId`, `uses`, `creditsSpent` |
 | `BuyerUsageSummary` | Buyer's usage of a listing: `listingId`, `listingName`, `totalUses`, `totalCreditsSpent`, `lastUsedAt` |
+| `TrialStatus` | `'active' \| 'expired' \| 'converted'` |
+| `MarketplaceTrial` | Trial record with camelCase fields: listingId, tenantId, usesRemaining, expiresAt, status |
+| `TrialRecord` | Snake-case DB row for marketplace_trials |
 
 ## Invariants
 

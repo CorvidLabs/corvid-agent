@@ -10,6 +10,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
+import { checkInjection } from '../lib/injection-guard';
 import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
@@ -22,6 +23,7 @@ export function handleAgentRoutes(
     context: RequestContext,
     agentWalletService?: AgentWalletService | null,
     agentMessenger?: AgentMessenger | null,
+    onAgentChange?: (() => void) | null,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
@@ -33,7 +35,10 @@ export function handleAgentRoutes(
     if (path === '/api/agents' && method === 'POST') {
         const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
         if (denied) return denied;
-        return handleCreate(req, db, context, agentWalletService);
+        return handleCreate(req, db, context, agentWalletService).then(res => {
+            if (res.status === 201) onAgentChange?.();
+            return res;
+        });
     }
 
     // Agent balance endpoint
@@ -105,7 +110,10 @@ export function handleAgentRoutes(
     if (method === 'PUT') {
         const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
         if (denied) return denied;
-        return handleUpdate(req, db, id, context);
+        return handleUpdate(req, db, id, context).then(res => {
+            if (res.ok) onAgentChange?.();
+            return res;
+        });
     }
 
     if (method === 'DELETE') {
@@ -115,6 +123,7 @@ export function handleAgentRoutes(
         if (deleted) {
             const actor = context.walletAddress ?? getClientIp(req);
             recordAudit(db, 'agent_delete', actor, 'agent', id, null, null, getClientIp(req));
+            onAgentChange?.();
             return json({ ok: true });
         }
         return json({ error: 'Not found' }, 404);
@@ -226,6 +235,10 @@ async function handleInvoke(
 
     try {
         const data = await parseBodyOrThrow(req, InvokeAgentSchema);
+
+        // Injection scan on agent invoke content
+        const injectionDenied = checkInjection(db, data.content, 'api_invoke', req);
+        if (injectionDenied) return injectionDenied;
 
         const result = await agentMessenger.invoke({
             fromAgentId,

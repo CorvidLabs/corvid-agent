@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { WebSocketService } from './websocket.service';
 import type { WorkTask, CreateWorkTaskInput } from '../models/work-task.model';
-import type { ServerWsMessage } from '../models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })

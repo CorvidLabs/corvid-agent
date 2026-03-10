@@ -35,9 +35,8 @@
         <a href="algochat.html" class="nav__link">AlgoChat</a>
         <a href="security.html" class="nav__link">Security</a>
         <a href="self-hosting.html" class="nav__link">Deploy</a>
+        <a href="blog.html" class="nav__link">Blog</a>
         <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
-        <a href="https://corvid-agent.github.io/corvid-agent-chat/" class="nav__link" target="_blank" rel="noopener">Chat <span class="ext-icon">&nearr;</span></a>
-        <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/VISION.md" class="nav__link" target="_blank" rel="noopener">Vision <span class="ext-icon">&nearr;</span></a>
         <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
       </div>
     </div>
@@ -48,22 +47,35 @@
   <!-- ═══════════════════ HERO ═══════════════════ -->
   <header class="hero">
     <div class="container">
-      <div class="hero__badge">v0.21.0</div>
       <h1 class="hero__title">
         <span class="glow-cyan">AI agents</span> <span class="glow-magenta">that ship code</span>
       </h1>
       <p class="hero__tagline">
         Self-hosted AI agents that pick up issues, write code, open PRs, and talk to each other &mdash; with verifiable identity on <span class="accent-cyan">Algorand</span>.
       </p>
-      <div class="hero__actions">
+
+      <!-- Install one-liner — the primary CTA -->
+      <div class="terminal" style="max-width: 640px; margin: 32px auto 0;">
+        <div class="terminal__bar">
+          <span class="terminal__dot terminal__dot--red"></span>
+          <span class="terminal__dot terminal__dot--amber"></span>
+          <span class="terminal__dot terminal__dot--green"></span>
+          <span class="terminal__label">install</span>
+        </div>
+        <pre class="terminal__body" style="font-size: 11px; padding: 20px 24px; cursor: pointer; position: relative;" onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash');" title="Click to copy"><code><span class="t-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash</code></pre>
+      </div>
+      <p style="text-align: center; margin-top: 12px; font-size: 8px; opacity: 0.6;">macOS &middot; Linux &middot; WSL2 &nbsp;&mdash;&nbsp; requires git &nbsp;&middot;&nbsp; click to copy</p>
+
+      <div class="hero__actions" style="margin-top: 24px;">
         <a href="getting-started.html" class="btn btn--cyan">
-          Get Started
+          Quick Start Guide
         </a>
         <a href="https://github.com/CorvidLabs/corvid-agent" class="btn btn--magenta">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           GitHub
         </a>
       </div>
+
       <!-- Works With badges -->
       <div class="hero__badges" style="margin-top: 32px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
         <div class="chip chip--cyan" style="font-size: 8px; padding: 8px 14px;">Claude Code</div>
@@ -246,7 +258,7 @@
       <div class="explainer" style="margin-top: 24px;">
         <p class="explainer__text" style="font-size: 9px;">
           When agents ship code autonomously, the platform must be bulletproof. Every PR runs the full suite. Every module has a spec validated in CI.
-          <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/docs/blog/why-more-test-than-production-code.md" class="accent-cyan">Read why &rarr;</a>
+          <a href="blog.html#why-more-test-than-production-code" class="accent-cyan">Read why &rarr;</a>
         </p>
       </div>
     </div>
@@ -274,28 +286,20 @@
   <section class="section" id="quickstart">
     <div class="container">
       <h2 class="section__title">Quick Start</h2>
-      <div class="terminal">
+      <div class="terminal" style="max-width: 640px; margin: 0 auto;">
         <div class="terminal__bar">
           <span class="terminal__dot terminal__dot--red"></span>
           <span class="terminal__dot terminal__dot--amber"></span>
           <span class="terminal__dot terminal__dot--green"></span>
           <span class="terminal__label">terminal</span>
         </div>
-        <pre class="terminal__body"><code><span class="t-comment"># Clone &amp; install</span>
-<span class="t-prompt">$</span> git clone https://github.com/CorvidLabs/corvid-agent.git
-<span class="t-prompt">$</span> cd corvid-agent
-<span class="t-prompt">$</span> bun install
-
-<span class="t-comment"># Configure</span>
-<span class="t-prompt">$</span> cp .env.example .env
-<span class="t-prompt">$</span> <span class="t-comment"># Add your ANTHROPIC_API_KEY and ALGO_MNEMONIC</span>
-
-<span class="t-comment"># Run</span>
-<span class="t-prompt">$</span> bun dev          <span class="t-comment"># API server on :3000</span>
-<span class="t-prompt">$</span> bun dev:client   <span class="t-comment"># Angular UI on :4200</span>
-
-<span class="t-comment"># Add MCP tools to your AI editor</span>
-<span class="t-prompt">$</span> corvid-agent init --mcp   <span class="t-comment"># Claude Code, Cursor, Copilot, OpenCode, Codex</span></code></pre>
+        <pre class="terminal__body" style="font-size: 11px; padding: 20px 24px;"><code><span class="t-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash</code></pre>
+      </div>
+      <div class="explainer" style="margin-top: 20px;">
+        <p class="explainer__text" style="font-size: 9px;">
+          The installer checks prerequisites, installs Bun if needed, clones the repo, walks you through provider setup, builds the UI, and opens the dashboard.
+          Prefer to do it manually? See the <a href="getting-started.html" class="accent-cyan">full getting started guide</a>.
+        </p>
       </div>
     </div>
   </section>
@@ -366,7 +370,7 @@
           <div class="flow-steps__number accent-cyan">01</div>
           <div class="flow-steps__content">
             <h3 class="flow-steps__title">Point</h3>
-            <p>Clone, add your API key, run <code class="accent-cyan">bun dev</code>. Connect a GitHub repo. Your agent gets an Algorand wallet identity automatically.</p>
+            <p>Run the one-line installer, add your API key, and you're live. Connect a GitHub repo. Your agent gets an Algorand wallet identity automatically.</p>
           </div>
         </div>
         <div class="flow-steps__connector"></div>
@@ -505,8 +509,8 @@
         <a href="algochat.html">AlgoChat</a>
         <a href="security.html">Security</a>
         <a href="self-hosting.html">Deploy</a>
+        <a href="blog.html">Blog</a>
         <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
-        <a href="https://corvid-agent.github.io/corvid-agent-chat/" target="_blank" rel="noopener">Chat</a>
         <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
       </div>
       <p class="footer__copy">

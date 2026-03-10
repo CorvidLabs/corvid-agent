@@ -38,7 +38,47 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | Type | Description |
 |------|-------------|
 | `ClientMessage` | Union type of all client-to-server WebSocket message shapes |
+| `ClientWsMessage` | Alias for `ClientMessage` (Angular client compatibility) |
 | `ServerMessage` | Union type of all server-to-client WebSocket message shapes |
+| `ServerWsMessage` | Alias for `ServerMessage` (Angular client compatibility) |
+| `ServerMessageType` | String literal union of all `ServerMessage` type discriminants |
+| `ServerMessageOfType` | Mapped type extracting a specific `ServerMessage` variant by its `type` discriminant |
+| `ServerMessageHandlerMap` | Typed handler map — one optional callback per server message type |
+| `SessionEventMessage` | `{ type: 'session_event'; sessionId; event: StreamEvent }` |
+| `SessionStatusMessage` | `{ type: 'session_status'; sessionId; status }` |
+| `AlgochatMessageEvent` | `{ type: 'algochat_message'; participant; content; direction }` |
+| `AgentBalanceMessage` | `{ type: 'agent_balance'; agentId; balance; funded }` |
+| `ChatStreamMessage` | `{ type: 'chat_stream'; agentId; chunk; done }` |
+| `ChatToolUseMessage` | `{ type: 'chat_tool_use'; agentId; toolName; input }` |
+| `ChatThinkingMessage` | `{ type: 'chat_thinking'; agentId; active }` |
+| `ChatSessionMessage` | `{ type: 'chat_session'; agentId; sessionId }` |
+| `AgentMessageUpdateEvent` | `{ type: 'agent_message_update'; message: AgentMessage }` |
+| `ApprovalRequestMessage` | `{ type: 'approval_request'; request: ApprovalRequestWire }` |
+| `CouncilStageChangeMessage` | `{ type: 'council_stage_change'; launchId; stage; sessionIds? }` |
+| `CouncilLogMessage` | `{ type: 'council_log'; log: CouncilLaunchLog }` |
+| `CouncilDiscussionMessageEvent` | `{ type: 'council_discussion_message'; message: CouncilDiscussionMessage }` |
+| `WorkTaskUpdateMessage` | `{ type: 'work_task_update'; task: WorkTask }` |
+| `ScheduleUpdateMessage` | `{ type: 'schedule_update'; schedule: AgentSchedule }` |
+| `ScheduleExecutionUpdateMessage` | `{ type: 'schedule_execution_update'; execution: ScheduleExecution }` |
+| `ScheduleApprovalRequestMessage` | `{ type: 'schedule_approval_request'; executionId; scheduleId; agentId; actionType; description }` |
+| `OllamaPullProgressMessage` | `{ type: 'ollama_pull_progress'; model; status; progress; downloadedBytes; totalBytes; currentLayer; error? }` |
+| `WebhookUpdateMessage` | `{ type: 'webhook_update'; registration: WebhookRegistration }` |
+| `WebhookDeliveryMessage` | `{ type: 'webhook_delivery'; delivery: WebhookDelivery }` |
+| `MentionPollingUpdateMessage` | `{ type: 'mention_polling_update'; config: MentionPollingConfig }` |
+| `WorkflowRunUpdateMessage` | `{ type: 'workflow_run_update'; run: WorkflowRun }` |
+| `WorkflowNodeUpdateMessage` | `{ type: 'workflow_node_update'; nodeExecution: WorkflowNodeRun }` |
+| `AgentNotificationMessage` | `{ type: 'agent_notification'; agentId; sessionId; title; message; level; timestamp }` |
+| `AgentQuestionMessage` | `{ type: 'agent_question'; question: OwnerQuestionWire }` |
+| `GovernanceVoteCastMessage` | `{ type: 'governance_vote_cast'; launchId; agentId; vote; weight; weightedApprovalRatio; totalVotesCast; totalMembers }` |
+| `GovernanceVoteResolvedMessage` | `{ type: 'governance_vote_resolved'; launchId; status; weightedApprovalRatio; effectiveThreshold; reason }` |
+| `GovernanceQuorumReachedMessage` | `{ type: 'governance_quorum_reached'; launchId; weightedApprovalRatio; threshold }` |
+| `PingMessage` | `{ type: 'ping'; serverTime }` |
+| `WelcomeMessage` | `{ type: 'welcome'; serverTime }` |
+| `ErrorMessage` | `{ type: 'error'; message; severity?; errorCode? }` |
+| `SessionErrorMessage` | `{ type: 'session_error'; sessionId; error: SessionErrorInfo }` |
+| `CouncilAgentErrorMessage` | `{ type: 'council_agent_error'; launchId; agentId; agentName; error: CouncilAgentErrorInfo }` |
+| `ApprovalRequestWire` | Wire type for approval requests: `{ id; sessionId; toolName; description; createdAt; timeoutMs }` |
+| `OwnerQuestionWire` | Wire type for owner questions: `{ id; sessionId; agentId; question; options; context; createdAt; timeoutMs }` |
 | `StreamEvent` | Session stream event payload forwarded via WebSocket (discriminated union on `eventType`) |
 | `StreamEventType` | String literal union of all `StreamEvent` eventType discriminants |
 | `ContentBlock` | Interface with `type: string` and optional `text?: string`. Represents a content block in assistant messages. |

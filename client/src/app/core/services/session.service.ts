@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { WebSocketService } from './websocket.service';
 import type { Session, SessionMessage, CreateSessionInput, AlgoChatStatus } from '../models/session.model';
-import type { ServerWsMessage, StreamEvent, ApprovalRequestWire } from '../models/ws-message.model';
+import type { ServerWsMessage, StreamEvent, ApprovalRequestWire } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })

@@ -1,3 +1,12 @@
+import type { AgentMessage } from './types/algochat';
+import type { CouncilLaunchLog, CouncilDiscussionMessage } from './types/councils';
+import type { WorkTask } from './types/work-tasks';
+import type { AgentSchedule, ScheduleExecution } from './types/schedules';
+import type { WebhookRegistration, WebhookDelivery, MentionPollingConfig } from './types/webhooks';
+import type { WorkflowRun, WorkflowNodeRun } from './types/workflows';
+
+// ── Client → Server messages ─────────────────────────────────────────
+
 export type ClientMessage =
     | { type: 'auth'; key: string }
     | { type: 'pong' }
@@ -12,35 +21,122 @@ export type ClientMessage =
     | { type: 'schedule_approval'; executionId: string; approved: boolean }
     | { type: 'question_response'; questionId: string; answer: string; selectedOption?: number };
 
+/** Alias for Angular client compatibility. */
+export type ClientWsMessage = ClientMessage;
+
+// ── Server → Client messages ─────────────────────────────────────────
+// Each variant is exported as a named interface so consumers can import
+// individual event shapes and the compiler can narrow on `type`.
+
+export interface SessionEventMessage { type: 'session_event'; sessionId: string; event: StreamEvent }
+export interface SessionStatusMessage { type: 'session_status'; sessionId: string; status: string }
+export interface AlgochatMessageEvent { type: 'algochat_message'; participant: string; content: string; direction: 'inbound' | 'outbound' | 'status' }
+export interface AgentBalanceMessage { type: 'agent_balance'; agentId: string; balance: number; funded: number }
+export interface ChatStreamMessage { type: 'chat_stream'; agentId: string; chunk: string; done: boolean }
+export interface ChatToolUseMessage { type: 'chat_tool_use'; agentId: string; toolName: string; input: string }
+export interface ChatThinkingMessage { type: 'chat_thinking'; agentId: string; active: boolean }
+export interface ChatSessionMessage { type: 'chat_session'; agentId: string; sessionId: string }
+export interface AgentMessageUpdateEvent { type: 'agent_message_update'; message: AgentMessage }
+export interface ApprovalRequestMessage { type: 'approval_request'; request: ApprovalRequestWire }
+export interface CouncilStageChangeMessage { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
+export interface CouncilLogMessage { type: 'council_log'; log: CouncilLaunchLog }
+export interface CouncilDiscussionMessageEvent { type: 'council_discussion_message'; message: CouncilDiscussionMessage }
+export interface WorkTaskUpdateMessage { type: 'work_task_update'; task: WorkTask }
+export interface ScheduleUpdateMessage { type: 'schedule_update'; schedule: AgentSchedule }
+export interface ScheduleExecutionUpdateMessage { type: 'schedule_execution_update'; execution: ScheduleExecution }
+export interface ScheduleApprovalRequestMessage { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
+export interface OllamaPullProgressMessage { type: 'ollama_pull_progress'; model: string; status: string; progress: number; downloadedBytes: number; totalBytes: number; currentLayer: string; error?: string }
+export interface WebhookUpdateMessage { type: 'webhook_update'; registration: WebhookRegistration }
+export interface WebhookDeliveryMessage { type: 'webhook_delivery'; delivery: WebhookDelivery }
+export interface MentionPollingUpdateMessage { type: 'mention_polling_update'; config: MentionPollingConfig }
+export interface WorkflowRunUpdateMessage { type: 'workflow_run_update'; run: WorkflowRun }
+export interface WorkflowNodeUpdateMessage { type: 'workflow_node_update'; nodeExecution: WorkflowNodeRun }
+export interface AgentNotificationMessage { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
+export interface AgentQuestionMessage { type: 'agent_question'; question: OwnerQuestionWire }
+export interface GovernanceVoteCastMessage { type: 'governance_vote_cast'; launchId: string; agentId: string; vote: 'approve' | 'reject' | 'abstain'; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }
+export interface GovernanceVoteResolvedMessage { type: 'governance_vote_resolved'; launchId: string; status: 'approved' | 'rejected' | 'awaiting_human'; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }
+export interface GovernanceQuorumReachedMessage { type: 'governance_quorum_reached'; launchId: string; weightedApprovalRatio: number; threshold: number }
+export interface PingMessage { type: 'ping'; serverTime: string }
+export interface WelcomeMessage { type: 'welcome'; serverTime: string }
+export interface ErrorMessage { type: 'error'; message: string; severity?: ErrorSeverity; errorCode?: string }
+export interface SessionErrorMessage { type: 'session_error'; sessionId: string; error: SessionErrorInfo }
+export interface CouncilAgentErrorMessage { type: 'council_agent_error'; launchId: string; agentId: string; agentName: string; error: CouncilAgentErrorInfo }
+
+/** Union of all server → client WebSocket messages. */
 export type ServerMessage =
-    | { type: 'session_event'; sessionId: string; event: StreamEvent }
-    | { type: 'session_status'; sessionId: string; status: string }
-    | { type: 'algochat_message'; participant: string; content: string; direction: 'inbound' | 'outbound' | 'status' }
-    | { type: 'agent_balance'; agentId: string; balance: number; funded: number }
-    | { type: 'chat_stream'; agentId: string; chunk: string; done: boolean }
-    | { type: 'chat_tool_use'; agentId: string; toolName: string; input: string }
-    | { type: 'chat_thinking'; agentId: string; active: boolean }
-    | { type: 'chat_session'; agentId: string; sessionId: string }
-    | { type: 'agent_message_update'; message: import('./types').AgentMessage }
-    | { type: 'approval_request'; request: { id: string; sessionId: string; toolName: string; description: string; createdAt: number; timeoutMs: number } }
-    | { type: 'council_stage_change'; launchId: string; stage: string; sessionIds?: string[] }
-    | { type: 'council_log'; log: import('./types').CouncilLaunchLog }
-    | { type: 'council_discussion_message'; message: import('./types').CouncilDiscussionMessage }
-    | { type: 'work_task_update'; task: import('./types').WorkTask }
-    | { type: 'schedule_update'; schedule: import('./types').AgentSchedule }
-    | { type: 'schedule_execution_update'; execution: import('./types').ScheduleExecution }
-    | { type: 'schedule_approval_request'; executionId: string; scheduleId: string; agentId: string; actionType: string; description: string }
-    | { type: 'ollama_pull_progress'; model: string; status: string; progress: number; downloadedBytes: number; totalBytes: number; currentLayer: string; error?: string }
-    | { type: 'agent_notification'; agentId: string; sessionId: string; title: string | null; message: string; level: string; timestamp: string }
-    | { type: 'agent_question'; question: { id: string; sessionId: string; agentId: string; question: string; options: string[] | null; context: string | null; createdAt: string; timeoutMs: number } }
-    | { type: 'ping'; serverTime: string }
-    | { type: 'welcome'; serverTime: string }
-    | { type: 'error'; message: string; severity?: ErrorSeverity; errorCode?: string }
-    | { type: 'session_error'; sessionId: string; error: SessionErrorInfo }
-    | { type: 'council_agent_error'; launchId: string; agentId: string; agentName: string; error: CouncilAgentErrorInfo }
-    | { type: 'governance_vote_cast'; launchId: string; agentId: string; vote: 'approve' | 'reject' | 'abstain'; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }
-    | { type: 'governance_vote_resolved'; launchId: string; status: 'approved' | 'rejected' | 'awaiting_human'; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }
-    | { type: 'governance_quorum_reached'; launchId: string; weightedApprovalRatio: number; threshold: number };
+    | SessionEventMessage
+    | SessionStatusMessage
+    | AlgochatMessageEvent
+    | AgentBalanceMessage
+    | ChatStreamMessage
+    | ChatToolUseMessage
+    | ChatThinkingMessage
+    | ChatSessionMessage
+    | AgentMessageUpdateEvent
+    | ApprovalRequestMessage
+    | CouncilStageChangeMessage
+    | CouncilLogMessage
+    | CouncilDiscussionMessageEvent
+    | WorkTaskUpdateMessage
+    | ScheduleUpdateMessage
+    | ScheduleExecutionUpdateMessage
+    | ScheduleApprovalRequestMessage
+    | OllamaPullProgressMessage
+    | WebhookUpdateMessage
+    | WebhookDeliveryMessage
+    | MentionPollingUpdateMessage
+    | WorkflowRunUpdateMessage
+    | WorkflowNodeUpdateMessage
+    | AgentNotificationMessage
+    | AgentQuestionMessage
+    | GovernanceVoteCastMessage
+    | GovernanceVoteResolvedMessage
+    | GovernanceQuorumReachedMessage
+    | PingMessage
+    | WelcomeMessage
+    | ErrorMessage
+    | SessionErrorMessage
+    | CouncilAgentErrorMessage;
+
+/** Alias for Angular client compatibility. */
+export type ServerWsMessage = ServerMessage;
+
+// ── Utility types ────────────────────────────────────────────────────
+
+/** Extract the `type` discriminant from the ServerMessage union. */
+export type ServerMessageType = ServerMessage['type'];
+
+/** Extract a specific ServerMessage variant by its `type` discriminant. */
+export type ServerMessageOfType<T extends ServerMessageType> = Extract<ServerMessage, { type: T }>;
+
+/** Typed handler map — one optional callback per server message type. */
+export type ServerMessageHandlerMap = {
+    [K in ServerMessageType]?: (msg: ServerMessageOfType<K>) => void;
+};
+
+// ── Wire types (shared between server and client) ────────────────────
+
+export interface ApprovalRequestWire {
+    id: string;
+    sessionId: string;
+    toolName: string;
+    description: string;
+    createdAt: number;
+    timeoutMs: number;
+}
+
+export interface OwnerQuestionWire {
+    id: string;
+    sessionId: string;
+    agentId: string;
+    question: string;
+    options: string[] | null;
+    context: string | null;
+    createdAt: string;
+    timeoutMs: number;
+}
+
+// ── Error types ──────────────────────────────────────────────────────
 
 /** Error severity level for structured WebSocket error messages. */
 export type ErrorSeverity = 'info' | 'warning' | 'error' | 'fatal';
@@ -114,39 +210,41 @@ export type StreamEvent =
 /** Convenience type for all known stream event type strings. */
 export type StreamEventType = StreamEvent['eventType'];
 
+// ── Type guard ───────────────────────────────────────────────────────
+
 export function isClientMessage(data: unknown): data is ClientMessage {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
-    if (typeof msg.type !== 'string') return false;
+    if (typeof msg['type'] !== 'string') return false;
 
-    switch (msg.type) {
+    switch (msg['type']) {
         case 'auth':
-            return typeof msg.key === 'string';
+            return typeof msg['key'] === 'string';
         case 'subscribe':
         case 'unsubscribe':
-            return typeof msg.sessionId === 'string';
+            return typeof msg['sessionId'] === 'string';
         case 'send_message':
-            return typeof msg.sessionId === 'string' && typeof msg.content === 'string';
+            return typeof msg['sessionId'] === 'string' && typeof msg['content'] === 'string';
         case 'chat_send':
-            return typeof msg.agentId === 'string' && typeof msg.content === 'string'
-                && (msg.projectId === undefined || typeof msg.projectId === 'string');
+            return typeof msg['agentId'] === 'string' && typeof msg['content'] === 'string'
+                && (msg['projectId'] === undefined || typeof msg['projectId'] === 'string');
         case 'agent_reward':
-            return typeof msg.agentId === 'string' && typeof msg.microAlgos === 'number';
+            return typeof msg['agentId'] === 'string' && typeof msg['microAlgos'] === 'number';
         case 'agent_invoke':
-            return typeof msg.fromAgentId === 'string' && typeof msg.toAgentId === 'string'
-                && typeof msg.content === 'string';
+            return typeof msg['fromAgentId'] === 'string' && typeof msg['toAgentId'] === 'string'
+                && typeof msg['content'] === 'string';
         case 'approval_response':
-            return typeof msg.requestId === 'string'
-                && (msg.behavior === 'allow' || msg.behavior === 'deny');
+            return typeof msg['requestId'] === 'string'
+                && (msg['behavior'] === 'allow' || msg['behavior'] === 'deny');
         case 'create_work_task':
-            return typeof msg.agentId === 'string' && typeof msg.description === 'string'
-                && (msg.projectId === undefined || typeof msg.projectId === 'string');
+            return typeof msg['agentId'] === 'string' && typeof msg['description'] === 'string'
+                && (msg['projectId'] === undefined || typeof msg['projectId'] === 'string');
         case 'schedule_approval':
-            return typeof msg.executionId === 'string' && typeof msg.approved === 'boolean';
+            return typeof msg['executionId'] === 'string' && typeof msg['approved'] === 'boolean';
         case 'pong':
             return true;
         case 'question_response':
-            return typeof msg.questionId === 'string' && typeof msg.answer === 'string';
+            return typeof msg['questionId'] === 'string' && typeof msg['answer'] === 'string';
         default:
             return false;
     }
