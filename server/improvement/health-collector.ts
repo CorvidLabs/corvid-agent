@@ -58,7 +58,7 @@ async function spawnAndCapture(
     cmd: string[],
     cwd: string,
     timeoutMs: number = SPAWN_TIMEOUT_MS,
-): Promise<{ stdout: string; exitCode: number }> {
+): Promise<{ stdout: string; exitCode: number; timedOut: boolean }> {
     // Resolve the executable path (Bun.which is broken on Windows)
     const resolvedCmd = [resolveExecutable(cmd[0]), ...cmd.slice(1)];
     const proc = Bun.spawn(resolvedCmd, {
@@ -67,7 +67,9 @@ async function spawnAndCapture(
         stderr: 'pipe',
     });
 
+    let timedOut = false;
     const timeout = setTimeout(() => {
+        timedOut = true;
         try { proc.kill(); } catch { /* already dead */ }
     }, timeoutMs);
 
@@ -75,7 +77,7 @@ async function spawnAndCapture(
         const stdoutText = await new Response(proc.stdout).text();
         const stderrText = await new Response(proc.stderr).text();
         const exitCode = await proc.exited;
-        return { stdout: stdoutText + stderrText, exitCode };
+        return { stdout: stdoutText + stderrText, exitCode, timedOut };
     } finally {
         clearTimeout(timeout);
     }
@@ -104,9 +106,19 @@ export function parseTscOutput(output: string): TscError[] {
 
 // ─── Test Output Parsing ─────────────────────────────────────────────────────
 
-export function parseTestOutput(output: string, exitCode: number): { passed: boolean; summary: string; failureCount: number } {
+export function parseTestOutput(output: string, exitCode: number, timedOut: boolean = false): { passed: boolean; summary: string; failureCount: number } {
     const lines = output.split('\n');
     const last50 = lines.slice(-50).join('\n');
+
+    // If the test process was killed by our timeout, don't report phantom failures.
+    // The test runner never produced a summary, so we can't know the real result.
+    if (timedOut) {
+        return {
+            passed: false,
+            summary: `Test run timed out (process killed). Last output:\n${last50.trim()}`,
+            failureCount: 0,
+        };
+    }
 
     // Search entire output for bun test summary line (stdout may not be at the end
     // when stderr is appended after it)
@@ -175,7 +187,7 @@ export function parseLargeFiles(output: string, threshold: number = 500): LargeF
         if (match) {
             const lineCount = parseInt(match[1], 10);
             const filePath = match[2].trim();
-            if (lineCount > threshold && filePath.endsWith('.ts')) {
+            if (lineCount > threshold && filePath.endsWith('.ts') && !filePath.endsWith('.d.ts')) {
                 files.push({ file: filePath, lines: lineCount });
             }
         }
@@ -271,17 +283,22 @@ export class CodebaseHealthCollector {
     }
 
     private async runTests(cwd: string): Promise<{ passed: boolean; summary: string; failureCount: number }> {
-        const { stdout, exitCode } = await spawnAndCapture(
+        const { stdout, exitCode, timedOut } = await spawnAndCapture(
             ['bun', 'test'],
             cwd,
             TEST_TIMEOUT_MS,
         );
-        return parseTestOutput(stdout, exitCode);
+        return parseTestOutput(stdout, exitCode, timedOut);
     }
 
     private async countTodos(cwd: string): Promise<{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }> {
         const { stdout } = await spawnAndCapture(
-            ['grep', '-rn', '--exclude-dir=node_modules', '--exclude-dir=__tests__', '--exclude-dir=improvement', '--exclude=categories.ts', '--exclude=review.ts', 'TODO\\|FIXME\\|HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
+            ['grep', '-rn',
+                '--exclude-dir=node_modules', '--exclude-dir=__tests__', '--exclude-dir=improvement',
+                '--exclude-dir=dist', '--exclude-dir=.angular',
+                '--exclude=categories.ts', '--exclude=review.ts', '--exclude=*.d.ts',
+                'TODO\\|FIXME\\|HACK', '--include=*.ts',
+                'server/', 'client/', 'shared/'],
             cwd,
         );
         return parseTodoOutput(stdout);
@@ -296,8 +313,15 @@ export class CodebaseHealthCollector {
         const THRESHOLD = 500;
 
         for await (const match of glob.scan({ cwd, dot: false, followSymlinks: false })) {
-            // Skip files inside node_modules or other dependency directories
-            if (match.includes('node_modules') || match.includes('.angular')) continue;
+            // Normalize path separators for cross-platform matching (Windows uses backslashes)
+            const normalised = match.replace(/\\/g, '/');
+            // Skip dependency directories, declaration files, and build artifacts
+            if (
+                normalised.includes('node_modules/') ||
+                normalised.includes('.angular/') ||
+                normalised.includes('/dist/') ||
+                normalised.endsWith('.d.ts')
+            ) continue;
             try {
                 const content = readFileSync(join(cwd, match), 'utf-8');
                 const lineCount = content.split('\n').length;

@@ -122,6 +122,16 @@ describe('parseTestOutput', () => {
         expect(result.passed).toBe(false);
         expect(result.failureCount).toBe(1);
     });
+
+    test('reports 0 failures when process was killed by timeout', () => {
+        // When the test process is killed by our timeout, we don't know the real
+        // result. Report 0 failures instead of a phantom 1-failure.
+        const output = `bun test v1.0.0\nrunning tests...\nsome log output\n`;
+        const result = parseTestOutput(output, 137, true);
+        expect(result.passed).toBe(false);
+        expect(result.failureCount).toBe(0);
+        expect(result.summary).toContain('timed out');
+    });
 });
 
 // ─── TODO Counting ───────────────────────────────────────────────────────────
