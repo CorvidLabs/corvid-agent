@@ -14,11 +14,24 @@
 
 Self-hosted. Open-source. Your agents write code, open pull requests, fix CI, and coordinate through encrypted on-chain channels — while you sleep.
 
+### Get started in 60 seconds
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+```
+
+> Works on macOS, Linux, and WSL2. Only requires `git`. The installer handles everything else.
+
+<details>
+<summary>Or clone manually</summary>
+
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
 bash scripts/dev-setup.sh   # installs deps, creates .env, builds UI
 bun run dev                 # → http://localhost:3000
 ```
+
+</details>
 
 **[5-min quickstart](docs/quickstart.md)** | **[Use cases](docs/use-cases.md)** | **[How it works](docs/how-it-works.md)** | **[API reference](docs/api-reference.md)**
 
@@ -56,13 +69,19 @@ See **[use cases](docs/use-cases.md)** for copy-paste API examples for each scen
 ## Quick Start
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+```
+
+Or manually:
+
+```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
 corvid-agent init           # guided setup: env, deps, first agent
 bun run dev                 # → http://localhost:3000
 ```
 
-Or non-interactive with defaults:
+Non-interactive with defaults:
 
 ```bash
 corvid-agent init --yes     # auto-detect Claude CLI / Ollama, skip prompts
