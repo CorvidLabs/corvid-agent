@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 78;
+const SCHEMA_VERSION = 79;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1448,6 +1448,14 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_listing ON marketplace_trials(listing_id)`,
         `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_tenant ON marketplace_trials(tenant_id)`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_trials_listing_tenant ON marketplace_trials(listing_id, tenant_id)`,
+    ],
+    79: [
+        // Flock Directory on-chain config (app ID persistence)
+        `CREATE TABLE IF NOT EXISTS flock_directory_config (
+            key         TEXT PRIMARY KEY,
+            value       TEXT NOT NULL,
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
     ],
 };
 
