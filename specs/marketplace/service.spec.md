@@ -84,6 +84,10 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `QualityGateResult` | `{ passed: boolean, failures: string[] }` |
 | `SearchSortBy` | `'rating' \| 'popularity' \| 'newest' \| 'price_low' \| 'price_high'` |
 | `LISTING_CATEGORIES` | Const array of all valid ListingCategory values |
+| `ListingAnalytics` | Aggregate analytics for a listing: total/7d/30d uses and revenue, uniqueUsers, dailyUsage buckets, topUsers |
+| `DailyBucket` | Single day aggregation: `date`, `uses`, `revenue` |
+| `TopUser` | Per-user usage summary: `userTenantId`, `uses`, `creditsSpent` |
+| `BuyerUsageSummary` | Buyer's usage of a listing: `listingId`, `listingName`, `totalUses`, `totalCreditsSpent`, `lastUsedAt` |
 
 ## Invariants
 

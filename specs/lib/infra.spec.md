@@ -132,6 +132,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `UpdateTierSchema` | Marketplace | Validates pricing tier update. All fields optional. |
 | `TierUseSchema` | Marketplace | Validates tier use: `tierId` (required). |
 | `TierSubscribeSchema` | Marketplace | Validates tier subscription: `tierId`, `subscriberTenantId` (required). |
+| `StartTrialSchema` | Marketplace | Validates trial start: `tenantId` (required). |
 | `RecordReputationEventSchema` | Reputation | Validates reputation event: `agentId`, `eventType`, `scoreImpact` (required). |
 | `CreateSubscriptionSchema` | Billing | Validates subscription creation: `tenantId`, `stripeSubscriptionId`, `plan`, `periodStart`, `periodEnd` (required). |
 | `UpsertPersonaSchema` | Personas | Validates persona upsert: optional `archetype`, `traits` (max 20), `voiceGuidelines`, `background`, `exampleMessages` (max 10). |
