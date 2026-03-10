@@ -1060,8 +1060,7 @@ export class DiscordBridge {
         // If this message is in a thread we're tracking, route to that thread's session
         if (isOurThread) {
             this.sendFirstInteractionTip(userId, channelId);
-            // Acknowledge receipt with reaction and show typing
-            this.addReaction(channelId, data.id, '%F0%9F%91%80').catch(() => {}); // 👀
+            // Acknowledge receipt with typing indicator
             this.sendTypingIndicator(channelId).catch(() => {});
             await this.routeToThread(channelId, userId, text);
             return;
@@ -1077,8 +1076,7 @@ export class DiscordBridge {
         // First-interaction welcome tip for @mention users
         this.sendFirstInteractionTip(userId, channelId);
 
-        // Acknowledge with reaction and typing indicator
-        this.addReaction(channelId, data.id, '%F0%9F%91%80').catch(() => {}); // 👀
+        // Acknowledge with typing indicator
         this.sendTypingIndicator(channelId).catch(() => {});
 
         // Handle @mention as one-off reply or work intake

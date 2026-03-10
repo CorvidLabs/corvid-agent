@@ -151,7 +151,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 27. **Smart message splitting**: Messages are split at natural boundaries (paragraphs, then sentences, then words). Code blocks are never split mid-block — oversized code blocks get their own opening/closing fences per chunk. Embed descriptions use 4096-char limit, plain messages use 2000-char limit. Implemented in `message-formatter.ts`
 28. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
 29. **Typing indicators**: A typing indicator is sent when a message is received and periodically refreshed (every 8s) while the agent is responding, since Discord typing indicators expire after ~10 seconds
-30. **Message reactions**: The bot reacts with 👀 when a message is received (before processing). Thread titles are updated with a ✓ prefix when the session completes
+30. **Message reactions**: Thread titles are updated with a ✓ prefix when the session completes
 31. **Stale thread auto-archive**: Threads inactive for 2 hours are automatically archived with a closing message. The stale check runs every 10 minutes. Thread sessions and subscriptions are cleaned up on archive
 
 ### Commands
