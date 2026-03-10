@@ -1,67 +1,61 @@
-import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { Database } from 'bun:sqlite';
+import { runMigrations } from '../db/schema';
+import { createAgent } from '../db/agents';
+import { DiscordBridge } from '../discord/bridge';
+import type { DiscordBridgeConfig } from '../discord/types';
 
 /**
  * Tests for the DiscordBridge.updateSlashCommands() debounce behaviour.
  *
- * We construct a minimal DiscordBridge (no real gateway connection) and
- * verify that rapid successive calls are coalesced into a single Discord
- * API request.
+ * Uses a real in-memory database with agents inserted, and intercepts
+ * fetch to track Discord API calls without hitting the real API.
  */
-
-// ── Minimal stubs ────────────────────────────────────────────────────
-
-// Mock the gateway so it never connects
-mock.module('../discord/gateway', () => ({
-    DiscordGateway: class {
-        start() {}
-        stop() {}
-        updatePresence() {}
-    },
-}));
-
-// Mock listAgents to return a predictable list
-const mockListAgents = mock(() => [
-    { name: 'Agent1', model: 'claude-3' },
-    { name: 'Agent2', model: 'gpt-4' },
-]);
-
-mock.module('../db/agents', () => ({
-    listAgents: mockListAgents,
-}));
 
 // Track fetch calls to the Discord slash-command registration endpoint
 const fetchCalls: Array<{ url: string; method: string }> = [];
 const originalFetch = globalThis.fetch;
 
-import { DiscordBridge } from '../discord/bridge';
-import type { Database } from 'bun:sqlite';
+function createMockProcessManager() {
+    return {
+        getActiveSessionIds: () => [] as string[],
+        startProcess: mock(() => {}),
+        sendMessage: mock(() => true),
+        subscribe: mock(() => {}),
+        unsubscribe: mock(() => {}),
+        resumeProcess: mock(() => {}),
+    } as unknown as import('../process/manager').ProcessManager;
+}
 
-function makeBridge(): DiscordBridge {
-    // Minimal config — appId is required for slash-command registration
-    const config = {
-        botToken: 'fake-token',
-        channelId: '1234567890123456789',
-        appId: '9876543210987654321',
-        guildId: '',
-        allowedUserIds: [],
-    };
+const defaultConfig: DiscordBridgeConfig = {
+    botToken: 'fake-token',
+    channelId: '1234567890123456789',
+    appId: '9876543210987654321',
+    guildId: '',
+    allowedUserIds: [],
+};
 
-    const fakeDb = {} as Database;
-    const fakeProcessManager = {} as any;
-
-    return new DiscordBridge(fakeDb, fakeProcessManager, config);
+function makeBridge(db: Database, config?: Partial<DiscordBridgeConfig>): DiscordBridge {
+    return new DiscordBridge(db, createMockProcessManager(), { ...defaultConfig, ...config });
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
 
 describe('DiscordBridge.updateSlashCommands', () => {
+    let db: Database;
+
     beforeEach(() => {
+        db = new Database(':memory:');
+        runMigrations(db);
+        // Seed two agents so registerSlashCommands has data to work with
+        createAgent(db, { name: 'Agent1', model: 'claude-3', systemPrompt: 'You are agent 1' });
+        createAgent(db, { name: 'Agent2', model: 'gpt-4', systemPrompt: 'You are agent 2' });
+
         fetchCalls.length = 0;
-        mockListAgents.mockClear();
         // Intercept fetch calls to Discord API
         globalThis.fetch = mock(async (input: any, init?: any) => {
             const url = typeof input === 'string' ? input : input.url;
-            if (typeof url === 'string' && url.includes('discord.com')) {
+            if (typeof url === 'string' && new URL(url).hostname === 'discord.com') {
                 fetchCalls.push({ url, method: init?.method ?? 'GET' });
                 return new Response(JSON.stringify([{ name: 'session' }]), {
                     status: 200,
@@ -72,17 +66,20 @@ describe('DiscordBridge.updateSlashCommands', () => {
         }) as unknown as typeof fetch;
     });
 
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+        db.close();
+    });
+
     test('is callable as a public method', () => {
-        const bridge = makeBridge();
-        // Should not throw — verifies the method is accessible
+        const bridge = makeBridge(db);
         expect(typeof bridge.updateSlashCommands).toBe('function');
         bridge.updateSlashCommands();
         bridge.stop();
     });
 
     test('debounces rapid calls into a single API request', async () => {
-        const bridge = makeBridge();
-        // Mark as running so updateSlashCommands will proceed
+        const bridge = makeBridge(db);
         (bridge as any).running = true;
 
         // Fire three rapid calls
@@ -105,7 +102,7 @@ describe('DiscordBridge.updateSlashCommands', () => {
     });
 
     test('does nothing when bridge is not running', async () => {
-        const bridge = makeBridge();
+        const bridge = makeBridge(db);
         // running defaults to false — updateSlashCommands should bail out
         bridge.updateSlashCommands();
 
@@ -116,14 +113,7 @@ describe('DiscordBridge.updateSlashCommands', () => {
     });
 
     test('does nothing when appId is not configured', async () => {
-        const config = {
-            botToken: 'fake-token',
-            channelId: '1234567890123456789',
-            appId: '', // no app ID
-            guildId: '',
-            allowedUserIds: [],
-        };
-        const bridge = new DiscordBridge({} as Database, {} as any, config);
+        const bridge = makeBridge(db, { appId: '' });
         (bridge as any).running = true;
 
         bridge.updateSlashCommands();
