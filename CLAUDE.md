@@ -8,29 +8,39 @@ See [VISION.md](VISION.md) for the full project manifesto: positioning, architec
 
 ```
 server/          — Bun server (API, WebSocket, process management)
-  algochat/      — On-chain messaging, wallets, agent directory
+  a2a/           — Google A2A protocol inbound task handling and agent card
+  algochat/      — On-chain messaging, wallets, agent directory, messenger
+  billing/       — Usage metering and billing
+  councils/      — Council discussion and synthesis engines
   db/            — SQLite via bun:sqlite (sessions, agents, projects, spending, credits, personas, skills)
   discord/       — Bidirectional Discord bridge (raw WebSocket gateway, no discord.js)
-  lib/           — Shared utilities (logger, crypto, validation)
-  mcp/           — MCP tool definitions and handlers (corvid_* tools)
+  health/        — Health monitoring, heartbeat, incident detection
+  lib/           — Shared utilities (logger, crypto, validation, dedup)
+  marketplace/   — Agent marketplace — publish, discover, consume services
+  mcp/           — MCP tool definitions and handlers (38 corvid_* tools)
   middleware/    — HTTP/WS auth, CORS, startup security checks
+  notifications/ — Multi-channel notification delivery
   process/       — Session lifecycle, SDK integration, approval flow, persona/skill injection
-  routes/        — HTTP API routes (34 modules)
+  routes/        — HTTP API routes (40 modules)
+  scheduler/     — Cron/interval execution engine
   selftest/      — Self-test service
+  slack/         — Bidirectional Slack bridge
   telegram/      — Bidirectional Telegram bridge (long-polling, voice notes, STT)
   voice/         — TTS via OpenAI tts-1, STT via Whisper, audio caching
   work/          — Work task service (branch, run agent, validate, PR)
+  workflow/      — Graph-based DAG workflow orchestration
   ws/            — WebSocket handler
 client/          — Angular 21 mobile-first dashboard
 shared/          — Shared TypeScript types (server + client)
-deploy/          — Dockerfile, docker-compose, systemd, macOS LaunchAgent
-e2e/             — Playwright end-to-end tests
+deploy/          — Dockerfile, docker-compose, systemd, macOS LaunchAgent, Helm, K8s
+e2e/             — Playwright end-to-end tests (31 spec files)
+specs/           — Module specification documents (113 specs)
 ```
 
 ## Tech Stack
 
 - **Runtime:** Bun
-- **Database:** bun:sqlite (62 migrations)
+- **Database:** bun:sqlite (71 migrations)
 - **Agent SDK:** @anthropic-ai/claude-agent-sdk
 - **MCP:** @modelcontextprotocol/sdk
 - **Frontend:** Angular (standalone components, signals)

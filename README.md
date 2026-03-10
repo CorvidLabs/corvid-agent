@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-5725%20unit%20%7C%20360%20E2E-brightgreen" alt="5725 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-5801%20unit%20%7C%20360%20E2E-brightgreen" alt="5801 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -20,12 +20,12 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 
 | Metric | Count |
 |--------|-------|
-| Unit tests | **5,725** across 228 files (15,933 assertions) |
+| Unit tests | **5,725** across 235 files (16,250 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **111** with automated validation |
+| Module specs | **113** with automated validation |
 | MCP tools | **38** corvid_* tool handlers |
-| API endpoints | **~200** across 38 route modules |
-| DB migrations | **21** (squashed baseline, 81 tables) |
+| API endpoints | **~200** across 40 route modules |
+| DB migrations | **22** (squashed baseline, 81 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows.
@@ -302,7 +302,7 @@ OPENAI_API_KEY=sk-...
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  21 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  22 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -317,7 +317,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (21 migrations) and query modules
+  db/            SQLite schema (22 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -328,7 +328,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 37 corvid_* tool handlers
+  mcp/           MCP tool server and 38 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -342,7 +342,7 @@ server/          Bun HTTP + WebSocket server
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (38 route modules)
+  routes/        REST API routes (40 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -389,7 +389,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 38 route modules:
+~200 REST endpoints and a WebSocket interface across 40 route modules:
 
 | Group | Endpoints | Description |
 |-------|----------|-------------|
@@ -443,7 +443,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 5725 server tests (~120s)
+bun test              # 5,801 server tests (~120s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
@@ -453,7 +453,7 @@ bun run spec:check    # Validate all module specs in specs/
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**111 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**113 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
@@ -463,7 +463,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 21 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 22 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |

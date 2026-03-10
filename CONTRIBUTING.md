@@ -60,7 +60,7 @@ See `.env.example` for the full list of 50+ configuration options with descripti
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  70 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  71 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -80,30 +80,55 @@ See `.env.example` for the full list of 50+ configuration options with descripti
 
 ```
 server/           Bun HTTP + WebSocket server
-  algochat/       On-chain messaging (bridge, wallet, directory)
+  a2a/            Google A2A protocol inbound task handling and agent card
+  algochat/       On-chain messaging (bridge, wallet, directory, messenger)
   ast/            Tree-sitter AST parser for code understanding
-  billing/        Usage metering and Stripe billing
-  db/             SQLite schema (70 migrations) and query modules
-  discord/        Bidirectional Discord bridge (raw WebSocket)
+  billing/        Usage metering and billing
+  channels/       Channel adapter interfaces for messaging bridges
+  councils/       Council discussion and synthesis engines
+  db/             SQLite schema (71 migrations) and query modules
+  discord/        Bidirectional Discord bridge (raw WebSocket gateway)
+  docs/           OpenAPI generator, MCP tool docs, route registry
+  events/         Event bus and WebSocket broadcasting
+  exam/           Model exam system with 18 test cases across 6 categories
+  feedback/       PR outcome tracking and schedule effectiveness learning
   github/         GitHub API operations (PRs, issues, reviews)
+  health/         Health monitoring, heartbeat, incident detection
+  improvement/    Self-improvement pipeline and health metrics
   lib/            Shared utilities (logger, crypto, validation, dedup)
-  mcp/            MCP tool server and 27 corvid_* tool handlers
+  marketplace/    Agent marketplace — publish, discover, consume services
+  mcp/            MCP tool server and 38 corvid_* tool handlers
+  memory/         Structured memory with vector embeddings
   middleware/     Auth, CORS, rate limiting, startup validation
+  notifications/  Multi-channel notification delivery
+  observability/  OpenTelemetry tracing, Prometheus metrics
+  performance/    Performance metrics collection and regression detection
+  permissions/    Capability broker — grant, revoke, and check agent tool access
+  plugins/        Plugin SDK and dynamic tool registration
+  polling/        GitHub mention polling for @mention-driven automation
   process/        Agent lifecycle (SDK + Ollama, persona/skill injection)
-  routes/         REST API route handlers (34 modules)
+  providers/      Multi-model cost-aware routing
+  reputation/     Reputation and trust scoring
+  routes/         REST API route handlers (40 modules)
+  sandbox/        Container sandboxing for isolated execution
   scheduler/      Cron/interval execution engine
+  slack/          Bidirectional Slack bridge
   telegram/       Bidirectional Telegram bridge (long-polling, voice)
+  tenant/         Multi-tenant isolation and access control
+  usage/          Schedule usage monitoring and anomaly detection
   voice/          TTS (OpenAI) and STT (Whisper) with caching
+  webhooks/       GitHub webhook and mention polling
   work/           Work task service (worktree, branch, validate, PR)
   workflow/       Graph-based DAG workflow orchestration
   ws/             WebSocket handlers with pub/sub
 client/           Angular 21 SPA (standalone components, signals)
+cli/              CLI entry point and commands
 shared/           TypeScript types shared between server and client
 e2e/              Playwright end-to-end tests (31 spec files)
-deploy/           Docker, docker-compose, systemd, launchd, nginx, caddy
+deploy/           Docker, docker-compose, systemd, launchd, nginx, caddy, Helm, K8s
 packages/         Workspace packages (env, result utilities)
 scripts/          Developer tooling and automation scripts
-specs/            Module specification documents (38 specs)
+specs/            Module specification documents (113 specs)
 ```
 
 ### Tech Stack
@@ -121,7 +146,7 @@ specs/            Module specification documents (38 specs)
 
 ### Database
 
-SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 70 with 81 tables.
+SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 71 with 81 tables.
 
 Key patterns:
 - All queries use parameterized statements (no string interpolation)
@@ -186,15 +211,15 @@ bun run lint:sql
 
 ## Testing
 
-### Unit Tests (4931+)
+### Unit Tests (5,801+)
 
 ```bash
-bun test                              # Run all tests (~30s)
+bun test                              # Run all tests (~120s)
 bun test server/__tests__/db.test.ts  # Run a specific file
 bun test --watch                      # Watch mode
 ```
 
-Tests live in `server/__tests__/` (194 test files) and cover API routes, authentication, billing, database, bridges (Discord/Telegram/Slack), GitHub tools, MCP handlers, scheduling, workflows, and more.
+Tests live in `server/__tests__/` (235 test files) and cover API routes, authentication, billing, database, bridges (Discord/Telegram/Slack), GitHub tools, MCP handlers, scheduling, workflows, and more.
 
 ### E2E Tests (360)
 
@@ -216,7 +241,7 @@ cd client && npx vitest               # Watch mode
 ### Module Spec Validation
 
 ```bash
-bun run spec:check                    # Validate 38 module specs in specs/
+bun run spec:check                    # Validate 113 module specs in specs/
 ```
 
 Checks YAML frontmatter, required sections, API surface coverage, file existence, and dependency graph integrity.
