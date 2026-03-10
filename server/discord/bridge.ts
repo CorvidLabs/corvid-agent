@@ -7,7 +7,7 @@ import type {
     DiscordMessageData,
     DiscordInteractionData,
 } from './types';
-import { InteractionType, InteractionCallbackType } from './types';
+import { InteractionType, InteractionCallbackType, PermissionLevel } from './types';
 import { DiscordGateway } from './gateway';
 import { listAgents } from '../db/agents';
 import { listCouncils, getCouncilLaunch } from '../db/councils';
@@ -19,6 +19,7 @@ import { scanForInjection } from '../lib/prompt-injection';
 import { extractContentText } from '../process/types';
 import { recordAudit } from '../db/audit';
 import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
+import { splitMessage, splitEmbedDescription } from './message-formatter';
 
 const log = createLogger('DiscordBridge');
 
@@ -77,6 +78,15 @@ export class DiscordBridge {
     private readonly RATE_LIMIT_MAX_MESSAGES = 10;
     private delivery: DeliveryTracker = getDeliveryTracker();
 
+    /** Track last activity per thread for stale detection */
+    private threadLastActivity: Map<string, number> = new Map();
+    private staleCheckTimer: ReturnType<typeof setInterval> | null = null;
+    /** Stale thread auto-archive after 2 hours of inactivity */
+    private readonly STALE_THREAD_MS = 2 * 60 * 60 * 1000;
+
+    /** Users muted from bot interactions (admin-managed). */
+    private mutedUsers: Set<string> = new Set();
+
     /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
     private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private static readonly SLASH_COMMAND_DEBOUNCE_MS = 2_000;
@@ -129,11 +139,22 @@ export class DiscordBridge {
                 });
             });
         }
+
+        // Start periodic stale thread check (every 10 minutes)
+        this.staleCheckTimer = setInterval(() => {
+            this.archiveStaleThreads().catch(err => {
+                log.warn('Stale thread check failed', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }, 10 * 60 * 1000);
     }
 
     stop(): void {
         this.running = false;
         this.gateway.stop();
+        if (this.staleCheckTimer) {
+            clearInterval(this.staleCheckTimer);
+            this.staleCheckTimer = null;
+        }
         log.info('Discord bridge stopped');
     }
 
@@ -221,6 +242,28 @@ export class DiscordBridge {
                 description: 'Show available commands and usage',
                 type: 1,
             },
+            {
+                name: 'mute',
+                description: 'Mute a user from bot interactions (admin only)',
+                type: 1,
+                options: [{
+                    name: 'user',
+                    description: 'The user to mute',
+                    type: 6, // USER
+                    required: true,
+                }],
+            },
+            {
+                name: 'unmute',
+                description: 'Unmute a user (admin only)',
+                type: 1,
+                options: [{
+                    name: 'user',
+                    description: 'The user to unmute',
+                    type: 6, // USER
+                    required: true,
+                }],
+            },
         ];
 
         // Register globally or per-guild
@@ -265,9 +308,10 @@ export class DiscordBridge {
         const userId = interaction.member?.user?.id ?? interaction.user?.id;
         if (!userId) return;
 
-        // Authorization check
-        if (this.config.allowedUserIds.length > 0 && !this.config.allowedUserIds.includes(userId)) {
-            await this.respondToInteraction(interaction, 'Unauthorized.');
+        // Role-based permission check
+        const permLevel = this.resolvePermissionLevel(userId, interaction.member?.roles);
+        if (permLevel <= PermissionLevel.BLOCKED) {
+            await this.respondToInteraction(interaction, 'You do not have permission to use this bot.');
             return;
         }
 
@@ -276,6 +320,10 @@ export class DiscordBridge {
 
         switch (commandName) {
             case 'session': {
+                if (permLevel < PermissionLevel.STANDARD) {
+                    await this.respondToInteraction(interaction, 'You need a higher role to create sessions. Try @mentioning the bot for a quick reply.');
+                    break;
+                }
                 const agentName = getOption('agent');
                 const topic = getOption('topic');
                 if (!agentName || !topic) {
@@ -330,6 +378,7 @@ export class DiscordBridge {
                     agentModel: agent.model || 'unknown',
                     ownerUserId: userId,
                 });
+                this.threadLastActivity.set(threadId, Date.now());
 
                 this.processManager.startProcess(session, topic);
                 this.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
@@ -358,6 +407,10 @@ export class DiscordBridge {
             }
 
             case 'council': {
+                if (permLevel < PermissionLevel.ADMIN) {
+                    await this.respondToInteraction(interaction, 'Council deliberation requires admin permissions.');
+                    break;
+                }
                 const topic = getOption('topic');
                 if (!topic) {
                     await this.respondToInteraction(interaction, 'Please provide a topic.');
@@ -413,6 +466,36 @@ export class DiscordBridge {
                 break;
             }
 
+            case 'mute': {
+                if (permLevel < PermissionLevel.ADMIN) {
+                    await this.respondToInteraction(interaction, 'Only admins can mute users.');
+                    break;
+                }
+                const targetUser = getOption('user');
+                if (!targetUser) {
+                    await this.respondToInteraction(interaction, 'Please specify a user.');
+                    break;
+                }
+                this.muteUser(targetUser);
+                await this.respondToInteraction(interaction, `User <@${targetUser}> has been muted from bot interactions.`);
+                break;
+            }
+
+            case 'unmute': {
+                if (permLevel < PermissionLevel.ADMIN) {
+                    await this.respondToInteraction(interaction, 'Only admins can unmute users.');
+                    break;
+                }
+                const targetUser = getOption('user');
+                if (!targetUser) {
+                    await this.respondToInteraction(interaction, 'Please specify a user.');
+                    break;
+                }
+                this.unmuteUser(targetUser);
+                await this.respondToInteraction(interaction, `User <@${targetUser}> has been unmuted.`);
+                break;
+            }
+
             case 'help': {
                 const helpText = [
                     '**Commands:**',
@@ -420,6 +503,8 @@ export class DiscordBridge {
                     '`/agents` — List all available agents',
                     '`/status` — Show bot status and active sessions',
                     '`/council <topic>` — Launch a council deliberation',
+                    '`/mute <user>` — Mute a user from bot interactions (admin)',
+                    '`/unmute <user>` — Unmute a user (admin)',
                     '`/help` — Show this help message',
                     '',
                     'You can also @mention the bot for a quick one-off reply.',
@@ -457,14 +542,78 @@ export class DiscordBridge {
         }
     }
 
-    private checkRateLimit(userId: string): boolean {
+    private checkRateLimit(userId: string, permLevel?: number): boolean {
         const now = Date.now();
         const timestamps = this.userMessageTimestamps.get(userId) ?? [];
         const recent = timestamps.filter(t => now - t < this.RATE_LIMIT_WINDOW_MS);
-        if (recent.length >= this.RATE_LIMIT_MAX_MESSAGES) return false;
+
+        // Tiered rate limiting: higher permission levels get higher limits
+        let maxMessages = this.RATE_LIMIT_MAX_MESSAGES;
+        if (permLevel !== undefined && this.config.rateLimitByLevel) {
+            maxMessages = this.config.rateLimitByLevel[permLevel] ?? maxMessages;
+        }
+
+        if (recent.length >= maxMessages) return false;
         recent.push(now);
         this.userMessageTimestamps.set(userId, recent);
         return true;
+    }
+
+    /**
+     * Resolve a user's permission level based on their roles.
+     * Returns the highest permission level from all matching roles.
+     */
+    private resolvePermissionLevel(userId: string, memberRoles?: string[]): number {
+        // Muted users are always blocked
+        if (this.mutedUsers.has(userId)) return PermissionLevel.BLOCKED;
+
+        // Legacy mode: use allowedUserIds
+        if (!this.config.publicMode) {
+            if (this.config.allowedUserIds.length > 0) {
+                return this.config.allowedUserIds.includes(userId)
+                    ? PermissionLevel.ADMIN
+                    : PermissionLevel.BLOCKED;
+            }
+            return PermissionLevel.ADMIN; // No restrictions configured
+        }
+
+        // Public mode with role-based access
+        if (!this.config.rolePermissions || !memberRoles?.length) {
+            return this.config.defaultPermissionLevel ?? PermissionLevel.BASIC;
+        }
+
+        let maxLevel = this.config.defaultPermissionLevel ?? PermissionLevel.BASIC;
+        for (const roleId of memberRoles) {
+            const level = this.config.rolePermissions[roleId];
+            if (level !== undefined && level > maxLevel) {
+                maxLevel = level;
+            }
+        }
+        return maxLevel;
+    }
+
+    /**
+     * Check if a channel is one we're monitoring.
+     */
+    private isMonitoredChannel(channelId: string): boolean {
+        if (channelId === this.config.channelId) return true;
+        return this.config.additionalChannelIds?.includes(channelId) ?? false;
+    }
+
+    /**
+     * Mute a user from bot interactions. Admin action.
+     */
+    muteUser(userId: string): void {
+        this.mutedUsers.add(userId);
+        log.info('User muted from Discord bot', { userId });
+    }
+
+    /**
+     * Unmute a user. Admin action.
+     */
+    unmuteUser(userId: string): void {
+        this.mutedUsers.delete(userId);
+        log.info('User unmuted from Discord bot', { userId });
     }
 
     private async handleMessage(data: DiscordMessageData): Promise<void> {
@@ -477,25 +626,26 @@ export class DiscordBridge {
         const userId = data.author.id;
         const channelId = data.channel_id;
 
-        // Check if this message is in a thread we're tracking
-        const isMainChannel = channelId === this.config.channelId;
+        // Check if this message is in a thread we're tracking or a monitored channel
+        const isMonitored = this.isMonitoredChannel(channelId);
         let isOurThread = this.threadSessions.has(channelId);
         // Try to recover thread from DB if not in memory (e.g. after server restart)
-        if (!isOurThread && !isMainChannel) {
+        if (!isOurThread && !isMonitored) {
             isOurThread = this.tryRecoverThread(channelId) !== null;
         }
-        if (!isMainChannel && !isOurThread) return;
+        if (!isMonitored && !isOurThread) return;
 
-        // Authorization check
-        if (this.config.allowedUserIds.length > 0 && !this.config.allowedUserIds.includes(userId)) {
-            log.warn('Unauthorized Discord user', { userId, username: data.author.username });
-            await this.sendMessage(channelId, 'Unauthorized.');
+        // Resolve permission level
+        const permLevel = this.resolvePermissionLevel(userId, data.member?.roles);
+        if (permLevel <= PermissionLevel.BLOCKED) {
+            log.warn('Blocked Discord user', { userId, username: data.author.username, permLevel });
+            await this.sendMessage(channelId, 'You do not have permission to interact with this bot.');
             return;
         }
 
-        // Per-user rate limiting (10 messages per 60 seconds)
-        if (!this.checkRateLimit(userId)) {
-            await this.sendMessage(channelId, 'Rate limit exceeded. Please wait before sending more messages.');
+        // Per-user rate limiting with tiered limits
+        if (!this.checkRateLimit(userId, permLevel)) {
+            await this.sendMessage(channelId, 'Slow down! Please wait before sending more messages.');
             return;
         }
 
@@ -528,6 +678,9 @@ export class DiscordBridge {
 
         // If this message is in a thread we're tracking, route to that thread's session
         if (isOurThread) {
+            // Acknowledge receipt with reaction and show typing
+            this.addReaction(channelId, data.id, '%F0%9F%91%80').catch(() => {}); // 👀
+            this.sendTypingIndicator(channelId).catch(() => {});
             await this.routeToThread(channelId, userId, text);
             return;
         }
@@ -538,6 +691,10 @@ export class DiscordBridge {
             : false;
 
         if (!isBotMentioned) return; // silently ignore regular channel messages
+
+        // Acknowledge with reaction and typing indicator
+        this.addReaction(channelId, data.id, '%F0%9F%91%80').catch(() => {}); // 👀
+        this.sendTypingIndicator(channelId).catch(() => {});
 
         // Handle @mention as one-off reply or work intake
         if (this.mode === 'work_intake') {
@@ -747,11 +904,25 @@ export class DiscordBridge {
             if (!buffer) return;
             const text = buffer;
             buffer = '';
-            await this.sendReplyEmbed(channelId, replyToMessageId, {
-                description: text.slice(0, 4096),
-                color,
-                footer: { text: `${agentName} · ${agentModel}` },
-            });
+
+            // Smart-split long responses at natural boundaries
+            const parts = splitEmbedDescription(text);
+            for (let i = 0; i < parts.length; i++) {
+                // Only first chunk is a reply to the original message
+                if (i === 0) {
+                    await this.sendReplyEmbed(channelId, replyToMessageId, {
+                        description: parts[i],
+                        color,
+                        footer: { text: `${agentName} · ${agentModel}` },
+                    });
+                } else {
+                    await this.sendEmbed(channelId, {
+                        description: parts[i],
+                        color,
+                        footer: { text: `${agentName} · ${agentModel}` },
+                    });
+                }
+            }
         };
 
         this.processManager.subscribe(sessionId, (_sid, event) => {
@@ -819,6 +990,9 @@ export class DiscordBridge {
      * Any user can participate — conversations are shared within threads.
      */
     private async routeToThread(threadId: string, _userId: string, text: string): Promise<void> {
+        // Track activity for stale detection
+        this.threadLastActivity.set(threadId, Date.now());
+
         let threadInfo = this.threadSessions.get(threadId);
 
         // Try to recover thread mapping from DB if not in memory (e.g. after server restart)
@@ -948,7 +1122,9 @@ export class DiscordBridge {
         let buffer = '';
         let debounceTimer: ReturnType<typeof setTimeout> | null = null;
         let lastStatusTime = 0;
+        let lastTypingTime = 0;
         const STATUS_DEBOUNCE_MS = 3000; // Don't flood status updates
+        const TYPING_REFRESH_MS = 8000; // Refresh typing indicator before 10s expiry
 
         // Agent color — consistent per agent name
         const color = this.agentColor(agentName);
@@ -957,11 +1133,16 @@ export class DiscordBridge {
             if (!buffer) return;
             const text = buffer;
             buffer = '';
-            await this.sendEmbed(threadId, {
-                description: text.slice(0, 4096), // Discord embed description limit
-                color,
-                footer: { text: `${agentName} · ${agentModel}` },
-            });
+
+            // Smart-split long responses at natural boundaries
+            const parts = splitEmbedDescription(text);
+            for (const part of parts) {
+                await this.sendEmbed(threadId, {
+                    description: part,
+                    color,
+                    footer: { text: `${agentName} · ${agentModel}` },
+                });
+            }
         };
 
         const callback: import('../process/interfaces').EventCallback = (_sid, event) => {
@@ -973,6 +1154,13 @@ export class DiscordBridge {
                     buffer += content;
                     if (debounceTimer) clearTimeout(debounceTimer);
                     debounceTimer = setTimeout(() => flush(), 1500);
+                }
+
+                // Refresh typing indicator periodically while agent is responding
+                const now = Date.now();
+                if (now - lastTypingTime >= TYPING_REFRESH_MS) {
+                    lastTypingTime = now;
+                    this.sendTypingIndicator(threadId).catch(() => {});
                 }
             }
 
@@ -987,6 +1175,11 @@ export class DiscordBridge {
                         footer: { text: `${agentName} · working...` },
                     }).catch(() => {}); // Best-effort
                 }
+                // Refresh typing indicator with status updates
+                if (now - lastTypingTime >= TYPING_REFRESH_MS) {
+                    lastTypingTime = now;
+                    this.sendTypingIndicator(threadId).catch(() => {});
+                }
             }
 
             if (event.type === 'result') {
@@ -994,6 +1187,12 @@ export class DiscordBridge {
                 flush();
                 // Clean up tracking on completion
                 this.threadCallbacks.delete(threadId);
+
+                // Update thread title to show completion
+                const info = this.threadSessions.get(threadId);
+                if (info) {
+                    this.updateThreadName(threadId, `✓ ${agentName} — done`).catch(() => {});
+                }
             }
 
             // Notify thread on session error
@@ -1045,18 +1244,97 @@ export class DiscordBridge {
              | Math.round((b + m) * 255);
     }
 
+    // ── Thread Management ─────────────────────────────────────────────────
+
+    /**
+     * Archive threads that have been inactive for STALE_THREAD_MS.
+     * Sends a closing message before archiving.
+     */
+    private async archiveStaleThreads(): Promise<void> {
+        const now = Date.now();
+        const staleThreads: string[] = [];
+
+        for (const [threadId, lastActive] of this.threadLastActivity) {
+            if (now - lastActive >= this.STALE_THREAD_MS) {
+                staleThreads.push(threadId);
+            }
+        }
+
+        for (const threadId of staleThreads) {
+            try {
+                await this.sendEmbed(threadId, {
+                    description: 'This conversation has been idle. Archiving thread — use `/session` to start a new one.',
+                    color: 0x95a5a6,
+                });
+
+                await this.archiveThread(threadId);
+                this.threadLastActivity.delete(threadId);
+                this.threadSessions.delete(threadId);
+                const cb = this.threadCallbacks.get(threadId);
+                if (cb) {
+                    this.processManager.unsubscribe(cb.sessionId, cb.callback);
+                    this.threadCallbacks.delete(threadId);
+                }
+                log.info('Auto-archived stale thread', { threadId });
+            } catch (err) {
+                log.warn('Failed to archive stale thread', {
+                    threadId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+    }
+
+    /**
+     * Archive a thread via the Discord API.
+     */
+    private async archiveThread(threadId: string): Promise<void> {
+        assertSnowflake(threadId, 'thread ID');
+        const response = await fetch(
+            `https://discord.com/api/v10/channels/${threadId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bot ${this.config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ archived: true }),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            log.warn('Failed to archive thread', { threadId, status: response.status, error: error.slice(0, 200) });
+        }
+    }
+
+    /**
+     * Update a thread's name via the Discord API.
+     */
+    private async updateThreadName(threadId: string, name: string): Promise<void> {
+        assertSnowflake(threadId, 'thread ID');
+        const response = await fetch(
+            `https://discord.com/api/v10/channels/${threadId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bot ${this.config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: name.slice(0, 100) }),
+            },
+        );
+
+        if (!response.ok) {
+            log.debug('Failed to update thread name', { threadId, status: response.status });
+        }
+    }
+
     // ── Messaging ────────────────────────────────────────────────────────
 
     async sendMessage(channelId: string, content: string): Promise<void> {
-        // Discord has a 2000 character limit per message
-        const chunks: string[] = [];
-        if (content.length <= MAX_MESSAGE_LENGTH) {
-            chunks.push(content);
-        } else {
-            for (let i = 0; i < content.length; i += MAX_MESSAGE_LENGTH) {
-                chunks.push(content.slice(i, i + MAX_MESSAGE_LENGTH));
-            }
-        }
+        // Smart-split at natural boundaries (paragraphs, sentences, code blocks)
+        const chunks = splitMessage(content, MAX_MESSAGE_LENGTH);
 
         for (const chunk of chunks) {
             try {
@@ -1082,6 +1360,82 @@ export class DiscordBridge {
             } catch {
                 // Error already logged by DeliveryTracker
             }
+        }
+    }
+
+    // ── Typing Indicator ─────────────────────────────────────────────────
+
+    /**
+     * Send a typing indicator to a channel.
+     * Lasts ~10 seconds or until a message is sent.
+     */
+    async sendTypingIndicator(channelId: string): Promise<void> {
+        try {
+            const response = await fetch(
+                `https://discord.com/api/v10/channels/${channelId}/typing`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bot ${this.config.botToken}`,
+                    },
+                },
+            );
+            if (!response.ok) {
+                log.debug('Failed to send typing indicator', { status: response.status });
+            }
+        } catch {
+            // Best-effort — don't fail on typing indicator errors
+        }
+    }
+
+    // ── Message Reactions ────────────────────────────────────────────────
+
+    /**
+     * Add a reaction to a message. Used to acknowledge receipt before full response.
+     * @param emoji URL-encoded emoji (e.g. '%F0%9F%91%80' for 👀, '%E2%9C%85' for ✅)
+     */
+    async addReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
+        try {
+            assertSnowflake(channelId, 'channel ID');
+            assertSnowflake(messageId, 'message ID');
+            const response = await fetch(
+                `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bot ${this.config.botToken}`,
+                    },
+                },
+            );
+            if (!response.ok) {
+                log.debug('Failed to add reaction', { status: response.status, emoji });
+            }
+        } catch {
+            // Best-effort — don't fail on reaction errors
+        }
+    }
+
+    /**
+     * Remove a reaction from a message.
+     */
+    async removeReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
+        try {
+            assertSnowflake(channelId, 'channel ID');
+            assertSnowflake(messageId, 'message ID');
+            const response = await fetch(
+                `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bot ${this.config.botToken}`,
+                    },
+                },
+            );
+            if (!response.ok) {
+                log.debug('Failed to remove reaction', { status: response.status, emoji });
+            }
+        } catch {
+            // Best-effort
         }
     }
 }
