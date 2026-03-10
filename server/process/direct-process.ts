@@ -24,6 +24,7 @@ const log = createLogger('DirectProcess');
 const MAX_TOOL_ITERATIONS = 25;
 const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Content-aware token estimation.
@@ -234,6 +235,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     // Message queue for follow-up user messages
     const pendingMessages: string[] = [];
     let processing = false;
+
+    // Idle-wait state: instead of exiting after each turn, wait for the next message
+    let idleResolver: ((msg: string | null) => void) | null = null;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Council deliberation sessions (member, discusser, reviewer) should reason,
     // not call tools. Only chairman/chat sessions get tools.
@@ -693,22 +698,45 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
         processing = false;
 
-        // Check for queued messages
-        if (pendingMessages.length > 0 && !aborted) {
-            const next = pendingMessages.shift()!;
-            runLoop(next).catch((err) => {
-                if (aborted) return;
-                const errorMsg = err instanceof Error ? err.message : String(err);
-                log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
-                onEvent({
-                    type: 'error',
-                    error: { message: errorMsg, type: 'direct_process_error' },
-                } as ClaudeStreamEvent);
-                onExit(1);
-            });
-        } else {
+        // Check for queued messages or wait for the next one
+        if (aborted) {
             onExit(0);
+            return;
         }
+
+        const next = pendingMessages.length > 0
+            ? pendingMessages.shift()!
+            : await waitForNextMessage();
+
+        if (next === null) {
+            // Idle timeout or abort — exit cleanly
+            onExit(0);
+            return;
+        }
+
+        runLoop(next).catch((err) => {
+            if (aborted) return;
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
+            onEvent({
+                type: 'error',
+                error: { message: errorMsg, type: 'direct_process_error' },
+            } as ClaudeStreamEvent);
+            onExit(1);
+        });
+    }
+
+    /** Wait for the next user message or idle timeout. Returns null on timeout/abort. */
+    function waitForNextMessage(): Promise<string | null> {
+        return new Promise<string | null>((resolve) => {
+            idleResolver = resolve;
+            idleTimer = setTimeout(() => {
+                idleResolver = null;
+                idleTimer = null;
+                log.info(`Session ${session.id} idle timeout after ${IDLE_TIMEOUT_MS / 1000}s`);
+                resolve(null);
+            }, IDLE_TIMEOUT_MS);
+        });
     }
 
     function emitToolStatus(toolName: string, message: string, _isError: boolean): void {
@@ -722,6 +750,15 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         if (aborted) return false;
         if (processing) {
             pendingMessages.push(content);
+        } else if (idleResolver) {
+            // Waiting for next message — resolve the idle promise
+            if (idleTimer) {
+                clearTimeout(idleTimer);
+                idleTimer = null;
+            }
+            const resolve = idleResolver;
+            idleResolver = null;
+            resolve(content);
         } else {
             runLoop(content).catch((err) => {
                 if (aborted) return;
@@ -740,6 +777,15 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     function kill(): void {
         aborted = true;
         abortController.abort();
+        // Clear idle wait so the process exits immediately
+        if (idleTimer) {
+            clearTimeout(idleTimer);
+            idleTimer = null;
+        }
+        if (idleResolver) {
+            idleResolver(null);
+            idleResolver = null;
+        }
         approvalManager.cancelSession(session.id);
         // Clean up external MCP server connections
         externalMcpManager.disconnectAll().catch((err: unknown) => {

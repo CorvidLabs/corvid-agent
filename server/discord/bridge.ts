@@ -87,6 +87,10 @@ export class DiscordBridge {
     /** Users muted from bot interactions (admin-managed). */
     private mutedUsers: Set<string> = new Set();
 
+    /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
+    private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private static readonly SLASH_COMMAND_DEBOUNCE_MS = 2_000;
+
     constructor(
         db: Database,
         processManager: ProcessManager,
@@ -160,6 +164,25 @@ export class DiscordBridge {
     }
 
     // ── Slash Command Registration ─────────────────────────────────────
+
+    /**
+     * Public debounced entry point — call when agents are created/updated/deleted.
+     * Coalesces rapid successive calls into a single Discord API request (2 s debounce).
+     */
+    updateSlashCommands(): void {
+        if (!this.config.appId || !this.running) return;
+        if (this.slashCommandDebounceTimer) {
+            clearTimeout(this.slashCommandDebounceTimer);
+        }
+        this.slashCommandDebounceTimer = setTimeout(() => {
+            this.slashCommandDebounceTimer = null;
+            this.registerSlashCommands().catch(err => {
+                log.error('Failed to refresh Discord slash commands', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }, DiscordBridge.SLASH_COMMAND_DEBOUNCE_MS);
+    }
 
     private async registerSlashCommands(): Promise<void> {
         const appId = this.config.appId;

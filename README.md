@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-6064%20unit%20%7C%20360%20E2E-brightgreen" alt="5920 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-6127%20unit%20%7C%20360%20E2E-brightgreen" alt="6127 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -14,11 +14,24 @@
 
 Self-hosted. Open-source. Your agents write code, open pull requests, fix CI, and coordinate through encrypted on-chain channels — while you sleep.
 
+### Get started in 60 seconds
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+```
+
+> Works on macOS, Linux, and WSL2. Only requires `git`. The installer handles everything else.
+
+<details>
+<summary>Or clone manually</summary>
+
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
 bash scripts/dev-setup.sh   # installs deps, creates .env, builds UI
 bun run dev                 # → http://localhost:3000
 ```
+
+</details>
 
 **[5-min quickstart](docs/quickstart.md)** | **[Use cases](docs/use-cases.md)** | **[How it works](docs/how-it-works.md)** | **[API reference](docs/api-reference.md)**
 
@@ -56,13 +69,19 @@ See **[use cases](docs/use-cases.md)** for copy-paste API examples for each scen
 ## Quick Start
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
+```
+
+Or manually:
+
+```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
 corvid-agent init           # guided setup: env, deps, first agent
 bun run dev                 # → http://localhost:3000
 ```
 
-Or non-interactive with defaults:
+Non-interactive with defaults:
 
 ```bash
 corvid-agent init --yes     # auto-detect Claude CLI / Ollama, skip prompts
@@ -117,7 +136,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,064** across 248 files (16,758 assertions) |
+| Unit tests | **6,127** across 251 files (16,946 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **116** with automated validation |
 | Test:code ratio | **1.14×** |
@@ -133,7 +152,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 | Metric | Count |
 |--------|-------|
 | MCP tools | **39** corvid_* tool handlers |
-| API endpoints | **~200** across 42 route modules |
+| API endpoints | **~205** across 44 route modules |
 | DB migrations | **29** (squashed baseline, 87 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
@@ -330,7 +349,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  25 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  29 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -345,7 +364,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (25 migrations) and query modules
+  db/            SQLite schema (29 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -370,7 +389,7 @@ server/          Bun HTTP + WebSocket server
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (42 route modules)
+  routes/        REST API routes (44 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -417,7 +436,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~200 REST endpoints and a WebSocket interface across 42 route modules.
+~205 REST endpoints and a WebSocket interface across 44 route modules.
 
 **[API Reference](docs/api-reference.md)** — detailed docs with request/response examples for workflows, councils, marketplace, reputation, and billing.
 
@@ -475,17 +494,17 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 5842 server tests (~120s)
+bun test              # 6156 server tests (~120s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**5,842 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**6,156 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**113 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**116 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
@@ -495,7 +514,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 21 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 29 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
