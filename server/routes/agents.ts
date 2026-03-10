@@ -10,6 +10,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import { parseBodyOrThrow, ValidationError, CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { buildAgentCardForAgent } from '../a2a/agent-card';
+import { checkInjection } from '../lib/injection-guard';
 import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
@@ -226,6 +227,10 @@ async function handleInvoke(
 
     try {
         const data = await parseBodyOrThrow(req, InvokeAgentSchema);
+
+        // Injection scan on agent invoke content
+        const injectionDenied = checkInjection(db, data.content, 'api_invoke', req);
+        if (injectionDenied) return injectionDenied;
 
         const result = await agentMessenger.invoke({
             fromAgentId,

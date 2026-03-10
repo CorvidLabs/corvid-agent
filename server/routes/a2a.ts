@@ -10,6 +10,7 @@ import type { ProcessManager } from '../process/manager';
 import { handleTaskSend, handleTaskGet, type A2ATaskDeps } from '../a2a/task-handler';
 import { json, notFound, handleRouteError } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, SendA2ATaskSchema } from '../lib/validation';
+import { checkInjection } from '../lib/injection-guard';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('A2ARoutes');
@@ -25,6 +26,10 @@ export async function handleA2ARoutes(
         try {
             const data = await parseBodyOrThrow(req, SendA2ATaskSchema);
             const params = data.params ?? data;
+
+            // Injection scan on inbound A2A message
+            const blocked = checkInjection(db, params.message ?? '', 'a2a', req);
+            if (blocked) return blocked;
 
             const deps: A2ATaskDeps = { db, processManager };
             const task = handleTaskSend(deps, {
