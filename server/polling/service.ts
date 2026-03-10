@@ -32,7 +32,7 @@ import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { scanGitHubContent } from '../lib/prompt-injection';
 import { DedupService } from '../lib/dedup';
-import { buildSafeGhEnv } from '../lib/env';
+import { buildSafeGhEnv, resolveGhExecutable } from '../lib/env';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { isGitHubUserAllowed } from '../db/github-allowlist';
 import { isRepoBlocked } from '../db/repo-blocklist';
@@ -594,7 +594,7 @@ export class MentionPollingService {
         // For external repos, give explicit instructions to clone and work there.
         // Use a unique path per issue to avoid conflicts when multiple sessions run concurrently.
         const repoName = repo.split('/')[1];
-        const workDir = `/tmp/${repoName}-issue-${mention.number}`;
+        const workDir = `${require('node:os').tmpdir()}/${repoName}-issue-${mention.number}`;
         const codeChangeInstructions = isHomeRepo
             ? `Use \`corvid_create_work_task\` to implement changes on a branch and open a PR.`
             : [
@@ -669,7 +669,7 @@ export class MentionPollingService {
      */
     private buildReviewFeedbackPrompt(repo: string, mention: DetectedMention): string {
         const repoName = repo.split('/')[1];
-        const workDir = `/tmp/${repoName}-pr-${mention.number}`;
+        const workDir = `${require('node:os').tmpdir()}/${repoName}-pr-${mention.number}`;
         const replyCmd = `gh pr comment ${mention.number} --repo ${repo} --body "YOUR RESPONSE"`;
 
         const context = [
@@ -736,7 +736,7 @@ export class MentionPollingService {
         }
 
         try {
-            const proc = Bun.spawn(['gh', ...args], {
+            const proc = Bun.spawn([resolveGhExecutable(), ...args], {
                 stdout: 'pipe',
                 stderr: 'pipe',
                 env: buildSafeGhEnv(),

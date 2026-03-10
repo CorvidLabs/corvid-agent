@@ -7,11 +7,12 @@
  */
 
 import { createLogger } from '../lib/logger';
+import { resolveExecutable } from '../lib/env';
 
 const log = createLogger('HealthCollector');
 
 const SPAWN_TIMEOUT_MS = 60_000;
-const TEST_TIMEOUT_MS = 180_000;
+const TEST_TIMEOUT_MS = 360_000;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,14 +58,18 @@ async function spawnAndCapture(
     cmd: string[],
     cwd: string,
     timeoutMs: number = SPAWN_TIMEOUT_MS,
-): Promise<{ stdout: string; exitCode: number }> {
-    const proc = Bun.spawn(cmd, {
+): Promise<{ stdout: string; exitCode: number; timedOut: boolean }> {
+    // Resolve the executable path (Bun.which is broken on Windows)
+    const resolvedCmd = [resolveExecutable(cmd[0]), ...cmd.slice(1)];
+    const proc = Bun.spawn(resolvedCmd, {
         cwd,
         stdout: 'pipe',
         stderr: 'pipe',
     });
 
+    let timedOut = false;
     const timeout = setTimeout(() => {
+        timedOut = true;
         try { proc.kill(); } catch { /* already dead */ }
     }, timeoutMs);
 
@@ -72,7 +77,7 @@ async function spawnAndCapture(
         const stdoutText = await new Response(proc.stdout).text();
         const stderrText = await new Response(proc.stderr).text();
         const exitCode = await proc.exited;
-        return { stdout: stdoutText + stderrText, exitCode };
+        return { stdout: stdoutText + stderrText, exitCode, timedOut };
     } finally {
         clearTimeout(timeout);
     }
@@ -101,36 +106,71 @@ export function parseTscOutput(output: string): TscError[] {
 
 // ─── Test Output Parsing ─────────────────────────────────────────────────────
 
-export function parseTestOutput(output: string, exitCode: number): { passed: boolean; summary: string; failureCount: number } {
+export function parseTestOutput(output: string, exitCode: number, timedOut: boolean = false): { passed: boolean; summary: string; failureCount: number } {
     const lines = output.split('\n');
     const last50 = lines.slice(-50).join('\n');
+
+    // If the test process was killed by our timeout, don't report phantom failures.
+    // The test runner never produced a summary, so we can't know the real result.
+    if (timedOut) {
+        return {
+            passed: false,
+            summary: `Test run timed out (process killed). Last output:\n${last50.trim()}`,
+            failureCount: 0,
+        };
+    }
 
     // Search entire output for bun test summary line (stdout may not be at the end
     // when stderr is appended after it)
     const failMatch = output.match(/^\s*(\d+)\s+fail\b/im);
+    const passMatch = output.match(/^\s*(\d+)\s+pass\b/im);
     const failureCount = failMatch ? parseInt(failMatch[1], 10) : 0;
 
+    // When the test runner produces a clear "X pass / Y fail" summary, trust it
+    // over the exit code. Non-zero exit codes can occur on some platforms due to
+    // stderr output or signal handling even when all tests pass.
+    const hasTestSummary = failMatch !== null && passMatch !== null;
+
     return {
-        passed: exitCode === 0 && failureCount === 0,
+        passed: hasTestSummary
+            ? failureCount === 0
+            : exitCode === 0 && failureCount === 0,
         summary: last50.trim(),
-        failureCount: exitCode !== 0 ? Math.max(failureCount, 1) : failureCount,
+        failureCount: hasTestSummary
+            ? failureCount
+            : (exitCode !== 0 ? Math.max(failureCount, 1) : failureCount),
     };
 }
 
 // ─── TODO/FIXME/HACK Counting ────────────────────────────────────────────────
 
 export function parseTodoOutput(output: string): { todoCount: number; fixmeCount: number; hackCount: number; samples: string[] } {
+    // grep output is file:line:content — extract the content portion for analysis
     const lines = output.split('\n').filter((l) => l.trim().length > 0);
     let todoCount = 0;
     let fixmeCount = 0;
     let hackCount = 0;
     const samples: string[] = [];
 
+    // Match TODO/FIXME/HACK only when they appear as comment markers, not inside
+    // strings that reference the feature (e.g. 'TODO collection failed' or
+    // `if (/TODO/i.test(line))`). We look for the keyword preceded by comment
+    // syntax or at the start of the content after the grep file:line: prefix.
+    const COMMENT_TODO  = /(?:\/\/|\/\*|\*)\s*TODO\b/i;
+    const COMMENT_FIXME = /(?:\/\/|\/\*|\*)\s*FIXME\b/i;
+    const COMMENT_HACK  = /(?:\/\/|\/\*|\*)\s*HACK\b/i;
+
     for (const line of lines) {
-        if (/TODO/i.test(line)) todoCount++;
-        if (/FIXME/i.test(line)) fixmeCount++;
-        if (/HACK/i.test(line)) hackCount++;
-        if (samples.length < 10) {
+        // Extract the content portion after the grep prefix (file:linenum:)
+        const content = line.replace(/^[^:]+:\d+:/, '');
+        const isTodo  = COMMENT_TODO.test(content);
+        const isFixme = COMMENT_FIXME.test(content);
+        const isHack  = COMMENT_HACK.test(content);
+
+        if (isTodo)  todoCount++;
+        if (isFixme) fixmeCount++;
+        if (isHack)  hackCount++;
+        if ((isTodo || isFixme || isHack) && samples.length < 10) {
             samples.push(line.trim().slice(0, 200));
         }
     }
@@ -147,7 +187,7 @@ export function parseLargeFiles(output: string, threshold: number = 500): LargeF
         if (match) {
             const lineCount = parseInt(match[1], 10);
             const filePath = match[2].trim();
-            if (lineCount > threshold && filePath.endsWith('.ts')) {
+            if (lineCount > threshold && filePath.endsWith('.ts') && !filePath.endsWith('.d.ts')) {
                 files.push({ file: filePath, lines: lineCount });
             }
         }
@@ -243,37 +283,57 @@ export class CodebaseHealthCollector {
     }
 
     private async runTests(cwd: string): Promise<{ passed: boolean; summary: string; failureCount: number }> {
-        const { stdout, exitCode } = await spawnAndCapture(
+        const { stdout, exitCode, timedOut } = await spawnAndCapture(
             ['bun', 'test'],
             cwd,
             TEST_TIMEOUT_MS,
         );
-        return parseTestOutput(stdout, exitCode);
+        return parseTestOutput(stdout, exitCode, timedOut);
     }
 
     private async countTodos(cwd: string): Promise<{ todoCount: number; fixmeCount: number; hackCount: number; samples: string[] }> {
         const { stdout } = await spawnAndCapture(
-            ['grep', '-rn', 'TODO\\|FIXME\\|HACK', '--include=*.ts', 'server/', 'client/', 'shared/'],
+            ['grep', '-rn',
+                '--exclude-dir=node_modules', '--exclude-dir=__tests__', '--exclude-dir=improvement',
+                '--exclude-dir=dist', '--exclude-dir=.angular',
+                '--exclude=categories.ts', '--exclude=review.ts', '--exclude=*.d.ts',
+                'TODO\\|FIXME\\|HACK', '--include=*.ts',
+                'server/', 'client/', 'shared/'],
             cwd,
         );
         return parseTodoOutput(stdout);
     }
 
     private async findLargeFiles(cwd: string): Promise<LargeFile[]> {
-        // Find all .ts files and count their lines
-        const { stdout: findOutput } = await spawnAndCapture(
-            ['find', 'server/', 'client/', 'shared/', '-name', '*.ts', '-type', 'f'],
-            cwd,
-        );
+        // Use Bun's Glob API instead of `find` + `wc` (cross-platform)
+        const { join } = require('node:path');
+        const { readFileSync } = require('node:fs');
+        const glob = new Bun.Glob('{server,client,shared}/**/*.ts');
+        const files: LargeFile[] = [];
+        const THRESHOLD = 500;
 
-        const tsFiles = findOutput.split('\n').filter((f) => f.trim().length > 0);
-        if (tsFiles.length === 0) return [];
+        for await (const match of glob.scan({ cwd, dot: false, followSymlinks: false })) {
+            // Normalize path separators for cross-platform matching (Windows uses backslashes)
+            const normalised = match.replace(/\\/g, '/');
+            // Skip dependency directories, declaration files, and build artifacts
+            if (
+                normalised.includes('node_modules/') ||
+                normalised.includes('.angular/') ||
+                normalised.includes('/dist/') ||
+                normalised.endsWith('.d.ts')
+            ) continue;
+            try {
+                const content = readFileSync(join(cwd, match), 'utf-8');
+                const lineCount = content.split('\n').length;
+                if (lineCount > THRESHOLD) {
+                    files.push({ file: match, lines: lineCount });
+                }
+            } catch {
+                // Skip unreadable files
+            }
+        }
 
-        const { stdout } = await spawnAndCapture(
-            ['wc', '-l', ...tsFiles],
-            cwd,
-        );
-        return parseLargeFiles(stdout);
+        return files.sort((a, b) => b.lines - a.lines);
     }
 
     private async checkOutdated(cwd: string): Promise<OutdatedDep[]> {

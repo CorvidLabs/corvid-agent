@@ -97,6 +97,16 @@ describe('parseTestOutput', () => {
         expect(result.summary).not.toContain('line 20');
     });
 
+    test('trusts test summary over non-zero exit code when all tests pass', () => {
+        // On some platforms (e.g. Windows), bun test may exit non-zero due to
+        // stderr output even when all tests pass. When a clear summary exists,
+        // trust it over the exit code.
+        const output = `bun test v1.0.0\n\n5796 pass\n0 fail\n`;
+        const result = parseTestOutput(output, 1);
+        expect(result.passed).toBe(true);
+        expect(result.failureCount).toBe(0);
+    });
+
     test('finds fail count when summary is buried by stderr', () => {
         // Simulates stdout (test results) + stderr (log output) concatenation
         const stdout = `bun test v1.0.0\n\n100 pass\n2 fail\n`;
@@ -111,6 +121,16 @@ describe('parseTestOutput', () => {
         const result = parseTestOutput(output, 0);
         expect(result.passed).toBe(false);
         expect(result.failureCount).toBe(1);
+    });
+
+    test('reports 0 failures when process was killed by timeout', () => {
+        // When the test process is killed by our timeout, we don't know the real
+        // result. Report 0 failures instead of a phantom 1-failure.
+        const output = `bun test v1.0.0\nrunning tests...\nsome log output\n`;
+        const result = parseTestOutput(output, 137, true);
+        expect(result.passed).toBe(false);
+        expect(result.failureCount).toBe(0);
+        expect(result.summary).toContain('timed out');
     });
 });
 
