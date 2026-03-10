@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.1] - 2026-03-10
+
+### Fixed
+- Remove eyes reaction on Discord message receipt to reduce noise (#912)
+
 ## [0.23.0] - 2026-03-10
 
 ### Added
