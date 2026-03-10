@@ -23,6 +23,7 @@ Pure data-access layer for project CRUD operations. Projects are the top-level o
 |----------|-----------|---------|-------------|
 | `listProjects` | `(db: Database, tenantId?: string)` | `Project[]` | List all projects ordered by `updated_at DESC`. Applies tenant filter when tenantId is not the default |
 | `getProject` | `(db: Database, id: string, tenantId?: string)` | `Project \| null` | Fetch a single project by ID. Returns null if not found or tenant ownership validation fails |
+| `getProjectByName` | `(db: Database, name: string, tenantId?: string)` | `Project \| null` | Fetch a single project by name (case-insensitive). Returns null if not found |
 | `createProject` | `(db: Database, input: CreateProjectInput, tenantId?: string)` | `Project` | Insert a new project with a generated UUID. Serializes `envVars` as JSON |
 | `updateProject` | `(db: Database, id: string, input: UpdateProjectInput, tenantId?: string)` | `Project \| null` | Partially update a project. Only provided fields are modified. Returns null if not found or tenant mismatch |
 | `deleteProject` | `(db: Database, id: string, tenantId?: string)` | `boolean` | Delete a project and all dependent records in a transaction. Returns false if not found or tenant mismatch |
@@ -98,6 +99,8 @@ Pure data-access layer for project CRUD operations. Projects are the top-level o
 | `server/discord/bridge.ts` | `listProjects`, `getProject` for project lookup in Discord bridge |
 | `server/slack/bridge.ts` | `listProjects`, `getProject` for project lookup in Slack bridge |
 | `server/mcp/tool-handlers/ast.ts` | `getProject` for AST tool project resolution |
+| `server/mcp/tool-handlers/projects.ts` | `listProjects`, `getProject` for project discovery tools |
+| `server/mcp/tool-handlers/work.ts` | `getProjectByName`, `listProjects` for project name resolution in work tasks |
 | `server/exam/runner.ts` | `getProject` for exam runner project context |
 | `server/selftest/service.ts` | `createProject`, `deleteProject` for self-test lifecycle |
 

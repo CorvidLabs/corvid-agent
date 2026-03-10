@@ -22,6 +22,7 @@ files:
   - server/mcp/tool-handlers/councils.ts
   - server/mcp/tool-handlers/repo-blocklist.ts
   - server/mcp/tool-handlers/flock-directory.ts
+  - server/mcp/tool-handlers/projects.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -63,7 +64,9 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleGrantCredits` | `(ctx, { wallet_address, amount, reference? })` | `Promise<CallToolResult>` | Grant credits to a wallet (privileged) |
 | `handleCreditConfig` | `(ctx, { action, key?, value? })` | `Promise<CallToolResult>` | Get or update credit config (privileged) |
 | `handleManageSchedule` | `(ctx, { action, ... })` | `Promise<CallToolResult>` | CRUD + approve/deny for agent schedules |
-| `handleCreateWorkTask` | `(ctx, { description, project_id? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit) |
+| `handleListProjects` | `(ctx)` | `Promise<CallToolResult>` | List all available projects with IDs, names, and working directories |
+| `handleCurrentProject` | `(ctx)` | `Promise<CallToolResult>` | Show the current agent's default project |
+| `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided |
 | `handleWebSearch` | `(ctx, { query, count? })` | `Promise<CallToolResult>` | Web search via Brave API |
 | `handleDeepResearch` | `(ctx, { query, queries? })` | `Promise<CallToolResult>` | Multi-query deep research via Brave |
 | `handleDiscoverAgent` | `(ctx, { query })` | `Promise<CallToolResult>` | Discover remote agents via A2A protocol |
