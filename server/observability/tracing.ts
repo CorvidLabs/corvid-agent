@@ -51,7 +51,9 @@ export async function initTracing(): Promise<void> {
         sdk.start();
 
         // Graceful shutdown
-        process.on('SIGTERM', () => sdk.shutdown().catch(() => {}));
+        process.on('SIGTERM', () => sdk.shutdown().catch((err) => {
+            console.warn('[Tracing] Shutdown error:', err instanceof Error ? err.message : String(err));
+        }));
 
         _tracer = trace.getTracer('corvid-agent');
     } catch (err) {

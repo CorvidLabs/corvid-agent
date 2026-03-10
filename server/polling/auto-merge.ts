@@ -36,8 +36,14 @@ export class AutoMergeService {
     start(): void {
         if (this.running) return;
         this.running = true;
-        this.checkAll();
-        this.timer = setInterval(() => this.checkAll(), AUTO_MERGE_INTERVAL_MS);
+        this.checkAll().catch((err) => {
+            log.error('Initial auto-merge check failed', { error: err instanceof Error ? err.message : String(err) });
+        });
+        this.timer = setInterval(() => {
+            this.checkAll().catch((err) => {
+                log.error('Auto-merge check failed', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }, AUTO_MERGE_INTERVAL_MS);
     }
 
     stop(): void {

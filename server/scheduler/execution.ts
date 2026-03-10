@@ -161,7 +161,9 @@ function broadcastScheduleResult(
     if (!agentMessenger) return;
     if (!BROADCAST_ACTION_TYPES.includes(actionType)) return;
     const msg = `[SCHEDULE:${actionType}] ${summary.slice(0, 200)}`;
-    agentMessenger.sendOnChainToSelf(agentId, msg).catch(() => {});
+    agentMessenger.sendOnChainToSelf(agentId, msg).catch((err) => {
+        log.debug('AlgoChat schedule broadcast failed', { agentId, error: err instanceof Error ? err.message : String(err) });
+    });
 }
 
 function notifyScheduleEvent(

@@ -251,7 +251,9 @@ async function handleSlackEvents(
                             message: 'Answer received!',
                             level: 'success',
                             timestamp: new Date().toISOString(),
-                        }, event.thread_ts).catch(() => {});
+                        }, event.thread_ts).catch((err) => {
+                            log.debug('Slack confirmation reply failed', { channel: event.channel, error: err instanceof Error ? err.message : String(err) });
+                        });
                     }
                 }
             }

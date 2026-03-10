@@ -48,6 +48,18 @@ import { recordAudit } from '../db/audit';
 
 const log = createLogger('MessageRouter');
 
+/**
+ * Safely extract an optional property from an object whose runtime shape
+ * may include fields not present in the compile-time type.
+ * Avoids unsafe `as unknown as` double-cast patterns.
+ */
+function optionalProp<T>(obj: unknown, key: string): T | undefined {
+    if (obj != null && typeof obj === 'object' && key in obj) {
+        return (obj as Record<string, unknown>)[key] as T;
+    }
+    return undefined;
+}
+
 /** Maximum reassembled group message size (16 KB). Prevents memory exhaustion. */
 const MAX_GROUP_MESSAGE_BYTES = 16 * 1024;
 
@@ -144,11 +156,11 @@ export class MessageRouter {
                 if (msg.direction === 'sent') continue;
 
                 // Skip messages sent by our agent wallets
-                const sender = (msg as unknown as { sender?: string }).sender;
+                const sender = optionalProp<string>(msg, 'sender');
                 if (sender && agentWalletAddresses.has(sender)) continue;
 
                 // Dedup by transaction ID
-                const txid = (msg as unknown as { id?: string }).id;
+                const txid = optionalProp<string>(msg, 'id');
                 if (txid) {
                     if (this.dedup.isDuplicate(ALGOCHAT_TXID_DEDUP_NS, txid)) {
                         log.debug('Skipping already-processed txid', { txid });
@@ -193,7 +205,7 @@ export class MessageRouter {
                     }
 
                     const totalAmount = chunks.reduce((sum, c) => {
-                        const a = (c as unknown as Record<string, unknown>).amount;
+                        const a = optionalProp<number>(c, 'amount');
                         return sum + (a != null ? Number(a) : 0);
                     }, 0);
                     log.info(`Reassembled group message (${chunks.length} chunks)`, { round });
@@ -210,7 +222,7 @@ export class MessageRouter {
 
             // Process regular messages
             for (const msg of regularMessages) {
-                const amount = (msg as unknown as Record<string, unknown>).amount;
+                const amount = optionalProp<number>(msg, 'amount');
                 this.handleIncomingMessage(participant, msg.content, Number(msg.confirmedRound), amount != null ? Number(amount) : undefined).catch((err) => {
                     log.error('Error handling message', { error: err instanceof Error ? err.message : String(err) });
                 });
@@ -424,7 +436,7 @@ export class MessageRouter {
                     messageContent = parsed.m;
                     deviceName = typeof parsed.d === 'string' ? parsed.d : undefined;
                 }
-            } catch { /* plain text */ }
+            } catch { /* plain text — JSON parse expected to fail for non-JSON messages */ }
         }
 
         // ── Prompt injection scan ─────────────────────────────────────
@@ -681,7 +693,7 @@ export class MessageRouter {
         if (reassembled) {
             this.pendingGroupChunks.delete(key);
             const totalAmount = pending.chunks.reduce((sum: number, c) => {
-                const a = (c as unknown as Record<string, number | undefined>).amount;
+                const a = optionalProp<number>(c, 'amount');
                 return sum + (a != null ? Number(a) : 0);
             }, 0);
             log.info(`Reassembled buffered group message (${contents.length} chunks)`, { round });
