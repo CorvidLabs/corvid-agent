@@ -1,7 +1,15 @@
 // ─── Marketplace Listing ────────────────────────────────────────────────────
 
 export type ListingStatus = 'draft' | 'published' | 'unlisted' | 'suspended';
-export type ListingCategory = 'coding' | 'research' | 'writing' | 'data' | 'devops' | 'security' | 'general';
+export type ListingCategory =
+    | 'coding' | 'research' | 'writing' | 'data' | 'devops' | 'security' | 'general'
+    | 'automation' | 'analysis' | 'communication' | 'monitoring' | 'blockchain' | 'creative';
+
+/** All valid listing categories. */
+export const LISTING_CATEGORIES: readonly ListingCategory[] = [
+    'coding', 'research', 'writing', 'data', 'devops', 'security', 'general',
+    'automation', 'analysis', 'communication', 'monitoring', 'blockchain', 'creative',
+] as const;
 export type PricingModel = 'free' | 'per_use' | 'subscription';
 
 export interface MarketplaceListing {
@@ -29,6 +37,10 @@ export interface MarketplaceListing {
     reviewCount: number;
     /** Owning tenant (seller wallet address for billing) */
     tenantId: string;
+    /** Number of free trial uses allowed (null = no trial) */
+    trialUses: number | null;
+    /** Number of free trial days (null = no trial) */
+    trialDays: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -95,6 +107,29 @@ export interface TierRecord {
     created_at: string;
 }
 
+// ─── Verification Badges ────────────────────────────────────────────────────
+
+/** Badge types awarded to listings based on quality signals. */
+export type VerificationBadge = 'verified' | 'trusted' | 'official';
+
+export interface ListingBadges {
+    /** Agent has on-chain reputation score >= 70 */
+    verified: boolean;
+    /** Listing has >= 10 reviews with avg rating >= 4.0 */
+    trusted: boolean;
+    /** Listing is from the instance owner */
+    official: boolean;
+}
+
+/** Quality gate validation result. */
+export interface QualityGateResult {
+    passed: boolean;
+    failures: string[];
+}
+
+/** Sort options for marketplace search. */
+export type SearchSortBy = 'rating' | 'popularity' | 'newest' | 'price_low' | 'price_high';
+
 // ─── Search ─────────────────────────────────────────────────────────────────
 
 export interface MarketplaceSearchParams {
@@ -105,6 +140,16 @@ export interface MarketplaceSearchParams {
     tags?: string[];
     /** Filter listings to agents with at least this verification tier */
     minVerificationTier?: string;
+    /** Sort order for results */
+    sortBy?: SearchSortBy;
+    /** Filter by verification badge */
+    badge?: VerificationBadge;
+    /** Minimum number of reviews */
+    minReviews?: number;
+    /** Minimum price (credits) */
+    minPrice?: number;
+    /** Maximum price (credits) */
+    maxPrice?: number;
     limit?: number;
     offset?: number;
 }
@@ -180,6 +225,8 @@ export interface ListingRecord {
     avg_rating: number;
     review_count: number;
     tenant_id: string;
+    trial_uses: number | null;
+    trial_days: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -192,4 +239,39 @@ export interface ReviewRecord {
     rating: number;
     comment: string;
     created_at: string;
+}
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+export interface ListingAnalytics {
+    listingId: string;
+    totalUses: number;
+    uses7d: number;
+    uses30d: number;
+    revenueAllTime: number;
+    revenue7d: number;
+    revenue30d: number;
+    uniqueUsers: number;
+    dailyUsage: DailyBucket[];
+    topUsers: TopUser[];
+}
+
+export interface DailyBucket {
+    date: string;
+    uses: number;
+    revenue: number;
+}
+
+export interface TopUser {
+    userTenantId: string;
+    uses: number;
+    creditsSpent: number;
+}
+
+export interface BuyerUsageSummary {
+    listingId: string;
+    listingName: string;
+    totalUses: number;
+    totalCreditsSpent: number;
+    lastUsedAt: string;
 }

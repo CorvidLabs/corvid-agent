@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 76;
+const SCHEMA_VERSION = 78;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1418,6 +1418,36 @@ const MIGRATIONS: Record<number, string[]> = {
             created_at      TEXT NOT NULL DEFAULT (datetime('now'))
         )`,
         `CREATE INDEX IF NOT EXISTS idx_marketplace_pricing_tiers_listing ON marketplace_pricing_tiers(listing_id)`,
+    ],
+    77: [
+        `CREATE TABLE IF NOT EXISTS marketplace_usage_events (
+            id                TEXT PRIMARY KEY,
+            listing_id        TEXT NOT NULL,
+            user_tenant_id    TEXT NOT NULL,
+            tier_id           TEXT DEFAULT NULL,
+            credits_charged   INTEGER NOT NULL DEFAULT 0,
+            created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_mue_listing ON marketplace_usage_events(listing_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_mue_user ON marketplace_usage_events(user_tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_mue_created ON marketplace_usage_events(created_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_mue_listing_created ON marketplace_usage_events(listing_id, created_at)`,
+    ],
+    78: [
+        `ALTER TABLE marketplace_listings ADD COLUMN trial_uses INTEGER DEFAULT NULL`,
+        `ALTER TABLE marketplace_listings ADD COLUMN trial_days INTEGER DEFAULT NULL`,
+        `CREATE TABLE IF NOT EXISTS marketplace_trials (
+            id              TEXT PRIMARY KEY,
+            listing_id      TEXT NOT NULL,
+            tenant_id       TEXT NOT NULL,
+            uses_remaining  INTEGER DEFAULT NULL,
+            expires_at      TEXT DEFAULT NULL,
+            status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'converted')),
+            created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_listing ON marketplace_trials(listing_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_marketplace_trials_tenant ON marketplace_trials(tenant_id)`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_trials_listing_tenant ON marketplace_trials(listing_id, tenant_id)`,
     ],
 };
 

@@ -540,6 +540,7 @@ export const WorkflowRunActionSchema = z.object({
 
 const ListingCategorySchema = z.enum([
     'coding', 'research', 'writing', 'data', 'devops', 'security', 'general',
+    'automation', 'analysis', 'communication', 'monitoring', 'blockchain', 'creative',
 ]);
 
 const PricingModelSchema = z.enum(['free', 'per_use', 'subscription']);
@@ -553,6 +554,8 @@ export const CreateListingSchema = z.object({
     tags: z.array(z.string()).optional(),
     pricingModel: PricingModelSchema.optional(),
     priceCredits: z.number().int().min(0).optional(),
+    trialUses: z.number().int().min(1).optional(),
+    trialDays: z.number().int().min(1).optional(),
 });
 
 export const UpdateListingSchema = z.object({
@@ -564,6 +567,8 @@ export const UpdateListingSchema = z.object({
     pricingModel: PricingModelSchema.optional(),
     priceCredits: z.number().int().min(0).optional(),
     status: z.enum(['draft', 'published', 'unlisted', 'suspended']).optional(),
+    trialUses: z.number().int().min(1).nullable().optional(),
+    trialDays: z.number().int().min(1).nullable().optional(),
 });
 
 export const CreateReviewSchema = z.object({
@@ -619,6 +624,12 @@ export const TierUseSchema = z.object({
 export const TierSubscribeSchema = z.object({
     tierId: z.string().min(1, 'tierId is required'),
     subscriberTenantId: z.string().min(1, 'subscriberTenantId is required'),
+});
+
+// ─── Trials ──────────────────────────────────────────────────────────────────
+
+export const StartTrialSchema = z.object({
+    tenantId: z.string().min(1, 'tenantId is required'),
 });
 
 // ─── Reputation ──────────────────────────────────────────────────────────────

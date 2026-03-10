@@ -19,6 +19,7 @@ import { handleMentionPollingRoutes } from './mention-polling';
 import { handleWorkflowRoutes } from './workflows';
 import { handleSandboxRoutes } from './sandbox';
 import { handleMarketplaceRoutes } from './marketplace';
+import { handleMarketplaceAnalyticsRoutes } from './marketplace-analytics';
 import { handleReputationRoutes } from './reputation';
 import { handleBillingRoutes } from './billing';
 import { handleAuthFlowRoutes } from './auth-flow';
@@ -385,6 +386,10 @@ async function handleRoutes(
     // Marketplace routes
     const marketplaceResponse = handleMarketplaceRoutes(req, url, db, marketplace, marketplaceFederation, context);
     if (marketplaceResponse) return marketplaceResponse;
+
+    // Marketplace analytics routes
+    const marketplaceAnalyticsResponse = handleMarketplaceAnalyticsRoutes(req, url, db, context);
+    if (marketplaceAnalyticsResponse) return marketplaceAnalyticsResponse;
 
     // Reputation routes
     const reputationResponse = handleReputationRoutes(req, url, db, reputationScorer, reputationAttestation, context);

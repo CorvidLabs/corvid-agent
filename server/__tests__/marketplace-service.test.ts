@@ -141,20 +141,21 @@ describe('MarketplaceService', () => {
     test('updateListing modifies fields', () => {
         const created = svc.createListing({
             agentId: 'agent-1',
-            name: 'Original',
-            description: 'Desc',
+            name: 'Original Code Reviewing Agent',
+            description: 'A description long enough to pass quality gates',
             category: 'coding',
+            tags: ['code-review'],
         });
 
         const updated = svc.updateListing(created.id, {
-            name: 'Updated',
+            name: 'Updated Code Reviewing Agent',
             status: 'published',
             pricingModel: 'per_use',
             priceCredits: 10,
         });
 
         expect(updated).not.toBeNull();
-        expect(updated!.name).toBe('Updated');
+        expect(updated!.name).toBe('Updated Code Reviewing Agent');
         expect(updated!.status).toBe('published');
         expect(updated!.pricingModel).toBe('per_use');
         expect(updated!.priceCredits).toBe(10);
@@ -210,54 +211,57 @@ describe('MarketplaceService', () => {
     // ─── Search ──────────────────────────────────────────────────────────────
 
     test('search returns only published listings', () => {
-        svc.createListing({ agentId: 'a1', name: 'Draft', description: 'x', category: 'coding' });
-        const pub = svc.createListing({ agentId: 'a1', name: 'Published', description: 'x', category: 'coding' });
+        svc.createListing({ agentId: 'a1', name: 'Draft Listing Not Published', description: 'Should remain in draft status always', category: 'coding', tags: ['draft'] });
+        const pub = svc.createListing({ agentId: 'a1', name: 'Published Listing Agent', description: 'This one should be published successfully', category: 'coding', tags: ['published'] });
         svc.updateListing(pub.id, { status: 'published' });
 
         const result = svc.search({});
         expect(result.total).toBe(1);
-        expect(result.listings[0].name).toBe('Published');
+        expect(result.listings[0].name).toBe('Published Listing Agent');
     });
 
     test('search filters by category', () => {
-        const l1 = svc.createListing({ agentId: 'a1', name: 'Coder', description: 'x', category: 'coding' });
-        const l2 = svc.createListing({ agentId: 'a1', name: 'Writer', description: 'x', category: 'writing' });
+        const l1 = svc.createListing({ agentId: 'a1', name: 'Coder Agent For Testing', description: 'An automated coding assistant agent', category: 'coding', tags: ['coder'] });
+        const l2 = svc.createListing({ agentId: 'a1', name: 'Writer Agent For Testing', description: 'An automated writing assistant agent', category: 'writing', tags: ['writer'] });
         svc.updateListing(l1.id, { status: 'published' });
         svc.updateListing(l2.id, { status: 'published' });
 
         const result = svc.search({ category: 'coding' });
         expect(result.total).toBe(1);
-        expect(result.listings[0].name).toBe('Coder');
+        expect(result.listings[0].name).toBe('Coder Agent For Testing');
     });
 
     test('search with query matches name/description', () => {
         const l1 = svc.createListing({
             agentId: 'a1',
-            name: 'Smart Coder',
-            description: 'AI coding assistant',
+            name: 'Smart Coder Agent For AI',
+            description: 'AI coding assistant for developers',
             category: 'coding',
+            tags: ['coding'],
         });
         const l2 = svc.createListing({
             agentId: 'a1',
-            name: 'Data Analyst',
-            description: 'Crunches numbers',
+            name: 'Data Analyst Agent For AI',
+            description: 'Crunches numbers efficiently',
             category: 'data',
+            tags: ['data'],
         });
         svc.updateListing(l1.id, { status: 'published' });
         svc.updateListing(l2.id, { status: 'published' });
 
         const result = svc.search({ query: 'coder' });
         expect(result.total).toBe(1);
-        expect(result.listings[0].name).toBe('Smart Coder');
+        expect(result.listings[0].name).toBe('Smart Coder Agent For AI');
     });
 
     test('search paginates with limit/offset', () => {
         for (let i = 0; i < 5; i++) {
             const l = svc.createListing({
                 agentId: 'a1',
-                name: `Agent ${i}`,
-                description: 'x',
+                name: `Agent Number ${i} For Testing`,
+                description: 'A general-purpose agent for tests',
                 category: 'general',
+                tags: ['test'],
             });
             svc.updateListing(l.id, { status: 'published' });
         }

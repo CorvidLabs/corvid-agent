@@ -20,10 +20,14 @@ import type {
     CreateTierInput,
     UpdateTierInput,
     TierRecord,
+    ListingBadges,
+    QualityGateResult,
 } from './types';
+import { LISTING_CATEGORIES } from './types';
 import { IdentityVerification } from '../reputation/identity-verification';
 import type { VerificationTier } from '../reputation/identity-verification';
 import { EscrowService } from './escrow';
+import { MarketplaceAnalytics } from './analytics';
 import { ValidationError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 
@@ -102,6 +106,8 @@ function recordToListing(row: ListingRecord): MarketplaceListing {
         avgRating: row.avg_rating,
         reviewCount: row.review_count,
         tenantId: row.tenant_id,
+        trialUses: row.trial_uses,
+        trialDays: row.trial_days,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -175,6 +181,67 @@ export class MarketplaceService {
         return this.identity.getTier(listing.agentId);
     }
 
+
+    // ─── Verification Badges ─────────────────────────────────────────────────
+
+    /**
+     * Compute verification badges for a listing.
+     * - verified: agent's on-chain reputation score >= 70
+     * - trusted: listing has >= 10 reviews with avg rating >= 4.0
+     * - official: listing's tenant matches the instance owner
+     */
+    getListingBadges(listingId: string): ListingBadges {
+        const listing = this.getListing(listingId);
+        if (!listing) return { verified: false, trusted: false, official: false };
+
+        // Verified: agent reputation score >= 70
+        const scoreRow = this.db.query(
+            'SELECT overall_score FROM agent_reputation WHERE agent_id = ?',
+        ).get(listing.agentId) as { overall_score: number } | null;
+        const verified = (scoreRow?.overall_score ?? 0) >= 70;
+
+        // Trusted: >= 10 reviews with avg >= 4.0
+        const trusted = listing.reviewCount >= 10 && listing.avgRating >= 4.0;
+
+        // Official: tenant_id matches the instance owner
+        const ownerRow = this.db.query(
+            "SELECT value FROM settings WHERE key = 'owner_wallet'",
+        ).get() as { value: string } | null;
+        const official = ownerRow !== null && listing.tenantId === ownerRow.value;
+
+        return { verified, trusted, official };
+    }
+
+    // ─── Quality Gates ───────────────────────────────────────────────────────
+
+    /**
+     * Check quality gates for publishing a listing (draft → published).
+     */
+    checkQualityGates(listingId: string): QualityGateResult {
+        const listing = this.getListing(listingId);
+        if (!listing) return { passed: false, failures: ['Listing not found'] };
+
+        const failures: string[] = [];
+
+        if (!listing.tenantId || listing.tenantId.length === 0) {
+            failures.push('Agent must have a valid Algorand wallet');
+        }
+        if (!listing.name || listing.name.length < 20) {
+            failures.push('Name must be at least 20 characters');
+        }
+        if (!listing.description || listing.description.length < 20) {
+            failures.push('Description must be at least 20 characters');
+        }
+        if (!listing.tags || listing.tags.length === 0) {
+            failures.push('At least one tag must be set');
+        }
+        if (!LISTING_CATEGORIES.includes(listing.category)) {
+            failures.push(`Invalid category: ${listing.category}`);
+        }
+
+        return { passed: failures.length === 0, failures };
+    }
+
     createListing(input: CreateListingInput): MarketplaceListing {
         const id = crypto.randomUUID();
         const tags = JSON.stringify(input.tags ?? []);
@@ -220,6 +287,13 @@ export class MarketplaceService {
                     id, agentId: existing.agentId, tier: check.tier, required: check.required,
                 });
                 throw new VerificationGateError(check.tier, check.required);
+            }
+
+            // Apply quality gates before publishing
+            const gates = this.checkQualityGates(id);
+            if (!gates.passed) {
+                log.warn('Publishing blocked: quality gates failed', { id, failures: gates.failures });
+                throw new ValidationError(`Quality gates failed: ${gates.failures.join('; ')}`);
             }
         }
 
@@ -309,6 +383,8 @@ export class MarketplaceService {
                 escrowId: escrowTx.id,
             });
 
+            new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress, listing.priceCredits);
+
             return { success: true, creditsDeducted: listing.priceCredits, escrowId: escrowTx.id };
         }
 
@@ -316,6 +392,9 @@ export class MarketplaceService {
         this.db.query(
             "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
         ).run(listingId);
+
+        new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress ?? 'anonymous', 0);
+
         return { success: true, creditsDeducted: 0 };
     }
 
@@ -359,18 +438,79 @@ export class MarketplaceService {
             values.push(pattern, pattern);
         }
 
+        // Min reviews filter
+        if (params.minReviews !== undefined) {
+            conditions.push('ml.review_count >= ?');
+            values.push(params.minReviews);
+        }
+
+        // Price range filters
+        if (params.minPrice !== undefined) {
+            conditions.push('ml.price_credits >= ?');
+            values.push(params.minPrice);
+        }
+        if (params.maxPrice !== undefined) {
+            conditions.push('ml.price_credits <= ?');
+            values.push(params.maxPrice);
+        }
+
         // Verification tier filter via LEFT JOIN on agent_identity
-        let joinClause = '';
+        const joins: string[] = [];
         if (params.minVerificationTier) {
-            joinClause = ' LEFT JOIN agent_identity ai ON ai.agent_id = ml.agent_id';
+            joins.push('LEFT JOIN agent_identity ai ON ai.agent_id = ml.agent_id');
             conditions.push("COALESCE(ai.tier, 'UNVERIFIED') = ?");
             values.push(params.minVerificationTier);
         }
+
+        // Badge filter
+        if (params.badge === 'verified') {
+            if (!joins.some(j => j.includes('agent_reputation'))) {
+                joins.push('INNER JOIN agent_reputation ar ON ar.agent_id = ml.agent_id');
+            }
+            conditions.push('ar.overall_score >= 70');
+        } else if (params.badge === 'trusted') {
+            conditions.push('ml.review_count >= 10');
+            conditions.push('ml.avg_rating >= 4.0');
+        } else if (params.badge === 'official') {
+            const ownerRow = this.db.query(
+                "SELECT value FROM settings WHERE key = 'owner_wallet'",
+            ).get() as { value: string } | null;
+            if (ownerRow) {
+                conditions.push('ml.tenant_id = ?');
+                values.push(ownerRow.value);
+            } else {
+                conditions.push('1 = 0');
+            }
+        }
+
+        const joinClause = joins.length > 0 ? ` ${joins.join(' ')}` : '';
 
         // Prefix conditions with table alias for disambiguation
         const where = conditions.length > 0
             ? `WHERE ${conditions.join(' AND ')}`
             : '';
+
+        // Sort order
+        let orderBy: string;
+        switch (params.sortBy) {
+            case 'rating':
+                orderBy = 'ml.avg_rating DESC, ml.review_count DESC';
+                break;
+            case 'popularity':
+                orderBy = 'ml.use_count DESC, ml.avg_rating DESC';
+                break;
+            case 'newest':
+                orderBy = 'ml.created_at DESC';
+                break;
+            case 'price_low':
+                orderBy = 'ml.price_credits ASC, ml.avg_rating DESC';
+                break;
+            case 'price_high':
+                orderBy = 'ml.price_credits DESC, ml.avg_rating DESC';
+                break;
+            default:
+                orderBy = 'ml.avg_rating DESC, ml.use_count DESC';
+        }
 
         // Count total
         const total = queryCount(this.db, `SELECT COUNT(*) as cnt FROM marketplace_listings ml${joinClause} ${where}`, ...values);
@@ -378,7 +518,7 @@ export class MarketplaceService {
         // Fetch page
         const rows = this.db.query(
             `SELECT ml.* FROM marketplace_listings ml${joinClause} ${where}
-             ORDER BY ml.avg_rating DESC, ml.use_count DESC
+             ORDER BY ${orderBy}
              LIMIT ? OFFSET ?`,
         ).all(...values, limit, offset) as ListingRecord[];
 
@@ -610,6 +750,8 @@ export class MarketplaceService {
                 listingId, tierId, buyer: buyerWalletAddress, credits: tier.priceCredits,
             });
 
+            new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress, tier.priceCredits, tierId);
+
             return { success: true, creditsDeducted: tier.priceCredits, escrowId: escrowTx.id };
         }
 
@@ -617,6 +759,9 @@ export class MarketplaceService {
         this.db.query(
             "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
         ).run(listingId);
+
+        new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress, 0, tierId);
+
         return { success: true, creditsDeducted: 0 };
     }
 

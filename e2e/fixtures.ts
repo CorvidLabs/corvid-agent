@@ -206,8 +206,8 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agentId,
-                        name: 'E2E Test Listing',
-                        description: 'Test marketplace listing',
+                        name: 'E2E Test Listing Agent',
+                        description: 'Test marketplace listing for E2E',
                         category: 'general',
                         pricingModel: 'free',
                         tags: ['test'],
