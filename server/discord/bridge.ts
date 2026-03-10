@@ -21,7 +21,7 @@ import { extractContentText } from '../process/types';
 import { recordAudit } from '../db/audit';
 import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
 import { splitMessage, splitEmbedDescription } from './message-formatter';
-import { getDiscordConfig } from '../db/discord-config';
+import { getDiscordConfig, updateDiscordConfig } from '../db/discord-config';
 
 const log = createLogger('DiscordBridge');
 
@@ -204,6 +204,13 @@ export class DiscordBridge {
 
             // Update bot presence if status/activity changed
             this.gateway.updatePresence(dbConfig.statusText, dbConfig.activityType);
+
+            // Load persisted interacted users (only merge in — never remove from memory)
+            if (dbConfig.interactedUsers.length > 0) {
+                for (const uid of dbConfig.interactedUsers) {
+                    this.interactedUsers.add(uid);
+                }
+            }
         } catch (err) {
             log.warn('Failed to reload Discord config from DB', {
                 error: err instanceof Error ? err.message : String(err),
@@ -985,6 +992,8 @@ export class DiscordBridge {
     private sendFirstInteractionTip(userId: string, channelId: string): void {
         if (this.interactedUsers.has(userId)) return;
         this.interactedUsers.add(userId);
+        // Persist to DB so the tip survives restarts
+        this.persistInteractedUsers();
         this.sendEmbed(channelId, {
             description: [
                 `Hey <@${userId}>! Looks like your first time here.`,
@@ -995,6 +1004,17 @@ export class DiscordBridge {
             color: 0x57f287, // green
             footer: { text: 'This tip only appears once' },
         }).catch(() => {});
+    }
+
+    /** Persist the interactedUsers set to the discord_config table. */
+    private persistInteractedUsers(): void {
+        try {
+            updateDiscordConfig(this.db, 'interacted_users', [...this.interactedUsers].join(','));
+        } catch (err) {
+            log.warn('Failed to persist interacted users', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     private async handleMessage(data: DiscordMessageData): Promise<void> {
