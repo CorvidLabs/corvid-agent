@@ -102,7 +102,7 @@ test.describe('Marketplace', () => {
 
     test('star ratings on listing cards', async ({ page, api }) => {
         const agent = await api.seedAgent('Star Rating Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'Starred Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Starred Listing For Ratings' });
 
         await gotoMarketplace(page);
 
@@ -118,7 +118,7 @@ test.describe('Marketplace', () => {
         const agent = await api.seedAgent('Trust Badge Agent');
         await api.seedReputationEvent(agent.id, 'task_completed', 10);
         await api.computeScore(agent.id);
-        await api.seedMarketplaceListing(agent.id, { name: 'Trusted Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Trusted Listing For Badge' });
 
         await gotoMarketplace(page);
 
@@ -126,7 +126,7 @@ test.describe('Marketplace', () => {
         await expect(page.locator('.listing-card').first()).toBeVisible({ timeout: 10000 });
 
         // Find the listing card and check for trust badge
-        const card = page.locator('.listing-card:has-text("Trusted Listing")').first();
+        const card = page.locator('.listing-card:has-text("Trusted Listing For Badge")').first();
         await expect(card).toBeVisible({ timeout: 5000 });
 
         const badge = card.locator('.trust-badge');
@@ -137,13 +137,13 @@ test.describe('Marketplace', () => {
 
     test('detail panel stats section', async ({ page, api }) => {
         const agent = await api.seedAgent('Detail Stats Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'Stats Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Stats Listing Detail Panel' });
 
         await gotoMarketplace(page);
 
         // Wait for listing cards to render, then click first match
         await expect(page.locator('.listing-card').first()).toBeVisible({ timeout: 10000 });
-        await page.locator('.listing-card:has-text("Stats Listing")').first().click();
+        await page.locator('.listing-card:has-text("Stats Listing Detail Panel")').first().click();
         await expect(page.locator('.detail-panel')).toBeVisible({ timeout: 5000 });
 
         // Verify detail panel structure
@@ -181,7 +181,7 @@ test.describe('Marketplace', () => {
 
     test('category filter dropdown works', async ({ page, api }) => {
         const agent = await api.seedAgent('Category Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'General Listing', category: 'general' });
+        await api.seedMarketplaceListing(agent.id, { name: 'General Listing Category', category: 'general' });
 
         await gotoMarketplace(page);
 
@@ -200,7 +200,7 @@ test.describe('Marketplace', () => {
 
     test('listing card shows pricing, category, and meta', async ({ page, api }) => {
         const agent = await api.seedAgent('Card Meta Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'Card Meta Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Card Meta Listing Agent' });
 
         await gotoMarketplace(page);
 
@@ -227,7 +227,7 @@ test.describe('Marketplace', () => {
 
     test('listing card shows tags when present', async ({ page, api }) => {
         const agent = await api.seedAgent('Tags Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'Tagged Listing', tags: ['automation', 'testing'] });
+        await api.seedMarketplaceListing(agent.id, { name: 'Tagged Listing With Labels', tags: ['automation', 'testing'] });
 
         await gotoMarketplace(page);
 
@@ -241,7 +241,7 @@ test.describe('Marketplace', () => {
 
     test('detail panel shows review form', async ({ page, api }) => {
         const agent = await api.seedAgent('Review Form Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'Review Form Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Review Form Listing Agent' });
 
         await gotoMarketplace(page);
 
@@ -275,7 +275,7 @@ test.describe('Marketplace', () => {
             body: JSON.stringify({
                 agentId: agent.id,
                 name: listingName,
-                description: 'API test listing',
+                description: 'API test listing for CRUD validation',
                 category: 'general',
                 pricingModel: 'free',
                 tags: ['test'],
@@ -319,7 +319,7 @@ test.describe('Marketplace', () => {
 
     test('listing card name and description visible', async ({ page, api }) => {
         const agent = await api.seedAgent('Name Desc Agent');
-        await api.seedMarketplaceListing(agent.id, { name: 'Name Desc Listing' });
+        await api.seedMarketplaceListing(agent.id, { name: 'Name Desc Listing Agent' });
 
         await gotoMarketplace(page);
 
@@ -351,7 +351,7 @@ test.describe('Marketplace', () => {
     test('use listing increments use count', async ({ api }) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Use Listing Agent');
-        const listing = await api.seedMarketplaceListing(agent.id, { name: 'Use Target Listing' });
+        const listing = await api.seedMarketplaceListing(agent.id, { name: 'Use Target Listing Agent' });
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/use`, {
             method: 'POST',
@@ -364,7 +364,7 @@ test.describe('Marketplace', () => {
     test('get reviews for listing returns array', async ({ api }) => {
         const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Reviews List Agent');
-        const listing = await api.seedMarketplaceListing(agent.id, { name: 'Reviews Listing' });
+        const listing = await api.seedMarketplaceListing(agent.id, { name: 'Reviews Listing For Agent' });
 
         const res = await authedFetch(`${BASE_URL}/api/marketplace/listings/${listing.id}/reviews`);
         expect(res.ok).toBe(true);
