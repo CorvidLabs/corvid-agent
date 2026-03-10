@@ -7,7 +7,8 @@ import type {
     DiscordMessageData,
     DiscordInteractionData,
 } from './types';
-import { InteractionType, InteractionCallbackType, PermissionLevel } from './types';
+import { InteractionType, InteractionCallbackType, PermissionLevel, ComponentType, ButtonStyle } from './types';
+import type { DiscordActionRow } from './types';
 import { DiscordGateway } from './gateway';
 import { listAgents } from '../db/agents';
 import { listCouncils, getCouncilLaunch } from '../db/councils';
@@ -20,6 +21,7 @@ import { extractContentText } from '../process/types';
 import { recordAudit } from '../db/audit';
 import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
 import { splitMessage, splitEmbedDescription } from './message-formatter';
+import { getDiscordConfig } from '../db/discord-config';
 
 const log = createLogger('DiscordBridge');
 
@@ -68,7 +70,7 @@ export class DiscordBridge {
     private running = false;
 
     // Map Discord threadId → session info (for thread-based conversations)
-    private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string }> = new Map();
+    private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string; topic?: string }> = new Map();
     /** Active subscription callbacks per thread — used to unsubscribe before re-subscribing. */
     private threadCallbacks: Map<string, { sessionId: string; callback: import('../process/interfaces').EventCallback }> = new Map();
 
@@ -90,6 +92,10 @@ export class DiscordBridge {
     /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
     private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private static readonly SLASH_COMMAND_DEBOUNCE_MS = 2_000;
+
+    /** Periodic config reload timer — picks up DB changes without restart */
+    private configReloadTimer: ReturnType<typeof setInterval> | null = null;
+    private static readonly CONFIG_RELOAD_INTERVAL_MS = 30_000; // 30 seconds
 
     constructor(
         db: Database,
@@ -146,6 +152,12 @@ export class DiscordBridge {
                 log.warn('Stale thread check failed', { error: err instanceof Error ? err.message : String(err) });
             });
         }, 10 * 60 * 1000);
+
+        // Start periodic config reload from DB (every 30 seconds)
+        this.reloadConfigFromDb();
+        this.configReloadTimer = setInterval(() => {
+            this.reloadConfigFromDb();
+        }, DiscordBridge.CONFIG_RELOAD_INTERVAL_MS);
     }
 
     stop(): void {
@@ -155,12 +167,54 @@ export class DiscordBridge {
             clearInterval(this.staleCheckTimer);
             this.staleCheckTimer = null;
         }
+        if (this.configReloadTimer) {
+            clearInterval(this.configReloadTimer);
+            this.configReloadTimer = null;
+        }
         log.info('Discord bridge stopped');
     }
 
     /** Update the bot's presence on the live gateway connection. */
     updatePresence(statusText?: string, activityType?: number): void {
         this.gateway.updatePresence(statusText, activityType);
+    }
+
+    /**
+     * Reload dynamic config from the discord_config DB table.
+     * Merges DB values into the live config — env-only fields (botToken, channelId,
+     * appId, guildId) are never overwritten.
+     */
+    reloadConfigFromDb(): void {
+        try {
+            const dbConfig = getDiscordConfig(this.db);
+
+            // Merge dynamic fields — only overwrite if DB has values
+            if (dbConfig.additionalChannelIds.length > 0) {
+                this.config.additionalChannelIds = dbConfig.additionalChannelIds;
+            }
+            if (dbConfig.allowedUserIds.length > 0) {
+                this.config.allowedUserIds = dbConfig.allowedUserIds;
+            }
+            if (dbConfig.mode !== 'chat') {
+                this.config.mode = dbConfig.mode;
+            }
+            if (dbConfig.defaultAgentId) {
+                this.config.defaultAgentId = dbConfig.defaultAgentId;
+            }
+            // Always apply these — they have meaningful defaults
+            this.config.publicMode = dbConfig.publicMode;
+            if (Object.keys(dbConfig.rolePermissions).length > 0) {
+                this.config.rolePermissions = dbConfig.rolePermissions;
+            }
+            this.config.defaultPermissionLevel = dbConfig.defaultPermissionLevel;
+            if (Object.keys(dbConfig.rateLimitByLevel).length > 0) {
+                this.config.rateLimitByLevel = dbConfig.rateLimitByLevel;
+            }
+        } catch (err) {
+            log.warn('Failed to reload Discord config from DB', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     // ── Slash Command Registration ─────────────────────────────────────
@@ -299,6 +353,12 @@ export class DiscordBridge {
     // ── Interaction Handling ─────────────────────────────────────────────
 
     private async handleInteraction(interaction: DiscordInteractionData): Promise<void> {
+        // Handle button/component interactions
+        if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
+            await this.handleComponentInteraction(interaction);
+            return;
+        }
+
         // Only handle application commands
         if (interaction.type !== InteractionType.APPLICATION_COMMAND) return;
 
@@ -377,11 +437,23 @@ export class DiscordBridge {
                     agentName: agent.name,
                     agentModel: agent.model || 'unknown',
                     ownerUserId: userId,
+                    topic,
                 });
                 this.threadLastActivity.set(threadId, Date.now());
 
                 this.processManager.startProcess(session, topic);
                 this.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
+
+                // Post a welcome embed with Stop button in the thread
+                this.sendEmbedWithButtons(threadId, {
+                    description: `**${agent.name}** is working on: ${topic}`,
+                    color: this.agentColor(agent.name),
+                    footer: { text: `${agent.name} · ${agent.model || 'unknown'}` },
+                }, [
+                    this.buildActionRow(
+                        { label: 'Stop', customId: 'stop_session', style: ButtonStyle.DANGER, emoji: '⏹' },
+                    ),
+                ]).catch(() => {});
 
                 await this.respondToInteraction(interaction,
                     `Session started in <#${threadId}> with **${agent.name}**.\nTopic: ${topic}`);
@@ -539,6 +611,202 @@ export class DiscordBridge {
                 status: response.status,
                 error: error.slice(0, 200),
             });
+        }
+    }
+
+    // ── Component (Button) Interaction Handling ──────────────────────────
+
+    /**
+     * Handle button clicks and other component interactions.
+     * Button custom_ids use the format: `action:param1:param2`
+     */
+    private async handleComponentInteraction(interaction: DiscordInteractionData): Promise<void> {
+        const customId = interaction.data?.custom_id;
+        if (!customId) return;
+
+        const userId = interaction.member?.user?.id ?? interaction.user?.id;
+        if (!userId) return;
+
+        const permLevel = this.resolvePermissionLevel(userId, interaction.member?.roles);
+        if (permLevel <= PermissionLevel.BLOCKED) {
+            await this.respondToInteraction(interaction, 'You do not have permission to use this bot.');
+            return;
+        }
+
+        const [action] = customId.split(':');
+
+        switch (action) {
+            case 'resume_thread': {
+                if (permLevel < PermissionLevel.STANDARD) {
+                    await this.respondToInteraction(interaction, 'You need a higher role to resume sessions.');
+                    return;
+                }
+                const threadId = interaction.channel_id;
+                const info = this.threadSessions.get(threadId) ?? this.tryRecoverThread(threadId);
+                if (!info) {
+                    await this.respondToInteraction(interaction, 'No session found for this thread. Use `/session` to start a new one.');
+                    return;
+                }
+
+                // Un-archive the thread if it was archived
+                await this.unarchiveThread(threadId);
+
+                // Resubscribe for responses
+                if (!this.threadCallbacks.has(threadId)) {
+                    this.subscribeForResponseWithEmbed(info.sessionId, threadId, info.agentName, info.agentModel);
+                }
+                this.threadLastActivity.set(threadId, Date.now());
+
+                // Restore thread name (remove ✓ prefix)
+                const topicSuffix = info.topic ? ` — ${info.topic}` : '';
+                this.updateThreadName(threadId, `${info.agentName}${topicSuffix}`).catch(() => {});
+
+                // Acknowledge the button press by updating the message to disable the button
+                await this.acknowledgeButton(interaction, 'Session resumed — send a message to continue.');
+                break;
+            }
+
+            case 'new_session': {
+                if (permLevel < PermissionLevel.STANDARD) {
+                    await this.respondToInteraction(interaction, 'You need a higher role to create sessions.');
+                    return;
+                }
+                // Direct them to use /session
+                await this.respondToInteraction(interaction, 'Use `/session` to start a new conversation with an agent.');
+                break;
+            }
+
+            case 'stop_session': {
+                const threadId = interaction.channel_id;
+                const info = this.threadSessions.get(threadId);
+                if (!info) {
+                    await this.respondToInteraction(interaction, 'No active session in this thread.');
+                    return;
+                }
+
+                // Only the owner or admins can stop
+                if (info.ownerUserId && info.ownerUserId !== userId && permLevel < PermissionLevel.ADMIN) {
+                    await this.respondToInteraction(interaction, 'Only the session owner or an admin can stop this session.');
+                    return;
+                }
+
+                this.processManager.stopProcess(info.sessionId);
+                const cb = this.threadCallbacks.get(threadId);
+                if (cb) {
+                    this.processManager.unsubscribe(cb.sessionId, cb.callback);
+                    this.threadCallbacks.delete(threadId);
+                }
+
+                const topicSuffix2 = info.topic ? ` — ${info.topic}` : '';
+                this.updateThreadName(threadId, `■ ${info.agentName}${topicSuffix2}`).catch(() => {});
+
+                await this.acknowledgeButton(interaction, 'Session stopped.');
+                break;
+            }
+
+            default:
+                log.debug('Unknown button custom_id', { customId });
+                await this.respondToInteraction(interaction, 'Unknown action.');
+        }
+    }
+
+    /**
+     * Acknowledge a button interaction with an ephemeral message.
+     */
+    private async acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
+        assertSnowflake(interaction.id, 'interaction ID');
+        assertInteractionToken(interaction.token);
+        const response = await fetch(
+            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: InteractionCallbackType.CHANNEL_MESSAGE,
+                    data: { content: message, flags: 64 }, // 64 = ephemeral
+                }),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            log.error('Failed to acknowledge button', { status: response.status, error: error.slice(0, 200) });
+        }
+    }
+
+    /**
+     * Send an embed with action row buttons.
+     */
+    private async sendEmbedWithButtons(
+        channelId: string,
+        embed: {
+            title?: string;
+            description?: string;
+            color?: number;
+            fields?: Array<{ name: string; value: string; inline?: boolean }>;
+            footer?: { text: string };
+        },
+        components: DiscordActionRow[],
+    ): Promise<void> {
+        try {
+            await this.delivery.sendWithReceipt('discord', async () => {
+                const response = await fetch(
+                    `https://discord.com/api/v10/channels/${channelId}/messages`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bot ${this.config.botToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ embeds: [embed], components }),
+                    },
+                );
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    log.error('Failed to send Discord embed with buttons', { status: response.status, error: error.slice(0, 200) });
+                    throw new Error(`Discord embed+buttons failed: ${response.status}`);
+                }
+            });
+        } catch {
+            // Error already logged by DeliveryTracker
+        }
+    }
+
+    /**
+     * Build an action row with buttons.
+     */
+    private buildActionRow(...buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }>): DiscordActionRow {
+        return {
+            type: ComponentType.ACTION_ROW,
+            components: buttons.map(b => ({
+                type: ComponentType.BUTTON,
+                style: b.style ?? ButtonStyle.SECONDARY,
+                label: b.label,
+                custom_id: b.customId,
+                ...(b.emoji ? { emoji: { name: b.emoji } } : {}),
+            })),
+        };
+    }
+
+    /**
+     * Un-archive a thread so it can receive messages again.
+     */
+    private async unarchiveThread(threadId: string): Promise<void> {
+        assertSnowflake(threadId, 'thread ID');
+        const response = await fetch(
+            `https://discord.com/api/v10/channels/${threadId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bot ${this.config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ archived: false }),
+            },
+        );
+        if (!response.ok) {
+            log.debug('Failed to unarchive thread', { threadId, status: response.status });
         }
     }
 
@@ -1007,7 +1275,14 @@ export class DiscordBridge {
         const session = getSession(this.db, sessionId);
         if (!session) {
             this.threadSessions.delete(threadId);
-            await this.sendMessage(threadId, 'This conversation has ended. Use /session to start a new one.');
+            await this.sendEmbedWithButtons(threadId, {
+                description: 'This conversation has ended.',
+                color: 0x95a5a6,
+            }, [
+                this.buildActionRow(
+                    { label: 'New Session', customId: 'new_session', style: ButtonStyle.PRIMARY, emoji: '➕' },
+                ),
+            ]);
             return;
         }
 
@@ -1026,15 +1301,15 @@ export class DiscordBridge {
      * Try to recover a thread-to-session mapping from the database.
      * Sessions are named `Discord thread:{threadId}` so we can look them up.
      */
-    private tryRecoverThread(threadId: string): { sessionId: string; agentName: string; agentModel: string; ownerUserId: string } | null {
+    private tryRecoverThread(threadId: string): { sessionId: string; agentName: string; agentModel: string; ownerUserId: string; topic?: string } | null {
         try {
             const row = this.db.query(
-                `SELECT s.id, s.agent_id, a.name as agent_name, a.model as agent_model
+                `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model
                  FROM sessions s
                  LEFT JOIN agents a ON a.id = s.agent_id
                  WHERE s.name = ? AND s.source = 'discord'
                  ORDER BY s.created_at DESC LIMIT 1`,
-            ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; agent_name: string; agent_model: string } | null;
+            ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string } | null;
 
             if (!row) return null;
 
@@ -1043,6 +1318,7 @@ export class DiscordBridge {
                 agentName: row.agent_name || 'Agent',
                 agentModel: row.agent_model || 'unknown',
                 ownerUserId: '',
+                topic: row.initial_prompt || undefined,
             };
             this.threadSessions.set(threadId, info);
             log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
@@ -1188,10 +1464,23 @@ export class DiscordBridge {
                 // Clean up tracking on completion
                 this.threadCallbacks.delete(threadId);
 
-                // Update thread title to show completion
+                // Update thread title to show completion — preserve original topic
                 const info = this.threadSessions.get(threadId);
                 if (info) {
-                    this.updateThreadName(threadId, `✓ ${agentName} — done`).catch(() => {});
+                    const topicSuffix = info.topic ? ` — ${info.topic}` : '';
+                    this.updateThreadName(threadId, `✓ ${agentName}${topicSuffix}`).catch(() => {});
+
+                    // Send completion message with Resume button
+                    this.sendEmbedWithButtons(threadId, {
+                        description: 'Session complete. Send a message to continue, or use the button below.',
+                        color: 0x57f287,
+                        footer: { text: `${agentName} · done` },
+                    }, [
+                        this.buildActionRow(
+                            { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
+                            { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
+                        ),
+                    ]).catch(() => {});
                 }
             }
 
@@ -1199,12 +1488,16 @@ export class DiscordBridge {
             if (event.type === 'session_error') {
                 const errEvent = event as { error?: { message?: string; errorType?: string } };
                 const errMsg = errEvent.error?.message || 'Unknown error';
-                this.sendEmbed(threadId, {
+                this.sendEmbedWithButtons(threadId, {
                     title: 'Session Error',
                     description: errMsg.slice(0, 4096),
                     color: 0xff3355, // Red
-                    footer: { text: `${agentName} · ${errEvent.error?.errorType || 'error'} · Send a message to resume` },
-                }).catch(() => {});
+                    footer: { text: `${agentName} · ${errEvent.error?.errorType || 'error'}` },
+                }, [
+                    this.buildActionRow(
+                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
+                    ),
+                ]).catch(() => {});
             }
 
             // Notify thread on unexpected exit (no result received)
@@ -1262,10 +1555,15 @@ export class DiscordBridge {
 
         for (const threadId of staleThreads) {
             try {
-                await this.sendEmbed(threadId, {
-                    description: 'This conversation has been idle. Archiving thread — use `/session` to start a new one.',
+                await this.sendEmbedWithButtons(threadId, {
+                    description: 'This conversation has been idle. Archiving thread.',
                     color: 0x95a5a6,
-                });
+                }, [
+                    this.buildActionRow(
+                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
+                        { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
+                    ),
+                ]);
 
                 await this.archiveThread(threadId);
                 this.threadLastActivity.delete(threadId);

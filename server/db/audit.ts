@@ -51,7 +51,9 @@ export type AuditAction =
     | 'permission_revoke'
     | 'permission_emergency_revoke'
     | 'subscription_create'
-    | 'subscription_cancel';
+    | 'subscription_cancel'
+    | 'discord_config_update'
+    | 'discord_config_delete';
 
 export interface AuditEntry {
     id: number;
