@@ -63,7 +63,7 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
             const denied = tenantRoleGuard('owner')(req, url, context);
             if (denied) return denied;
         }
-        return handleUpdateDiscordConfig(req, db);
+        return handleUpdateDiscordConfig(req, db, context);
     }
 
     // DELETE /api/settings/discord/:key — delete a Discord config key (owner-only)
@@ -73,7 +73,7 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
             const denied = tenantRoleGuard('owner')(req, url, context);
             if (denied) return denied;
         }
-        return handleDeleteDiscordConfigKey(db, discordKeyMatch[1]);
+        return handleDeleteDiscordConfigKey(db, discordKeyMatch[1], context);
     }
 
     return null;
@@ -209,7 +209,7 @@ function handleGetDiscordConfig(db: Database): Response {
     return json({ discordConfig: config });
 }
 
-async function handleUpdateDiscordConfig(req: Request, db: Database): Promise<Response> {
+async function handleUpdateDiscordConfig(req: Request, db: Database, context?: RequestContext): Promise<Response> {
     let body: Record<string, unknown>;
     try {
         body = await req.json() as Record<string, unknown>;
@@ -241,12 +241,13 @@ async function handleUpdateDiscordConfig(req: Request, db: Database): Promise<Re
     }
 
     const count = updateDiscordConfigBatch(db, updates);
-    recordAudit(db, 'discord_config_update', 'admin', 'discord_config', null, JSON.stringify(Object.keys(updates)));
+    const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+    recordAudit(db, 'discord_config_update', actor, 'discord_config', null, JSON.stringify(Object.keys(updates)));
 
     return json({ ok: true, updated: count });
 }
 
-function handleDeleteDiscordConfigKey(db: Database, key: string): Response {
+function handleDeleteDiscordConfigKey(db: Database, key: string, context?: RequestContext): Response {
     if (!VALID_DISCORD_CONFIG_KEYS.has(key)) {
         return json({ error: `Invalid config key: ${key}` }, 400);
     }
@@ -256,6 +257,7 @@ function handleDeleteDiscordConfigKey(db: Database, key: string): Response {
         return json({ error: `Config key not found: ${key}` }, 404);
     }
 
-    recordAudit(db, 'discord_config_delete', 'admin', 'discord_config', null, key);
+    const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+    recordAudit(db, 'discord_config_delete', actor, 'discord_config', null, key);
     return json({ ok: true, deleted: key });
 }

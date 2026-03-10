@@ -188,28 +188,19 @@ export class DiscordBridge {
         try {
             const dbConfig = getDiscordConfig(this.db);
 
-            // Merge dynamic fields — only overwrite if DB has values
-            if (dbConfig.additionalChannelIds.length > 0) {
-                this.config.additionalChannelIds = dbConfig.additionalChannelIds;
-            }
-            if (dbConfig.allowedUserIds.length > 0) {
-                this.config.allowedUserIds = dbConfig.allowedUserIds;
-            }
-            if (dbConfig.mode !== 'chat') {
-                this.config.mode = dbConfig.mode;
-            }
-            if (dbConfig.defaultAgentId) {
-                this.config.defaultAgentId = dbConfig.defaultAgentId;
-            }
-            // Always apply these — they have meaningful defaults
+            // Apply all dynamic fields unconditionally — DB defaults are correct
+            // when a key is deleted, so conditional merging would prevent clearing values.
+            this.config.additionalChannelIds = dbConfig.additionalChannelIds;
+            this.config.allowedUserIds = dbConfig.allowedUserIds;
+            this.config.mode = dbConfig.mode;
+            this.config.defaultAgentId = dbConfig.defaultAgentId ?? undefined;
             this.config.publicMode = dbConfig.publicMode;
-            if (Object.keys(dbConfig.rolePermissions).length > 0) {
-                this.config.rolePermissions = dbConfig.rolePermissions;
-            }
+            this.config.rolePermissions = dbConfig.rolePermissions;
             this.config.defaultPermissionLevel = dbConfig.defaultPermissionLevel;
-            if (Object.keys(dbConfig.rateLimitByLevel).length > 0) {
-                this.config.rateLimitByLevel = dbConfig.rateLimitByLevel;
-            }
+            this.config.rateLimitByLevel = dbConfig.rateLimitByLevel;
+
+            // Update bot presence if status/activity changed
+            this.gateway.updatePresence(dbConfig.statusText, dbConfig.activityType);
         } catch (err) {
             log.warn('Failed to reload Discord config from DB', {
                 error: err instanceof Error ? err.message : String(err),
@@ -626,6 +617,8 @@ export class DiscordBridge {
 
         const userId = interaction.member?.user?.id ?? interaction.user?.id;
         if (!userId) return;
+
+        assertSnowflake(interaction.channel_id, 'channel ID');
 
         const permLevel = this.resolvePermissionLevel(userId, interaction.member?.roles);
         if (permLevel <= PermissionLevel.BLOCKED) {
