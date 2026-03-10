@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.1] - 2026-03-10
+
+### Fixed
+- Remove unused `execSync` and `existsSync` imports from `bin/corvid-agent.mjs` (#919)
+- Add CodeQL config to exclude auto-generated `*.generated.ts` files from static analysis (#919)
+
 ## [0.24.0] - 2026-03-10
 
 ### Added
