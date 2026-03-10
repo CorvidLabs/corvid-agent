@@ -21,6 +21,19 @@ interface OperationalMode {
     mode: string;
 }
 
+interface DiscordConfig {
+    additional_channel_ids?: string;
+    allowed_user_ids?: string;
+    mode?: string;
+    default_agent_id?: string;
+    public_mode?: string;
+    role_permissions?: string;
+    default_permission_level?: string;
+    rate_limit_by_level?: string;
+    status_text?: string;
+    activity_type?: string;
+}
+
 interface PSKContact {
     id: string;
     nickname: string;
@@ -101,6 +114,126 @@ interface PSKContact {
                         </div>
                     }
                 </div>
+
+                <!-- Discord Configuration -->
+                @if (discordConfig()) {
+                    <div class="settings__section">
+                        <h3 class="section-toggle" (click)="toggleSection('discord')">
+                            <span class="section-chevron">{{ collapsedSections().has('discord') ? '\u25B6' : '\u25BC' }}</span>
+                            Discord
+                            @if (discordDirty()) {
+                                <span class="dirty-badge">Unsaved changes</span>
+                            }
+                        </h3>
+                        @if (!collapsedSections().has('discord')) {
+                            <div class="discord-grid">
+                                <div class="discord-field">
+                                    <label class="discord-label" for="discord_mode">Bridge Mode</label>
+                                    <select class="discord-select" id="discord_mode"
+                                        [ngModel]="discordValues()['mode'] ?? discordConfig()?.mode ?? 'chat'"
+                                        (ngModelChange)="setDiscordValue('mode', $event)">
+                                        <option value="chat">Chat</option>
+                                        <option value="work_intake">Work Intake</option>
+                                    </select>
+                                    <span class="discord-desc">Chat: interactive sessions. Work Intake: creates work tasks.</span>
+                                </div>
+                                <div class="discord-field">
+                                    <label class="discord-label" for="discord_public_mode">Public Mode</label>
+                                    <select class="discord-select" id="discord_public_mode"
+                                        [ngModel]="discordValues()['public_mode'] ?? discordConfig()?.public_mode ?? 'false'"
+                                        (ngModelChange)="setDiscordValue('public_mode', $event)">
+                                        <option value="false">Off (allowlist only)</option>
+                                        <option value="true">On (role-based access)</option>
+                                    </select>
+                                    <span class="discord-desc">When on, anyone can interact (subject to role permissions).</span>
+                                </div>
+                                <div class="discord-field">
+                                    <label class="discord-label" for="discord_default_perm">Default Permission Level</label>
+                                    <select class="discord-select" id="discord_default_perm"
+                                        [ngModel]="discordValues()['default_permission_level'] ?? discordConfig()?.default_permission_level ?? '1'"
+                                        (ngModelChange)="setDiscordValue('default_permission_level', $event)">
+                                        <option value="0">0 — Blocked</option>
+                                        <option value="1">1 — Basic (chat, mention)</option>
+                                        <option value="2">2 — Standard (slash commands)</option>
+                                        <option value="3">3 — Admin (council, work intake)</option>
+                                    </select>
+                                    <span class="discord-desc">Permission level for users with no matching role (public mode only).</span>
+                                </div>
+                                <div class="discord-field">
+                                    <label class="discord-label" for="discord_activity_type">Activity Type</label>
+                                    <select class="discord-select" id="discord_activity_type"
+                                        [ngModel]="discordValues()['activity_type'] ?? discordConfig()?.activity_type ?? '3'"
+                                        (ngModelChange)="setDiscordValue('activity_type', $event)">
+                                        <option value="0">Playing</option>
+                                        <option value="1">Streaming</option>
+                                        <option value="2">Listening to</option>
+                                        <option value="3">Watching</option>
+                                        <option value="5">Competing in</option>
+                                    </select>
+                                    <span class="discord-desc">Bot presence activity type.</span>
+                                </div>
+                                <div class="discord-field discord-field--wide">
+                                    <label class="discord-label" for="discord_status_text">Status Text</label>
+                                    <input class="discord-input" id="discord_status_text"
+                                        [ngModel]="discordValues()['status_text'] ?? discordConfig()?.status_text ?? ''"
+                                        (ngModelChange)="setDiscordValue('status_text', $event)"
+                                        placeholder="corvid-agent" />
+                                    <span class="discord-desc">Text shown in the bot's presence status.</span>
+                                </div>
+                                <div class="discord-field discord-field--wide">
+                                    <label class="discord-label" for="discord_channels">Additional Channels</label>
+                                    <input class="discord-input" id="discord_channels"
+                                        [ngModel]="discordValues()['additional_channel_ids'] ?? discordConfig()?.additional_channel_ids ?? ''"
+                                        (ngModelChange)="setDiscordValue('additional_channel_ids', $event)"
+                                        placeholder="Channel IDs, comma-separated" />
+                                    <span class="discord-desc">Extra channel IDs to monitor (beyond the primary channel).</span>
+                                </div>
+                                <div class="discord-field discord-field--wide">
+                                    <label class="discord-label" for="discord_users">Allowed Users (Legacy)</label>
+                                    <input class="discord-input" id="discord_users"
+                                        [ngModel]="discordValues()['allowed_user_ids'] ?? discordConfig()?.allowed_user_ids ?? ''"
+                                        (ngModelChange)="setDiscordValue('allowed_user_ids', $event)"
+                                        placeholder="User IDs, comma-separated" />
+                                    <span class="discord-desc">User allowlist for legacy mode (ignored when public mode is on).</span>
+                                </div>
+                                <div class="discord-field discord-field--wide">
+                                    <label class="discord-label" for="discord_default_agent">Default Agent ID</label>
+                                    <input class="discord-input" id="discord_default_agent"
+                                        [ngModel]="discordValues()['default_agent_id'] ?? discordConfig()?.default_agent_id ?? ''"
+                                        (ngModelChange)="setDiscordValue('default_agent_id', $event)"
+                                        placeholder="Agent UUID" />
+                                    <span class="discord-desc">Default agent for @mention replies (leave empty for first available).</span>
+                                </div>
+                                <div class="discord-field discord-field--wide">
+                                    <label class="discord-label" for="discord_roles">Role Permissions (JSON)</label>
+                                    <textarea class="discord-textarea" id="discord_roles" rows="3"
+                                        [ngModel]="discordValues()['role_permissions'] ?? discordConfig()?.role_permissions ?? '{}'"
+                                        (ngModelChange)="setDiscordValue('role_permissions', $event)"
+                                        placeholder='{"role_id": 3, "other_role_id": 1}'></textarea>
+                                    <span class="discord-desc">Maps Discord role IDs to permission levels (0-3). JSON object.</span>
+                                </div>
+                                <div class="discord-field discord-field--wide">
+                                    <label class="discord-label" for="discord_rate_limits">Rate Limits by Level (JSON)</label>
+                                    <textarea class="discord-textarea" id="discord_rate_limits" rows="2"
+                                        [ngModel]="discordValues()['rate_limit_by_level'] ?? discordConfig()?.rate_limit_by_level ?? '{}'"
+                                        (ngModelChange)="setDiscordValue('rate_limit_by_level', $event)"
+                                        placeholder='{"1": 5, "2": 15, "3": 50}'></textarea>
+                                    <span class="discord-desc">Max messages per window by permission level. JSON object.</span>
+                                </div>
+                            </div>
+                            <div class="discord-actions">
+                                <button
+                                    class="save-btn"
+                                    [disabled]="savingDiscord() || !discordDirty()"
+                                    (click)="saveDiscordConfig()"
+                                >{{ savingDiscord() ? 'Saving...' : 'Save Discord Config' }}</button>
+                                @if (discordDirty()) {
+                                    <button class="cancel-btn cancel-btn--sm" (click)="resetDiscordChanges()">Discard Changes</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
 
                 <!-- AlgoChat Status -->
                 <div class="settings__section">
@@ -355,6 +488,49 @@ interface PSKContact {
         /* Credit dirty input */
         .credit-input--dirty { border-color: var(--accent-amber) !important; }
         .credit-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+        /* Discord config */
+        .discord-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .discord-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .discord-field--wide { grid-column: 1 / -1; }
+        .discord-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+        .discord-input, .discord-select, .discord-textarea {
+            padding: 0.45rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-family: inherit;
+            width: 100%;
+        }
+        .discord-textarea {
+            resize: vertical;
+            font-size: 0.75rem;
+            font-family: var(--font-mono, monospace);
+        }
+        .discord-select { cursor: pointer; }
+        .discord-input:focus, .discord-select:focus, .discord-textarea:focus {
+            border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none;
+        }
+        .discord-desc {
+            font-size: 0.6rem;
+            color: var(--text-tertiary);
+        }
+        .discord-actions { display: flex; gap: 0.5rem; align-items: center; }
 
         .settings__section {
             background: var(--bg-surface);
@@ -623,6 +799,12 @@ export class SettingsComponent implements OnInit {
     readonly backupResult = signal<string | null>(null);
     readonly algochatStatus = this.sessionService.algochatStatus;
 
+    // Discord config state
+    readonly discordConfig = signal<DiscordConfig | null>(null);
+    readonly discordValues = signal<Record<string, string>>({});
+    readonly savingDiscord = signal(false);
+    readonly discordDirty = computed(() => Object.keys(this.discordValues()).length > 0);
+
     // Multi-contact PSK state
     readonly pskContacts = signal<PSKContact[]>([]);
     readonly expandedContactId = signal<string | null>(null);
@@ -842,6 +1024,53 @@ export class SettingsComponent implements OnInit {
         }
     }
 
+    // ── Discord config methods ────────────────────────────────────────
+
+    setDiscordValue(key: string, value: string): void {
+        const original = this.discordConfig()?.[key as keyof DiscordConfig] ?? '';
+        this.discordValues.update(vals => {
+            const next = { ...vals };
+            if (value === original) {
+                delete next[key];
+            } else {
+                next[key] = value;
+            }
+            return next;
+        });
+    }
+
+    resetDiscordChanges(): void {
+        this.discordValues.set({});
+    }
+
+    async saveDiscordConfig(): Promise<void> {
+        const updates = this.discordValues();
+        if (Object.keys(updates).length === 0) return;
+        this.savingDiscord.set(true);
+        try {
+            await firstValueFrom(this.api.put<{ ok: boolean }>('/settings/discord', updates));
+            // Merge saved values into the loaded config
+            this.discordConfig.update(cfg => cfg ? { ...cfg, ...updates } : cfg);
+            this.discordValues.set({});
+            this.notifications.success('Discord configuration saved');
+        } catch {
+            this.notifications.error('Failed to save Discord configuration');
+        } finally {
+            this.savingDiscord.set(false);
+        }
+    }
+
+    private async loadDiscordConfig(): Promise<void> {
+        try {
+            const result = await firstValueFrom(
+                this.api.get<{ discordConfig: DiscordConfig }>('/settings/discord')
+            );
+            this.discordConfig.set(result.discordConfig);
+        } catch {
+            // Non-critical — user may not have permission or Discord not configured
+        }
+    }
+
     // ── Private ──────────────────────────────────────────────────────
 
     /** Retry rendering until the canvas element is available in the DOM. */
@@ -884,8 +1113,11 @@ export class SettingsComponent implements OnInit {
             this.operationalMode.set(mode.mode);
             this.sessionService.loadAlgoChatStatus();
 
-            // Load PSK contacts
-            await this.loadPSKContacts();
+            // Load PSK contacts and Discord config in parallel
+            await Promise.all([
+                this.loadPSKContacts(),
+                this.loadDiscordConfig(),
+            ]);
         } catch {
             // Non-critical
         } finally {

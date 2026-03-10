@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-6215%20unit%20%7C%20360%20E2E-brightgreen" alt="6215 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-6324%20unit%20%7C%20360%20E2E-brightgreen" alt="6215 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -136,7 +136,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,215** across 255 files (17,166 assertions) |
+| Unit tests | **6,324** across 261 files (17,448 assertions) |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **116** with automated validation |
 | Test:code ratio | **1.14×** |
@@ -153,7 +153,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 |--------|-------|
 | MCP tools | **39** corvid_* tool handlers |
 | API endpoints | **~205** across 44 route modules |
-| DB migrations | **2** (squashed baseline, 88 tables) |
+| DB migrations | **3** (squashed baseline, 90 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).

@@ -17,6 +17,7 @@ import {
     type AuthConfig,
 } from '../middleware/auth';
 import { recordAudit } from '../db/audit';
+import { getDiscordConfigRaw, updateDiscordConfigBatch, deleteDiscordConfigKey, VALID_DISCORD_CONFIG_KEYS } from '../db/discord-config';
 
 export function handleSettingsRoutes(req: Request, url: URL, db: Database, context?: RequestContext, authConfig?: AuthConfig | null): Response | Promise<Response> | null {
     // GET /api/settings — all settings (system metadata is admin-only)
@@ -47,6 +48,34 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
         return handleApiKeyStatus(authConfig ?? null);
     }
 
+    // GET /api/settings/discord — get Discord runtime config (admin-only)
+    if (url.pathname === '/api/settings/discord' && req.method === 'GET') {
+        if (context) {
+            const denied = tenantRoleGuard('operator')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleGetDiscordConfig(db);
+    }
+
+    // PUT /api/settings/discord — update Discord runtime config (owner-only)
+    if (url.pathname === '/api/settings/discord' && req.method === 'PUT') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleUpdateDiscordConfig(req, db, context);
+    }
+
+    // DELETE /api/settings/discord/:key — delete a Discord config key (owner-only)
+    const discordKeyMatch = url.pathname.match(/^\/api\/settings\/discord\/([a-z_]+)$/);
+    if (discordKeyMatch && req.method === 'DELETE') {
+        if (context) {
+            const denied = tenantRoleGuard('owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleDeleteDiscordConfigKey(db, discordKeyMatch[1], context);
+    }
+
     return null;
 }
 
@@ -59,6 +88,16 @@ function handleGetSettings(db: Database, isAdmin: boolean): Response {
     }
 
     const result: Record<string, unknown> = { creditConfig };
+
+    // Discord configuration — admin-only
+    if (isAdmin) {
+        try {
+            result.discordConfig = getDiscordConfigRaw(db);
+        } catch {
+            // Table may not exist yet if file-based migrations haven't run
+            result.discordConfig = {};
+        }
+    }
 
     // System stats — admin-only to avoid leaking operational metadata
     if (isAdmin) {
@@ -161,4 +200,64 @@ function handleApiKeyStatus(authConfig: AuthConfig | null): Response {
             : null,
         warning,
     });
+}
+
+// ─── Discord Config ───────────────────────────────────────────────────────
+
+function handleGetDiscordConfig(db: Database): Response {
+    const config = getDiscordConfigRaw(db);
+    return json({ discordConfig: config });
+}
+
+async function handleUpdateDiscordConfig(req: Request, db: Database, context?: RequestContext): Promise<Response> {
+    let body: Record<string, unknown>;
+    try {
+        body = await req.json() as Record<string, unknown>;
+    } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    // Validate keys
+    const updates: Record<string, string> = {};
+    const invalidKeys: string[] = [];
+    for (const [key, value] of Object.entries(body)) {
+        if (!VALID_DISCORD_CONFIG_KEYS.has(key)) {
+            invalidKeys.push(key);
+            continue;
+        }
+        // Stringify objects/arrays for JSON fields, otherwise use string value
+        updates[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    }
+
+    if (invalidKeys.length > 0) {
+        return json({
+            error: `Invalid config keys: ${invalidKeys.join(', ')}`,
+            validKeys: [...VALID_DISCORD_CONFIG_KEYS],
+        }, 400);
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return json({ error: 'No valid config keys provided' }, 400);
+    }
+
+    const count = updateDiscordConfigBatch(db, updates);
+    const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+    recordAudit(db, 'discord_config_update', actor, 'discord_config', null, JSON.stringify(Object.keys(updates)));
+
+    return json({ ok: true, updated: count });
+}
+
+function handleDeleteDiscordConfigKey(db: Database, key: string, context?: RequestContext): Response {
+    if (!VALID_DISCORD_CONFIG_KEYS.has(key)) {
+        return json({ error: `Invalid config key: ${key}` }, 400);
+    }
+
+    const deleted = deleteDiscordConfigKey(db, key);
+    if (!deleted) {
+        return json({ error: `Config key not found: ${key}` }, 404);
+    }
+
+    const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+    recordAudit(db, 'discord_config_delete', actor, 'discord_config', null, key);
+    return json({ ok: true, deleted: key });
 }

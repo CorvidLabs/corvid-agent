@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 6
+version: 7
 status: active
 files:
   - server/discord/bridge.ts
@@ -97,8 +97,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, PRESENCE_UPDATE=3, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
 | `GatewayIntent` | Bit flags: `GUILDS` (1<<0), `GUILD_MEMBERS` (1<<1), `GUILD_MESSAGES` (1<<9), `MESSAGE_CONTENT` (1<<15) |
 | `PermissionLevel` | Constants: `BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3` |
-| `InteractionType` | `PING=1, APPLICATION_COMMAND=2` |
-| `InteractionCallbackType` | `PONG=1, CHANNEL_MESSAGE=4, DEFERRED_CHANNEL_MESSAGE=5` |
+| `ComponentType` | Constants for Discord component types: `ACTION_ROW=1, BUTTON=2` |
+| `ButtonStyle` | Constants for Discord button styles: `PRIMARY=1, SECONDARY=2, SUCCESS=3, DANGER=4` |
+| `DiscordButton` | `{ type, style, label, custom_id, emoji?, disabled? }` — a Discord button component |
+| `DiscordActionRow` | `{ type, components: DiscordButton[] }` — a row of button components |
+| `InteractionType` | `PING=1, APPLICATION_COMMAND=2, MESSAGE_COMPONENT=3` |
+| `InteractionCallbackType` | `PONG=1, CHANNEL_MESSAGE=4, DEFERRED_CHANNEL_MESSAGE=5, UPDATE_MESSAGE=7` |
 
 ## Invariants
 

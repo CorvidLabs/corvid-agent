@@ -1,4 +1,5 @@
 import { getDb, initDb } from './db/connection';
+import { initDiscordConfigFromEnv } from './db/discord-config';
 import { handleRequest, initRateLimiterDb } from './routes/index';
 import { createWebSocketHandler } from './ws/handler';
 import { existsSync } from 'node:fs';
@@ -52,6 +53,8 @@ const db = getDb();
 initDb().then(() => {
     // Attach db to rate limiter for persistent state after migrations are applied
     initRateLimiterDb(db);
+    // Seed discord config from env vars (if not already in DB)
+    initDiscordConfigFromEnv(db);
 }).catch((err) => {
     log.error('File-based migration failed', { error: err instanceof Error ? err.message : String(err) });
 });

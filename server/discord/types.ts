@@ -39,7 +39,7 @@ export interface DiscordBridgeConfig {
 
 export interface DiscordInteractionData {
     id: string;
-    type: number; // 1=PING, 2=APPLICATION_COMMAND
+    type: number; // 1=PING, 2=APPLICATION_COMMAND, 3=MESSAGE_COMPONENT
     channel_id: string;
     guild_id?: string;
     member?: { user: DiscordAuthor; roles?: string[] };
@@ -47,14 +47,21 @@ export interface DiscordInteractionData {
     data?: {
         name: string;
         options?: Array<{ name: string; type: number; value: string | number | boolean }>;
+        /** For component interactions — the custom_id of the button clicked */
+        custom_id?: string;
+        /** For component interactions — the component type */
+        component_type?: number;
     };
     token: string; // interaction token for responding
+    /** The message the component was attached to (for component interactions) */
+    message?: { id: string; channel_id: string };
 }
 
 // Interaction types
 export const InteractionType = {
     PING: 1,
     APPLICATION_COMMAND: 2,
+    MESSAGE_COMPONENT: 3,
 } as const;
 
 // Interaction callback types
@@ -62,7 +69,36 @@ export const InteractionCallbackType = {
     PONG: 1,
     CHANNEL_MESSAGE: 4,
     DEFERRED_CHANNEL_MESSAGE: 5,
+    UPDATE_MESSAGE: 7,
 } as const;
+
+// Component types
+export const ComponentType = {
+    ACTION_ROW: 1,
+    BUTTON: 2,
+} as const;
+
+// Button styles
+export const ButtonStyle = {
+    PRIMARY: 1,
+    SECONDARY: 2,
+    SUCCESS: 3,
+    DANGER: 4,
+} as const;
+
+export interface DiscordButton {
+    type: typeof ComponentType.BUTTON;
+    style: number;
+    label: string;
+    custom_id: string;
+    emoji?: { name: string };
+    disabled?: boolean;
+}
+
+export interface DiscordActionRow {
+    type: typeof ComponentType.ACTION_ROW;
+    components: DiscordButton[];
+}
 
 export interface DiscordGatewayPayload {
     op: number;
