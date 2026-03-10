@@ -340,10 +340,23 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
                 allowedUserIds: process.env.DISCORD_ALLOWED_USER_IDS
                     ? process.env.DISCORD_ALLOWED_USER_IDS.split(',').map(s => s.trim()).filter(Boolean)
                     : [],
+                additionalChannelIds: process.env.DISCORD_ADDITIONAL_CHANNEL_IDS
+                    ? process.env.DISCORD_ADDITIONAL_CHANNEL_IDS.split(',').map(s => s.trim()).filter(Boolean)
+                    : undefined,
                 mode: (process.env.DISCORD_BRIDGE_MODE as 'chat' | 'work_intake') ?? undefined,
                 defaultAgentId: process.env.DISCORD_DEFAULT_AGENT_ID ?? undefined,
                 appId: process.env.DISCORD_APP_ID ?? undefined,
                 guildId: process.env.DISCORD_GUILD_ID ?? undefined,
+                publicMode: process.env.DISCORD_PUBLIC_MODE === 'true',
+                rolePermissions: process.env.DISCORD_ROLE_PERMISSIONS
+                    ? JSON.parse(process.env.DISCORD_ROLE_PERMISSIONS)
+                    : undefined,
+                defaultPermissionLevel: process.env.DISCORD_DEFAULT_PERMISSION_LEVEL
+                    ? parseInt(process.env.DISCORD_DEFAULT_PERMISSION_LEVEL, 10)
+                    : undefined,
+                rateLimitByLevel: process.env.DISCORD_RATE_LIMIT_BY_LEVEL
+                    ? JSON.parse(process.env.DISCORD_RATE_LIMIT_BY_LEVEL)
+                    : undefined,
             },
             workTaskService,
         );

@@ -1,10 +1,12 @@
 ---
 module: discord-bridge
-version: 5
+version: 6
 status: active
 files:
   - server/discord/bridge.ts
   - server/discord/types.ts
+  - server/discord/message-formatter.ts
+  - server/discord/gateway.ts
 db_tables:
   - sessions
   - session_messages
@@ -18,7 +20,7 @@ depends_on:
 
 ## Purpose
 
-Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). No external Discord library dependencies. Connects to the Discord gateway, handles heartbeating, identifies/resumes sessions, and routes channel messages to agent sessions. The bot operates in **passive channel mode**: it does not auto-respond to regular channel messages. It only responds when @mentioned or when a slash command is used. Agent conversations happen exclusively in threads created via the `/session` command, where the user selects an agent and topic. Includes per-user rate limiting, user authorization, prompt injection scanning, session management, automatic reconnection with exponential backoff, slash command registration, and bot presence management.
+Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). No external Discord library dependencies. Connects to the Discord gateway, handles heartbeating, identifies/resumes sessions, and routes channel messages to agent sessions. The bot operates in **passive channel mode**: it does not auto-respond to regular channel messages. It only responds when @mentioned or when a slash command is used. Agent conversations happen exclusively in threads created via the `/session` command, where the user selects an agent and topic. Includes per-user rate limiting (with tiered limits by permission level), role-based access control, public channel mode, multi-channel support, prompt injection scanning, session management, automatic reconnection with exponential backoff, slash command registration, typing indicators, message reactions, smart message splitting (code block preservation), stale thread auto-archiving, and bot presence management.
 
 ## Public API
 
@@ -41,25 +43,31 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `start` | `()` | `void` | Open the gateway WebSocket connection; idempotent. Also registers slash commands if `appId` is configured |
-| `stop` | `()` | `void` | Close the WebSocket with code 1000, clear heartbeat timer |
-| `sendMessage` | `(channelId: string, content: string)` | `Promise<void>` | Send a message to a Discord channel via REST API; auto-chunks at 2000 characters |
+| `start` | `()` | `void` | Open the gateway WebSocket connection; idempotent. Also registers slash commands if `appId` is configured. Starts stale thread checker (10-minute interval) |
+| `stop` | `()` | `void` | Close the WebSocket with code 1000, clear heartbeat timer and stale thread checker |
+| `sendMessage` | `(channelId: string, content: string)` | `Promise<void>` | Send a message to a Discord channel via REST API; smart-splits at paragraph/sentence/word boundaries, preserves code blocks |
 | `updatePresence` | `(statusText?: string, activityType?: number)` | `void` | Update the bot's presence/status on the live gateway connection |
+| `sendTypingIndicator` | `(channelId: string)` | `Promise<void>` | Send a typing indicator to a channel (lasts ~10s). Best-effort |
+| `addReaction` | `(channelId, messageId, emoji: string)` | `Promise<void>` | Add a reaction to a message. Emoji must be URL-encoded. Best-effort |
+| `removeReaction` | `(channelId, messageId, emoji: string)` | `Promise<void>` | Remove a bot reaction from a message. Best-effort |
+| `muteUser` | `(userId: string)` | `void` | Mute a user from bot interactions (admin action) |
+| `unmuteUser` | `(userId: string)` | `void` | Unmute a previously muted user (admin action) |
 
 ### Exported Types (from types.ts)
 
 | Type | Description |
 |------|-------------|
 | `DiscordBridgeMode` | `'chat' \| 'work_intake'` — operational mode for the bridge |
-| `DiscordBridgeConfig` | `{ botToken, channelId, allowedUserIds, mode?, defaultAgentId?, appId?, guildId? }` |
+| `DiscordBridgeConfig` | `{ botToken, channelId, additionalChannelIds?, allowedUserIds, mode?, defaultAgentId?, appId?, guildId?, publicMode?, rolePermissions?, defaultPermissionLevel?, rateLimitByLevel? }` |
 | `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
 | `DiscordHelloData` | `{ heartbeat_interval: number }` |
 | `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
-| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[] }` |
+| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], member?: { roles: string[] } }` |
 | `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
 | `DiscordInteractionData` | Slash command interaction payload from gateway |
 | `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, PRESENCE_UPDATE=3, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
-| `GatewayIntent` | Bit flags: `GUILD_MESSAGES` (1<<9), `MESSAGE_CONTENT` (1<<15) |
+| `GatewayIntent` | Bit flags: `GUILDS` (1<<0), `GUILD_MEMBERS` (1<<1), `GUILD_MESSAGES` (1<<9), `MESSAGE_CONTENT` (1<<15) |
+| `PermissionLevel` | Constants: `BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3` |
 | `InteractionType` | `PING=1, APPLICATION_COMMAND=2` |
 | `InteractionCallbackType` | `PONG=1, CHANNEL_MESSAGE=4, DEFERRED_CHANNEL_MESSAGE=5` |
 
@@ -75,14 +83,14 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 6. **Session resume**: On reconnection, if a `sessionId` exists, a RESUME is sent instead of IDENTIFY. On INVALID_SESSION with `resumable=false`, the session ID is cleared and IDENTIFY is used
 7. **INVALID_SESSION delay**: After receiving INVALID_SESSION, the bridge waits 1-5 seconds (random) before re-identifying, per Discord documentation
 8. **Reconnection backoff**: Exponential backoff with `delay = min(1000 * 2^attempt, 60000)`. Maximum 10 reconnect attempts before giving up and setting `running = false`
-9. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY
+9. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY. When `publicMode` is enabled, also requests `GUILDS` and `GUILD_MEMBERS` for role data
 10. **Bot presence**: Set via the `presence` field in IDENTIFY payload. Configurable via `DISCORD_STATUS` and `DISCORD_ACTIVITY_TYPE` env vars. Can be updated at runtime via `updatePresence()`
 
 ### Channel Message Handling (Passive Mode)
 
 11. **Passive channel mode**: The bot does NOT auto-respond to regular messages in the configured channel. Regular channel messages are silently ignored unless the bot is @mentioned
 12. **@mention response**: When the bot is @mentioned in the configured channel, it responds inline (not in a thread) as a one-off reply. The response uses the `defaultAgentId` agent (or first available agent). No session or thread is created
-13. **Channel filter**: Only messages from the configured `channelId` and from threads created by the bridge are processed. Messages from other channels are silently ignored
+13. **Multi-channel support**: Messages from the primary `channelId` and any `additionalChannelIds` are processed, plus threads created by the bridge. Messages from other channels are silently ignored
 14. **Bot message ignore**: Messages from bot accounts (`author.bot === true`) are silently ignored to prevent loops
 
 ### Thread & Session Management
@@ -96,21 +104,26 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 ### Security & Rate Limiting
 
-21. **User authorization**: If `config.allowedUserIds` is non-empty, only those user IDs can interact. Unauthorized users receive `"Unauthorized."` reply
-22. **Per-user rate limiting**: Each user is limited to 10 messages per 60-second sliding window
+21. **Role-based access control**: Permission levels (BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3). In legacy mode, `allowedUserIds` grants ADMIN level. In `publicMode`, permissions are resolved from Discord roles via `rolePermissions` config. Highest matching role wins. Muted users are always BLOCKED
+22. **Tiered rate limiting**: Each user is limited per 60-second sliding window. Default is 10 messages. Can be customized per permission level via `rateLimitByLevel` config (e.g., BASIC=3, STANDARD=10, ADMIN=50)
 23. **Prompt injection scanning**: All incoming messages (channel @mentions and thread messages) are scanned via `scanForInjection()`. Blocked messages are audited and rejected
+24. **Permission-gated commands**: `/session` requires STANDARD or higher. `/council`, `/mute`, `/unmute` require ADMIN. `/agents`, `/status`, `/help` require BASIC
+25. **User muting**: Admins can mute/unmute users via `/mute` and `/unmute` slash commands. Muted users cannot interact with the bot regardless of their role permissions
 
 ### Response Formatting
 
 24. **Rich embed responses**: Agent responses are sent as Discord embeds with the message content in the description, agent name and model in the footer, and a consistent per-agent color derived from name hashing
 25. **Response debouncing**: Session events are buffered for 1500ms before being sent as embeds to the thread
 26. **Subscription deduplication**: Each thread maintains at most one active event subscription. When a new message is routed to a thread, the previous subscription callback is unsubscribed before a new one is created, preventing duplicate responses
-27. **Message chunking**: Discord has a 4096-character embed description limit. Long responses are truncated. Plain messages are chunked at 2000 characters
+27. **Smart message splitting**: Messages are split at natural boundaries (paragraphs, then sentences, then words). Code blocks are never split mid-block — oversized code blocks get their own opening/closing fences per chunk. Embed descriptions use 4096-char limit, plain messages use 2000-char limit. Implemented in `message-formatter.ts`
 28. **Content extraction**: Assistant responses use `extractContentText()` to properly handle both string and `ContentBlock[]` formats
+29. **Typing indicators**: A typing indicator is sent when a message is received and periodically refreshed (every 8s) while the agent is responding, since Discord typing indicators expire after ~10 seconds
+30. **Message reactions**: The bot reacts with 👀 when a message is received (before processing). Thread titles are updated with a ✓ prefix when the session completes
+31. **Stale thread auto-archive**: Threads inactive for 2 hours are automatically archived with a closing message. The stale check runs every 10 minutes. Thread sessions and subscriptions are cleaned up on archive
 
 ### Commands
 
-29. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/agents`, `/status`, `/council`, `/help`
+32. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/agents`, `/status`, `/council`, `/mute`, `/unmute`, `/help`
 30. **`/session` command**: Creates a new thread with an agent session. Required options: `agent` (dropdown of available agents, capped at 25), `topic` (string, used as thread name). The thread is created in the configured channel with the selected agent bound to it
 31. **`/agents` command**: Lists all available agents with their models. Does not create a session
 32. **`/status` command**: Shows the bot's current status and active sessions
@@ -255,8 +268,13 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `DISCORD_BOT_TOKEN` | (required) | Discord bot token |
-| `DISCORD_CHANNEL_ID` | (required) | Discord channel ID to listen on |
-| `DISCORD_ALLOWED_USER_IDS` | `""` | Comma-separated list of allowed Discord user IDs; empty = allow all |
+| `DISCORD_CHANNEL_ID` | (required) | Primary Discord channel ID to listen on |
+| `DISCORD_ADDITIONAL_CHANNEL_IDS` | `""` | Comma-separated additional channel IDs to monitor |
+| `DISCORD_ALLOWED_USER_IDS` | `""` | Comma-separated list of allowed Discord user IDs; empty = allow all (legacy mode) |
+| `DISCORD_PUBLIC_MODE` | `"false"` | Enable public channel mode with role-based access |
+| `DISCORD_ROLE_PERMISSIONS` | (none) | JSON object mapping Discord role IDs to permission levels (0-3) |
+| `DISCORD_DEFAULT_PERMISSION_LEVEL` | `1` | Default permission level for users with no matching role in public mode |
+| `DISCORD_RATE_LIMIT_BY_LEVEL` | (none) | JSON object mapping permission levels to max messages per window |
 | `DISCORD_BRIDGE_MODE` | `"chat"` | `chat` or `work_intake` |
 | `DISCORD_DEFAULT_AGENT_ID` | (none) | Default agent UUID for new sessions |
 | `DISCORD_APP_ID` | (none) | Discord application ID; enables slash command registration |
@@ -273,3 +291,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-07 | corvid-agent | v3: Thread-based conversations (shared sessions), rich embed responses with agent name/model, removed @AgentName routing (conflicts with Discord @), agent choices dropdown in /switch |
 | 2026-03-07 | corvid-agent | v4: Passive channel mode — bot no longer auto-responds to channel messages. Only responds to @mentions (one-off) and slash commands. Threads created exclusively via `/session` command with agent selection and topic. Removed `/switch` and `/new` commands (replaced by `/session`). Removed text command parsing (slash-only). Added `mentions` field to `DiscordMessageData` |
 | 2026-03-08 | corvid-agent | v5: Fix duplicate message bug — track active subscription per thread, unsubscribe previous callback before re-subscribing on each message. Added invariant #26 (subscription deduplication) |
+| 2026-03-10 | corvid-agent | v6: Public channel mode with role-based access control (BLOCKED/BASIC/STANDARD/ADMIN). Multi-channel support. Tiered rate limiting by permission level. Smart message splitting at natural boundaries with code block preservation. Typing indicators with periodic refresh. Message reactions for acknowledgment. Stale thread auto-archiving (2h). Thread title updates on session completion. `/mute` and `/unmute` admin commands. Added `message-formatter.ts`. Refs #891, #893 |

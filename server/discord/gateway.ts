@@ -74,6 +74,11 @@ export class DiscordGateway {
         }
     }
 
+    /** Expose the bot token for REST API calls made by the bridge. */
+    get botToken(): string {
+        return this.config.botToken;
+    }
+
     /** Send a PRESENCE_UPDATE over the live gateway connection. */
     updatePresence(statusText?: string, activityType?: number): void {
         this.send({
@@ -217,11 +222,16 @@ export class DiscordGateway {
     // ── Identify / Resume ─────────────────────────────────────────────────
 
     private identify(): void {
+        // Request GUILD_MEMBERS intent when public mode is enabled (needed for role data)
+        let intents = GatewayIntent.GUILD_MESSAGES | GatewayIntent.MESSAGE_CONTENT;
+        if (this.config.publicMode) {
+            intents |= GatewayIntent.GUILDS | GatewayIntent.GUILD_MEMBERS;
+        }
         this.send({
             op: GatewayOp.IDENTIFY,
             d: {
                 token: this.config.botToken,
-                intents: GatewayIntent.GUILD_MESSAGES | GatewayIntent.MESSAGE_CONTENT,
+                intents,
                 properties: {
                     os: 'linux',
                     browser: 'corvid-agent',
