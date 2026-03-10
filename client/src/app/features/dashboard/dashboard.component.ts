@@ -59,61 +59,65 @@ interface ActivityEvent {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
         } @else {
         <div class="dashboard">
+            <h2 class="sr-only">Dashboard Overview</h2>
+
             <!-- Top Metrics Row -->
-            <div class="metrics-row">
-                <div class="metric-card">
-                    <span class="metric-card__label">Total Agents</span>
-                    <span class="metric-card__value">{{ agentService.agents().length }}</span>
-                    <a class="metric-card__link" routerLink="/agents">View all</a>
+            <section class="metrics-row" aria-label="Key metrics">
+                <div class="metric-card" role="group" aria-label="Total Agents">
+                    <span class="metric-card__label" id="metric-agents-label">Total Agents</span>
+                    <span class="metric-card__value" aria-labelledby="metric-agents-label">{{ agentService.agents().length }}</span>
+                    <a class="metric-card__link" routerLink="/agents">View all<span class="sr-only"> agents</span></a>
                 </div>
-                <div class="metric-card">
-                    <span class="metric-card__label">Active Sessions</span>
-                    <span class="metric-card__value metric-card__value--active">{{ runningSessions().length }}</span>
-                    <a class="metric-card__link" routerLink="/sessions">View all</a>
+                <div class="metric-card" role="group" aria-label="Active Sessions">
+                    <span class="metric-card__label" id="metric-active-label">Active Sessions</span>
+                    <span class="metric-card__value metric-card__value--active" aria-labelledby="metric-active-label">{{ runningSessions().length }}</span>
+                    <a class="metric-card__link" routerLink="/sessions">View all<span class="sr-only"> sessions</span></a>
                 </div>
-                <div class="metric-card">
-                    <span class="metric-card__label">Total Projects</span>
-                    <span class="metric-card__value">{{ projectService.projects().length }}</span>
-                    <a class="metric-card__link" routerLink="/projects">View all</a>
+                <div class="metric-card" role="group" aria-label="Total Projects">
+                    <span class="metric-card__label" id="metric-projects-label">Total Projects</span>
+                    <span class="metric-card__value" aria-labelledby="metric-projects-label">{{ projectService.projects().length }}</span>
+                    <a class="metric-card__link" routerLink="/projects">View all<span class="sr-only"> projects</span></a>
                 </div>
-                <div class="metric-card metric-card--highlight">
-                    <span class="metric-card__label">API Cost (Today)</span>
-                    <span class="metric-card__value metric-card__value--usd">\${{ (overview()?.todaySpending?.apiCostUsd ?? 0) | number:'1.2-4' }}</span>
+                <div class="metric-card metric-card--highlight" role="group" aria-label="API Cost Today">
+                    <span class="metric-card__label" id="metric-cost-label">API Cost (Today)</span>
+                    <span class="metric-card__value metric-card__value--usd" aria-labelledby="metric-cost-label">\${{ (overview()?.todaySpending?.apiCostUsd ?? 0) | number:'1.2-4' }}</span>
                 </div>
                 @if (algochatStatus(); as status) {
                     @if (status.enabled && status.address !== 'local') {
-                        <div class="metric-card">
-                            <span class="metric-card__label">ALGO Balance</span>
-                            <span class="metric-card__value metric-card__value--algo">{{ (status.balance / 1000000) | number:'1.2-4' }}</span>
+                        <div class="metric-card" role="group" aria-label="ALGO Balance">
+                            <span class="metric-card__label" id="metric-algo-label">ALGO Balance</span>
+                            <span class="metric-card__value metric-card__value--algo" aria-labelledby="metric-algo-label">{{ (status.balance / 1000000) | number:'1.2-4' }}</span>
                             <span class="metric-card__sub">{{ status.network }}</span>
                         </div>
                     }
                 }
-                <div class="metric-card">
-                    <span class="metric-card__label">Credits Used</span>
-                    <span class="metric-card__value">{{ overview()?.totalCreditsConsumed ?? 0 }}</span>
+                <div class="metric-card" role="group" aria-label="Credits Used">
+                    <span class="metric-card__label" id="metric-credits-label">Credits Used</span>
+                    <span class="metric-card__value" aria-labelledby="metric-credits-label">{{ overview()?.totalCreditsConsumed ?? 0 }}</span>
                 </div>
-                <div class="metric-card">
-                    <span class="metric-card__label">Work Tasks</span>
-                    <span class="metric-card__value metric-card__value--work">{{ activeWorkTaskCount() }}</span>
-                    <a class="metric-card__link" routerLink="/work-tasks">View all</a>
+                <div class="metric-card" role="group" aria-label="Work Tasks">
+                    <span class="metric-card__label" id="metric-work-label">Work Tasks</span>
+                    <span class="metric-card__value metric-card__value--work" aria-labelledby="metric-work-label">{{ activeWorkTaskCount() }}</span>
+                    <a class="metric-card__link" routerLink="/work-tasks">View all<span class="sr-only"> work tasks</span></a>
                 </div>
-                <div class="metric-card">
-                    <span class="metric-card__label">Total Sessions</span>
-                    <span class="metric-card__value">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
+                <div class="metric-card" role="group" aria-label="Total Sessions">
+                    <span class="metric-card__label" id="metric-sessions-label">Total Sessions</span>
+                    <span class="metric-card__value" aria-labelledby="metric-sessions-label">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
                 </div>
-            </div>
+            </section>
 
             <!-- Agent Activity Grid -->
             @if (agentSummaries().length > 0) {
-                <div class="section">
+                <section class="section" aria-label="Agent activity">
                     <div class="section__header">
                         <h3>Agent Activity</h3>
                         <a class="section__link" routerLink="/agents">View all agents</a>
                     </div>
                     <div class="agent-grid">
                         @for (summary of agentSummaries(); track summary.agent.id) {
-                            <a class="agent-card" [routerLink]="['/agents', summary.agent.id]">
+                            <a class="agent-card"
+                               [routerLink]="['/agents', summary.agent.id]"
+                               [attr.aria-label]="summary.agent.name + ' — ' + (summary.runningSessions > 0 ? 'Busy' : 'Idle')">
                                 <div class="agent-card__top">
                                     <div class="agent-card__info">
                                         <span class="agent-card__name">{{ summary.agent.name }}</span>
@@ -125,7 +129,8 @@ interface ActivityEvent {
                                     </div>
                                     <span
                                         class="agent-card__status"
-                                        [attr.data-status]="summary.runningSessions > 0 ? 'busy' : 'idle'">
+                                        [attr.data-status]="summary.runningSessions > 0 ? 'busy' : 'idle'"
+                                        role="status">
                                         {{ summary.runningSessions > 0 ? 'Busy' : 'Idle' }}
                                     </span>
                                 </div>
@@ -144,51 +149,57 @@ interface ActivityEvent {
                                     </div>
                                 </div>
                                 <div class="agent-card__actions">
-                                    <button class="agent-card__btn" (click)="startChat(summary.agent.id, $event)">Chat</button>
-                                    <button class="agent-card__btn" (click)="startWorkTask(summary.agent.id, $event)">Work Task</button>
+                                    <button class="agent-card__btn"
+                                            (click)="startChat(summary.agent.id, $event)"
+                                            [attr.aria-label]="'Start chat with ' + summary.agent.name">Chat</button>
+                                    <button class="agent-card__btn"
+                                            (click)="startWorkTask(summary.agent.id, $event)"
+                                            [attr.aria-label]="'Create work task for ' + summary.agent.name">Work Task</button>
                                 </div>
                             </a>
                         }
                     </div>
-                </div>
+                </section>
             }
 
             <div class="two-col">
                 <!-- Recent Activity Feed -->
-                <div class="section section--feed">
+                <section class="section section--feed" aria-label="Recent activity">
                     <div class="section__header">
                         <h3>Recent Activity</h3>
                     </div>
                     @if (activityFeed().length === 0) {
                         <p class="empty">No recent activity.</p>
                     } @else {
-                        <div class="activity-feed">
+                        <ul class="activity-feed" role="list">
                             @for (event of activityFeed(); track $index) {
-                                <a class="activity-item" [routerLink]="event.link">
-                                    <span class="activity-item__icon" [attr.data-type]="event.type">
-                                        @switch (event.type) {
-                                            @case ('session_started') { &gt; }
-                                            @case ('session_completed') { &check; }
-                                            @case ('session_error') { ! }
-                                            @case ('work_task') { &gt;&gt; }
-                                            @case ('council') { &amp; }
-                                        }
-                                    </span>
-                                    <div class="activity-item__body">
-                                        <span class="activity-item__label">{{ event.label }}</span>
-                                        <span class="activity-item__detail">{{ event.detail }}</span>
-                                    </div>
-                                    <span class="activity-item__time" [title]="event.timestamp | absoluteTime">{{ event.timestamp | relativeTime }}</span>
-                                </a>
+                                <li>
+                                    <a class="activity-item" [routerLink]="event.link" [attr.aria-label]="event.label + ': ' + event.detail">
+                                        <span class="activity-item__icon" [attr.data-type]="event.type" aria-hidden="true">
+                                            @switch (event.type) {
+                                                @case ('session_started') { &gt; }
+                                                @case ('session_completed') { &check; }
+                                                @case ('session_error') { ! }
+                                                @case ('work_task') { &gt;&gt; }
+                                                @case ('council') { &amp; }
+                                            }
+                                        </span>
+                                        <div class="activity-item__body">
+                                            <span class="activity-item__label">{{ event.label }}</span>
+                                            <span class="activity-item__detail">{{ event.detail }}</span>
+                                        </div>
+                                        <span class="activity-item__time" [title]="event.timestamp | absoluteTime">{{ event.timestamp | relativeTime }}</span>
+                                    </a>
+                                </li>
                             }
-                        </div>
+                        </ul>
                     }
-                </div>
+                </section>
 
                 <!-- Right Column: Quick Actions + System Status -->
                 <div class="right-col">
                     <!-- Quick Actions -->
-                    <div class="section section--actions">
+                    <section class="section section--actions" aria-label="Quick actions">
                         <h3>Quick Actions</h3>
                         <div class="quick-actions">
                             <button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
@@ -197,58 +208,62 @@ interface ActivityEvent {
                             <button
                                 class="action-btn action-btn--selftest"
                                 [disabled]="selfTestRunning()"
-                                (click)="runSelfTest()">
+                                (click)="runSelfTest()"
+                                [attr.aria-busy]="selfTestRunning()">
                                 {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
                             </button>
                         </div>
-                    </div>
+                    </section>
 
                     <!-- System Status -->
-                    <div class="section section--status">
+                    <section class="section section--status" aria-label="System status">
                         <h3>System Status</h3>
-                        <div class="status-list">
+                        <dl class="status-list">
                             <div class="status-row">
-                                <span class="status-row__label">WebSocket</span>
-                                <span
+                                <dt class="status-row__label">WebSocket</dt>
+                                <dd
                                     class="status-row__indicator"
-                                    [attr.data-ok]="wsService.connected()">
+                                    [attr.data-ok]="wsService.connected()"
+                                    role="status">
                                     {{ wsService.connected() ? 'Connected' : 'Disconnected' }}
-                                </span>
+                                </dd>
                             </div>
                             <div class="status-row">
-                                <span class="status-row__label">AlgoChat</span>
+                                <dt class="status-row__label">AlgoChat</dt>
                                 @if (algochatStatus(); as status) {
-                                    <span
+                                    <dd
                                         class="status-row__indicator"
                                         [attr.data-ok]="status.enabled">
                                         {{ status.enabled ? (status.address === 'local' ? 'Local Mode' : status.network) : 'Disabled' }}
-                                    </span>
+                                    </dd>
                                 } @else {
-                                    <span class="status-row__indicator" data-ok="false">Loading...</span>
+                                    <dd class="status-row__indicator" data-ok="false">Loading...</dd>
                                 }
                             </div>
                             <div class="status-row">
-                                <span class="status-row__label">Active Schedules</span>
-                                <span class="status-row__value">{{ activeScheduleCount() }}</span>
+                                <dt class="status-row__label">Active Schedules</dt>
+                                <dd class="status-row__value">{{ activeScheduleCount() }}</dd>
                             </div>
                             <div class="status-row">
-                                <span class="status-row__label">Active Councils</span>
-                                <span class="status-row__value">{{ activeCouncilLaunches().length }}</span>
+                                <dt class="status-row__label">Active Councils</dt>
+                                <dd class="status-row__value">{{ activeCouncilLaunches().length }}</dd>
                             </div>
-                        </div>
-                    </div>
+                        </dl>
+                    </section>
 
                     <!-- Active Councils -->
                     @if (activeCouncilLaunches().length > 0) {
-                        <div class="section">
+                        <section class="section" aria-label="Active councils">
                             <h3>Active Councils</h3>
-                            @for (launch of activeCouncilLaunches(); track launch.id) {
-                                <div class="running-item">
-                                    <a [routerLink]="['/council-launches', launch.id]">{{ launch.prompt.length > 50 ? launch.prompt.slice(0, 50) + '...' : launch.prompt }}</a>
-                                    <span class="stage-badge" [attr.data-stage]="launch.stage">{{ launch.stage }}</span>
-                                </div>
-                            }
-                        </div>
+                            <ul class="running-list" role="list">
+                                @for (launch of activeCouncilLaunches(); track launch.id) {
+                                    <li class="running-item">
+                                        <a [routerLink]="['/council-launches', launch.id]">{{ launch.prompt.length > 50 ? launch.prompt.slice(0, 50) + '...' : launch.prompt }}</a>
+                                        <span class="stage-badge" [attr.data-stage]="launch.stage" role="status">{{ launch.stage }}</span>
+                                    </li>
+                                }
+                            </ul>
+                        </section>
                     }
                 </div>
             </div>
@@ -369,8 +384,15 @@ interface ActivityEvent {
             align-items: start;
         }
 
+        /* Screen-reader only */
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+
         /* Activity Feed */
-        .activity-feed { display: flex; flex-direction: column; }
+        .activity-feed { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+        .activity-feed li { margin: 0; padding: 0; }
         .activity-item {
             display: flex; align-items: center; gap: 0.75rem;
             padding: 0.5rem 0; border-bottom: 1px solid var(--border);
@@ -411,19 +433,20 @@ interface ActivityEvent {
         .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* System Status */
-        .status-list { display: flex; flex-direction: column; gap: 0.25rem; }
+        .status-list { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; padding: 0; }
         .status-row {
             display: flex; justify-content: space-between; align-items: center;
             padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem;
         }
         .status-row:last-child { border-bottom: none; }
-        .status-row__label { color: var(--text-secondary); }
-        .status-row__indicator { font-weight: 600; font-size: 0.75rem; }
+        .status-row__label { color: var(--text-secondary); margin: 0; }
+        .status-row__indicator { font-weight: 600; font-size: 0.75rem; margin: 0; }
         .status-row__indicator[data-ok="true"] { color: var(--accent-green); }
         .status-row__indicator[data-ok="false"] { color: var(--accent-red); }
-        .status-row__value { font-weight: 600; color: var(--text-primary); }
+        .status-row__value { font-weight: 600; color: var(--text-primary); margin: 0; }
 
         /* Running items */
+        .running-list { list-style: none; margin: 0; padding: 0; }
         .running-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
         .running-item:last-child { border-bottom: none; }
         .running-item a { color: var(--accent-cyan); text-decoration: none; font-size: 0.8rem; }
