@@ -657,11 +657,7 @@ export class DiscordBridge {
                 }
                 this.threadLastActivity.set(threadId, Date.now());
 
-                // Restore thread name (remove ✓ prefix)
-                const topicSuffix = info.topic ? ` — ${info.topic}` : '';
-                this.updateThreadName(threadId, `${info.agentName}${topicSuffix}`).catch(() => {});
-
-                // Acknowledge the button press by updating the message to disable the button
+                // Acknowledge the button press
                 await this.acknowledgeButton(interaction, 'Session resumed — send a message to continue.');
                 break;
             }
@@ -697,9 +693,7 @@ export class DiscordBridge {
                     this.threadCallbacks.delete(threadId);
                 }
 
-                const topicSuffix2 = info.topic ? ` — ${info.topic}` : '';
-                this.updateThreadName(threadId, `■ ${info.agentName}${topicSuffix2}`).catch(() => {});
-
+                // Don't rename thread — keep original topic visible
                 await this.acknowledgeButton(interaction, 'Session stopped.');
                 break;
             }
@@ -1464,24 +1458,17 @@ export class DiscordBridge {
                 // Clean up tracking on completion
                 this.threadCallbacks.delete(threadId);
 
-                // Update thread title to show completion — preserve original topic
-                const info = this.threadSessions.get(threadId);
-                if (info) {
-                    const topicSuffix = info.topic ? ` — ${info.topic}` : '';
-                    this.updateThreadName(threadId, `✓ ${agentName}${topicSuffix}`).catch(() => {});
-
-                    // Send completion message with Resume button
-                    this.sendEmbedWithButtons(threadId, {
-                        description: 'Session complete. Send a message to continue, or use the button below.',
-                        color: 0x57f287,
-                        footer: { text: `${agentName} · done` },
-                    }, [
-                        this.buildActionRow(
-                            { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                            { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
-                        ),
-                    ]).catch(() => {});
-                }
+                // Send completion message with Resume button (don't rename thread — keep original topic visible)
+                this.sendEmbedWithButtons(threadId, {
+                    description: 'Session complete. Send a message to continue, or use the buttons below.',
+                    color: 0x57f287,
+                    footer: { text: `${agentName} · done` },
+                }, [
+                    this.buildActionRow(
+                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
+                        { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
+                    ),
+                ]).catch(() => {});
             }
 
             // Notify thread on session error
@@ -1603,28 +1590,6 @@ export class DiscordBridge {
         if (!response.ok) {
             const error = await response.text();
             log.warn('Failed to archive thread', { threadId, status: response.status, error: error.slice(0, 200) });
-        }
-    }
-
-    /**
-     * Update a thread's name via the Discord API.
-     */
-    private async updateThreadName(threadId: string, name: string): Promise<void> {
-        assertSnowflake(threadId, 'thread ID');
-        const response = await fetch(
-            `https://discord.com/api/v10/channels/${threadId}`,
-            {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bot ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: name.slice(0, 100) }),
-            },
-        );
-
-        if (!response.ok) {
-            log.debug('Failed to update thread name', { threadId, status: response.status });
         }
     }
 
