@@ -186,6 +186,8 @@ export interface CreateListingInput {
     tags?: string[];
     pricingModel?: PricingModel;
     priceCredits?: number;
+    trialUses?: number;
+    trialDays?: number;
 }
 
 export interface UpdateListingInput {
@@ -197,6 +199,8 @@ export interface UpdateListingInput {
     pricingModel?: PricingModel;
     priceCredits?: number;
     status?: ListingStatus;
+    trialUses?: number | null;
+    trialDays?: number | null;
 }
 
 export interface CreateReviewInput {
@@ -229,6 +233,30 @@ export interface ListingRecord {
     trial_days: number | null;
     created_at: string;
     updated_at: string;
+}
+
+// ─── Trials ──────────────────────────────────────────────────────────────────
+
+export type TrialStatus = 'active' | 'expired' | 'converted';
+
+export interface MarketplaceTrial {
+    id: string;
+    listingId: string;
+    tenantId: string;
+    usesRemaining: number | null;
+    expiresAt: string | null;
+    status: TrialStatus;
+    createdAt: string;
+}
+
+export interface TrialRecord {
+    id: string;
+    listing_id: string;
+    tenant_id: string;
+    uses_remaining: number | null;
+    expires_at: string | null;
+    status: string;
+    created_at: string;
 }
 
 export interface ReviewRecord {

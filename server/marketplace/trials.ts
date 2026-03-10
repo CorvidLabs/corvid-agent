@@ -1,108 +1,106 @@
 /**
- * TrialService — Manages free trial periods for marketplace listings.
+ * TrialService — Free trial periods for paid marketplace listings.
  *
- * A trial allows a buyer to use a paid listing for free, constrained by
- * a maximum number of uses and/or an expiry date.
+ * Supports two trial modes:
+ *   1. Usage-based (trial_uses): N free uses before per-use billing kicks in
+ *   2. Time-based (trial_days): N days of free access before subscription billing starts
+ *
+ * Trial lifecycle:
+ *   active → expired (uses exhausted or time elapsed)
+ *   active → converted (buyer purchases after trial)
  */
 import type { Database } from 'bun:sqlite';
-import type { MarketplaceListing } from './types';
+import type { MarketplaceTrial, TrialRecord, MarketplaceListing } from './types';
+import { createLogger } from '../lib/logger';
 
-export interface Trial {
-    id: string;
-    listingId: string;
-    tenantId: string;
-    usesRemaining: number | null;
-    expiresAt: string | null;
-    status: 'active' | 'expired' | 'converted';
-    createdAt: string;
-}
+const log = createLogger('MarketplaceTrials');
 
-interface TrialRecord {
-    id: string;
-    listing_id: string;
-    tenant_id: string;
-    uses_remaining: number | null;
-    expires_at: string | null;
-    status: string;
-    created_at: string;
-}
+// ─── Row Mapper ──────────────────────────────────────────────────────────────
 
-function recordToTrial(row: TrialRecord): Trial {
+function recordToTrial(row: TrialRecord): MarketplaceTrial {
     return {
         id: row.id,
         listingId: row.listing_id,
         tenantId: row.tenant_id,
         usesRemaining: row.uses_remaining,
         expiresAt: row.expires_at,
-        status: row.status as Trial['status'],
+        status: row.status as MarketplaceTrial['status'],
         createdAt: row.created_at,
     };
 }
 
+// ─── Service ─────────────────────────────────────────────────────────────────
+
 export class TrialService {
-    constructor(private db: Database) {}
+    private db: Database;
+
+    constructor(db: Database) {
+        this.db = db;
+    }
 
     /**
-     * Start a new trial for a listing + tenant pair.
-     * Returns null if the listing has no trial configuration.
+     * Start a free trial for a buyer on a listing.
+     * Returns null if the listing has no trial configured, or if a trial already exists.
      */
-    startTrial(listing: MarketplaceListing, tenantId: string): Trial | null {
-        if (!listing.trialUses && !listing.trialDays) return null;
+    startTrial(listing: MarketplaceListing, tenantId: string): MarketplaceTrial | null {
+        // Check listing has a trial configured
+        if (!listing.trialUses && !listing.trialDays) {
+            return null;
+        }
+
+        // Check for existing trial (any status)
+        const existing = this.getTrial(listing.id, tenantId);
+        if (existing) {
+            return null;
+        }
 
         const id = crypto.randomUUID();
-        const expiresAt = listing.trialDays
-            ? new Date(Date.now() + listing.trialDays * 86400000).toISOString()
-            : null;
+        const usesRemaining = listing.trialUses ?? null;
+
+        let expiresAt: string | null = null;
+        if (listing.trialDays) {
+            const expiry = new Date();
+            expiry.setUTCDate(expiry.getUTCDate() + listing.trialDays);
+            expiresAt = expiry.toISOString().replace('T', ' ').slice(0, 19);
+        }
 
         this.db.query(`
-            INSERT INTO marketplace_trials (id, listing_id, tenant_id, uses_remaining, expires_at)
-            VALUES (?, ?, ?, ?, ?)
-        `).run(id, listing.id, tenantId, listing.trialUses ?? null, expiresAt);
+            INSERT INTO marketplace_trials
+                (id, listing_id, tenant_id, uses_remaining, expires_at, status)
+            VALUES (?, ?, ?, ?, ?, 'active')
+        `).run(id, listing.id, tenantId, usesRemaining, expiresAt);
+
+        log.info('Trial started', {
+            id, listingId: listing.id, tenantId,
+            usesRemaining, expiresAt,
+        });
 
         return this.getTrialById(id)!;
     }
 
     /**
-     * Get a trial by listing + tenant (unique constraint).
+     * Get the active trial for a buyer-listing pair.
+     * Returns null if no trial exists or trial is not active.
      */
-    getTrial(listingId: string, tenantId: string): Trial | null {
-        const row = this.db.query(
-            'SELECT * FROM marketplace_trials WHERE listing_id = ? AND tenant_id = ?',
-        ).get(listingId, tenantId) as TrialRecord | null;
-        return row ? recordToTrial(row) : null;
-    }
+    getActiveTrial(listingId: string, tenantId: string): MarketplaceTrial | null {
+        const row = this.db.query(`
+            SELECT * FROM marketplace_trials
+            WHERE listing_id = ? AND tenant_id = ? AND status = 'active'
+        `).get(listingId, tenantId) as TrialRecord | null;
 
-    /**
-     * Get a trial by its ID.
-     */
-    getTrialById(id: string): Trial | null {
-        const row = this.db.query(
-            'SELECT * FROM marketplace_trials WHERE id = ?',
-        ).get(id) as TrialRecord | null;
-        return row ? recordToTrial(row) : null;
-    }
+        if (!row) return null;
 
-    /**
-     * Get the active trial for a listing + tenant, checking expiry and uses.
-     * Returns null if no active trial or trial has expired/exhausted.
-     */
-    getActiveTrial(listingId: string, tenantId: string): Trial | null {
-        const trial = this.getTrial(listingId, tenantId);
-        if (!trial || trial.status !== 'active') return null;
+        const trial = recordToTrial(row);
 
-        // Check expiry
-        if (trial.expiresAt && new Date(trial.expiresAt) < new Date()) {
-            this.db.query(
-                "UPDATE marketplace_trials SET status = 'expired' WHERE id = ?",
-            ).run(trial.id);
+        // Check if time-based trial has expired
+        if (trial.expiresAt && new Date(trial.expiresAt + 'Z') <= new Date()) {
+            this.expireTrial(trial.id);
             return null;
         }
 
-        // Check uses
+        // Check if usage-based trial has been exhausted
         if (trial.usesRemaining !== null && trial.usesRemaining <= 0) {
-            this.db.query(
-                "UPDATE marketplace_trials SET status = 'expired' WHERE id = ?",
-            ).run(trial.id);
+            this.expireTrial(trial.id);
             return null;
         }
 
@@ -110,26 +108,102 @@ export class TrialService {
     }
 
     /**
-     * Consume one trial use. Returns true if successful, false if exhausted.
+     * Get any trial (any status) for a buyer-listing pair.
+     */
+    getTrial(listingId: string, tenantId: string): MarketplaceTrial | null {
+        const row = this.db.query(`
+            SELECT * FROM marketplace_trials
+            WHERE listing_id = ? AND tenant_id = ?
+        `).get(listingId, tenantId) as TrialRecord | null;
+
+        return row ? recordToTrial(row) : null;
+    }
+
+    /**
+     * Get a trial by its ID.
+     */
+    getTrialById(id: string): MarketplaceTrial | null {
+        const row = this.db.query(
+            'SELECT * FROM marketplace_trials WHERE id = ?',
+        ).get(id) as TrialRecord | null;
+
+        return row ? recordToTrial(row) : null;
+    }
+
+    /**
+     * Consume one trial use. Returns true if use was consumed, false if trial exhausted.
      */
     consumeTrialUse(trialId: string): boolean {
         const trial = this.getTrialById(trialId);
         if (!trial || trial.status !== 'active') return false;
 
-        if (trial.usesRemaining !== null) {
-            if (trial.usesRemaining <= 0) return false;
-            this.db.query(
-                'UPDATE marketplace_trials SET uses_remaining = uses_remaining - 1 WHERE id = ?',
-            ).run(trialId);
-
-            // Expire if this was the last use
-            if (trial.usesRemaining - 1 <= 0) {
-                this.db.query(
-                    "UPDATE marketplace_trials SET status = 'expired' WHERE id = ?",
-                ).run(trialId);
+        if (trial.usesRemaining === null) {
+            // Time-based trial only — no uses to consume, just verify not expired
+            if (trial.expiresAt && new Date(trial.expiresAt + 'Z') <= new Date()) {
+                this.expireTrial(trialId);
+                return false;
             }
+            return true;
         }
 
+        if (trial.usesRemaining <= 0) {
+            this.expireTrial(trialId);
+            return false;
+        }
+
+        const newRemaining = trial.usesRemaining - 1;
+        this.db.query(`
+            UPDATE marketplace_trials SET uses_remaining = ? WHERE id = ?
+        `).run(newRemaining, trialId);
+
+        // Auto-expire if no uses left
+        if (newRemaining <= 0) {
+            this.expireTrial(trialId);
+        }
+
+        log.info('Trial use consumed', { trialId, usesRemaining: newRemaining });
         return true;
+    }
+
+    /**
+     * Mark a trial as converted (buyer purchased after trial).
+     */
+    convertTrial(trialId: string): MarketplaceTrial | null {
+        const trial = this.getTrialById(trialId);
+        if (!trial) return null;
+
+        this.db.query(`
+            UPDATE marketplace_trials SET status = 'converted' WHERE id = ?
+        `).run(trialId);
+
+        log.info('Trial converted', { trialId, listingId: trial.listingId, tenantId: trial.tenantId });
+        return this.getTrialById(trialId);
+    }
+
+    /**
+     * Expire time-based trials past their expires_at. Called by scheduler.
+     */
+    expireTrials(): number {
+        const result = this.db.query(`
+            UPDATE marketplace_trials
+            SET status = 'expired'
+            WHERE status = 'active'
+              AND expires_at IS NOT NULL
+              AND expires_at <= datetime('now')
+        `).run();
+
+        if (result.changes > 0) {
+            log.info('Expired time-based trials', { count: result.changes });
+        }
+
+        return result.changes;
+    }
+
+    // ─── Private ─────────────────────────────────────────────────────────
+
+    private expireTrial(trialId: string): void {
+        this.db.query(`
+            UPDATE marketplace_trials SET status = 'expired' WHERE id = ? AND status = 'active'
+        `).run(trialId);
     }
 }
