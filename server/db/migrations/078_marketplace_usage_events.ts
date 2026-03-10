@@ -1,5 +1,5 @@
 /**
- * Migration 077: Add marketplace_usage_events table for usage metering.
+ * Migration 078: Add marketplace_usage_events table for usage metering.
  *
  * Records every listing invocation with buyer, tier, and credits charged.
  * Enables per-listing analytics: usage over time, revenue, unique users.
