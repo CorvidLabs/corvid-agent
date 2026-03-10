@@ -89,6 +89,9 @@ export class DiscordBridge {
     /** Users muted from bot interactions (admin-managed). */
     private mutedUsers: Set<string> = new Set();
 
+    /** Users who have interacted at least once — used for first-interaction welcome tips. */
+    private interactedUsers: Set<string> = new Set();
+
     /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
     private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private static readonly SLASH_COMMAND_DEBOUNCE_MS = 2_000;
@@ -281,6 +284,11 @@ export class DiscordBridge {
                     type: 3, // STRING
                     required: true,
                 }],
+            },
+            {
+                name: 'quickstart',
+                description: 'Guided walkthrough for new users',
+                type: 1,
             },
             {
                 name: 'help',
@@ -559,20 +567,79 @@ export class DiscordBridge {
                 break;
             }
 
-            case 'help': {
-                const helpText = [
-                    '**Commands:**',
-                    '`/session` — Start a new conversation thread (select agent + topic)',
-                    '`/agents` — List all available agents',
-                    '`/status` — Show bot status and active sessions',
-                    '`/council <topic>` — Launch a council deliberation',
-                    '`/mute <user>` — Mute a user from bot interactions (admin)',
-                    '`/unmute <user>` — Unmute a user (admin)',
-                    '`/help` — Show this help message',
+            case 'quickstart': {
+                const agents = listAgents(this.db);
+                const agentCount = agents.length;
+                const firstAgent = agents[0]?.name ?? 'your agent';
+
+                const steps = [
+                    '**1. Start a session**',
+                    `Use \`/session\` to pick an agent and topic. ${agentCount > 0 ? `Try \`/session ${firstAgent} Hello!\`` : 'Set up an agent first in the dashboard.'}`,
                     '',
-                    'You can also @mention the bot for a quick one-off reply.',
+                    '**2. Chat in the thread**',
+                    'A new thread is created for your conversation. Send messages and the agent will respond.',
+                    '',
+                    '**3. Quick one-off replies**',
+                    `@mention the bot in the channel for a fast reply without creating a thread.`,
+                    '',
+                    '**4. Explore commands**',
+                    'Use `/help` to see all available commands and what they do.',
                 ].join('\n');
-                await this.respondToInteraction(interaction, helpText);
+
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Welcome to CorvidAgent!',
+                    description: steps,
+                    color: 0x5865f2, // Discord blurple
+                    fields: [
+                        {
+                            name: 'Available Agents',
+                            value: agentCount > 0
+                                ? agents.slice(0, 5).map(a => `\`${a.name}\` — ${a.model || 'unknown'}`).join('\n')
+                                    + (agentCount > 5 ? `\n_...and ${agentCount - 5} more (use \`/agents\`)_` : '')
+                                : '_No agents configured yet — check the dashboard._',
+                            inline: false,
+                        },
+                    ],
+                    footer: { text: 'Use /help to see all commands' },
+                });
+                break;
+            }
+
+            case 'help': {
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'CorvidAgent Commands',
+                    color: 0x5865f2, // Discord blurple
+                    fields: [
+                        {
+                            name: 'Conversations',
+                            value: [
+                                '`/session <agent> <topic>` — Start a threaded conversation',
+                                '`/quickstart` — Guided walkthrough for new users',
+                                '`@mention` — Quick one-off reply in channel',
+                            ].join('\n'),
+                            inline: false,
+                        },
+                        {
+                            name: 'Information',
+                            value: [
+                                '`/agents` — List all available agents and models',
+                                '`/status` — Show active sessions and bot status',
+                                '`/help` — Show this help message',
+                            ].join('\n'),
+                            inline: false,
+                        },
+                        {
+                            name: 'Advanced',
+                            value: [
+                                '`/council <topic>` — Launch a multi-agent council deliberation',
+                                '`/mute <user>` — Mute a user (admin)',
+                                '`/unmute <user>` — Unmute a user (admin)',
+                            ].join('\n'),
+                            inline: false,
+                        },
+                    ],
+                    footer: { text: 'New here? Try /quickstart for a guided walkthrough' },
+                });
                 break;
             }
 
@@ -718,6 +785,46 @@ export class DiscordBridge {
         if (!response.ok) {
             const error = await response.text();
             log.error('Failed to acknowledge button', { status: response.status, error: error.slice(0, 200) });
+        }
+    }
+
+    /**
+     * Respond to an interaction with a rich embed (optionally ephemeral).
+     */
+    private async respondToInteractionEmbed(
+        interaction: DiscordInteractionData,
+        embed: {
+            title?: string;
+            description?: string;
+            color?: number;
+            fields?: Array<{ name: string; value: string; inline?: boolean }>;
+            footer?: { text: string };
+        },
+        ephemeral = false,
+    ): Promise<void> {
+        assertSnowflake(interaction.id, 'interaction ID');
+        assertInteractionToken(interaction.token);
+        const response = await fetch(
+            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: InteractionCallbackType.CHANNEL_MESSAGE,
+                    data: {
+                        embeds: [embed],
+                        ...(ephemeral ? { flags: 64 } : {}),
+                    },
+                }),
+            },
+        );
+
+        if (!response.ok) {
+            const error = await response.text();
+            log.error('Failed to respond to Discord interaction with embed', {
+                status: response.status,
+                error: error.slice(0, 200),
+            });
         }
     }
 
@@ -871,6 +978,25 @@ export class DiscordBridge {
         log.info('User unmuted from Discord bot', { userId });
     }
 
+    /**
+     * Send a one-time welcome tip to a user on their first interaction.
+     * Fire-and-forget — does not block the message flow.
+     */
+    private sendFirstInteractionTip(userId: string, channelId: string): void {
+        if (this.interactedUsers.has(userId)) return;
+        this.interactedUsers.add(userId);
+        this.sendEmbed(channelId, {
+            description: [
+                `Hey <@${userId}>! Looks like your first time here.`,
+                '',
+                'Use `/quickstart` for a guided walkthrough, or `/help` to see all commands.',
+                'You can also @mention me for a quick reply!',
+            ].join('\n'),
+            color: 0x57f287, // green
+            footer: { text: 'This tip only appears once' },
+        }).catch(() => {});
+    }
+
     private async handleMessage(data: DiscordMessageData): Promise<void> {
         // Ignore bot messages
         if (data.author.bot) return;
@@ -933,6 +1059,7 @@ export class DiscordBridge {
 
         // If this message is in a thread we're tracking, route to that thread's session
         if (isOurThread) {
+            this.sendFirstInteractionTip(userId, channelId);
             // Acknowledge receipt with reaction and show typing
             this.addReaction(channelId, data.id, '%F0%9F%91%80').catch(() => {}); // 👀
             this.sendTypingIndicator(channelId).catch(() => {});
@@ -946,6 +1073,9 @@ export class DiscordBridge {
             : false;
 
         if (!isBotMentioned) return; // silently ignore regular channel messages
+
+        // First-interaction welcome tip for @mention users
+        this.sendFirstInteractionTip(userId, channelId);
 
         // Acknowledge with reaction and typing indicator
         this.addReaction(channelId, data.id, '%F0%9F%91%80').catch(() => {}); // 👀
