@@ -1,6 +1,6 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
-@Pipe({ name: 'relativeTime' })
+@Pipe({ name: 'relativeTime', standalone: true })
 export class RelativeTimePipe implements PipeTransform {
     transform(value: string | null | undefined): string {
         if (!value) return '';

@@ -181,7 +181,7 @@ export class ToastContainerComponent {
 
     readonly notifications = this.notificationService.notifications;
 
-    icon(type: NotificationType): string {
+    protected icon(type: NotificationType): string {
         switch (type) {
             case 'success': return '✓';
             case 'error': return '✕';
@@ -190,7 +190,7 @@ export class ToastContainerComponent {
         }
     }
 
-    dismiss(id: string): void {
+    protected dismiss(id: string): void {
         this.notificationService.dismiss(id);
     }
 }

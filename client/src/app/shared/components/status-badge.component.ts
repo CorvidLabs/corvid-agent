@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 
 @Component({
     selector: 'app-status-badge',
@@ -6,9 +6,19 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
     template: `
         <span
             class="status-badge"
-            [class]="'status-badge--' + status()"
+            [class.status-badge--idle]="status() === 'idle'"
+            [class.status-badge--loading]="status() === 'loading'"
+            [class.status-badge--running]="status() === 'running'"
+            [class.status-badge--thinking]="status() === 'thinking'"
+            [class.status-badge--tool_use]="status() === 'tool_use'"
+            [class.status-badge--paused]="status() === 'paused'"
+            [class.status-badge--stopped]="status() === 'stopped'"
+            [class.status-badge--error]="status() === 'error'"
+            [class.status-badge--queued]="status() === 'queued'"
+            [class.status-badge--connected]="status() === 'connected'"
+            [class.status-badge--disconnected]="status() === 'disconnected'"
             [attr.aria-label]="'Status: ' + status()">
-            {{ status() }}
+            {{ statusLabel() }}
         </span>
     `,
     styles: `
@@ -38,4 +48,7 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 })
 export class StatusBadgeComponent {
     readonly status = input.required<string>();
+
+    /** Human-readable label with underscores replaced by spaces */
+    protected readonly statusLabel = computed(() => this.status().replace(/_/g, ' '));
 }
