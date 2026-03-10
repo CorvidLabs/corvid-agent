@@ -16,7 +16,7 @@ import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
 import type { Session } from '../../core/models/session.model';
 import type { WorkTask } from '../../core/models/work-task.model';
-import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { AgentPersona } from '../../core/models/persona.model';
 import type { AgentSkillAssignment } from '../../core/models/skill-bundle.model';
 

@@ -10,7 +10,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge.compo
 import { GovernanceVotePanelComponent } from './governance-vote-panel.component';
 import type { CouncilLaunch, CouncilLaunchLog, CouncilDiscussionMessage } from '../../core/models/council.model';
 import type { Session } from '../../core/models/session.model';
-import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.model';
+import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
 
 @Component({
     selector: 'app-council-launch-view',

@@ -10,7 +10,7 @@ import { SessionInputComponent } from './session-input.component';
 import { ApprovalDialogComponent, type ApprovalDecision } from './approval-dialog.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Session, SessionMessage } from '../../core/models/session.model';
-import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '../../core/models/ws-message.model';
+import type { StreamEvent, ApprovalRequestWire, OwnerQuestionWire } from '@shared/ws-protocol';
 import { NotificationService } from '../../core/services/notification.service';
 
 @Component({

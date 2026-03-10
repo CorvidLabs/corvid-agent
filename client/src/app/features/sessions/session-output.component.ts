@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, ElementRef, viewChild, AfterViewChecked, computed, booleanAttribute, signal, OnDestroy, NgZone, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import type { StreamEvent } from '../../core/models/ws-message.model';
+import type { StreamEvent } from '@shared/ws-protocol';
 import type { SessionMessage } from '../../core/models/session.model';
 
 interface ParsedEvent {
