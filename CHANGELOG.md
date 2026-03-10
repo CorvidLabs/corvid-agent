@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.2] - 2026-03-10
+
+### Fixed
+- Persist Discord interacted users to DB across restarts (#914)
+
 ## [0.23.1] - 2026-03-10
 
 ### Fixed
