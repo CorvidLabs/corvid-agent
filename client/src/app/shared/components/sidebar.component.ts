@@ -110,7 +110,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         [attr.aria-expanded]="!isSectionCollapsed('sessions')"
                         aria-controls="sidebar-section-sessions"
                         type="button">
-                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('sessions')">&#x25B8;</span>
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('sessions')" aria-hidden="true">&#x25B8;</span>
                         <span class="sidebar__section-label">Sessions</span>
                     </button>
                 </li>
@@ -150,7 +150,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         [attr.aria-expanded]="!isSectionCollapsed('automation')"
                         aria-controls="sidebar-section-automation"
                         type="button">
-                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('automation')">&#x25B8;</span>
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('automation')" aria-hidden="true">&#x25B8;</span>
                         <span class="sidebar__section-label">Automation</span>
                     </button>
                 </li>
@@ -196,7 +196,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         [attr.aria-expanded]="!isSectionCollapsed('integrations')"
                         aria-controls="sidebar-section-integrations"
                         type="button">
-                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('integrations')">&#x25B8;</span>
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('integrations')" aria-hidden="true">&#x25B8;</span>
                         <span class="sidebar__section-label">Integrations</span>
                     </button>
                 </li>
@@ -224,7 +224,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         [attr.aria-expanded]="!isSectionCollapsed('monitoring')"
                         aria-controls="sidebar-section-monitoring"
                         type="button">
-                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('monitoring')">&#x25B8;</span>
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('monitoring')" aria-hidden="true">&#x25B8;</span>
                         <span class="sidebar__section-label">Monitoring</span>
                     </button>
                 </li>
@@ -264,7 +264,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         [attr.aria-expanded]="!isSectionCollapsed('community')"
                         aria-controls="sidebar-section-community"
                         type="button">
-                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('community')">&#x25B8;</span>
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('community')" aria-hidden="true">&#x25B8;</span>
                         <span class="sidebar__section-label">Community</span>
                     </button>
                 </li>
@@ -298,7 +298,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         [attr.aria-expanded]="!isSectionCollapsed('config')"
                         aria-controls="sidebar-section-config"
                         type="button">
-                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('config')">&#x25B8;</span>
+                        <span class="sidebar__chevron" [class.sidebar__chevron--open]="!isSectionCollapsed('config')" aria-hidden="true">&#x25B8;</span>
                         <span class="sidebar__section-label">Config</span>
                     </button>
                 </li>
@@ -541,6 +541,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         .sidebar__collapse-btn:hover {
             color: var(--accent-cyan);
             background: var(--bg-hover);
+        }
+        .sidebar__collapse-btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: -2px;
         }
 
         /* Collapsed state (desktop) */

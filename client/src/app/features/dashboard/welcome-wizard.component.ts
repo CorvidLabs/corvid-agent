@@ -21,9 +21,9 @@ interface HealthStatus {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [ReactiveFormsModule],
     template: `
-        <div class="wizard">
+        <div class="wizard" role="region" aria-label="Setup wizard">
             <div class="wizard__header">
-                <pre class="wizard__logo">
+                <pre class="wizard__logo" aria-hidden="true">
  ██████╗ ██████╗ ██████╗ ██╗   ██╗██╗██████╗
 ██╔════╝██╔═══██╗██╔══██╗██║   ██║██║██╔══██╗
 ██║     ██║   ██║██████╔╝██║   ██║██║██║  ██║
@@ -40,24 +40,24 @@ interface HealthStatus {
                         <h2 class="step__title">System Status</h2>
                         <p class="step__desc">Checking your environment...</p>
 
-                        <div class="status-grid">
-                            <div class="status-check" [attr.data-ok]="health()?.apiKey">
-                                <span class="status-check__icon">{{ health()?.apiKey ? '>' : '!' }}</span>
+                        <div class="status-grid" role="list" aria-label="System status checks">
+                            <div class="status-check" [attr.data-ok]="health()?.apiKey" role="listitem" [attr.aria-label]="'API Key: ' + (health()?.apiKey ? 'Configured' : 'Missing')">
+                                <span class="status-check__icon" aria-hidden="true">{{ health()?.apiKey ? '>' : '!' }}</span>
                                 <span class="status-check__label">API Key</span>
                                 <span class="status-check__value">{{ health()?.apiKey ? 'Configured' : 'Missing' }}</span>
                             </div>
-                            <div class="status-check" [attr.data-ok]="health()?.llm">
-                                <span class="status-check__icon">{{ health()?.llm ? '>' : '!' }}</span>
+                            <div class="status-check" [attr.data-ok]="health()?.llm" role="listitem" [attr.aria-label]="'LLM Provider: ' + (health()?.llm ? 'Available' : 'Unavailable')">
+                                <span class="status-check__icon" aria-hidden="true">{{ health()?.llm ? '>' : '!' }}</span>
                                 <span class="status-check__label">LLM Provider</span>
                                 <span class="status-check__value">{{ health()?.llm ? 'Available' : 'Unavailable' }}</span>
                             </div>
-                            <div class="status-check" [attr.data-ok]="health()?.github">
-                                <span class="status-check__icon">{{ health()?.github ? '>' : '~' }}</span>
+                            <div class="status-check" [attr.data-ok]="health()?.github" role="listitem" [attr.aria-label]="'GitHub: ' + (health()?.github ? 'Connected' : 'Optional')">
+                                <span class="status-check__icon" aria-hidden="true">{{ health()?.github ? '>' : '~' }}</span>
                                 <span class="status-check__label">GitHub</span>
                                 <span class="status-check__value">{{ health()?.github ? 'Connected' : 'Optional' }}</span>
                             </div>
-                            <div class="status-check" [attr.data-ok]="health()?.algorand">
-                                <span class="status-check__icon">{{ health()?.algorand ? '>' : '~' }}</span>
+                            <div class="status-check" [attr.data-ok]="health()?.algorand" role="listitem" [attr.aria-label]="'AlgoChat: ' + (health()?.algorand ? 'Connected' : 'Optional')">
+                                <span class="status-check__icon" aria-hidden="true">{{ health()?.algorand ? '>' : '~' }}</span>
                                 <span class="status-check__label">AlgoChat</span>
                                 <span class="status-check__value">{{ health()?.algorand ? 'Connected' : 'Optional' }}</span>
                             </div>
@@ -68,7 +68,7 @@ interface HealthStatus {
                                 Create Your First Agent
                             </button>
                         } @else {
-                            <div class="wizard__warning">
+                            <div class="wizard__warning" role="alert">
                                 <p>Set <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> file or install Claude Code CLI to get started.</p>
                             </div>
                             <button class="wizard__btn" (click)="step.set('create')">
@@ -83,11 +83,13 @@ interface HealthStatus {
                         <h2 class="step__title">Create Your First Agent</h2>
                         <p class="step__desc">Give your agent a name and choose a model.</p>
 
-                        <form [formGroup]="form" (ngSubmit)="onCreateAgent()" class="wizard__form">
+                        <form [formGroup]="form" (ngSubmit)="onCreateAgent()" class="wizard__form" aria-label="Create agent form">
                             <div class="field">
-                                <label for="wiz-name" class="field__label">Agent Name</label>
+                                <label for="wiz-name" class="field__label">Agent Name <span class="sr-only">(required)</span></label>
                                 <input id="wiz-name" formControlName="name" class="field__input"
-                                       placeholder="e.g. Corvid, Scout, Builder" autocomplete="off" />
+                                       placeholder="e.g. Corvid, Scout, Builder" autocomplete="off"
+                                       aria-required="true"
+                                       [attr.aria-invalid]="form.controls.name.touched && form.controls.name.invalid" />
                             </div>
 
                             <div class="field">
@@ -132,7 +134,7 @@ interface HealthStatus {
 
                 @case ('done') {
                     <div class="wizard__step wizard__step--done">
-                        <div class="done__icon">&check;</div>
+                        <div class="done__icon" aria-hidden="true">&check;</div>
                         <h2 class="step__title">Agent Created</h2>
                         <p class="step__desc">{{ createdAgentName() }} is ready to go.</p>
 
@@ -149,7 +151,7 @@ interface HealthStatus {
             }
 
             <p class="wizard__footer">
-                <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">Docs</a>
+                <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener" aria-label="Documentation (opens in new tab)">Docs</a>
                 &middot; Built on Algorand
             </p>
         </div>
@@ -373,6 +375,10 @@ interface HealthStatus {
             text-decoration: none;
         }
         .wizard__footer a:hover { text-decoration: underline; }
+        .wizard__footer a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .wizard__btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .field__input:focus-visible { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
         @media (max-width: 768px) {
             .wizard { padding: 1rem; }

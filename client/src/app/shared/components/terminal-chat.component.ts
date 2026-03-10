@@ -64,8 +64,8 @@ interface AutocompleteItem {
                     </div>
                 }
                 @if (thinking()) {
-                    <div class="terminal__thinking" aria-label="Agent is thinking">
-                        <span class="terminal__thinking-dot"></span>
+                    <div class="terminal__thinking" role="status" aria-live="polite" aria-label="Agent is thinking">
+                        <span class="terminal__thinking-dot" aria-hidden="true"></span>
                         <span>thinking...</span>
                     </div>
                 }
@@ -77,12 +77,13 @@ interface AutocompleteItem {
                 <span class="terminal__input-prompt">> </span>
                 <div class="terminal__input-wrapper">
                     @if (showAutocomplete() && autocompleteItems().length > 0) {
-                        <div class="autocomplete" role="listbox" aria-label="Autocomplete suggestions">
+                        <div class="autocomplete" role="listbox" id="terminal-autocomplete" aria-label="Autocomplete suggestions">
                             @for (item of autocompleteItems(); track item.label; let i = $index) {
                                 <div
                                     class="autocomplete__item"
                                     [class.autocomplete__item--active]="i === autocompleteIndex()"
                                     [attr.data-kind]="item.kind"
+                                    [id]="'autocomplete-item-' + i"
                                     role="option"
                                     [attr.aria-selected]="i === autocompleteIndex()"
                                     (mousedown)="selectAutocomplete(item, $event)"
@@ -104,6 +105,11 @@ interface AutocompleteItem {
                         (blur)="onBlur()"
                         [rows]="inputRows()"
                         aria-label="Chat message input"
+                        [attr.aria-autocomplete]="showAutocomplete() ? 'list' : null"
+                        [attr.aria-controls]="showAutocomplete() ? 'terminal-autocomplete' : null"
+                        [attr.aria-activedescendant]="showAutocomplete() ? 'autocomplete-item-' + autocompleteIndex() : null"
+                        [attr.aria-expanded]="showAutocomplete() && autocompleteItems().length > 0"
+                        role="combobox"
                         #inputEl
                     ></textarea>
                 </div>
@@ -204,6 +210,7 @@ interface AutocompleteItem {
             .terminal__copy { opacity: 0.4; }
             .terminal__copy:active { opacity: 1; }
         }
+        .terminal__copy:focus-visible { opacity: 1; outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
         .terminal__cursor {
             display: inline-block;
             width: 7px;
@@ -322,6 +329,10 @@ interface AutocompleteItem {
         .terminal__help-btn:hover {
             color: var(--accent-cyan);
             border-color: var(--accent-cyan);
+        }
+        .terminal__help-btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: 2px;
         }
 
         /* Autocomplete overlay */
