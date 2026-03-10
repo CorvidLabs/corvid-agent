@@ -6,6 +6,7 @@ import type {
     DiscordBridgeConfig,
     DiscordMessageData,
     DiscordInteractionData,
+    DiscordInteractionOption,
 } from './types';
 import { InteractionType, InteractionCallbackType, PermissionLevel, ComponentType, ButtonStyle } from './types';
 import type { DiscordActionRow } from './types';
@@ -364,6 +365,160 @@ export class DiscordBridge {
                     type: 6, // USER
                     required: true,
                 }],
+            },
+            {
+                name: 'admin',
+                description: 'Manage bot configuration (admin only)',
+                type: 1, // CHAT_INPUT
+                options: [
+                    {
+                        name: 'channels',
+                        description: 'Manage monitored channels',
+                        type: 2, // SUB_COMMAND_GROUP
+                        options: [
+                            {
+                                name: 'add',
+                                description: 'Add a channel to the monitored list',
+                                type: 1, // SUB_COMMAND
+                                options: [{
+                                    name: 'channel',
+                                    description: 'The channel to add',
+                                    type: 7, // CHANNEL
+                                    required: true,
+                                }],
+                            },
+                            {
+                                name: 'remove',
+                                description: 'Remove a channel from the monitored list',
+                                type: 1,
+                                options: [{
+                                    name: 'channel',
+                                    description: 'The channel to remove',
+                                    type: 7, // CHANNEL
+                                    required: true,
+                                }],
+                            },
+                            {
+                                name: 'list',
+                                description: 'Show all monitored channels',
+                                type: 1,
+                            },
+                        ],
+                    },
+                    {
+                        name: 'users',
+                        description: 'Manage allowed users',
+                        type: 2, // SUB_COMMAND_GROUP
+                        options: [
+                            {
+                                name: 'add',
+                                description: 'Add a user to the allow list',
+                                type: 1,
+                                options: [{
+                                    name: 'user',
+                                    description: 'The user to allow',
+                                    type: 6, // USER
+                                    required: true,
+                                }],
+                            },
+                            {
+                                name: 'remove',
+                                description: 'Remove a user from the allow list',
+                                type: 1,
+                                options: [{
+                                    name: 'user',
+                                    description: 'The user to remove',
+                                    type: 6, // USER
+                                    required: true,
+                                }],
+                            },
+                            {
+                                name: 'list',
+                                description: 'Show all allowed users',
+                                type: 1,
+                            },
+                        ],
+                    },
+                    {
+                        name: 'roles',
+                        description: 'Manage role permissions',
+                        type: 2, // SUB_COMMAND_GROUP
+                        options: [
+                            {
+                                name: 'set',
+                                description: 'Set permission level for a role',
+                                type: 1,
+                                options: [
+                                    {
+                                        name: 'role',
+                                        description: 'The role to configure',
+                                        type: 8, // ROLE
+                                        required: true,
+                                    },
+                                    {
+                                        name: 'level',
+                                        description: 'Permission level (0=blocked, 1=basic, 2=standard, 3=admin)',
+                                        type: 4, // INTEGER
+                                        required: true,
+                                        choices: [
+                                            { name: 'Blocked (0)', value: 0 },
+                                            { name: 'Basic (1) — chat, @mention', value: 1 },
+                                            { name: 'Standard (2) — slash commands', value: 2 },
+                                            { name: 'Admin (3) — full access', value: 3 },
+                                        ],
+                                    },
+                                ],
+                            },
+                            {
+                                name: 'remove',
+                                description: 'Remove permission override for a role',
+                                type: 1,
+                                options: [{
+                                    name: 'role',
+                                    description: 'The role to remove',
+                                    type: 8, // ROLE
+                                    required: true,
+                                }],
+                            },
+                            {
+                                name: 'list',
+                                description: 'Show all role permission mappings',
+                                type: 1,
+                            },
+                        ],
+                    },
+                    {
+                        name: 'mode',
+                        description: 'Set the bridge mode',
+                        type: 1, // SUB_COMMAND
+                        options: [{
+                            name: 'value',
+                            description: 'Bridge mode',
+                            type: 3, // STRING
+                            required: true,
+                            choices: [
+                                { name: 'Chat — interactive conversations', value: 'chat' },
+                                { name: 'Work Intake — fire-and-forget tasks', value: 'work_intake' },
+                            ],
+                        }],
+                    },
+                    {
+                        name: 'public',
+                        description: 'Toggle public mode (role-based access for all users)',
+                        type: 1,
+                        options: [{
+                            name: 'enabled',
+                            description: 'Enable or disable public mode',
+                            type: 5, // BOOLEAN
+                            required: true,
+                        }],
+                    },
+                    {
+                        name: 'show',
+                        description: 'Show current bot configuration',
+                        type: 1,
+                    },
+                ],
             },
         ];
 
@@ -806,15 +961,406 @@ export class DiscordBridge {
                             ].join('\n'),
                             inline: false,
                         },
+                        {
+                            name: 'Admin Configuration',
+                            value: [
+                                '`/admin channels add/remove/list` — Manage monitored channels',
+                                '`/admin users add/remove/list` — Manage allowed users',
+                                '`/admin roles set/remove/list` — Manage role permissions',
+                                '`/admin mode <chat|work_intake>` — Set bridge mode',
+                                '`/admin public <on|off>` — Toggle public mode',
+                                '`/admin show` — Show current configuration',
+                            ].join('\n'),
+                            inline: false,
+                        },
                     ],
                     footer: { text: 'New here? Try /quickstart for a guided walkthrough' },
                 });
                 break;
             }
 
+            case 'admin': {
+                if (permLevel < PermissionLevel.ADMIN) {
+                    await this.respondToInteraction(interaction, 'Only admins can use `/admin` commands.');
+                    break;
+                }
+                await this.handleAdminCommand(interaction, options);
+                break;
+            }
+
             default:
                 await this.respondToInteraction(interaction, `Unknown command: ${commandName}`);
         }
+    }
+
+    // ── Admin Command Handling ───────────────────────────────────────────
+
+    /**
+     * Handle `/admin` subcommands for managing channels, users, roles, mode, and config display.
+     * All changes persist to `discord_config` DB table and hot-reload within 30s.
+     */
+    private async handleAdminCommand(
+        interaction: DiscordInteractionData,
+        options: DiscordInteractionOption[],
+    ): Promise<void> {
+        // For subcommand groups: options[0] = group, options[0].options[0] = subcommand
+        // For direct subcommands: options[0] = subcommand
+        const group = options[0];
+        if (!group) {
+            await this.respondToInteraction(interaction, 'Missing subcommand.');
+            return;
+        }
+
+        const groupName = group.name;
+
+        // Direct subcommands (mode, public, show)
+        if (groupName === 'show') {
+            await this.handleAdminShow(interaction);
+            return;
+        }
+
+        if (groupName === 'mode') {
+            const sub = group.options?.[0];
+            const mode = sub?.value as string ?? group.value as string;
+            if (mode !== 'chat' && mode !== 'work_intake') {
+                await this.respondToInteraction(interaction, 'Invalid mode. Use `chat` or `work_intake`.');
+                return;
+            }
+            updateDiscordConfig(this.db, 'mode', mode);
+            this.config.mode = mode;
+            recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'mode', JSON.stringify({ value: mode }));
+            await this.respondToInteractionEmbed(interaction, {
+                title: 'Bridge Mode Updated',
+                description: `Mode set to **${mode === 'chat' ? 'Chat' : 'Work Intake'}**`,
+                color: 0x57f287,
+                footer: { text: mode === 'chat' ? 'Messages route to agent sessions' : 'Messages create async work tasks' },
+            });
+            return;
+        }
+
+        if (groupName === 'public') {
+            const sub = group.options?.[0];
+            const enabled = (sub?.value ?? group.value) as boolean;
+            updateDiscordConfig(this.db, 'public_mode', String(enabled));
+            this.config.publicMode = enabled;
+            recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'public_mode', JSON.stringify({ value: enabled }));
+            await this.respondToInteractionEmbed(interaction, {
+                title: 'Public Mode Updated',
+                description: enabled
+                    ? 'Public mode **enabled** — all users can interact (subject to role permissions)'
+                    : 'Public mode **disabled** — only allowed users can interact',
+                color: enabled ? 0x57f287 : 0xed4245,
+            });
+            return;
+        }
+
+        // Subcommand groups (channels, users, roles)
+        const subcommand = group.options?.[0];
+        if (!subcommand) {
+            await this.respondToInteraction(interaction, 'Missing subcommand.');
+            return;
+        }
+        const subName = subcommand.name;
+        const subOptions = subcommand.options ?? [];
+        const getSubOption = (name: string) => subOptions.find(o => o.name === name)?.value;
+
+        switch (groupName) {
+            case 'channels':
+                await this.handleAdminChannels(interaction, subName, getSubOption);
+                break;
+            case 'users':
+                await this.handleAdminUsers(interaction, subName, getSubOption);
+                break;
+            case 'roles':
+                await this.handleAdminRoles(interaction, subName, getSubOption);
+                break;
+            default:
+                await this.respondToInteraction(interaction, `Unknown admin subcommand: ${groupName}`);
+        }
+    }
+
+    private async handleAdminChannels(
+        interaction: DiscordInteractionData,
+        subName: string,
+        getSubOption: (name: string) => string | number | boolean | undefined,
+    ): Promise<void> {
+        const current = this.config.additionalChannelIds ?? [];
+
+        switch (subName) {
+            case 'add': {
+                const channelId = String(getSubOption('channel'));
+                if (!channelId || !DISCORD_SNOWFLAKE_RE.test(channelId)) {
+                    await this.respondToInteraction(interaction, 'Invalid channel.');
+                    return;
+                }
+                if (channelId === this.config.channelId) {
+                    await this.respondToInteraction(interaction, 'That is already the primary channel.');
+                    return;
+                }
+                if (current.includes(channelId)) {
+                    await this.respondToInteraction(interaction, `<#${channelId}> is already monitored.`);
+                    return;
+                }
+                const updated = [...current, channelId];
+                updateDiscordConfig(this.db, 'additional_channel_ids', updated.join(','));
+                this.config.additionalChannelIds = updated;
+                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'additional_channel_ids', JSON.stringify({ action: 'add', channelId }));
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Channel Added',
+                    description: `<#${channelId}> is now being monitored.\n\nTotal monitored: **${updated.length + 1}** (including primary)`,
+                    color: 0x57f287,
+                });
+                break;
+            }
+            case 'remove': {
+                const channelId = String(getSubOption('channel'));
+                if (!channelId || !DISCORD_SNOWFLAKE_RE.test(channelId)) {
+                    await this.respondToInteraction(interaction, 'Invalid channel.');
+                    return;
+                }
+                if (channelId === this.config.channelId) {
+                    await this.respondToInteraction(interaction, 'Cannot remove the primary channel. Change `DISCORD_CHANNEL_ID` in your environment to change it.');
+                    return;
+                }
+                if (!current.includes(channelId)) {
+                    await this.respondToInteraction(interaction, `<#${channelId}> is not in the monitored list.`);
+                    return;
+                }
+                const updated = current.filter(id => id !== channelId);
+                updateDiscordConfig(this.db, 'additional_channel_ids', updated.join(','));
+                this.config.additionalChannelIds = updated;
+                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'additional_channel_ids', JSON.stringify({ action: 'remove', channelId }));
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Channel Removed',
+                    description: `<#${channelId}> removed from monitoring.\n\nTotal monitored: **${updated.length + 1}** (including primary)`,
+                    color: 0xed4245,
+                });
+                break;
+            }
+            case 'list': {
+                const allChannels = [
+                    `<#${this.config.channelId}> *(primary)*`,
+                    ...current.map(id => `<#${id}>`),
+                ];
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Monitored Channels',
+                    description: allChannels.join('\n') || 'No channels configured.',
+                    color: 0x5865f2,
+                    footer: { text: `${allChannels.length} channel${allChannels.length === 1 ? '' : 's'} total` },
+                });
+                break;
+            }
+        }
+    }
+
+    private async handleAdminUsers(
+        interaction: DiscordInteractionData,
+        subName: string,
+        getSubOption: (name: string) => string | number | boolean | undefined,
+    ): Promise<void> {
+        const current = [...this.config.allowedUserIds];
+
+        switch (subName) {
+            case 'add': {
+                const userId = String(getSubOption('user'));
+                if (!userId || !DISCORD_SNOWFLAKE_RE.test(userId)) {
+                    await this.respondToInteraction(interaction, 'Invalid user.');
+                    return;
+                }
+                if (current.includes(userId)) {
+                    await this.respondToInteraction(interaction, `<@${userId}> is already on the allow list.`);
+                    return;
+                }
+                const updated = [...current, userId];
+                updateDiscordConfig(this.db, 'allowed_user_ids', updated.join(','));
+                this.config.allowedUserIds = updated;
+                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'allowed_user_ids', JSON.stringify({ action: 'add', userId }));
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'User Added',
+                    description: `<@${userId}> added to the allow list.\n\nTotal allowed: **${updated.length}**`,
+                    color: 0x57f287,
+                });
+                break;
+            }
+            case 'remove': {
+                const userId = String(getSubOption('user'));
+                if (!userId || !DISCORD_SNOWFLAKE_RE.test(userId)) {
+                    await this.respondToInteraction(interaction, 'Invalid user.');
+                    return;
+                }
+                if (!current.includes(userId)) {
+                    await this.respondToInteraction(interaction, `<@${userId}> is not on the allow list.`);
+                    return;
+                }
+                const updated = current.filter(id => id !== userId);
+                updateDiscordConfig(this.db, 'allowed_user_ids', updated.join(','));
+                this.config.allowedUserIds = updated;
+                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'allowed_user_ids', JSON.stringify({ action: 'remove', userId }));
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'User Removed',
+                    description: `<@${userId}> removed from the allow list.\n\nTotal allowed: **${updated.length}**`,
+                    color: 0xed4245,
+                });
+                break;
+            }
+            case 'list': {
+                const userLines = current.length > 0
+                    ? current.map(id => `<@${id}>`).join('\n')
+                    : '_No users on allow list — all users have access (legacy mode with empty list)_';
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Allowed Users',
+                    description: userLines,
+                    color: 0x5865f2,
+                    footer: { text: `${current.length} user${current.length === 1 ? '' : 's'} · ${this.config.publicMode ? 'Public mode (roles take precedence)' : 'Legacy mode (allow list enforced)'}` },
+                });
+                break;
+            }
+        }
+    }
+
+    private async handleAdminRoles(
+        interaction: DiscordInteractionData,
+        subName: string,
+        getSubOption: (name: string) => string | number | boolean | undefined,
+    ): Promise<void> {
+        const current = { ...(this.config.rolePermissions ?? {}) };
+        const levelName = (level: number) =>
+            level === 0 ? 'Blocked' : level === 1 ? 'Basic' : level === 2 ? 'Standard' : level === 3 ? 'Admin' : `Level ${level}`;
+
+        switch (subName) {
+            case 'set': {
+                const roleId = String(getSubOption('role'));
+                const level = Number(getSubOption('level'));
+                if (!roleId || !DISCORD_SNOWFLAKE_RE.test(roleId)) {
+                    await this.respondToInteraction(interaction, 'Invalid role.');
+                    return;
+                }
+                if (level < 0 || level > 3 || !Number.isInteger(level)) {
+                    await this.respondToInteraction(interaction, 'Permission level must be 0-3.');
+                    return;
+                }
+                current[roleId] = level;
+                const json = JSON.stringify(current);
+                updateDiscordConfig(this.db, 'role_permissions', json);
+                this.config.rolePermissions = current;
+                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'role_permissions', JSON.stringify({ action: 'set', roleId, level }));
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Role Permission Set',
+                    description: `<@&${roleId}> → **${levelName(level)}** (${level})`,
+                    color: 0x57f287,
+                    footer: { text: `${Object.keys(current).length} role mapping${Object.keys(current).length === 1 ? '' : 's'} configured` },
+                });
+                break;
+            }
+            case 'remove': {
+                const roleId = String(getSubOption('role'));
+                if (!roleId || !DISCORD_SNOWFLAKE_RE.test(roleId)) {
+                    await this.respondToInteraction(interaction, 'Invalid role.');
+                    return;
+                }
+                if (!(roleId in current)) {
+                    await this.respondToInteraction(interaction, `<@&${roleId}> has no permission override.`);
+                    return;
+                }
+                delete current[roleId];
+                const json = JSON.stringify(current);
+                updateDiscordConfig(this.db, 'role_permissions', json);
+                this.config.rolePermissions = current;
+                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'role_permissions', JSON.stringify({ action: 'remove', roleId }));
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Role Permission Removed',
+                    description: `<@&${roleId}> permission override removed.\nUsers with this role will get the default level (**${levelName(this.config.defaultPermissionLevel ?? 1)}**).`,
+                    color: 0xed4245,
+                });
+                break;
+            }
+            case 'list': {
+                const entries = Object.entries(current);
+                const roleLines = entries.length > 0
+                    ? entries.map(([rid, lvl]) => `<@&${rid}> → **${levelName(lvl)}** (${lvl})`).join('\n')
+                    : '_No role permissions configured_';
+                await this.respondToInteractionEmbed(interaction, {
+                    title: 'Role Permissions',
+                    description: roleLines,
+                    color: 0x5865f2,
+                    fields: [
+                        {
+                            name: 'Default Level',
+                            value: `**${levelName(this.config.defaultPermissionLevel ?? 1)}** (${this.config.defaultPermissionLevel ?? 1})`,
+                            inline: true,
+                        },
+                        {
+                            name: 'Public Mode',
+                            value: this.config.publicMode ? 'Enabled' : 'Disabled',
+                            inline: true,
+                        },
+                    ],
+                    footer: { text: entries.length > 0 ? `${entries.length} role mapping${entries.length === 1 ? '' : 's'}` : 'Use /admin roles set to add mappings' },
+                });
+                break;
+            }
+        }
+    }
+
+    private async handleAdminShow(interaction: DiscordInteractionData): Promise<void> {
+        const channels = [
+            `<#${this.config.channelId}> *(primary)*`,
+            ...(this.config.additionalChannelIds ?? []).map(id => `<#${id}>`),
+        ];
+        const users = this.config.allowedUserIds.length > 0
+            ? this.config.allowedUserIds.map(id => `<@${id}>`).join(', ')
+            : '_none_';
+        const roleEntries = Object.entries(this.config.rolePermissions ?? {});
+        const levelName = (level: number) =>
+            level === 0 ? 'Blocked' : level === 1 ? 'Basic' : level === 2 ? 'Standard' : level === 3 ? 'Admin' : `Level ${level}`;
+        const roles = roleEntries.length > 0
+            ? roleEntries.map(([rid, lvl]) => `<@&${rid}>=${levelName(lvl)}`).join(', ')
+            : '_none_';
+
+        await this.respondToInteractionEmbed(interaction, {
+            title: 'Bot Configuration',
+            color: 0x5865f2,
+            fields: [
+                {
+                    name: 'Mode',
+                    value: this.config.mode === 'work_intake' ? 'Work Intake' : 'Chat',
+                    inline: true,
+                },
+                {
+                    name: 'Public Mode',
+                    value: this.config.publicMode ? 'Enabled' : 'Disabled',
+                    inline: true,
+                },
+                {
+                    name: 'Default Permission',
+                    value: `${levelName(this.config.defaultPermissionLevel ?? 1)} (${this.config.defaultPermissionLevel ?? 1})`,
+                    inline: true,
+                },
+                {
+                    name: `Channels (${channels.length})`,
+                    value: channels.join('\n').slice(0, 1024),
+                    inline: false,
+                },
+                {
+                    name: 'Allowed Users',
+                    value: users.slice(0, 1024),
+                    inline: false,
+                },
+                {
+                    name: 'Role Permissions',
+                    value: roles.slice(0, 1024),
+                    inline: false,
+                },
+                {
+                    name: 'Muted Users',
+                    value: this.mutedUsers.size > 0
+                        ? [...this.mutedUsers].map(id => `<@${id}>`).join(', ').slice(0, 1024)
+                        : '_none_',
+                    inline: false,
+                },
+            ],
+            footer: { text: `Active sessions: ${this.threadSessions.size} · Config reloads every 30s` },
+        });
     }
 
     private async respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
