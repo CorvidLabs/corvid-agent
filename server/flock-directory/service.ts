@@ -3,6 +3,9 @@
  *
  * Manages agent registration, discovery, heartbeat tracking,
  * and reputation aggregation for the on-chain agent registry.
+ *
+ * Supports hybrid operation: off-chain SQLite for fast queries,
+ * with optional on-chain sync via OnChainFlockClient when available.
  */
 import type { Database, SQLQueryBindings } from 'bun:sqlite';
 import { queryCount } from '../db/types';
@@ -16,9 +19,21 @@ import type {
     RegisterFlockAgentInput,
     UpdateFlockAgentInput,
 } from './types';
+import type { OnChainFlockClient, OnChainAgentRecord } from './on-chain-client';
+import { TIER_NAMES } from './on-chain-client';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('FlockDirectory');
+
+/** Config for on-chain operations that require signing. */
+export interface OnChainSignerConfig {
+    /** The Algorand address that signs transactions. */
+    senderAddress: string;
+    /** The secret key for signing (Uint8Array). */
+    sk: Uint8Array;
+    /** Network name (for logging). */
+    network: string;
+}
 
 // ─── Row Mapper ─────────────────────────────────────────────────────────────
 
@@ -47,7 +62,33 @@ function recordToAgent(row: FlockAgentRecord): FlockAgent {
 const HEARTBEAT_STALE_MINUTES = 30;
 
 export class FlockDirectoryService {
+    private onChainClient: OnChainFlockClient | null = null;
+    private signerConfig: OnChainSignerConfig | null = null;
+
     constructor(private readonly db: Database) {}
+
+    /**
+     * Inject the on-chain client and signer config for hybrid operation.
+     * When set, register/deregister/heartbeat also write on-chain.
+     */
+    setOnChainClient(client: OnChainFlockClient, signer: OnChainSignerConfig): void {
+        this.onChainClient = client;
+        this.signerConfig = signer;
+        log.info('On-chain client attached', {
+            appId: client.getAppId(),
+            network: signer.network,
+        });
+    }
+
+    /** Whether on-chain operations are available. */
+    get hasOnChain(): boolean {
+        return this.onChainClient !== null && this.signerConfig !== null;
+    }
+
+    /** Get the on-chain client (null if not attached). */
+    getOnChainClient(): OnChainFlockClient | null {
+        return this.onChainClient;
+    }
 
     /** Register a new agent in the directory. Returns the created agent. */
     register(input: RegisterFlockAgentInput): FlockAgent {
@@ -61,7 +102,39 @@ export class FlockDirectoryService {
         `).run(id, input.address, input.name, input.description ?? '', input.instanceUrl ?? null, capabilities, now, now, now);
 
         log.info('Agent registered', { id, address: input.address, name: input.name });
+
+        // Fire-and-forget on-chain registration
+        if (this.onChainClient && this.signerConfig) {
+            this.registerOnChain(input).catch(err => {
+                log.warn('On-chain registration failed (off-chain record is intact)', {
+                    address: input.address,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
+
         return this.getById(id)!;
+    }
+
+    /**
+     * Register an agent on-chain via the admin signer.
+     */
+    private async registerOnChain(input: RegisterFlockAgentInput): Promise<void> {
+        if (!this.onChainClient || !this.signerConfig) return;
+        const metadata = JSON.stringify({
+            description: input.description ?? '',
+            capabilities: input.capabilities ?? [],
+        });
+        const DEFAULT_STAKE_MICRO_ALGOS = 1_000_000; // 1 ALGO
+        await this.onChainClient.registerAgent(
+            this.signerConfig.senderAddress,
+            this.signerConfig.sk,
+            input.name,
+            input.instanceUrl ?? '',
+            metadata,
+            DEFAULT_STAKE_MICRO_ALGOS,
+        );
+        log.info('Agent registered on-chain', { address: input.address, name: input.name });
     }
 
     /** Deregister an agent (soft delete — sets status to 'deregistered'). */
@@ -72,6 +145,14 @@ export class FlockDirectoryService {
         `).run(id);
         if (result.changes > 0) {
             log.info('Agent deregistered', { id });
+
+            // Fire-and-forget on-chain deregistration
+            if (this.onChainClient && this.signerConfig) {
+                this.onChainClient.deregister(this.signerConfig.senderAddress, this.signerConfig.sk).catch(err => {
+                    log.warn('On-chain deregistration failed', { error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+
             return true;
         }
         return false;
@@ -84,6 +165,14 @@ export class FlockDirectoryService {
             UPDATE flock_agents SET last_heartbeat = ?, status = 'active', updated_at = ?
             WHERE id = ? AND status != 'deregistered'
         `).run(now, now, id);
+
+        if (result.changes > 0 && this.onChainClient && this.signerConfig) {
+            // Fire-and-forget on-chain heartbeat
+            this.onChainClient.heartbeat(this.signerConfig.senderAddress, this.signerConfig.sk).catch(err => {
+                log.debug('On-chain heartbeat failed', { error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+
         return result.changes > 0;
     }
 
@@ -198,9 +287,93 @@ export class FlockDirectoryService {
     }
 
     /** Get directory statistics. */
-    getStats(): { total: number; active: number; inactive: number } {
+    getStats(): { total: number; active: number; inactive: number; onChainAppId: number | null } {
         const total = queryCount(this.db, `SELECT COUNT(*) as cnt FROM flock_agents WHERE status != 'deregistered'`);
         const active = queryCount(this.db, `SELECT COUNT(*) as cnt FROM flock_agents WHERE status = 'active'`);
-        return { total, active, inactive: total - active };
+        return {
+            total,
+            active,
+            inactive: total - active,
+            onChainAppId: this.onChainClient?.getAppId() ?? null,
+        };
+    }
+
+    /**
+     * Self-register this corvid-agent instance in the Flock Directory.
+     * Ensures both off-chain and on-chain records exist.
+     * Idempotent — skips if already registered at the given address.
+     */
+    async selfRegister(opts: {
+        address: string;
+        name: string;
+        description: string;
+        instanceUrl: string;
+        capabilities: string[];
+    }): Promise<FlockAgent> {
+        // Check if already registered off-chain
+        const existing = this.getByAddress(opts.address);
+        if (existing && existing.status !== 'deregistered') {
+            log.info('Self-registration: already registered', { id: existing.id, address: opts.address });
+            // Send heartbeat to keep it active
+            this.heartbeat(existing.id);
+            return existing;
+        }
+
+        // Register off-chain (this also fires on-chain registration)
+        const agent = this.register({
+            address: opts.address,
+            name: opts.name,
+            description: opts.description,
+            instanceUrl: opts.instanceUrl,
+            capabilities: opts.capabilities,
+        });
+
+        log.info('Self-registered in Flock Directory', {
+            id: agent.id,
+            address: opts.address,
+            onChain: this.hasOnChain,
+        });
+        return agent;
+    }
+
+    /**
+     * Fetch an agent's on-chain record and enrich the off-chain entry
+     * with tier and score data. Returns null if on-chain client is not available
+     * or the agent is not found on-chain.
+     */
+    async syncFromChain(address: string): Promise<OnChainAgentRecord | null> {
+        if (!this.onChainClient || !this.signerConfig) return null;
+
+        try {
+            const record = await this.onChainClient.getAgentInfo(
+                address,
+                this.signerConfig.senderAddress,
+                this.signerConfig.sk,
+            );
+
+            // Update off-chain record with on-chain reputation data
+            const agent = this.getByAddress(address);
+            if (agent) {
+                const score = record.totalMaxScore > 0
+                    ? Math.round((record.totalScore / record.totalMaxScore) * 100)
+                    : 0;
+                this.update(agent.id, {
+                    reputationScore: score,
+                });
+                log.debug('Synced on-chain data to off-chain', {
+                    address,
+                    tier: TIER_NAMES[record.tier] ?? record.tier,
+                    score,
+                });
+            }
+
+            return record;
+        } catch (err) {
+            log.debug('On-chain sync failed (agent may not be registered on-chain)', {
+                address,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return null;
+        }
     }
 }

@@ -39,6 +39,7 @@ import { resolveAgentTenant } from '../tenant/resolve';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import { createKeyProvider } from '../lib/key-provider';
 import type { FlockDirectoryService } from '../flock-directory/service';
+import { createFlockClient } from '../flock-directory/deploy';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('AlgoChatInit');
@@ -174,6 +175,39 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     if (usdcRevenueService) {
         usdcRevenueService.start();
         shutdownCoordinator.register({ name: 'UsdcRevenue', priority: 20, handler: () => usdcRevenueService.stop() });
+    }
+
+    // ── Flock Directory on-chain integration ─────────────────────────────
+    // Deploy (or reconnect to) the FlockDirectory smart contract and wire
+    // it into the off-chain FlockDirectoryService for hybrid operation.
+    try {
+        const onChainClient = await createFlockClient(db, service, algochatConfig.network);
+        if (onChainClient) {
+            flockDirectoryService.setOnChainClient(onChainClient, {
+                senderAddress: service.chatAccount.address,
+                sk: service.chatAccount.account.sk,
+                network: algochatConfig.network,
+            });
+            log.info('Flock Directory on-chain integration active', {
+                appId: onChainClient.getAppId(),
+                network: algochatConfig.network,
+            });
+        }
+
+        // Self-register this corvid-agent instance
+        const serverUrl = process.env.SERVER_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+        const agentName = process.env.AGENT_NAME ?? 'corvid-agent';
+        await flockDirectoryService.selfRegister({
+            address: service.chatAccount.address,
+            name: agentName,
+            description: 'CorvidAgent — autonomous AI development agent on Algorand',
+            instanceUrl: serverUrl,
+            capabilities: ['code', 'review', 'test', 'deploy', 'algochat', 'mcp'],
+        });
+    } catch (err) {
+        log.warn('Flock Directory on-chain init failed (off-chain still works)', {
+            error: err instanceof Error ? err.message : String(err),
+        });
     }
 }
 

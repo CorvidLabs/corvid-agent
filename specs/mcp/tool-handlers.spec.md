@@ -92,7 +92,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleFindReferences` | `(ctx, { project_id?, symbol, path? })` | `Promise<CallToolResult>` | Find references to a symbol across project files using AST parsing |
 | `handleLaunchCouncil` | `(ctx, { topic, agentIds?, chairmanAgentId?, discussionRounds?, governanceTier? })` | `Promise<CallToolResult>` | Launch a multi-agent council deliberation. Requires `processManager` in context |
 | `handleManageRepoBlocklist` | `(ctx, { action, repo?, reason?, source? })` | `Promise<CallToolResult>` | Manage the repo blocklist: list, add, remove, or check entries |
-| `handleFlockDirectory` | `(ctx, { action, agent_id?, address?, name?, description?, instance_url?, capabilities?, query?, capability?, min_reputation?, limit? })` | `Promise<CallToolResult>` | Flock Directory operations: register, deregister, heartbeat, lookup, search, list, stats |
+| `handleFlockDirectory` | `(ctx, { action, agent_id?, address?, name?, description?, instance_url?, capabilities?, query?, capability?, min_reputation?, limit? })` | `Promise<CallToolResult>` | Flock Directory operations: register, deregister, heartbeat, lookup, search, list, stats, sync |
 
 ## Invariants
 

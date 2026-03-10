@@ -102,12 +102,22 @@ export async function handleFlockDirectory(
 
             case 'stats': {
                 const stats = svc.getStats();
-                return textResult(`Flock Directory: ${stats.total} registered, ${stats.active} active, ${stats.inactive} inactive`);
+                const onChainInfo = stats.onChainAppId
+                    ? `, on-chain app ID: ${stats.onChainAppId}`
+                    : ', on-chain: not connected';
+                return textResult(`Flock Directory: ${stats.total} registered, ${stats.active} active, ${stats.inactive} inactive${onChainInfo}`);
+            }
+
+            case 'sync': {
+                if (!args.address) return errorResult('sync requires address');
+                const record = await svc.syncFromChain(args.address);
+                if (!record) return errorResult('On-chain sync not available or agent not found on-chain.');
+                return textResult(`On-chain record for ${args.address}:\n${JSON.stringify(record, null, 2)}`);
             }
 
             default:
                 return errorResult(
-                    `Unknown action "${args.action}". Valid actions: register, deregister, heartbeat, lookup, search, list, stats`,
+                    `Unknown action "${args.action}". Valid actions: register, deregister, heartbeat, lookup, search, list, stats, sync`,
                 );
         }
     } catch (err) {
