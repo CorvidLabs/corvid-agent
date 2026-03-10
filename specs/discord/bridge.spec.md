@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 7
+version: 8
 status: active
 files:
   - server/discord/bridge.ts
@@ -156,14 +156,15 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 ### Commands
 
-32. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/agents`, `/status`, `/council`, `/mute`, `/unmute`, `/help`
-30. **`/session` command**: Creates a new thread with an agent session. Required options: `agent` (dropdown of available agents, capped at 25), `topic` (string, used as thread name). The thread is created in the configured channel with the selected agent bound to it
-31. **`/agents` command**: Lists all available agents with their models. Does not create a session
-32. **`/status` command**: Shows the bot's current status and active sessions
-33. **`/council` command**: Launches a council discussion on a given topic
-34. **`/help` command**: Shows available commands and usage
-35. **Text commands deprecated**: Text commands (messages starting with `/`) are no longer parsed from regular channel messages. All commands use Discord's slash command system (requires `appId`)
-36. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
+32. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/work`, `/agents`, `/status`, `/council`, `/mute`, `/unmute`, `/help`
+33. **`/session` command** (interactive chat): Creates a new Discord thread with a live agent session. The user can go back and forth with the agent in real-time. Required options: `agent` (dropdown, capped at 25), `topic` (string, thread name). Optional: `project` (dropdown). The thread is created in the configured channel with the selected agent bound to it. Use `/session` when you want to **discuss, explore, or guide** the agent interactively
+34. **`/work` command** (autonomous task): Creates an async work task — the agent works autonomously (clones repo, makes changes, creates a PR) without further interaction. Required: `description` (what to do). Optional: `agent` (dropdown), `project` (dropdown). Responds with a rich confirmation embed showing task ID, agent, and status. Sends a completion notification with PR link (or error details) when done, mentioning the requester. Use `/work` when you want to **assign a task** and get notified with a PR
+35. **`/agents` command**: Lists all available agents with their models. Does not create a session
+36. **`/status` command**: Shows the bot's current status and active sessions
+37. **`/council` command**: Launches a council discussion on a given topic
+38. **`/help` command**: Shows available commands and usage
+39. **Text commands deprecated**: Text commands (messages starting with `/`) are no longer parsed from regular channel messages. All commands use Discord's slash command system (requires `appId`)
+40. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
 
 ## Behavioral Examples
 
@@ -181,7 +182,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 - **Given** a Discord bridge with `appId` configured
 - **When** `start()` is called
-- **Then** slash commands (`session`, `agents`, `status`, `council`, `help`) are registered via PUT to the Discord API
+- **Then** slash commands (`session`, `work`, `agents`, `status`, `council`, `help`, `mute`, `unmute`) are registered via PUT to the Discord API
 - **When** a guild ID is also configured
 - **Then** commands are registered as guild-scoped (instant availability) instead of global (up to 1 hour propagation)
 
@@ -206,6 +207,22 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 - **And** a new session is created with source `discord`, bound to "ResearchBot"
 - **And** the bot posts an initial embed in the thread confirming the session is active
 - **And** subsequent messages in the thread are handled by "ResearchBot" automatically (no @mention needed)
+
+### Scenario: /work creates an autonomous task
+
+- **Given** a running Discord bridge with agents and a WorkTaskService
+- **When** a user invokes `/work` with description "Fix the login page CSS", agent "CorvidAgent", and project "corvid-agent"
+- **Then** the bot responds with "Creating work task for **CorvidAgent**..."
+- **And** a rich embed is posted showing task ID, agent name, status "In Progress", and the description
+- **And** the embed footer says "You'll be notified when it completes"
+- **When** the agent finishes working (creates a PR)
+- **Then** a completion embed is posted in the same channel with the PR link, summary, branch, and iteration count
+- **And** the original requester is @mentioned so they receive a Discord notification
+
+### Scenario: /session vs /work — when to use which
+
+- **`/session`** is for **interactive conversations**: the user wants to discuss, explore, or iteratively guide the agent. Creates a Discord thread where both sides can exchange messages in real-time. Think of it as "chat with an agent."
+- **`/work`** is for **fire-and-forget tasks**: the user has a clear task description and wants the agent to work autonomously. No thread is created — the agent clones the repo, works, creates a PR, and posts a completion notification. Think of it as "assign a task to an agent."
 
 ### Scenario: Multiple users in a thread
 
@@ -270,6 +287,11 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Interaction response fails | Logs error |
 | Thread creation fails | Responds to `/session` interaction: `"Failed to create conversation thread."` |
 | Thread session ended | Replies in thread: `"This conversation has ended. Use /session to start a new one."` |
+| `/work` without WorkTaskService | Responds "Work task service not available." |
+| `/work` without description | Responds "Please provide a task description." |
+| `/work` with unknown agent | Responds with available agent names |
+| `/work` with unknown project | Responds with available project names |
+| `/work` task creation fails | Error embed posted in channel with failure details |
 | `/session` without `appId` | Not available — slash commands require `appId` to be configured |
 
 ## Dependencies
@@ -325,3 +347,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-07 | corvid-agent | v4: Passive channel mode — bot no longer auto-responds to channel messages. Only responds to @mentions (one-off) and slash commands. Threads created exclusively via `/session` command with agent selection and topic. Removed `/switch` and `/new` commands (replaced by `/session`). Removed text command parsing (slash-only). Added `mentions` field to `DiscordMessageData` |
 | 2026-03-08 | corvid-agent | v5: Fix duplicate message bug — track active subscription per thread, unsubscribe previous callback before re-subscribing on each message. Added invariant #26 (subscription deduplication) |
 | 2026-03-10 | corvid-agent | v6: Public channel mode with role-based access control (BLOCKED/BASIC/STANDARD/ADMIN). Multi-channel support. Tiered rate limiting by permission level. Smart message splitting at natural boundaries with code block preservation. Typing indicators with periodic refresh. Message reactions for acknowledgment. Stale thread auto-archiving (2h). Thread title updates on session completion. `/mute` and `/unmute` admin commands. Added `message-formatter.ts`. Refs #891, #893 |
+| 2026-03-10 | corvid-agent | v8: Added `/work` slash command for autonomous task creation (agent works independently, creates PR, notifies on completion). Added optional `project` dropdown to `/session`. Rich embed confirmations for `/work` with task status, agent, branch. Completion notifications @mention the requester. Added `sendMessageWithEmbed` for content+embed messages. AlgoChat `/work` now supports `--project <name>` flag. Clear documentation differentiating `/session` (interactive chat) vs `/work` (fire-and-forget task) |

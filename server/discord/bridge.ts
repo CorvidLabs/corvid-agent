@@ -250,6 +250,13 @@ export class DiscordBridge {
             value: a.name,
         }));
 
+        // Build project choices for /session and /work
+        const projects = listProjects(this.db);
+        const projectChoices = projects.slice(0, 25).map(p => ({
+            name: `${p.name}${p.description ? ` — ${p.description}` : ''}`.slice(0, 100),
+            value: p.name,
+        }));
+
         const commands = [
             {
                 name: 'session',
@@ -268,6 +275,40 @@ export class DiscordBridge {
                         description: 'Topic for the conversation',
                         type: 3, // STRING
                         required: true,
+                    },
+                    {
+                        name: 'project',
+                        description: 'Project to work on (defaults to agent default)',
+                        type: 3, // STRING
+                        required: false,
+                        ...(projectChoices.length > 0 ? { choices: projectChoices } : {}),
+                    },
+                ],
+            },
+            {
+                name: 'work',
+                description: 'Create a work task (branch + PR)',
+                type: 1, // CHAT_INPUT
+                options: [
+                    {
+                        name: 'description',
+                        description: 'What the agent should work on',
+                        type: 3, // STRING
+                        required: true,
+                    },
+                    {
+                        name: 'agent',
+                        description: 'Agent to assign the task to',
+                        type: 3, // STRING
+                        required: false,
+                        ...(agentChoices.length > 0 ? { choices: agentChoices } : {}),
+                    },
+                    {
+                        name: 'project',
+                        description: 'Project to work on (defaults to agent default)',
+                        type: 3, // STRING
+                        required: false,
+                        ...(projectChoices.length > 0 ? { choices: projectChoices } : {}),
                     },
                 ],
             },
@@ -392,6 +433,7 @@ export class DiscordBridge {
                 }
                 const agentName = getOption('agent');
                 const topic = getOption('topic');
+                const projectName = getOption('project');
                 if (!agentName || !topic) {
                     await this.respondToInteraction(interaction, 'Please provide both an agent and a topic.');
                     break;
@@ -413,10 +455,20 @@ export class DiscordBridge {
                     break;
                 }
 
-                const projects = listProjects(this.db);
-                const project = agent.defaultProjectId
-                    ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
-                    : projects[0];
+                const allProjects = listProjects(this.db);
+                let project;
+                if (projectName) {
+                    project = allProjects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
+                    if (!project) {
+                        const names = allProjects.map(p => p.name).join(', ');
+                        await this.respondToInteraction(interaction, `Project not found: "${projectName}". Available: ${names}`);
+                        break;
+                    }
+                } else {
+                    project = agent.defaultProjectId
+                        ? allProjects.find(p => p.id === agent.defaultProjectId) ?? allProjects[0]
+                        : allProjects[0];
+                }
                 if (!project) {
                     await this.respondToInteraction(interaction, 'No projects configured.');
                     break;
@@ -463,6 +515,116 @@ export class DiscordBridge {
 
                 await this.respondToInteraction(interaction,
                     `Session started in <#${threadId}> with **${agent.name}**.\nTopic: ${topic}`);
+                break;
+            }
+
+            case 'work': {
+                if (permLevel < PermissionLevel.STANDARD) {
+                    await this.respondToInteraction(interaction, 'You need a higher role to create work tasks.');
+                    break;
+                }
+                if (!this.workTaskService) {
+                    await this.respondToInteraction(interaction, 'Work task service not available.');
+                    break;
+                }
+
+                const workDescription = getOption('description');
+                if (!workDescription) {
+                    await this.respondToInteraction(interaction, 'Please provide a task description.');
+                    break;
+                }
+
+                const workAgentName = getOption('agent');
+                const workProjectName = getOption('project');
+
+                // Resolve agent
+                const allAgents = listAgents(this.db);
+                let workAgent;
+                if (workAgentName) {
+                    workAgent = allAgents.find(a =>
+                        a.name.toLowerCase() === workAgentName.toLowerCase() ||
+                        a.name.toLowerCase().replace(/\s+/g, '') === workAgentName.toLowerCase().replace(/\s+/g, '')
+                    );
+                    if (!workAgent) {
+                        const names = allAgents.map(a => a.name).join(', ');
+                        await this.respondToInteraction(interaction, `Agent not found: "${workAgentName}". Available: ${names}`);
+                        break;
+                    }
+                } else {
+                    workAgent = this.config.defaultAgentId
+                        ? allAgents.find(a => a.id === this.config.defaultAgentId) ?? allAgents[0]
+                        : allAgents[0];
+                }
+                if (!workAgent) {
+                    await this.respondToInteraction(interaction, 'No agents configured.');
+                    break;
+                }
+
+                // Resolve project
+                const workProjects = listProjects(this.db);
+                let workProjectId: string | undefined;
+                if (workProjectName) {
+                    const workProject = workProjects.find(p => p.name.toLowerCase() === workProjectName.toLowerCase());
+                    if (!workProject) {
+                        const names = workProjects.map(p => p.name).join(', ');
+                        await this.respondToInteraction(interaction, `Project not found: "${workProjectName}". Available: ${names}`);
+                        break;
+                    }
+                    workProjectId = workProject.id;
+                }
+
+                // Defer the response since task creation may take a moment
+                await this.respondToInteraction(interaction, `Creating work task for **${workAgent.name}**...`);
+
+                const channelId = interaction.channel_id;
+                try {
+                    const task = await this.workTaskService.create({
+                        agentId: workAgent.id,
+                        description: workDescription,
+                        projectId: workProjectId,
+                        source: 'discord',
+                        requesterInfo: { discordUserId: userId },
+                    });
+
+                    // Send a rich confirmation embed in the channel
+                    if (channelId) {
+                        const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+                            { name: 'Agent', value: workAgent.name, inline: true },
+                            { name: 'Status', value: 'In Progress', inline: true },
+                        ];
+                        if (task.branchName) {
+                            fields.push({ name: 'Branch', value: `\`${task.branchName}\``, inline: false });
+                        }
+
+                        await this.sendEmbed(channelId, {
+                            title: 'Work Task Created',
+                            description: workDescription.slice(0, 300) + (workDescription.length > 300 ? '...' : ''),
+                            color: 0x5865f2, // Discord blurple
+                            fields,
+                            footer: { text: `Task: ${task.id} · You'll be notified when it completes` },
+                        });
+
+                        // Subscribe for completion notification
+                        this.workTaskService.onComplete(task.id, (completedTask) => {
+                            this.sendTaskResult(channelId, completedTask, userId).catch(err => {
+                                log.error('Failed to send task result to Discord', {
+                                    taskId: completedTask.id,
+                                    error: err instanceof Error ? err.message : String(err),
+                                });
+                            });
+                        });
+                    }
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+                    log.error('Discord /work command failed', { error: message, userId });
+                    if (channelId) {
+                        await this.sendEmbed(channelId, {
+                            title: 'Work Task Failed',
+                            description: `Could not create work task: ${message.slice(0, 500)}`,
+                            color: 0xed4245, // Red
+                        });
+                    }
+                }
                 break;
             }
 
@@ -1177,7 +1339,14 @@ export class DiscordBridge {
         }
     }
 
-    private async sendTaskResult(channelId: string, task: import('../../shared/types/work-tasks').WorkTask): Promise<void> {
+    private async sendTaskResult(
+        channelId: string,
+        task: import('../../shared/types/work-tasks').WorkTask,
+        mentionUserId?: string,
+    ): Promise<void> {
+        // Mention the requester so they get a Discord notification
+        const mention = mentionUserId ? `<@${mentionUserId}> ` : '';
+
         if (task.status === 'completed') {
             const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
 
@@ -1189,22 +1358,32 @@ export class DiscordBridge {
                 fields.push({ name: 'Summary', value: task.summary.slice(0, 1024), inline: false });
             }
 
-            await this.sendEmbed(channelId, {
+            if (task.branchName) {
+                fields.push({ name: 'Branch', value: `\`${task.branchName}\``, inline: true });
+            }
+
+            fields.push({ name: 'Iterations', value: String(task.iterationCount), inline: true });
+
+            // Send mention as content so Discord pings the user, embed has the details
+            await this.sendMessageWithEmbed(channelId, mention ? `${mention}Your work task is done!` : undefined, {
                 title: 'Task Completed',
-                description: task.description.slice(0, 200),
+                description: task.description.slice(0, 300),
                 color: 0x57f287, // Green
                 fields,
                 footer: { text: `Task: ${task.id}` },
             });
         } else if (task.status === 'failed') {
-            await this.sendEmbed(channelId, {
+            await this.sendMessageWithEmbed(channelId, mention ? `${mention}Your work task encountered an issue.` : undefined, {
                 title: 'Task Failed',
-                description: task.description.slice(0, 200),
+                description: task.description.slice(0, 300),
                 color: 0xed4245, // Red
-                fields: task.error
-                    ? [{ name: 'Error', value: task.error.slice(0, 1024), inline: false }]
-                    : [],
-                footer: { text: `Task: ${task.id} | Iterations: ${task.iterationCount}` },
+                fields: [
+                    ...(task.error
+                        ? [{ name: 'Error', value: task.error.slice(0, 1024), inline: false }]
+                        : []),
+                    { name: 'Iterations', value: String(task.iterationCount), inline: true },
+                ],
+                footer: { text: `Task: ${task.id}` },
             });
         }
     }
@@ -1232,6 +1411,45 @@ export class DiscordBridge {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ embeds: [embed] }),
+                    },
+                );
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
+                    throw new Error(`Discord embed failed: ${response.status}`);
+                }
+            });
+        } catch {
+            // Error already logged by DeliveryTracker
+        }
+    }
+
+    private async sendMessageWithEmbed(
+        channelId: string,
+        content: string | undefined,
+        embed: {
+            title?: string;
+            description?: string;
+            color?: number;
+            fields?: Array<{ name: string; value: string; inline?: boolean }>;
+            footer?: { text: string };
+        },
+    ): Promise<void> {
+        try {
+            await this.delivery.sendWithReceipt('discord', async () => {
+                const body: Record<string, unknown> = { embeds: [embed] };
+                if (content) body.content = content;
+
+                const response = await fetch(
+                    `https://discord.com/api/v10/channels/${channelId}/messages`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bot ${this.config.botToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(body),
                     },
                 );
 

@@ -18,6 +18,7 @@ import {
     updateAgentMessageStatus,
     getAgentMessage,
 } from '../db/agent-messages';
+import { getProjectByName, listProjects } from '../db/projects';
 import { ValidationError, NotFoundError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 
@@ -63,6 +64,8 @@ export class WorkCommandRouter {
     /**
      * Handle the `/work <description>` slash command from AlgoChat.
      *
+     * Supports `--project <name>` flag to specify the target project.
+     *
      * @param participant - The sender's address
      * @param description - The task description (already parsed, without `/work` prefix)
      * @param respond - Callback to send a response message
@@ -75,7 +78,7 @@ export class WorkCommandRouter {
         findAgent: () => string | null,
     ): void {
         if (!description) {
-            respond('Usage: /work <task description>');
+            respond('Usage: /work [--project <name>] <task description>');
             return;
         }
 
@@ -90,19 +93,52 @@ export class WorkCommandRouter {
             return;
         }
 
+        // Parse --project flag
+        let projectId: string | undefined;
+        let taskDescription = description;
+        const projectMatch = description.match(/^--project\s+(\S+)\s+([\s\S]*)$/i);
+        if (projectMatch) {
+            const projectName = projectMatch[1];
+            const project = getProjectByName(this.db, projectName);
+            if (!project) {
+                const available = listProjects(this.db).map(p => p.name).join(', ');
+                respond(`Project not found: "${projectName}". Available: ${available}`);
+                return;
+            }
+            projectId = project.id;
+            taskDescription = projectMatch[2].trim();
+            if (!taskDescription) {
+                respond('Usage: /work --project <name> <task description>');
+                return;
+            }
+        }
+
         this.workTaskService.create({
             agentId,
-            description,
+            description: taskDescription,
+            projectId,
             source: 'algochat',
             requesterInfo: { participant },
         }).then((task) => {
-            respond(`Work task started: ${task.id}\nBranch: ${task.branchName ?? 'creating...'}\nStatus: ${task.status}`);
+            const lines = [
+                `✓ Work task created: ${task.id}`,
+                `Branch: ${task.branchName ?? '(creating...)'}`,
+                `Status: ${task.status}`,
+                '',
+                'I\'ll notify you when it completes with the PR link.',
+            ];
+            respond(lines.join('\n'));
 
             this.workTaskService?.onComplete(task.id, (completed) => {
                 if (completed.status === 'completed' && completed.prUrl) {
-                    respond(`Work task completed!\nPR: ${completed.prUrl}`);
+                    const completedLines = [
+                        `✓ Work task completed: ${completed.id}`,
+                        `PR: ${completed.prUrl}`,
+                        ...(completed.summary ? [`Summary: ${completed.summary.slice(0, 500)}`] : []),
+                    ];
+                    respond(completedLines.join('\n'));
                 } else {
-                    respond(`Work task failed: ${completed.error ?? 'Unknown error'}`);
+                    respond(`✗ Work task failed: ${completed.id}\nError: ${completed.error ?? 'Unknown error'}`);
                 }
             });
         }).catch((err) => {

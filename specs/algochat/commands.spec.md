@@ -1,6 +1,6 @@
 ---
 module: commands
-version: 1
+version: 2
 status: draft
 files:
   - server/algochat/command-handler.ts
@@ -78,7 +78,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `constructor` | `db: Database` | `WorkCommandRouter` | Creates router with DB reference |
 | `setWorkTaskService` | `service: WorkTaskService` | `void` | Injects or updates the WorkTaskService dependency |
 | `hasService` | _(getter)_ | `boolean` | Returns whether a WorkTaskService is currently available |
-| `handleSlashCommand` | `participant: string, description: string, respond: (text: string) => void, findAgent: () => string \| null` | `void` | Handles `/work <description>` from AlgoChat; creates task, registers completion callback, responds with status/PR URL |
+| `handleSlashCommand` | `participant: string, description: string, respond: (text: string) => void, findAgent: () => string \| null` | `void` | Handles `/work [--project <name>] <description>` from AlgoChat; parses optional `--project` flag, creates task, registers completion callback, responds with task confirmation and PR URL on completion |
 | `handleAgentWorkRequest` | `params: AgentWorkRequestParams` | `Promise<AgentWorkRequestResult>` | Handles `[WORK]` prefix from agent-to-agent messages; creates agent_messages row, delegates to WorkTaskService, registers completion callback that updates message status |
 
 ## Invariants
@@ -115,7 +115,20 @@ _No standalone exported functions. All functionality is exposed via exported cla
 ### Scenario: /work command creates task
 - **Given** the work command router and WorkTaskService are available, and an agent is found
 - **When** owner sends `/work Fix the login page CSS`
-- **Then** a work task is created with the description, and the response includes the task ID, branch name, and status; on completion, a follow-up message with the PR URL is sent
+- **Then** a work task is created with the description
+- **And** the response includes `✓ Work task created: <id>`, branch name, status, and a note that the user will be notified on completion
+- **When** the task completes
+- **Then** a follow-up message is sent with `✓ Work task completed: <id>`, PR URL, and summary
+
+### Scenario: /work with --project flag
+- **Given** the work command router and WorkTaskService are available, and a project named "nft-remix" exists
+- **When** owner sends `/work --project nft-remix add unit tests for auth module`
+- **Then** a work task is created targeting the "nft-remix" project with the description "add unit tests for auth module"
+
+### Scenario: /work with unknown project
+- **Given** the work command router is available but no project named "nonexistent" exists
+- **When** owner sends `/work --project nonexistent fix a bug`
+- **Then** the response includes `Project not found: "nonexistent"` and lists available projects
 
 ### Scenario: Agent-to-agent [WORK] request
 - **Given** agent A sends a `[WORK] Implement feature X` message to agent B
@@ -139,6 +152,8 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `/mode` with invalid mode | Responds with list of valid modes (normal, queued, paused) |
 | `/work` without WorkCommandRouter | Responds "Work task service not available" |
 | `/work` without available agent | Responds "No agent available for work tasks" |
+| `/work --project unknown-name ...` | Responds with "Project not found" and lists available projects |
+| `/work --project name` (no description after) | Responds with usage message |
 | WorkTaskService.create fails | Error message sent via respond callback |
 | `[WORK]` with empty description | Throws `ValidationError` |
 | `[WORK]` without WorkTaskService | Throws `NotFoundError` |
@@ -183,3 +198,4 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-10 | corvid-agent | v2: `/work` command now supports `--project <name>` flag for targeting specific projects. Improved response messages with ✓/✗ status indicators and completion notifications with PR URL and summary. Added behavioral examples for `--project` usage and unknown project error. Updated error cases |

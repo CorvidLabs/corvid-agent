@@ -114,12 +114,13 @@ export const COMMAND_DEFS: CommandDef[] = [
     {
         name: '/work',
         description: 'Create a work task (branch + PR)',
-        usage: '/work <description>',
+        usage: '/work [--project <name>] <description>',
         params: [
+            { name: '--project', description: 'Target project name (optional)', required: false },
             { name: 'description', description: 'Task description', required: true, rest: true },
         ],
         privileged: true,
-        examples: ['/work fix the login bug', '/work add unit tests for auth module'],
+        examples: ['/work fix the login bug', '/work --project nft-remix add unit tests for auth module'],
     },
     {
         name: '/council',
