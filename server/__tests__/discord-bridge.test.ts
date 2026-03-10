@@ -490,9 +490,12 @@ describe('DiscordBridge work_intake mode', () => {
             expect(input.source).toBe('discord');
             expect(input.sourceId).toBe('200000000000000001');
 
-            // Should have sent an embed acknowledgment
+            // Should have sent an embed acknowledgment (may also include first-interaction tip)
             expect(fetchBodies.length).toBeGreaterThanOrEqual(1);
-            const embedBody = fetchBodies.find((b: unknown) => (b as { embeds?: unknown[] }).embeds) as { embeds: Array<{ title: string }> } | undefined;
+            const embedBody = fetchBodies.find((b: unknown) => {
+                const embeds = (b as { embeds?: Array<{ title?: string }> }).embeds;
+                return embeds?.some(e => e.title === 'Task Queued');
+            }) as { embeds: Array<{ title: string }> } | undefined;
             expect(embedBody).toBeDefined();
             expect(embedBody!.embeds[0].title).toBe('Task Queued');
         } finally {
@@ -731,6 +734,142 @@ describe('DiscordBridge work_intake mode', () => {
             const textBody = fetchBodies.find((b: unknown) => (b as { content?: string }).content) as { content: string } | undefined;
             expect(textBody).toBeDefined();
             expect(textBody!.content).toContain('WorkTaskService');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
+
+describe('DiscordBridge onboarding', () => {
+    test('/help responds with embed containing command fields', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            appId: '800000000000000001',
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        const fetchBodies: unknown[] = [];
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction({
+                id: '300000000000000001',
+                token: 'test-interaction-token-abcdef123456',
+                type: 2, // APPLICATION_COMMAND
+                channel_id: '100000000000000001',
+                data: { name: 'help' },
+                member: { user: { id: 'user-1' }, roles: [] },
+            });
+
+            expect(fetchBodies.length).toBe(1);
+            const body = fetchBodies[0] as { data: { embeds: Array<{ title: string; fields: Array<{ name: string }> }> } };
+            expect(body.data.embeds).toBeDefined();
+            expect(body.data.embeds[0].title).toBe('CorvidAgent Commands');
+            const fieldNames = body.data.embeds[0].fields.map((f: { name: string }) => f.name);
+            expect(fieldNames).toContain('Conversations');
+            expect(fieldNames).toContain('Information');
+            expect(fieldNames).toContain('Advanced');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('/quickstart responds with welcome embed listing agents', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'AlphaAgent' });
+        createAgent(db, { name: 'BetaAgent' });
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            appId: '800000000000000001',
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        const fetchBodies: unknown[] = [];
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleInteraction: (i: unknown) => Promise<void> }).handleInteraction({
+                id: '300000000000000002',
+                token: 'test-interaction-token-quickstart789',
+                type: 2,
+                channel_id: '100000000000000001',
+                data: { name: 'quickstart' },
+                member: { user: { id: 'user-1' }, roles: [] },
+            });
+
+            expect(fetchBodies.length).toBe(1);
+            const body = fetchBodies[0] as { data: { embeds: Array<{ title: string; description: string; fields: Array<{ value: string }> }> } };
+            expect(body.data.embeds[0].title).toBe('Welcome to CorvidAgent!');
+            expect(body.data.embeds[0].description).toContain('/session');
+            // Should list agents in the field
+            expect(body.data.embeds[0].fields[0].value).toContain('AlphaAgent');
+            expect(body.data.embeds[0].fields[0].value).toContain('BetaAgent');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('first-interaction tip is sent once on @mention', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const fetchBodies: unknown[] = [];
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+            if (init?.body) fetchBodies.push(JSON.parse(String(init.body)));
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            const msg = {
+                id: '200000000000000010',
+                channel_id: '100000000000000001',
+                author: { id: 'new-user-1', username: 'NewUser' },
+                content: '<@999000000000000001> Hello!',
+                timestamp: new Date().toISOString(),
+                mentions: [{ id: '999000000000000001', username: 'CorvidBot' }],
+            };
+
+            // First interaction — should send welcome tip
+            await (bridge as unknown as { handleMessage: (m: unknown) => Promise<void> }).handleMessage(msg);
+            const welcomeEmbed = fetchBodies.find((b: unknown) => {
+                const embeds = (b as { embeds?: Array<{ footer?: { text: string } }> }).embeds;
+                return embeds?.some(e => e.footer?.text === 'This tip only appears once');
+            });
+            expect(welcomeEmbed).toBeDefined();
+
+            // Second interaction — no welcome tip
+            fetchBodies.length = 0;
+            await (bridge as unknown as { handleMessage: (m: unknown) => Promise<void> }).handleMessage({
+                ...msg,
+                id: '200000000000000011',
+            });
+            const secondWelcome = fetchBodies.find((b: unknown) => {
+                const embeds = (b as { embeds?: Array<{ footer?: { text: string } }> }).embeds;
+                return embeds?.some(e => e.footer?.text === 'This tip only appears once');
+            });
+            expect(secondWelcome).toBeUndefined();
         } finally {
             globalThis.fetch = originalFetch;
         }
