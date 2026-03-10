@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 
 @Component({
     selector: 'app-skeleton',
@@ -7,7 +7,7 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
     template: `
         <div class="skeleton" [attr.data-variant]="variant()" role="status" aria-label="Loading">
             <span class="sr-only">Loading...</span>
-            @for (item of items; track $index) {
+            @for (item of items(); track $index) {
                 <div class="skeleton__item"></div>
             }
         </div>
@@ -49,7 +49,7 @@ export class SkeletonComponent {
     readonly variant = input<'table' | 'card' | 'line'>('line');
     readonly count = input(3);
 
-    get items(): number[] {
-        return Array.from({ length: this.count() }, (_, i) => i);
-    }
+    protected readonly items = computed(() =>
+        Array.from({ length: this.count() }, (_, i) => i),
+    );
 }

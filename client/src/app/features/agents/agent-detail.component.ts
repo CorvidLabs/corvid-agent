@@ -42,7 +42,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
 
                 <!-- Tabs -->
                 <div class="tabs">
-                    @for (tab of tabs; track tab.key) {
+                    @for (tab of tabs(); track tab.key) {
                         <button
                             class="tab"
                             [class.tab--active]="activeTab() === tab.key"
@@ -201,6 +201,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
                             [(ngModel)]="invokeContent"
                             placeholder="Message content..."
                             rows="3"
+                            aria-label="Message content"
                         ></textarea>
                         <button
                             class="btn btn--primary"
@@ -218,6 +219,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
                             [(ngModel)]="workDescription"
                             placeholder="Describe the task (e.g. 'Fix the login button alignment')..."
                             rows="3"
+                            aria-label="Work task description"
                         ></textarea>
                         <button
                             class="btn btn--primary"
@@ -511,16 +513,14 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         }));
     });
 
-    protected get tabs(): { key: Tab; label: string; count?: number }[] {
-        return [
-            { key: 'overview', label: 'Overview' },
-            { key: 'sessions', label: 'Sessions', count: this.agentSessions().length },
-            { key: 'messages', label: 'Messages', count: this.messages().length },
-            { key: 'work-tasks', label: 'Work Tasks', count: this.workTasks().length },
-            { key: 'persona', label: 'Persona' },
-            { key: 'skills', label: 'Skills', count: this.agentBundles().length },
-        ];
-    }
+    protected readonly tabs = computed<{ key: Tab; label: string; count?: number }[]>(() => [
+        { key: 'overview', label: 'Overview' },
+        { key: 'sessions', label: 'Sessions', count: this.agentSessions().length },
+        { key: 'messages', label: 'Messages', count: this.messages().length },
+        { key: 'work-tasks', label: 'Work Tasks', count: this.workTasks().length },
+        { key: 'persona', label: 'Persona' },
+        { key: 'skills', label: 'Skills', count: this.agentBundles().length },
+    ]);
 
     async ngOnInit(): Promise<void> {
         const id = this.route.snapshot.paramMap.get('id');
@@ -529,9 +529,13 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         const agent = await this.agentService.getAgent(id);
         this.agent.set(agent);
 
-        // Load sessions for this agent
-        this.sessionService.loadSessions();
+        this.loadAgentData(agent);
+        this.loadAgentRelations(id);
+        this.subscribeToUpdates(id);
+    }
 
+    /** Load supplemental data tied to the agent (project, wallet, persona, bundles). */
+    private loadAgentData(agent: Agent): void {
         if (agent.defaultProjectId) {
             this.projectService.getProject(agent.defaultProjectId)
                 .then((p) => this.defaultProjectName.set(p.name))
@@ -539,15 +543,29 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         }
 
         if (agent.walletAddress) {
-            this.agentService.getBalance(id)
+            this.agentService.getBalance(agent.id)
                 .then((info) => this.walletBalance.set(info.balance))
-                .catch(() => {});
+                .catch(() => this.notify.error('Failed to load wallet balance'));
         }
 
-        this.personaService.loadPersona(id).then((p) => this.persona.set(p)).catch(() => this.persona.set(null));
-        this.skillBundleService.getAgentBundles(id).then((ab) => this.agentBundles.set(ab)).catch(() => this.agentBundles.set([]));
+        this.personaService.loadPersona(agent.id)
+            .then((p) => this.persona.set(p))
+            .catch(() => this.persona.set(null));
+
+        this.skillBundleService.getAgentBundles(agent.id)
+            .then((ab) => this.agentBundles.set(ab))
+            .catch(() => this.agentBundles.set([]));
+
         this.skillBundleService.loadBundles().catch(() => {});
-        this.agentService.getMessages(id).then((msgs) => this.messages.set(msgs)).catch(() => this.messages.set([]));
+    }
+
+    /** Load sessions, messages, other agents, and work tasks. */
+    private async loadAgentRelations(id: string): Promise<void> {
+        this.sessionService.loadSessions();
+
+        this.agentService.getMessages(id)
+            .then((msgs) => this.messages.set(msgs))
+            .catch(() => this.messages.set([]));
 
         await this.agentService.loadAgents();
         this.otherAgents.set(this.agentService.agents().filter((a) => a.id !== id));
@@ -555,9 +573,14 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             this.agentNameCache[a.id] = a.name;
         }
 
-        this.workTaskService.loadTasks(id).then(() => this.workTasks.set(this.workTaskService.tasks())).catch(() => this.workTasks.set([]));
+        this.workTaskService.loadTasks(id)
+            .then(() => this.workTasks.set(this.workTaskService.tasks()))
+            .catch(() => this.workTasks.set([]));
         this.workTaskService.startListening();
+    }
 
+    /** Subscribe to WebSocket events for real-time updates. */
+    private subscribeToUpdates(id: string): void {
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
             if (msg.type === 'agent_balance' && msg.agentId === id) {
                 this.walletBalance.set(msg.balance);
@@ -590,8 +613,14 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     async onDelete(): Promise<void> {
         const a = this.agent();
         if (!a) return;
-        await this.agentService.deleteAgent(a.id);
-        this.router.navigate(['/agents']);
+        if (!confirm(`Delete agent "${a.name}"? This action cannot be undone.`)) return;
+        try {
+            await this.agentService.deleteAgent(a.id);
+            this.notify.success(`Agent "${a.name}" deleted`);
+            this.router.navigate(['/agents']);
+        } catch {
+            this.notify.error('Failed to delete agent');
+        }
     }
 
     protected getAgentName(agentId: string): string {

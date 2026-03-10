@@ -1,7 +1,7 @@
 import { getDb, initDb } from './db/connection';
 import { handleRequest, initRateLimiterDb } from './routes/index';
 import { createWebSocketHandler } from './ws/handler';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createLogger } from './lib/logger';
 import { checkWsAuth, loadAuthConfig, validateStartupSecurity, timingSafeEqual } from './middleware/auth';
@@ -373,7 +373,7 @@ const server = Bun.serve<WsData>({
                 const filePath = join(CLIENT_DIST, url.pathname);
 
                 // Check if path exists as a file
-                if (existsSync(filePath) && !filePath.endsWith('/')) {
+                if (existsSync(filePath) && statSync(filePath).isFile()) {
                     const headers: Record<string, string> = {};
                     const basename = url.pathname.split('/').pop() ?? '';
                     // Angular outputHashing:"all" produces files like main.abc1234f.js
@@ -456,9 +456,16 @@ function logShutdownDiagnostics(signal: string): void {
     let parentInfo = `ppid=${process.ppid}`;
     try {
         // Try to identify the parent process that may have sent the signal
-        const result = Bun.spawnSync(['ps', '-p', String(process.ppid), '-o', 'comm=']);
-        const parentName = result.stdout.toString().trim();
-        if (parentName) parentInfo += ` (${parentName})`;
+        if (process.platform === 'win32') {
+            const result = Bun.spawnSync(['tasklist', '/FI', `PID eq ${process.ppid}`, '/FO', 'CSV', '/NH']);
+            const line = result.stdout.toString().trim();
+            const name = line.split(',')[0]?.replace(/"/g, '');
+            if (name) parentInfo += ` (${name})`;
+        } else {
+            const result = Bun.spawnSync(['ps', '-p', String(process.ppid), '-o', 'comm=']);
+            const parentName = result.stdout.toString().trim();
+            if (parentName) parentInfo += ` (${parentName})`;
+        }
     } catch { /* ignore */ }
 
     log.info(`Shutting down (${signal})`, {
