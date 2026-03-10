@@ -132,6 +132,27 @@ export class SystemStateDetector {
 
     private async checkDiskPressure(): Promise<string | null> {
         try {
+            if (process.platform === 'win32') {
+                // On Windows, use wmic to check disk space
+                const proc = Bun.spawn(['wmic', 'logicaldisk', 'where', 'DeviceID="C:"', 'get', 'FreeSpace,Size', '/format:csv'], {
+                    stdout: 'pipe', stderr: 'pipe',
+                });
+                const stdout = await new Response(proc.stdout).text();
+                await proc.exited;
+                const lines = stdout.trim().split('\n').filter(l => l.trim());
+                if (lines.length < 2) return null;
+                const parts = lines[lines.length - 1].split(',');
+                // CSV format: Node,FreeSpace,Size
+                const freeSpace = parseInt(parts[1], 10);
+                const totalSize = parseInt(parts[2], 10);
+                if (!freeSpace || !totalSize) return null;
+                const usage = 1 - (freeSpace / totalSize);
+                if (usage >= this.config.diskPressureThreshold) {
+                    return `Disk usage at ${Math.round(usage * 100)}% (threshold: ${Math.round(this.config.diskPressureThreshold * 100)}%)`;
+                }
+                return null;
+            }
+
             const proc = Bun.spawn(['df', '-P', '.'], { stdout: 'pipe', stderr: 'pipe' });
             const stdout = await new Response(proc.stdout).text();
             await proc.exited;

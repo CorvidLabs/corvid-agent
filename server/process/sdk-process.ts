@@ -42,6 +42,22 @@ export const ENV_ALLOWLIST = new Set([
     'VISUAL',
     // Ollama
     'OLLAMA_HOST',
+    // Windows-specific (required for subprocess execution and SDK)
+    'USERPROFILE',
+    'HOMEDRIVE',
+    'HOMEPATH',
+    'APPDATA',
+    'LOCALAPPDATA',
+    'SystemRoot',
+    'COMSPEC',
+    'PATHEXT',
+    'TEMP',
+    'TMP',
+    'OS',
+    'ProgramFiles',
+    'ProgramFiles(x86)',
+    'CommonProgramFiles',
+    'windir',
 ]);
 
 export function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<string, string> {
@@ -60,6 +76,38 @@ export function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<st
     // Set to 2 hours to avoid tools dying mid-session.
     safe.CLAUDE_CODE_STREAM_CLOSE_TIMEOUT = '7200000';
     return safe;
+}
+
+/**
+ * Resolve the path to the Claude Code executable.
+ * Bun.which() is broken on Windows for dynamically appended PATH entries,
+ * so we check common locations directly.
+ */
+function resolveClaudeExecutable(): string | undefined {
+    // Try Bun.which first (works on macOS/Linux)
+    const found = Bun.which('claude');
+    if (found) return found;
+
+    // On Windows, check common install locations
+    // Use path.join to avoid backslash escaping issues
+    if (process.platform === 'win32') {
+        const { existsSync } = require('node:fs');
+        const { join } = require('node:path');
+        const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+        const candidates = [
+            join(home, '.local', 'bin', 'claude.exe'),
+            join(home, 'AppData', 'Roaming', 'npm', 'claude.cmd'),
+            join(home, 'AppData', 'Local', 'Microsoft', 'WindowsApps', 'claude.exe'),
+        ];
+        for (const candidate of candidates) {
+            if (existsSync(candidate)) {
+                log.info('Resolved Claude executable', { path: candidate });
+                return candidate;
+            }
+        }
+    }
+
+    return undefined;
 }
 
 export const API_FAILURE_THRESHOLD = 3;
@@ -225,6 +273,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         allowDangerouslySkipPermissions: needsBypass || undefined,
         includePartialMessages: true,
         env: buildSafeEnv(project.envVars),
+        pathToClaudeCodeExecutable: resolveClaudeExecutable(),
     };
 
     if (agent?.model) {

@@ -63,7 +63,8 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                         class="sidebar__link"
                         routerLink="/dashboard"
                         routerLinkActive="sidebar__link--active"
-                        aria-current="page"
+                        [attr.aria-current]="rla_dashboard.isActive ? 'page' : null"
+                        #rla_dashboard="routerLinkActive"
                         title="Dashboard"
                         #firstLink>
                         <span class="sidebar__label">Dashboard</span>
@@ -407,6 +408,11 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                 color: var(--accent-cyan);
             }
         }
+        .sidebar__link:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: -2px;
+            border-radius: 0;
+        }
         .sidebar__link--active {
             color: var(--accent-cyan);
             background: var(--bg-raised);
@@ -541,6 +547,10 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
         .sidebar__collapse-btn:hover {
             color: var(--accent-cyan);
             background: var(--bg-hover);
+        }
+        .sidebar__collapse-btn:focus-visible {
+            outline: 2px solid var(--accent-cyan);
+            outline-offset: -2px;
         }
 
         /* Collapsed state (desktop) */
