@@ -4,6 +4,7 @@ import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
 import { createLogger } from '../../lib/logger';
 import { queryCount } from '../../db/types';
+import { getProjectByName, listProjects } from '../../db/projects';
 
 const log = createLogger('McpToolHandlers');
 
@@ -16,7 +17,7 @@ function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
 
 export async function handleCreateWorkTask(
     ctx: McpToolContext,
-    args: { description: string; project_id?: string },
+    args: { description: string; project_id?: string; project_name?: string },
 ): Promise<CallToolResult> {
     if (!ctx.workTaskService) {
         return errorResult('Work task service is not available.');
@@ -27,12 +28,27 @@ export async function handleCreateWorkTask(
     }
 
     try {
+        // Resolve project_name to project_id if needed
+        let projectId = args.project_id;
+        if (!projectId && args.project_name) {
+            const project = getProjectByName(ctx.db, args.project_name);
+            if (!project) {
+                const allProjects = listProjects(ctx.db);
+                const names = allProjects.map((p) => p.name).join(', ');
+                return errorResult(
+                    `No project found with name "${args.project_name}". ` +
+                    `Available projects: ${names || '(none)'}`,
+                );
+            }
+            projectId = project.id;
+        }
+
         ctx.emitStatus?.('Creating work task...');
 
         const task = await ctx.workTaskService.create({
             agentId: ctx.agentId,
             description: args.description,
-            projectId: args.project_id,
+            projectId,
             source: 'agent',
         });
 
@@ -45,6 +61,7 @@ export async function handleCreateWorkTask(
         return textResult(
             `Work task created.\n` +
             `  ID: ${task.id}\n` +
+            `  Project: ${task.projectId}\n` +
             `  Status: ${task.status}\n` +
             `  Branch: ${task.branchName ?? '(pending)'}`,
         );

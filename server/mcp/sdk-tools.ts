@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { getAgent } from '../db/agents';
@@ -14,6 +14,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_list_agents',
     'corvid_extend_timeout',
     'corvid_check_credits',
+    'corvid_list_projects',
+    'corvid_current_project',
     'corvid_create_work_task',
     'corvid_manage_schedule',
     'corvid_web_search',
@@ -135,15 +137,29 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             },
             async (args) => handleCreditConfig(ctx, args),
         ),
+        tool(
+            'corvid_list_projects',
+            'List all available projects with their IDs, names, and working directories. ' +
+            'Use this to discover projects before creating work tasks.',
+            {},
+            async () => handleListProjects(ctx),
+        ),
+        tool(
+            'corvid_current_project',
+            'Show the current agent\'s default project — the project used when no project_id is specified in corvid_create_work_task.',
+            {},
+            async () => handleCurrentProject(ctx),
+        ),
         ...(ctx.workTaskService ? [
             tool(
                 'corvid_create_work_task',
                 'Create a work task that spawns a new agent session on a dedicated branch. ' +
                 'The agent will implement the described changes, run validation, and open a PR. ' +
-                'Use this to propose code improvements or fixes to the codebase.',
+                'Use corvid_list_projects to discover available projects first.',
                 {
                     description: z.string().describe('A clear description of the work to be done'),
                     project_id: z.string().optional().describe('Project ID to work on. Omit to use the agent default project.'),
+                    project_name: z.string().optional().describe('Project name (alternative to project_id). Use corvid_list_projects to discover names.'),
                 },
                 async (args) => handleCreateWorkTask(ctx, args),
             ),

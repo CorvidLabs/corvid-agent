@@ -151,7 +151,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 
 | Metric | Count |
 |--------|-------|
-| MCP tools | **39** corvid_* tool handlers |
+| MCP tools | **41** corvid_* tool handlers |
 | API endpoints | **~205** across 44 route modules |
 | DB migrations | **3** (squashed baseline + 2 post-squash, 90 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |

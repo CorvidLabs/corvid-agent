@@ -1,7 +1,7 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type { Project, CreateProjectInput, UpdateProjectInput } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
-import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
+import { withTenantFilter, validateTenantOwnership, tenantQuery } from '../tenant/db-filter';
 import { encryptEnvVars, decryptEnvVars } from '../lib/env-encryption';
 
 interface ProjectRow {
@@ -38,6 +38,16 @@ export function getProject(db: Database, id: string, tenantId: string = DEFAULT_
     if (!validateTenantOwnership(db, 'projects', id, tenantId)) return null;
     const row = db.query('SELECT * FROM projects WHERE id = ?').get(id) as ProjectRow | null;
     return row ? rowToProject(row) : null;
+}
+
+export function getProjectByName(db: Database, name: string, tenantId: string = DEFAULT_TENANT_ID): Project | null {
+    const rows = tenantQuery<ProjectRow>(
+        db,
+        'SELECT * FROM projects WHERE LOWER(name) = LOWER(?) LIMIT 1',
+        tenantId,
+        name,
+    );
+    return rows.length > 0 ? rowToProject(rows[0]) : null;
 }
 
 export function createProject(db: Database, input: CreateProjectInput, tenantId: string = DEFAULT_TENANT_ID): Project {

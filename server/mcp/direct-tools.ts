@@ -36,6 +36,8 @@ import {
     handleCodeSymbols,
     handleFindReferences,
     handleFlockDirectory,
+    handleListProjects,
+    handleCurrentProject,
 } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
@@ -58,6 +60,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_list_agents',
     'corvid_extend_timeout',
     'corvid_check_credits',
+    'corvid_list_projects',
+    'corvid_current_project',
     'corvid_create_work_task',
     'corvid_manage_schedule',
     'corvid_manage_workflow',
@@ -238,23 +242,40 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
     );
 
+    // Project discovery tools
+    tools.push(
+        {
+            name: 'corvid_list_projects',
+            description: 'List all available projects with their IDs, names, and working directories.',
+            parameters: { type: 'object', properties: {} },
+            handler: async () => unwrapResult(await handleListProjects(ctx)),
+        },
+        {
+            name: 'corvid_current_project',
+            description: 'Show the current agent\'s default project.',
+            parameters: { type: 'object', properties: {} },
+            handler: async () => unwrapResult(await handleCurrentProject(ctx)),
+        },
+    );
+
     // Conditionally add work task tool
     if (ctx.workTaskService) {
         tools.push({
             name: 'corvid_create_work_task',
-            description: 'Create a work task that spawns a new agent session on a dedicated branch.',
+            description: 'Create a work task that spawns a new agent session on a dedicated branch. Use corvid_list_projects to discover available projects first.',
             parameters: {
                 type: 'object',
                 properties: {
                     description: { type: 'string', description: 'A clear description of the work to be done' },
                     project_id: { type: 'string', description: 'Project ID to work on. Omit to use agent default.' },
+                    project_name: { type: 'string', description: 'Project name (alternative to project_id). Use corvid_list_projects to discover names.' },
                 },
                 required: ['description'],
             },
             handler: async (args) => {
                 const err = validateRequired('corvid_create_work_task', args, ['description']);
                 if (err) return err;
-                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string }));
+                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; project_name?: string }));
             },
         });
     }

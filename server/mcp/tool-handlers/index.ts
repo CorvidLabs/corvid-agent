@@ -21,6 +21,9 @@ export { handleExtendTimeout } from './session';
 // ─── Credits ─────────────────────────────────────────────────────────────────
 export { handleCheckCredits, handleGrantCredits, handleCreditConfig } from './credits';
 
+// ─── Projects ────────────────────────────────────────────────────────────────
+export { handleListProjects, handleCurrentProject } from './projects';
+
 // ─── Work tasks ──────────────────────────────────────────────────────────────
 export { handleCreateWorkTask } from './work';
 
