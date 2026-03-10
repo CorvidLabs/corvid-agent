@@ -1,5 +1,5 @@
-# Auto-regenerate bun.lockb for Dependabot PRs
-# Dependabot can't update Bun's binary lockfile, so CI fails on --frozen-lockfile.
+# Auto-regenerate bun.lock for Dependabot PRs
+# Dependabot can't update Bun's lockfile, so CI fails on --frozen-lockfile.
 # This workflow regenerates the lockfile and pushes it back to the PR branch.
 
 name: Dependabot Lockfile Sync
@@ -34,5 +34,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lockb
-          git diff --cached --quiet && echo "No lockfile changes" || (git commit -m "deps: regenerate bun.lockb for Dependabot update" && git push)
+          git add bun.lock
+          git diff --cached --quiet && echo "No lockfile changes" || (git commit -m "deps: regenerate bun.lock for Dependabot update" && git push)
