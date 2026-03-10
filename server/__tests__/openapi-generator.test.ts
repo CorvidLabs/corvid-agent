@@ -540,15 +540,14 @@ describe('MCP Tool Docs', () => {
         const tools = getMcpToolDocs();
         const names = tools.map(t => t.name);
         expect(names).toContain('corvid_list_agents');
-        expect(names).toContain('corvid_list_sessions');
-        expect(names).toContain('corvid_get_session_info');
+        expect(names).toContain('corvid_send_message');
     });
 
     test('includes messaging tools', () => {
         const tools = getMcpToolDocs();
         const names = tools.map(t => t.name);
         expect(names).toContain('corvid_send_message');
-        expect(names).toContain('corvid_read_messages');
+        expect(names).toContain('corvid_notify_owner');
     });
 
     test('includes memory tools', () => {
@@ -568,14 +567,14 @@ describe('MCP Tool Docs', () => {
         const tools = getMcpToolDocs();
         const names = tools.map(t => t.name);
         expect(names).toContain('corvid_web_search');
-        expect(names).toContain('corvid_web_fetch');
+        expect(names).toContain('corvid_deep_research');
     });
 
     test('includes work task tools', () => {
         const tools = getMcpToolDocs();
         const names = tools.map(t => t.name);
         expect(names).toContain('corvid_create_work_task');
-        expect(names).toContain('corvid_list_work_tasks');
+        expect(names).toContain('corvid_manage_schedule');
     });
 
     test('all descriptions are meaningful (>10 chars)', () => {
