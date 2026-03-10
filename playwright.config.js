@@ -10,11 +10,12 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
     workers: process.env.CI ? 1 : 2,
-    reporter: 'line',
+    reporter: process.env.CI ? [['html', { open: 'never' }], ['line']] : 'line',
     timeout: 120_000,
     use: {
         baseURL: E2E_BASE,
         trace: 'on-first-retry',
+        screenshot: 'only-on-failure',
     },
     projects: [
         {

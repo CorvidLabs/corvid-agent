@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Sessions', () => {
     test('session list renders', async ({ page, api }) => {
@@ -72,8 +70,8 @@ test.describe('Sessions', () => {
         const searchInput = page.locator('.search-input');
         if (await searchInput.count() > 0) {
             await searchInput.fill(uniqueName.slice(0, 8));
-            await page.waitForTimeout(500);
 
+            // Assertion timeout covers search debounce
             await expect(page.locator(`text=${uniqueName}`).first()).toBeVisible({ timeout: 10000 });
         }
     });

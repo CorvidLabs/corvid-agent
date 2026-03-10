@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL , E2E_DEFAULT_MODEL } from './fixtures';
 
 // Council sessions require a working Claude API — skip in CI without it
 const skipNoKey = !!process.env.CI && !process.env.ANTHROPIC_API_KEY;
@@ -39,7 +37,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const agent1Res = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Flow Agent Alpha', model: 'claude-sonnet-4-20250514' }),
+            body: JSON.stringify({ name: 'Flow Agent Alpha', model: E2E_DEFAULT_MODEL }),
         });
         const agent1 = await agent1Res.json();
         agent1Id = agent1.id;
@@ -47,7 +45,7 @@ test.describe.serial('Council Deliberation Flow', () => {
         const agent2Res = await authedFetch(`${BASE_URL}/api/agents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Flow Agent Beta', model: 'claude-sonnet-4-20250514' }),
+            body: JSON.stringify({ name: 'Flow Agent Beta', model: E2E_DEFAULT_MODEL }),
         });
         const agent2 = await agent2Res.json();
         agent2Id = agent2.id;
@@ -113,8 +111,6 @@ test.describe.serial('Council Deliberation Flow', () => {
 
         // Review sessions should appear (if still in reviewing stage or later)
         if (launch.stage === 'reviewing') {
-            // Wait briefly for UI to render review cards
-            await page.waitForTimeout(1000);
             const reviewCards = page.locator('h3:has-text("Peer Reviews")');
             // May or may not be visible if stage already advanced
             if (await reviewCards.count() > 0) {
@@ -247,7 +243,6 @@ test.describe.serial('Council Deliberation Flow', () => {
         const logsBtn = page.locator('button:text("Logs"), button:text("Hide Logs")').first();
         if (await logsBtn.count() > 0) {
             await logsBtn.click();
-            await page.waitForTimeout(500);
 
             // Log panel should be visible after clicking
             const logPanel = page.locator('.log-panel');

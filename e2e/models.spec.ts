@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Models', () => {
     test('page loads with heading and status banner', async ({ page }) => {
@@ -60,8 +58,8 @@ test.describe('Models', () => {
 
         // Type a search query
         await searchInput.fill('llama');
-        // Wait for debounce
-        await page.waitForTimeout(500);
+        // Allow debounce to settle
+        await page.waitForLoadState('networkidle');
 
         // Model cards should still render (or show filtered results)
         const cards = page.locator('.model-card');

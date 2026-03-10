@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Schedules', () => {
     test('page loads with heading', async ({ page }) => {
@@ -44,8 +42,8 @@ test.describe('Schedules', () => {
         const runBtn = page.locator('.action-btn--run, button:text("Run Now")').first();
         if (await runBtn.count() > 0) {
             await runBtn.click();
-            // Just verify no crash — result depends on scheduler availability
-            await page.waitForTimeout(1000);
+            // Verify no crash — wait for any network response to settle
+            await page.waitForLoadState('networkidle');
         }
     });
 
