@@ -2,10 +2,10 @@
  * Tests for the on-chain FlockDirectory client and deploy helpers.
  *
  * These tests verify:
- * - ABI method loading from ARC56 spec
+ * - OnChainFlockClient construction and type exports
+ * - Tier constants
  * - App ID persistence (config table read/write)
- * - OnChainFlockClient construction and method resolution
- * - Type exports and tier constants
+ * - AlgoKit generated client structure (APP_SPEC, typed structs)
  */
 import { test, expect, describe, beforeEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
@@ -19,6 +19,11 @@ import {
     TIER_NAMES,
 } from '../flock-directory/on-chain-client';
 import { getPersistedAppId, setPersistedAppId } from '../flock-directory/deploy';
+import {
+    APP_SPEC,
+    FlockDirectoryClient,
+    FlockDirectoryFactory,
+} from '../flock-directory/contract/FlockDirectoryClient.generated';
 
 // ─── DB Setup ────────────────────────────────────────────────────────────────
 
@@ -75,7 +80,6 @@ describe('app ID persistence', () => {
 
 describe('OnChainFlockClient', () => {
     test('constructs with config', () => {
-        // Use a mock algod client (just need the type to construct)
         const mockAlgod = {} as import('algosdk').default.Algodv2;
         const client = new OnChainFlockClient({
             appId: 42,
@@ -95,15 +99,15 @@ describe('OnChainFlockClient', () => {
     });
 });
 
-// ─── ARC56 Spec ──────────────────────────────────────────────────────────────
+// ─── AlgoKit Generated Client ────────────────────────────────────────────────
 
-describe('ARC56 spec', () => {
-    test('ARC56 JSON is loadable and has expected methods', async () => {
-        const spec = await import('../flock-directory/contract/FlockDirectory.arc56.json');
-        expect(spec.name).toBe('FlockDirectory');
-        expect(spec.methods).toBeArray();
+describe('AlgoKit generated client (APP_SPEC)', () => {
+    test('APP_SPEC has correct contract name', () => {
+        expect(APP_SPEC.name).toBe('FlockDirectory');
+    });
 
-        const methodNames = spec.methods.map((m: { name: string }) => m.name);
+    test('APP_SPEC has all expected ABI methods', () => {
+        const methodNames = APP_SPEC.methods.map((m) => m.name);
         expect(methodNames).toContain('registerAgent');
         expect(methodNames).toContain('updateAgent');
         expect(methodNames).toContain('heartbeat');
@@ -116,30 +120,68 @@ describe('ARC56 spec', () => {
         expect(methodNames).toContain('createApplication');
     });
 
-    test('registerAgent method requires payment arg', async () => {
-        const spec = await import('../flock-directory/contract/FlockDirectory.arc56.json');
-        const registerMethod = spec.methods.find((m: { name: string }) => m.name === 'registerAgent');
-        expect(registerMethod).toBeTruthy();
+    test('APP_SPEC has 17 methods total', () => {
+        expect(APP_SPEC.methods.length).toBe(17);
+    });
 
-        const payArg = registerMethod!.args.find((a: { name: string; type: string }) => a.type === 'pay');
+    test('registerAgent method requires payment arg', () => {
+        const registerMethod = APP_SPEC.methods.find((m) => m.name === 'registerAgent');
+        expect(registerMethod).toBeTruthy();
+        const payArg = registerMethod!.args.find((a) => a.type === 'pay');
         expect(payArg).toBeTruthy();
         expect(payArg!.name).toBe('payment');
     });
 
-    test('getAgentInfo returns AgentRecord struct', async () => {
-        const spec = await import('../flock-directory/contract/FlockDirectory.arc56.json');
-        const method = spec.methods.find((m: { name: string }) => m.name === 'getAgentInfo');
+    test('getAgentInfo returns AgentRecord struct', () => {
+        const method = APP_SPEC.methods.find((m) => m.name === 'getAgentInfo');
         expect(method).toBeTruthy();
-        expect(method!.returns.type).toBe('(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)');
+        expect(method!.returns.type).toBe(
+            '(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)',
+        );
     });
 
-    test('structs are defined', async () => {
-        const spec = await import('../flock-directory/contract/FlockDirectory.arc56.json');
-        expect(spec.structs).toBeTruthy();
-        expect(spec.structs.AgentRecord).toBeArray();
-        expect(spec.structs.AgentRecord.length).toBe(10);
-        expect(spec.structs.Challenge).toBeArray();
-        expect(spec.structs.TestResult).toBeArray();
+    test('structs are defined with correct fields', () => {
+        expect(APP_SPEC.structs).toBeTruthy();
+        expect(APP_SPEC.structs.AgentRecord).toBeArray();
+        expect(APP_SPEC.structs.AgentRecord.length).toBe(10);
+        expect(APP_SPEC.structs.Challenge).toBeArray();
+        expect(APP_SPEC.structs.TestResult).toBeArray();
+    });
+
+    test('byteCode is embedded in APP_SPEC', () => {
+        expect(APP_SPEC.byteCode).toBeTruthy();
+        expect(APP_SPEC.byteCode!.approval).toBeTruthy();
+        expect(APP_SPEC.byteCode!.clear).toBeTruthy();
+        // Approval program should be substantial
+        expect(APP_SPEC.byteCode!.approval.length).toBeGreaterThan(100);
+    });
+
+    test('state schema is correct', () => {
+        expect(APP_SPEC.state.schema.global.ints).toBe(4);
+        expect(APP_SPEC.state.schema.global.bytes).toBe(1);
+    });
+
+    test('box maps are defined for agents, challenges, testResults', () => {
+        const boxMaps = APP_SPEC.state.maps.box;
+        expect(boxMaps.agents).toBeTruthy();
+        expect(boxMaps.challenges).toBeTruthy();
+        expect(boxMaps.testResults).toBeTruthy();
+    });
+
+    test('networks field exists (for future app ID storage)', () => {
+        expect(APP_SPEC.networks).toBeDefined();
+    });
+});
+
+describe('generated typed exports', () => {
+    test('FlockDirectoryClient class is exported', () => {
+        expect(FlockDirectoryClient).toBeDefined();
+        expect(typeof FlockDirectoryClient).toBe('function');
+    });
+
+    test('FlockDirectoryFactory class is exported', () => {
+        expect(FlockDirectoryFactory).toBeDefined();
+        expect(typeof FlockDirectoryFactory).toBe('function');
     });
 });
 

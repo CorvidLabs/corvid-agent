@@ -1,8 +1,11 @@
 /**
- * OnChainFlockClient — TypeScript client for the FlockDirectory smart contract.
+ * OnChainFlockClient — Typed client facade for the FlockDirectory smart contract.
  *
- * Uses algosdk's AtomicTransactionComposer + ABI methods to interact
- * with the on-chain Flock Directory contract on Algorand.
+ * Wraps the AlgoKit-generated typed client (FlockDirectoryClient) with a
+ * purpose-built API for corvid-agent's flock directory operations.
+ *
+ * Contract spec: server/flock-directory/contract/FlockDirectory.arc56.json
+ * Generated client: server/flock-directory/contract/FlockDirectoryClient.generated.ts
  */
 import { createLogger } from '../lib/logger';
 import { wipeBuffer } from '../lib/secure-wipe';
@@ -60,7 +63,6 @@ export class OnChainFlockClient {
     private appId: number;
     private algodClient: import('algosdk').default.Algodv2;
     private waitRounds: number;
-    private abiMethods: Map<string, import('algosdk').default.ABIMethod> = new Map();
 
     constructor(config: OnChainFlockConfig) {
         this.appId = config.appId;
@@ -73,117 +75,45 @@ export class OnChainFlockClient {
         return this.appId;
     }
 
-    // ─── ABI Method Resolution ───────────────────────────────────────────────
+    // ─── AlgoKit Client Helpers ─────────────────────────────────────────────
 
     /**
-     * Load ABI methods from the ARC56 spec bundled with the contract.
-     * Lazy-loaded on first use.
+     * Build an AlgorandClient + signer + typed FlockDirectoryClient for a given account.
      */
-    private async getMethod(name: string): Promise<import('algosdk').default.ABIMethod> {
-        if (this.abiMethods.size === 0) {
-            await this.loadAbiMethods();
-        }
-        const method = this.abiMethods.get(name);
-        if (!method) throw new Error(`Unknown ABI method: ${name}`);
-        return method;
-    }
-
-    private async loadAbiMethods(): Promise<void> {
-        const algosdk = (await import('algosdk')).default;
-        // Load ARC56 spec from bundled artifact
-        const spec = await import('./contract/FlockDirectory.arc56.json');
-        for (const m of spec.methods) {
-            const abiMethod = new algosdk.ABIMethod({
-                name: m.name,
-                args: m.args.map((a: { name: string; type: string }) => ({
-                    name: a.name,
-                    type: a.type === 'pay' ? 'pay' : a.type,
-                })),
-                returns: { type: m.returns.type },
-            });
-            this.abiMethods.set(m.name, abiMethod);
-        }
-        log.info(`Loaded ${this.abiMethods.size} ABI methods from FlockDirectory spec`);
-    }
-
-    // ─── Transaction Helpers ─────────────────────────────────────────────────
-
-    /**
-     * Create a TransactionSigner from a secret key.
-     * Uses algosdk's makeBasicAccountTransactionSigner for compatibility.
-     */
-    private async makeSigner(sk: Uint8Array): Promise<import('algosdk').TransactionSigner> {
-        const algosdk = (await import('algosdk')).default;
-        // Reconstruct an Account object from the secret key
-        const mnemonic = algosdk.secretKeyToMnemonic(sk);
-        const account = algosdk.mnemonicToSecretKey(mnemonic);
-        return algosdk.makeBasicAccountTransactionSigner(account);
-    }
-
-    /**
-     * Execute a simple ABI method call (no payment transaction argument).
-     */
-    private async callMethod(
-        methodName: string,
-        args: import('algosdk').ABIValue[],
+    private async buildTypedClient(
         senderAddress: string,
         sk: Uint8Array,
-        opts?: { boxes?: import('algosdk').BoxReference[]; appAccounts?: string[] },
-    ): Promise<import('algosdk').ABIResult> {
+    ) {
         const algosdk = (await import('algosdk')).default;
-        const method = await this.getMethod(methodName);
-        const params = await this.algodClient.getTransactionParams().do();
-        const signer = await this.makeSigner(sk);
+        const { AlgorandClient } = await import(
+            '@algorandfoundation/algokit-utils/types/algorand-client'
+        );
+        const { FlockDirectoryClient } = await import(
+            './contract/FlockDirectoryClient.generated'
+        );
 
-        const composer = new algosdk.AtomicTransactionComposer();
-        composer.addMethodCall({
-            appID: this.appId,
-            method,
-            methodArgs: args,
-            sender: senderAddress,
-            suggestedParams: params,
-            signer,
-            boxes: opts?.boxes,
-            appAccounts: opts?.appAccounts?.map((a) => algosdk.Address.fromString(a)),
+        const algorand = AlgorandClient.fromClients({ algod: this.algodClient });
+
+        // Reconstruct account from secret key to get a TransactionSigner
+        const mnemonic = algosdk.secretKeyToMnemonic(sk);
+        const account = algosdk.mnemonicToSecretKey(mnemonic);
+        const signer = algosdk.makeBasicAccountTransactionSigner(account);
+        algorand.setDefaultSigner(signer);
+
+        const client = new FlockDirectoryClient({
+            algorand,
+            appId: BigInt(this.appId),
+            defaultSender: senderAddress,
         });
 
-        const result = await composer.execute(this.algodClient, this.waitRounds);
-        return result.methodResults[0];
-    }
-
-    /**
-     * Compute the box reference for an agent address.
-     * Box key = prefix 'a' + 32-byte address.
-     */
-    private async agentBoxRef(address: string): Promise<import('algosdk').BoxReference> {
-        const algosdk = (await import('algosdk')).default;
-        const addr = algosdk.Address.fromString(address);
-        const key = new Uint8Array(1 + 32);
-        key[0] = 0x61; // 'a'
-        key.set(addr.publicKey, 1);
-        return { appIndex: this.appId, name: key };
-    }
-
-    /**
-     * Compute the box reference for a challenge ID.
-     * Box key = prefix 'c' + encoded challenge ID string.
-     */
-    private challengeBoxRef(challengeId: string): import('algosdk').BoxReference {
-        const encoder = new TextEncoder();
-        const idBytes = encoder.encode(challengeId);
-        // Dynamic-size box: prefix 'c' + 2-byte length + id bytes
-        const key = new Uint8Array(1 + 2 + idBytes.length);
-        key[0] = 0x63; // 'c'
-        key[1] = (idBytes.length >> 8) & 0xff;
-        key[2] = idBytes.length & 0xff;
-        key.set(idBytes, 3);
-        return { appIndex: this.appId, name: key };
+        return { algorand, client, signer, algosdk };
     }
 
     // ─── Contract Deployment ─────────────────────────────────────────────────
 
     /**
      * Deploy the FlockDirectory contract to the network.
+     * Uses the AlgoKit AppFactory for idempotent deployment.
      * Returns the new app ID.
      */
     async deploy(
@@ -191,51 +121,41 @@ export class OnChainFlockClient {
         sk: Uint8Array,
     ): Promise<number> {
         const algosdk = (await import('algosdk')).default;
-        const fs = await import('fs');
-        const path = await import('path');
+        const { AlgorandClient } = await import(
+            '@algorandfoundation/algokit-utils/types/algorand-client'
+        );
+        const { FlockDirectoryFactory } = await import(
+            './contract/FlockDirectoryClient.generated'
+        );
 
-        const artifactDir = path.join(import.meta.dir, 'contract');
-        const approvalTeal = fs.readFileSync(path.join(artifactDir, 'FlockDirectory.approval.teal'), 'utf-8');
-        const clearTeal = fs.readFileSync(path.join(artifactDir, 'FlockDirectory.clear.teal'), 'utf-8');
+        const algorand = AlgorandClient.fromClients({ algod: this.algodClient });
+        const mnemonic = algosdk.secretKeyToMnemonic(sk);
+        const account = algosdk.mnemonicToSecretKey(mnemonic);
+        algorand.setDefaultSigner(algosdk.makeBasicAccountTransactionSigner(account));
 
-        // Compile TEAL programs
-        const approvalResult = await this.algodClient.compile(approvalTeal).do();
-        const clearResult = await this.algodClient.compile(clearTeal).do();
-
-        const approvalProgram = new Uint8Array(Buffer.from(approvalResult.result, 'base64'));
-        const clearProgram = new Uint8Array(Buffer.from(clearResult.result, 'base64'));
-
-        const method = await this.getMethod('createApplication');
-        const params = await this.algodClient.getTransactionParams().do();
-        const signer = await this.makeSigner(sk);
-
-        const composer = new algosdk.AtomicTransactionComposer();
-        composer.addMethodCall({
-            appID: 0, // 0 = create
-            method,
-            methodArgs: [],
-            sender: senderAddress,
-            suggestedParams: params,
-            signer,
-            approvalProgram,
-            clearProgram,
-            numGlobalInts: 4,
-            numGlobalByteSlices: 1,
-            numLocalInts: 0,
-            numLocalByteSlices: 0,
-            extraPages: 3, // Large approval program needs extra pages
+        const factory = new FlockDirectoryFactory({
+            algorand,
+            defaultSender: senderAddress,
         });
 
-        const result = await composer.execute(this.algodClient, this.waitRounds);
-        const txInfo = result.methodResults[0].txInfo;
-        const newAppId = Number(txInfo?.applicationIndex ?? 0);
+        const { appClient } = await factory.send.create.createApplication({
+            args: [],
+            schema: {
+                globalInts: 4,
+                globalByteSlices: 1,
+                localInts: 0,
+                localByteSlices: 0,
+            },
+            extraProgramPages: 3,
+        });
 
+        const newAppId = Number(appClient.appId);
         if (newAppId === 0) {
             throw new Error('Deploy failed: no application ID returned');
         }
 
         this.appId = newAppId;
-        log.info('Deployed FlockDirectory contract', { appId: newAppId, txId: result.txIDs[0] });
+        log.info('Deployed FlockDirectory contract', { appId: newAppId });
         return newAppId;
     }
 
@@ -279,35 +199,22 @@ export class OnChainFlockClient {
         metadata: string,
         stakeMicroAlgos: number,
     ): Promise<string> {
-        const algosdk = (await import('algosdk')).default;
-        const method = await this.getMethod('registerAgent');
-        const params = await this.algodClient.getTransactionParams().do();
-        const signer = await this.makeSigner(sk);
-        const appAddr = algosdk.getApplicationAddress(this.appId);
+        const { algorand, client, algosdk } = await this.buildTypedClient(senderAddress, sk);
 
         // Create the stake payment transaction
-        const payTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+        const { AlgoAmount } = await import('@algorandfoundation/algokit-utils/types/amount');
+        const appAddr = algosdk.getApplicationAddress(this.appId);
+        const payTxn = await algorand.createTransaction.payment({
             sender: senderAddress,
             receiver: appAddr.toString(),
-            amount: stakeMicroAlgos,
-            suggestedParams: params,
+            amount: AlgoAmount.MicroAlgo(stakeMicroAlgos),
         });
 
-        const agentBox = await this.agentBoxRef(senderAddress);
-
-        const composer = new algosdk.AtomicTransactionComposer();
-        composer.addMethodCall({
-            appID: this.appId,
-            method,
-            methodArgs: [name, endpoint, metadata, { txn: payTxn, signer }],
-            sender: senderAddress,
-            suggestedParams: params,
-            signer,
-            boxes: [agentBox],
+        const result = await client.send.registerAgent({
+            args: { name, endpoint, metadata, payment: payTxn },
         });
 
-        const result = await composer.execute(this.algodClient, this.waitRounds);
-        const txId = result.txIDs[result.txIDs.length - 1];
+        const txId = result.transaction.txID();
         log.info('Registered agent on-chain', { address: senderAddress, name, txId });
         return txId;
     }
@@ -322,40 +229,39 @@ export class OnChainFlockClient {
         endpoint: string,
         metadata: string,
     ): Promise<string> {
-        const agentBox = await this.agentBoxRef(senderAddress);
-        const result = await this.callMethod(
-            'updateAgent',
-            [name, endpoint, metadata],
-            senderAddress,
-            sk,
-            { boxes: [agentBox] },
-        );
-        log.info('Updated agent on-chain', { address: senderAddress, txId: result.txID });
-        return result.txID;
+        const { client } = await this.buildTypedClient(senderAddress, sk);
+        const result = await client.send.updateAgent({
+            args: { name, endpoint, metadata },
+        });
+        const txId = result.transaction.txID();
+        log.info('Updated agent on-chain', { address: senderAddress, txId });
+        return txId;
     }
 
     /**
      * Send a heartbeat to keep the agent's status active.
      */
     async heartbeat(senderAddress: string, sk: Uint8Array): Promise<string> {
-        const agentBox = await this.agentBoxRef(senderAddress);
-        const result = await this.callMethod('heartbeat', [], senderAddress, sk, {
-            boxes: [agentBox],
+        const { client } = await this.buildTypedClient(senderAddress, sk);
+        const result = await client.send.heartbeat({
+            args: [],
         });
+        const txId = result.transaction.txID();
         log.debug('Agent heartbeat sent', { address: senderAddress });
-        return result.txID;
+        return txId;
     }
 
     /**
      * Deregister an agent and return its stake.
      */
     async deregister(senderAddress: string, sk: Uint8Array): Promise<string> {
-        const agentBox = await this.agentBoxRef(senderAddress);
-        const result = await this.callMethod('deregister', [], senderAddress, sk, {
-            boxes: [agentBox],
+        const { client } = await this.buildTypedClient(senderAddress, sk);
+        const result = await client.send.deregister({
+            args: [],
         });
-        log.info('Deregistered agent on-chain', { address: senderAddress, txId: result.txID });
-        return result.txID;
+        const txId = result.transaction.txID();
+        log.info('Deregistered agent on-chain', { address: senderAddress, txId });
+        return txId;
     }
 
     // ─── Challenge Protocol ──────────────────────────────────────────────────
@@ -371,16 +277,13 @@ export class OnChainFlockClient {
         description: string,
         maxScore: number,
     ): Promise<string> {
-        const challengeBox = this.challengeBoxRef(challengeId);
-        const result = await this.callMethod(
-            'createChallenge',
-            [challengeId, category, description, BigInt(maxScore)],
-            adminAddress,
-            sk,
-            { boxes: [challengeBox] },
-        );
-        log.info('Created challenge', { challengeId, category, txId: result.txID });
-        return result.txID;
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.createChallenge({
+            args: { challengeId, category, description, maxScore: BigInt(maxScore) },
+        });
+        const txId = result.transaction.txID();
+        log.info('Created challenge', { challengeId, category, txId });
+        return txId;
     }
 
     /**
@@ -391,16 +294,13 @@ export class OnChainFlockClient {
         sk: Uint8Array,
         challengeId: string,
     ): Promise<string> {
-        const challengeBox = this.challengeBoxRef(challengeId);
-        const result = await this.callMethod(
-            'deactivateChallenge',
-            [challengeId],
-            adminAddress,
-            sk,
-            { boxes: [challengeBox] },
-        );
-        log.info('Deactivated challenge', { challengeId, txId: result.txID });
-        return result.txID;
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.deactivateChallenge({
+            args: { challengeId },
+        });
+        const txId = result.transaction.txID();
+        log.info('Deactivated challenge', { challengeId, txId });
+        return txId;
     }
 
     /**
@@ -413,36 +313,17 @@ export class OnChainFlockClient {
         challengeId: string,
         score: number,
     ): Promise<string> {
-        const algosdk = (await import('algosdk')).default;
-        const agentBox = await this.agentBoxRef(agentAddress);
-        const challengeBox = this.challengeBoxRef(challengeId);
-
-        // Test result box: prefix 't' + 2-byte len + (32-byte addr + 2-byte len + challengeId)
-        const challengeIdBytes = new TextEncoder().encode(challengeId);
-        const addr = algosdk.Address.fromString(agentAddress);
-        const testKey = new Uint8Array(1 + 2 + 32 + 2 + challengeIdBytes.length);
-        testKey[0] = 0x74; // 't'
-        const innerLen = 32 + 2 + challengeIdBytes.length;
-        testKey[1] = (innerLen >> 8) & 0xff;
-        testKey[2] = innerLen & 0xff;
-        testKey.set(addr.publicKey, 3);
-        testKey[35] = (challengeIdBytes.length >> 8) & 0xff;
-        testKey[36] = challengeIdBytes.length & 0xff;
-        testKey.set(challengeIdBytes, 37);
-        const testBox: import('algosdk').BoxReference = { appIndex: this.appId, name: testKey };
-
-        const result = await this.callMethod(
-            'recordTestResult',
-            [algosdk.Address.fromString(agentAddress), challengeId, BigInt(score)],
-            adminAddress,
-            sk,
-            {
-                boxes: [agentBox, challengeBox, testBox],
-                appAccounts: [agentAddress],
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.recordTestResult({
+            args: {
+                agentAddress,
+                challengeId,
+                score: BigInt(score),
             },
-        );
-        log.info('Recorded test result', { agentAddress, challengeId, score, txId: result.txID });
-        return result.txID;
+        });
+        const txId = result.transaction.txID();
+        log.info('Recorded test result', { agentAddress, challengeId, score, txId });
+        return txId;
     }
 
     // ─── Read Methods ────────────────────────────────────────────────────────
@@ -455,29 +336,23 @@ export class OnChainFlockClient {
         readerAddress: string,
         sk: Uint8Array,
     ): Promise<OnChainAgentRecord> {
-        const algosdk = (await import('algosdk')).default;
-        const agentBox = await this.agentBoxRef(agentAddress);
-        const result = await this.callMethod(
-            'getAgentInfo',
-            [algosdk.Address.fromString(agentAddress)],
-            readerAddress,
-            sk,
-            { boxes: [agentBox], appAccounts: [agentAddress] },
-        );
+        const { client } = await this.buildTypedClient(readerAddress, sk);
+        const result = await client.send.getAgentInfo({
+            args: { agentAddress },
+        });
 
-        // Result is a tuple: (string, string, string, uint64, uint64, uint64, uint64, uint64, uint64, uint64)
-        const tuple = result.returnValue as unknown as [string, string, string, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+        const record = result.return!;
         return {
-            name: tuple[0],
-            endpoint: tuple[1],
-            metadata: tuple[2],
-            tier: Number(tuple[3]),
-            totalScore: Number(tuple[4]),
-            totalMaxScore: Number(tuple[5]),
-            testCount: Number(tuple[6]),
-            lastHeartbeatRound: Number(tuple[7]),
-            registrationRound: Number(tuple[8]),
-            stake: Number(tuple[9]),
+            name: record.name,
+            endpoint: record.endpoint,
+            metadata: record.metadata,
+            tier: Number(record.tier),
+            totalScore: Number(record.totalScore),
+            totalMaxScore: Number(record.totalMaxScore),
+            testCount: Number(record.testCount),
+            lastHeartbeatRound: Number(record.lastHeartbeatRound),
+            registrationRound: Number(record.registrationRound),
+            stake: Number(record.stake),
         };
     }
 
@@ -489,16 +364,11 @@ export class OnChainFlockClient {
         readerAddress: string,
         sk: Uint8Array,
     ): Promise<number> {
-        const algosdk = (await import('algosdk')).default;
-        const agentBox = await this.agentBoxRef(agentAddress);
-        const result = await this.callMethod(
-            'getAgentTier',
-            [algosdk.Address.fromString(agentAddress)],
-            readerAddress,
-            sk,
-            { boxes: [agentBox], appAccounts: [agentAddress] },
-        );
-        return Number(result.returnValue as bigint);
+        const { client } = await this.buildTypedClient(readerAddress, sk);
+        const result = await client.send.getAgentTier({
+            args: { agentAddress },
+        });
+        return Number(result.return!);
     }
 
     /**
@@ -509,16 +379,11 @@ export class OnChainFlockClient {
         readerAddress: string,
         sk: Uint8Array,
     ): Promise<number> {
-        const algosdk = (await import('algosdk')).default;
-        const agentBox = await this.agentBoxRef(agentAddress);
-        const result = await this.callMethod(
-            'getAgentScore',
-            [algosdk.Address.fromString(agentAddress)],
-            readerAddress,
-            sk,
-            { boxes: [agentBox], appAccounts: [agentAddress] },
-        );
-        return Number(result.returnValue as bigint);
+        const { client } = await this.buildTypedClient(readerAddress, sk);
+        const result = await client.send.getAgentScore({
+            args: { agentAddress },
+        });
+        return Number(result.return!);
     }
 
     /**
@@ -529,16 +394,11 @@ export class OnChainFlockClient {
         readerAddress: string,
         sk: Uint8Array,
     ): Promise<number> {
-        const algosdk = (await import('algosdk')).default;
-        const agentBox = await this.agentBoxRef(agentAddress);
-        const result = await this.callMethod(
-            'getAgentTestCount',
-            [algosdk.Address.fromString(agentAddress)],
-            readerAddress,
-            sk,
-            { boxes: [agentBox], appAccounts: [agentAddress] },
-        );
-        return Number(result.returnValue as bigint);
+        const { client } = await this.buildTypedClient(readerAddress, sk);
+        const result = await client.send.getAgentTestCount({
+            args: { agentAddress },
+        });
+        return Number(result.return!);
     }
 
     /**
@@ -549,22 +409,17 @@ export class OnChainFlockClient {
         readerAddress: string,
         sk: Uint8Array,
     ): Promise<OnChainChallenge> {
-        const challengeBox = this.challengeBoxRef(challengeId);
-        const result = await this.callMethod(
-            'getChallengeInfo',
-            [challengeId],
-            readerAddress,
-            sk,
-            { boxes: [challengeBox] },
-        );
+        const { client } = await this.buildTypedClient(readerAddress, sk);
+        const result = await client.send.getChallengeInfo({
+            args: { challengeId },
+        });
 
-        // Result is a tuple: (string, string, uint64, uint64)
-        const tuple = result.returnValue as unknown as [string, string, bigint, bigint];
+        const challenge = result.return!;
         return {
-            category: tuple[0],
-            description: tuple[1],
-            maxScore: Number(tuple[2]),
-            active: tuple[3] === 1n,
+            category: challenge.category,
+            description: challenge.description,
+            maxScore: Number(challenge.maxScore),
+            active: challenge.active === 1n,
         };
     }
 
@@ -578,13 +433,11 @@ export class OnChainFlockClient {
         sk: Uint8Array,
         newMinStakeMicroAlgos: number,
     ): Promise<string> {
-        const result = await this.callMethod(
-            'updateMinStake',
-            [BigInt(newMinStakeMicroAlgos)],
-            adminAddress,
-            sk,
-        );
-        return result.txID;
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.updateMinStake({
+            args: { newMinStake: BigInt(newMinStakeMicroAlgos) },
+        });
+        return result.transaction.txID();
     }
 
     /**
@@ -595,14 +448,11 @@ export class OnChainFlockClient {
         sk: Uint8Array,
         newAdminAddress: string,
     ): Promise<string> {
-        const algosdk = (await import('algosdk')).default;
-        const result = await this.callMethod(
-            'transferAdmin',
-            [algosdk.Address.fromString(newAdminAddress)],
-            adminAddress,
-            sk,
-        );
-        return result.txID;
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.transferAdmin({
+            args: { newAdmin: newAdminAddress },
+        });
+        return result.transaction.txID();
     }
 
     /**
@@ -613,13 +463,11 @@ export class OnChainFlockClient {
         sk: Uint8Array,
         open: boolean,
     ): Promise<string> {
-        const result = await this.callMethod(
-            'setRegistrationOpen',
-            [BigInt(open ? 1 : 0)],
-            adminAddress,
-            sk,
-        );
-        return result.txID;
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.setRegistrationOpen({
+            args: { open: BigInt(open ? 1 : 0) },
+        });
+        return result.transaction.txID();
     }
 
     /**
@@ -630,15 +478,10 @@ export class OnChainFlockClient {
         sk: Uint8Array,
         agentAddress: string,
     ): Promise<string> {
-        const algosdk = (await import('algosdk')).default;
-        const agentBox = await this.agentBoxRef(agentAddress);
-        const result = await this.callMethod(
-            'adminRemoveAgent',
-            [algosdk.Address.fromString(agentAddress)],
-            adminAddress,
-            sk,
-            { boxes: [agentBox], appAccounts: [agentAddress] },
-        );
-        return result.txID;
+        const { client } = await this.buildTypedClient(adminAddress, sk);
+        const result = await client.send.adminRemoveAgent({
+            args: { agentAddress },
+        });
+        return result.transaction.txID();
     }
 }
