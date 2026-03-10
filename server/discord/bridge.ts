@@ -327,6 +327,7 @@ export class DiscordBridge {
                 name: 'council',
                 description: 'Launch a council deliberation on a topic',
                 type: 1,
+                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
                 options: [{
                     name: 'topic',
                     description: 'The topic to deliberate on',
@@ -348,6 +349,7 @@ export class DiscordBridge {
                 name: 'mute',
                 description: 'Mute a user from bot interactions (admin only)',
                 type: 1,
+                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
                 options: [{
                     name: 'user',
                     description: 'The user to mute',
@@ -359,6 +361,7 @@ export class DiscordBridge {
                 name: 'unmute',
                 description: 'Unmute a user (admin only)',
                 type: 1,
+                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
                 options: [{
                     name: 'user',
                     description: 'The user to unmute',
@@ -370,6 +373,7 @@ export class DiscordBridge {
                 name: 'admin',
                 description: 'Manage bot configuration (admin only)',
                 type: 1, // CHAT_INPUT
+                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
                 options: [
                     {
                         name: 'channels',

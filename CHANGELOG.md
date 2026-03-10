@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.2] - 2026-03-10
+
+### Fixed
+- Hide admin-only Discord commands (`/admin`, `/council`, `/mute`, `/unmute`) from non-admin users via `default_member_permissions` (#921)
+
 ## [0.24.1] - 2026-03-10
 
 ### Fixed
