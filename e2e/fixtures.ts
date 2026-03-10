@@ -2,8 +2,12 @@ import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+/** Base URL for the E2E test server — shared across all spec files. */
+export const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 const E2E_API_KEY = process.env.API_KEY || 'e2e-test-key';
+
+/** Default model used when seeding agents in E2E tests. */
+export const E2E_DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
 /**
  * Navigate to a page, retrying on 429 rate-limit responses or empty lazy-load.
@@ -124,7 +128,7 @@ export const test = base.extend<{ api: ApiHelpers }>({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name,
-                        model: 'claude-sonnet-4-20250514',
+                        model: E2E_DEFAULT_MODEL,
                         algochatEnabled: true,
                     }),
                 });
@@ -525,7 +529,13 @@ export const test = base.extend<{ api: ApiHelpers }>({
             fetch(`${BASE_URL}${path}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${E2E_API_KEY}` },
-            }).catch(() => {});
+            }).then((res) => {
+                if (!res.ok && res.status !== 404) {
+                    console.warn(`[e2e cleanup] DELETE ${path} → ${res.status}`);
+                }
+            }).catch((err) => {
+                console.warn(`[e2e cleanup] DELETE ${path} failed:`, err.message);
+            });
 
         for (const id of createdSessionIds) await del(`/api/sessions/${id}`);
         for (const id of createdCouncilIds) await del(`/api/councils/${id}`);

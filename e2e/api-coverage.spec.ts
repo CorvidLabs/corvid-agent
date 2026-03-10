@@ -1,6 +1,4 @@
-import { test, expect , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('API Coverage — Previously Untested Endpoints', () => {
     test('POST /api/backup creates database backup', async ({}) => {

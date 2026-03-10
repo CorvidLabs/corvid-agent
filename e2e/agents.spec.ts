@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL , E2E_DEFAULT_MODEL } from './fixtures';
 
 test.describe('Agents', () => {
     test('create agent and verify it appears in list', async ({ page }) => {
@@ -31,8 +29,7 @@ test.describe('Agents', () => {
 
         // If AlgoChat is enabled on localnet, wallet address should be visible
         if (health.algochat) {
-            // Wait for potential wallet creation (async)
-            await page.waitForTimeout(2000);
+            // Reload after wallet creation settles
             await page.reload();
             await page.waitForLoadState('networkidle');
 
@@ -89,9 +86,8 @@ test.describe('Agents', () => {
         const searchInput = page.locator('.search-input');
         if (await searchInput.count() > 0) {
             await searchInput.fill(uniqueName.slice(0, 12));
-            await page.waitForTimeout(500);
 
-            // The target agent should be visible
+            // The target agent should be visible (wait covers debounce)
             await expect(page.locator(`text=${uniqueName}`).first()).toBeVisible({ timeout: 5000 });
         }
     });
@@ -161,7 +157,7 @@ test.describe('Agents', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: `CRUD Agent ${Date.now()}`,
-                model: 'claude-sonnet-4-20250514',
+                model: E2E_DEFAULT_MODEL,
             }),
         });
         expect(createRes.status).toBe(201);

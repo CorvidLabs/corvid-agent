@@ -24,6 +24,7 @@ import {
     countQueuedTasks,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
+import { resolveExecutable } from '../lib/env';
 import { recordAudit } from '../db/audit';
 import { NotFoundError, ValidationError, ConflictError } from '../lib/errors';
 import { isRepoOffLimits } from '../github/off-limits';
@@ -339,7 +340,7 @@ export class WorkTaskService {
         // Resolve repo slug from git remote (used for off-limits check and dedup)
         let repoSlug: string | null = null;
         try {
-            const proc = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
+            const proc = Bun.spawn([resolveExecutable('git'), 'remote', 'get-url', 'origin'], {
                 cwd: project.workingDir, stdout: 'pipe', stderr: 'pipe',
             });
             const remoteUrl = (await new Response(proc.stdout).text()).trim();
@@ -842,11 +843,11 @@ export class WorkTaskService {
 
         try {
             // Ensure all changes are committed (agent may have left unstaged changes)
-            const statusProc = Bun.spawn(['git', 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+            const statusProc = Bun.spawn([resolveExecutable('git'), 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
             await statusProc.exited;
             if (await statusProc.exited !== 0) {
                 // There are uncommitted changes — commit them
-                const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+                const addProc = Bun.spawn([resolveExecutable('git'), 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
                 await addProc.exited;
                 const commitProc = Bun.spawn(
                     ['git', 'commit', '-m', `Work task: ${task.description.slice(0, 60)}`],
@@ -875,7 +876,7 @@ export class WorkTaskService {
             log.info('Fallback: creating PR', { taskId, branch: task.branchName });
 
             const prProc = Bun.spawn(
-                ['gh', 'pr', 'create', '--title', title, '--body', body, '--head', task.branchName],
+                [resolveExecutable('gh'), 'pr', 'create', '--title', title, '--body', body, '--head', task.branchName],
                 { cwd, stdout: 'pipe', stderr: 'pipe' },
             );
             const prStdout = await new Response(prProc.stdout).text();

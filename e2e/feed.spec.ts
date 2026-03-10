@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Feed', () => {
     test('page loads with heading and list or empty', async ({ page }) => {
@@ -57,7 +55,8 @@ test.describe('Feed', () => {
         // Enter search text to trigger pagination rendering
         const search = page.locator('.feed__search');
         await search.fill('a');
-        await page.waitForTimeout(500);
+        // Allow debounce to settle before checking pagination
+        await page.waitForLoadState('networkidle');
 
         const pagination = page.locator('.feed__pagination');
         if (await pagination.count() > 0) {

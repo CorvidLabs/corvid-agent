@@ -1,4 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Skill Bundles', () => {
     test('navigate to skill bundles page and verify empty state', async ({ page }) => {
@@ -150,7 +150,6 @@ test.describe('Skill Bundles', () => {
     });
 
     test('API CRUD for skill bundles', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const name = `API Bundle ${Date.now()}`;
 
         // Create
@@ -191,7 +190,6 @@ test.describe('Skill Bundles', () => {
     });
 
     test('validation rejects missing name', async ({}) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
 
         const res = await authedFetch(`${BASE_URL}/api/skill-bundles`, {
             method: 'POST',
@@ -202,7 +200,6 @@ test.describe('Skill Bundles', () => {
     });
 
     test('assign bundle to agent, list, and remove', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Assign Agent');
         const bundle = await api.seedSkillBundle({ name: `Assign Bundle ${Date.now()}` });
 
@@ -234,7 +231,6 @@ test.describe('Skill Bundles', () => {
     });
 
     test('assign bundle to project, list, and remove', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const project = await api.seedProject('Assign Project');
         const bundle = await api.seedSkillBundle({ name: `Project Bundle ${Date.now()}` });
 
@@ -266,7 +262,6 @@ test.describe('Skill Bundles', () => {
     });
 
     test('agent skill assignment rejects nonexistent bundle', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const agent = await api.seedAgent('Bad Assign Agent');
 
         const res = await authedFetch(`${BASE_URL}/api/agents/${agent.id}/skills`, {
@@ -278,7 +273,6 @@ test.describe('Skill Bundles', () => {
     });
 
     test('project skill assignment rejects nonexistent bundle', async ({ api }) => {
-        const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
         const project = await api.seedProject('Bad Assign Project');
 
         const res = await authedFetch(`${BASE_URL}/api/projects/${project.id}/skills`, {

@@ -8,9 +8,7 @@
  * via the unit test suite since those channels require external infrastructure.
  * These E2E tests focus on the API endpoint path and audit trail verification.
  */
-import { test, expect , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Prompt Injection Detection', () => {
     test.describe.configure({ mode: 'serial' });

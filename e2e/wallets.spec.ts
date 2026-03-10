@@ -1,6 +1,4 @@
-import { test, expect, gotoWithRetry , authedFetch } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect, gotoWithRetry , authedFetch , BASE_URL } from './fixtures';
 
 test.describe('Wallets', () => {
     test('page loads with heading', async ({ page }) => {
@@ -30,12 +28,13 @@ test.describe('Wallets', () => {
 
         // Type a nonexistent address
         await search.fill('ZZZNONEXISTENT999');
-        await page.waitForTimeout(500);
 
-        // Cards should disappear (or be empty)
-        const remaining = await page.locator('.wallet-card').count();
-        const hasEmpty = await page.locator('.empty').count() > 0;
-        expect(remaining === 0 || hasEmpty).toBe(true);
+        // Wait for filter to take effect — either cards disappear or empty state shows
+        await expect(async () => {
+            const remaining = await page.locator('.wallet-card').count();
+            const hasEmpty = await page.locator('.empty').count() > 0;
+            expect(remaining === 0 || hasEmpty).toBe(true);
+        }).toPass({ timeout: 5000 });
     });
 
     test('API summary returns data', async ({}) => {

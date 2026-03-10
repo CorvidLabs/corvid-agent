@@ -1,6 +1,4 @@
-import { test, expect , authedFetch , gotoWithRetry } from './fixtures';
-
-const BASE_URL = `http://localhost:${process.env.E2E_PORT || '3001'}`;
+import { test, expect , authedFetch , gotoWithRetry , BASE_URL , E2E_DEFAULT_MODEL } from './fixtures';
 
 interface TestWindow extends Window {
     __TEST_WS_INSTANCES: WebSocket[];
@@ -39,7 +37,7 @@ test.describe.serial('Approval Dialog Critical Path', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: 'Approval E2E Agent',
-                model: 'claude-sonnet-4-20250514',
+                model: E2E_DEFAULT_MODEL,
             }),
         });
         expect(agentRes.ok).toBe(true);
