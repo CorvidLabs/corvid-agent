@@ -37,6 +37,15 @@ export interface DiscordBridgeConfig {
     rateLimitByLevel?: Record<number, number>;
 }
 
+/** Recursive option type — supports subcommand groups and subcommands with nested options. */
+export interface DiscordInteractionOption {
+    name: string;
+    type: number;
+    value?: string | number | boolean;
+    /** Nested options — present for SUB_COMMAND (type 1) and SUB_COMMAND_GROUP (type 2) */
+    options?: DiscordInteractionOption[];
+}
+
 export interface DiscordInteractionData {
     id: string;
     type: number; // 1=PING, 2=APPLICATION_COMMAND, 3=MESSAGE_COMPONENT
@@ -46,7 +55,7 @@ export interface DiscordInteractionData {
     user?: DiscordAuthor;
     data?: {
         name: string;
-        options?: Array<{ name: string; type: number; value: string | number | boolean }>;
+        options?: DiscordInteractionOption[];
         /** For component interactions — the custom_id of the button clicked */
         custom_id?: string;
         /** For component interactions — the component type */

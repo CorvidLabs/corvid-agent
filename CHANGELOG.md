@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.24.0] - 2026-03-10
+
+### Added
+- **Discord `/admin` commands** — manage bot configuration directly from Discord using native mentions. Subcommands: `channels add/remove/list` (#channel mentions), `users add/remove/list` (@user mentions), `roles set/remove/list` (@role mentions with permission level dropdown), `mode` (chat/work_intake toggle), `public` (role-based access toggle), `show` (full config summary). All mutations audit-logged and persisted to `discord_config` table with 30s hot-reload
+- **Discord `/work` command** — fire-and-forget work task creation from Discord with rich embed confirmations, @mention notifications on completion/failure, and PR link delivery
+- **AlgoChat `/work` improvements** — `--project` flag for project targeting, clear status indicators, PR URL in completion messages
+- **Project discovery MCP tools** — `corvid_list_projects` and `corvid_current_project` tools for agent project awareness
+- **RC verification script** — `scripts/verify-rc.sh` for release candidate validation and mainnet config template
+
+### Changed
+- **Discord bridge spec v8** — `/admin` command fully documented with subcommand groups, recursive `DiscordInteractionOption` type
+- **AlgoChat commands spec v2** — `--project` flag, behavioral examples for project resolution
+
+### Tests
+- 20 new tests for `/admin` command handlers (channels, users, roles, mode, public, show)
+- Discord `/work` and AlgoChat `/work` spec coverage
+
+### Stats
+- **6,347** unit tests across 262 files (17,499 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **115** module specs with automated validation (0 warnings)
+- **41** MCP tools, **~205** API endpoints, **44** route modules, **90** tables
+- **4** commits, **2** PRs merged this release
+
 ## [0.23.2] - 2026-03-10
 
 ### Fixed
