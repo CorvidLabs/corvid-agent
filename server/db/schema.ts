@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 79;
+const SCHEMA_VERSION = 80;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -321,6 +321,12 @@ const MIGRATIONS: Record<number, string[]> = {
             date         TEXT PRIMARY KEY,
             algo_micro   INTEGER DEFAULT 0,
             api_cost_usd REAL DEFAULT 0.0
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS discord_config (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )`,
 
         `CREATE TABLE IF NOT EXISTS dedup_state (
@@ -1235,6 +1241,14 @@ const MIGRATIONS: Record<number, string[]> = {
             key         TEXT PRIMARY KEY,
             value       TEXT NOT NULL,
             updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+    ],
+    80: [
+        // Discord bridge dynamic configuration
+        `CREATE TABLE IF NOT EXISTS discord_config (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )`,
     ],
 };
