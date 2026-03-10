@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.0] - 2026-03-10
+
+### Added
+- **Discord onboarding** — guided setup flow for new users with welcome embeds, server configuration wizard, and role assignment (#890, #910)
+- **Discord dynamic configuration** — DB-backed config for Discord settings (channel modes, auto-archive, rate limits) with hot-reload via settings API (#909)
+- **Hybrid FlockDirectoryService** — on-chain sync for Flock Directory with local cache fallback (#902, #907)
+
+### Fixed
+- Grant `contents:write` permission to docker-publish workflow for SBOM release asset attachment (#908)
+
+### Tests
+- Coverage for scheduler orchestration and marketplace subscriptions (#906)
+
+### Stats
+- **6,327** unit tests across 261 files (17,461 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **116** module specs with automated validation
+- **39** MCP tools, **~205** API endpoints, **44** route modules, **90** tables
+- **5** commits, **5** PRs merged this release
+
 ## [0.22.0] - 2026-03-10
 
 ### Added
