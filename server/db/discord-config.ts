@@ -33,6 +33,8 @@ export interface DiscordDynamicConfig {
     statusText: string;
     /** Activity type (0=Playing, 1=Streaming, 2=Listening, 3=Watching, 5=Competing) */
     activityType: number;
+    /** Discord user IDs who have interacted at least once (comma-separated in DB) */
+    interactedUsers: string[];
 }
 
 // ─── Config helpers ───────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ const DEFAULTS: DiscordDynamicConfig = {
     rateLimitByLevel: {},
     statusText: 'corvid-agent',
     activityType: 3,
+    interactedUsers: [],
 };
 
 function parseCommaSeparated(value: string | undefined): string[] {
@@ -85,6 +88,7 @@ export function getDiscordConfig(db: Database): DiscordDynamicConfig {
         rateLimitByLevel: parseJsonOrDefault(map.get('rate_limit_by_level'), DEFAULTS.rateLimitByLevel),
         statusText: map.get('status_text') ?? DEFAULTS.statusText,
         activityType: parseInt(map.get('activity_type') ?? String(DEFAULTS.activityType), 10),
+        interactedUsers: parseCommaSeparated(map.get('interacted_users')),
     };
 }
 
