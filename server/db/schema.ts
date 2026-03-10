@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 76;
+const SCHEMA_VERSION = 77;
 
 const MIGRATIONS: Record<number, string[]> = {
     1: [
@@ -1418,6 +1418,21 @@ const MIGRATIONS: Record<number, string[]> = {
             created_at      TEXT NOT NULL DEFAULT (datetime('now'))
         )`,
         `CREATE INDEX IF NOT EXISTS idx_marketplace_pricing_tiers_listing ON marketplace_pricing_tiers(listing_id)`,
+    ],
+
+    77: [
+        // Nevermore NFT holders — bridge NFT ownership to credit allocation
+        `CREATE TABLE IF NOT EXISTS nft_holders (
+            id              TEXT PRIMARY KEY,
+            wallet_address  TEXT NOT NULL,
+            asset_id        INTEGER NOT NULL,
+            verified_at     TEXT NOT NULL DEFAULT (datetime('now')),
+            credits_granted INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
+            created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+        )`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_nft_holders_wallet_asset ON nft_holders(wallet_address, asset_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_nft_holders_status ON nft_holders(status)`,
     ],
 };
 
