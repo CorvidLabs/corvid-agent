@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, Input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 @Component({
@@ -6,27 +6,27 @@ import { RouterLink } from '@angular/router';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterLink],
     template: `
-        <div class="empty-state" role="status" [attr.aria-label]="description">
-            <pre class="empty-state__icon" aria-hidden="true">{{ icon }}</pre>
-            <p class="empty-state__title">{{ title }}</p>
-            <p class="empty-state__desc">{{ description }}</p>
-            @if (actionRoute) {
+        <div class="empty-state" role="status" [attr.aria-label]="description()">
+            <pre class="empty-state__icon" aria-hidden="true">{{ icon() }}</pre>
+            <p class="empty-state__title">{{ title() }}</p>
+            <p class="empty-state__desc">{{ description() }}</p>
+            @if (actionRoute()) {
                 <a
                     class="empty-state__action"
-                    [routerLink]="actionRoute"
-                    [attr.aria-label]="actionAriaLabel || actionLabel">
-                    {{ actionLabel }}
+                    [routerLink]="actionRoute()"
+                    [attr.aria-label]="actionAriaLabel() || actionLabel()">
+                    {{ actionLabel() }}
                 </a>
-            } @else if (actionLabel) {
+            } @else if (actionLabel()) {
                 <button
                     class="empty-state__action"
-                    (click)="onAction()"
-                    [attr.aria-label]="actionAriaLabel || actionLabel">
-                    {{ actionLabel }}
+                    (click)="actionClicked.emit()"
+                    [attr.aria-label]="actionAriaLabel() || actionLabel()">
+                    {{ actionLabel() }}
                 </button>
             }
-            @if (docsHint) {
-                <p class="empty-state__docs">{{ docsHint }}</p>
+            @if (docsHint()) {
+                <p class="empty-state__docs">{{ docsHint() }}</p>
             }
         </div>
     `,
@@ -110,16 +110,14 @@ import { RouterLink } from '@angular/router';
     `,
 })
 export class EmptyStateComponent {
-    @Input({ required: true }) icon!: string;
-    @Input({ required: true }) title!: string;
-    @Input({ required: true }) description!: string;
-    @Input() actionLabel?: string;
-    @Input() actionRoute?: string;
-    @Input() actionAriaLabel?: string;
-    @Input() docsHint?: string;
-    @Input() actionClick?: () => void;
+    readonly icon = input.required<string>();
+    readonly title = input.required<string>();
+    readonly description = input.required<string>();
+    readonly actionLabel = input<string>();
+    readonly actionRoute = input<string>();
+    readonly actionAriaLabel = input<string>();
+    readonly docsHint = input<string>();
 
-    onAction(): void {
-        this.actionClick?.();
-    }
+    /** Emitted when the action button (non-route variant) is clicked. */
+    readonly actionClicked = output<void>();
 }

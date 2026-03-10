@@ -164,7 +164,7 @@ const OFFICIAL_SERVERS: OfficialMcpServer[] = [
                                                     <input
                                                         class="env-input"
                                                         [placeholder]="hint"
-                                                        (input)="setOfficialEnv(official.name, hint, $any($event.target).value)" />
+                                                        (input)="setOfficialEnv(official.name, hint, getInputValue($event))" />
                                                 }
                                             </div>
                                         }
@@ -642,6 +642,10 @@ export class McpServerListComponent implements OnInit {
         return this.mcpService.servers().some(
             (s) => s.name.toLowerCase() === officialName.toLowerCase(),
         );
+    }
+
+    protected getInputValue(event: Event): string {
+        return (event.target as HTMLInputElement).value;
     }
 
     protected setOfficialEnv(serverName: string, key: string, value: string): void {

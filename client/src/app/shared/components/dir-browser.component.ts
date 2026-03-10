@@ -21,6 +21,7 @@ import {
                         class="browser__up btn btn--icon"
                         (click)="navigateUp()"
                         [disabled]="!parentPath()"
+                        [attr.aria-disabled]="!parentPath()"
                         aria-label="Go to parent directory">
                         ↑ Up
                     </button>
@@ -39,7 +40,8 @@ import {
                         @for (dir of dirs(); track dir) {
                             <li class="browser__item" role="option" tabindex="0"
                                 (click)="navigateInto(dir)"
-                                (keydown.enter)="navigateInto(dir)">
+                                (keydown.enter)="navigateInto(dir)"
+                                (keydown.space)="navigateInto(dir); $event.preventDefault()">
                                 <span class="browser__icon">📁</span>
                                 {{ dir }}
                             </li>

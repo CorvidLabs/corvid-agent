@@ -33,8 +33,8 @@ interface SessionGroup {
                 <input
                     class="search-input"
                     placeholder="Search by name or prompt..."
-                    [(ngModel)]="searchQuery"
-                    (input)="searchQuery = $any($event.target).value" />
+                    [ngModel]="searchQuery"
+                    (ngModelChange)="searchQuery = $event" />
             </div>
 
             <!-- Filter Tabs -->
@@ -70,7 +70,7 @@ interface SessionGroup {
 
             @if (sessionService.loading()) {
                 <div class="skeleton-list">
-                    @for (_ of [1,2,3,4,5]; track _) {
+                    @for (n of skeletonRows; track n) {
                         <div class="skeleton-row">
                             <div class="skeleton skeleton--name"></div>
                             <div class="skeleton skeleton--agent"></div>
@@ -226,6 +226,7 @@ interface SessionGroup {
     `,
 })
 export class SessionListComponent implements OnInit {
+    protected readonly skeletonRows = [1, 2, 3, 4, 5] as const;
     protected readonly sessionService = inject(SessionService);
     private readonly agentService = inject(AgentService);
     private readonly notify = inject(NotificationService);

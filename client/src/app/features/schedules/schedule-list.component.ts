@@ -157,7 +157,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                     description="Schedules run agent tasks automatically on a cron or interval."
                     actionLabel="+ Create a schedule"
                     actionAriaLabel="Create your first automation schedule"
-                    [actionClick]="toggleCreateForm" />
+                    (actionClicked)="toggleCreateForm()" />
             } @else if (noFilteredSchedules()) {
                 <div class="empty">
                     <p>No matching schedules found.</p>

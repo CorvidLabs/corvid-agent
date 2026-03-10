@@ -42,7 +42,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
 
                 <!-- Tabs -->
                 <div class="tabs">
-                    @for (tab of tabs; track tab.key) {
+                    @for (tab of tabs(); track tab.key) {
                         <button
                             class="tab"
                             [class.tab--active]="activeTab() === tab.key"
@@ -190,7 +190,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
 
                     <div class="invoke-form">
                         <h4>Invoke Another Agent</h4>
-                        <select class="invoke-select" [(ngModel)]="invokeTargetId" aria-label="Select target agent">
+                        <select class="invoke-select" [ngModel]="invokeTargetId()" (ngModelChange)="invokeTargetId.set($event)" aria-label="Select target agent">
                             <option value="" disabled>Select target agent...</option>
                             @for (other of otherAgents(); track other.id) {
                                 <option [value]="other.id">{{ other.name }}</option>
@@ -198,13 +198,14 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
                         </select>
                         <textarea
                             class="invoke-textarea"
-                            [(ngModel)]="invokeContent"
+                            [ngModel]="invokeContent()"
+                            (ngModelChange)="invokeContent.set($event)"
                             placeholder="Message content..."
                             rows="3"
                         ></textarea>
                         <button
                             class="btn btn--primary"
-                            [disabled]="!invokeTargetId || !invokeContent || invoking()"
+                            [disabled]="!invokeTargetId() || !invokeContent() || invoking()"
                             (click)="onInvoke()"
                         >{{ invoking() ? 'Sending...' : 'Send Message' }}</button>
                     </div>
@@ -215,13 +216,14 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
                     <div class="work-form">
                         <textarea
                             class="invoke-textarea"
-                            [(ngModel)]="workDescription"
+                            [ngModel]="workDescription()"
+                            (ngModelChange)="workDescription.set($event)"
                             placeholder="Describe the task (e.g. 'Fix the login button alignment')..."
                             rows="3"
                         ></textarea>
                         <button
                             class="btn btn--primary"
-                            [disabled]="!workDescription || creatingWork()"
+                            [disabled]="!workDescription() || creatingWork()"
                             (click)="onCreateWork()"
                         >{{ creatingWork() ? 'Starting...' : 'Start Work Task' }}</button>
                     </div>
@@ -468,9 +470,9 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     protected readonly creatingWork = signal(false);
     protected readonly activeTab = signal<Tab>('overview');
 
-    protected invokeTargetId = '';
-    protected invokeContent = '';
-    protected workDescription = '';
+    protected readonly invokeTargetId = signal('');
+    protected readonly invokeContent = signal('');
+    protected readonly workDescription = signal('');
 
     private agentNameCache: Record<string, string> = {};
     private unsubscribeWs: (() => void) | null = null;
@@ -511,16 +513,14 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         }));
     });
 
-    protected get tabs(): { key: Tab; label: string; count?: number }[] {
-        return [
-            { key: 'overview', label: 'Overview' },
-            { key: 'sessions', label: 'Sessions', count: this.agentSessions().length },
-            { key: 'messages', label: 'Messages', count: this.messages().length },
-            { key: 'work-tasks', label: 'Work Tasks', count: this.workTasks().length },
-            { key: 'persona', label: 'Persona' },
-            { key: 'skills', label: 'Skills', count: this.agentBundles().length },
-        ];
-    }
+    protected readonly tabs = computed<{ key: Tab; label: string; count?: number }[]>(() => [
+        { key: 'overview', label: 'Overview' },
+        { key: 'sessions', label: 'Sessions', count: this.agentSessions().length },
+        { key: 'messages', label: 'Messages', count: this.messages().length },
+        { key: 'work-tasks', label: 'Work Tasks', count: this.workTasks().length },
+        { key: 'persona', label: 'Persona' },
+        { key: 'skills', label: 'Skills', count: this.agentBundles().length },
+    ]);
 
     async ngOnInit(): Promise<void> {
         const id = this.route.snapshot.paramMap.get('id');
@@ -541,12 +541,12 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
         if (agent.walletAddress) {
             this.agentService.getBalance(id)
                 .then((info) => this.walletBalance.set(info.balance))
-                .catch(() => {});
+                .catch(() => this.walletBalance.set(0));
         }
 
         this.personaService.loadPersona(id).then((p) => this.persona.set(p)).catch(() => this.persona.set(null));
         this.skillBundleService.getAgentBundles(id).then((ab) => this.agentBundles.set(ab)).catch(() => this.agentBundles.set([]));
-        this.skillBundleService.loadBundles().catch(() => {});
+        this.skillBundleService.loadBundles().catch(() => { /* non-critical */ });
         this.agentService.getMessages(id).then((msgs) => this.messages.set(msgs)).catch(() => this.messages.set([]));
 
         await this.agentService.loadAgents();
@@ -604,12 +604,12 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
 
     async onCreateWork(): Promise<void> {
         const a = this.agent();
-        if (!a || !this.workDescription) return;
+        if (!a || !this.workDescription()) return;
         this.creatingWork.set(true);
         try {
-            const task = await this.workTaskService.createTask({ agentId: a.id, description: this.workDescription, projectId: a.defaultProjectId ?? undefined });
+            const task = await this.workTaskService.createTask({ agentId: a.id, description: this.workDescription(), projectId: a.defaultProjectId ?? undefined });
             this.workTasks.update((tasks) => [task, ...tasks]);
-            this.workDescription = '';
+            this.workDescription.set('');
         } catch {
             this.notify.error('Failed to create work task');
         } finally { this.creatingWork.set(false); }
@@ -626,11 +626,11 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
 
     async onInvoke(): Promise<void> {
         const a = this.agent();
-        if (!a || !this.invokeTargetId || !this.invokeContent) return;
+        if (!a || !this.invokeTargetId() || !this.invokeContent()) return;
         this.invoking.set(true);
         try {
-            await this.agentService.invokeAgent(a.id, this.invokeTargetId, this.invokeContent);
-            this.invokeContent = '';
+            await this.agentService.invokeAgent(a.id, this.invokeTargetId(), this.invokeContent());
+            this.invokeContent.set('');
             const msgs = await this.agentService.getMessages(a.id);
             this.messages.set(msgs);
         } catch {

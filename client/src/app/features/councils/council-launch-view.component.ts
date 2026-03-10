@@ -310,7 +310,7 @@ import type { ServerWsMessage, StreamEvent } from '../../core/models/ws-message.
                                     type="text"
                                     placeholder="Ask a follow-up question about the council's decision..."
                                     [value]="chatInput()"
-                                    (input)="chatInput.set($any($event.target).value)"
+                                    (input)="onChatInputChange($event)"
                                     (keydown.enter)="onSendChat()"
                                     [disabled]="chatSending()"
                                 />
@@ -881,6 +881,10 @@ export class CouncilLaunchViewComponent implements OnInit, OnDestroy {
     protected getChatEvents(): StreamEvent[] {
         const id = this.chatSessionId();
         return id ? (this.sessionEvents().get(id) ?? []) : [];
+    }
+
+    protected onChatInputChange(event: Event): void {
+        this.chatInput.set((event.target as HTMLInputElement).value);
     }
 
     protected async onSendChat(): Promise<void> {

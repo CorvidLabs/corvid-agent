@@ -46,8 +46,8 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                 <input
                     class="search-input"
                     placeholder="Search agents..."
-                    [(ngModel)]="searchQuery"
-                    (input)="searchQuery = $any($event.target).value" />
+                    [ngModel]="searchQuery"
+                    (ngModelChange)="searchQuery = $event" />
             </div>
 
             <!-- Filter Chips -->
@@ -81,7 +81,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                         type="checkbox"
                         class="toggle-input"
                         [checked]="hideInactive()"
-                        (change)="hideInactive.set($any($event.target).checked)" />
+                        (change)="onHideInactiveChange($event)" />
                     <span class="toggle-text">Hide inactive</span>
                 </label>
                 <div class="sort-group">
@@ -276,7 +276,7 @@ export class AgentListComponent implements OnInit {
         if (query) {
             cards = cards.filter((c) =>
                 c.agent.name.toLowerCase().includes(query) ||
-                c.agent.description.toLowerCase().includes(query),
+                (c.agent.description ?? '').toLowerCase().includes(query),
             );
         }
         if (algochatFilter !== null) {
@@ -326,6 +326,10 @@ export class AgentListComponent implements OnInit {
 
     protected getProviderColor(provider?: string): { color: string; border: string; bg: string } {
         return PROVIDER_COLORS[provider ?? 'anthropic'] ?? DEFAULT_PROVIDER_COLOR;
+    }
+
+    protected onHideInactiveChange(event: Event): void {
+        this.hideInactive.set((event.target as HTMLInputElement).checked);
     }
 
     protected startSession(agentId: string, event: Event): void {

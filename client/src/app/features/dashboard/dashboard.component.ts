@@ -163,7 +163,7 @@ interface ActivityEvent {
                         <p class="empty">No recent activity.</p>
                     } @else {
                         <div class="activity-feed">
-                            @for (event of activityFeed(); track $index) {
+                            @for (event of activityFeed(); track event.link + event.type) {
                                 <a class="activity-item" [routerLink]="event.link">
                                     <span class="activity-item__icon" [attr.data-type]="event.type">
                                         @switch (event.type) {

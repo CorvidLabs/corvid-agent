@@ -73,7 +73,7 @@ import { WorkTask } from '../../core/models/work-task.model';
                     description="Work tasks are agent-driven code changes — branch, implement, validate, PR."
                     actionLabel="+ Create a work task"
                     actionAriaLabel="Create your first agent work task"
-                    [actionClick]="toggleCreateForm" />
+                    (actionClicked)="toggleCreateForm()" />
             } @else if (filteredTasks().length === 0) {
                 <div class="empty">
                     <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}work tasks found.</p>
