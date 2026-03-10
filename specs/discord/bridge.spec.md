@@ -53,6 +53,35 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `muteUser` | `(userId: string)` | `void` | Mute a user from bot interactions (admin action) |
 | `unmuteUser` | `(userId: string)` | `void` | Unmute a previously muted user (admin action) |
 
+### Exported Functions (from message-formatter.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `splitMessage` | `(text: string, maxLen?: number)` | `string[]` | Split text into chunks respecting natural boundaries (paragraphs, sentences, words) and preserving code blocks. Default limit is 2000 chars |
+| `splitEmbedDescription` | `(text: string)` | `string[]` | Split text for Discord embed descriptions (4096-char limit). Delegates to `splitMessage` with embed limit |
+
+### Exported Interfaces & Classes (from gateway.ts)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `GatewayDispatchHandlers` | Interface | Callbacks for gateway dispatch events: `onMessage`, `onInteraction`, `onReady` |
+| `DiscordGateway` | Class | Manages the Discord Gateway WebSocket connection, heartbeat, identify/resume lifecycle, and reconnection. Dispatch events are forwarded to the bridge via `GatewayDispatchHandlers` |
+
+#### DiscordGateway Constructor
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `config` | `DiscordBridgeConfig` | Bot token, channel ID, etc. |
+| `handlers` | `GatewayDispatchHandlers` | Callbacks for dispatch events |
+
+#### DiscordGateway Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `start` | `()` | `void` | Open the gateway WebSocket connection |
+| `stop` | `()` | `void` | Close the WebSocket and clear heartbeat timer |
+| `updatePresence` | `(statusText?: string, activityType?: number)` | `void` | Update bot presence on the live gateway connection |
+
 ### Exported Types (from types.ts)
 
 | Type | Description |
