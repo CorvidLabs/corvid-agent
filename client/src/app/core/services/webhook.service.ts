@@ -7,7 +7,7 @@ import type {
     UpdateWebhookRegistrationInput,
     WebhookDelivery,
 } from '../models/webhook.model';
-import type { ServerWsMessage } from '../models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })

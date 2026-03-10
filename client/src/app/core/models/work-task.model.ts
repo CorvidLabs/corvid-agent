@@ -1,4 +1,4 @@
-export type WorkTaskStatus = 'pending' | 'branching' | 'running' | 'validating' | 'completed' | 'failed';
+export type WorkTaskStatus = 'pending' | 'queued' | 'branching' | 'running' | 'validating' | 'completed' | 'failed' | 'paused';
 export type WorkTaskSource = 'web' | 'algochat' | 'agent' | 'discord' | 'telegram';
 
 export interface WorkTask {

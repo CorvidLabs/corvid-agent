@@ -8,7 +8,7 @@ import type {
     MentionPollingStats,
     PollingActivity,
 } from '../models/mention-polling.model';
-import type { ServerWsMessage } from '../models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })

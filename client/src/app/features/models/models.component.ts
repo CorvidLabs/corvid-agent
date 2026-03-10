@@ -11,7 +11,7 @@ import { DecimalPipe, SlicePipe } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { NotificationService } from '../../core/services/notification.service';
-import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import { firstValueFrom } from 'rxjs';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────

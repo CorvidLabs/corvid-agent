@@ -4,7 +4,7 @@ import {
     ApprovalDialogComponent,
     ApprovalDecision,
 } from './approval-dialog.component';
-import type { ApprovalRequestWire } from '../../core/models/ws-message.model';
+import type { ApprovalRequestWire } from '@shared/ws-protocol';
 import { vi, beforeEach, afterEach, describe, it, expect } from 'vitest';
 
 /**

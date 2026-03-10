@@ -14,7 +14,7 @@ import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
-import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { Agent } from '../../core/models/agent.model';
 import type { Session } from '../../core/models/session.model';
 import { firstValueFrom } from 'rxjs';

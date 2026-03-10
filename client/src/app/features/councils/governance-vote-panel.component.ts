@@ -17,7 +17,7 @@ import {
     type WeightedVoteRecord,
     type GovernanceVoteOption,
 } from '../../core/models/governance.model';
-import type { ServerWsMessage } from '../../core/models/ws-message.model';
+import type { ServerWsMessage } from '@shared/ws-protocol';
 
 @Component({
     selector: 'app-governance-vote-panel',

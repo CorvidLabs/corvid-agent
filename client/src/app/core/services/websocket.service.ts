@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { NotificationService } from './notification.service';
-import type { ClientWsMessage, ServerWsMessage, StreamEvent } from '../models/ws-message.model';
+import type { ClientWsMessage, ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
 
 type MessageHandler = (msg: ServerWsMessage) => void;
 
