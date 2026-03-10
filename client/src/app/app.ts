@@ -23,6 +23,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [RouterOutlet, HeaderComponent, SidebarComponent, BreadcrumbComponent, ToastContainerComponent, KeyboardShortcutsOverlayComponent],
     template: `
+        <a class="skip-link" href="#main-content">Skip to main content</a>
         <div class="app-layout">
             <app-header
                 [sidebarOpen]="sidebarOpen()"
@@ -34,7 +35,7 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             }
             <div class="app-layout__body">
                 <app-sidebar [(sidebarOpen)]="sidebarOpen" />
-                <main class="app-layout__content" role="main">
+                <main class="app-layout__content" id="main-content" role="main">
                     <app-breadcrumb />
                     <div class="app-layout__page page-enter">
                         <router-outlet />
