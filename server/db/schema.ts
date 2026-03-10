@@ -1179,6 +1179,55 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
         `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
+
+        // ── FTS5 virtual table ────────────────────────────────────────────
+        `CREATE VIRTUAL TABLE IF NOT EXISTS agent_memories_fts USING fts5(
+            key, content, content=agent_memories, content_rowid=rowid
+        )`,
+
+        // ── FTS sync triggers ─────────────────────────────────────────────
+        `CREATE TRIGGER IF NOT EXISTS agent_memories_ai AFTER INSERT ON agent_memories BEGIN
+            INSERT INTO agent_memories_fts(rowid, key, content)
+            VALUES (new.rowid, new.key, new.content);
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS agent_memories_ad AFTER DELETE ON agent_memories BEGIN
+            INSERT INTO agent_memories_fts(agent_memories_fts, rowid, key, content)
+            VALUES ('delete', old.rowid, old.key, old.content);
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS agent_memories_au AFTER UPDATE ON agent_memories BEGIN
+            INSERT INTO agent_memories_fts(agent_memories_fts, rowid, key, content)
+            VALUES ('delete', old.rowid, old.key, old.content);
+            INSERT INTO agent_memories_fts(rowid, key, content)
+            VALUES (new.rowid, new.key, new.content);
+        END`,
+
+        // ── Seed data (credit config) ─────────────────────────────────────
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_algo', '1000')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('low_credit_threshold', '50')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('reserve_per_group_message', '10')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_turn', '1')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('credits_per_agent_message', '5')`,
+        `INSERT OR IGNORE INTO credit_config (key, value) VALUES ('free_credits_on_first_message', '100')`,
+
+        // ── Seed data (preset skill bundles) ──────────────────────────────
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-code-reviewer', 'Code Reviewer', 'Review pull requests and provide feedback', '["corvid_github_list_prs","corvid_github_review_pr","corvid_github_get_pr_diff","corvid_github_comment_on_pr"]', 'You are an expert code reviewer. Focus on code quality, security, performance, and maintainability. Provide specific, actionable feedback.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-devops', 'DevOps', 'Infrastructure and deployment automation', '["corvid_create_work_task","corvid_github_create_pr","corvid_github_fork_repo"]', 'You specialize in DevOps practices. Focus on CI/CD, infrastructure-as-code, monitoring, and deployment automation.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-researcher', 'Researcher', 'Deep research and information gathering', '["corvid_web_search","corvid_deep_research","corvid_save_memory","corvid_recall_memory"]', 'You are a thorough researcher. Gather comprehensive information, cross-reference sources, and synthesize findings into clear summaries.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-communicator', 'Communicator', 'Inter-agent and external communication', '["corvid_send_message","corvid_list_agents","corvid_discover_agent","corvid_invoke_remote_agent"]', 'You excel at communication and coordination. Draft clear messages, manage conversations, and facilitate collaboration between agents.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-analyst', 'Analyst', 'Code analysis and health monitoring', '["corvid_check_health_trends","corvid_check_reputation","corvid_github_repo_info","corvid_github_list_issues"]', 'You are a data-driven analyst. Examine metrics, identify trends, and provide actionable insights from codebase health and project data.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-coder', 'Coder', 'Read, write, and edit code with command execution', '["read_file","write_file","edit_file","run_command","list_files","search_files"]', 'You are an expert coder. Read files to understand context before making changes. Use edit_file for targeted modifications and write_file only for new files. Always verify changes by reading the result. Run commands to test and validate your work.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-github-ops', 'GitHub Ops', 'GitHub PR and issue management', '["corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_github_repo_info"]', 'You specialize in GitHub operations. Review PRs thoroughly by reading diffs before commenting. When creating issues or PRs, write clear titles and descriptions. Check existing issues before creating duplicates.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-full-stack', 'Full Stack', 'Code, GitHub, tasks, and web search combined', '["read_file","write_file","edit_file","run_command","list_files","search_files","corvid_github_list_prs","corvid_github_get_pr_diff","corvid_github_review_pr","corvid_github_comment_on_pr","corvid_github_create_pr","corvid_github_create_issue","corvid_github_list_issues","corvid_create_work_task","corvid_web_search"]', 'You are a full-stack developer agent. You can read and edit code, run commands, manage GitHub PRs and issues, and create work tasks. Approach problems methodically: understand the codebase first, make targeted changes, test your work, then create PRs or report findings.', 1)`,
+        `INSERT OR IGNORE INTO skill_bundles (id, name, description, tools, prompt_additions, preset) VALUES
+            ('preset-memory-manager', 'Memory Manager', 'Knowledge and memory management with research', '["corvid_save_memory","corvid_recall_memory","corvid_web_search","corvid_deep_research"]', 'You manage knowledge and memory. Save important findings, decisions, and context using structured keys. Recall relevant memories before starting new work. Use web search and deep research to fill knowledge gaps.', 1)`,
     ],
 };
 
@@ -1234,6 +1283,8 @@ export function runMigrations(db: Database): void {
 const IDEMPOTENT_CREATE_TABLE = /^\s*CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\w+)/i;
 const IDEMPOTENT_CREATE_INDEX = /^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS/i;
 const IDEMPOTENT_CREATE_VTABLE = /^\s*CREATE\s+VIRTUAL\s+TABLE\s+IF\s+NOT\s+EXISTS/i;
+const IDEMPOTENT_CREATE_TRIGGER = /^\s*CREATE\s+TRIGGER\s+IF\s+NOT\s+EXISTS/i;
+const IDEMPOTENT_INSERT_OR_IGNORE = /^\s*INSERT\s+OR\s+IGNORE\s+INTO/i;
 
 function reconcileTables(db: Database): void {
     for (const statements of Object.values(MIGRATIONS)) {
@@ -1251,6 +1302,16 @@ function reconcileTables(db: Database): void {
             // Reconcile CREATE VIRTUAL TABLE IF NOT EXISTS
             if (IDEMPOTENT_CREATE_VTABLE.test(sql)) {
                 try { db.exec(sql); } catch { /* table may already exist */ }
+                continue;
+            }
+            // Reconcile CREATE TRIGGER IF NOT EXISTS
+            if (IDEMPOTENT_CREATE_TRIGGER.test(sql)) {
+                try { db.exec(sql); } catch { /* trigger may already exist */ }
+                continue;
+            }
+            // Reconcile INSERT OR IGNORE (seed data)
+            if (IDEMPOTENT_INSERT_OR_IGNORE.test(sql)) {
+                try { db.exec(sql); } catch { /* table may not exist yet */ }
             }
         }
     }
