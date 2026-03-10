@@ -9,13 +9,15 @@
 import { z } from 'zod';
 import {
     CreateProjectSchema, UpdateProjectSchema,
-    CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema,
+    CreateAgentSchema, UpdateAgentSchema, FundAgentSchema, InvokeAgentSchema, SetSpendingCapSchema,
     CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema,
-    CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema,
+    CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema, CastVoteSchema, HumanApprovalSchema,
     CreateWorkTaskSchema,
     McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema,
     AddAllowlistSchema, UpdateAllowlistSchema,
-    CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema,
+    AddGitHubAllowlistSchema, UpdateGitHubAllowlistSchema,
+    AddRepoBlocklistSchema,
+    CreateScheduleSchema, UpdateScheduleSchema, ScheduleApprovalSchema, BulkScheduleActionSchema,
     CreateWebhookRegistrationSchema, UpdateWebhookRegistrationSchema,
     CreateMentionPollingSchema, UpdateMentionPollingSchema,
     CreateWorkflowSchema, UpdateWorkflowSchema, TriggerWorkflowSchema, WorkflowRunActionSchema,
@@ -27,6 +29,13 @@ import {
     CreateMcpServerConfigSchema, UpdateMcpServerConfigSchema,
     EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema,
     OllamaPullModelSchema, OllamaDeleteModelSchema,
+    UpdateCreditConfigSchema,
+    PSKContactNicknameSchema,
+    CreditGrantSchema,
+    DeviceTokenSchema, DeviceAuthorizeSchema,
+    LoadPluginSchema, PluginCapabilityActionSchema,
+    SetSandboxPolicySchema, AssignSandboxSchema,
+    SendA2ATaskSchema,
 } from '../lib/validation';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -55,6 +64,37 @@ export const routes: RouteEntry[] = [
         tags: ['System'],
         auth: 'none',
         responses: { 200: { description: 'Health status' } },
+    },
+    {
+        method: 'GET', path: '/health',
+        summary: 'Health check (alias)',
+        description: 'Alias for /api/health.',
+        tags: ['System'],
+        auth: 'none',
+        responses: { 200: { description: 'Health status' } },
+    },
+    {
+        method: 'GET', path: '/health/live',
+        summary: 'Liveness probe',
+        description: 'Lightweight liveness check for container orchestrators.',
+        tags: ['System'],
+        auth: 'none',
+        responses: { 200: { description: 'Server is alive' } },
+    },
+    {
+        method: 'GET', path: '/health/ready',
+        summary: 'Readiness probe',
+        description: 'Checks that the server is ready to accept requests (database accessible).',
+        tags: ['System'],
+        auth: 'none',
+        responses: { 200: { description: 'Server is ready' }, 503: { description: 'Not ready' } },
+    },
+    {
+        method: 'GET', path: '/api/health/history',
+        summary: 'Health history snapshots',
+        description: 'Returns recent health check snapshots with timestamps.',
+        tags: ['System'],
+        auth: 'required',
     },
     {
         method: 'GET', path: '/metrics',
@@ -259,6 +299,25 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
     {
+        method: 'GET', path: '/api/agents/{id}/spending',
+        summary: 'Get agent daily spending',
+        tags: ['Agents', 'Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'PUT', path: '/api/agents/{id}/spending-cap',
+        summary: 'Set agent spending cap',
+        tags: ['Agents'],
+        auth: 'required',
+        requestBody: SetSpendingCapSchema,
+    },
+    {
+        method: 'DELETE', path: '/api/agents/{id}/spending-cap',
+        summary: 'Remove agent spending cap',
+        tags: ['Agents'],
+        auth: 'required',
+    },
+    {
         method: 'GET', path: '/api/agents/{id}/agent-card',
         summary: 'Get A2A agent card for agent',
         tags: ['Agents', 'A2A'],
@@ -454,6 +513,27 @@ export const routes: RouteEntry[] = [
         summary: 'Continue chat on completed council',
         tags: ['Councils'],
         auth: 'required',
+        requestBody: CouncilChatSchema,
+    },
+    {
+        method: 'GET', path: '/api/council-launches/{id}/vote',
+        summary: 'Get governance vote for launch',
+        tags: ['Councils'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/council-launches/{id}/vote',
+        summary: 'Cast governance vote',
+        tags: ['Councils'],
+        auth: 'required',
+        requestBody: CastVoteSchema,
+    },
+    {
+        method: 'POST', path: '/api/council-launches/{id}/vote/approve',
+        summary: 'Human approval for governance vote',
+        tags: ['Councils'],
+        auth: 'required',
+        requestBody: HumanApprovalSchema,
     },
 
     // ── Work Tasks ──────────────────────────────────────────────────────────
@@ -549,6 +629,57 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
 
+    // ── GitHub Allowlist ─────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/github-allowlist',
+        summary: 'List GitHub allowlisted users',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/github-allowlist',
+        summary: 'Add GitHub user to allowlist',
+        tags: ['Allowlist'],
+        auth: 'required',
+        requestBody: AddGitHubAllowlistSchema,
+        responses: { 201: { description: 'Added to allowlist' } },
+    },
+    {
+        method: 'PUT', path: '/api/github-allowlist/{username}',
+        summary: 'Update GitHub allowlist entry',
+        tags: ['Allowlist'],
+        auth: 'required',
+        requestBody: UpdateGitHubAllowlistSchema,
+    },
+    {
+        method: 'DELETE', path: '/api/github-allowlist/{username}',
+        summary: 'Remove GitHub user from allowlist',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+
+    // ── Repo Blocklist ──────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/repo-blocklist',
+        summary: 'List blocked repositories',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/repo-blocklist',
+        summary: 'Add repository to blocklist',
+        tags: ['Allowlist'],
+        auth: 'required',
+        requestBody: AddRepoBlocklistSchema,
+        responses: { 201: { description: 'Added to blocklist' } },
+    },
+    {
+        method: 'DELETE', path: '/api/repo-blocklist/{repo}',
+        summary: 'Remove repository from blocklist',
+        tags: ['Allowlist'],
+        auth: 'required',
+    },
+
     // ── Bridge Delivery ───────────────────────────────────────────────────
     {
         method: 'GET', path: '/api/bridges/delivery',
@@ -616,6 +747,20 @@ export const routes: RouteEntry[] = [
         summary: 'Update credit configuration',
         tags: ['Settings'],
         auth: 'required',
+        requestBody: UpdateCreditConfigSchema,
+    },
+    {
+        method: 'POST', path: '/api/settings/api-key/rotate',
+        summary: 'Rotate API key',
+        tags: ['Settings'],
+        auth: 'admin',
+    },
+    {
+        method: 'GET', path: '/api/settings/api-key/status',
+        summary: 'Get API key status',
+        description: 'Returns API key rotation status and expiry info.',
+        tags: ['Settings'],
+        auth: 'required',
     },
 
     // ── Schedules ───────────────────────────────────────────────────────────
@@ -678,6 +823,12 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
     {
+        method: 'POST', path: '/api/schedule-executions/{id}/cancel',
+        summary: 'Cancel schedule execution',
+        tags: ['Schedules'],
+        auth: 'required',
+    },
+    {
         method: 'POST', path: '/api/schedule-executions/{id}/resolve',
         summary: 'Approve or deny schedule execution',
         tags: ['Schedules'],
@@ -685,8 +836,22 @@ export const routes: RouteEntry[] = [
         requestBody: ScheduleApprovalSchema,
     },
     {
+        method: 'POST', path: '/api/schedules/bulk',
+        summary: 'Bulk schedule action (enable/disable/delete)',
+        tags: ['Schedules'],
+        auth: 'required',
+        requestBody: BulkScheduleActionSchema,
+    },
+    {
         method: 'GET', path: '/api/scheduler/health',
         summary: 'Scheduler health and stats',
+        tags: ['Schedules'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/scheduler/system-state',
+        summary: 'Scheduler system state',
+        description: 'Returns full scheduler system state including active timers and configuration.',
         tags: ['Schedules'],
         auth: 'required',
     },
@@ -904,6 +1069,7 @@ export const routes: RouteEntry[] = [
         summary: 'Set sandbox policy for agent',
         tags: ['Sandbox'],
         auth: 'required',
+        requestBody: SetSandboxPolicySchema,
     },
     {
         method: 'DELETE', path: '/api/sandbox/policies/{agentId}',
@@ -916,6 +1082,7 @@ export const routes: RouteEntry[] = [
         summary: 'Assign container to session',
         tags: ['Sandbox'],
         auth: 'required',
+        requestBody: AssignSandboxSchema,
     },
     {
         method: 'POST', path: '/api/sandbox/release/{sessionId}',
@@ -1064,6 +1231,24 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
     {
+        method: 'GET', path: '/api/reputation/identities',
+        summary: 'List all agent identities',
+        tags: ['Reputation'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/reputation/identity/{agentId}',
+        summary: 'Get identity for agent',
+        tags: ['Reputation'],
+        auth: 'required',
+    },
+    {
+        method: 'PUT', path: '/api/reputation/identity/{agentId}',
+        summary: 'Update identity for agent',
+        tags: ['Reputation'],
+        auth: 'required',
+    },
+    {
         method: 'GET', path: '/api/reputation/attestation/{agentId}',
         summary: 'Get attestation for agent',
         tags: ['Reputation'],
@@ -1135,12 +1320,14 @@ export const routes: RouteEntry[] = [
         summary: 'Poll for access token',
         tags: ['Auth'],
         auth: 'none',
+        requestBody: DeviceTokenSchema,
     },
     {
         method: 'POST', path: '/api/auth/device/authorize',
         summary: 'Authorize device from web UI',
         tags: ['Auth'],
         auth: 'none',
+        requestBody: DeviceAuthorizeSchema,
     },
     {
         method: 'GET', path: '/api/auth/verify',
@@ -1155,6 +1342,7 @@ export const routes: RouteEntry[] = [
         summary: 'Create and start A2A task',
         tags: ['A2A'],
         auth: 'none',
+        requestBody: SendA2ATaskSchema,
     },
     {
         method: 'GET', path: '/a2a/tasks/{id}',
@@ -1175,6 +1363,7 @@ export const routes: RouteEntry[] = [
         summary: 'Load a plugin',
         tags: ['Plugins'],
         auth: 'required',
+        requestBody: LoadPluginSchema,
     },
     {
         method: 'POST', path: '/api/plugins/{name}/unload',
@@ -1187,12 +1376,14 @@ export const routes: RouteEntry[] = [
         summary: 'Grant capability to plugin',
         tags: ['Plugins'],
         auth: 'required',
+        requestBody: PluginCapabilityActionSchema,
     },
     {
         method: 'POST', path: '/api/plugins/{name}/revoke',
         summary: 'Revoke capability from plugin',
         tags: ['Plugins'],
         auth: 'required',
+        requestBody: PluginCapabilityActionSchema,
     },
 
     // ── Skill Bundles ───────────────────────────────────────────────────────
@@ -1362,12 +1553,14 @@ export const routes: RouteEntry[] = [
         summary: 'Create PSK contact',
         tags: ['AlgoChat'],
         auth: 'required',
+        requestBody: PSKContactNicknameSchema,
     },
     {
         method: 'PATCH', path: '/api/algochat/psk-contacts/{id}',
         summary: 'Rename PSK contact',
         tags: ['AlgoChat'],
         auth: 'required',
+        requestBody: PSKContactNicknameSchema,
     },
     {
         method: 'DELETE', path: '/api/algochat/psk-contacts/{id}',
@@ -1416,6 +1609,148 @@ export const routes: RouteEntry[] = [
         method: 'GET', path: '/api/wallets/{address}/messages',
         summary: 'Get messages for a wallet',
         tags: ['Wallets'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/wallets/{address}/credits',
+        summary: 'Grant credits to a wallet',
+        tags: ['Wallets'],
+        auth: 'required',
+        requestBody: CreditGrantSchema,
+    },
+
+    // ── Dashboard ──────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/dashboard/summary',
+        summary: 'Aggregated dashboard summary',
+        description: 'Returns agents, sessions, councils, work tasks, and recent activity.',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+
+    // ── Performance ────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/performance/snapshot',
+        summary: 'Current performance snapshot',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/performance/trends',
+        summary: 'Performance time-series data',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/performance/regressions',
+        summary: 'Detect performance regressions',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/performance/report',
+        summary: 'Full performance report',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/performance/metrics',
+        summary: 'List available metric names',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/performance/collect',
+        summary: 'Trigger manual metric collection',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+
+    // ── Usage ──────────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/usage/summary',
+        summary: 'Per-schedule usage aggregates',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/usage/daily',
+        summary: 'Per-day usage breakdown',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/usage/anomalies',
+        summary: 'Current usage anomaly flags',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/usage/schedule/{id}',
+        summary: 'Detailed usage for a specific schedule',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+
+    // ── Feedback ───────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/feedback/metrics',
+        summary: 'Current outcome metrics',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/feedback/analysis',
+        summary: 'Weekly outcome analysis',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/feedback/context',
+        summary: 'Outcome context string for prompts',
+        tags: ['Analytics'],
+        auth: 'required',
+    },
+
+    // ── Onboarding ─────────────────────────────────────────────────────
+    {
+        method: 'GET', path: '/api/onboarding/status',
+        summary: 'Get onboarding progress',
+        description: 'Returns setup progress for new users (wallet, bridge, agent, project).',
+        tags: ['System'],
+        auth: 'none',
+    },
+
+    // ── Tenants ────────────────────────────────────────────────────────
+    {
+        method: 'POST', path: '/api/tenants/register',
+        summary: 'Register new tenant',
+        description: 'Public endpoint, no auth required.',
+        tags: ['Auth'],
+        auth: 'none',
+    },
+    {
+        method: 'GET', path: '/api/tenants/me',
+        summary: 'Get current tenant info',
+        tags: ['Auth'],
+        auth: 'required',
+    },
+    {
+        method: 'GET', path: '/api/tenants/me/members',
+        summary: 'List tenant members',
+        tags: ['Auth'],
+        auth: 'required',
+    },
+    {
+        method: 'POST', path: '/api/tenants/me/members',
+        summary: 'Add tenant member',
+        tags: ['Auth'],
+        auth: 'required',
+    },
+    {
+        method: 'DELETE', path: '/api/tenants/me/members/{keyHash}',
+        summary: 'Remove tenant member',
+        tags: ['Auth'],
         auth: 'required',
     },
 

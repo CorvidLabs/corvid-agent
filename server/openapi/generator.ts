@@ -141,6 +141,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     Ollama: 'Local Ollama model management.',
     Integrations: 'Third-party integrations (Slack, Discord, Telegram).',
     Providers: 'LLM provider registry and model listing.',
+    Bridges: 'Bridge delivery metrics across platforms (Discord, Telegram, Slack).',
+    Security: 'Security configuration and overview.',
 };
 
 // ─── Generator ──────────────────────────────────────────────────────────────
