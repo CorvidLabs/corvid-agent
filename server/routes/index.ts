@@ -180,6 +180,7 @@ export async function handleRequest(
     performanceCollector?: PerformanceCollector | null,
     outcomeTracker?: OutcomeTrackerService | null,
     flockDirectory?: FlockDirectoryService | null,
+    onAgentChange?: (() => void) | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
     const config = getAuthConfig();
@@ -237,7 +238,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory, onAgentChange);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -281,6 +282,7 @@ async function handleRoutes(
     performanceCollector?: PerformanceCollector | null,
     outcomeTracker?: OutcomeTrackerService | null,
     flockDirectory?: FlockDirectoryService | null,
+    onAgentChange?: (() => void) | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -298,7 +300,7 @@ async function handleRoutes(
     const projectResponse = handleProjectRoutes(req, url, db, context);
     if (projectResponse) return projectResponse;
 
-    const agentResponse = handleAgentRoutes(req, url, db, context, agentWalletService, agentMessenger);
+    const agentResponse = handleAgentRoutes(req, url, db, context, agentWalletService, agentMessenger, onAgentChange);
     if (agentResponse) return agentResponse;
 
     // Persona routes (agent identity/personality)

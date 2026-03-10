@@ -22,6 +22,7 @@ export function handleAgentRoutes(
     context: RequestContext,
     agentWalletService?: AgentWalletService | null,
     agentMessenger?: AgentMessenger | null,
+    onAgentChange?: (() => void) | null,
 ): Response | Promise<Response> | null {
     const path = url.pathname;
     const method = req.method;
@@ -33,7 +34,10 @@ export function handleAgentRoutes(
     if (path === '/api/agents' && method === 'POST') {
         const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
         if (denied) return denied;
-        return handleCreate(req, db, context, agentWalletService);
+        return handleCreate(req, db, context, agentWalletService).then(res => {
+            if (res.status === 201) onAgentChange?.();
+            return res;
+        });
     }
 
     // Agent balance endpoint
@@ -105,7 +109,10 @@ export function handleAgentRoutes(
     if (method === 'PUT') {
         const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
         if (denied) return denied;
-        return handleUpdate(req, db, id, context);
+        return handleUpdate(req, db, id, context).then(res => {
+            if (res.ok) onAgentChange?.();
+            return res;
+        });
     }
 
     if (method === 'DELETE') {
@@ -115,6 +122,7 @@ export function handleAgentRoutes(
         if (deleted) {
             const actor = context.walletAddress ?? getClientIp(req);
             recordAudit(db, 'agent_delete', actor, 'agent', id, null, null, getClientIp(req));
+            onAgentChange?.();
             return json({ ok: true });
         }
         return json({ error: 'Not found' }, 404);
