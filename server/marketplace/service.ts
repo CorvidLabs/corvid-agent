@@ -27,6 +27,7 @@ import { LISTING_CATEGORIES } from './types';
 import { IdentityVerification } from '../reputation/identity-verification';
 import type { VerificationTier } from '../reputation/identity-verification';
 import { EscrowService } from './escrow';
+import { MarketplaceAnalytics } from './analytics';
 import { ValidationError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 
@@ -105,6 +106,8 @@ function recordToListing(row: ListingRecord): MarketplaceListing {
         avgRating: row.avg_rating,
         reviewCount: row.review_count,
         tenantId: row.tenant_id,
+        trialUses: row.trial_uses,
+        trialDays: row.trial_days,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -380,6 +383,8 @@ export class MarketplaceService {
                 escrowId: escrowTx.id,
             });
 
+            new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress, listing.priceCredits);
+
             return { success: true, creditsDeducted: listing.priceCredits, escrowId: escrowTx.id };
         }
 
@@ -387,6 +392,9 @@ export class MarketplaceService {
         this.db.query(
             "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
         ).run(listingId);
+
+        new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress ?? 'anonymous', 0);
+
         return { success: true, creditsDeducted: 0 };
     }
 
@@ -742,6 +750,8 @@ export class MarketplaceService {
                 listingId, tierId, buyer: buyerWalletAddress, credits: tier.priceCredits,
             });
 
+            new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress, tier.priceCredits, tierId);
+
             return { success: true, creditsDeducted: tier.priceCredits, escrowId: escrowTx.id };
         }
 
@@ -749,6 +759,9 @@ export class MarketplaceService {
         this.db.query(
             "UPDATE marketplace_listings SET use_count = use_count + 1, updated_at = datetime('now') WHERE id = ?",
         ).run(listingId);
+
+        new MarketplaceAnalytics(this.db).recordUsageEvent(listingId, buyerWalletAddress, 0, tierId);
+
         return { success: true, creditsDeducted: 0 };
     }
 

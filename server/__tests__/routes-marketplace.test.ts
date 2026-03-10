@@ -77,16 +77,17 @@ describe('Marketplace Routes', () => {
     it('POST /api/marketplace/listings creates a listing', async () => {
         const { req, url } = fakeReq('POST', '/api/marketplace/listings', {
             agentId,
-            name: 'Code Reviewer',
-            description: 'AI-powered code reviews',
+            name: 'Code Reviewer Agent Service',
+            description: 'AI-powered code reviews for developers',
             category: 'coding',
+            tags: ['code-review'],
         });
         const res = await handleMarketplaceRoutes(req, url, db, marketplace, federation)!;
         expect(res).not.toBeNull();
         expect(res!.status).toBe(201);
         const data = await res!.json();
-        expect(data.name).toBe('Code Reviewer');
-        expect(data.description).toBe('AI-powered code reviews');
+        expect(data.name).toBe('Code Reviewer Agent Service');
+        expect(data.description).toBe('AI-powered code reviews for developers');
         expect(data.category).toBe('coding');
         expect(data.agentId).toBe(agentId);
         expect(data.status).toBe('draft');
@@ -131,7 +132,7 @@ describe('Marketplace Routes', () => {
         expect(res!.status).toBe(200);
         const data = await res!.json();
         expect(data.id).toBe(listingId);
-        expect(data.name).toBe('Code Reviewer');
+        expect(data.name).toBe('Code Reviewer Agent Service');
     });
 
     it('GET /api/marketplace/listings/:id returns 404 for unknown', async () => {
@@ -142,14 +143,14 @@ describe('Marketplace Routes', () => {
 
     it('PUT /api/marketplace/listings/:id updates a listing', async () => {
         const { req, url } = fakeReq('PUT', `/api/marketplace/listings/${listingId}`, {
-            name: 'Code Reviewer Pro',
+            name: 'Code Reviewer Pro Service',
             status: 'published',
         });
         const res = await handleMarketplaceRoutes(req, url, db, marketplace, federation)!;
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json();
-        expect(data.name).toBe('Code Reviewer Pro');
+        expect(data.name).toBe('Code Reviewer Pro Service');
         expect(data.status).toBe('published');
     });
 
@@ -164,7 +165,7 @@ describe('Marketplace Routes', () => {
         expect(data.listings).toBeDefined();
         expect(Array.isArray(data.listings)).toBe(true);
         expect(data.total).toBeGreaterThanOrEqual(1);
-        expect(data.listings[0].name).toContain('Code Reviewer');
+        expect(data.listings[0].name).toContain('Code Reviewer Pro');
     });
 
     // ─── Reviews ─────────────────────────────────────────────────────────────

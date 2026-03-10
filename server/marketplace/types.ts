@@ -37,6 +37,10 @@ export interface MarketplaceListing {
     reviewCount: number;
     /** Owning tenant (seller wallet address for billing) */
     tenantId: string;
+    /** Number of free trial uses allowed (null = no trial) */
+    trialUses: number | null;
+    /** Number of free trial days (null = no trial) */
+    trialDays: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -221,6 +225,8 @@ export interface ListingRecord {
     avg_rating: number;
     review_count: number;
     tenant_id: string;
+    trial_uses: number | null;
+    trial_days: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -233,4 +239,39 @@ export interface ReviewRecord {
     rating: number;
     comment: string;
     created_at: string;
+}
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+export interface ListingAnalytics {
+    listingId: string;
+    totalUses: number;
+    uses7d: number;
+    uses30d: number;
+    revenueAllTime: number;
+    revenue7d: number;
+    revenue30d: number;
+    uniqueUsers: number;
+    dailyUsage: DailyBucket[];
+    topUsers: TopUser[];
+}
+
+export interface DailyBucket {
+    date: string;
+    uses: number;
+    revenue: number;
+}
+
+export interface TopUser {
+    userTenantId: string;
+    uses: number;
+    creditsSpent: number;
+}
+
+export interface BuyerUsageSummary {
+    listingId: string;
+    listingName: string;
+    totalUses: number;
+    totalCreditsSpent: number;
+    lastUsedAt: string;
 }

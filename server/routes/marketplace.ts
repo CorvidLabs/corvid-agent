@@ -493,6 +493,33 @@ async function handleCancelSubscription(
     }
 }
 
+// ─── Trial Handler ──────────────────────────────────────────────────────────
+
+async function handleStartTrial(
+    req: Request,
+    listingId: string,
+    db: Database,
+    marketplace: MarketplaceService,
+): Promise<Response> {
+    try {
+        const body = await parseBodyOrThrow(req, StartTrialSchema);
+        const listing = marketplace.getListing(listingId);
+        if (!listing) return notFound('Listing not found');
+
+        const trials = new TrialService(db);
+        const existing = trials.getTrial(listingId, body.tenantId);
+        if (existing) return badRequest('Trial already exists for this tenant');
+
+        const trial = trials.startTrial(listing, body.tenantId);
+        if (!trial) return badRequest('Listing does not offer trials');
+
+        return json(trial, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return badRequest(err.detail);
+        return handleRouteError(err);
+    }
+}
+
 // ─── Pricing Tier Handlers ──────────────────────────────────────────────────
 
 async function handleCreateTier(
