@@ -441,3 +441,68 @@ describe('tenant registration rate limiting (default config)', () => {
         expect(limiter.check('ip2', 'POST', '/api/tenants/register', 'public').allowed).toBe(true);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Device auth flow rate limiting (#743 — security hardening)
+// ---------------------------------------------------------------------------
+
+describe('device auth flow rate limiting (default config)', () => {
+    let limiter: EndpointRateLimiter;
+
+    beforeEach(() => {
+        limiter = new EndpointRateLimiter(loadEndpointRateLimitConfig());
+    });
+
+    afterEach(() => {
+        limiter.stop();
+    });
+
+    it('blocks device auth initiation after 5 public requests', () => {
+        for (let i = 0; i < 5; i++) {
+            const result = limiter.check('attacker', 'POST', '/api/auth/device', 'public');
+            expect(result.allowed).toBe(true);
+        }
+        const blocked = limiter.check('attacker', 'POST', '/api/auth/device', 'public');
+        expect(blocked.allowed).toBe(false);
+        expect(blocked.response!.status).toBe(429);
+    });
+
+    it('blocks device authorize after 5 public requests (brute-force protection)', () => {
+        for (let i = 0; i < 5; i++) {
+            const result = limiter.check('attacker', 'POST', '/api/auth/device/authorize', 'public');
+            expect(result.allowed).toBe(true);
+        }
+        const blocked = limiter.check('attacker', 'POST', '/api/auth/device/authorize', 'public');
+        expect(blocked.allowed).toBe(false);
+        expect(blocked.response!.status).toBe(429);
+    });
+
+    it('allows moderate token polling (30 per minute)', () => {
+        for (let i = 0; i < 30; i++) {
+            const result = limiter.check('client', 'POST', '/api/auth/device/token', 'public');
+            expect(result.allowed).toBe(true);
+        }
+        const blocked = limiter.check('client', 'POST', '/api/auth/device/token', 'public');
+        expect(blocked.allowed).toBe(false);
+    });
+
+    it('gives admin higher limits for device auth', () => {
+        for (let i = 0; i < 20; i++) {
+            const result = limiter.check('admin-client', 'POST', '/api/auth/device', 'admin');
+            expect(result.allowed).toBe(true);
+        }
+        const blocked = limiter.check('admin-client', 'POST', '/api/auth/device', 'admin');
+        expect(blocked.allowed).toBe(false);
+    });
+
+    it('device auth and authorize have independent counters', () => {
+        // Exhaust device auth initiation
+        for (let i = 0; i < 5; i++) {
+            limiter.check('client', 'POST', '/api/auth/device', 'public');
+        }
+        expect(limiter.check('client', 'POST', '/api/auth/device', 'public').allowed).toBe(false);
+
+        // Authorize endpoint should still have budget
+        expect(limiter.check('client', 'POST', '/api/auth/device/authorize', 'public').allowed).toBe(true);
+    });
+});
