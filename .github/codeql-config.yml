@@ -1,0 +1,2 @@
+paths-ignore:
+  - "server/flock-directory/contract/*.generated.ts"

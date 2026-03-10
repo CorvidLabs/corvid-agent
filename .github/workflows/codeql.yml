@@ -30,6 +30,7 @@ jobs:
         uses: github/codeql-action/init@7aefa1c9aed02ae41531ec219164e64a0f087410  # v4
         with:
           languages: ${{ matrix.language }}
+          config-file: ./.github/codeql-config.yml
           queries: security-extended,security-and-quality
 
       - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461  # v2.1.3
