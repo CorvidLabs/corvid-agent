@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import type { WorkTask, WorkTaskStatus, WorkTaskPriority } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership } from '../tenant/db-filter';
+import { writeTransaction } from './pool';
 
 interface WorkTaskRow {
     id: string;
@@ -224,9 +225,9 @@ export function updateWorkTaskStatus(
  * Returns the list of affected tasks (for branch restoration).
  */
 export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
-    // Wrap SELECT→UPDATE in a transaction to prevent a race where a task
-    // starts between the read and the status update.
-    const cleanup = db.transaction(() => {
+    // Wrap SELECT→UPDATE in a BEGIN IMMEDIATE transaction to prevent a race where
+    // a task starts between the read and the status update.
+    return writeTransaction(db, (db) => {
         const staleRows = db.query(
             `SELECT * FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
         ).all() as WorkTaskRow[];
@@ -246,8 +247,6 @@ export function cleanupStaleWorkTasks(db: Database): WorkTask[] {
 
         return staleRows.map(rowToWorkTask);
     });
-
-    return cleanup();
 }
 
 /**

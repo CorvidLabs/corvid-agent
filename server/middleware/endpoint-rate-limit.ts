@@ -139,6 +139,32 @@ export function loadEndpointRateLimitConfig(): EndpointRateLimitConfig {
                     admin: { max: 10, windowMs: ONE_MINUTE * 5 },
                 },
             },
+            // Device auth flow is public (RFC 8628) — strict limits to prevent
+            // brute-force of user codes and DoS via auth flood
+            {
+                pattern: 'POST /api/auth/device',
+                tiers: {
+                    public: { max: 5, windowMs: ONE_MINUTE * 5 },
+                    user: { max: 5, windowMs: ONE_MINUTE * 5 },
+                    admin: { max: 20, windowMs: ONE_MINUTE * 5 },
+                },
+            },
+            {
+                pattern: 'POST /api/auth/device/token',
+                tiers: {
+                    public: { max: 30, windowMs: ONE_MINUTE },
+                    user: { max: 30, windowMs: ONE_MINUTE },
+                    admin: { max: 60, windowMs: ONE_MINUTE },
+                },
+            },
+            {
+                pattern: 'POST /api/auth/device/authorize',
+                tiers: {
+                    public: { max: 5, windowMs: ONE_MINUTE * 5 },
+                    user: { max: 5, windowMs: ONE_MINUTE * 5 },
+                    admin: { max: 20, windowMs: ONE_MINUTE * 5 },
+                },
+            },
         ],
         exemptPaths: ['/api/health', '/webhooks/github', '/ws', '/.well-known/agent-card.json'],
     };

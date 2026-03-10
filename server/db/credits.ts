@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from './audit';
 import { creditsConsumedTotal } from '../observability/metrics';
+import { writeTransaction } from './pool';
 
 const log = createLogger('CreditManager');
 
@@ -231,8 +232,8 @@ export function deductTurnCredits(
 ): { success: boolean; creditsRemaining: number; isLow: boolean; isExhausted: boolean } {
     const config = getCreditConfig(db);
 
-    // Atomic check-and-deduct in a single transaction to prevent race conditions
-    const result = db.transaction(() => {
+    // Atomic check-and-deduct in a BEGIN IMMEDIATE transaction to prevent race conditions
+    const result = writeTransaction(db, (db) => {
         ensureLedgerRow(db, walletAddress);
 
         const updated = db.query(
@@ -268,7 +269,7 @@ export function deductTurnCredits(
             isLow: newBalance.available <= config.lowCreditThreshold,
             isExhausted: newBalance.available <= 0,
         };
-    })();
+    });
 
     if (result.success) {
         creditsConsumedTotal.inc({}, config.creditsPerTurn);
@@ -289,7 +290,7 @@ export function deductAgentMessageCredits(
 ): { success: boolean; creditsRemaining: number } {
     const config = getCreditConfig(db);
 
-    return db.transaction(() => {
+    return writeTransaction(db, (db) => {
         ensureLedgerRow(db, walletAddress);
 
         const updated = db.query(
@@ -312,7 +313,7 @@ export function deductAgentMessageCredits(
         );
 
         return { success: true, creditsRemaining: newBalance.available };
-    })();
+    });
 }
 
 // ─── Reserve system (for group messages) ──────────────────────────────────
@@ -331,7 +332,7 @@ export function reserveGroupCredits(
     const reserveAmount = config.reservePerGroupMessage * memberCount;
 
     // Atomic check-and-reserve to prevent over-reservation from concurrent calls
-    return db.transaction(() => {
+    return writeTransaction(db, (db) => {
         ensureLedgerRow(db, walletAddress);
 
         const updated = db.query(
@@ -350,7 +351,7 @@ export function reserveGroupCredits(
         recordTransaction(db, walletAddress, 'reserve', reserveAmount, newBalance.credits, `group:${memberCount}`);
 
         return { success: true, reserved: reserveAmount, creditsRemaining: newBalance.available };
-    })();
+    });
 }
 
 /**
@@ -364,7 +365,7 @@ export function consumeReservedCredits(
 ): void {
     // Atomic consume — credits were already reserved, so debit is safe.
     // MAX(0, ...) prevents reserved underflow; credits debit matches the reservation.
-    db.transaction(() => {
+    writeTransaction(db, (db) => {
         db.query(
             `UPDATE credit_ledger
              SET reserved = MAX(0, reserved - ?),
@@ -376,7 +377,7 @@ export function consumeReservedCredits(
 
         const balance = getBalance(db, walletAddress);
         recordTransaction(db, walletAddress, 'deduction', amount, balance.credits, 'group_consumed', null, sessionId);
-    })();
+    });
 }
 
 /**
@@ -388,7 +389,7 @@ export function releaseReservedCredits(
     amount: number,
 ): void {
     // Atomic release — MAX(0, ...) prevents underflow
-    db.transaction(() => {
+    writeTransaction(db, (db) => {
         db.query(
             `UPDATE credit_ledger
              SET reserved = MAX(0, reserved - ?),
@@ -398,7 +399,7 @@ export function releaseReservedCredits(
 
         const balance = getBalance(db, walletAddress);
         recordTransaction(db, walletAddress, 'release', amount, balance.credits, 'group_release');
-    })();
+    });
 }
 
 // ─── Query helpers ────────────────────────────────────────────────────────
@@ -528,7 +529,7 @@ export function depositUsdc(
         return 0;
     }
 
-    const deposit = db.transaction(() => {
+    const added = writeTransaction(db, (db) => {
         ensureLedgerRow(db, walletAddress);
 
         db.query(
@@ -544,8 +545,6 @@ export function depositUsdc(
 
         return creditsToAdd;
     });
-
-    const added = deposit();
 
     log.info('USDC deposit converted to credits', {
         walletAddress: walletAddress.slice(0, 8) + '...',

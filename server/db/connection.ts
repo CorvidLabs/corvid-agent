@@ -3,9 +3,12 @@ import { chmodSync, existsSync } from 'node:fs';
 import { runMigrations } from './schema';
 import { migrateUp, getCurrentVersion, discoverMigrations } from './migrate';
 import { initCreditConfigFromEnv } from './credits';
+import { DbPool, writeTransaction } from './pool';
+import type { WriteTransactionOptions } from './pool';
 
 let db: Database | null = null;
 let _initPromise: Promise<void> | null = null;
+let _pool: DbPool | null = null;
 
 function setDbFilePermissions(path: string): void {
     try {
@@ -69,7 +72,50 @@ export async function initDb(): Promise<void> {
     return _initPromise;
 }
 
+/**
+ * Get or create a connection pool for the current database.
+ * The pool provides separate read and write connections with
+ * BEGIN IMMEDIATE transactions and SQLITE_BUSY retry logic.
+ */
+export function getDbPool(options?: { maxReadConnections?: number }): DbPool {
+    if (_pool) return _pool;
+
+    const d = getDb();
+    const dbPath = (d as unknown as { filename: string }).filename;
+
+    // In-memory databases can't use a pool (no file to share)
+    if (!dbPath || dbPath === ':memory:' || dbPath === '') {
+        // Return a minimal pool backed by the singleton
+        _pool = new DbPool({
+            path: ':memory:',
+            maxReadConnections: 1,
+        });
+        return _pool;
+    }
+
+    _pool = new DbPool({
+        path: dbPath,
+        maxReadConnections: options?.maxReadConnections ?? 4,
+    });
+
+    return _pool;
+}
+
+/**
+ * Execute `fn` inside a BEGIN IMMEDIATE write transaction with SQLITE_BUSY
+ * retry. Use this instead of `db.transaction()` for all write operations.
+ *
+ * @see server/db/pool.ts for implementation details.
+ */
+export function dbWriteTransaction<T>(fn: (db: Database) => T, options?: WriteTransactionOptions): T {
+    return writeTransaction(getDb(), fn, options);
+}
+
 export function closeDb(): void {
+    if (_pool) {
+        _pool.close();
+        _pool = null;
+    }
     if (db) {
         db.close();
         db = null;

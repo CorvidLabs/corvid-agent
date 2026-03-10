@@ -24,7 +24,9 @@ Provides the singleton SQLite database connection, shared query utility types/fu
 |----------|-----------|---------|-------------|
 | `getDb` | `path?: string` | `Database` | Returns the singleton database connection, creating and initializing it on first call. Sets WAL journal mode, 5s busy timeout, enables foreign keys, runs legacy migrations (v1-52), and initializes credit config from env. `path` defaults to `'corvid-agent.db'`. |
 | `initDb` | _(none)_ | `Promise<void>` | Runs any pending file-based migrations (v53+) beyond the legacy schema version. Safe to call multiple times; only runs once via a cached promise. Must be called after `getDb()`. |
-| `closeDb` | _(none)_ | `void` | Closes the database connection and resets the singleton and init promise to `null`. |
+| `getDbPool` | `options?: { maxReadConnections?: number }` | `DbPool` | Returns or creates a connection pool for the current database. The pool provides separate read and write connections with BEGIN IMMEDIATE transactions and SQLITE_BUSY retry logic. Falls back to a minimal single-connection pool for in-memory databases. |
+| `dbWriteTransaction` | `fn: (db: Database) => T, options?: WriteTransactionOptions` | `T` | Executes `fn` inside a BEGIN IMMEDIATE write transaction with SQLITE_BUSY retry on the singleton database connection. Delegates to `writeTransaction` from `db/pool`. |
+| `closeDb` | _(none)_ | `void` | Closes the database connection, the connection pool, and resets the singleton and init promise to `null`. |
 
 #### From `server/db/types.ts`
 | Function | Parameters | Returns | Description |
@@ -101,6 +103,7 @@ Provides the singleton SQLite database connection, shared query utility types/fu
 | `db/schema` | `runMigrations` for legacy inline migrations (v1-52) |
 | `db/migrate` | `migrateUp`, `getCurrentVersion`, `discoverMigrations` for file-based migrations (v53+) |
 | `db/credits` | `initCreditConfigFromEnv` for initializing credit configuration |
+| `db/pool` | `DbPool`, `writeTransaction`, `WriteTransactionOptions` for connection pooling and write transaction handling |
 | `lib/logger` | `createLogger('JsonUtils')` for structured warning logs (json-utils.ts) |
 
 ### Consumed By
