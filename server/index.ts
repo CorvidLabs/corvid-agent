@@ -91,6 +91,7 @@ const {
     astParserService,
     permissionBroker,
     flockDirectoryService,
+    discordBridge,
 } = await bootstrapServices(db, startTime);
 
 // AlgoChat init dependencies (shared by init, switchNetwork, and post-init wiring)
@@ -348,7 +349,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatState.bridge, algochatState.walletService, algochatState.messenger, workTaskService, selfTestService, algochatState.directory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService, flockDirectoryService);
+            const apiResponse = await handleRequest(req, db, processManager, algochatState.bridge, algochatState.walletService, algochatState.messenger, workTaskService, selfTestService, algochatState.directory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService, flockDirectoryService, () => discordBridge?.updateSlashCommands());
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');
