@@ -28,7 +28,9 @@ export type InjectionCategory =
     | 'data_exfiltration'
     | 'jailbreak'
     | 'encoding_attack'
-    | 'social_engineering';
+    | 'social_engineering'
+    | 'unicode_attack'
+    | 'prompt_leakage';
 
 export interface InjectionResult {
     /** Overall confidence level (highest across all matches) */
@@ -302,6 +304,71 @@ const PATTERNS: PatternRule[] = [
         label: 'external_crypto_trust',
         category: 'social_engineering',
         confidence: 'MEDIUM',
+    },
+
+    // ── Unicode/Bidi attacks (MEDIUM/HIGH) ──────────────────────────
+    {
+        // Zero-width characters: U+200B (zero-width space), U+200C (ZWNJ),
+        // U+200D (ZWJ), U+FEFF (BOM/ZWNBS), U+2060 (word joiner),
+        // U+00AD (soft hyphen), U+034F (combining grapheme joiner)
+        regex: /[\u200B\u200C\u200D\uFEFF\u2060\u00AD\u034F]/,
+        label: 'zero_width_character',
+        category: 'unicode_attack',
+        confidence: 'MEDIUM',
+    },
+    {
+        // Bidirectional override/embedding characters: U+202A-U+202E, U+2066-U+2069
+        // Used to visually reorder text (trojan source attacks)
+        regex: /[\u202A-\u202E\u2066-\u2069]/,
+        label: 'bidi_override_character',
+        category: 'unicode_attack',
+        confidence: 'HIGH',
+    },
+    {
+        // Homoglyph detection: Cyrillic characters that look like Latin
+        // а(U+0430)=a, е(U+0435)=e, о(U+043E)=o, р(U+0440)=p, с(U+0441)=c,
+        // х(U+0445)=x, у(U+0443)=y, А(U+0410)=A, В(U+0412)=B, Е(U+0415)=E,
+        // К(U+041A)=K, М(U+041C)=M, Н(U+041D)=H, О(U+041E)=O, Р(U+0420)=P,
+        // С(U+0421)=C, Т(U+0422)=T, Х(U+0425)=X
+        // Only flag when mixed with ASCII Latin in the same word
+        regex: /[a-zA-Z][\u0430\u0435\u043E\u0440\u0441\u0445\u0443\u0410\u0412\u0415\u041A\u041C\u041D\u041E\u0420\u0421\u0422\u0425]|[\u0430\u0435\u043E\u0440\u0441\u0445\u0443\u0410\u0412\u0415\u041A\u041C\u041D\u041E\u0420\u0421\u0422\u0425][a-zA-Z]/,
+        label: 'homoglyph_mixed_script',
+        category: 'unicode_attack',
+        confidence: 'HIGH',
+    },
+    {
+        // Tag characters (U+E0001-U+E007F) — invisible "language tags" used to hide text
+        // Must use /u flag and \u{...} syntax for supplementary plane characters
+        regex: /[\u{E0001}-\u{E007F}]/u,
+        label: 'tag_character',
+        category: 'unicode_attack',
+        confidence: 'HIGH',
+    },
+
+    // ── Prompt leakage attempts (HIGH) ──────────────────────────────
+    {
+        regex: /(?:repeat|show(?:\s+me)?|display|print|output|reveal|tell\s+me)\s+(?:your|the)\s+(?:system\s+)?(?:prompt|instructions|rules|directives|guidelines|configuration)/i,
+        label: 'prompt_extraction_request',
+        category: 'prompt_leakage',
+        confidence: 'HIGH',
+    },
+    {
+        regex: /what\s+(?:is|are|were)\s+(?:your|the)\s+(?:system\s+)?(?:instructions|rules|directives|guidelines|prompt)/i,
+        label: 'prompt_inquiry',
+        category: 'prompt_leakage',
+        confidence: 'HIGH',
+    },
+    {
+        regex: /(?:(?:copy|paste|echo|write)\s+(?:out\s+)?(?:your|the)\s+(?:entire\s+)?(?:system\s+)?prompt|(?:dump|leak|extract)\s+(?:your|the)\s+(?:system\s+)?(?:prompt|instructions))/i,
+        label: 'prompt_dump_request',
+        category: 'prompt_leakage',
+        confidence: 'HIGH',
+    },
+    {
+        regex: /(?:what\s+(?:is|was)\s+(?:the\s+)?(?:first|original|initial)\s+(?:thing|message|text)\s+(?:you\s+were|in\s+your))|(?:beginning\s+of\s+(?:your|the)\s+(?:context|conversation|chat)\s+window)/i,
+        label: 'context_boundary_probe',
+        category: 'prompt_leakage',
+        confidence: 'HIGH',
     },
 ];
 
