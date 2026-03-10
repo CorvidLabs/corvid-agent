@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",
@@ -46,6 +46,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@algorandfoundation/algokit-utils": "^9.2.0",
     "@anthropic-ai/claude-agent-sdk": "^0.2.68",
     "@anthropic-ai/sdk": "^0.78.0",
     "@modelcontextprotocol/sdk": "^1.27.1",

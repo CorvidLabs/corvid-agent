@@ -1,0 +1,505 @@
+{
+  "name": "FlockDirectory",
+  "desc": "",
+  "methods": [
+    {
+      "name": "createApplication",
+      "args": [],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [
+          "NoOp"
+        ],
+        "call": []
+      }
+    },
+    {
+      "name": "registerAgent",
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "endpoint",
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "type": "string"
+        },
+        {
+          "name": "payment",
+          "type": "pay"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "updateAgent",
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "endpoint",
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "heartbeat",
+      "args": [],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "deregister",
+      "args": [],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "createChallenge",
+      "args": [
+        {
+          "name": "challengeId",
+          "type": "string"
+        },
+        {
+          "name": "category",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "maxScore",
+          "type": "uint64"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "deactivateChallenge",
+      "args": [
+        {
+          "name": "challengeId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "recordTestResult",
+      "args": [
+        {
+          "name": "agentAddress",
+          "type": "address"
+        },
+        {
+          "name": "challengeId",
+          "type": "string"
+        },
+        {
+          "name": "score",
+          "type": "uint64"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "getAgentTier",
+      "args": [
+        {
+          "name": "agentAddress",
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "uint64"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "getAgentScore",
+      "args": [
+        {
+          "name": "agentAddress",
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "uint64"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "getAgentTestCount",
+      "args": [
+        {
+          "name": "agentAddress",
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "uint64"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "getAgentInfo",
+      "args": [
+        {
+          "name": "agentAddress",
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "(string,string,string,uint64,uint64,uint64,uint64,uint64,uint64,uint64)",
+        "struct": "AgentRecord"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "getChallengeInfo",
+      "args": [
+        {
+          "name": "challengeId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "type": "(string,string,uint64,uint64)",
+        "struct": "Challenge"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "updateMinStake",
+      "args": [
+        {
+          "name": "newMinStake",
+          "type": "uint64"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "transferAdmin",
+      "args": [
+        {
+          "name": "newAdmin",
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "setRegistrationOpen",
+      "args": [
+        {
+          "name": "open",
+          "type": "uint64"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    },
+    {
+      "name": "adminRemoveAgent",
+      "args": [
+        {
+          "name": "agentAddress",
+          "type": "address"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      },
+      "actions": {
+        "create": [],
+        "call": [
+          "NoOp"
+        ]
+      }
+    }
+  ],
+  "arcs": [
+    4,
+    56
+  ],
+  "structs": {
+    "AgentRecord": [
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "endpoint",
+        "type": "string"
+      },
+      {
+        "name": "metadata",
+        "type": "string"
+      },
+      {
+        "name": "tier",
+        "type": "uint64"
+      },
+      {
+        "name": "totalScore",
+        "type": "uint64"
+      },
+      {
+        "name": "totalMaxScore",
+        "type": "uint64"
+      },
+      {
+        "name": "testCount",
+        "type": "uint64"
+      },
+      {
+        "name": "lastHeartbeatRound",
+        "type": "uint64"
+      },
+      {
+        "name": "registrationRound",
+        "type": "uint64"
+      },
+      {
+        "name": "stake",
+        "type": "uint64"
+      }
+    ],
+    "TestResult": [
+      {
+        "name": "score",
+        "type": "uint64"
+      },
+      {
+        "name": "maxScore",
+        "type": "uint64"
+      },
+      {
+        "name": "category",
+        "type": "string"
+      },
+      {
+        "name": "round",
+        "type": "uint64"
+      }
+    ],
+    "Challenge": [
+      {
+        "name": "category",
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "type": "string"
+      },
+      {
+        "name": "maxScore",
+        "type": "uint64"
+      },
+      {
+        "name": "active",
+        "type": "uint64"
+      }
+    ]
+  },
+  "state": {
+    "schema": {
+      "global": {
+        "bytes": 1,
+        "ints": 4
+      },
+      "local": {
+        "bytes": 0,
+        "ints": 0
+      }
+    },
+    "keys": {
+      "global": {
+        "agentCount": {
+          "key": "YWdlbnRfY291bnQ=",
+          "keyType": "AVMBytes",
+          "valueType": "uint64"
+        },
+        "minStake": {
+          "key": "bWluX3N0YWtl",
+          "keyType": "AVMBytes",
+          "valueType": "uint64"
+        },
+        "admin": {
+          "key": "YWRtaW4=",
+          "keyType": "AVMBytes",
+          "valueType": "address"
+        },
+        "challengeCount": {
+          "key": "Y2hhbF9jb3VudA==",
+          "keyType": "AVMBytes",
+          "valueType": "uint64"
+        },
+        "registrationOpen": {
+          "key": "cmVnX29wZW4=",
+          "keyType": "AVMBytes",
+          "valueType": "uint64"
+        }
+      },
+      "local": {},
+      "box": {}
+    },
+    "maps": {
+      "global": {},
+      "local": {},
+      "box": {
+        "agents": {
+          "keyType": "address",
+          "valueType": "AgentRecord",
+          "prefix": "YQ=="
+        },
+        "testResults": {
+          "keyType": "(address,string)",
+          "valueType": "TestResult",
+          "prefix": "dA=="
+        },
+        "challenges": {
+          "keyType": "string",
+          "valueType": "Challenge",
+          "prefix": "Yw=="
+        }
+      }
+    }
+  },
+  "bareActions": {
+    "create": [],
+    "call": []
+  },
+  "byteCode": {
+    "approval": "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",
+    "clear": "Cg=="
+  },
+  "compilerInfo": {
+    "compiler": "algod",
+    "compilerVersion": {
+      "major": 4,
+      "minor": 4,
+      "patch": 1,
+      "commitHash": "7b607ce4"
+    }
+  },
+  "networks": {}
+}

@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.22.0] - 2026-03-10
+
+### Added
+- **Marketplace ecosystem** — tiered pricing plans (#842), per-use credit billing (#800), verification badges and quality gates (#851), free trial periods (#873), usage metering and analytics (#854)
+- **Flock Directory** — on-chain agent registry with MCP tool and API (#806), ARC56 contract client (#901)
+- **Governance v2 frontend** — vote panel and governance service UI (#802), real-time WebSocket vote events (#846)
+- **MCP expansion** — standalone corvid-agent-mcp server package (#815), agent-agnostic MCP support for Cursor, Copilot, and OpenCode (#843), VibeKit smart contract integration (#839), skills-as-markdown for AI assistant discovery (#838)
+- **Work task priority queue** — preemption support for higher-priority tasks (#816)
+- **Branch protection** — enforce branch protection on main branch (#808)
+- **Enhanced init** — `corvid-agent init` with `--mcp`, `--yes`, and auto-clone (#837)
+- **WebSocket shared type layer** — shared types between server and client (#870)
+- **Discord public channel mode** — role-based access control, multi-channel support, smart message splitting, typing indicators, and stale thread auto-archiving (#899)
+
+### Security
+- **Injection hardening** — unicode bypass detection, API route scanning, and prompt leakage prevention (#875)
+- **Rate-limit device auth** — rate-limit device auth flow endpoints (#868)
+
+### Refactored
+- Extract MessageTransport interface for bridge swappability (#871)
+- Module boundary decomposition step 1: split shared/types.ts (#814)
+- Spec strict CI gate enforcement (#805)
+- Squash migrations into single baseline for faster fresh installs (#872)
+
+### Fixed
+- Keep direct-process sessions alive for multi-turn conversations (#900)
+- Refresh Discord slash commands on agent CRUD (#879)
+- Document undocumented exports in marketplace billing (#801) and connection spec (#867)
+- Log errors in broadcast listener callbacks instead of silently swallowing (#850)
+- CI: auto-regenerate bun.lock on Dependabot PRs (#847, #848, #849, #853, #856)
+
+### Documentation
+- System requirements and RAM benchmarks (#840)
+- Improved landing page messaging and onboarding (#836)
+- "Most tested AI agent platform" positioning (#844)
+- Blog page on GitHub Pages site (#876)
+- Expanded API reference with agent, session, schedule, and work-task details (#813)
+- Spec coverage for algochat/init and repo-blocklist handler (#818)
+- Sync stale stats across README and deep-dive (#885, #897)
+
+### Tests
+- Route integration tests for flock-directory endpoints (#888)
+- Route integration tests for governance proposals (#812)
+- Route tests for permissions, mention-polling, performance, and health (#820)
+- Protected-paths and shutdown-coordinator module specs (#811)
+
+### Stats
+- **6,215** unit tests across 255 files (17,166 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **116** module specs with automated validation
+- **39** MCP tools, **~205** API endpoints, **44** route modules, **88** tables
+- **57** commits, **~42** PRs merged this release
+
 ## [0.21.0] - 2026-03-08
 
 ### Added
