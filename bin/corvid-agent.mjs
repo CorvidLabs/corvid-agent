@@ -5,8 +5,7 @@
 // to bun if available. If only node is available, we provide helpful
 // instructions for commands that require bun.
 
-import { execFileSync, execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
