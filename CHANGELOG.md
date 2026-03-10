@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - **Branch protection** — enforce branch protection on main branch (#808)
 - **Enhanced init** — `corvid-agent init` with `--mcp`, `--yes`, and auto-clone (#837)
 - **WebSocket shared type layer** — shared types between server and client (#870)
+- **Discord public channel mode** — role-based access control, multi-channel support, smart message splitting, typing indicators, and stale thread auto-archiving (#899)
 
 ### Security
 - **Injection hardening** — unicode bypass detection, API route scanning, and prompt leakage prevention (#875)
@@ -22,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Extract MessageTransport interface for bridge swappability (#871)
 - Module boundary decomposition step 1: split shared/types.ts (#814)
 - Spec strict CI gate enforcement (#805)
+- Squash migrations into single baseline for faster fresh installs (#872)
 
 ### Fixed
 - Keep direct-process sessions alive for multi-turn conversations (#900)
@@ -50,7 +52,7 @@ All notable changes to this project will be documented in this file.
 - **360** E2E tests across 31 Playwright specs
 - **116** module specs with automated validation
 - **39** MCP tools, **~205** API endpoints, **44** route modules, **88** tables
-- **53** commits, **~40** PRs merged this release
+- **57** commits, **~42** PRs merged this release
 
 ## [0.21.0] - 2026-03-08
 
