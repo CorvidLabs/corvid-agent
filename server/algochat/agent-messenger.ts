@@ -84,7 +84,11 @@ export class AgentMessenger {
         const updated = getAgentMessage(this.db, messageId);
         if (!updated) return;
         for (const cb of this.messageUpdateListeners) {
-            try { cb(updated); } catch { /* ignore */ }
+            try {
+                cb(updated);
+            } catch (e) {
+                log.warn('messageUpdate listener threw', { error: e });
+            }
         }
     }
 

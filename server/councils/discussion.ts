@@ -57,7 +57,11 @@ export function onCouncilStageChange(cb: StageChangeCallback): () => void {
 
 function broadcastStageChange(launchId: string, stage: string, sessionIds?: string[]): void {
     for (const cb of stageChangeListeners) {
-        try { cb(launchId, stage, sessionIds); } catch { /* ignore */ }
+        try {
+            cb(launchId, stage, sessionIds);
+        } catch (e) {
+            log.warn('stageChange listener threw', { launchId, stage, error: e });
+        }
     }
 }
 
@@ -71,7 +75,11 @@ export function onCouncilLog(cb: LogCallback): () => void {
 
 function broadcastLog(entry: CouncilLaunchLog): void {
     for (const cb of logListeners) {
-        try { cb(entry); } catch { /* ignore */ }
+        try {
+            cb(entry);
+        } catch (e) {
+            log.warn('councilLog listener threw', { launchId: entry.launchId, error: e });
+        }
     }
 }
 
@@ -85,7 +93,11 @@ export function onCouncilDiscussionMessage(cb: DiscussionMessageCallback): () =>
 
 function broadcastDiscussionMessage(message: CouncilDiscussionMessage): void {
     for (const cb of discussionMessageListeners) {
-        try { cb(message); } catch { /* ignore */ }
+        try {
+            cb(message);
+        } catch (e) {
+            log.warn('discussionMessage listener threw', { launchId: message.launchId, error: e });
+        }
     }
 }
 
@@ -99,7 +111,11 @@ export function onCouncilAgentError(cb: AgentErrorCallback): () => void {
 
 export function broadcastAgentError(error: CouncilAgentError): void {
     for (const cb of agentErrorListeners) {
-        try { cb(error); } catch { /* ignore */ }
+        try {
+            cb(error);
+        } catch (e) {
+            log.warn('agentError listener threw', { launchId: error.launchId, error: e });
+        }
     }
 }
 
@@ -139,7 +155,11 @@ export function onGovernanceVoteCast(cb: GovernanceVoteCastCallback): () => void
 
 export function broadcastGovernanceVoteCast(event: GovernanceVoteCastEvent): void {
     for (const cb of governanceVoteCastListeners) {
-        try { cb(event); } catch { /* ignore */ }
+        try {
+            cb(event);
+        } catch (e) {
+            log.warn('governanceVoteCast listener threw', { launchId: event.launchId, error: e });
+        }
     }
 }
 
@@ -153,7 +173,11 @@ export function onGovernanceVoteResolved(cb: GovernanceVoteResolvedCallback): ()
 
 export function broadcastGovernanceVoteResolved(event: GovernanceVoteResolvedEvent): void {
     for (const cb of governanceVoteResolvedListeners) {
-        try { cb(event); } catch { /* ignore */ }
+        try {
+            cb(event);
+        } catch (e) {
+            log.warn('governanceVoteResolved listener threw', { launchId: event.launchId, error: e });
+        }
     }
 }
 
@@ -167,7 +191,11 @@ export function onGovernanceQuorumReached(cb: GovernanceQuorumReachedCallback): 
 
 export function broadcastGovernanceQuorumReached(event: GovernanceQuorumReachedEvent): void {
     for (const cb of governanceQuorumReachedListeners) {
-        try { cb(event); } catch { /* ignore */ }
+        try {
+            cb(event);
+        } catch (e) {
+            log.warn('governanceQuorumReached listener threw', { launchId: event.launchId, error: e });
+        }
     }
 }
 
