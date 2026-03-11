@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.1] - 2026-03-11
+
+### Fixed
+- **Discord typing indicator** — keep typing indicator alive during AI warm-up with continuous 8-second interval refresh (#940)
+
 ## [0.25.0] - 2026-03-11
 
 ### Security
