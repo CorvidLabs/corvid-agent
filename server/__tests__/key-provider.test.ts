@@ -55,6 +55,11 @@ describe('KeyProvider', () => {
             await expect(provider.getEncryptionPassphrase()).rejects.toThrow('WALLET_ENCRYPTION_KEY must be set');
         });
 
+        it('has providerType "env"', () => {
+            const provider = new EnvKeyProvider();
+            expect(provider.providerType).toBe('env');
+        });
+
         it('dispose is safe to call multiple times', () => {
             const provider = new EnvKeyProvider();
             provider.dispose();
@@ -65,9 +70,11 @@ describe('KeyProvider', () => {
 
     describe('createKeyProvider', () => {
         let originalKey: string | undefined;
+        let originalAllow: string | undefined;
 
         beforeEach(() => {
             originalKey = process.env.WALLET_ENCRYPTION_KEY;
+            originalAllow = process.env.ALLOW_PLAINTEXT_KEYS;
             process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
         });
 
@@ -76,6 +83,11 @@ describe('KeyProvider', () => {
                 delete process.env.WALLET_ENCRYPTION_KEY;
             } else {
                 process.env.WALLET_ENCRYPTION_KEY = originalKey;
+            }
+            if (originalAllow === undefined) {
+                delete process.env.ALLOW_PLAINTEXT_KEYS;
+            } else {
+                process.env.ALLOW_PLAINTEXT_KEYS = originalAllow;
             }
         });
 
@@ -89,11 +101,34 @@ describe('KeyProvider', () => {
             const passphrase = await provider.getEncryptionPassphrase();
             expect(passphrase).toBe(TEST_PASSPHRASE);
         });
+
+        it('throws on mainnet without ALLOW_PLAINTEXT_KEYS', () => {
+            delete process.env.ALLOW_PLAINTEXT_KEYS;
+            expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
+        });
+
+        it('allows mainnet with ALLOW_PLAINTEXT_KEYS=true', () => {
+            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+            const provider = createKeyProvider('mainnet');
+            expect(provider).toBeInstanceOf(EnvKeyProvider);
+        });
+
+        it('allows mainnet with ALLOW_PLAINTEXT_KEYS=1', () => {
+            process.env.ALLOW_PLAINTEXT_KEYS = '1';
+            const provider = createKeyProvider('mainnet');
+            expect(provider).toBeInstanceOf(EnvKeyProvider);
+        });
+
+        it('rejects mainnet with ALLOW_PLAINTEXT_KEYS=false', () => {
+            process.env.ALLOW_PLAINTEXT_KEYS = 'false';
+            expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
+        });
     });
 
     describe('custom KeyProvider', () => {
         it('can implement the interface for testing', async () => {
             const customProvider: KeyProvider = {
+                providerType: 'mock-kms',
                 async getEncryptionPassphrase() {
                     return 'custom-test-passphrase-for-mock-kms';
                 },
@@ -140,6 +175,7 @@ describe('encryptMnemonicWithPassphrase / decryptMnemonicWithPassphrase', () => 
 
     it('round-trips through KeyProvider pattern', async () => {
         const provider: KeyProvider = {
+            providerType: 'test',
             async getEncryptionPassphrase() {
                 return TEST_PASSPHRASE;
             },

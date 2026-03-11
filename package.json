@@ -34,7 +34,8 @@
     "security:scan": "bun scripts/ci-security-scan.ts",
     "stats:check": "bun scripts/collect-stats.ts",
     "stats:update": "bun scripts/collect-stats.ts --update",
-    "version:check": "bun scripts/version-check.ts"
+    "version:check": "bun scripts/version-check.ts",
+    "migrate:keys": "bun scripts/migrate-keys.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"

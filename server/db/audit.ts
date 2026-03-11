@@ -53,7 +53,10 @@ export type AuditAction =
     | 'subscription_create'
     | 'subscription_cancel'
     | 'discord_config_update'
-    | 'discord_config_delete';
+    | 'discord_config_delete'
+    | 'key_access_decrypt'
+    | 'key_access_encrypt'
+    | 'key_access_sign';
 
 export interface AuditEntry {
     id: number;
