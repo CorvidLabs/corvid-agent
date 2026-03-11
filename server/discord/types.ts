@@ -42,6 +42,8 @@ export interface DiscordInteractionOption {
     name: string;
     type: number;
     value?: string | number | boolean;
+    /** True when this is the option the user is currently typing (autocomplete interactions only) */
+    focused?: boolean;
     /** Nested options — present for SUB_COMMAND (type 1) and SUB_COMMAND_GROUP (type 2) */
     options?: DiscordInteractionOption[];
 }
@@ -71,6 +73,7 @@ export const InteractionType = {
     PING: 1,
     APPLICATION_COMMAND: 2,
     MESSAGE_COMPONENT: 3,
+    APPLICATION_COMMAND_AUTOCOMPLETE: 4,
 } as const;
 
 // Interaction callback types
@@ -79,6 +82,7 @@ export const InteractionCallbackType = {
     CHANNEL_MESSAGE: 4,
     DEFERRED_CHANNEL_MESSAGE: 5,
     UPDATE_MESSAGE: 7,
+    AUTOCOMPLETE_RESULT: 8,
 } as const;
 
 // Component types
