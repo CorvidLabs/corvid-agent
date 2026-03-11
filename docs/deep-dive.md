@@ -67,9 +67,9 @@ algochat/        21 files — On-chain identity, wallets, PSK messaging, agent d
 councils/        3 files  — Multi-agent deliberation, governance tiers, synthesis
 work/            1 file   — Self-improvement pipeline (worktrees, validation, PRs)
 process/         —          Session lifecycle, SDK + Ollama, approval flow, personas
-mcp/             17 files — 38 corvid_* tool handlers
-routes/          38 files — REST API (~200 endpoints)
-db/              —          SQLite schema, 2 migrations, 81 tables
+mcp/             17 files — 41 corvid_* tool handlers
+routes/          44 files — REST API (~205 endpoints)
+db/              —          SQLite schema, 3 migrations, 90 tables
 reputation/      5 files  — Scoring, attestation, verification, identity proofs
 memory/          8 files  — Vector embeddings, FTS5 search, decay, sync
 permissions/     —          Capability broker, tenant role guards

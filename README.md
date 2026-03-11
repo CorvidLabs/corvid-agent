@@ -349,7 +349,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  2 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  3 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -364,7 +364,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (2 migrations) and query modules
+  db/            SQLite schema (3 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -375,7 +375,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 38 corvid_* tool handlers
+  mcp/           MCP tool server and 41 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -405,13 +405,15 @@ server/          Bun HTTP + WebSocket server
 client/          Angular 21 SPA (standalone components, signals)
 cli/             CLI entry point and commands
 shared/          TypeScript types shared between server and client
+packages/        Published packages (MCP server, env loader, result monad)
+skills/          Agent skill definitions (AlgoChat, GitHub, scheduling, etc.)
 deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm, K8s
 e2e/             Playwright end-to-end tests (31 spec files, 360 E2E tests)
 ```
 
 ---
 
-## MCP Tools (38)
+## MCP Tools (41)
 
 Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
 
@@ -421,7 +423,8 @@ Extensible tool system via [Model Context Protocol](https://github.com/modelcont
 | **Memory** | `corvid_save_memory` (on-chain encrypted), `corvid_recall_memory` (FTS5) |
 | **GitHub** | `corvid_github_star_repo`, `corvid_github_fork_repo`, `corvid_github_list_prs`, `corvid_github_create_pr`, `corvid_github_review_pr`, `corvid_github_get_pr_diff`, `corvid_github_comment_on_pr`, `corvid_github_create_issue`, `corvid_github_list_issues`, `corvid_github_repo_info`, `corvid_github_unstar_repo`, `corvid_github_follow_user` |
 | **Automation** | `corvid_create_work_task`, `corvid_manage_schedule`, `corvid_manage_workflow`, `corvid_launch_council` |
-| **Discovery** | `corvid_discover_agent`, `corvid_invoke_remote_agent` (A2A protocol) |
+| **Projects** | `corvid_list_projects`, `corvid_current_project` |
+| **Discovery** | `corvid_discover_agent`, `corvid_invoke_remote_agent` (A2A protocol), `corvid_flock_directory` |
 | **Web** | `corvid_web_search` (Brave), `corvid_deep_research` (multi-angle) |
 | **Credits** | `corvid_check_credits`, `corvid_grant_credits`, `corvid_credit_config` |
 | **Owner Comms** | `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications` |
@@ -514,7 +517,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 2 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 3 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
