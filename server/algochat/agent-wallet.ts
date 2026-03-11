@@ -7,6 +7,7 @@ import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, list
 import { encryptMnemonic, decryptMnemonic, encryptMnemonicWithPassphrase, decryptMnemonicWithPassphrase } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
 import { wipeBuffer } from '../lib/secure-wipe';
+import { recordAudit } from '../db/audit';
 import { createLogger } from '../lib/logger';
 import { NotFoundError } from '../lib/errors';
 
@@ -38,7 +39,9 @@ export class AgentWalletService {
      * Encrypt a mnemonic using the KeyProvider if available, otherwise fall back
      * to the legacy config-based passphrase resolution.
      */
-    private async encryptMnemonicInternal(plaintext: string): Promise<string> {
+    private async encryptMnemonicInternal(plaintext: string, agentName?: string): Promise<string> {
+        const provider = this.keyProvider?.providerType ?? 'legacy';
+        recordAudit(this.db, 'key_access_encrypt', 'system', 'wallet_mnemonic', agentName ?? null, JSON.stringify({ provider }));
         if (this.keyProvider) {
             const passphrase = await this.keyProvider.getEncryptionPassphrase();
             return encryptMnemonicWithPassphrase(plaintext, passphrase);
@@ -50,7 +53,9 @@ export class AgentWalletService {
      * Decrypt a mnemonic using the KeyProvider if available, otherwise fall back
      * to the legacy config-based passphrase resolution.
      */
-    private async decryptMnemonicInternal(encrypted: string): Promise<string> {
+    private async decryptMnemonicInternal(encrypted: string, agentName?: string): Promise<string> {
+        const provider = this.keyProvider?.providerType ?? 'legacy';
+        recordAudit(this.db, 'key_access_decrypt', 'system', 'wallet_mnemonic', agentName ?? null, JSON.stringify({ provider }));
         if (this.keyProvider) {
             const passphrase = await this.keyProvider.getEncryptionPassphrase();
             return decryptMnemonicWithPassphrase(encrypted, passphrase);
@@ -106,7 +111,7 @@ export class AgentWalletService {
         try {
             const algochat = await import('@corvidlabs/ts-algochat');
             const generated = algochat.createRandomChatAccount();
-            const encrypted = await this.encryptMnemonicInternal(generated.mnemonic);
+            const encrypted = await this.encryptMnemonicInternal(generated.mnemonic, agent.name);
 
             setAgentWallet(this.db, agentId, generated.account.address, encrypted);
             saveKeystoreEntry(agent.name, generated.account.address, encrypted);
@@ -160,7 +165,7 @@ export class AgentWalletService {
         if (!encrypted) return null;
 
         try {
-            const mnemonic = await this.decryptMnemonicInternal(encrypted);
+            const mnemonic = await this.decryptMnemonicInternal(encrypted, agent.name);
             const algochat = await import('@corvidlabs/ts-algochat');
             const account = algochat.createChatAccountFromMnemonic(mnemonic);
 
@@ -284,6 +289,7 @@ export class AgentWalletService {
             await this.service.algodClient.sendRawTransaction(signedTxn).do();
 
             const agent = getAgent(this.db, agentId);
+            recordAudit(this.db, 'key_access_sign', agent?.name ?? agentId, 'asa_opt_in', String(asaId), JSON.stringify({ address: chatAccount.address }));
             log.info(`Agent ${agent?.name ?? agentId} opted into ASA ${asaId}`);
         } catch (err) {
             log.warn(`Failed to opt agent into ASA ${asaId}`, {
@@ -320,7 +326,7 @@ export class AgentWalletService {
 
         const algochat = await import('@corvidlabs/ts-algochat');
         const generated = algochat.createRandomChatAccount();
-        const encrypted = await this.encryptMnemonicInternal(generated.mnemonic);
+        const encrypted = await this.encryptMnemonicInternal(generated.mnemonic, agent.name);
 
         setAgentWallet(this.db, agentId, generated.account.address, encrypted);
         saveKeystoreEntry(agent.name, generated.account.address, encrypted);
@@ -367,6 +373,7 @@ export class AgentWalletService {
         const signedTxn = txn.signTxn(this.service.chatAccount.account.sk);
         try {
             await this.service.algodClient.sendRawTransaction(signedTxn).do();
+            recordAudit(this.db, 'key_access_sign', 'master', 'payment', toAddress, JSON.stringify({ microAlgos }));
         } finally {
             // Wipe signed transaction bytes
             wipeBuffer(signedTxn);

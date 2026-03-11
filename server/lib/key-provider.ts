@@ -6,6 +6,12 @@
  *
  * Phase 1: EnvKeyProvider (wraps existing WALLET_ENCRYPTION_KEY env var logic).
  * Phase 2: VaultKeyProvider, AwsSecretsKeyProvider, etc.
+ *
+ * Production enforcement (#923):
+ * On mainnet, EnvKeyProvider (plaintext env-var source) is rejected by default.
+ * Set ALLOW_PLAINTEXT_KEYS=true to explicitly opt in. This ensures operators
+ * acknowledge the risk of keeping the encryption passphrase in a process
+ * environment variable on production infrastructure.
  */
 
 import { getEncryptionPassphrase } from './crypto';
@@ -26,6 +32,9 @@ export interface KeyProvider {
 
     /** Clean up any cached key material or connections. */
     dispose(): void;
+
+    /** Human-readable name of this provider type (for audit logging). */
+    readonly providerType: string;
 }
 
 /**
@@ -38,6 +47,7 @@ export interface KeyProvider {
  * - Throws on testnet/mainnet if no key is configured
  */
 export class EnvKeyProvider implements KeyProvider {
+    readonly providerType = 'env';
     private network: string;
     private serverMnemonic: string | null;
 
@@ -58,9 +68,9 @@ export class EnvKeyProvider implements KeyProvider {
 /**
  * Create a KeyProvider based on configuration.
  *
- * Currently always returns EnvKeyProvider. Future implementations will
- * check for KMS configuration (e.g., VAULT_ADDR, AWS_SECRET_ARN) and
- * return the appropriate provider.
+ * On mainnet, EnvKeyProvider is rejected unless ALLOW_PLAINTEXT_KEYS=true.
+ * Future implementations will check for KMS configuration and return
+ * the appropriate provider (e.g., VaultKeyProvider, AwsSecretsKeyProvider).
  */
 export function createKeyProvider(
     network?: string,
@@ -70,6 +80,31 @@ export function createKeyProvider(
     // if (process.env.VAULT_ADDR) return new VaultKeyProvider(...)
     // if (process.env.AWS_SECRET_ARN) return new AwsSecretsKeyProvider(...)
 
-    log.debug('Using EnvKeyProvider for wallet encryption');
+    // Enforce: on mainnet, reject plaintext env-based key provider unless explicitly allowed
+    if (network === 'mainnet' && !isPlaintextKeysAllowed()) {
+        throw new Error(
+            'Refusing to start on mainnet with plaintext key provider (EnvKeyProvider). ' +
+            'Wallet encryption keys stored in environment variables are vulnerable to ' +
+            'process memory dumps and log leaks. ' +
+            'Set ALLOW_PLAINTEXT_KEYS=true to explicitly accept this risk, ' +
+            'or configure a KMS-backed key provider (VAULT_ADDR or AWS_SECRET_ARN).',
+        );
+    }
+
+    if (network === 'mainnet') {
+        log.warn(
+            'Using EnvKeyProvider on mainnet with ALLOW_PLAINTEXT_KEYS=true — ' +
+            'migrate to a KMS-backed provider for production hardening. ' +
+            'See: bun run migrate:keys --help',
+        );
+    }
+
+    log.debug('Using EnvKeyProvider for wallet encryption', { network });
     return new EnvKeyProvider(network, serverMnemonic);
+}
+
+/** Check whether the operator has explicitly opted into plaintext key storage. */
+function isPlaintextKeysAllowed(): boolean {
+    const value = process.env.ALLOW_PLAINTEXT_KEYS;
+    return value === 'true' || value === '1';
 }
