@@ -2,12 +2,11 @@ import { describe, it, expect } from 'bun:test';
 import {
     errorHandlerMiddleware,
     requestLogMiddleware,
-    corsMiddleware,
     roleMiddleware,
     ORDER,
 } from '../middleware/builtin';
 import type { MiddlewareContext } from '../middleware/pipeline';
-import { AppError, RateLimitError, ValidationError } from '../lib/errors';
+import { RateLimitError, ValidationError } from '../lib/errors';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

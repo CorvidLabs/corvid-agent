@@ -9,7 +9,7 @@ import {
     safeNumParam,
     handleRouteError,
 } from '../lib/response';
-import { ValidationError, RateLimitError, NotFoundError, AppError } from '../lib/errors';
+import { ValidationError, RateLimitError, NotFoundError } from '../lib/errors';
 
 // ── json() ──────────────────────────────────────────────────────────────────
 
