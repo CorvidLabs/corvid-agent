@@ -748,11 +748,15 @@ describe('GitHubSearcher', () => {
             const isAllowed = (sender: string) => sender === 'allowed-user';
 
             const result = await searcher.fetchMentions(config, isAllowed);
-            // Assigned search runs without mention filter, so it will include items
-            // but the global isAllowed filter should block 'blocked-user'
-            for (const m of result) {
+            // Non-assignment mentions from blocked users are filtered out.
+            // Assignment-type mentions bypass the allowlist (assignment = authorization).
+            const nonAssignment = result.filter(m => m.type !== 'assignment');
+            for (const m of nonAssignment) {
                 expect(m.sender).toBe('allowed-user');
             }
+            // Assignment mentions from blocked-user should still be included
+            const assignments = result.filter(m => m.type === 'assignment');
+            expect(assignments.length).toBeGreaterThan(0);
         });
 
         test('applies per-config allowed users filter', async () => {
@@ -780,9 +784,14 @@ describe('GitHubSearcher', () => {
             });
 
             const result = await searcher.fetchMentions(config, () => true);
-            for (const m of result) {
+            // Non-assignment mentions should only be from alice
+            const nonAssignment = result.filter(m => m.type !== 'assignment');
+            for (const m of nonAssignment) {
                 expect(m.sender.toLowerCase()).toBe('alice');
             }
+            // Assignment mentions bypass per-config filter too
+            const assignments = result.filter(m => m.type === 'assignment');
+            expect(assignments.length).toBeGreaterThan(0);
         });
 
         test('sorts mentions by createdAt descending', async () => {
