@@ -124,13 +124,28 @@ export class GitHubSearcher {
         // Sort by creation time descending (newest first)
         mentions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        // Global allowlist filter (empty = open mode)
-        const globalFiltered = mentions.filter(m => isAllowed(m.sender));
+        // Global allowlist filter (empty = open mode).
+        // Assignment-type mentions bypass the allowlist — the assignment itself
+        // is authorization (someone with repo write access explicitly assigned us).
+        const globalFiltered = mentions.filter(m => {
+            if (m.type === 'assignment') return true;
+            const allowed = isAllowed(m.sender);
+            if (!allowed) {
+                log.debug('Filtered mention — sender not in allowlist', {
+                    sender: m.sender, type: m.type, number: m.number, id: m.id,
+                });
+            }
+            return allowed;
+        });
 
-        // Per-config allowed users filter (further restricts global list)
+        // Per-config allowed users filter (further restricts global list).
+        // Assignments still bypass this filter.
         if (config.allowedUsers.length > 0) {
             const allowed = new Set(config.allowedUsers.map(u => u.toLowerCase()));
-            return globalFiltered.filter(m => allowed.has(m.sender.toLowerCase()));
+            return globalFiltered.filter(m => {
+                if (m.type === 'assignment') return true;
+                return allowed.has(m.sender.toLowerCase());
+            });
         }
 
         return globalFiltered;
