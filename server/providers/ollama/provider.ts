@@ -436,6 +436,12 @@ export class OllamaProvider extends BaseLlmProvider {
 
     /** Resolve the concurrency weight for a model based on its parameter size. */
     private getModelWeight(modelName: string): number {
+        // Cloud models (e.g. "qwen3.5:cloud") are proxied through Ollama's cloud
+        // gateway which serializes requests. Assign maxWeight so only one cloud
+        // model inference runs at a time, preventing proxy bottleneck & timeouts.
+        if (modelName.includes('-cloud') || modelName.includes(':cloud')) {
+            return this.maxWeight;
+        }
         const tag = this.cachedTags.find(t => t.name === modelName);
         const paramSize = tag?.details?.parameter_size; // e.g. "14B", "3.4B", "8B"
         if (!paramSize) return 1; // unknown → assume small
