@@ -37,7 +37,7 @@ import { broadcastAlgoChatMessage } from '../ws/handler';
 import { publishToTenant } from '../events/broadcasting';
 import { resolveAgentTenant } from '../tenant/resolve';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
-import { createKeyProvider } from '../lib/key-provider';
+import { createKeyProvider, assertProductionReady } from '../lib/key-provider';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import { createFlockClient } from '../flock-directory/deploy';
 import { createLogger } from '../lib/logger';
@@ -109,6 +109,22 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
 
     // Initialize agent wallet service on the agent network (localnet for funding/keys)
     const keyProvider = createKeyProvider(agentNetworkConfig.network, agentNetworkConfig.mnemonic);
+
+    // Validate production readiness on testnet/mainnet (blocks startup if misconfigured)
+    try {
+        await assertProductionReady(keyProvider, agentNetworkConfig.network);
+    } catch (err) {
+        log.error('KeyProvider production readiness check failed', {
+            network: agentNetworkConfig.network,
+            error: err instanceof Error ? err.message : String(err),
+        });
+        if (agentNetworkConfig.network === 'mainnet') {
+            throw err; // Fatal on mainnet — refuse to start with weak key config
+        }
+        // On testnet, warn but continue (allows development with degraded security)
+        log.warn('Continuing with degraded key security on testnet — NOT safe for mainnet');
+    }
+
     algochatState.walletService = new AgentWalletService(db, agentNetworkConfig, agentService, keyProvider);
 
     // Only let the bridge use agent wallets if both networks match

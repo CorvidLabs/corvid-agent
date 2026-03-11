@@ -2,10 +2,12 @@ import type { Database } from 'bun:sqlite';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatService } from './service';
 import type { KeyProvider } from '../lib/key-provider';
+import { assertProductionReady } from '../lib/key-provider';
 import { fundFromTestnetFaucet } from './service';
 import { getAgent, setAgentWallet, getAgentWalletMnemonic, addAgentFunding, listAgents } from '../db/agents';
 import { encryptMnemonic, decryptMnemonic, encryptMnemonicWithPassphrase, decryptMnemonicWithPassphrase } from '../lib/crypto';
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
+import { recordAudit } from '../db/audit';
 import { wipeBuffer } from '../lib/secure-wipe';
 import { recordAudit } from '../db/audit';
 import { createLogger } from '../lib/logger';
@@ -17,9 +19,26 @@ const DEFAULT_FUND_ALGO = 10;
 const REFILL_THRESHOLD_MICRO = 1_000_000; // 1 ALGO
 const REFILL_AMOUNT_MICRO = 5_000_000; // 5 ALGO
 
+/** Default TTL for cached decrypted mnemonics: 5 minutes. */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 export interface AgentChatAccount {
     address: string;
     account: import('@corvidlabs/ts-algochat').ChatAccount;
+}
+
+/**
+ * Encrypted in-memory cache entry for decrypted mnemonics.
+ * Stores the re-encrypted mnemonic with a short-lived random passphrase
+ * so that plaintext never lingers in the heap.
+ */
+interface CacheEntry {
+    /** Mnemonic re-encrypted with ephemeral key for in-memory caching. */
+    encryptedValue: string;
+    /** Ephemeral passphrase used to encrypt the cached value. */
+    ephemeralKey: string;
+    /** Timestamp when the entry was cached. */
+    cachedAt: number;
 }
 
 export class AgentWalletService {
@@ -27,12 +46,27 @@ export class AgentWalletService {
     private config: AlgoChatConfig;
     private service: AlgoChatService;
     private keyProvider: KeyProvider | null;
+    /** Encrypted in-memory cache: agentId → CacheEntry. */
+    private keyCache = new Map<string, CacheEntry>();
+    /** Whether production readiness has been validated. */
+    private productionValidated = false;
 
     constructor(db: Database, config: AlgoChatConfig, service: AlgoChatService, keyProvider?: KeyProvider) {
         this.db = db;
         this.config = config;
         this.service = service;
         this.keyProvider = keyProvider ?? null;
+    }
+
+    /**
+     * Validate that the key provider is production-ready.
+     * Called once lazily on first wallet operation. On localnet this is a no-op.
+     * On testnet/mainnet, asserts WALLET_ENCRYPTION_KEY is strong enough.
+     */
+    private async assertReady(): Promise<void> {
+        if (this.productionValidated) return;
+        await assertProductionReady(this.keyProvider, this.config.network);
+        this.productionValidated = true;
     }
 
     /**
@@ -64,12 +98,85 @@ export class AgentWalletService {
     }
 
     /**
+     * Record a key access event to the audit log.
+     * Non-blocking: never throws even if audit recording fails.
+     */
+    private auditKeyAccess(agentId: string, operation: string, success: boolean): void {
+        try {
+            recordAudit(
+                this.db,
+                success ? 'key_access' : 'key_access_denied',
+                'system',
+                'agent_wallet',
+                agentId,
+                JSON.stringify({ operation, network: this.config.network }),
+            );
+        } catch {
+            // Audit should never crash the caller
+        }
+    }
+
+    /**
+     * Get a decrypted mnemonic from the encrypted in-memory cache.
+     * Returns null on cache miss or expired entry.
+     */
+    private async getCachedMnemonic(agentId: string): Promise<string | null> {
+        const entry = this.keyCache.get(agentId);
+        if (!entry) return null;
+
+        if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+            this.keyCache.delete(agentId);
+            return null;
+        }
+
+        try {
+            return await decryptMnemonicWithPassphrase(entry.encryptedValue, entry.ephemeralKey);
+        } catch {
+            // Cache entry corrupted or ephemeral key mismatch — evict
+            this.keyCache.delete(agentId);
+            return null;
+        }
+    }
+
+    /**
+     * Store a decrypted mnemonic in the encrypted in-memory cache.
+     * The mnemonic is re-encrypted with a random ephemeral key so plaintext
+     * never sits in the heap.
+     */
+    private async setCachedMnemonic(agentId: string, plaintext: string): Promise<void> {
+        const ephemeralKey = generateEphemeralKey();
+        try {
+            const encryptedValue = await encryptMnemonicWithPassphrase(plaintext, ephemeralKey);
+            this.keyCache.set(agentId, {
+                encryptedValue,
+                ephemeralKey,
+                cachedAt: Date.now(),
+            });
+        } catch {
+            // Cache write failure is non-fatal — next access will just re-decrypt
+            log.warn('Failed to cache encrypted mnemonic', { agentId });
+        }
+    }
+
+    /** Evict a specific agent's cached key. */
+    evictCachedKey(agentId: string): void {
+        this.keyCache.delete(agentId);
+    }
+
+    /** Evict all cached keys (e.g., on key rotation). */
+    evictAllCachedKeys(): void {
+        this.keyCache.clear();
+    }
+
+    /**
      * Ensure the agent has a wallet. On localnet/testnet with no existing wallet,
      * check the persistent keystore first (survives DB rebuilds), then
      * auto-create and fund. On mainnet this is a no-op (wallets must be funded manually).
      */
     async ensureWallet(agentId: string): Promise<void> {
         if (this.config.network === 'mainnet') return;
+
+        await this.assertReady();
 
         const agent = getAgent(this.db, agentId);
         if (!agent) return;
@@ -80,6 +187,7 @@ export class AgentWalletService {
         if (saved) {
             setAgentWallet(this.db, agentId, saved.address, saved.encryptedMnemonic);
             log.info(`Restored wallet from keystore for agent ${agent.name}`, { address: saved.address });
+            this.auditKeyAccess(agentId, 'restore_from_keystore', true);
 
             // Check if the on-chain account still has funds
             try {
@@ -116,6 +224,7 @@ export class AgentWalletService {
             setAgentWallet(this.db, agentId, generated.account.address, encrypted);
             saveKeystoreEntry(agent.name, generated.account.address, encrypted);
             log.info(`Created wallet for agent ${agent.name}`, { address: generated.account.address });
+            this.auditKeyAccess(agentId, 'create_wallet', true);
 
             // Fund from appropriate dispenser (KMD on localnet, faucet on testnet)
             await this.fundWallet(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
@@ -156,10 +265,27 @@ export class AgentWalletService {
 
     /**
      * Retrieve the agent's ChatAccount by decrypting its stored mnemonic.
+     * Uses an encrypted in-memory cache to avoid repeated PBKDF2 derivations.
      */
     async getAgentChatAccount(agentId: string): Promise<AgentChatAccount | null> {
         const agent = getAgent(this.db, agentId);
         if (!agent?.walletAddress) return null;
+
+        await this.assertReady();
+
+        // Try encrypted in-memory cache first
+        const cached = await this.getCachedMnemonic(agentId);
+        if (cached) {
+            try {
+                const algochat = await import('@corvidlabs/ts-algochat');
+                const account = algochat.createChatAccountFromMnemonic(cached);
+                this.auditKeyAccess(agentId, 'decrypt_cached', true);
+                return { address: agent.walletAddress, account };
+            } catch {
+                // Cache had stale data — fall through to re-decrypt
+                this.evictCachedKey(agentId);
+            }
+        }
 
         const encrypted = getAgentWalletMnemonic(this.db, agentId);
         if (!encrypted) return null;
@@ -169,12 +295,17 @@ export class AgentWalletService {
             const algochat = await import('@corvidlabs/ts-algochat');
             const account = algochat.createChatAccountFromMnemonic(mnemonic);
 
+            // Cache the decrypted mnemonic (re-encrypted with ephemeral key)
+            await this.setCachedMnemonic(agentId, mnemonic);
+            this.auditKeyAccess(agentId, 'decrypt', true);
+
             return { address: agent.walletAddress, account };
         } catch (err) {
             log.error('Failed to decrypt agent mnemonic', {
                 agentId,
                 error: err instanceof Error ? err.message : String(err),
             });
+            this.auditKeyAccess(agentId, 'decrypt', false);
 
             // On localnet/testnet, re-create the wallet if decryption fails
             // (wallet was encrypted with a different key)
@@ -331,6 +462,10 @@ export class AgentWalletService {
         setAgentWallet(this.db, agentId, generated.account.address, encrypted);
         saveKeystoreEntry(agent.name, generated.account.address, encrypted);
         log.info(`Re-created wallet for agent ${agent.name}`, { address: generated.account.address });
+        this.auditKeyAccess(agentId, 'recreate_wallet', true);
+
+        // Evict stale cache entry
+        this.evictCachedKey(agentId);
 
         await this.fundWallet(generated.account.address, DEFAULT_FUND_ALGO * 1_000_000);
         addAgentFunding(this.db, agentId, DEFAULT_FUND_ALGO);
@@ -442,4 +577,13 @@ export class AgentWalletService {
             await kmd.releaseWalletHandle(walletHandle);
         }
     }
+}
+
+/**
+ * Generate a random 64-character hex string for ephemeral cache encryption.
+ * Uses crypto.getRandomValues for cryptographic randomness.
+ */
+function generateEphemeralKey(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
