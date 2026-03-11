@@ -57,6 +57,32 @@ export async function parseBody<T extends z.ZodType>(
     }
 }
 
+/**
+ * Validate an Algorand address format (58-char base32 with valid checksum).
+ * Uses algosdk.isValidAddress when available, falls back to format check.
+ */
+let _algosdk: typeof import('algosdk').default | null = null;
+async function loadAlgosdk() {
+    if (!_algosdk) _algosdk = (await import('algosdk')).default;
+    return _algosdk;
+}
+
+/** Synchronous format check: 58 uppercase A-Z2-7 characters. */
+export function isAlgorandAddressFormat(address: string): boolean {
+    return /^[A-Z2-7]{58}$/.test(address);
+}
+
+/** Full async validation with checksum via algosdk. */
+export async function isValidAlgorandAddress(address: string): Promise<boolean> {
+    try {
+        const sdk = await loadAlgosdk();
+        return sdk.isValidAddress(address);
+    } catch {
+        // Fallback to format check if algosdk not available
+        return isAlgorandAddressFormat(address);
+    }
+}
+
 /** Validate query/search params (plain object) against a schema. */
 export function parseQuery<T extends z.ZodType>(
     params: Record<string, string | null>,
@@ -268,8 +294,13 @@ export const CreateWorkTaskSchema = z.object({
 
 // ─── Allowlist ──────────────────────────────────────────────────────────────────
 
+export const AlgorandAddressSchema = z.string()
+    .min(1, 'address is required')
+    .transform(s => s.trim().toUpperCase())
+    .refine(isAlgorandAddressFormat, 'Invalid Algorand address format');
+
 export const AddAllowlistSchema = z.object({
-    address: z.string().min(1, 'address is required'),
+    address: AlgorandAddressSchema,
     label: z.string().optional(),
 });
 

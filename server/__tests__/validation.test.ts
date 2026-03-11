@@ -237,11 +237,20 @@ describe('CreateWorkTaskSchema', () => {
 // ─── Allowlist ────────────────────────────────────────────────────────────────
 
 describe('AddAllowlistSchema', () => {
-    it('accepts valid address', () => {
-        expect(AddAllowlistSchema.safeParse({ address: 'ALGO_ADDRESS_HERE_123' }).success).toBe(true);
+    const validAddr = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
+    it('accepts valid Algorand address', () => {
+        expect(AddAllowlistSchema.safeParse({ address: validAddr }).success).toBe(true);
+    });
+    it('normalises to uppercase', () => {
+        const result = AddAllowlistSchema.safeParse({ address: validAddr.toLowerCase() });
+        expect(result.success).toBe(true);
+        if (result.success) expect(result.data.address).toBe(validAddr);
     });
     it('rejects empty address', () => {
         expect(AddAllowlistSchema.safeParse({ address: '' }).success).toBe(false);
+    });
+    it('rejects invalid format', () => {
+        expect(AddAllowlistSchema.safeParse({ address: 'NOT_VALID' }).success).toBe(false);
     });
 });
 

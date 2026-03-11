@@ -56,7 +56,7 @@ import { backupDatabase } from '../db/backup';
 import { updateMemoryTxid } from '../db/agent-memories';
 import { encryptMemoryContent } from '../lib/crypto';
 import { loadAlgoChatConfig } from '../algochat/config';
-import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema, PSKContactNicknameSchema, CreditGrantSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema, PSKContactNicknameSchema, CreditGrantSchema, isAlgorandAddressFormat } from '../lib/validation';
 import { createLogger } from '../lib/logger';
 import { json, handleRouteError, safeNumParam } from '../lib/response';
 import { buildCorsHeaders, applyCors, loadAuthConfig, type AuthConfig } from '../middleware/auth';
@@ -638,7 +638,10 @@ async function handleRoutes(
     // Wallet viewer — messages for a specific wallet
     const walletMsgMatch = url.pathname.match(/^\/api\/wallets\/([^/]+)\/messages$/);
     if (walletMsgMatch && req.method === 'GET') {
-        const address = decodeURIComponent(walletMsgMatch[1]);
+        const address = decodeURIComponent(walletMsgMatch[1]).toUpperCase();
+        if (!isAlgorandAddressFormat(address)) {
+            return json({ error: 'Invalid Algorand address format' }, 400);
+        }
         const limit = safeNumParam(url.searchParams.get('limit'), 50);
         const offset = safeNumParam(url.searchParams.get('offset'), 0);
         const result = getWalletMessages(db, address, limit, offset);
@@ -648,11 +651,11 @@ async function handleRoutes(
     // Wallet viewer — grant credits to a wallet
     const walletCreditsMatch = url.pathname.match(/^\/api\/wallets\/([^/]+)\/credits$/);
     if (walletCreditsMatch && req.method === 'POST') {
-        const address = decodeURIComponent(walletCreditsMatch[1]);
+        const address = decodeURIComponent(walletCreditsMatch[1]).toUpperCase();
         try {
             const data = await parseBodyOrThrow(req, CreditGrantSchema);
-            if (!address || address.length < 58) {
-                return json({ error: 'Invalid wallet address' }, 400);
+            if (!isAlgorandAddressFormat(address)) {
+                return json({ error: 'Invalid Algorand address format' }, 400);
             }
             grantCredits(db, address, Math.round(data.amount), data.reference);
             const balance = getBalance(db, address);

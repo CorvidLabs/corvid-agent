@@ -6,11 +6,11 @@ import type { FlockDirectoryService } from '../flock-directory/service';
 import type { RequestContext } from '../middleware/guards';
 import type { FlockAgentStatus } from '../../shared/types/flock-directory';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
-import { parseBodyOrThrow, ValidationError } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, AlgorandAddressSchema, isAlgorandAddressFormat } from '../lib/validation';
 import { z } from 'zod';
 
 const RegisterAgentSchema = z.object({
-    address: z.string().min(1),
+    address: AlgorandAddressSchema,
     name: z.string().min(1),
     description: z.string().optional(),
     instanceUrl: z.string().url().optional(),
@@ -134,7 +134,11 @@ export function handleFlockDirectoryRoutes(
 
     const addressMatch = path.match(/^\/api\/flock-directory\/lookup\/([^/]+)$/);
     if (addressMatch && method === 'GET') {
-        const agent = flockDirectory.getByAddress(addressMatch[1]);
+        const address = decodeURIComponent(addressMatch[1]).toUpperCase();
+        if (!isAlgorandAddressFormat(address)) {
+            return badRequest('Invalid Algorand address format');
+        }
+        const agent = flockDirectory.getByAddress(address);
         if (!agent) return notFound('Agent not found');
         return json(agent);
     }

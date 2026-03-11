@@ -87,8 +87,15 @@ describe('Allowlist Routes', () => {
         expect(data.label).toBe('Updated Label');
     });
 
-    it('PUT /api/allowlist/:address returns 404 for unknown', async () => {
+    it('PUT /api/allowlist/:address returns 400 for invalid address format', async () => {
         const { req, url } = fakeReq('PUT', '/api/allowlist/UNKNOWN_ADDRESS', { label: 'x' });
+        const res = await handleAllowlistRoutes(req, url, db);
+        expect((res as Response).status).toBe(400);
+    });
+
+    it('PUT /api/allowlist/:address returns 404 for valid but unknown address', async () => {
+        const unknownValid = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC4';
+        const { req, url } = fakeReq('PUT', `/api/allowlist/${unknownValid}`, { label: 'x' });
         const res = await handleAllowlistRoutes(req, url, db);
         expect((res as Response).status).toBe(404);
     });
@@ -114,8 +121,15 @@ describe('Allowlist Routes', () => {
         expect(data.ok).toBe(true);
     });
 
-    it('DELETE /api/allowlist/:address returns 404 for unknown', async () => {
+    it('DELETE /api/allowlist/:address returns 400 for invalid address format', async () => {
         const { req, url } = fakeReq('DELETE', '/api/allowlist/UNKNOWN_ADDRESS');
+        const res = handleAllowlistRoutes(req, url, db);
+        expect((res as Response).status).toBe(400);
+    });
+
+    it('DELETE /api/allowlist/:address returns 404 for valid but unknown address', () => {
+        const unknownValid = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC4';
+        const { req, url } = fakeReq('DELETE', `/api/allowlist/${unknownValid}`);
         const res = handleAllowlistRoutes(req, url, db);
         expect((res as Response).status).toBe(404);
     });
