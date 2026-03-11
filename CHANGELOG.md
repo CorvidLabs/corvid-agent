@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.2] - 2026-03-11
+
+### Fixed
+- **Discord typing indicator** — add safety timeout to prevent typing indicator interval leaks (#947)
+- **GitHub mention allowlist** — bypass allowlist for assignment-type GitHub mentions (#946)
+- **Process exit errors** — pass error details through process exit to session messages (#945)
+- **Discord mentions** — resolve Discord mentions to @username in message text (#942)
+
+### Chore
+- **Test coverage** — coverage expansion for response, builtin middleware, key rotation (#943)
+
 ## [0.25.1] - 2026-03-11
 
 ### Fixed
