@@ -6,6 +6,10 @@ import type { FlockDirectoryService } from '../flock-directory/service';
 
 let db: Database;
 
+// Valid-format 58-char Algorand addresses for tests
+const VALID_ADDR1 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
+const VALID_ADDR2 = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC4';
+
 function fakeReq(method: string, path: string, body?: unknown): { req: Request; url: URL } {
     const url = new URL(`http://localhost:3000${path}`);
     const opts: RequestInit = { method };
@@ -31,7 +35,7 @@ function createMockService(overrides?: Partial<FlockDirectoryService>): FlockDir
         listActive: mock(() => []),
         register: mock(() => ({
             id: 'new-id',
-            address: 'ADDR1',
+            address: VALID_ADDR1,
             name: 'TestAgent',
             description: '',
             instanceUrl: null,
@@ -164,7 +168,7 @@ describe('Flock Directory Routes', () => {
     it('POST /api/flock-directory/agents registers a new agent', async () => {
         const svc = createMockService();
         const { req, url } = fakeReq('POST', '/api/flock-directory/agents', {
-            address: 'ADDR1',
+            address: VALID_ADDR1,
             name: 'TestAgent',
         });
         const res = await callRoute(req, url, db, svc);
@@ -174,7 +178,7 @@ describe('Flock Directory Routes', () => {
         expect(data.id).toBe('new-id');
         expect(data.name).toBe('TestAgent');
         expect(svc.register).toHaveBeenCalledWith({
-            address: 'ADDR1',
+            address: VALID_ADDR1,
             name: 'TestAgent',
         });
     });
@@ -182,7 +186,7 @@ describe('Flock Directory Routes', () => {
     it('POST /api/flock-directory/agents with full body', async () => {
         const svc = createMockService();
         const { req, url } = fakeReq('POST', '/api/flock-directory/agents', {
-            address: 'ADDR2',
+            address: VALID_ADDR2,
             name: 'FullAgent',
             description: 'A full agent',
             instanceUrl: 'https://example.com',
@@ -192,7 +196,7 @@ describe('Flock Directory Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(201);
         expect(svc.register).toHaveBeenCalledWith({
-            address: 'ADDR2',
+            address: VALID_ADDR2,
             name: 'FullAgent',
             description: 'A full agent',
             instanceUrl: 'https://example.com',
@@ -218,7 +222,7 @@ describe('Flock Directory Routes', () => {
 
     it('POST /api/flock-directory/agents rejects missing name', async () => {
         const svc = createMockService();
-        const { req, url } = fakeReq('POST', '/api/flock-directory/agents', { address: 'ADDR1' });
+        const { req, url } = fakeReq('POST', '/api/flock-directory/agents', { address: VALID_ADDR1 });
         const res = await callRoute(req, url, db, svc);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(400);
@@ -227,7 +231,7 @@ describe('Flock Directory Routes', () => {
     it('POST /api/flock-directory/agents rejects invalid instanceUrl', async () => {
         const svc = createMockService();
         const { req, url } = fakeReq('POST', '/api/flock-directory/agents', {
-            address: 'ADDR1',
+            address: VALID_ADDR1,
             name: 'Test',
             instanceUrl: 'not-a-url',
         });
@@ -241,7 +245,7 @@ describe('Flock Directory Routes', () => {
     it('GET /api/flock-directory/agents/:id returns agent', async () => {
         const agent = {
             id: 'agent-1',
-            address: 'ADDR1',
+            address: VALID_ADDR1,
             name: 'TestAgent',
             status: 'active',
         };
@@ -334,20 +338,28 @@ describe('Flock Directory Routes', () => {
     // ─── Lookup by address ───────────────────────────────────────────────────
 
     it('GET /api/flock-directory/lookup/:address returns agent', async () => {
-        const agent = { id: 'agent-1', address: 'SOME_ADDRESS', name: 'Test' };
+        const agent = { id: 'agent-1', address: VALID_ADDR1, name: 'Test' };
         const svc = createMockService({ getByAddress: mock(() => agent as any) });
-        const { req, url } = fakeReq('GET', '/api/flock-directory/lookup/SOME_ADDRESS');
+        const { req, url } = fakeReq('GET', `/api/flock-directory/lookup/${VALID_ADDR1}`);
         const res = await callRoute(req, url, db, svc);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json();
-        expect(data.address).toBe('SOME_ADDRESS');
-        expect(svc.getByAddress).toHaveBeenCalledWith('SOME_ADDRESS');
+        expect(data.address).toBe(VALID_ADDR1);
+        expect(svc.getByAddress).toHaveBeenCalledWith(VALID_ADDR1);
     });
 
-    it('GET /api/flock-directory/lookup/:address returns 404 when not found', async () => {
+    it('GET /api/flock-directory/lookup/:address returns 400 for invalid address format', async () => {
         const svc = createMockService();
-        const { req, url } = fakeReq('GET', '/api/flock-directory/lookup/UNKNOWN');
+        const { req, url } = fakeReq('GET', '/api/flock-directory/lookup/INVALID');
+        const res = await callRoute(req, url, db, svc);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(400);
+    });
+
+    it('GET /api/flock-directory/lookup/:address returns 404 for valid but unknown address', async () => {
+        const svc = createMockService();
+        const { req, url } = fakeReq('GET', `/api/flock-directory/lookup/${VALID_ADDR2}`);
         const res = await callRoute(req, url, db, svc);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(404);

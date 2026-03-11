@@ -55,6 +55,15 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `parseBodyOrThrow` | `req: Request, schema: T extends z.ZodType` | `Promise<z.infer<T>>` | Parses and validates a JSON request body against a Zod schema. Throws `ValidationError` on failure. |
 | `parseBody` | `req: Request, schema: T extends z.ZodType` | `Promise<{ data: z.infer<T> \| null; error: string \| null }>` | Safe variant of `parseBodyOrThrow`. Returns `{ data, error }` instead of throwing. |
 | `parseQuery` | `params: Record<string, string \| null>, schema: T extends z.ZodType` | `{ data: z.infer<T>; error: null } \| { data: null; error: string }` | Validates query/search params (plain object) against a Zod schema. |
+| `isAlgorandAddressFormat` | `(address: string)` | `boolean` | Synchronous format check: 58 uppercase A-Z2-7 characters. |
+| `isValidAlgorandAddress` | `(address: string)` | `Promise<boolean>` | Full async validation with checksum via algosdk, falls back to format check. |
+
+### Exported Constants
+
+#### validation.ts
+| Constant | Type | Description |
+|----------|------|-------------|
+| `AlgorandAddressSchema` | `z.ZodEffects<z.ZodString>` | Zod schema that trims, uppercases, and validates Algorand address format (58-char base32). |
 
 ### Exported Types
 

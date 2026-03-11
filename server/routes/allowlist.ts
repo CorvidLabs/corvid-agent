@@ -5,7 +5,7 @@ import {
     updateAllowlistEntry,
     removeFromAllowlist,
 } from '../db/allowlist';
-import { parseBodyOrThrow, ValidationError, AddAllowlistSchema, UpdateAllowlistSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, AddAllowlistSchema, UpdateAllowlistSchema, isAlgorandAddressFormat } from '../lib/validation';
 import { json } from '../lib/response';
 
 let _algosdk: typeof import('algosdk').default | null = null;
@@ -34,6 +34,9 @@ export function handleAllowlistRoutes(
     if (!match) return null;
 
     const address = decodeURIComponent(match[1]).toUpperCase();
+    if (!isAlgorandAddressFormat(address)) {
+        return json({ error: 'Invalid Algorand address format' }, 400);
+    }
 
     if (method === 'PUT') {
         return handleUpdate(req, db, address);
@@ -50,13 +53,12 @@ export function handleAllowlistRoutes(
 async function handleAdd(req: Request, db: Database): Promise<Response> {
     try {
         const data = await parseBodyOrThrow(req, AddAllowlistSchema);
-
-        const address = data.address.trim().toUpperCase();
+        // Schema already trims/uppercases and validates format; checksum validation below
         const algosdk = await getAlgosdk();
-        if (!algosdk.isValidAddress(address)) {
-            return json({ error: 'Invalid Algorand address' }, 400);
+        if (!algosdk.isValidAddress(data.address)) {
+            return json({ error: 'Invalid Algorand address checksum' }, 400);
         }
-        const entry = addToAllowlist(db, address, data.label);
+        const entry = addToAllowlist(db, data.address, data.label);
         return json(entry, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
