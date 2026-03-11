@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.3] - 2026-03-11
+
+### Fixed
+- **Install script** — read user input from /dev/tty so prompts work when piped via curl (#944, #949)
+
 ## [0.25.2] - 2026-03-11
 
 ### Fixed
