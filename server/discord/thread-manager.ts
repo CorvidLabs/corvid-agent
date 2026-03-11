@@ -65,6 +65,11 @@ export function subscribeForResponseWithEmbed(
     const STATUS_DEBOUNCE_MS = 3000;
     const TYPING_REFRESH_MS = 8000;
 
+    // Keep typing indicator alive continuously until response completes
+    const typingInterval = setInterval(() => {
+        sendTypingIndicator(botToken, threadId).catch(() => {});
+    }, TYPING_REFRESH_MS);
+
     const color = agentColor(agentName);
 
     const flush = async () => {
@@ -117,6 +122,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'result') {
+            clearInterval(typingInterval);
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
             threadCallbacks.delete(threadId);
@@ -134,6 +140,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'session_error') {
+            clearInterval(typingInterval);
             const errEvent = event as { error?: { message?: string; errorType?: string } };
             const errMsg = errEvent.error?.message || 'Unknown error';
             sendEmbedWithButtons(delivery, botToken, threadId, {
@@ -149,6 +156,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'session_exited') {
+            clearInterval(typingInterval);
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
             threadCallbacks.delete(threadId);
@@ -175,7 +183,13 @@ export function subscribeForInlineResponse(
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const TYPING_REFRESH_MS = 8000;
     const color = agentColor(agentName);
+
+    // Keep typing indicator alive continuously until response completes
+    const typingInterval = setInterval(() => {
+        sendTypingIndicator(botToken, channelId).catch(() => {});
+    }, TYPING_REFRESH_MS);
 
     // Import sendReplyEmbed inline to avoid circular dependency
     const { sendReplyEmbed } = require('./embeds') as typeof import('./embeds');
@@ -215,8 +229,13 @@ export function subscribeForInlineResponse(
         }
 
         if (event.type === 'result') {
+            clearInterval(typingInterval);
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
+        }
+
+        if (event.type === 'session_error' || event.type === 'session_exited') {
+            clearInterval(typingInterval);
         }
     });
 }

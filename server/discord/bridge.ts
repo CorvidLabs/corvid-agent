@@ -200,6 +200,10 @@ export class DiscordBridge {
             clearInterval(this.configReloadTimer);
             this.configReloadTimer = null;
         }
+        if (this.slashCommandDebounceTimer) {
+            clearTimeout(this.slashCommandDebounceTimer);
+            this.slashCommandDebounceTimer = null;
+        }
         if (this.globalEventCallback) {
             this.processManager.unsubscribeAll(this.globalEventCallback);
             this.globalEventCallback = null;

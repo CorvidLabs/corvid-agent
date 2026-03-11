@@ -16,6 +16,11 @@ import type { DiscordBridgeConfig } from '../discord/types';
 const fetchCalls: Array<{ url: string; method: string }> = [];
 const originalFetch = globalThis.fetch;
 
+/** Return only fetch calls to the slash-command registration endpoint. */
+function slashCommandCalls() {
+    return fetchCalls.filter(c => c.url.includes('/applications/') && c.method === 'PUT');
+}
+
 function createMockProcessManager() {
     return {
         getActiveSessionIds: () => [] as string[],
@@ -87,16 +92,17 @@ describe('DiscordBridge.updateSlashCommands', () => {
         bridge.updateSlashCommands();
         bridge.updateSlashCommands();
 
-        // No fetch should have happened yet (still within debounce window)
-        expect(fetchCalls.length).toBe(0);
+        // No slash-command fetch should have happened yet (still within debounce window)
+        expect(slashCommandCalls().length).toBe(0);
 
         // Wait for the debounce timer (2 s) + a small buffer
         await new Promise(resolve => setTimeout(resolve, 2200));
 
-        // Only one API call should have been made
-        expect(fetchCalls.length).toBe(1);
-        expect(fetchCalls[0].method).toBe('PUT');
-        expect(fetchCalls[0].url).toContain('discord.com/api/v10/applications');
+        // Only one slash-command API call should have been made
+        const calls = slashCommandCalls();
+        expect(calls.length).toBe(1);
+        expect(calls[0].method).toBe('PUT');
+        expect(calls[0].url).toContain('discord.com/api/v10/applications');
 
         bridge.stop();
     });
@@ -107,7 +113,7 @@ describe('DiscordBridge.updateSlashCommands', () => {
         bridge.updateSlashCommands();
 
         await new Promise(resolve => setTimeout(resolve, 2500));
-        expect(fetchCalls.length).toBe(0);
+        expect(slashCommandCalls().length).toBe(0);
 
         bridge.stop();
     });
@@ -119,7 +125,7 @@ describe('DiscordBridge.updateSlashCommands', () => {
         bridge.updateSlashCommands();
 
         await new Promise(resolve => setTimeout(resolve, 2500));
-        expect(fetchCalls.length).toBe(0);
+        expect(slashCommandCalls().length).toBe(0);
 
         bridge.stop();
     });
