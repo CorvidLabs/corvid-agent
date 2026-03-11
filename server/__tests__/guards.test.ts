@@ -487,6 +487,11 @@ describe('requiresAdminRole', () => {
         expect(requiresAdminRole('/api/github-allowlist/someuser')).toBe(true);
     });
 
+    it('returns true for /api/repo-blocklist paths', () => {
+        expect(requiresAdminRole('/api/repo-blocklist')).toBe(true);
+        expect(requiresAdminRole('/api/repo-blocklist/owner/repo')).toBe(true);
+    });
+
     it('returns true for /api/performance paths', () => {
         expect(requiresAdminRole('/api/performance/snapshot')).toBe(true);
         expect(requiresAdminRole('/api/performance/trends')).toBe(true);

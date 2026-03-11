@@ -297,6 +297,8 @@ export function requiresAdminRole(pathname: string): boolean {
     if (pathname.startsWith('/api/allowlist')) return true;
     // GitHub allowlist controls which GitHub users can trigger work — admin-only
     if (pathname.startsWith('/api/github-allowlist')) return true;
+    // Repo blocklist controls which repositories are blocked from work — admin-only
+    if (pathname.startsWith('/api/repo-blocklist')) return true;
     // Performance metrics expose system internals (memory, heap, DB latency, regressions)
     if (pathname.startsWith('/api/performance')) return true;
     // Network switch can activate mainnet — admin-only to prevent accidental ALGO expenditure
