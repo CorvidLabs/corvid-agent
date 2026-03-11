@@ -38,6 +38,18 @@ import {
 
 const log = createLogger('DiscordMessageHandler');
 
+/** Replace Discord mention IDs with @username before stripping unresolved mentions.
+ *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
+function resolveMentions(text: string, mentions?: Array<{ id: string; username: string }>, botUserId?: string | null): string {
+    let resolved = text;
+    for (const mention of mentions ?? []) {
+        if (mention.id === botUserId) continue; // bot mention stripped below
+        resolved = resolved.replace(new RegExp(`<@!?${mention.id}>`, 'g'), `@${mention.username}`);
+    }
+    // Strip bot mention and any remaining unresolved mention IDs
+    return resolved.replace(/<@!?\d+>/g, '').trim();
+}
+
 /** Context needed by the message handler to access bridge state. */
 export interface MessageHandlerContext {
     db: Database;
@@ -136,9 +148,9 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
 
     const mode = ctx.config.mode ?? 'chat';
     if (mode === 'work_intake') {
-        await handleWorkIntake(ctx, channelId, data.id, userId, text);
+        await handleWorkIntake(ctx, channelId, data.id, userId, text, data.mentions);
     } else {
-        await handleMentionReply(ctx, channelId, userId, data.id, text);
+        await handleMentionReply(ctx, channelId, userId, data.id, text, data.mentions);
     }
 }
 
@@ -171,13 +183,14 @@ async function handleWorkIntake(
     messageId: string,
     userId: string,
     text: string,
+    mentions?: Array<{ id: string; username: string }>,
 ): Promise<void> {
     if (!ctx.workTaskService) {
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'Work intake mode requires WorkTaskService. Check server configuration.');
         return;
     }
 
-    const description = text.replace(/<@!?\d+>/g, '').trim();
+    const description = resolveMentions(text, mentions, ctx.botUserId);
     if (!description) {
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'Please provide a task description.');
         return;
@@ -275,7 +288,7 @@ export async function sendTaskResult(
     }
 }
 
-async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string): Promise<void> {
+async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string, mentions?: Array<{ id: string; username: string }>): Promise<void> {
     const agent = resolveDefaultAgent(ctx.db, ctx.config);
     if (!agent) {
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No agents configured. Create an agent first.');
@@ -292,7 +305,7 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         return;
     }
 
-    const cleanText = text.replace(/<@!?\d+>/g, '').trim();
+    const cleanText = resolveMentions(text, mentions, ctx.botUserId);
     if (!cleanText) return;
 
     const session = createSession(ctx.db, {
