@@ -12,12 +12,20 @@
  * Set ALLOW_PLAINTEXT_KEYS=true to explicitly opt in. This ensures operators
  * acknowledge the risk of keeping the encryption passphrase in a process
  * environment variable on production infrastructure.
+ *
+ * assertProductionReady() validates the KeyProvider is configured
+ * with a strong passphrase (>= 32 chars) on testnet/mainnet, and rejects
+ * plaintext key sources (default localnet key, server mnemonic fallback)
+ * on non-localnet networks.
  */
 
 import { getEncryptionPassphrase } from './crypto';
 import { createLogger } from './logger';
 
 const log = createLogger('KeyProvider');
+
+/** Minimum passphrase length for production networks (testnet/mainnet). */
+const MIN_PRODUCTION_KEY_LENGTH = 32;
 
 /**
  * Interface for resolving the wallet encryption passphrase.
@@ -58,6 +66,10 @@ export class EnvKeyProvider implements KeyProvider {
 
     async getEncryptionPassphrase(): Promise<string> {
         return getEncryptionPassphrase(this.network, this.serverMnemonic);
+    }
+
+    getNetwork(): string {
+        return this.network;
     }
 
     dispose(): void {
@@ -107,4 +119,64 @@ export function createKeyProvider(
 function isPlaintextKeysAllowed(): boolean {
     const value = process.env.ALLOW_PLAINTEXT_KEYS;
     return value === 'true' || value === '1';
+}
+
+/**
+ * Validate that the given KeyProvider is configured for production use.
+ *
+ * On testnet/mainnet this asserts:
+ *   1. A KeyProvider is available (not null)
+ *   2. WALLET_ENCRYPTION_KEY env var is explicitly set (no mnemonic/default fallback)
+ *   3. The passphrase meets minimum length requirements (>= 32 chars)
+ *
+ * Throws on violation with a descriptive message. No-op on localnet.
+ */
+export async function assertProductionReady(
+    keyProvider: KeyProvider | null,
+    network: string,
+): Promise<void> {
+    if (network === 'localnet') return;
+
+    if (!keyProvider) {
+        throw new Error(
+            `KeyProvider is required on ${network}. ` +
+            'Configure WALLET_ENCRYPTION_KEY or a KMS backend before starting.',
+        );
+    }
+
+    // Verify WALLET_ENCRYPTION_KEY is explicitly set (not a fallback)
+    const envKey = process.env.WALLET_ENCRYPTION_KEY;
+    if (!envKey || envKey.trim().length === 0) {
+        throw new Error(
+            `WALLET_ENCRYPTION_KEY must be explicitly set on ${network}. ` +
+            'Server mnemonic fallback is not allowed in production. ' +
+            'Generate a key with: openssl rand -hex 32',
+        );
+    }
+
+    if (envKey.trim().length < MIN_PRODUCTION_KEY_LENGTH) {
+        throw new Error(
+            `WALLET_ENCRYPTION_KEY is too short for ${network} (${envKey.trim().length} chars, need >= ${MIN_PRODUCTION_KEY_LENGTH}). ` +
+            'Generate a stronger key with: openssl rand -hex 32',
+        );
+    }
+
+    // Verify the provider actually resolves (sanity check)
+    try {
+        const passphrase = await keyProvider.getEncryptionPassphrase();
+        if (passphrase.length < MIN_PRODUCTION_KEY_LENGTH) {
+            throw new Error(
+                `KeyProvider returned a passphrase shorter than ${MIN_PRODUCTION_KEY_LENGTH} chars on ${network}`,
+            );
+        }
+    } catch (err) {
+        if (err instanceof Error && err.message.includes('KeyProvider returned')) {
+            throw err;
+        }
+        throw new Error(
+            `KeyProvider failed to resolve passphrase on ${network}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+    }
+
+    log.info(`KeyProvider production readiness validated for ${network}`);
 }

@@ -56,7 +56,9 @@ export type AuditAction =
     | 'discord_config_delete'
     | 'key_access_decrypt'
     | 'key_access_encrypt'
-    | 'key_access_sign';
+    | 'key_access_sign'
+    | 'key_access'
+    | 'key_access_denied';
 
 export interface AuditEntry {
     id: number;

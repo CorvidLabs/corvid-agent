@@ -22,6 +22,7 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `createKeyProvider` | `(network?: string, serverMnemonic?: string \| null)` | `KeyProvider` | Factory that returns the appropriate provider based on config |
+| `assertProductionReady` | `(keyProvider: KeyProvider \| null, network: string)` | `Promise<void>` | Validates KeyProvider is configured with a strong passphrase on testnet/mainnet; no-op on localnet |
 
 ### Exported Types
 
@@ -47,6 +48,7 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
 | `getEncryptionPassphrase` | `()` | `Promise<string>` | Delegates to crypto.ts getEncryptionPassphrase() |
+| `getNetwork` | `()` | `string` | Returns the configured network |
 | `dispose` | `()` | `void` | No-op (no cached secrets) |
 
 ## Invariants
@@ -56,6 +58,9 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 3. `EnvKeyProvider.getEncryptionPassphrase()` returns a non-empty string on success
 4. `KeyProvider.dispose()` is safe to call multiple times
 5. When a `KeyProvider` is passed to `AgentWalletService`, all encrypt/decrypt operations use it instead of config-based passphrase resolution
+6. `assertProductionReady` is a no-op on localnet
+7. `assertProductionReady` throws if no KeyProvider is supplied on testnet/mainnet
+8. `assertProductionReady` throws if WALLET_ENCRYPTION_KEY is missing or shorter than 32 chars on non-localnet
 
 ## Behavioral Examples
 
@@ -84,6 +89,10 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 |-----------|----------|
 | No WALLET_ENCRYPTION_KEY on testnet/mainnet | Throws with setup instructions |
 | Short WALLET_ENCRYPTION_KEY on non-localnet | Logs warning, returns key |
+| `assertProductionReady` with null provider on testnet/mainnet | Throws requiring KeyProvider |
+| `assertProductionReady` with missing WALLET_ENCRYPTION_KEY on testnet/mainnet | Throws requiring explicit env var |
+| `assertProductionReady` with short WALLET_ENCRYPTION_KEY on mainnet | Throws requiring >= 32 chars |
+| `assertProductionReady` with provider that returns short passphrase | Throws describing length requirement |
 
 ## Dependencies
 

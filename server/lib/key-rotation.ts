@@ -136,6 +136,18 @@ export async function rotateWalletEncryptionKey(
             }),
         );
 
+        // Record individual key_access audit entries for each rotated agent
+        for (const update of dbUpdates) {
+            recordAudit(
+                db,
+                'key_access',
+                'owner',
+                'agent_wallet',
+                update.id,
+                JSON.stringify({ operation: 'key_rotation_reencrypt', agent: update.name }),
+            );
+        }
+
         log.info('Wallet encryption key rotated successfully', {
             agentsRotated: dbUpdates.length,
             keystoreEntriesRotated: Object.keys(keystoreUpdates).length,
