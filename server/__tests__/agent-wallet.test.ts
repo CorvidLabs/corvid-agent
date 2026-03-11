@@ -5,6 +5,16 @@ import { createAgent, getAgent, setAgentWallet } from '../db/agents';
 import type { AlgoChatConfig } from '../algochat/config';
 import type { AlgoChatService } from '../algochat/service';
 import { AgentWalletService } from '../algochat/agent-wallet';
+import type { KeyProvider } from '../lib/key-provider';
+
+const TEST_PASSPHRASE = 'test-encryption-key-for-unit-tests-32chars!';
+
+function makeMockKeyProvider(): KeyProvider {
+    return {
+        async getEncryptionPassphrase() { return TEST_PASSPHRASE; },
+        dispose() {},
+    };
+}
 
 // ─── Mock helpers ────────────────────────────────────────────────────────────
 
@@ -70,16 +80,23 @@ afterEach(() => {
 
 describe('ensureWallet', () => {
     test('is no-op on non-localnet networks', async () => {
-        const config = makeConfig({ network: 'testnet' });
-        const service = makeMockService();
-        const wallet = new AgentWalletService(db, config, service);
+        const origKey = process.env.WALLET_ENCRYPTION_KEY;
+        process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+        try {
+            const config = makeConfig({ network: 'testnet' });
+            const service = makeMockService();
+            const wallet = new AgentWalletService(db, config, service, makeMockKeyProvider());
 
-        const agent = createAgent(db, { name: 'TestAgent', model: 'sonnet' });
-        await wallet.ensureWallet(agent.id);
+            const agent = createAgent(db, { name: 'TestAgent', model: 'sonnet' });
+            await wallet.ensureWallet(agent.id);
 
-        // Agent should still have no wallet since testnet skips auto-creation
-        const updated = getAgent(db, agent.id);
-        expect(updated?.walletAddress).toBeNull();
+            // Agent should still have no wallet since testnet skips auto-creation
+            const updated = getAgent(db, agent.id);
+            expect(updated?.walletAddress).toBeNull();
+        } finally {
+            if (origKey === undefined) delete process.env.WALLET_ENCRYPTION_KEY;
+            else process.env.WALLET_ENCRYPTION_KEY = origKey;
+        }
     });
 
     test('is no-op on mainnet', async () => {
@@ -326,18 +343,25 @@ describe('getAgentChatAccount', () => {
 
 describe('publishAllKeys', () => {
     test('is no-op on non-localnet networks', async () => {
-        const config = makeConfig({ network: 'testnet' });
-        const service = makeMockService();
-        const wallet = new AgentWalletService(db, config, service);
+        const origKey = process.env.WALLET_ENCRYPTION_KEY;
+        process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+        try {
+            const config = makeConfig({ network: 'testnet' });
+            const service = makeMockService();
+            const wallet = new AgentWalletService(db, config, service, makeMockKeyProvider());
 
-        const agent = createAgent(db, { name: 'TestnetAgent', model: 'sonnet' });
-        setAgentWallet(db, agent.id, 'ADDR', 'enc-mnemonic');
+            const agent = createAgent(db, { name: 'TestnetAgent', model: 'sonnet' });
+            setAgentWallet(db, agent.id, 'ADDR', 'enc-mnemonic');
 
-        // Should return early without attempting any key publishing
-        await wallet.publishAllKeys();
+            // Should return early without attempting any key publishing
+            await wallet.publishAllKeys();
 
-        // algorandService.publishKey should not have been called
-        expect(service.algorandService.publishKey).not.toHaveBeenCalled();
+            // algorandService.publishKey should not have been called
+            expect(service.algorandService.publishKey).not.toHaveBeenCalled();
+        } finally {
+            if (origKey === undefined) delete process.env.WALLET_ENCRYPTION_KEY;
+            else process.env.WALLET_ENCRYPTION_KEY = origKey;
+        }
     });
 });
 
