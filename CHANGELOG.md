@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.4] - 2026-03-11
+
+### Added
+- **TaskQueueService** — parallel work task dispatch with configurable concurrency (#951)
+- **Flock Directory specs** — module specs for on-chain client and service (#952)
+- **Discord autocomplete** — agent and project choice autocomplete for Discord commands (#954)
+
+### Fixed
+- **Silent catches** — add debug logging to silent catch blocks in Discord thread-manager (#955)
+
+### Security
+- **Wallet validation** — validate Algorand address format on all wallet routes (#953)
+
 ## [0.25.3] - 2026-03-11
 
 ### Fixed
