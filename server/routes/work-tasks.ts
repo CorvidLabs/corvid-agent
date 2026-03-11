@@ -14,6 +14,13 @@ export function handleWorkTaskRoutes(
     const method = req.method;
     const tenantId = context?.tenantId ?? 'default';
 
+    // GET /api/work-tasks/queue-status — queue status
+    if (path === '/api/work-tasks/queue-status' && method === 'GET') {
+        const status = workTaskService.getQueueStatus();
+        if (!status) return json({ error: 'Task queue not enabled' }, 503);
+        return json(status);
+    }
+
     // GET /api/work-tasks — list (optional ?agentId= filter)
     if (path === '/api/work-tasks' && method === 'GET') {
         const agentId = url.searchParams.get('agentId') ?? undefined;

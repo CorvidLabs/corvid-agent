@@ -35,6 +35,10 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | `resumePausedTask` | `db: Database, taskId: string` | `void` | Resume a paused task by setting status back to 'pending'; only acts on paused tasks |
 | `getPausedTasks` | `db: Database, projectId: string` | `WorkTask[]` | Get all paused tasks for a project, ordered by created_at ASC |
 | `countQueuedTasks` | `db: Database, projectId: string` | `number` | Count pending/queued tasks for a project |
+| `countActiveTasks` | `db: Database` | `number` | Count globally active work tasks (branching, running, validating) |
+| `countPendingTasks` | `db: Database` | `number` | Count globally pending work tasks |
+| `dispatchCandidates` | `db: Database, limit: number` | `WorkTask[]` | Find pending tasks eligible for dispatch whose project has no active task; ordered by priority DESC, created_at ASC |
+| `getActiveTasksByProject` | `db: Database` | `Record<string, string>` | Map each project with an active task to its task ID |
 | `listWorkTasks` | `db: Database, agentId?: string, tenantId?: string` | `WorkTask[]` | Lists work tasks, optionally filtered by agent ID, ordered by created_at DESC |
 
 ### Exported Types
@@ -117,11 +121,13 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | original_branch | TEXT | DEFAULT NULL | The branch that was checked out before the task created its worktree |
 | worktree_dir | TEXT | DEFAULT NULL | Path to the git worktree directory |
 | iteration_count | INTEGER | DEFAULT 0 | Number of validation-retry iterations performed |
+| priority | INTEGER | NOT NULL, DEFAULT 2 | Dispatch priority (0=critical, 1=high, 2=normal, 3=low) |
+| queued_at | TEXT | DEFAULT NULL | ISO 8601 timestamp when the task entered the queue |
 | tenant_id | TEXT | NOT NULL, DEFAULT 'default' | Multi-tenant isolation key |
 | created_at | TEXT | DEFAULT datetime('now') | ISO 8601 creation timestamp |
 | completed_at | TEXT | DEFAULT NULL | ISO 8601 completion timestamp (set on completed/failed) |
 
-**Indexes:** `idx_work_tasks_agent(agent_id)`, `idx_work_tasks_status(status)`, `idx_work_tasks_session(session_id)`
+**Indexes:** `idx_work_tasks_agent(agent_id)`, `idx_work_tasks_status(status)`, `idx_work_tasks_session(session_id)`, `idx_work_tasks_pending_dispatch(status, project_id, priority DESC, created_at ASC)`
 
 ## Change Log
 | Date | Author | Change |
@@ -129,3 +135,4 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-08 | corvid-agent | Documented `resetWorkTaskForRetry` and `getActiveWorkTasks` |
 | 2026-03-09 | corvid-agent | Documented priority queue exports: `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`; added 'paused' and 'queued' statuses |
+| 2026-03-11 | corvid-agent | Added `countActiveTasks`, `countPendingTasks`, `dispatchCandidates`, `getActiveTasksByProject`; added `priority` and `queued_at` columns; added `idx_work_tasks_pending_dispatch` index |
