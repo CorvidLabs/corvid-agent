@@ -48,6 +48,7 @@ function createMockWorkTaskService() {
             lastRetryAt: null,
             priority: 2 as const,
             preemptedBy: null,
+            queuedAt: null,
             createdAt: new Date().toISOString(),
             completedAt: null,
         })),
@@ -604,6 +605,7 @@ describe('DiscordBridge work_intake mode', () => {
                 lastRetryAt: null,
             priority: 2 as const,
             preemptedBy: null,
+            queuedAt: null,
                 createdAt: new Date().toISOString(),
                 completedAt: new Date().toISOString(),
             });
@@ -682,6 +684,7 @@ describe('DiscordBridge work_intake mode', () => {
                 lastRetryAt: null,
             priority: 2 as const,
             preemptedBy: null,
+            queuedAt: null,
                 createdAt: new Date().toISOString(),
                 completedAt: new Date().toISOString(),
             });

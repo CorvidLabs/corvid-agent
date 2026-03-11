@@ -17,6 +17,7 @@ import type { AgentDirectory } from './algochat/agent-directory';
 import type { AgentMessenger } from './algochat/agent-messenger';
 import { SelfTestService } from './selftest/service';
 import { WorkTaskService } from './work/service';
+import { TaskQueueService } from './work/queue';
 import { SchedulerService } from './scheduler/service';
 import { UsageMonitor } from './usage/monitor';
 import { WebhookService } from './webhooks/service';
@@ -93,6 +94,7 @@ export interface ServiceContainer {
     // Work orchestration
     selfTestService: SelfTestService;
     workTaskService: WorkTaskService;
+    taskQueueService: TaskQueueService;
     schedulerService: SchedulerService;
     webhookService: WebhookService;
     mentionPollingService: MentionPollingService;
@@ -228,6 +230,11 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     workTaskService.recoverInterruptedTasks().catch((err) =>
         log.error('Failed to recover interrupted work tasks', { error: err instanceof Error ? err.message : String(err) }),
     );
+
+    // TaskQueueService — dispatches pending tasks with concurrency control
+    const taskQueueService = new TaskQueueService(db, workTaskService);
+    workTaskService.setTaskQueueService(taskQueueService);
+    taskQueueService.start();
 
     const schedulerService = new SchedulerService(db, processManager, workTaskService);
     const webhookService = new WebhookService(db, processManager, workTaskService);
@@ -386,6 +393,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     shutdownCoordinator.registerService('NotificationService', notificationService, 0);
     shutdownCoordinator.registerService('WorkflowService', workflowService, 0);
     shutdownCoordinator.registerService('SchedulerService', schedulerService, 0);
+    shutdownCoordinator.register({ name: 'TaskQueueService', priority: 0, handler: () => taskQueueService.stop() });
     shutdownCoordinator.registerService('MentionPollingService', mentionPollingService, 0);
     shutdownCoordinator.registerService('SessionLifecycleManager', sessionLifecycle, 0);
     shutdownCoordinator.register({ name: 'UsageMonitor', priority: 0, handler: () => usageMonitor.stop() });
@@ -423,6 +431,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         memorySyncService,
         selfTestService,
         workTaskService,
+        taskQueueService,
         schedulerService,
         webhookService,
         mentionPollingService,
