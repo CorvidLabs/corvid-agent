@@ -28,6 +28,7 @@ export interface WorkTask {
     retryBackoff: RetryBackoff;
     lastRetryAt: string | null;
     preemptedBy: string | null;
+    queuedAt: string | null;
     createdAt: string;
     completedAt: string | null;
 }

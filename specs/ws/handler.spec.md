@@ -58,6 +58,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `CouncilLogMessage` | `{ type: 'council_log'; log: CouncilLaunchLog }` |
 | `CouncilDiscussionMessageEvent` | `{ type: 'council_discussion_message'; message: CouncilDiscussionMessage }` |
 | `WorkTaskUpdateMessage` | `{ type: 'work_task_update'; task: WorkTask }` |
+| `WorkTaskQueueUpdateMessage` | `{ type: 'work_task_queue_update'; tasks: Array<{ id: string; position: number; projectId: string }> }` |
 | `ScheduleUpdateMessage` | `{ type: 'schedule_update'; schedule: AgentSchedule }` |
 | `ScheduleExecutionUpdateMessage` | `{ type: 'schedule_execution_update'; execution: ScheduleExecution }` |
 | `ScheduleApprovalRequestMessage` | `{ type: 'schedule_approval_request'; executionId; scheduleId; agentId; actionType; description }` |

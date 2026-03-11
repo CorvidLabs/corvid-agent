@@ -738,14 +738,13 @@ test.describe('API Coverage — Previously Untested Endpoints', () => {
 
     // ─── Allowlist ───────────────────────────────────────────────────────
 
-    test('PUT /api/allowlist/:address returns 404 for nonexistent', async ({}) => {
+    test('PUT /api/allowlist/:address returns 400 for invalid address format', async ({}) => {
         const res = await authedFetch(`${BASE_URL}/api/allowlist/NONEXISTENT`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ label: 'test' }),
         });
-        // 200 (upsert) or 404 (feature not enabled) — accept both
-        expect([200, 404]).toContain(res.status);
+        expect(res.status).toBe(400);
     });
 
     // ─── A2A ─────────────────────────────────────────────────────────────

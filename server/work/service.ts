@@ -79,6 +79,17 @@ export class WorkTaskService {
         this.agentMessenger = messenger;
     }
 
+    /** TaskQueueService reference — set by bootstrap after both are created. */
+    private _taskQueueService: { getQueueStatus(): { activeCount: number; pendingCount: number; maxConcurrency: number; activeByProject: Record<string, string> } } | null = null;
+
+    setTaskQueueService(queue: { getQueueStatus(): { activeCount: number; pendingCount: number; maxConcurrency: number; activeByProject: Record<string, string> } }): void {
+        this._taskQueueService = queue;
+    }
+
+    getQueueStatus(): { activeCount: number; pendingCount: number; maxConcurrency: number; activeByProject: Record<string, string> } | null {
+        return this._taskQueueService?.getQueueStatus() ?? null;
+    }
+
     /** Get the in-memory priority for a task (defaults to P2). */
     private getTaskPriority(taskId: string): WorkTaskPriority {
         return this.priorityMap.get(taskId) ?? 2;
@@ -516,7 +527,7 @@ export class WorkTaskService {
      * Execute a pending work task: create worktree, install deps, start session.
      * Shared by both `create` (new tasks) and `recoverStaleTasks` (retried tasks).
      */
-    private async executeTask(task: WorkTask, agent: { id: string; name: string }, project: { id: string; workingDir: string }): Promise<WorkTask> {
+    async executeTask(task: WorkTask, agent: { id: string; name: string }, project: { id: string; workingDir: string }): Promise<WorkTask> {
         // Generate branch name
         const agentSlug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const taskSlug = task.description.slice(0, 40).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

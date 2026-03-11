@@ -21,6 +21,8 @@ interface WorkTaskRow {
     original_branch: string | null;
     worktree_dir: string | null;
     iteration_count: number;
+    priority: number;
+    queued_at: string | null;
     created_at: string;
     completed_at: string | null;
 }
@@ -44,7 +46,8 @@ function rowToWorkTask(row: WorkTaskRow): WorkTask {
         description: row.description,
         branchName: row.branch_name,
         status: row.status as WorkTaskStatus,
-        priority: 2 as WorkTaskPriority,
+        priority: (row.priority ?? 2) as WorkTaskPriority,
+        queuedAt: row.queued_at ?? null,
         prUrl: row.pr_url,
         summary: row.summary,
         error: row.error,
@@ -76,9 +79,10 @@ export function createWorkTask(
 ): WorkTask {
     const id = crypto.randomUUID();
     const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
+    const priority = params.priority ?? 2;
     db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, queued_at, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
     ).run(
         id,
         params.agentId,
@@ -87,13 +91,11 @@ export function createWorkTask(
         params.source ?? 'web',
         params.sourceId ?? null,
         JSON.stringify(params.requesterInfo ?? {}),
+        priority,
         tenantId,
     );
 
-    const task = getWorkTask(db, id) as WorkTask;
-    // Apply in-memory priority (not persisted to DB)
-    task.priority = (params.priority ?? 2) as WorkTaskPriority;
-    return task;
+    return getWorkTask(db, id) as WorkTask;
 }
 
 /**
@@ -117,11 +119,12 @@ export function createWorkTaskAtomic(
     const source = params.source ?? 'web';
     const sourceId = params.sourceId ?? null;
     const requesterInfo = JSON.stringify(params.requesterInfo ?? {});
+    const priority = params.priority ?? 2;
     const tenantId = params.tenantId ?? DEFAULT_TENANT_ID;
 
     const result = db.query(
-        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, tenant_id)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO work_tasks (id, agent_id, project_id, description, source, source_id, requester_info, priority, queued_at, tenant_id)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?
          WHERE NOT EXISTS (
              SELECT 1 FROM work_tasks
              WHERE project_id = ? AND status IN ('branching', 'running', 'validating')
@@ -134,6 +137,7 @@ export function createWorkTaskAtomic(
         source,
         sourceId,
         requesterInfo,
+        priority,
         tenantId,
         params.projectId,
     );
@@ -142,10 +146,7 @@ export function createWorkTaskAtomic(
         return null;
     }
 
-    const task = getWorkTask(db, id) as WorkTask;
-    // Apply in-memory priority (not persisted to DB)
-    task.priority = (params.priority ?? 2) as WorkTaskPriority;
-    return task;
+    return getWorkTask(db, id) as WorkTask;
 }
 
 export function getWorkTask(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask | null {
@@ -354,6 +355,52 @@ export function countQueuedTasks(db: Database, projectId: string): number {
         `SELECT COUNT(*) as cnt FROM work_tasks WHERE project_id = ? AND status IN ('pending', 'queued')`
     ).get(projectId) as { cnt: number };
     return row.cnt;
+}
+
+/** Count globally active work tasks (branching, running, validating). */
+export function countActiveTasks(db: Database): number {
+    const row = db.query(
+        `SELECT COUNT(*) as cnt FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
+    ).get() as { cnt: number };
+    return row.cnt;
+}
+
+/** Count globally pending work tasks. */
+export function countPendingTasks(db: Database): number {
+    const row = db.query(
+        `SELECT COUNT(*) as cnt FROM work_tasks WHERE status = 'pending'`
+    ).get() as { cnt: number };
+    return row.cnt;
+}
+
+/**
+ * Find pending tasks eligible for dispatch: their project has no active task.
+ * Ordered by priority DESC, created_at ASC (FIFO within same priority).
+ */
+export function dispatchCandidates(db: Database, limit: number): WorkTask[] {
+    const rows = db.query(
+        `SELECT * FROM work_tasks
+         WHERE status = 'pending'
+         AND project_id NOT IN (
+             SELECT project_id FROM work_tasks
+             WHERE status IN ('branching', 'running', 'validating')
+         )
+         ORDER BY priority DESC, created_at ASC
+         LIMIT ?`
+    ).all(limit) as WorkTaskRow[];
+    return rows.map(rowToWorkTask);
+}
+
+/** Get a map of projectId → taskId for all active tasks. */
+export function getActiveTasksByProject(db: Database): Record<string, string> {
+    const rows = db.query(
+        `SELECT id, project_id FROM work_tasks WHERE status IN ('branching', 'running', 'validating')`
+    ).all() as Array<{ id: string; project_id: string }>;
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+        result[row.project_id] = row.id;
+    }
+    return result;
 }
 
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
