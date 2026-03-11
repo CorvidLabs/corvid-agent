@@ -13,6 +13,14 @@
 #
 set -euo pipefail
 
+# When piped via `curl | bash`, stdin is the pipe — not the terminal.
+# Redirect all user prompts through /dev/tty so input works correctly.
+if [[ -t 0 ]]; then
+    USER_INPUT=/dev/stdin
+else
+    USER_INPUT=/dev/tty
+fi
+
 # ─── Colors ─────────────────────────────────────────────────────────────────
 
 GREEN='\033[0;32m'
@@ -105,7 +113,7 @@ if command -v bun &>/dev/null; then
     if [[ "$BUN_MAJOR" -lt 1 ]] || { [[ "$BUN_MAJOR" -eq 1 ]] && [[ "$BUN_MINOR" -lt 3 ]]; }; then
         warn "Bun $BUN_VERSION found but >= 1.3.0 required"
         echo -n "Install/update Bun now? [Y/n] "
-        read -r INSTALL_BUN
+        read -r INSTALL_BUN < "$USER_INPUT"
         if [[ "${INSTALL_BUN:-Y}" =~ ^[Yy]$ ]]; then
             curl -fsSL https://bun.sh/install | bash
             export PATH="$HOME/.bun/bin:$PATH"
@@ -118,7 +126,7 @@ if command -v bun &>/dev/null; then
     fi
 else
     echo -n "Bun is not installed. Install it now? [Y/n] "
-    read -r INSTALL_BUN
+    read -r INSTALL_BUN < "$USER_INPUT"
     if [[ "${INSTALL_BUN:-Y}" =~ ^[Yy]$ ]]; then
         curl -fsSL https://bun.sh/install | bash
         export PATH="$HOME/.bun/bin:$PATH"
@@ -158,12 +166,13 @@ if [[ ! -f .env ]]; then
     echo "  3) Ollama only (free, local, no API key needed)"
     echo ""
     echo -n "Choice [1/2/3]: "
-    read -r PROVIDER_CHOICE
+    read -r PROVIDER_CHOICE < "$USER_INPUT"
 
     case "${PROVIDER_CHOICE:-1}" in
         1)
             echo -n "Enter your ANTHROPIC_API_KEY: "
-            read -r API_KEY_VAL
+            read -rs API_KEY_VAL < "$USER_INPUT"
+            echo ""
             if [[ -n "$API_KEY_VAL" ]]; then
                 if [[ "$(uname)" == "Darwin" ]]; then
                     sed -i '' "s|^# ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$API_KEY_VAL|" .env
@@ -185,7 +194,7 @@ if [[ ! -f .env ]]; then
             if command -v ollama &>/dev/null; then
                 info "Ollama detected"
                 echo -n "Ollama host [http://localhost:11434]: "
-                read -r OLLAMA_VAL
+                read -r OLLAMA_VAL < "$USER_INPUT"
                 if [[ -n "$OLLAMA_VAL" ]]; then
                     if [[ "$(uname)" == "Darwin" ]]; then
                         sed -i '' "s|^# OLLAMA_HOST=.*|OLLAMA_HOST=$OLLAMA_VAL|" .env
@@ -202,7 +211,7 @@ if [[ ! -f .env ]]; then
     # GitHub token (optional)
     echo ""
     echo -n "GitHub token for PR/issue integration (optional, press Enter to skip): "
-    read -r GH_TOKEN_VAL
+    read -r GH_TOKEN_VAL < "$USER_INPUT"
     if [[ -n "$GH_TOKEN_VAL" ]]; then
         if [[ "$(uname)" == "Darwin" ]]; then
             sed -i '' "s|^# GH_TOKEN=.*|GH_TOKEN=$GH_TOKEN_VAL|" .env
