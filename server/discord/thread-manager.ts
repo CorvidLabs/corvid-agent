@@ -68,7 +68,9 @@ export function subscribeForResponseWithEmbed(
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
-        sendTypingIndicator(botToken, threadId).catch(() => {});
+        sendTypingIndicator(botToken, threadId).catch((err) => {
+            log.debug('Typing indicator failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+        });
     }, TYPING_REFRESH_MS);
 
     // Safety timeout: clear typing if no terminal event arrives
@@ -113,7 +115,9 @@ export function subscribeForResponseWithEmbed(
             const now = Date.now();
             if (now - lastTypingTime >= TYPING_REFRESH_MS) {
                 lastTypingTime = now;
-                sendTypingIndicator(botToken, threadId).catch(() => {});
+                sendTypingIndicator(botToken, threadId).catch((err) => {
+                    log.debug('Typing indicator failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                });
             }
         }
 
@@ -125,11 +129,15 @@ export function subscribeForResponseWithEmbed(
                     description: `⏳ ${event.statusMessage}`,
                     color: 0x95a5a6,
                     footer: { text: `${agentName} · working...` },
-                }).catch(() => {});
+                }).catch((err) => {
+                    log.debug('Tool status embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                });
             }
             if (now - lastTypingTime >= TYPING_REFRESH_MS) {
                 lastTypingTime = now;
-                sendTypingIndicator(botToken, threadId).catch(() => {});
+                sendTypingIndicator(botToken, threadId).catch((err) => {
+                    log.debug('Typing indicator failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                });
             }
         }
 
@@ -148,7 +156,9 @@ export function subscribeForResponseWithEmbed(
                     { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
                     { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
                 ),
-            ]).catch(() => {});
+            ]).catch((err) => {
+                log.debug('Session complete embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+            });
         }
 
         if (event.type === 'session_error') {
@@ -164,7 +174,9 @@ export function subscribeForResponseWithEmbed(
                 buildActionRow(
                     { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
                 ),
-            ]).catch(() => {});
+            ]).catch((err) => {
+                log.debug('Session error embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+            });
         }
 
         if (event.type === 'session_exited') {
@@ -201,7 +213,9 @@ export function subscribeForInlineResponse(
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
-        sendTypingIndicator(botToken, channelId).catch(() => {});
+        sendTypingIndicator(botToken, channelId).catch((err) => {
+            log.debug('Typing indicator failed (inline)', { channelId, error: err instanceof Error ? err.message : String(err) });
+        });
     }, TYPING_REFRESH_MS);
 
     // Safety timeout: clear typing if no terminal event arrives
