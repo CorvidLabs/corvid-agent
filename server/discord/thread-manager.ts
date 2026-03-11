@@ -64,11 +64,23 @@ export function subscribeForResponseWithEmbed(
     let lastTypingTime = 0;
     const STATUS_DEBOUNCE_MS = 3000;
     const TYPING_REFRESH_MS = 8000;
+    const TYPING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minute safety timeout
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
         sendTypingIndicator(botToken, threadId).catch(() => {});
     }, TYPING_REFRESH_MS);
+
+    // Safety timeout: clear typing if no terminal event arrives
+    const typingSafetyTimeout = setTimeout(() => {
+        clearInterval(typingInterval);
+        log.warn('Typing indicator safety timeout reached', { sessionId, threadId });
+    }, TYPING_TIMEOUT_MS);
+
+    const clearTyping = () => {
+        clearInterval(typingInterval);
+        clearTimeout(typingSafetyTimeout);
+    };
 
     const color = agentColor(agentName);
 
@@ -122,7 +134,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'result') {
-            clearInterval(typingInterval);
+            clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
             threadCallbacks.delete(threadId);
@@ -140,7 +152,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'session_error') {
-            clearInterval(typingInterval);
+            clearTyping();
             const errEvent = event as { error?: { message?: string; errorType?: string } };
             const errMsg = errEvent.error?.message || 'Unknown error';
             sendEmbedWithButtons(delivery, botToken, threadId, {
@@ -156,7 +168,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'session_exited') {
-            clearInterval(typingInterval);
+            clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
             threadCallbacks.delete(threadId);
@@ -184,12 +196,24 @@ export function subscribeForInlineResponse(
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const TYPING_REFRESH_MS = 8000;
+    const TYPING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minute safety timeout
     const color = agentColor(agentName);
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
         sendTypingIndicator(botToken, channelId).catch(() => {});
     }, TYPING_REFRESH_MS);
+
+    // Safety timeout: clear typing if no terminal event arrives
+    const typingSafetyTimeout = setTimeout(() => {
+        clearInterval(typingInterval);
+        log.warn('Typing indicator safety timeout reached (inline)', { sessionId, channelId });
+    }, TYPING_TIMEOUT_MS);
+
+    const clearTyping = () => {
+        clearInterval(typingInterval);
+        clearTimeout(typingSafetyTimeout);
+    };
 
     // Import sendReplyEmbed inline to avoid circular dependency
     const { sendReplyEmbed } = require('./embeds') as typeof import('./embeds');
@@ -229,13 +253,13 @@ export function subscribeForInlineResponse(
         }
 
         if (event.type === 'result') {
-            clearInterval(typingInterval);
+            clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
         }
 
         if (event.type === 'session_error' || event.type === 'session_exited') {
-            clearInterval(typingInterval);
+            clearTyping();
         }
     });
 }
