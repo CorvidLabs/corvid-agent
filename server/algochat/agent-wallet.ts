@@ -176,7 +176,14 @@ export class AgentWalletService {
     async ensureWallet(agentId: string): Promise<void> {
         if (this.config.network === 'mainnet') return;
 
-        await this.assertReady();
+        try {
+            await this.assertReady();
+        } catch (err) {
+            log.warn('Wallet operations not available — skipping ensureWallet', {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return;
+        }
 
         const agent = getAgent(this.db, agentId);
         if (!agent) return;
@@ -271,7 +278,15 @@ export class AgentWalletService {
         const agent = getAgent(this.db, agentId);
         if (!agent?.walletAddress) return null;
 
-        await this.assertReady();
+        try {
+            await this.assertReady();
+        } catch (err) {
+            log.warn('KeyProvider not ready — cannot decrypt wallet', {
+                agentId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return null;
+        }
 
         // Try encrypted in-memory cache first
         const cached = await this.getCachedMnemonic(agentId);

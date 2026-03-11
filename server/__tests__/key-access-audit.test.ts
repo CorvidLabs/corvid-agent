@@ -192,22 +192,22 @@ describe('Key access audit actions', () => {
     });
 
     it('key rotation creates key_access entries for each agent', async () => {
-        const { encryptMnemonic } = require('../lib/crypto');
         const { rotateWalletEncryptionKey } = require('../lib/key-rotation');
 
         const OLD = 'a'.repeat(32) + '-old-passphrase';
         const NEW = 'b'.repeat(32) + '-new-passphrase';
-        process.env.WALLET_ENCRYPTION_KEY = OLD;
 
         const mnemonic = 'abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual about';
-        const enc = await encryptMnemonic(mnemonic, null, 'testnet');
+        // Encrypt directly with passphrase (avoids env-var race with parallel tests)
+        const enc = await encryptMnemonicWithPassphrase(mnemonic, OLD);
 
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('a1', 'Agent1', 'test', 'test')`);
         db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${enc}', wallet_address = 'ADDR1' WHERE id = 'a1'`);
         db.exec(`INSERT INTO agents (id, name, model, system_prompt) VALUES ('a2', 'Agent2', 'test', 'test')`);
         db.exec(`UPDATE agents SET wallet_mnemonic_encrypted = '${enc}', wallet_address = 'ADDR2' WHERE id = 'a2'`);
 
-        await rotateWalletEncryptionKey(db, OLD, NEW, 'testnet');
+        const result = await rotateWalletEncryptionKey(db, OLD, NEW, 'testnet');
+        expect(result.success).toBe(true);
 
         // Should have key_rotation + 2x key_access entries
         const rotationEntries = queryAuditLog(db, { action: 'key_rotation' });
@@ -218,9 +218,6 @@ describe('Key access audit actions', () => {
 
         const agentIds = accessEntries.entries.map(e => e.resourceId).sort();
         expect(agentIds).toEqual(['a1', 'a2']);
-
-        // Cleanup
-        delete process.env.WALLET_ENCRYPTION_KEY;
     });
 });
 
