@@ -2,8 +2,8 @@ apiVersion: v2
 name: corvid-agent
 description: Agent orchestration platform with MCP tools, AlgoChat messaging, and on-chain wallet integration
 type: application
-version: 0.24.2
-appVersion: "0.24.2"
+version: 0.25.0
+appVersion: "0.25.0"
 keywords:
   - ai
   - agent

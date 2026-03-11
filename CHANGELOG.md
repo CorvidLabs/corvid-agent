@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.25.0] - 2026-03-11
+
+### Security
+- **KMS migration enforcement** — encrypted in-memory key cache, startup enforcement requiring KMS migration, key access audit logging with 18 new tests (#931)
+- **Hono CVE override** — update hono override to >=4.12.7 for CVE GHSA-v8w9-8mx6-g223 (#934)
+- **Admin role guard** — add admin role guard to repo-blocklist routes (#930)
+
+### Fixed
+- **Ollama cloud model serialization** — cloud models get `maxWeight` in the slot system to force serialization and prevent proxy timeouts (#937)
+- Hide admin Discord commands from non-admin users (#921)
+
+### Changed
+- **Discord bridge decomposition** — decompose `discord/bridge.ts` from 2,688 to 367 lines (#933)
+
+### Added
+- RC verification script and mainnet config template (#917)
+- Spec documentation for polling modules: auto-merge, auto-update, ci-retry (#936)
+
+### Chore
+- Align `@opentelemetry/exporter-prometheus` to 0.213.0 (#922)
+- Sync MCP tools, migration count, and directory structure in docs (#935)
+
 ## [0.24.2] - 2026-03-10
 
 ### Fixed
