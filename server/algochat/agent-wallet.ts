@@ -9,7 +9,6 @@ import { encryptMnemonic, decryptMnemonic, encryptMnemonicWithPassphrase, decryp
 import { getKeystoreEntry, saveKeystoreEntry } from '../lib/wallet-keystore';
 import { recordAudit } from '../db/audit';
 import { wipeBuffer } from '../lib/secure-wipe';
-import { recordAudit } from '../db/audit';
 import { createLogger } from '../lib/logger';
 import { NotFoundError } from '../lib/errors';
 

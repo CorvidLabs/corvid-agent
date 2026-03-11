@@ -110,6 +110,7 @@ describe('assertProductionReady', () => {
     it('rejects provider that returns short passphrase', async () => {
         process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
         const badProvider: KeyProvider = {
+            providerType: 'test',
             async getEncryptionPassphrase() { return 'short'; },
             dispose() {},
         };
@@ -122,6 +123,7 @@ describe('assertProductionReady', () => {
     it('rejects provider that throws', async () => {
         process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
         const failingProvider: KeyProvider = {
+            providerType: 'test',
             async getEncryptionPassphrase() { throw new Error('vault unavailable'); },
             dispose() {},
         };
