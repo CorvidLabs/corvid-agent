@@ -237,7 +237,7 @@ export class ProcessManager {
                 prompt,
                 approvalManager: this.approvalManager,
                 onEvent: (event) => this.handleEvent(session.id, event),
-                onExit: (code) => this.handleExit(session.id, code),
+                onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 onApiOutage: () => this.handleApiOutage(session.id),
                 mcpServers,
@@ -308,7 +308,7 @@ export class ProcessManager {
                 provider,
                 approvalManager: this.approvalManager,
                 onEvent: (event) => this.handleEvent(session.id, event),
-                onExit: (code) => this.handleExit(session.id, code),
+                onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 mcpToolContext,
                 extendTimeout: (ms) => this.extendTimeout(session.id, ms),
@@ -456,7 +456,7 @@ export class ProcessManager {
                     provider: providerInstance,
                     approvalManager: this.approvalManager,
                     onEvent: (event) => this.handleEvent(session.id, event),
-                    onExit: (code) => this.handleExit(session.id, code),
+                    onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     mcpToolContext,
                     extendTimeout: (ms) => this.extendTimeout(session.id, ms),
@@ -478,7 +478,7 @@ export class ProcessManager {
                     prompt: resumePrompt ?? '',
                     approvalManager: this.approvalManager,
                     onEvent: (event) => this.handleEvent(session.id, event),
-                    onExit: (code) => this.handleExit(session.id, code),
+                    onExit: (code, errorMessage) => this.handleExit(session.id, code, errorMessage),
                     onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                     onApiOutage: () => this.handleApiOutage(session.id),
                     mcpServers,
@@ -832,7 +832,7 @@ export class ProcessManager {
         } as ClaudeStreamEvent);
     }
 
-    private handleExit(sessionId: string, code: number | null): void {
+    private handleExit(sessionId: string, code: number | null, errorMessage?: string): void {
         log.info(`Process exited for session ${sessionId}`, { code });
         const meta = this.sessionMeta.get(sessionId);
         updateSessionPid(this.db, sessionId, null);
@@ -847,8 +847,9 @@ export class ProcessManager {
 
         // Log unexpected exits as system messages so the user can see what happened
         if (code !== 0) {
+            const detail = errorMessage ? `: ${errorMessage}` : '';
             addSessionMessage(this.db, sessionId, 'system',
-                `Session exited unexpectedly (code ${code}). Send a message to resume.`);
+                `Session exited unexpectedly (code ${code})${detail}. Send a message to resume.`);
         } else if (meta) {
             // Clean exit — record it so the conversation shows the boundary
             addSessionMessage(this.db, sessionId, 'system', 'Session completed.');
@@ -860,7 +861,7 @@ export class ProcessManager {
                 type: 'session_error',
                 session_id: sessionId,
                 error: {
-                    message: `Session crashed with exit code ${code}`,
+                    message: errorMessage || `Session crashed with exit code ${code}`,
                     errorType: 'crash',
                     severity: isAutoRestartable ? 'warning' : 'error',
                     recoverable: true,
