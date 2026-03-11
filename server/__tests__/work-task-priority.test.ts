@@ -57,18 +57,17 @@ describe('priority field', () => {
         }
     });
 
-    test('DB does not persist priority (returns default P2 on re-fetch)', () => {
+    test('DB persists priority (survives re-fetch)', () => {
         const task = createWorkTask(db, {
             agentId: AGENT_ID,
             projectId: PROJECT_ID,
             description: 'P0 critical',
             priority: 0,
         });
-        // The returned task has in-memory priority
         expect(task.priority).toBe(0);
-        // But re-fetching from DB returns default P2 (no column yet)
+        // Priority is now persisted to the DB column
         const fetched = getWorkTask(db, task.id)!;
-        expect(fetched.priority).toBe(2);
+        expect(fetched.priority).toBe(0);
     });
 });
 

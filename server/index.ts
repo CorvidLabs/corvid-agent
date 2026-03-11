@@ -70,6 +70,7 @@ const {
     memorySyncService,
     selfTestService,
     workTaskService,
+    taskQueueService,
     schedulerService,
     webhookService,
     mentionPollingService,
@@ -420,6 +421,12 @@ algochatInitDeps.server = server;
 wireEventBroadcasting({
     server, db, processManager, schedulerService, webhookService,
     mentionPollingService, workflowService, notificationService, multiTenant,
+});
+
+// Wire TaskQueueService queue change events to WebSocket
+taskQueueService.onQueueChange((activeCount, pendingCount) => {
+    const msg = JSON.stringify({ type: 'work_task_queue_update', tasks: [], activeCount, pendingCount });
+    publishToTenant(server, 'work_tasks', msg);
 });
 
 // Initialize AlgoChat after server starts

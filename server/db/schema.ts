@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 80;
+const SCHEMA_VERSION = 81;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -979,6 +979,8 @@ const MIGRATIONS: Record<number, string[]> = {
             original_branch TEXT DEFAULT NULL,
             iteration_count INTEGER DEFAULT 0,
             worktree_dir    TEXT DEFAULT NULL,
+            priority        INTEGER NOT NULL DEFAULT 2,
+            queued_at       TEXT DEFAULT NULL,
             tenant_id       TEXT NOT NULL DEFAULT 'default',
             created_at      TEXT DEFAULT (datetime('now')),
             completed_at    TEXT DEFAULT NULL
@@ -1176,6 +1178,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_session ON work_tasks(session_id)`,
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_status ON work_tasks(status)`,
         `CREATE INDEX IF NOT EXISTS idx_work_tasks_tenant ON work_tasks(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_work_tasks_pending_dispatch ON work_tasks(status, project_id, priority DESC, created_at ASC)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_run ON workflow_node_runs(run_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_session ON workflow_node_runs(session_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_node_runs_status ON workflow_node_runs(status)`,
