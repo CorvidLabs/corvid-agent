@@ -92,7 +92,7 @@ export interface SdkProcessOptions {
     prompt: string;
     approvalManager: ApprovalManager;
     onEvent: (event: ClaudeStreamEvent) => void;
-    onExit: (code: number | null) => void;
+    onExit: (code: number | null, errorMessage?: string) => void;
     onApprovalRequest: (request: ApprovalRequestWire) => void;
     onApiOutage?: () => void;
     mcpServers?: McpSdkServerConfigWithInstance[];
@@ -356,7 +356,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
                 type: 'error',
                 error: { message: errorMsg, type: 'sdk_error' },
             } as ClaudeStreamEvent);
-            onExit(1);
+            onExit(1, errorMsg);
         } finally {
             inputDone = true;
         }

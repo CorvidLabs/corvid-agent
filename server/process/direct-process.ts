@@ -189,7 +189,7 @@ export interface DirectProcessOptions {
     provider: LlmProvider;
     approvalManager: ApprovalManager;
     onEvent: (event: ClaudeStreamEvent) => void;
-    onExit: (code: number | null) => void;
+    onExit: (code: number | null, errorMessage?: string) => void;
     onApprovalRequest: (request: ApprovalRequestWire) => void;
     mcpToolContext: McpToolContext | null;
     /** Called to reset the session timeout when the agent is still active. */
@@ -306,7 +306,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             type: 'error',
             error: { message: errorMsg, type: 'direct_process_error' },
         } as ClaudeStreamEvent);
-        onExit(1);
+        onExit(1, errorMsg);
     });
 
     async function runLoop(userMessage: string): Promise<void> {
@@ -722,7 +722,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 type: 'error',
                 error: { message: errorMsg, type: 'direct_process_error' },
             } as ClaudeStreamEvent);
-            onExit(1);
+            onExit(1, errorMsg);
         });
     }
 
@@ -768,7 +768,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     type: 'error',
                     error: { message: errorMsg, type: 'direct_process_error' },
                 } as ClaudeStreamEvent);
-                onExit(1);
+                onExit(1, errorMsg);
             });
         }
         return true;

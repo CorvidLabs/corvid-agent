@@ -20,7 +20,7 @@ export interface ClaudeProcessOptions {
     prompt?: string;
     mcpEnabled?: boolean;
     onEvent: (event: ClaudeStreamEvent) => void;
-    onExit: (code: number | null) => void;
+    onExit: (code: number | null, errorMessage?: string) => void;
 }
 
 export interface ClaudeProcess {
@@ -76,10 +76,11 @@ export function spawnClaudeProcess(options: ClaudeProcessOptions): ClaudeProcess
     proc.exited.then((code) => {
         onExit(code);
     }).catch((err) => {
+        const errorMsg = err instanceof Error ? err.message : String(err);
         log.error(`Process exited promise rejected for session ${session.id}`, {
-            error: err instanceof Error ? err.message : String(err),
+            error: errorMsg,
         });
-        onExit(1);
+        onExit(1, errorMsg);
     });
 
     function sendMessage(content: string): boolean {
