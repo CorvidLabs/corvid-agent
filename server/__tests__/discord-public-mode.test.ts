@@ -6,6 +6,7 @@ import type { DiscordBridgeConfig } from '../discord/types';
 import { PermissionLevel } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
+import { resolvePermissionLevel, checkRateLimit } from '../discord/permissions';
 
 function createMockProcessManager() {
     return {
@@ -14,7 +15,10 @@ function createMockProcessManager() {
         sendMessage: mock(() => true),
         subscribe: mock(() => {}),
         unsubscribe: mock(() => {}),
+        subscribeAll: mock(() => {}),
+        unsubscribeAll: mock(() => {}),
         resumeProcess: mock(() => {}),
+        stopProcess: mock(() => {}),
     } as unknown as import('../process/manager').ProcessManager;
 }
 
@@ -108,10 +112,6 @@ describe('DiscordBridge public mode', () => {
     });
 
     test('role-based permissions resolve highest matching role', async () => {
-        const pm = createMockProcessManager();
-        createAgent(db, { name: 'TestAgent' });
-        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
-
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: '100000000000000001',
@@ -123,24 +123,19 @@ describe('DiscordBridge public mode', () => {
             },
             defaultPermissionLevel: PermissionLevel.BASIC,
         };
-        const bridge = new DiscordBridge(db, pm, config);
-
-        const resolvePermLevel = (bridge as unknown as {
-            resolvePermissionLevel: (userId: string, roles?: string[]) => number;
-        }).resolvePermissionLevel.bind(bridge);
+        const mutedUsers = new Set<string>();
 
         // User with admin role gets ADMIN level
-        expect(resolvePermLevel('user-1', ['basic-role-00000001', 'admin-role-00000001'])).toBe(PermissionLevel.ADMIN);
+        expect(resolvePermissionLevel(config, mutedUsers, 'user-1', ['basic-role-00000001', 'admin-role-00000001'])).toBe(PermissionLevel.ADMIN);
 
         // User with only basic role gets BASIC
-        expect(resolvePermLevel('user-2', ['basic-role-00000001'])).toBe(PermissionLevel.BASIC);
+        expect(resolvePermissionLevel(config, mutedUsers, 'user-2', ['basic-role-00000001'])).toBe(PermissionLevel.BASIC);
 
         // User with no matching roles gets default
-        expect(resolvePermLevel('user-3', ['unknown-role-00001'])).toBe(PermissionLevel.BASIC);
+        expect(resolvePermissionLevel(config, mutedUsers, 'user-3', ['unknown-role-00001'])).toBe(PermissionLevel.BASIC);
     });
 
     test('muted users are blocked regardless of roles', async () => {
-        const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: '100000000000000001',
@@ -148,39 +143,30 @@ describe('DiscordBridge public mode', () => {
             publicMode: true,
             rolePermissions: { 'admin-role-00000001': PermissionLevel.ADMIN },
         };
-        const bridge = new DiscordBridge(db, pm, config);
+        const mutedUsers = new Set<string>();
 
-        bridge.muteUser('user-muted-1234567');
-
-        const resolvePermLevel = (bridge as unknown as {
-            resolvePermissionLevel: (userId: string, roles?: string[]) => number;
-        }).resolvePermissionLevel.bind(bridge);
+        mutedUsers.add('user-muted-1234567');
 
         // Even with admin role, muted user is BLOCKED
-        expect(resolvePermLevel('user-muted-1234567', ['admin-role-00000001'])).toBe(PermissionLevel.BLOCKED);
+        expect(resolvePermissionLevel(config, mutedUsers, 'user-muted-1234567', ['admin-role-00000001'])).toBe(PermissionLevel.BLOCKED);
 
         // Unmute restores access
-        bridge.unmuteUser('user-muted-1234567');
-        expect(resolvePermLevel('user-muted-1234567', ['admin-role-00000001'])).toBe(PermissionLevel.ADMIN);
+        mutedUsers.delete('user-muted-1234567');
+        expect(resolvePermissionLevel(config, mutedUsers, 'user-muted-1234567', ['admin-role-00000001'])).toBe(PermissionLevel.ADMIN);
     });
 
     test('legacy mode (no publicMode) uses allowedUserIds', async () => {
-        const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: '100000000000000001',
             allowedUserIds: ['allowed-user-123456'],
         };
-        const bridge = new DiscordBridge(db, pm, config);
-
-        const resolvePermLevel = (bridge as unknown as {
-            resolvePermissionLevel: (userId: string, roles?: string[]) => number;
-        }).resolvePermissionLevel.bind(bridge);
+        const mutedUsers = new Set<string>();
 
         // Allowed user gets ADMIN level
-        expect(resolvePermLevel('allowed-user-123456')).toBe(PermissionLevel.ADMIN);
+        expect(resolvePermissionLevel(config, mutedUsers, 'allowed-user-123456')).toBe(PermissionLevel.ADMIN);
         // Non-allowed user gets BLOCKED
-        expect(resolvePermLevel('unknown-user-654321')).toBe(PermissionLevel.BLOCKED);
+        expect(resolvePermissionLevel(config, mutedUsers, 'unknown-user-654321')).toBe(PermissionLevel.BLOCKED);
     });
 });
 
@@ -236,7 +222,6 @@ describe('DiscordBridge multi-channel', () => {
 
 describe('DiscordBridge tiered rate limiting', () => {
     test('higher permission levels get higher rate limits', async () => {
-        const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: '100000000000000001',
@@ -248,43 +233,34 @@ describe('DiscordBridge tiered rate limiting', () => {
                 [PermissionLevel.ADMIN]: 50,
             },
         };
-        const bridge = new DiscordBridge(db, pm, config);
-
-        const checkRateLimit = (bridge as unknown as {
-            checkRateLimit: (userId: string, permLevel?: number) => boolean;
-        }).checkRateLimit.bind(bridge);
+        const timestamps = new Map<string, number[]>();
 
         // Basic user: limit of 3
-        expect(checkRateLimit('basic-user-12345678', PermissionLevel.BASIC)).toBe(true);
-        expect(checkRateLimit('basic-user-12345678', PermissionLevel.BASIC)).toBe(true);
-        expect(checkRateLimit('basic-user-12345678', PermissionLevel.BASIC)).toBe(true);
-        expect(checkRateLimit('basic-user-12345678', PermissionLevel.BASIC)).toBe(false); // 4th blocked
+        expect(checkRateLimit(config, timestamps, 'basic-user-12345678', 60_000, 10, PermissionLevel.BASIC)).toBe(true);
+        expect(checkRateLimit(config, timestamps, 'basic-user-12345678', 60_000, 10, PermissionLevel.BASIC)).toBe(true);
+        expect(checkRateLimit(config, timestamps, 'basic-user-12345678', 60_000, 10, PermissionLevel.BASIC)).toBe(true);
+        expect(checkRateLimit(config, timestamps, 'basic-user-12345678', 60_000, 10, PermissionLevel.BASIC)).toBe(false); // 4th blocked
 
         // Admin user: limit of 50
         for (let i = 0; i < 50; i++) {
-            expect(checkRateLimit('admin-user-12345678', PermissionLevel.ADMIN)).toBe(true);
+            expect(checkRateLimit(config, timestamps, 'admin-user-12345678', 60_000, 10, PermissionLevel.ADMIN)).toBe(true);
         }
-        expect(checkRateLimit('admin-user-12345678', PermissionLevel.ADMIN)).toBe(false); // 51st blocked
+        expect(checkRateLimit(config, timestamps, 'admin-user-12345678', 60_000, 10, PermissionLevel.ADMIN)).toBe(false); // 51st blocked
     });
 
     test('default rate limit when no level-based config', async () => {
-        const pm = createMockProcessManager();
         const config: DiscordBridgeConfig = {
             botToken: 'test-token',
             channelId: '100000000000000001',
             allowedUserIds: [],
         };
-        const bridge = new DiscordBridge(db, pm, config);
-
-        const checkRateLimit = (bridge as unknown as {
-            checkRateLimit: (userId: string, permLevel?: number) => boolean;
-        }).checkRateLimit.bind(bridge);
+        const timestamps = new Map<string, number[]>();
 
         // Default is 10 messages per window
         for (let i = 0; i < 10; i++) {
-            expect(checkRateLimit('default-user-1234567')).toBe(true);
+            expect(checkRateLimit(config, timestamps, 'default-user-1234567', 60_000, 10)).toBe(true);
         }
-        expect(checkRateLimit('default-user-1234567')).toBe(false);
+        expect(checkRateLimit(config, timestamps, 'default-user-1234567', 60_000, 10)).toBe(false);
     });
 });
 

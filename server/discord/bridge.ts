@@ -1,51 +1,3 @@
-import type { Database } from 'bun:sqlite';
-import type { ProcessManager } from '../process/manager';
-import type { SessionSource } from '../../shared/types';
-import type { WorkTaskService } from '../work/service';
-import type {
-    DiscordBridgeConfig,
-    DiscordMessageData,
-    DiscordInteractionData,
-    DiscordInteractionOption,
-} from './types';
-import { InteractionType, InteractionCallbackType, PermissionLevel, ComponentType, ButtonStyle } from './types';
-import type { DiscordActionRow } from './types';
-import { DiscordGateway } from './gateway';
-import { listAgents } from '../db/agents';
-import { listCouncils, getCouncilLaunch } from '../db/councils';
-import { launchCouncil, onCouncilStageChange } from '../councils/discussion';
-import { createSession, getSession } from '../db/sessions';
-import { listProjects } from '../db/projects';
-import { createLogger } from '../lib/logger';
-import { scanForInjection } from '../lib/prompt-injection';
-import { extractContentText } from '../process/types';
-import { recordAudit } from '../db/audit';
-import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
-import { splitMessage, splitEmbedDescription } from './message-formatter';
-import { getDiscordConfig, updateDiscordConfig } from '../db/discord-config';
-
-const log = createLogger('DiscordBridge');
-
-const MAX_MESSAGE_LENGTH = 2000;
-
-/** Discord snowflake IDs are purely numeric strings. */
-const DISCORD_SNOWFLAKE_RE = /^\d{17,20}$/;
-
-/** Discord interaction tokens are alphanumeric with dashes, dots, and underscores. */
-const DISCORD_TOKEN_RE = /^[\w.\-]{20,500}$/;
-
-function assertSnowflake(value: string, label: string): void {
-    if (!DISCORD_SNOWFLAKE_RE.test(value)) {
-        throw new Error(`Invalid Discord ${label}: expected snowflake ID`);
-    }
-}
-
-function assertInteractionToken(value: string): void {
-    if (!DISCORD_TOKEN_RE.test(value)) {
-        throw new Error('Invalid Discord interaction token');
-    }
-}
-
 /**
  * Bidirectional Discord bridge using raw WebSocket gateway.
  * No external Discord library dependencies.
@@ -59,7 +11,50 @@ function assertInteractionToken(value: string): void {
  * Therefore, Ed25519 request signature validation (X-Signature-Ed25519) is not
  * applicable here. If Discord Interactions support is added in the future,
  * Ed25519 verification must be implemented for that endpoint.
+ *
+ * This file is a thin orchestration layer. Domain logic is in:
+ * - commands.ts — slash command registration & handling
+ * - admin-commands.ts — /admin subcommand handlers
+ * - embeds.ts — embed builders & Discord API helpers
+ * - message-handler.ts — message routing & dispatch
+ * - permissions.ts — role-based access control
+ * - thread-manager.ts — thread lifecycle & streaming
  */
+
+import type { Database } from 'bun:sqlite';
+import type { ProcessManager } from '../process/manager';
+import type { WorkTaskService } from '../work/service';
+import type { DiscordBridgeConfig, DiscordInteractionData, DiscordMessageData } from './types';
+import type { EventCallback } from '../process/interfaces';
+import { DiscordGateway } from './gateway';
+import { getAgent } from '../db/agents';
+import { getSession } from '../db/sessions';
+import { createLogger } from '../lib/logger';
+import { getDeliveryTracker, type DeliveryTracker } from '../lib/delivery-tracker';
+import { getDiscordConfig } from '../db/discord-config';
+
+// Extracted modules
+import { registerSlashCommands, handleInteraction as handleInteractionImpl } from './commands';
+import type { InteractionContext } from './commands';
+import { handleMessage as handleMessageImpl, sendTaskResult as sendTaskResultImpl } from './message-handler';
+import type { MessageHandlerContext } from './message-handler';
+import {
+    sendDiscordMessage,
+    sendTypingIndicator as sendTypingIndicatorImpl,
+    addReaction as addReactionImpl,
+    removeReaction as removeReactionImpl,
+} from './embeds';
+import { muteUser as muteUserImpl, unmuteUser as unmuteUserImpl } from './permissions';
+import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
+import {
+    subscribeForResponseWithEmbed as subscribeImpl,
+    recoverActiveThreadSubscriptions,
+    archiveStaleThreads as archiveStaleThreadsImpl,
+    createStandaloneThread as createStandaloneThreadImpl,
+} from './thread-manager';
+
+const log = createLogger('DiscordBridge');
+
 export class DiscordBridge {
     private db: Database;
     private processManager: ProcessManager;
@@ -71,9 +66,9 @@ export class DiscordBridge {
     private running = false;
 
     // Map Discord threadId → session info (for thread-based conversations)
-    private threadSessions: Map<string, { sessionId: string; agentName: string; agentModel: string; ownerUserId: string; topic?: string }> = new Map();
+    private threadSessions: Map<string, ThreadSessionInfo> = new Map();
     /** Active subscription callbacks per thread — used to unsubscribe before re-subscribing. */
-    private threadCallbacks: Map<string, { sessionId: string; callback: import('../process/interfaces').EventCallback }> = new Map();
+    private threadCallbacks: Map<string, ThreadCallbackInfo> = new Map();
 
     // Per-user rate limiting: userId → timestamps of recent messages
     private userMessageTimestamps: Map<string, number[]> = new Map();
@@ -99,7 +94,10 @@ export class DiscordBridge {
 
     /** Periodic config reload timer — picks up DB changes without restart */
     private configReloadTimer: ReturnType<typeof setInterval> | null = null;
-    private static readonly CONFIG_RELOAD_INTERVAL_MS = 30_000; // 30 seconds
+    private static readonly CONFIG_RELOAD_INTERVAL_MS = 30_000;
+
+    /** Global event subscriber for auto-recovering Discord thread subscriptions */
+    private globalEventCallback: EventCallback | null = null;
 
     constructor(
         db: Database,
@@ -127,6 +125,10 @@ export class DiscordBridge {
                     this.botUserId = botUserId;
                 }
                 log.info('Discord bridge received gateway ready', { sessionId, botUserId });
+                recoverActiveThreadSubscriptions(
+                    this.db, this.processManager, this.delivery, this.config.botToken,
+                    this.threadSessions, this.threadCallbacks,
+                );
             },
         });
     }
@@ -141,9 +143,8 @@ export class DiscordBridge {
         log.info('Discord bridge starting', { channelId: this.config.channelId, mode: this.mode });
         this.gateway.start();
 
-        // Register slash commands if app ID is configured
         if (this.config.appId) {
-            this.registerSlashCommands().catch(err => {
+            registerSlashCommands(this.db, this.config).catch(err => {
                 log.error('Failed to register Discord slash commands', {
                     error: err instanceof Error ? err.message : String(err),
                 });
@@ -152,7 +153,11 @@ export class DiscordBridge {
 
         // Start periodic stale thread check (every 10 minutes)
         this.staleCheckTimer = setInterval(() => {
-            this.archiveStaleThreads().catch(err => {
+            archiveStaleThreadsImpl(
+                this.processManager, this.delivery, this.config.botToken,
+                this.threadLastActivity, this.threadSessions, this.threadCallbacks,
+                this.STALE_THREAD_MS,
+            ).catch(err => {
                 log.warn('Stale thread check failed', { error: err instanceof Error ? err.message : String(err) });
             });
         }, 10 * 60 * 1000);
@@ -162,6 +167,26 @@ export class DiscordBridge {
         this.configReloadTimer = setInterval(() => {
             this.reloadConfigFromDb();
         }, DiscordBridge.CONFIG_RELOAD_INTERVAL_MS);
+
+        // Watch for Discord sessions that start producing events without a thread subscription.
+        this.globalEventCallback = (sessionId, event) => {
+            if (event.type !== 'assistant') return;
+            for (const [, cb] of this.threadCallbacks) {
+                if (cb.sessionId === sessionId) return;
+            }
+            const session = getSession(this.db, sessionId);
+            if (!session || session.source !== 'discord' || !session.name?.startsWith('Discord thread:')) return;
+            const threadId = session.name.replace('Discord thread:', '');
+            if (!threadId || this.threadCallbacks.has(threadId)) return;
+
+            const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
+            const agentName = agent?.name || 'Agent';
+            const agentModel = agent?.model || 'unknown';
+            this.threadSessions.set(threadId, { sessionId, agentName, agentModel, ownerUserId: '' });
+            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
+            log.info('Auto-subscribed Discord thread for resumed session', { threadId, sessionId });
+        };
+        this.processManager.subscribeAll(this.globalEventCallback);
     }
 
     stop(): void {
@@ -174,6 +199,10 @@ export class DiscordBridge {
         if (this.configReloadTimer) {
             clearInterval(this.configReloadTimer);
             this.configReloadTimer = null;
+        }
+        if (this.globalEventCallback) {
+            this.processManager.unsubscribeAll(this.globalEventCallback);
+            this.globalEventCallback = null;
         }
         log.info('Discord bridge stopped');
     }
@@ -192,8 +221,6 @@ export class DiscordBridge {
         try {
             const dbConfig = getDiscordConfig(this.db);
 
-            // Apply all dynamic fields unconditionally — DB defaults are correct
-            // when a key is deleted, so conditional merging would prevent clearing values.
             this.config.additionalChannelIds = dbConfig.additionalChannelIds;
             this.config.allowedUserIds = dbConfig.allowedUserIds;
             this.config.mode = dbConfig.mode;
@@ -203,10 +230,8 @@ export class DiscordBridge {
             this.config.defaultPermissionLevel = dbConfig.defaultPermissionLevel;
             this.config.rateLimitByLevel = dbConfig.rateLimitByLevel;
 
-            // Update bot presence if status/activity changed
             this.gateway.updatePresence(dbConfig.statusText, dbConfig.activityType);
 
-            // Load persisted interacted users (only merge in — never remove from memory)
             if (dbConfig.interactedUsers.length > 0) {
                 for (const uid of dbConfig.interactedUsers) {
                     this.interactedUsers.add(uid);
@@ -219,8 +244,6 @@ export class DiscordBridge {
         }
     }
 
-    // ── Slash Command Registration ─────────────────────────────────────
-
     /**
      * Public debounced entry point — call when agents are created/updated/deleted.
      * Coalesces rapid successive calls into a single Discord API request (2 s debounce).
@@ -232,7 +255,7 @@ export class DiscordBridge {
         }
         this.slashCommandDebounceTimer = setTimeout(() => {
             this.slashCommandDebounceTimer = null;
-            this.registerSlashCommands().catch(err => {
+            registerSlashCommands(this.db, this.config).catch(err => {
                 log.error('Failed to refresh Discord slash commands', {
                     error: err instanceof Error ? err.message : String(err),
                 });
@@ -240,1653 +263,56 @@ export class DiscordBridge {
         }, DiscordBridge.SLASH_COMMAND_DEBOUNCE_MS);
     }
 
-    private async registerSlashCommands(): Promise<void> {
-        const appId = this.config.appId;
-        if (!appId) return;
-
-        // Build agent choices for /session from the database
-        const agents = listAgents(this.db);
-        const agentChoices = agents.slice(0, 25).map(a => ({
-            name: `${a.name} (${a.model || 'unknown'})`.slice(0, 100),
-            value: a.name,
-        }));
-
-        // Build project choices for /session and /work
-        const projects = listProjects(this.db);
-        const projectChoices = projects.slice(0, 25).map(p => ({
-            name: `${p.name}${p.description ? ` — ${p.description}` : ''}`.slice(0, 100),
-            value: p.name,
-        }));
-
-        const commands = [
-            {
-                name: 'session',
-                description: 'Start a new conversation thread with an agent',
-                type: 1, // CHAT_INPUT
-                options: [
-                    {
-                        name: 'agent',
-                        description: 'Agent to start the session with',
-                        type: 3, // STRING
-                        required: true,
-                        ...(agentChoices.length > 0 ? { choices: agentChoices } : {}),
-                    },
-                    {
-                        name: 'topic',
-                        description: 'Topic for the conversation',
-                        type: 3, // STRING
-                        required: true,
-                    },
-                    {
-                        name: 'project',
-                        description: 'Project to work on (defaults to agent default)',
-                        type: 3, // STRING
-                        required: false,
-                        ...(projectChoices.length > 0 ? { choices: projectChoices } : {}),
-                    },
-                ],
-            },
-            {
-                name: 'work',
-                description: 'Create a work task (branch + PR)',
-                type: 1, // CHAT_INPUT
-                options: [
-                    {
-                        name: 'description',
-                        description: 'What the agent should work on',
-                        type: 3, // STRING
-                        required: true,
-                    },
-                    {
-                        name: 'agent',
-                        description: 'Agent to assign the task to',
-                        type: 3, // STRING
-                        required: false,
-                        ...(agentChoices.length > 0 ? { choices: agentChoices } : {}),
-                    },
-                    {
-                        name: 'project',
-                        description: 'Project to work on (defaults to agent default)',
-                        type: 3, // STRING
-                        required: false,
-                        ...(projectChoices.length > 0 ? { choices: projectChoices } : {}),
-                    },
-                ],
-            },
-            {
-                name: 'agents',
-                description: 'List all available agents',
-                type: 1,
-            },
-            {
-                name: 'status',
-                description: 'Show bot status and active sessions',
-                type: 1,
-            },
-            {
-                name: 'council',
-                description: 'Launch a council deliberation on a topic',
-                type: 1,
-                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
-                options: [{
-                    name: 'topic',
-                    description: 'The topic to deliberate on',
-                    type: 3, // STRING
-                    required: true,
-                }],
-            },
-            {
-                name: 'quickstart',
-                description: 'Guided walkthrough for new users',
-                type: 1,
-            },
-            {
-                name: 'help',
-                description: 'Show available commands and usage',
-                type: 1,
-            },
-            {
-                name: 'mute',
-                description: 'Mute a user from bot interactions (admin only)',
-                type: 1,
-                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
-                options: [{
-                    name: 'user',
-                    description: 'The user to mute',
-                    type: 6, // USER
-                    required: true,
-                }],
-            },
-            {
-                name: 'unmute',
-                description: 'Unmute a user (admin only)',
-                type: 1,
-                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
-                options: [{
-                    name: 'user',
-                    description: 'The user to unmute',
-                    type: 6, // USER
-                    required: true,
-                }],
-            },
-            {
-                name: 'admin',
-                description: 'Manage bot configuration (admin only)',
-                type: 1, // CHAT_INPUT
-                default_member_permissions: '8', // ADMINISTRATOR — hidden from non-admins
-                options: [
-                    {
-                        name: 'channels',
-                        description: 'Manage monitored channels',
-                        type: 2, // SUB_COMMAND_GROUP
-                        options: [
-                            {
-                                name: 'add',
-                                description: 'Add a channel to the monitored list',
-                                type: 1, // SUB_COMMAND
-                                options: [{
-                                    name: 'channel',
-                                    description: 'The channel to add',
-                                    type: 7, // CHANNEL
-                                    required: true,
-                                }],
-                            },
-                            {
-                                name: 'remove',
-                                description: 'Remove a channel from the monitored list',
-                                type: 1,
-                                options: [{
-                                    name: 'channel',
-                                    description: 'The channel to remove',
-                                    type: 7, // CHANNEL
-                                    required: true,
-                                }],
-                            },
-                            {
-                                name: 'list',
-                                description: 'Show all monitored channels',
-                                type: 1,
-                            },
-                        ],
-                    },
-                    {
-                        name: 'users',
-                        description: 'Manage allowed users',
-                        type: 2, // SUB_COMMAND_GROUP
-                        options: [
-                            {
-                                name: 'add',
-                                description: 'Add a user to the allow list',
-                                type: 1,
-                                options: [{
-                                    name: 'user',
-                                    description: 'The user to allow',
-                                    type: 6, // USER
-                                    required: true,
-                                }],
-                            },
-                            {
-                                name: 'remove',
-                                description: 'Remove a user from the allow list',
-                                type: 1,
-                                options: [{
-                                    name: 'user',
-                                    description: 'The user to remove',
-                                    type: 6, // USER
-                                    required: true,
-                                }],
-                            },
-                            {
-                                name: 'list',
-                                description: 'Show all allowed users',
-                                type: 1,
-                            },
-                        ],
-                    },
-                    {
-                        name: 'roles',
-                        description: 'Manage role permissions',
-                        type: 2, // SUB_COMMAND_GROUP
-                        options: [
-                            {
-                                name: 'set',
-                                description: 'Set permission level for a role',
-                                type: 1,
-                                options: [
-                                    {
-                                        name: 'role',
-                                        description: 'The role to configure',
-                                        type: 8, // ROLE
-                                        required: true,
-                                    },
-                                    {
-                                        name: 'level',
-                                        description: 'Permission level (0=blocked, 1=basic, 2=standard, 3=admin)',
-                                        type: 4, // INTEGER
-                                        required: true,
-                                        choices: [
-                                            { name: 'Blocked (0)', value: 0 },
-                                            { name: 'Basic (1) — chat, @mention', value: 1 },
-                                            { name: 'Standard (2) — slash commands', value: 2 },
-                                            { name: 'Admin (3) — full access', value: 3 },
-                                        ],
-                                    },
-                                ],
-                            },
-                            {
-                                name: 'remove',
-                                description: 'Remove permission override for a role',
-                                type: 1,
-                                options: [{
-                                    name: 'role',
-                                    description: 'The role to remove',
-                                    type: 8, // ROLE
-                                    required: true,
-                                }],
-                            },
-                            {
-                                name: 'list',
-                                description: 'Show all role permission mappings',
-                                type: 1,
-                            },
-                        ],
-                    },
-                    {
-                        name: 'mode',
-                        description: 'Set the bridge mode',
-                        type: 1, // SUB_COMMAND
-                        options: [{
-                            name: 'value',
-                            description: 'Bridge mode',
-                            type: 3, // STRING
-                            required: true,
-                            choices: [
-                                { name: 'Chat — interactive conversations', value: 'chat' },
-                                { name: 'Work Intake — fire-and-forget tasks', value: 'work_intake' },
-                            ],
-                        }],
-                    },
-                    {
-                        name: 'public',
-                        description: 'Toggle public mode (role-based access for all users)',
-                        type: 1,
-                        options: [{
-                            name: 'enabled',
-                            description: 'Enable or disable public mode',
-                            type: 5, // BOOLEAN
-                            required: true,
-                        }],
-                    },
-                    {
-                        name: 'show',
-                        description: 'Show current bot configuration',
-                        type: 1,
-                    },
-                ],
-            },
-        ];
-
-        // Register globally or per-guild
-        const url = this.config.guildId
-            ? `https://discord.com/api/v10/applications/${appId}/guilds/${this.config.guildId}/commands`
-            : `https://discord.com/api/v10/applications/${appId}/commands`;
-
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bot ${this.config.botToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(commands),
-        });
-
-        if (response.ok) {
-            const registered = await response.json() as Array<{ name: string }>;
-            log.info('Discord slash commands registered', {
-                count: registered.length,
-                commands: registered.map(c => c.name),
-                scope: this.config.guildId ? 'guild' : 'global',
-            });
-        } else {
-            const error = await response.text();
-            log.error('Failed to register Discord slash commands', {
-                status: response.status,
-                error: error.slice(0, 500),
-            });
-        }
-    }
-
-    // ── Interaction Handling ─────────────────────────────────────────────
+    // ── Delegation methods ──────────────────────────────────────────────
 
     private async handleInteraction(interaction: DiscordInteractionData): Promise<void> {
-        // Handle button/component interactions
-        if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
-            await this.handleComponentInteraction(interaction);
-            return;
-        }
-
-        // Only handle application commands
-        if (interaction.type !== InteractionType.APPLICATION_COMMAND) return;
-
-        const commandName = interaction.data?.name;
-        if (!commandName) return;
-
-        const userId = interaction.member?.user?.id ?? interaction.user?.id;
-        if (!userId) return;
-
-        // Role-based permission check
-        const permLevel = this.resolvePermissionLevel(userId, interaction.member?.roles);
-        if (permLevel <= PermissionLevel.BLOCKED) {
-            await this.respondToInteraction(interaction, 'You do not have permission to use this bot.');
-            return;
-        }
-
-        const options = interaction.data?.options ?? [];
-        const getOption = (name: string) => options.find(o => o.name === name)?.value as string | undefined;
-
-        switch (commandName) {
-            case 'session': {
-                if (permLevel < PermissionLevel.STANDARD) {
-                    await this.respondToInteraction(interaction, 'You need a higher role to create sessions. Try @mentioning the bot for a quick reply.');
-                    break;
-                }
-                const agentName = getOption('agent');
-                const topic = getOption('topic');
-                const projectName = getOption('project');
-                if (!agentName || !topic) {
-                    await this.respondToInteraction(interaction, 'Please provide both an agent and a topic.');
-                    break;
-                }
-
-                const agents = listAgents(this.db);
-                if (agents.length === 0) {
-                    await this.respondToInteraction(interaction, 'No agents configured. Create an agent first.');
-                    break;
-                }
-
-                const agent = agents.find(a =>
-                    a.name.toLowerCase() === agentName.toLowerCase() ||
-                    a.name.toLowerCase().replace(/\s+/g, '') === agentName.toLowerCase().replace(/\s+/g, '')
-                );
-                if (!agent) {
-                    const names = agents.map(a => a.name).join(', ');
-                    await this.respondToInteraction(interaction, `Agent not found: "${agentName}". Available: ${names}`);
-                    break;
-                }
-
-                const allProjects = listProjects(this.db);
-                let project;
-                if (projectName) {
-                    project = allProjects.find(p => p.name.toLowerCase() === projectName.toLowerCase());
-                    if (!project) {
-                        const names = allProjects.map(p => p.name).join(', ');
-                        await this.respondToInteraction(interaction, `Project not found: "${projectName}". Available: ${names}`);
-                        break;
-                    }
-                } else {
-                    project = agent.defaultProjectId
-                        ? allProjects.find(p => p.id === agent.defaultProjectId) ?? allProjects[0]
-                        : allProjects[0];
-                }
-                if (!project) {
-                    await this.respondToInteraction(interaction, 'No projects configured.');
-                    break;
-                }
-
-                // Create a standalone thread (not attached to a message)
-                const threadName = `${agent.name} — ${topic}`;
-                const threadId = await this.createStandaloneThread(this.config.channelId, threadName);
-                if (!threadId) {
-                    await this.respondToInteraction(interaction, 'Failed to create conversation thread.');
-                    break;
-                }
-
-                const session = createSession(this.db, {
-                    projectId: project.id,
-                    agentId: agent.id,
-                    name: `Discord thread:${threadId}`,
-                    initialPrompt: topic,
-                    source: 'discord' as SessionSource,
-                });
-
-                this.threadSessions.set(threadId, {
-                    sessionId: session.id,
-                    agentName: agent.name,
-                    agentModel: agent.model || 'unknown',
-                    ownerUserId: userId,
-                    topic,
-                });
-                this.threadLastActivity.set(threadId, Date.now());
-
-                this.processManager.startProcess(session, topic);
-                this.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
-
-                // Post a welcome embed with Stop button in the thread
-                this.sendEmbedWithButtons(threadId, {
-                    description: `**${agent.name}** is working on: ${topic}`,
-                    color: this.agentColor(agent.name),
-                    footer: { text: `${agent.name} · ${agent.model || 'unknown'}` },
-                }, [
-                    this.buildActionRow(
-                        { label: 'Stop', customId: 'stop_session', style: ButtonStyle.DANGER, emoji: '⏹' },
-                    ),
-                ]).catch(() => {});
-
-                await this.respondToInteraction(interaction,
-                    `Session started in <#${threadId}> with **${agent.name}**.\nTopic: ${topic}`);
-                break;
-            }
-
-            case 'work': {
-                if (permLevel < PermissionLevel.STANDARD) {
-                    await this.respondToInteraction(interaction, 'You need a higher role to create work tasks.');
-                    break;
-                }
-                if (!this.workTaskService) {
-                    await this.respondToInteraction(interaction, 'Work task service not available.');
-                    break;
-                }
-
-                const workDescription = getOption('description');
-                if (!workDescription) {
-                    await this.respondToInteraction(interaction, 'Please provide a task description.');
-                    break;
-                }
-
-                const workAgentName = getOption('agent');
-                const workProjectName = getOption('project');
-
-                // Resolve agent
-                const allAgents = listAgents(this.db);
-                let workAgent;
-                if (workAgentName) {
-                    workAgent = allAgents.find(a =>
-                        a.name.toLowerCase() === workAgentName.toLowerCase() ||
-                        a.name.toLowerCase().replace(/\s+/g, '') === workAgentName.toLowerCase().replace(/\s+/g, '')
-                    );
-                    if (!workAgent) {
-                        const names = allAgents.map(a => a.name).join(', ');
-                        await this.respondToInteraction(interaction, `Agent not found: "${workAgentName}". Available: ${names}`);
-                        break;
-                    }
-                } else {
-                    workAgent = this.config.defaultAgentId
-                        ? allAgents.find(a => a.id === this.config.defaultAgentId) ?? allAgents[0]
-                        : allAgents[0];
-                }
-                if (!workAgent) {
-                    await this.respondToInteraction(interaction, 'No agents configured.');
-                    break;
-                }
-
-                // Resolve project
-                const workProjects = listProjects(this.db);
-                let workProjectId: string | undefined;
-                if (workProjectName) {
-                    const workProject = workProjects.find(p => p.name.toLowerCase() === workProjectName.toLowerCase());
-                    if (!workProject) {
-                        const names = workProjects.map(p => p.name).join(', ');
-                        await this.respondToInteraction(interaction, `Project not found: "${workProjectName}". Available: ${names}`);
-                        break;
-                    }
-                    workProjectId = workProject.id;
-                }
-
-                // Defer the response since task creation may take a moment
-                await this.respondToInteraction(interaction, `Creating work task for **${workAgent.name}**...`);
-
-                const channelId = interaction.channel_id;
-                try {
-                    const task = await this.workTaskService.create({
-                        agentId: workAgent.id,
-                        description: workDescription,
-                        projectId: workProjectId,
-                        source: 'discord',
-                        requesterInfo: { discordUserId: userId },
-                    });
-
-                    // Send a rich confirmation embed in the channel
-                    if (channelId) {
-                        const fields: Array<{ name: string; value: string; inline?: boolean }> = [
-                            { name: 'Agent', value: workAgent.name, inline: true },
-                            { name: 'Status', value: 'In Progress', inline: true },
-                        ];
-                        if (task.branchName) {
-                            fields.push({ name: 'Branch', value: `\`${task.branchName}\``, inline: false });
-                        }
-
-                        await this.sendEmbed(channelId, {
-                            title: 'Work Task Created',
-                            description: workDescription.slice(0, 300) + (workDescription.length > 300 ? '...' : ''),
-                            color: 0x5865f2, // Discord blurple
-                            fields,
-                            footer: { text: `Task: ${task.id} · You'll be notified when it completes` },
-                        });
-
-                        // Subscribe for completion notification
-                        this.workTaskService.onComplete(task.id, (completedTask) => {
-                            this.sendTaskResult(channelId, completedTask, userId).catch(err => {
-                                log.error('Failed to send task result to Discord', {
-                                    taskId: completedTask.id,
-                                    error: err instanceof Error ? err.message : String(err),
-                                });
-                            });
-                        });
-                    }
-                } catch (err) {
-                    const message = err instanceof Error ? err.message : String(err);
-                    log.error('Discord /work command failed', { error: message, userId });
-                    if (channelId) {
-                        await this.sendEmbed(channelId, {
-                            title: 'Work Task Failed',
-                            description: `Could not create work task: ${message.slice(0, 500)}`,
-                            color: 0xed4245, // Red
-                        });
-                    }
-                }
-                break;
-            }
-
-            case 'agents': {
-                const agents = listAgents(this.db);
-                if (agents.length === 0) {
-                    await this.respondToInteraction(interaction, 'No agents configured.');
-                    break;
-                }
-                const lines = agents.map(a => `\u2022 **${a.name}** (${a.model || 'no model'})`);
-                await this.respondToInteraction(interaction, `Available agents:\n${lines.join('\n')}`);
-                break;
-            }
-
-            case 'status': {
-                const activeSessions = this.threadSessions.size;
-                await this.respondToInteraction(interaction,
-                    `Active thread sessions: **${activeSessions}**\nUse \`/session\` to start a new conversation.`);
-                break;
-            }
-
-            case 'council': {
-                if (permLevel < PermissionLevel.ADMIN) {
-                    await this.respondToInteraction(interaction, 'Council deliberation requires admin permissions.');
-                    break;
-                }
-                const topic = getOption('topic');
-                if (!topic) {
-                    await this.respondToInteraction(interaction, 'Please provide a topic.');
-                    break;
-                }
-                const councils = listCouncils(this.db);
-                if (councils.length === 0) {
-                    await this.respondToInteraction(interaction, 'No councils configured.');
-                    break;
-                }
-                const council = councils[0];
-                const projects = listProjects(this.db);
-                const project = projects[0];
-                if (!project) {
-                    await this.respondToInteraction(interaction, 'No projects configured.');
-                    break;
-                }
-                try {
-                    const result = launchCouncil(this.db, this.processManager, council.id, project.id, topic, null);
-
-                    // Get the channel where the interaction happened for posting results
-                    const councilChannelId = interaction.channel_id;
-
-                    await this.respondToInteraction(interaction,
-                        `Council deliberation launched.\nCouncil: **${council.name}**\nLaunch ID: \`${result.launchId.slice(0, 8)}\`\nSessions: ${result.sessionIds.length}`);
-
-                    // Subscribe for council completion and post synthesis to Discord
-                    if (councilChannelId) {
-                        const unsubscribe = onCouncilStageChange((launchId, stage) => {
-                            if (launchId !== result.launchId || stage !== 'complete') return;
-                            unsubscribe();
-
-                            const launch = getCouncilLaunch(this.db, result.launchId);
-                            const synthesis = launch?.synthesis || '(No synthesis produced)';
-
-                            this.sendEmbed(councilChannelId, {
-                                title: `Council Complete: ${council.name}`,
-                                description: synthesis.slice(0, 4096),
-                                color: 0x57f287,
-                                footer: { text: `Topic: ${topic.slice(0, 100)} · Launch: ${result.launchId.slice(0, 8)}` },
-                            }).catch(err => {
-                                log.warn('Failed to post council synthesis to Discord', {
-                                    launchId: result.launchId,
-                                    error: err instanceof Error ? err.message : String(err),
-                                });
-                            });
-                        });
-                    }
-                } catch (err) {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    await this.respondToInteraction(interaction, `Failed to launch council: ${msg}`);
-                }
-                break;
-            }
-
-            case 'mute': {
-                if (permLevel < PermissionLevel.ADMIN) {
-                    await this.respondToInteraction(interaction, 'Only admins can mute users.');
-                    break;
-                }
-                const targetUser = getOption('user');
-                if (!targetUser) {
-                    await this.respondToInteraction(interaction, 'Please specify a user.');
-                    break;
-                }
-                this.muteUser(targetUser);
-                await this.respondToInteraction(interaction, `User <@${targetUser}> has been muted from bot interactions.`);
-                break;
-            }
-
-            case 'unmute': {
-                if (permLevel < PermissionLevel.ADMIN) {
-                    await this.respondToInteraction(interaction, 'Only admins can unmute users.');
-                    break;
-                }
-                const targetUser = getOption('user');
-                if (!targetUser) {
-                    await this.respondToInteraction(interaction, 'Please specify a user.');
-                    break;
-                }
-                this.unmuteUser(targetUser);
-                await this.respondToInteraction(interaction, `User <@${targetUser}> has been unmuted.`);
-                break;
-            }
-
-            case 'quickstart': {
-                const agents = listAgents(this.db);
-                const agentCount = agents.length;
-                const firstAgent = agents[0]?.name ?? 'your agent';
-
-                const steps = [
-                    '**1. Start a session**',
-                    `Use \`/session\` to pick an agent and topic. ${agentCount > 0 ? `Try \`/session ${firstAgent} Hello!\`` : 'Set up an agent first in the dashboard.'}`,
-                    '',
-                    '**2. Chat in the thread**',
-                    'A new thread is created for your conversation. Send messages and the agent will respond.',
-                    '',
-                    '**3. Quick one-off replies**',
-                    `@mention the bot in the channel for a fast reply without creating a thread.`,
-                    '',
-                    '**4. Explore commands**',
-                    'Use `/help` to see all available commands and what they do.',
-                ].join('\n');
-
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Welcome to CorvidAgent!',
-                    description: steps,
-                    color: 0x5865f2, // Discord blurple
-                    fields: [
-                        {
-                            name: 'Available Agents',
-                            value: agentCount > 0
-                                ? agents.slice(0, 5).map(a => `\`${a.name}\` — ${a.model || 'unknown'}`).join('\n')
-                                    + (agentCount > 5 ? `\n_...and ${agentCount - 5} more (use \`/agents\`)_` : '')
-                                : '_No agents configured yet — check the dashboard._',
-                            inline: false,
-                        },
-                    ],
-                    footer: { text: 'Use /help to see all commands' },
-                });
-                break;
-            }
-
-            case 'help': {
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'CorvidAgent Commands',
-                    color: 0x5865f2, // Discord blurple
-                    fields: [
-                        {
-                            name: 'Conversations',
-                            value: [
-                                '`/session <agent> <topic>` — Start a threaded conversation',
-                                '`/quickstart` — Guided walkthrough for new users',
-                                '`@mention` — Quick one-off reply in channel',
-                            ].join('\n'),
-                            inline: false,
-                        },
-                        {
-                            name: 'Information',
-                            value: [
-                                '`/agents` — List all available agents and models',
-                                '`/status` — Show active sessions and bot status',
-                                '`/help` — Show this help message',
-                            ].join('\n'),
-                            inline: false,
-                        },
-                        {
-                            name: 'Advanced',
-                            value: [
-                                '`/council <topic>` — Launch a multi-agent council deliberation',
-                                '`/mute <user>` — Mute a user (admin)',
-                                '`/unmute <user>` — Unmute a user (admin)',
-                            ].join('\n'),
-                            inline: false,
-                        },
-                        {
-                            name: 'Admin Configuration',
-                            value: [
-                                '`/admin channels add/remove/list` — Manage monitored channels',
-                                '`/admin users add/remove/list` — Manage allowed users',
-                                '`/admin roles set/remove/list` — Manage role permissions',
-                                '`/admin mode <chat|work_intake>` — Set bridge mode',
-                                '`/admin public <on|off>` — Toggle public mode',
-                                '`/admin show` — Show current configuration',
-                            ].join('\n'),
-                            inline: false,
-                        },
-                    ],
-                    footer: { text: 'New here? Try /quickstart for a guided walkthrough' },
-                });
-                break;
-            }
-
-            case 'admin': {
-                if (permLevel < PermissionLevel.ADMIN) {
-                    await this.respondToInteraction(interaction, 'Only admins can use `/admin` commands.');
-                    break;
-                }
-                await this.handleAdminCommand(interaction, options);
-                break;
-            }
-
-            default:
-                await this.respondToInteraction(interaction, `Unknown command: ${commandName}`);
-        }
-    }
-
-    // ── Admin Command Handling ───────────────────────────────────────────
-
-    /**
-     * Handle `/admin` subcommands for managing channels, users, roles, mode, and config display.
-     * All changes persist to `discord_config` DB table and hot-reload within 30s.
-     */
-    private async handleAdminCommand(
-        interaction: DiscordInteractionData,
-        options: DiscordInteractionOption[],
-    ): Promise<void> {
-        // For subcommand groups: options[0] = group, options[0].options[0] = subcommand
-        // For direct subcommands: options[0] = subcommand
-        const group = options[0];
-        if (!group) {
-            await this.respondToInteraction(interaction, 'Missing subcommand.');
-            return;
-        }
-
-        const groupName = group.name;
-
-        // Direct subcommands (mode, public, show)
-        if (groupName === 'show') {
-            await this.handleAdminShow(interaction);
-            return;
-        }
-
-        if (groupName === 'mode') {
-            const sub = group.options?.[0];
-            const mode = sub?.value as string ?? group.value as string;
-            if (mode !== 'chat' && mode !== 'work_intake') {
-                await this.respondToInteraction(interaction, 'Invalid mode. Use `chat` or `work_intake`.');
-                return;
-            }
-            updateDiscordConfig(this.db, 'mode', mode);
-            this.config.mode = mode;
-            recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'mode', JSON.stringify({ value: mode }));
-            await this.respondToInteractionEmbed(interaction, {
-                title: 'Bridge Mode Updated',
-                description: `Mode set to **${mode === 'chat' ? 'Chat' : 'Work Intake'}**`,
-                color: 0x57f287,
-                footer: { text: mode === 'chat' ? 'Messages route to agent sessions' : 'Messages create async work tasks' },
-            });
-            return;
-        }
-
-        if (groupName === 'public') {
-            const sub = group.options?.[0];
-            const enabled = (sub?.value ?? group.value) as boolean;
-            updateDiscordConfig(this.db, 'public_mode', String(enabled));
-            this.config.publicMode = enabled;
-            recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'public_mode', JSON.stringify({ value: enabled }));
-            await this.respondToInteractionEmbed(interaction, {
-                title: 'Public Mode Updated',
-                description: enabled
-                    ? 'Public mode **enabled** — all users can interact (subject to role permissions)'
-                    : 'Public mode **disabled** — only allowed users can interact',
-                color: enabled ? 0x57f287 : 0xed4245,
-            });
-            return;
-        }
-
-        // Subcommand groups (channels, users, roles)
-        const subcommand = group.options?.[0];
-        if (!subcommand) {
-            await this.respondToInteraction(interaction, 'Missing subcommand.');
-            return;
-        }
-        const subName = subcommand.name;
-        const subOptions = subcommand.options ?? [];
-        const getSubOption = (name: string) => subOptions.find(o => o.name === name)?.value;
-
-        switch (groupName) {
-            case 'channels':
-                await this.handleAdminChannels(interaction, subName, getSubOption);
-                break;
-            case 'users':
-                await this.handleAdminUsers(interaction, subName, getSubOption);
-                break;
-            case 'roles':
-                await this.handleAdminRoles(interaction, subName, getSubOption);
-                break;
-            default:
-                await this.respondToInteraction(interaction, `Unknown admin subcommand: ${groupName}`);
-        }
-    }
-
-    private async handleAdminChannels(
-        interaction: DiscordInteractionData,
-        subName: string,
-        getSubOption: (name: string) => string | number | boolean | undefined,
-    ): Promise<void> {
-        const current = this.config.additionalChannelIds ?? [];
-
-        switch (subName) {
-            case 'add': {
-                const channelId = String(getSubOption('channel'));
-                if (!channelId || !DISCORD_SNOWFLAKE_RE.test(channelId)) {
-                    await this.respondToInteraction(interaction, 'Invalid channel.');
-                    return;
-                }
-                if (channelId === this.config.channelId) {
-                    await this.respondToInteraction(interaction, 'That is already the primary channel.');
-                    return;
-                }
-                if (current.includes(channelId)) {
-                    await this.respondToInteraction(interaction, `<#${channelId}> is already monitored.`);
-                    return;
-                }
-                const updated = [...current, channelId];
-                updateDiscordConfig(this.db, 'additional_channel_ids', updated.join(','));
-                this.config.additionalChannelIds = updated;
-                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'additional_channel_ids', JSON.stringify({ action: 'add', channelId }));
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Channel Added',
-                    description: `<#${channelId}> is now being monitored.\n\nTotal monitored: **${updated.length + 1}** (including primary)`,
-                    color: 0x57f287,
-                });
-                break;
-            }
-            case 'remove': {
-                const channelId = String(getSubOption('channel'));
-                if (!channelId || !DISCORD_SNOWFLAKE_RE.test(channelId)) {
-                    await this.respondToInteraction(interaction, 'Invalid channel.');
-                    return;
-                }
-                if (channelId === this.config.channelId) {
-                    await this.respondToInteraction(interaction, 'Cannot remove the primary channel. Change `DISCORD_CHANNEL_ID` in your environment to change it.');
-                    return;
-                }
-                if (!current.includes(channelId)) {
-                    await this.respondToInteraction(interaction, `<#${channelId}> is not in the monitored list.`);
-                    return;
-                }
-                const updated = current.filter(id => id !== channelId);
-                updateDiscordConfig(this.db, 'additional_channel_ids', updated.join(','));
-                this.config.additionalChannelIds = updated;
-                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'additional_channel_ids', JSON.stringify({ action: 'remove', channelId }));
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Channel Removed',
-                    description: `<#${channelId}> removed from monitoring.\n\nTotal monitored: **${updated.length + 1}** (including primary)`,
-                    color: 0xed4245,
-                });
-                break;
-            }
-            case 'list': {
-                const allChannels = [
-                    `<#${this.config.channelId}> *(primary)*`,
-                    ...current.map(id => `<#${id}>`),
-                ];
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Monitored Channels',
-                    description: allChannels.join('\n') || 'No channels configured.',
-                    color: 0x5865f2,
-                    footer: { text: `${allChannels.length} channel${allChannels.length === 1 ? '' : 's'} total` },
-                });
-                break;
-            }
-        }
-    }
-
-    private async handleAdminUsers(
-        interaction: DiscordInteractionData,
-        subName: string,
-        getSubOption: (name: string) => string | number | boolean | undefined,
-    ): Promise<void> {
-        const current = [...this.config.allowedUserIds];
-
-        switch (subName) {
-            case 'add': {
-                const userId = String(getSubOption('user'));
-                if (!userId || !DISCORD_SNOWFLAKE_RE.test(userId)) {
-                    await this.respondToInteraction(interaction, 'Invalid user.');
-                    return;
-                }
-                if (current.includes(userId)) {
-                    await this.respondToInteraction(interaction, `<@${userId}> is already on the allow list.`);
-                    return;
-                }
-                const updated = [...current, userId];
-                updateDiscordConfig(this.db, 'allowed_user_ids', updated.join(','));
-                this.config.allowedUserIds = updated;
-                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'allowed_user_ids', JSON.stringify({ action: 'add', userId }));
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'User Added',
-                    description: `<@${userId}> added to the allow list.\n\nTotal allowed: **${updated.length}**`,
-                    color: 0x57f287,
-                });
-                break;
-            }
-            case 'remove': {
-                const userId = String(getSubOption('user'));
-                if (!userId || !DISCORD_SNOWFLAKE_RE.test(userId)) {
-                    await this.respondToInteraction(interaction, 'Invalid user.');
-                    return;
-                }
-                if (!current.includes(userId)) {
-                    await this.respondToInteraction(interaction, `<@${userId}> is not on the allow list.`);
-                    return;
-                }
-                const updated = current.filter(id => id !== userId);
-                updateDiscordConfig(this.db, 'allowed_user_ids', updated.join(','));
-                this.config.allowedUserIds = updated;
-                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'allowed_user_ids', JSON.stringify({ action: 'remove', userId }));
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'User Removed',
-                    description: `<@${userId}> removed from the allow list.\n\nTotal allowed: **${updated.length}**`,
-                    color: 0xed4245,
-                });
-                break;
-            }
-            case 'list': {
-                const userLines = current.length > 0
-                    ? current.map(id => `<@${id}>`).join('\n')
-                    : '_No users on allow list — all users have access (legacy mode with empty list)_';
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Allowed Users',
-                    description: userLines,
-                    color: 0x5865f2,
-                    footer: { text: `${current.length} user${current.length === 1 ? '' : 's'} · ${this.config.publicMode ? 'Public mode (roles take precedence)' : 'Legacy mode (allow list enforced)'}` },
-                });
-                break;
-            }
-        }
-    }
-
-    private async handleAdminRoles(
-        interaction: DiscordInteractionData,
-        subName: string,
-        getSubOption: (name: string) => string | number | boolean | undefined,
-    ): Promise<void> {
-        const current = { ...(this.config.rolePermissions ?? {}) };
-        const levelName = (level: number) =>
-            level === 0 ? 'Blocked' : level === 1 ? 'Basic' : level === 2 ? 'Standard' : level === 3 ? 'Admin' : `Level ${level}`;
-
-        switch (subName) {
-            case 'set': {
-                const roleId = String(getSubOption('role'));
-                const level = Number(getSubOption('level'));
-                if (!roleId || !DISCORD_SNOWFLAKE_RE.test(roleId)) {
-                    await this.respondToInteraction(interaction, 'Invalid role.');
-                    return;
-                }
-                if (level < 0 || level > 3 || !Number.isInteger(level)) {
-                    await this.respondToInteraction(interaction, 'Permission level must be 0-3.');
-                    return;
-                }
-                current[roleId] = level;
-                const json = JSON.stringify(current);
-                updateDiscordConfig(this.db, 'role_permissions', json);
-                this.config.rolePermissions = current;
-                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'role_permissions', JSON.stringify({ action: 'set', roleId, level }));
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Role Permission Set',
-                    description: `<@&${roleId}> → **${levelName(level)}** (${level})`,
-                    color: 0x57f287,
-                    footer: { text: `${Object.keys(current).length} role mapping${Object.keys(current).length === 1 ? '' : 's'} configured` },
-                });
-                break;
-            }
-            case 'remove': {
-                const roleId = String(getSubOption('role'));
-                if (!roleId || !DISCORD_SNOWFLAKE_RE.test(roleId)) {
-                    await this.respondToInteraction(interaction, 'Invalid role.');
-                    return;
-                }
-                if (!(roleId in current)) {
-                    await this.respondToInteraction(interaction, `<@&${roleId}> has no permission override.`);
-                    return;
-                }
-                delete current[roleId];
-                const json = JSON.stringify(current);
-                updateDiscordConfig(this.db, 'role_permissions', json);
-                this.config.rolePermissions = current;
-                recordAudit(this.db, 'discord_config_update', interaction.member?.user?.id ?? 'unknown', 'discord_config', 'role_permissions', JSON.stringify({ action: 'remove', roleId }));
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Role Permission Removed',
-                    description: `<@&${roleId}> permission override removed.\nUsers with this role will get the default level (**${levelName(this.config.defaultPermissionLevel ?? 1)}**).`,
-                    color: 0xed4245,
-                });
-                break;
-            }
-            case 'list': {
-                const entries = Object.entries(current);
-                const roleLines = entries.length > 0
-                    ? entries.map(([rid, lvl]) => `<@&${rid}> → **${levelName(lvl)}** (${lvl})`).join('\n')
-                    : '_No role permissions configured_';
-                await this.respondToInteractionEmbed(interaction, {
-                    title: 'Role Permissions',
-                    description: roleLines,
-                    color: 0x5865f2,
-                    fields: [
-                        {
-                            name: 'Default Level',
-                            value: `**${levelName(this.config.defaultPermissionLevel ?? 1)}** (${this.config.defaultPermissionLevel ?? 1})`,
-                            inline: true,
-                        },
-                        {
-                            name: 'Public Mode',
-                            value: this.config.publicMode ? 'Enabled' : 'Disabled',
-                            inline: true,
-                        },
-                    ],
-                    footer: { text: entries.length > 0 ? `${entries.length} role mapping${entries.length === 1 ? '' : 's'}` : 'Use /admin roles set to add mappings' },
-                });
-                break;
-            }
-        }
-    }
-
-    private async handleAdminShow(interaction: DiscordInteractionData): Promise<void> {
-        const channels = [
-            `<#${this.config.channelId}> *(primary)*`,
-            ...(this.config.additionalChannelIds ?? []).map(id => `<#${id}>`),
-        ];
-        const users = this.config.allowedUserIds.length > 0
-            ? this.config.allowedUserIds.map(id => `<@${id}>`).join(', ')
-            : '_none_';
-        const roleEntries = Object.entries(this.config.rolePermissions ?? {});
-        const levelName = (level: number) =>
-            level === 0 ? 'Blocked' : level === 1 ? 'Basic' : level === 2 ? 'Standard' : level === 3 ? 'Admin' : `Level ${level}`;
-        const roles = roleEntries.length > 0
-            ? roleEntries.map(([rid, lvl]) => `<@&${rid}>=${levelName(lvl)}`).join(', ')
-            : '_none_';
-
-        await this.respondToInteractionEmbed(interaction, {
-            title: 'Bot Configuration',
-            color: 0x5865f2,
-            fields: [
-                {
-                    name: 'Mode',
-                    value: this.config.mode === 'work_intake' ? 'Work Intake' : 'Chat',
-                    inline: true,
-                },
-                {
-                    name: 'Public Mode',
-                    value: this.config.publicMode ? 'Enabled' : 'Disabled',
-                    inline: true,
-                },
-                {
-                    name: 'Default Permission',
-                    value: `${levelName(this.config.defaultPermissionLevel ?? 1)} (${this.config.defaultPermissionLevel ?? 1})`,
-                    inline: true,
-                },
-                {
-                    name: `Channels (${channels.length})`,
-                    value: channels.join('\n').slice(0, 1024),
-                    inline: false,
-                },
-                {
-                    name: 'Allowed Users',
-                    value: users.slice(0, 1024),
-                    inline: false,
-                },
-                {
-                    name: 'Role Permissions',
-                    value: roles.slice(0, 1024),
-                    inline: false,
-                },
-                {
-                    name: 'Muted Users',
-                    value: this.mutedUsers.size > 0
-                        ? [...this.mutedUsers].map(id => `<@${id}>`).join(', ').slice(0, 1024)
-                        : '_none_',
-                    inline: false,
-                },
-            ],
-            footer: { text: `Active sessions: ${this.threadSessions.size} · Config reloads every 30s` },
-        });
-    }
-
-    private async respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {
-        assertSnowflake(interaction.id, 'interaction ID');
-        assertInteractionToken(interaction.token);
-        const response = await fetch(
-            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: InteractionCallbackType.CHANNEL_MESSAGE,
-                    data: { content: content.slice(0, MAX_MESSAGE_LENGTH) },
-                }),
-            },
-        );
-
-        if (!response.ok) {
-            const error = await response.text();
-            log.error('Failed to respond to Discord interaction', {
-                status: response.status,
-                error: error.slice(0, 200),
-            });
-        }
-    }
-
-    // ── Component (Button) Interaction Handling ──────────────────────────
-
-    /**
-     * Handle button clicks and other component interactions.
-     * Button custom_ids use the format: `action:param1:param2`
-     */
-    private async handleComponentInteraction(interaction: DiscordInteractionData): Promise<void> {
-        const customId = interaction.data?.custom_id;
-        if (!customId) return;
-
-        const userId = interaction.member?.user?.id ?? interaction.user?.id;
-        if (!userId) return;
-
-        assertSnowflake(interaction.channel_id, 'channel ID');
-
-        const permLevel = this.resolvePermissionLevel(userId, interaction.member?.roles);
-        if (permLevel <= PermissionLevel.BLOCKED) {
-            await this.respondToInteraction(interaction, 'You do not have permission to use this bot.');
-            return;
-        }
-
-        const [action] = customId.split(':');
-
-        switch (action) {
-            case 'resume_thread': {
-                if (permLevel < PermissionLevel.STANDARD) {
-                    await this.respondToInteraction(interaction, 'You need a higher role to resume sessions.');
-                    return;
-                }
-                const threadId = interaction.channel_id;
-                const info = this.threadSessions.get(threadId) ?? this.tryRecoverThread(threadId);
-                if (!info) {
-                    await this.respondToInteraction(interaction, 'No session found for this thread. Use `/session` to start a new one.');
-                    return;
-                }
-
-                // Un-archive the thread if it was archived
-                await this.unarchiveThread(threadId);
-
-                // Resubscribe for responses
-                if (!this.threadCallbacks.has(threadId)) {
-                    this.subscribeForResponseWithEmbed(info.sessionId, threadId, info.agentName, info.agentModel);
-                }
-                this.threadLastActivity.set(threadId, Date.now());
-
-                // Acknowledge the button press
-                await this.acknowledgeButton(interaction, 'Session resumed — send a message to continue.');
-                break;
-            }
-
-            case 'new_session': {
-                if (permLevel < PermissionLevel.STANDARD) {
-                    await this.respondToInteraction(interaction, 'You need a higher role to create sessions.');
-                    return;
-                }
-                // Direct them to use /session
-                await this.respondToInteraction(interaction, 'Use `/session` to start a new conversation with an agent.');
-                break;
-            }
-
-            case 'stop_session': {
-                const threadId = interaction.channel_id;
-                const info = this.threadSessions.get(threadId);
-                if (!info) {
-                    await this.respondToInteraction(interaction, 'No active session in this thread.');
-                    return;
-                }
-
-                // Only the owner or admins can stop
-                if (info.ownerUserId && info.ownerUserId !== userId && permLevel < PermissionLevel.ADMIN) {
-                    await this.respondToInteraction(interaction, 'Only the session owner or an admin can stop this session.');
-                    return;
-                }
-
-                this.processManager.stopProcess(info.sessionId);
-                const cb = this.threadCallbacks.get(threadId);
-                if (cb) {
-                    this.processManager.unsubscribe(cb.sessionId, cb.callback);
-                    this.threadCallbacks.delete(threadId);
-                }
-
-                // Don't rename thread — keep original topic visible
-                await this.acknowledgeButton(interaction, 'Session stopped.');
-                break;
-            }
-
-            default:
-                log.debug('Unknown button custom_id', { customId });
-                await this.respondToInteraction(interaction, 'Unknown action.');
-        }
-    }
-
-    /**
-     * Acknowledge a button interaction with an ephemeral message.
-     */
-    private async acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
-        assertSnowflake(interaction.id, 'interaction ID');
-        assertInteractionToken(interaction.token);
-        const response = await fetch(
-            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: InteractionCallbackType.CHANNEL_MESSAGE,
-                    data: { content: message, flags: 64 }, // 64 = ephemeral
-                }),
-            },
-        );
-
-        if (!response.ok) {
-            const error = await response.text();
-            log.error('Failed to acknowledge button', { status: response.status, error: error.slice(0, 200) });
-        }
-    }
-
-    /**
-     * Respond to an interaction with a rich embed (optionally ephemeral).
-     */
-    private async respondToInteractionEmbed(
-        interaction: DiscordInteractionData,
-        embed: {
-            title?: string;
-            description?: string;
-            color?: number;
-            fields?: Array<{ name: string; value: string; inline?: boolean }>;
-            footer?: { text: string };
-        },
-        ephemeral = false,
-    ): Promise<void> {
-        assertSnowflake(interaction.id, 'interaction ID');
-        assertInteractionToken(interaction.token);
-        const response = await fetch(
-            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: InteractionCallbackType.CHANNEL_MESSAGE,
-                    data: {
-                        embeds: [embed],
-                        ...(ephemeral ? { flags: 64 } : {}),
-                    },
-                }),
-            },
-        );
-
-        if (!response.ok) {
-            const error = await response.text();
-            log.error('Failed to respond to Discord interaction with embed', {
-                status: response.status,
-                error: error.slice(0, 200),
-            });
-        }
-    }
-
-    /**
-     * Send an embed with action row buttons.
-     */
-    private async sendEmbedWithButtons(
-        channelId: string,
-        embed: {
-            title?: string;
-            description?: string;
-            color?: number;
-            fields?: Array<{ name: string; value: string; inline?: boolean }>;
-            footer?: { text: string };
-        },
-        components: DiscordActionRow[],
-    ): Promise<void> {
-        try {
-            await this.delivery.sendWithReceipt('discord', async () => {
-                const response = await fetch(
-                    `https://discord.com/api/v10/channels/${channelId}/messages`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bot ${this.config.botToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ embeds: [embed], components }),
-                    },
-                );
-
-                if (!response.ok) {
-                    const error = await response.text();
-                    log.error('Failed to send Discord embed with buttons', { status: response.status, error: error.slice(0, 200) });
-                    throw new Error(`Discord embed+buttons failed: ${response.status}`);
-                }
-            });
-        } catch {
-            // Error already logged by DeliveryTracker
-        }
-    }
-
-    /**
-     * Build an action row with buttons.
-     */
-    private buildActionRow(...buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }>): DiscordActionRow {
-        return {
-            type: ComponentType.ACTION_ROW,
-            components: buttons.map(b => ({
-                type: ComponentType.BUTTON,
-                style: b.style ?? ButtonStyle.SECONDARY,
-                label: b.label,
-                custom_id: b.customId,
-                ...(b.emoji ? { emoji: { name: b.emoji } } : {}),
-            })),
+        const ctx: InteractionContext = {
+            db: this.db,
+            config: this.config,
+            processManager: this.processManager,
+            workTaskService: this.workTaskService,
+            delivery: this.delivery,
+            mutedUsers: this.mutedUsers,
+            threadSessions: this.threadSessions,
+            threadCallbacks: this.threadCallbacks,
+            threadLastActivity: this.threadLastActivity,
+            createStandaloneThread: (channelId, name) =>
+                createStandaloneThreadImpl(this.config.botToken, channelId, name),
+            subscribeForResponseWithEmbed: (sid, tid, an, am) =>
+                this.subscribeForResponseWithEmbed(sid, tid, an, am),
+            sendTaskResult: (cid, task, uid) =>
+                this.sendTaskResult(cid, task, uid),
+            muteUser: (uid) => this.muteUser(uid),
+            unmuteUser: (uid) => this.unmuteUser(uid),
         };
-    }
-
-    /**
-     * Un-archive a thread so it can receive messages again.
-     */
-    private async unarchiveThread(threadId: string): Promise<void> {
-        assertSnowflake(threadId, 'thread ID');
-        const response = await fetch(
-            `https://discord.com/api/v10/channels/${threadId}`,
-            {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bot ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ archived: false }),
-            },
-        );
-        if (!response.ok) {
-            log.debug('Failed to unarchive thread', { threadId, status: response.status });
-        }
-    }
-
-    private checkRateLimit(userId: string, permLevel?: number): boolean {
-        const now = Date.now();
-        const timestamps = this.userMessageTimestamps.get(userId) ?? [];
-        const recent = timestamps.filter(t => now - t < this.RATE_LIMIT_WINDOW_MS);
-
-        // Tiered rate limiting: higher permission levels get higher limits
-        let maxMessages = this.RATE_LIMIT_MAX_MESSAGES;
-        if (permLevel !== undefined && this.config.rateLimitByLevel) {
-            maxMessages = this.config.rateLimitByLevel[permLevel] ?? maxMessages;
-        }
-
-        if (recent.length >= maxMessages) return false;
-        recent.push(now);
-        this.userMessageTimestamps.set(userId, recent);
-        return true;
-    }
-
-    /**
-     * Resolve a user's permission level based on their roles.
-     * Returns the highest permission level from all matching roles.
-     */
-    private resolvePermissionLevel(userId: string, memberRoles?: string[]): number {
-        // Muted users are always blocked
-        if (this.mutedUsers.has(userId)) return PermissionLevel.BLOCKED;
-
-        // Legacy mode: use allowedUserIds
-        if (!this.config.publicMode) {
-            if (this.config.allowedUserIds.length > 0) {
-                return this.config.allowedUserIds.includes(userId)
-                    ? PermissionLevel.ADMIN
-                    : PermissionLevel.BLOCKED;
-            }
-            return PermissionLevel.ADMIN; // No restrictions configured
-        }
-
-        // Public mode with role-based access
-        if (!this.config.rolePermissions || !memberRoles?.length) {
-            return this.config.defaultPermissionLevel ?? PermissionLevel.BASIC;
-        }
-
-        let maxLevel = this.config.defaultPermissionLevel ?? PermissionLevel.BASIC;
-        for (const roleId of memberRoles) {
-            const level = this.config.rolePermissions[roleId];
-            if (level !== undefined && level > maxLevel) {
-                maxLevel = level;
-            }
-        }
-        return maxLevel;
-    }
-
-    /**
-     * Check if a channel is one we're monitoring.
-     */
-    private isMonitoredChannel(channelId: string): boolean {
-        if (channelId === this.config.channelId) return true;
-        return this.config.additionalChannelIds?.includes(channelId) ?? false;
-    }
-
-    /**
-     * Mute a user from bot interactions. Admin action.
-     */
-    muteUser(userId: string): void {
-        this.mutedUsers.add(userId);
-        log.info('User muted from Discord bot', { userId });
-    }
-
-    /**
-     * Unmute a user. Admin action.
-     */
-    unmuteUser(userId: string): void {
-        this.mutedUsers.delete(userId);
-        log.info('User unmuted from Discord bot', { userId });
-    }
-
-    /**
-     * Send a one-time welcome tip to a user on their first interaction.
-     * Fire-and-forget — does not block the message flow.
-     */
-    private sendFirstInteractionTip(userId: string, channelId: string): void {
-        if (this.interactedUsers.has(userId)) return;
-        this.interactedUsers.add(userId);
-        // Persist to DB so the tip survives restarts
-        this.persistInteractedUsers();
-        this.sendEmbed(channelId, {
-            description: [
-                `Hey <@${userId}>! Looks like your first time here.`,
-                '',
-                'Use `/quickstart` for a guided walkthrough, or `/help` to see all commands.',
-                'You can also @mention me for a quick reply!',
-            ].join('\n'),
-            color: 0x57f287, // green
-            footer: { text: 'This tip only appears once' },
-        }).catch(() => {});
-    }
-
-    /** Persist the interactedUsers set to the discord_config table. */
-    private persistInteractedUsers(): void {
-        try {
-            updateDiscordConfig(this.db, 'interacted_users', [...this.interactedUsers].join(','));
-        } catch (err) {
-            log.warn('Failed to persist interacted users', {
-                error: err instanceof Error ? err.message : String(err),
-            });
-        }
+        await handleInteractionImpl(ctx, interaction);
     }
 
     private async handleMessage(data: DiscordMessageData): Promise<void> {
-        // Ignore bot messages
-        if (data.author.bot) return;
-
-        const text = data.content;
-        if (!text) return;
-
-        const userId = data.author.id;
-        const channelId = data.channel_id;
-
-        // Check if this message is in a thread we're tracking or a monitored channel
-        const isMonitored = this.isMonitoredChannel(channelId);
-        let isOurThread = this.threadSessions.has(channelId);
-        // Try to recover thread from DB if not in memory (e.g. after server restart)
-        if (!isOurThread && !isMonitored) {
-            isOurThread = this.tryRecoverThread(channelId) !== null;
-        }
-        if (!isMonitored && !isOurThread) return;
-
-        // Resolve permission level
-        const permLevel = this.resolvePermissionLevel(userId, data.member?.roles);
-        if (permLevel <= PermissionLevel.BLOCKED) {
-            log.warn('Blocked Discord user', { userId, username: data.author.username, permLevel });
-            await this.sendMessage(channelId, 'You do not have permission to interact with this bot.');
-            return;
-        }
-
-        // Per-user rate limiting with tiered limits
-        if (!this.checkRateLimit(userId, permLevel)) {
-            await this.sendMessage(channelId, 'Slow down! Please wait before sending more messages.');
-            return;
-        }
-
-        // Prompt injection scan
-        const injectionResult = scanForInjection(text);
-        if (injectionResult.blocked) {
-            log.warn('Blocked message: prompt injection detected', {
-                userId,
-                username: data.author.username,
-                confidence: injectionResult.confidence,
-                patterns: injectionResult.matches.map((m) => m.pattern),
-                contentPreview: text.slice(0, 100),
-            });
-            recordAudit(
-                this.db,
-                'injection_blocked',
-                userId,
-                'discord_message',
-                null,
-                JSON.stringify({
-                    channel: 'discord',
-                    confidence: injectionResult.confidence,
-                    patterns: injectionResult.matches.map((m) => m.pattern),
-                    contentPreview: text.slice(0, 200),
-                }),
-            );
-            await this.sendMessage(channelId, 'Message blocked: content policy violation.');
-            return;
-        }
-
-        // If this message is in a thread we're tracking, route to that thread's session
-        if (isOurThread) {
-            this.sendFirstInteractionTip(userId, channelId);
-            // Acknowledge receipt with typing indicator
-            this.sendTypingIndicator(channelId).catch(() => {});
-            await this.routeToThread(channelId, userId, text);
-            return;
-        }
-
-        // Passive channel mode: only respond to @mentions in the main channel
-        const isBotMentioned = this.botUserId
-            ? data.mentions?.some(m => m.id === this.botUserId) ?? false
-            : false;
-
-        if (!isBotMentioned) return; // silently ignore regular channel messages
-
-        // First-interaction welcome tip for @mention users
-        this.sendFirstInteractionTip(userId, channelId);
-
-        // Acknowledge with typing indicator
-        this.sendTypingIndicator(channelId).catch(() => {});
-
-        // Handle @mention as one-off reply or work intake
-        if (this.mode === 'work_intake') {
-            await this.handleWorkIntake(channelId, data.id, userId, text);
-        } else {
-            await this.handleMentionReply(channelId, userId, data.id, text);
-        }
+        const ctx: MessageHandlerContext = {
+            db: this.db,
+            config: this.config,
+            processManager: this.processManager,
+            workTaskService: this.workTaskService,
+            delivery: this.delivery,
+            botUserId: this.botUserId,
+            mutedUsers: this.mutedUsers,
+            interactedUsers: this.interactedUsers,
+            userMessageTimestamps: this.userMessageTimestamps,
+            rateLimitWindowMs: this.RATE_LIMIT_WINDOW_MS,
+            rateLimitMaxMessages: this.RATE_LIMIT_MAX_MESSAGES,
+            threadSessions: this.threadSessions,
+            threadCallbacks: this.threadCallbacks,
+            threadLastActivity: this.threadLastActivity,
+        };
+        await handleMessageImpl(ctx, data);
     }
 
-    // ── Work Intake Mode ─────────────────────────────────────────────────
-
-    private async handleWorkIntake(
-        channelId: string,
-        messageId: string,
-        userId: string,
-        text: string,
-    ): Promise<void> {
-        if (!this.workTaskService) {
-            await this.sendMessage(channelId, 'Work intake mode requires WorkTaskService. Check server configuration.');
-            return;
-        }
-
-        // Strip bot mentions from the task description
-        const description = text.replace(/<@!?\d+>/g, '').trim();
-        if (!description) {
-            await this.sendMessage(channelId, 'Please provide a task description.');
-            return;
-        }
-
-        // Resolve agent
-        const agents = listAgents(this.db);
-        const agent = this.config.defaultAgentId
-            ? agents.find(a => a.id === this.config.defaultAgentId) ?? agents[0]
-            : agents[0];
-        if (!agent) {
-            await this.sendMessage(channelId, 'No agents configured. Create an agent first.');
-            return;
-        }
-
-        try {
-            const task = await this.workTaskService.create({
-                agentId: agent.id,
-                description,
-                source: 'discord',
-                sourceId: messageId,
-                requesterInfo: { discordUserId: userId, channelId, messageId },
-            });
-
-            log.info('Work task created from Discord', { taskId: task.id, userId });
-
-            // Send acknowledgment embed
-            await this.sendEmbed(channelId, {
-                title: 'Task Queued',
-                description: `**${task.id}**\n\n${description.slice(0, 200)}${description.length > 200 ? '...' : ''}`,
-                color: 0x5865f2, // Discord blurple
-                footer: { text: `Status: ${task.status}` },
-            });
-
-            // Subscribe for completion
-            this.workTaskService.onComplete(task.id, (completedTask) => {
-                this.sendTaskResult(channelId, completedTask).catch(err => {
-                    log.error('Failed to send task result to Discord', {
-                        taskId: completedTask.id,
-                        error: err instanceof Error ? err.message : String(err),
-                    });
-                });
-            });
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error('Failed to create work task from Discord', { error: message, userId });
-
-            await this.sendEmbed(channelId, {
-                title: 'Task Failed',
-                description: message.slice(0, 500),
-                color: 0xed4245, // Red
-            });
-        }
+    private subscribeForResponseWithEmbed(sessionId: string, threadId: string, agentName: string, agentModel: string): void {
+        subscribeImpl(
+            this.processManager, this.delivery, this.config.botToken,
+            this.threadCallbacks, sessionId, threadId, agentName, agentModel,
+        );
     }
 
     private async sendTaskResult(
@@ -1894,720 +320,48 @@ export class DiscordBridge {
         task: import('../../shared/types/work-tasks').WorkTask,
         mentionUserId?: string,
     ): Promise<void> {
-        // Mention the requester so they get a Discord notification
-        const mention = mentionUserId ? `<@${mentionUserId}> ` : '';
-
-        if (task.status === 'completed') {
-            const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
-
-            if (task.prUrl) {
-                fields.push({ name: 'Pull Request', value: task.prUrl, inline: false });
-            }
-
-            if (task.summary) {
-                fields.push({ name: 'Summary', value: task.summary.slice(0, 1024), inline: false });
-            }
-
-            if (task.branchName) {
-                fields.push({ name: 'Branch', value: `\`${task.branchName}\``, inline: true });
-            }
-
-            fields.push({ name: 'Iterations', value: String(task.iterationCount), inline: true });
-
-            // Send mention as content so Discord pings the user, embed has the details
-            await this.sendMessageWithEmbed(channelId, mention ? `${mention}Your work task is done!` : undefined, {
-                title: 'Task Completed',
-                description: task.description.slice(0, 300),
-                color: 0x57f287, // Green
-                fields,
-                footer: { text: `Task: ${task.id}` },
-            });
-        } else if (task.status === 'failed') {
-            await this.sendMessageWithEmbed(channelId, mention ? `${mention}Your work task encountered an issue.` : undefined, {
-                title: 'Task Failed',
-                description: task.description.slice(0, 300),
-                color: 0xed4245, // Red
-                fields: [
-                    ...(task.error
-                        ? [{ name: 'Error', value: task.error.slice(0, 1024), inline: false }]
-                        : []),
-                    { name: 'Iterations', value: String(task.iterationCount), inline: true },
-                ],
-                footer: { text: `Task: ${task.id}` },
-            });
-        }
-    }
-
-    // ── Discord Embeds ───────────────────────────────────────────────────
-
-    private async sendEmbed(
-        channelId: string,
-        embed: {
-            title?: string;
-            description?: string;
-            color?: number;
-            fields?: Array<{ name: string; value: string; inline?: boolean }>;
-            footer?: { text: string };
-        },
-    ): Promise<void> {
-        try {
-            await this.delivery.sendWithReceipt('discord', async () => {
-                const response = await fetch(
-                    `https://discord.com/api/v10/channels/${channelId}/messages`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bot ${this.config.botToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ embeds: [embed] }),
-                    },
-                );
-
-                if (!response.ok) {
-                    const error = await response.text();
-                    log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
-                    throw new Error(`Discord embed failed: ${response.status}`);
-                }
-            });
-        } catch {
-            // Error already logged by DeliveryTracker
-        }
-    }
-
-    private async sendMessageWithEmbed(
-        channelId: string,
-        content: string | undefined,
-        embed: {
-            title?: string;
-            description?: string;
-            color?: number;
-            fields?: Array<{ name: string; value: string; inline?: boolean }>;
-            footer?: { text: string };
-        },
-    ): Promise<void> {
-        try {
-            await this.delivery.sendWithReceipt('discord', async () => {
-                const body: Record<string, unknown> = { embeds: [embed] };
-                if (content) body.content = content;
-
-                const response = await fetch(
-                    `https://discord.com/api/v10/channels/${channelId}/messages`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bot ${this.config.botToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(body),
-                    },
-                );
-
-                if (!response.ok) {
-                    const error = await response.text();
-                    log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
-                    throw new Error(`Discord embed failed: ${response.status}`);
-                }
-            });
-        } catch {
-            // Error already logged by DeliveryTracker
-        }
-    }
-
-    // ── Chat Mode ────────────────────────────────────────────────────────
-
-    /**
-     * Handle an @mention in the main channel with a one-off reply.
-     * No thread or persistent session is created.
-     */
-    private async handleMentionReply(channelId: string, _userId: string, messageId: string, text: string): Promise<void> {
-        const agent = this.resolveDefaultAgent();
-        if (!agent) {
-            await this.sendMessage(channelId, 'No agents configured. Create an agent first.');
-            return;
-        }
-
-        const projects = listProjects(this.db);
-        const project = agent.defaultProjectId
-            ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
-            : projects[0];
-
-        if (!project) {
-            await this.sendMessage(channelId, 'No projects configured.');
-            return;
-        }
-
-        // Strip bot mention from text
-        const cleanText = text.replace(/<@!?\d+>/g, '').trim();
-        if (!cleanText) return;
-
-        // Create an ephemeral session for the one-off reply
-        const session = createSession(this.db, {
-            projectId: project.id,
-            agentId: agent.id,
-            name: `Discord mention:${messageId}`,
-            initialPrompt: cleanText,
-            source: 'discord' as SessionSource,
-        });
-
-        this.processManager.startProcess(session, cleanText);
-
-        // Subscribe and send response inline (not in a thread)
-        this.subscribeForInlineResponse(session.id, channelId, messageId, agent.name, agent.model || 'unknown');
-    }
-
-    /**
-     * Subscribe for agent response and send it as an inline reply in the channel.
-     * Used for one-off @mention responses.
-     */
-    private subscribeForInlineResponse(
-        sessionId: string,
-        channelId: string,
-        replyToMessageId: string,
-        agentName: string,
-        agentModel: string,
-    ): void {
-        let buffer = '';
-        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-        const color = this.agentColor(agentName);
-
-        const flush = async () => {
-            if (!buffer) return;
-            const text = buffer;
-            buffer = '';
-
-            // Smart-split long responses at natural boundaries
-            const parts = splitEmbedDescription(text);
-            for (let i = 0; i < parts.length; i++) {
-                // Only first chunk is a reply to the original message
-                if (i === 0) {
-                    await this.sendReplyEmbed(channelId, replyToMessageId, {
-                        description: parts[i],
-                        color,
-                        footer: { text: `${agentName} · ${agentModel}` },
-                    });
-                } else {
-                    await this.sendEmbed(channelId, {
-                        description: parts[i],
-                        color,
-                        footer: { text: `${agentName} · ${agentModel}` },
-                    });
-                }
-            }
+        const ctx: MessageHandlerContext = {
+            db: this.db,
+            config: this.config,
+            processManager: this.processManager,
+            workTaskService: this.workTaskService,
+            delivery: this.delivery,
+            botUserId: this.botUserId,
+            mutedUsers: this.mutedUsers,
+            interactedUsers: this.interactedUsers,
+            userMessageTimestamps: this.userMessageTimestamps,
+            rateLimitWindowMs: this.RATE_LIMIT_WINDOW_MS,
+            rateLimitMaxMessages: this.RATE_LIMIT_MAX_MESSAGES,
+            threadSessions: this.threadSessions,
+            threadCallbacks: this.threadCallbacks,
+            threadLastActivity: this.threadLastActivity,
         };
-
-        this.processManager.subscribe(sessionId, (_sid, event) => {
-            if (event.type === 'assistant' && event.message) {
-                const msg = event.message as { content?: unknown };
-                const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
-                if (content) {
-                    buffer += content;
-                    if (debounceTimer) clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => flush(), 1500);
-                }
-            }
-
-            if (event.type === 'result') {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                flush();
-            }
-        });
+        await sendTaskResultImpl(ctx, channelId, task, mentionUserId);
     }
 
-    /**
-     * Send an embed as a reply to a specific message.
-     */
-    private async sendReplyEmbed(
-        channelId: string,
-        replyToMessageId: string,
-        embed: {
-            description?: string;
-            color?: number;
-            footer?: { text: string };
-        },
-    ): Promise<void> {
-        assertSnowflake(channelId, 'channel ID');
-        assertSnowflake(replyToMessageId, 'message ID');
-        try {
-            await this.delivery.sendWithReceipt('discord', async () => {
-                const response = await fetch(
-                    `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bot ${this.config.botToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            embeds: [embed],
-                            message_reference: { message_id: replyToMessageId },
-                        }),
-                    },
-                );
+    // ── Public API (kept for backward compatibility) ────────────────────
 
-                if (!response.ok) {
-                    const error = await response.text();
-                    log.error('Failed to send Discord reply embed', { status: response.status, error: error.slice(0, 200) });
-                    throw new Error(`Discord reply embed failed: ${response.status}`);
-                }
-            });
-        } catch {
-            // Error already logged by DeliveryTracker
-        }
+    muteUser(userId: string): void {
+        muteUserImpl(this.mutedUsers, userId);
     }
 
-    /**
-     * Route a message within an existing thread to the thread's session.
-     * Any user can participate — conversations are shared within threads.
-     */
-    private async routeToThread(threadId: string, _userId: string, text: string): Promise<void> {
-        // Track activity for stale detection
-        this.threadLastActivity.set(threadId, Date.now());
-
-        let threadInfo = this.threadSessions.get(threadId);
-
-        // Try to recover thread mapping from DB if not in memory (e.g. after server restart)
-        if (!threadInfo) {
-            threadInfo = this.tryRecoverThread(threadId) ?? undefined;
-            if (!threadInfo) return;
-        }
-
-        const { sessionId, agentName, agentModel } = threadInfo;
-
-        // Check if session still exists (stopped/error sessions can be resumed)
-        const session = getSession(this.db, sessionId);
-        if (!session) {
-            this.threadSessions.delete(threadId);
-            await this.sendEmbedWithButtons(threadId, {
-                description: 'This conversation has ended.',
-                color: 0x95a5a6,
-            }, [
-                this.buildActionRow(
-                    { label: 'New Session', customId: 'new_session', style: ButtonStyle.PRIMARY, emoji: '➕' },
-                ),
-            ]);
-            return;
-        }
-
-        const sent = this.processManager.sendMessage(sessionId, text);
-        if (!sent) {
-            // Resume with conversation context instead of starting fresh
-            this.processManager.resumeProcess(session, text);
-            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
-            return;
-        }
-
-        this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
+    unmuteUser(userId: string): void {
+        unmuteUserImpl(this.mutedUsers, userId);
     }
-
-    /**
-     * Try to recover a thread-to-session mapping from the database.
-     * Sessions are named `Discord thread:{threadId}` so we can look them up.
-     */
-    private tryRecoverThread(threadId: string): { sessionId: string; agentName: string; agentModel: string; ownerUserId: string; topic?: string } | null {
-        try {
-            const row = this.db.query(
-                `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model
-                 FROM sessions s
-                 LEFT JOIN agents a ON a.id = s.agent_id
-                 WHERE s.name = ? AND s.source = 'discord'
-                 ORDER BY s.created_at DESC LIMIT 1`,
-            ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string } | null;
-
-            if (!row) return null;
-
-            const info = {
-                sessionId: row.id,
-                agentName: row.agent_name || 'Agent',
-                agentModel: row.agent_model || 'unknown',
-                ownerUserId: '',
-                topic: row.initial_prompt || undefined,
-            };
-            this.threadSessions.set(threadId, info);
-            log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
-            return info;
-        } catch (err) {
-            log.warn('Failed to recover thread session', { threadId, error: err instanceof Error ? err.message : String(err) });
-            return null;
-        }
-    }
-
-    /**
-     * Resolve the default agent.
-     * Priority: config default > first agent.
-     */
-    private resolveDefaultAgent(): import('../../shared/types').Agent | null {
-        const agents = listAgents(this.db);
-        if (agents.length === 0) return null;
-
-        if (this.config.defaultAgentId) {
-            const defaultAgent = agents.find(a => a.id === this.config.defaultAgentId);
-            if (defaultAgent) return defaultAgent;
-        }
-
-        return agents[0];
-    }
-
-    /**
-     * Create a standalone Discord thread (not attached to a message).
-     * Used by /session command. Returns the thread channel ID, or null on failure.
-     */
-    private async createStandaloneThread(channelId: string, name: string): Promise<string | null> {
-        assertSnowflake(channelId, 'channel ID');
-        const safeChannelId = encodeURIComponent(channelId);
-        const response = await fetch(
-            `https://discord.com/api/v10/channels/${safeChannelId}/threads`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bot ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    name: name.slice(0, 100),
-                    type: 11, // GUILD_PUBLIC_THREAD
-                    auto_archive_duration: 1440, // 24 hours
-                }),
-            },
-        );
-
-        if (response.ok) {
-            const thread = await response.json() as { id: string };
-            log.info('Discord standalone thread created', { threadId: thread.id, name: name.slice(0, 60) });
-            return thread.id;
-        }
-
-        const error = await response.text();
-        log.error('Failed to create Discord thread', { status: response.status, error: error.slice(0, 200) });
-        return null;
-    }
-
-    /**
-     * Subscribe for agent responses and send them as rich embeds in the thread.
-     * Shows agent name and model in the embed footer.
-     */
-    private subscribeForResponseWithEmbed(
-        sessionId: string,
-        threadId: string,
-        agentName: string,
-        agentModel: string,
-    ): void {
-        // Unsubscribe the previous callback for this thread to prevent duplicates
-        const prev = this.threadCallbacks.get(threadId);
-        if (prev) {
-            this.processManager.unsubscribe(prev.sessionId, prev.callback);
-        }
-
-        let buffer = '';
-        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-        let lastStatusTime = 0;
-        let lastTypingTime = 0;
-        const STATUS_DEBOUNCE_MS = 3000; // Don't flood status updates
-        const TYPING_REFRESH_MS = 8000; // Refresh typing indicator before 10s expiry
-
-        // Agent color — consistent per agent name
-        const color = this.agentColor(agentName);
-
-        const flush = async () => {
-            if (!buffer) return;
-            const text = buffer;
-            buffer = '';
-
-            // Smart-split long responses at natural boundaries
-            const parts = splitEmbedDescription(text);
-            for (const part of parts) {
-                await this.sendEmbed(threadId, {
-                    description: part,
-                    color,
-                    footer: { text: `${agentName} · ${agentModel}` },
-                });
-            }
-        };
-
-        const callback: import('../process/interfaces').EventCallback = (_sid, event) => {
-            if (event.type === 'assistant' && event.message) {
-                const msg = event.message as { content?: unknown };
-                const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
-
-                if (content) {
-                    buffer += content;
-                    if (debounceTimer) clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => flush(), 1500);
-                }
-
-                // Refresh typing indicator periodically while agent is responding
-                const now = Date.now();
-                if (now - lastTypingTime >= TYPING_REFRESH_MS) {
-                    lastTypingTime = now;
-                    this.sendTypingIndicator(threadId).catch(() => {});
-                }
-            }
-
-            // Show tool status updates (e.g. "Creating work task...", "Searching...")
-            if (event.type === 'tool_status' && event.statusMessage) {
-                const now = Date.now();
-                if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
-                    lastStatusTime = now;
-                    this.sendEmbed(threadId, {
-                        description: `⏳ ${event.statusMessage}`,
-                        color: 0x95a5a6, // Gray for status
-                        footer: { text: `${agentName} · working...` },
-                    }).catch(() => {}); // Best-effort
-                }
-                // Refresh typing indicator with status updates
-                if (now - lastTypingTime >= TYPING_REFRESH_MS) {
-                    lastTypingTime = now;
-                    this.sendTypingIndicator(threadId).catch(() => {});
-                }
-            }
-
-            if (event.type === 'result') {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                flush();
-                // Clean up tracking on completion
-                this.threadCallbacks.delete(threadId);
-
-                // Send completion message with Resume button (don't rename thread — keep original topic visible)
-                this.sendEmbedWithButtons(threadId, {
-                    description: 'Session complete. Send a message to continue, or use the buttons below.',
-                    color: 0x57f287,
-                    footer: { text: `${agentName} · done` },
-                }, [
-                    this.buildActionRow(
-                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                        { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
-                    ),
-                ]).catch(() => {});
-            }
-
-            // Notify thread on session error
-            if (event.type === 'session_error') {
-                const errEvent = event as { error?: { message?: string; errorType?: string } };
-                const errMsg = errEvent.error?.message || 'Unknown error';
-                this.sendEmbedWithButtons(threadId, {
-                    title: 'Session Error',
-                    description: errMsg.slice(0, 4096),
-                    color: 0xff3355, // Red
-                    footer: { text: `${agentName} · ${errEvent.error?.errorType || 'error'}` },
-                }, [
-                    this.buildActionRow(
-                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                    ),
-                ]).catch(() => {});
-            }
-
-            // Notify thread on unexpected exit (no result received)
-            if (event.type === 'session_exited') {
-                if (debounceTimer) clearTimeout(debounceTimer);
-                flush(); // Flush any buffered text first
-                this.threadCallbacks.delete(threadId);
-            }
-        };
-
-        this.processManager.subscribe(sessionId, callback);
-        this.threadCallbacks.set(threadId, { sessionId, callback });
-    }
-
-    /** Generate a consistent color for an agent name. */
-    private agentColor(name: string): number {
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
-        }
-        // Map to a pleasant color range (avoid very dark/light)
-        const hue = Math.abs(hash) % 360;
-        // HSL to RGB approximation for Discord embed colors
-        const s = 0.6, l = 0.5;
-        const c = (1 - Math.abs(2 * l - 1)) * s;
-        const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
-        const m = l - c / 2;
-        let r = 0, g = 0, b = 0;
-        if (hue < 60) { r = c; g = x; }
-        else if (hue < 120) { r = x; g = c; }
-        else if (hue < 180) { g = c; b = x; }
-        else if (hue < 240) { g = x; b = c; }
-        else if (hue < 300) { r = x; b = c; }
-        else { r = c; b = x; }
-        return (Math.round((r + m) * 255) << 16)
-             | (Math.round((g + m) * 255) << 8)
-             | Math.round((b + m) * 255);
-    }
-
-    // ── Thread Management ─────────────────────────────────────────────────
-
-    /**
-     * Archive threads that have been inactive for STALE_THREAD_MS.
-     * Sends a closing message before archiving.
-     */
-    private async archiveStaleThreads(): Promise<void> {
-        const now = Date.now();
-        const staleThreads: string[] = [];
-
-        for (const [threadId, lastActive] of this.threadLastActivity) {
-            if (now - lastActive >= this.STALE_THREAD_MS) {
-                staleThreads.push(threadId);
-            }
-        }
-
-        for (const threadId of staleThreads) {
-            try {
-                await this.sendEmbedWithButtons(threadId, {
-                    description: 'This conversation has been idle. Archiving thread.',
-                    color: 0x95a5a6,
-                }, [
-                    this.buildActionRow(
-                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                        { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
-                    ),
-                ]);
-
-                await this.archiveThread(threadId);
-                this.threadLastActivity.delete(threadId);
-                this.threadSessions.delete(threadId);
-                const cb = this.threadCallbacks.get(threadId);
-                if (cb) {
-                    this.processManager.unsubscribe(cb.sessionId, cb.callback);
-                    this.threadCallbacks.delete(threadId);
-                }
-                log.info('Auto-archived stale thread', { threadId });
-            } catch (err) {
-                log.warn('Failed to archive stale thread', {
-                    threadId,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
-    }
-
-    /**
-     * Archive a thread via the Discord API.
-     */
-    private async archiveThread(threadId: string): Promise<void> {
-        assertSnowflake(threadId, 'thread ID');
-        const response = await fetch(
-            `https://discord.com/api/v10/channels/${threadId}`,
-            {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bot ${this.config.botToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ archived: true }),
-            },
-        );
-
-        if (!response.ok) {
-            const error = await response.text();
-            log.warn('Failed to archive thread', { threadId, status: response.status, error: error.slice(0, 200) });
-        }
-    }
-
-    // ── Messaging ────────────────────────────────────────────────────────
 
     async sendMessage(channelId: string, content: string): Promise<void> {
-        // Smart-split at natural boundaries (paragraphs, sentences, code blocks)
-        const chunks = splitMessage(content, MAX_MESSAGE_LENGTH);
-
-        for (const chunk of chunks) {
-            try {
-                await this.delivery.sendWithReceipt('discord', async () => {
-                    const response = await fetch(
-                        `https://discord.com/api/v10/channels/${channelId}/messages`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bot ${this.config.botToken}`,
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ content: chunk }),
-                        },
-                    );
-
-                    if (!response.ok) {
-                        const error = await response.text();
-                        log.error('Failed to send Discord message', { status: response.status, error: error.slice(0, 200) });
-                        throw new Error(`Discord sendMessage failed: ${response.status}`);
-                    }
-                });
-            } catch {
-                // Error already logged by DeliveryTracker
-            }
-        }
+        await sendDiscordMessage(this.delivery, this.config.botToken, channelId, content);
     }
 
-    // ── Typing Indicator ─────────────────────────────────────────────────
-
-    /**
-     * Send a typing indicator to a channel.
-     * Lasts ~10 seconds or until a message is sent.
-     */
     async sendTypingIndicator(channelId: string): Promise<void> {
-        try {
-            const response = await fetch(
-                `https://discord.com/api/v10/channels/${channelId}/typing`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bot ${this.config.botToken}`,
-                    },
-                },
-            );
-            if (!response.ok) {
-                log.debug('Failed to send typing indicator', { status: response.status });
-            }
-        } catch {
-            // Best-effort — don't fail on typing indicator errors
-        }
+        await sendTypingIndicatorImpl(this.config.botToken, channelId);
     }
 
-    // ── Message Reactions ────────────────────────────────────────────────
-
-    /**
-     * Add a reaction to a message. Used to acknowledge receipt before full response.
-     * @param emoji URL-encoded emoji (e.g. '%F0%9F%91%80' for 👀, '%E2%9C%85' for ✅)
-     */
     async addReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
-        try {
-            assertSnowflake(channelId, 'channel ID');
-            assertSnowflake(messageId, 'message ID');
-            const response = await fetch(
-                `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bot ${this.config.botToken}`,
-                    },
-                },
-            );
-            if (!response.ok) {
-                log.debug('Failed to add reaction', { status: response.status, emoji });
-            }
-        } catch {
-            // Best-effort — don't fail on reaction errors
-        }
+        await addReactionImpl(this.config.botToken, channelId, messageId, emoji);
     }
 
-    /**
-     * Remove a reaction from a message.
-     */
     async removeReaction(channelId: string, messageId: string, emoji: string): Promise<void> {
-        try {
-            assertSnowflake(channelId, 'channel ID');
-            assertSnowflake(messageId, 'message ID');
-            const response = await fetch(
-                `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${emoji}/@me`,
-                {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bot ${this.config.botToken}`,
-                    },
-                },
-            );
-            if (!response.ok) {
-                log.debug('Failed to remove reaction', { status: response.status, emoji });
-            }
-        } catch {
-            // Best-effort
-        }
+        await removeReactionImpl(this.config.botToken, channelId, messageId, emoji);
     }
 }

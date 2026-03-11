@@ -1,9 +1,15 @@
 ---
 module: discord-bridge
-version: 9
+version: 10
 status: active
 files:
   - server/discord/bridge.ts
+  - server/discord/commands.ts
+  - server/discord/admin-commands.ts
+  - server/discord/embeds.ts
+  - server/discord/message-handler.ts
+  - server/discord/permissions.ts
+  - server/discord/thread-manager.ts
   - server/discord/types.ts
   - server/discord/message-formatter.ts
   - server/discord/gateway.ts
@@ -54,6 +60,68 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `muteUser` | `(userId: string)` | `void` | Mute a user from bot interactions (admin action) |
 | `unmuteUser` | `(userId: string)` | `void` | Unmute a previously muted user (admin action) |
 
+### Exported Functions (from commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `registerSlashCommands` | `(db, config)` | `Promise<void>` | Register all slash commands with the Discord API |
+| `handleInteraction` | `(ctx, interaction)` | `Promise<void>` | Dispatch an interaction event to the appropriate command handler |
+
+### Exported Functions (from admin-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleAdminCommand` | `(db, config, mutedUsers, threadSessionCount, interaction, options)` | `Promise<void>` | Dispatch `/admin` subcommands |
+
+### Exported Functions (from embeds.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `respondToInteraction` | `(interaction, content)` | `Promise<void>` | Send a text response to an interaction callback |
+| `respondToInteractionEmbed` | `(interaction, embed, ephemeral?)` | `Promise<void>` | Send an embed response to an interaction callback |
+| `acknowledgeButton` | `(interaction, message)` | `Promise<void>` | Acknowledge a button press with an ephemeral message |
+| `sendEmbed` | `(delivery, botToken, channelId, embed)` | `Promise<void>` | Send an embed to a channel |
+| `sendMessageWithEmbed` | `(delivery, botToken, channelId, content?, embed)` | `Promise<void>` | Send text content + embed to a channel |
+| `sendEmbedWithButtons` | `(delivery, botToken, channelId, embed, components)` | `Promise<void>` | Send an embed with action row buttons |
+| `sendReplyEmbed` | `(delivery, botToken, channelId, replyToId, embed)` | `Promise<void>` | Send an embed as a reply to a specific message |
+| `buildActionRow` | `(...buttons)` | `DiscordActionRow` | Construct an ACTION_ROW component with buttons |
+| `sendDiscordMessage` | `(delivery, botToken, channelId, content)` | `Promise<void>` | Send a text message with smart splitting |
+| `sendTypingIndicator` | `(botToken, channelId)` | `Promise<void>` | Send a typing indicator (best-effort) |
+| `addReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Add a reaction to a message (best-effort) |
+| `removeReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Remove a reaction from a message (best-effort) |
+| `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
+| `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
+
+### Exported Functions (from message-handler.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleMessage` | `(ctx, data)` | `Promise<void>` | Dispatch an incoming Discord message to the appropriate handler |
+| `sendTaskResult` | `(ctx, channelId, task, mentionUserId?)` | `Promise<void>` | Send a task completion/failure embed |
+
+### Exported Functions (from permissions.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `resolvePermissionLevel` | `(config, mutedUsers, userId, memberRoles?)` | `number` | Resolve a user's permission level based on roles and config |
+| `checkRateLimit` | `(config, timestamps, userId, windowMs, maxMsg, permLevel?)` | `boolean` | Check if a user is within their rate limit |
+| `isMonitoredChannel` | `(config, channelId)` | `boolean` | Check if a channel is being monitored |
+| `muteUser` | `(mutedUsers, userId)` | `void` | Mute a user from bot interactions |
+| `unmuteUser` | `(mutedUsers, userId)` | `void` | Unmute a user |
+
+### Exported Functions (from thread-manager.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `subscribeForResponseWithEmbed` | `(pm, delivery, botToken, threadCallbacks, sessionId, threadId, agentName, agentModel)` | `void` | Subscribe to agent events and stream responses as embeds |
+| `subscribeForInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel)` | `void` | Subscribe for inline reply responses (one-off @mention) |
+| `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
+| `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
+| `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
+| `archiveThread` | `(botToken, threadId)` | `Promise<void>` | Archive a single thread via the Discord API |
+| `createStandaloneThread` | `(botToken, channelId, name)` | `Promise<string \| null>` | Create a standalone Discord thread |
+| `resolveDefaultAgent` | `(db, config)` | `Agent \| null` | Resolve the default agent from config or first available |
+
 ### Exported Functions (from message-formatter.ts)
 
 | Function | Parameters | Returns | Description |
@@ -82,6 +150,17 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `start` | `()` | `void` | Open the gateway WebSocket connection |
 | `stop` | `()` | `void` | Close the WebSocket and clear heartbeat timer |
 | `updatePresence` | `(statusText?: string, activityType?: number)` | `void` | Update bot presence on the live gateway connection |
+
+### Exported Types (from extracted modules)
+
+| Type | Source | Description |
+|------|--------|-------------|
+| `InteractionContext` | `commands.ts` | Context object for interaction handler delegation |
+| `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer) |
+| `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
+| `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?) |
+| `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
+| `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |
 
 ### Exported Types (from types.ts)
 
@@ -353,3 +432,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-10 | corvid-agent | v7: DB-backed dynamic configuration with 30s hot-reload. Discord onboarding flow (`/quickstart`). First-interaction welcome tips. Persisted interacted users. `discord_config` table. Settings API endpoints |
 | 2026-03-10 | corvid-agent | v8: Added `/work` slash command for autonomous task creation (agent works independently, creates PR, notifies on completion). Added optional `project` dropdown to `/session`. Rich embed confirmations for `/work` with task status, agent, branch. Completion notifications @mention the requester. Added `sendMessageWithEmbed` for content+embed messages. AlgoChat `/work` now supports `--project <name>` flag. Clear documentation differentiating `/session` (interactive chat) vs `/work` (fire-and-forget task) |
 | 2026-03-10 | corvid-agent | v9: `/admin` slash command with subcommand groups for managing channels (add/remove/list), users (add/remove/list), roles (set/remove/list), bridge mode, and public mode — all from within Discord using native mentions. `DiscordInteractionOption` recursive type for nested subcommands. Audit logging on every config mutation. `/help` updated with Admin Configuration section. 20 new tests |
+| 2026-03-11 | corvid-agent | v10: Decomposed bridge.ts (2688→367 lines) into 6 extracted modules: `commands.ts` (slash command registration & handling), `admin-commands.ts` (/admin subcommands), `embeds.ts` (Discord API helpers & embed builders), `message-handler.ts` (message routing & dispatch), `permissions.ts` (RBAC & rate limiting), `thread-manager.ts` (thread lifecycle & streaming). Bridge.ts retained as thin orchestration layer. No behavioral changes — pure refactoring. Closes #932 |
