@@ -136,7 +136,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,446** across 269 files |
+| Unit tests | **6,446** across 267 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **120** with automated validation |
 | Test:code ratio | **1.14×** |
@@ -498,7 +498,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 6156 server tests (~120s)
+bun test              # 6446 server tests (~100s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
