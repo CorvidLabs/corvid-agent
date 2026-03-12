@@ -180,11 +180,44 @@ Configure via `DAILY_ALGO_LIMIT_MICRO` in `.env`.
 
 ## 8. Wallet Security
 
-- Agent sub-wallets are encrypted at rest (`server/lib/crypto.ts`) using **AES-256-GCM**.
-- Encryption key is derived from `WALLET_ENCRYPTION_KEY` env var (or server mnemonic on localnet).
-- Persistent keystore in `~/.corvid-agent/keystore/` survives database rebuilds.
+- Agent sub-wallets are encrypted at rest (`server/lib/crypto.ts`) using **AES-256-GCM** with PBKDF2 key derivation (600,000 iterations).
+- Encryption key is derived from `WALLET_ENCRYPTION_KEY` env var. On localnet, a default key is used for development convenience.
+- **On testnet/mainnet, `WALLET_ENCRYPTION_KEY` must be explicitly configured** (>= 32 chars). There is no fallback.
+- Persistent keystore in `~/.corvid-agent/keystore/` survives database rebuilds. File permissions are enforced (0o600).
 - Mnemonic phrases are never logged, never exposed via API, and never included in agent session context.
 - Wallet operations (sign, send) happen server-side only -- agents request transactions through MCP tools, never handling raw keys.
+- In-memory mnemonic cache re-encrypts with ephemeral keys (5-minute TTL) so plaintext never lingers in the heap.
+- Key rotation is supported via `bun run migrate:keys` for re-encrypting all mnemonics with a new passphrase.
+
+### Key management migration guide
+
+If you previously used `ALLOW_PLAINTEXT_KEYS=true` on mainnet, this escape hatch has been **removed** as of #924. All mainnet deployments now require:
+
+1. **Set `WALLET_ENCRYPTION_KEY`** with a strong passphrase (>= 32 chars):
+   ```bash
+   # Generate a 256-bit hex key
+   openssl rand -hex 32
+   ```
+
+2. **Remove `ALLOW_PLAINTEXT_KEYS`** from your environment — it is deprecated and ignored.
+
+3. **Use secret management** for `ALGOCHAT_MNEMONIC` and `WALLET_ENCRYPTION_KEY`:
+   - Docker secrets: mount as files in `/run/secrets/`
+   - HashiCorp Vault: inject via `vault agent`
+   - AWS Secrets Manager: inject via ECS task definition or Lambda env
+   - systemd: use `LoadCredential=` directive
+
+4. **Rotate encryption keys** if you suspect compromise:
+   ```bash
+   WALLET_ENCRYPTION_KEY="current-key" \
+   WALLET_ENCRYPTION_KEY_NEW="$(openssl rand -hex 32)" \
+   bun run migrate:keys
+   ```
+
+5. **Verify configuration** without making changes:
+   ```bash
+   bun run migrate:keys --check
+   ```
 
 ---
 

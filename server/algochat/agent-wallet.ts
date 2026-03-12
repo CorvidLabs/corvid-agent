@@ -69,8 +69,8 @@ export class AgentWalletService {
     }
 
     /**
-     * Encrypt a mnemonic using the KeyProvider if available, otherwise fall back
-     * to the legacy config-based passphrase resolution.
+     * Encrypt a mnemonic using the KeyProvider. On non-localnet, a KeyProvider
+     * is required (#924) — legacy config-based fallback is only allowed on localnet.
      */
     private async encryptMnemonicInternal(plaintext: string, agentName?: string): Promise<string> {
         const provider = this.keyProvider?.providerType ?? 'legacy';
@@ -79,12 +79,19 @@ export class AgentWalletService {
             const passphrase = await this.keyProvider.getEncryptionPassphrase();
             return encryptMnemonicWithPassphrase(plaintext, passphrase);
         }
+        // Legacy fallback: only allowed on localnet (#924)
+        if (this.config.network !== 'localnet') {
+            throw new Error(
+                `KeyProvider is required for wallet encryption on ${this.config.network}. ` +
+                'Configure WALLET_ENCRYPTION_KEY or a KMS backend.',
+            );
+        }
         return encryptMnemonic(plaintext, this.config.mnemonic, this.config.network);
     }
 
     /**
-     * Decrypt a mnemonic using the KeyProvider if available, otherwise fall back
-     * to the legacy config-based passphrase resolution.
+     * Decrypt a mnemonic using the KeyProvider. On non-localnet, a KeyProvider
+     * is required (#924) — legacy config-based fallback is only allowed on localnet.
      */
     private async decryptMnemonicInternal(encrypted: string, agentName?: string): Promise<string> {
         const provider = this.keyProvider?.providerType ?? 'legacy';
@@ -92,6 +99,13 @@ export class AgentWalletService {
         if (this.keyProvider) {
             const passphrase = await this.keyProvider.getEncryptionPassphrase();
             return decryptMnemonicWithPassphrase(encrypted, passphrase);
+        }
+        // Legacy fallback: only allowed on localnet (#924)
+        if (this.config.network !== 'localnet') {
+            throw new Error(
+                `KeyProvider is required for wallet decryption on ${this.config.network}. ` +
+                'Configure WALLET_ENCRYPTION_KEY or a KMS backend.',
+            );
         }
         return decryptMnemonic(encrypted, this.config.mnemonic, this.config.network);
     }
