@@ -1,4 +1,5 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
+import { writeTransaction } from './pool';
 import type { Project, CreateProjectInput, UpdateProjectInput } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership, tenantQuery } from '../tenant/db-filter';
@@ -103,7 +104,7 @@ export function deleteProject(db: Database, id: string, tenantId: string = DEFAU
     const existing = getProject(db, id, tenantId);
     if (!existing) return false;
 
-    db.transaction(() => {
+    writeTransaction(db, (db) => {
         // Delete dependent records that reference this project
         // Order matters: delete children before parents
 
@@ -122,7 +123,7 @@ export function deleteProject(db: Database, id: string, tenantId: string = DEFAU
 
         // Finally delete the project itself
         db.query('DELETE FROM projects WHERE id = ?').run(id);
-    })();
+    });
 
     return true;
 }

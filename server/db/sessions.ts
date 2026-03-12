@@ -1,4 +1,5 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
+import { writeTransaction } from './pool';
 import type {
     Session,
     SessionMessage,
@@ -200,12 +201,12 @@ export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: num
 
 export function deleteSession(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
     if (!validateTenantOwnership(db, 'sessions', id, tenantId)) return false;
-    const result = db.transaction(() => {
+    const result = writeTransaction(db, (db) => {
         // Clean up dependent records
         db.query('DELETE FROM session_messages WHERE session_id = ?').run(id);
         db.query('UPDATE algochat_conversations SET session_id = NULL WHERE session_id = ?').run(id);
         return db.query('DELETE FROM sessions WHERE id = ?').run(id);
-    })();
+    });
     return result.changes > 0;
 }
 

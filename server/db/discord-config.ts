@@ -6,6 +6,7 @@
  * Dynamic settings (channels, users, roles, permissions) live here.
  */
 import type { Database } from 'bun:sqlite';
+import { writeTransaction } from './pool';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DiscordConfig');
@@ -118,12 +119,12 @@ export function updateDiscordConfigBatch(db: Database, updates: Record<string, s
         `INSERT OR REPLACE INTO discord_config (key, value, updated_at) VALUES (?, ?, datetime('now'))`,
     );
     let count = 0;
-    db.transaction(() => {
+    writeTransaction(db, (_db) => {
         for (const [key, value] of Object.entries(updates)) {
             stmt.run(key, value);
             count++;
         }
-    })();
+    });
     log.info('Discord config batch updated', { count });
     return count;
 }
@@ -170,7 +171,7 @@ export function initDiscordConfigFromEnv(db: Database): void {
     );
 
     let seeded = 0;
-    db.transaction(() => {
+    writeTransaction(db, (_db) => {
         for (const [envKey, dbKey] of envMappings) {
             const value = process.env[envKey];
             if (value !== undefined && value !== '') {
@@ -178,7 +179,7 @@ export function initDiscordConfigFromEnv(db: Database): void {
                 if (result.changes > 0) seeded++;
             }
         }
-    })();
+    });
 
     if (seeded > 0) {
         log.info('Discord config seeded from environment', { count: seeded });

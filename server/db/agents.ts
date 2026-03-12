@@ -1,4 +1,5 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
+import { writeTransaction } from './pool';
 import type { Agent, CreateAgentInput, UpdateAgentInput } from '../../shared/types';
 import { NotFoundError } from '../lib/errors';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
@@ -180,7 +181,7 @@ export function deleteAgent(db: Database, id: string, tenantId: string = DEFAULT
     const existing = getAgent(db, id, tenantId);
     if (!existing) return false;
 
-    db.transaction(() => {
+    writeTransaction(db, (db) => {
         // Delete dependent records that reference this agent
         // Order matters: delete children before parents
 
@@ -234,7 +235,7 @@ export function deleteAgent(db: Database, id: string, tenantId: string = DEFAULT
 
         // Finally delete the agent
         db.query('DELETE FROM agents WHERE id = ?').run(id);
-    })();
+    });
 
     return true;
 }

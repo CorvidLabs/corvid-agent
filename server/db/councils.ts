@@ -1,4 +1,5 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
+import { writeTransaction } from './pool';
 import type {
     Council,
     CouncilDiscussionMessage,
@@ -109,7 +110,7 @@ export function getCouncil(db: Database, id: string, tenantId: string = DEFAULT_
 export function createCouncil(db: Database, input: CreateCouncilInput, tenantId: string = DEFAULT_TENANT_ID): Council {
     const id = crypto.randomUUID();
 
-    db.transaction(() => {
+    writeTransaction(db, (db) => {
         db.query(
             `INSERT INTO councils (id, name, description, chairman_agent_id, discussion_rounds, on_chain_mode, quorum_type, quorum_threshold, tenant_id)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -120,7 +121,7 @@ export function createCouncil(db: Database, input: CreateCouncilInput, tenantId:
                 'INSERT INTO council_members (council_id, agent_id, sort_order) VALUES (?, ?, ?)'
             ).run(id, input.agentIds[i], i);
         }
-    })();
+    });
 
     return getCouncil(db, id) as Council;
 }
@@ -129,7 +130,7 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
     const existing = getCouncil(db, id, tenantId);
     if (!existing) return null;
 
-    db.transaction(() => {
+    writeTransaction(db, (db) => {
         const fields: string[] = [];
         const values: unknown[] = [];
 
@@ -176,14 +177,14 @@ export function updateCouncil(db: Database, id: string, input: UpdateCouncilInpu
                 ).run(id, input.agentIds[i], i);
             }
         }
-    })();
+    });
 
     return getCouncil(db, id, tenantId);
 }
 
 export function deleteCouncil(db: Database, id: string, tenantId: string = DEFAULT_TENANT_ID): boolean {
     if (tenantId !== DEFAULT_TENANT_ID && !validateTenantOwnership(db, 'councils', id, tenantId)) return false;
-    const result = db.transaction(() => {
+    const result = writeTransaction(db, (db) => {
         // council_launch_logs and council_discussion_messages cascade from council_launches
         // Sessions may reference council_launches via council_launch_id
         db.query(`UPDATE sessions SET council_launch_id = NULL WHERE council_launch_id IN
@@ -191,7 +192,7 @@ export function deleteCouncil(db: Database, id: string, tenantId: string = DEFAU
         db.query('DELETE FROM council_launches WHERE council_id = ?').run(id);
         // council_members has ON DELETE CASCADE, handled automatically
         return db.query('DELETE FROM councils WHERE id = ?').run(id);
-    })();
+    });
     return result.changes > 0;
 }
 
