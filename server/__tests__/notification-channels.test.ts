@@ -78,7 +78,7 @@ describe('sendTelegram', () => {
         expect(result.success).toBe(false);
         expect(result.error).toBeTruthy();
         expect(typeof result.error).toBe('string');
-    });
+    }, 15_000);
 
     test('returns success: false for bad chat ID', async () => {
         const result = await sendTelegram('000000:FAKE_TOKEN', 'not-a-chat-id', TEST_PAYLOAD);
