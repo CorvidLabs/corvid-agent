@@ -320,6 +320,19 @@ Agent marketplace with listings, reviews, usage tracking, and cross-instance fed
 | POST | `/api/marketplace/subscriptions/{id}/cancel` | Cancel subscription | operator |
 | GET | `/api/marketplace/subscriptions` | Get subscriptions by tenant | any |
 | GET | `/api/marketplace/listings/{id}/subscribers` | Get listing subscribers | any |
+| GET | `/api/marketplace/listings/{id}/badges` | Get listing badges | any |
+| GET | `/api/marketplace/listings/{id}/quality-gates` | Check quality gates | any |
+| GET | `/api/marketplace/listings/{id}/analytics` | Get listing analytics | any |
+| GET | `/api/marketplace/usage` | Get buyer usage | any |
+| GET | `/api/marketplace/listings/{id}/tiers` | List pricing tiers | any |
+| POST | `/api/marketplace/listings/{id}/tiers` | Create pricing tier | operator |
+| GET | `/api/marketplace/tiers/{id}` | Get tier by ID | any |
+| PUT | `/api/marketplace/tiers/{id}` | Update tier | operator |
+| DELETE | `/api/marketplace/tiers/{id}` | Delete tier | operator |
+| POST | `/api/marketplace/listings/{id}/tier-use` | Record tier-based use | any |
+| POST | `/api/marketplace/listings/{id}/tier-subscribe` | Tier-based subscription | operator |
+| POST | `/api/marketplace/listings/{id}/trial` | Start trial | any |
+| GET | `/api/marketplace/listings/{id}/trial` | Get trial status | any |
 
 ### Search Listings
 
@@ -889,6 +902,7 @@ Standalone work units dispatched to agents. Supports retry and cancellation.
 
 | Method | Path | Summary | Auth |
 |--------|------|---------|------|
+| GET | `/api/work-tasks/queue-status` | Get task queue status | any |
 | GET | `/api/work-tasks` | List work tasks | any |
 | POST | `/api/work-tasks` | Create work task | operator |
 | GET | `/api/work-tasks/{id}` | Get work task by ID | any |
@@ -1285,7 +1299,18 @@ The following modules are fully documented in the interactive API explorer at `/
 | Wallets | `/api/wallets/*` | Summary, messages, credits |
 | Feed | `/api/feed/history` | Activity feed |
 | Escalation | `/api/escalation-queue` | Escalation queue management |
-| A2A | `/api/a2a/*` | Agent-to-Agent protocol |
+| A2A | `/a2a/tasks/*` | Agent-to-Agent protocol inbound tasks |
+| Flock Directory | `/api/flock-directory/*` | Cross-instance agent discovery, search, heartbeat |
+| Dashboard | `/api/dashboard/summary` | Aggregated dashboard summary |
+| Performance | `/api/performance/*` | Snapshots, trends, regression detection |
+| Usage | `/api/usage/*` | Schedule usage monitoring, anomaly detection |
+| Feedback | `/api/feedback/*` | PR outcome metrics and analysis |
+| Audit | `/api/audit-log` | Immutable audit log queries |
+| Onboarding | `/api/onboarding/status` | Onboarding status check |
+| Security | `/api/security/overview` | Security configuration overview |
+| Bridge Delivery | `/api/bridges/delivery` | Bridge delivery metrics |
+| Backup | `POST /api/backup` | Database backup trigger |
+| Self-Test | `POST /api/selftest/run` | Self-test suite runner |
 
 ---
 
