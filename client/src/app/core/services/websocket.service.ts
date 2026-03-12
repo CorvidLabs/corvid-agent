@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { NotificationService } from './notification.service';
-import type { ClientWsMessage, ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
+import type { ClientWsMessage, ServerWsMessage, StreamEvent, ServerMessageType, ServerMessageOfType } from '@shared/ws-protocol';
 
 type MessageHandler = (msg: ServerWsMessage) => void;
 
@@ -127,6 +127,18 @@ export class WebSocketService {
     onMessage(handler: MessageHandler): () => void {
         this.handlers.add(handler);
         return () => this.handlers.delete(handler);
+    }
+
+    /** Subscribe to a specific message type with full type narrowing. */
+    onMessageType<T extends ServerMessageType>(
+        type: T,
+        handler: (msg: ServerMessageOfType<T>) => void,
+    ): () => void {
+        const wrapped: MessageHandler = (msg) => {
+            if (msg.type === type) handler(msg as ServerMessageOfType<T>);
+        };
+        this.handlers.add(wrapped);
+        return () => this.handlers.delete(wrapped);
     }
 
     private send(msg: ClientWsMessage): void {

@@ -13,6 +13,7 @@ import type { MentionPollingService } from '../polling/service';
 import type { WorkflowService } from '../workflow/service';
 import type { NotificationService } from '../notifications/service';
 import type { ProcessManager } from '../process/manager';
+import type { ServerMessage } from '../../shared/ws-protocol';
 import { onCouncilStageChange, onCouncilLog, onCouncilDiscussionMessage, onCouncilAgentError } from '../routes/councils';
 import { onGovernanceVoteCast, onGovernanceVoteResolved, onGovernanceQuorumReached } from '../councils/discussion';
 import { tenantTopic } from '../ws/handler';
@@ -30,38 +31,50 @@ export interface BroadcastDeps {
     multiTenant: boolean;
 }
 
-function spreadScheduleEvent(event: { type: string; data: unknown }): Record<string, unknown> {
-    switch (event.type) {
-        case 'schedule_update':
-            return { schedule: event.data };
-        case 'schedule_execution_update':
-            return { execution: event.data };
-        case 'schedule_approval_request':
-            return event.data as Record<string, unknown>;
-        default:
-            return {};
-    }
-}
-
-function spreadWorkflowEvent(event: { type: string; data: unknown }): Record<string, unknown> {
-    switch (event.type) {
-        case 'workflow_update':
-            return { workflow: event.data };
-        case 'workflow_run_update':
-            return { run: event.data };
-        case 'workflow_node_update':
-            return { nodeRun: event.data };
-        default:
-            return {};
-    }
-}
-
 /**
  * Publish a message to a tenant-scoped topic.
  * In single-tenant mode, publishes to the flat topic.
  */
 export function publishToTenant(server: BunServer, baseTopic: string, data: string, tid?: string): void {
     server.publish(tenantTopic(baseTopic, tid), data);
+}
+
+/** Serialize and publish a typed ServerMessage to a tenant-scoped topic. */
+function publishMessage(
+    publish: (baseTopic: string, data: string, tid?: string) => void,
+    baseTopic: string,
+    msg: ServerMessage,
+    tid?: string,
+): void {
+    publish(baseTopic, JSON.stringify(msg), tid);
+}
+
+/** Build a typed ServerMessage from a scheduler service event. */
+function toScheduleMessage(event: { type: string; data: unknown }): ServerMessage | null {
+    switch (event.type) {
+        case 'schedule_update':
+            return { type: 'schedule_update', schedule: event.data } as ServerMessage;
+        case 'schedule_execution_update':
+            return { type: 'schedule_execution_update', execution: event.data } as ServerMessage;
+        case 'schedule_approval_request': {
+            const d = event.data as Record<string, unknown>;
+            return { type: 'schedule_approval_request', executionId: d['executionId'], scheduleId: d['scheduleId'], agentId: d['agentId'], actionType: d['actionType'], description: d['description'] } as ServerMessage;
+        }
+        default:
+            return null;
+    }
+}
+
+/** Build a typed ServerMessage from a workflow service event. */
+function toWorkflowMessage(event: { type: string; data: unknown }): ServerMessage | null {
+    switch (event.type) {
+        case 'workflow_run_update':
+            return { type: 'workflow_run_update', run: event.data } as ServerMessage;
+        case 'workflow_node_update':
+            return { type: 'workflow_node_update', nodeExecution: event.data } as ServerMessage;
+        default:
+            return null;
+    }
 }
 
 /**
@@ -83,22 +96,22 @@ export function wireEventBroadcasting(deps: BroadcastDeps): void {
 
     // Broadcast council events to tenant-scoped WS topics
     onCouncilStageChange((launchId, stage, sessionIds) => {
-        const msg = JSON.stringify({ type: 'council_stage_change', launchId, stage, sessionIds });
-        publish('council', msg, resolveCouncil(launchId));
+        const msg: ServerMessage = { type: 'council_stage_change', launchId, stage, sessionIds };
+        publishMessage(publish, 'council', msg, resolveCouncil(launchId));
     });
 
     onCouncilLog((logEntry) => {
-        const msg = JSON.stringify({ type: 'council_log', log: logEntry });
-        publish('council', msg, resolveCouncil(logEntry.launchId));
+        const msg: ServerMessage = { type: 'council_log', log: logEntry };
+        publishMessage(publish, 'council', msg, resolveCouncil(logEntry.launchId));
     });
 
     onCouncilDiscussionMessage((message) => {
-        const msg = JSON.stringify({ type: 'council_discussion_message', message });
-        publish('council', msg, resolveAgent(message.agentId));
+        const msg: ServerMessage = { type: 'council_discussion_message', message };
+        publishMessage(publish, 'council', msg, resolveAgent(message.agentId));
     });
 
     onCouncilAgentError((error) => {
-        const msg = JSON.stringify({
+        const msg: ServerMessage = {
             type: 'council_agent_error',
             launchId: error.launchId,
             agentId: error.agentId,
@@ -111,53 +124,55 @@ export function wireEventBroadcasting(deps: BroadcastDeps): void {
                 sessionId: error.sessionId,
                 round: error.round,
             },
-        });
-        publish('council', msg, resolveCouncil(error.launchId));
+        };
+        publishMessage(publish, 'council', msg, resolveCouncil(error.launchId));
     });
 
     // Broadcast governance vote events
     onGovernanceVoteCast((event) => {
-        const msg = JSON.stringify({ type: 'governance_vote_cast', ...event });
-        publish('council', msg, resolveCouncil(event.launchId));
+        const msg: ServerMessage = { type: 'governance_vote_cast', ...event };
+        publishMessage(publish, 'council', msg, resolveCouncil(event.launchId));
     });
 
     onGovernanceVoteResolved((event) => {
-        const msg = JSON.stringify({ type: 'governance_vote_resolved', ...event });
-        publish('council', msg, resolveCouncil(event.launchId));
+        const msg: ServerMessage = { type: 'governance_vote_resolved', ...event };
+        publishMessage(publish, 'council', msg, resolveCouncil(event.launchId));
     });
 
     onGovernanceQuorumReached((event) => {
-        const msg = JSON.stringify({ type: 'governance_quorum_reached', ...event });
-        publish('council', msg, resolveCouncil(event.launchId));
+        const msg: ServerMessage = { type: 'governance_quorum_reached', ...event };
+        publishMessage(publish, 'council', msg, resolveCouncil(event.launchId));
     });
 
     // Broadcast schedule events
     schedulerService.onEvent((event) => {
-        const msg = JSON.stringify({ type: event.type, ...spreadScheduleEvent(event) });
+        const msg = toScheduleMessage(event);
+        if (!msg) return;
         const eventData = event.data as Record<string, unknown> | undefined;
         const agentId = (eventData as { agentId?: string } | undefined)?.agentId;
-        publish('council', msg, agentId ? resolveAgent(agentId) : undefined);
+        publishMessage(publish, 'council', msg, agentId ? resolveAgent(agentId) : undefined);
     });
 
     // Broadcast webhook events
     webhookService.onEvent((event) => {
-        const msg = JSON.stringify({ type: event.type, delivery: event.data });
         const delivery = event.data as Record<string, unknown> | undefined;
+        const msg: ServerMessage = { type: 'webhook_delivery', delivery: event.data } as ServerMessage;
         const agentId = (delivery as { agentId?: string } | undefined)?.agentId;
-        publish('council', msg, agentId ? resolveAgent(agentId) : undefined);
+        publishMessage(publish, 'council', msg, agentId ? resolveAgent(agentId) : undefined);
     });
 
     // Broadcast mention polling events
     mentionPollingService.onEvent((event) => {
         const eventData = event.data as Record<string, unknown>;
-        const msg = JSON.stringify({ type: event.type, ...eventData });
+        const msg = { type: 'mention_polling_update' as const, config: eventData } as unknown as ServerMessage;
         const agentId = (eventData as { agentId?: string }).agentId;
-        publish('council', msg, agentId ? resolveAgent(agentId) : undefined);
+        publishMessage(publish, 'council', msg, agentId ? resolveAgent(agentId) : undefined);
     });
 
     // Broadcast workflow events
     workflowService.onEvent((event) => {
-        const msg = JSON.stringify({ type: event.type, ...spreadWorkflowEvent(event) });
-        publish('council', msg); // Workflows don't carry agentId in events yet
+        const msg = toWorkflowMessage(event);
+        if (!msg) return;
+        publishMessage(publish, 'council', msg);
     });
 }
