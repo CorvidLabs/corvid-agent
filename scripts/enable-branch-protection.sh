@@ -10,6 +10,8 @@
 #   - Require status checks to pass (where CI exists)
 #   - For corvid-agent: require CI build status check
 #
+# Last applied: 2026-03-12 (corvid-agent/corvid-agent main branch)
+#
 # Usage: ./scripts/enable-branch-protection.sh [--dry-run] [--verify-only]
 
 set -euo pipefail
