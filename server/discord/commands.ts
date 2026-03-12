@@ -238,6 +238,26 @@ export async function registerSlashCommands(
             commands: registered.map(c => c.name),
             scope: config.guildId ? 'guild' : 'global',
         });
+
+        // When using guild commands, clear any stale global commands so they don't shadow guild ones
+        if (config.guildId) {
+            const globalUrl = `https://discord.com/api/v10/applications/${appId}/commands`;
+            const globalRes = await fetch(globalUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bot ${config.botToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify([]),
+            });
+            if (globalRes.ok) {
+                log.info('Cleared stale global slash commands');
+            } else {
+                log.warn('Failed to clear global slash commands', {
+                    status: globalRes.status,
+                });
+            }
+        }
     } else {
         const error = await response.text();
         log.error('Failed to register Discord slash commands', {
