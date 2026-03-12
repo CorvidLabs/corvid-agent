@@ -79,4 +79,57 @@ describe('Security Overview Routes', () => {
         const { req, url } = fakeReq('POST', '/api/security/overview');
         expect(handleSecurityOverviewRoutes(req, url, db)).toBeNull();
     });
+
+    it('returns null for wrong subpath', () => {
+        const { req, url } = fakeReq('GET', '/api/security/other');
+        expect(handleSecurityOverviewRoutes(req, url, db)).toBeNull();
+    });
+
+    it('counts reflect actual DB rows', async () => {
+        // Use a fresh DB for this test
+        const testDb = new Database(':memory:');
+        testDb.exec('PRAGMA foreign_keys = ON');
+        runMigrations(testDb);
+
+        testDb.query(`INSERT INTO github_allowlist (username) VALUES ('user1')`).run();
+        testDb.query(`INSERT INTO github_allowlist (username) VALUES ('user2')`).run();
+        testDb.query(`INSERT INTO repo_blocklist (repo, reason) VALUES ('bad/repo', 'test')`).run();
+
+        const { req, url } = fakeReq('GET', '/api/security/overview');
+        const res = handleSecurityOverviewRoutes(req, url, testDb);
+        const data = await (res as Response).json();
+
+        expect(data.allowlistCount).toBe(2);
+        expect(data.blocklistCount).toBe(1);
+
+        testDb.close();
+    });
+
+    it('blocked patterns have required fields', async () => {
+        const { req, url } = fakeReq('GET', '/api/security/overview');
+        const res = handleSecurityOverviewRoutes(req, url, db);
+        const data = await (res as Response).json();
+
+        for (const pattern of data.blockedPatterns) {
+            expect(pattern).toHaveProperty('name');
+            expect(pattern).toHaveProperty('category');
+            expect(pattern).toHaveProperty('severity');
+            expect(['critical', 'warning']).toContain(pattern.severity);
+        }
+    });
+
+    it('governance tiers have required structure', async () => {
+        const { req, url } = fakeReq('GET', '/api/security/overview');
+        const res = handleSecurityOverviewRoutes(req, url, db);
+        const data = await (res as Response).json();
+
+        for (const tier of data.governanceTiers) {
+            expect(typeof tier.tier).toBe('number');
+            expect(typeof tier.label).toBe('string');
+            expect(typeof tier.description).toBe('string');
+            expect(typeof tier.quorumThreshold).toBe('number');
+            expect(typeof tier.requiresHumanApproval).toBe('boolean');
+            expect(typeof tier.allowsAutomation).toBe('boolean');
+        }
+    });
 });

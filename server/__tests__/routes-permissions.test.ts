@@ -250,4 +250,62 @@ describe('routes/permissions', () => {
         expect(data.actions).toBeDefined();
         expect(typeof data.actions).toBe('object');
     });
+
+    // ── Check denied without grants ──────────────────────────────────────
+
+    it('check returns allowed for unmapped tools (permissive default)', async () => {
+        const { req, url } = fakeReq('POST', '/api/permissions/check', {
+            agent_id: 'agent-none',
+            tool_name: 'unmapped_tool',
+        });
+        const res = await handlePermissionRoutes(req, url, db);
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        // Tools without an action mapping are allowed by default
+        expect(data.allowed).toBe(true);
+        expect(data.reason).toContain('no permission mapping');
+    });
+
+    it('rejects check with invalid JSON', async () => {
+        const url = new URL('http://localhost:3000/api/permissions/check');
+        const req = new Request(url.toString(), {
+            method: 'POST',
+            body: 'bad',
+        });
+        const res = await handlePermissionRoutes(req, url, db);
+        expect(res!.status).toBe(400);
+    });
+
+    it('rejects emergency-revoke with invalid JSON', async () => {
+        const url = new URL('http://localhost:3000/api/permissions/emergency-revoke');
+        const req = new Request(url.toString(), {
+            method: 'POST',
+            body: 'bad',
+        });
+        const res = await handlePermissionRoutes(req, url, db);
+        expect(res!.status).toBe(400);
+    });
+
+    // ── Tenant scoping ──────────────────────────────────────────────────
+
+    it('supports tenant_id on grant and list', async () => {
+        const { req: grantReq, url: grantUrl } = fakeReq('POST', '/api/permissions/grant', {
+            agent_id: 'agent-t',
+            action: 'git:push',
+            tenant_id: 'tenant-a',
+        });
+        await handlePermissionRoutes(grantReq, grantUrl, db);
+
+        // List with default tenant should be empty
+        const { req: listReq, url: listUrl } = fakeReq('GET', '/api/permissions/agent-t');
+        const res = await handlePermissionRoutes(listReq, listUrl, db);
+        const data = await res!.json();
+        expect(data.count).toBe(0);
+
+        // List with correct tenant should have the grant
+        const { req: listReq2, url: listUrl2 } = fakeReq('GET', '/api/permissions/agent-t?tenant_id=tenant-a');
+        const res2 = await handlePermissionRoutes(listReq2, listUrl2, db);
+        const data2 = await res2!.json();
+        expect(data2.count).toBe(1);
+    });
 });
