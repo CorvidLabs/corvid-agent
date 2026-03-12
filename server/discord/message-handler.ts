@@ -136,12 +136,24 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
         return;
     }
 
-    // Passive channel mode: only respond to @mentions in the main channel
-    const isBotMentioned = ctx.botUserId
+    // Passive channel mode: only respond to @mentions in the main channel.
+    // Check direct user mentions AND role mentions (users often tag the bot role).
+    const isBotUserMentioned = ctx.botUserId
         ? data.mentions?.some(m => m.id === ctx.botUserId) ?? false
         : false;
+    // Bot's managed role has a different snowflake than botUserId, so we check
+    // if ANY role was mentioned. This is intentional — if someone tags a role
+    // in a monitored channel, they likely want the bot to respond.
+    const hasRoleMention = (data.mention_roles?.length ?? 0) > 0;
+    const isBotMentioned = isBotUserMentioned || hasRoleMention;
 
-    if (!isBotMentioned) return;
+    if (!isBotMentioned) {
+        log.debug('Message in monitored channel without bot mention', {
+            channelId, userId, isBotUserMentioned, hasRoleMention,
+            textPreview: text.slice(0, 50),
+        });
+        return;
+    }
 
     sendFirstInteractionTip(ctx, userId, channelId);
     sendTypingIndicator(ctx.config.botToken, channelId).catch(() => {});

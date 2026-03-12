@@ -319,15 +319,20 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     let consecutiveApiErrors = 0;
 
     (async () => {
+        let messageCount = 0;
         try {
             for await (const message of q) {
-                log.debug(`SDK message for session ${session.id}`, { type: message.type });
+                messageCount++;
+                log.debug(`SDK message #${messageCount} for session ${session.id}`, { type: message.type, subtype: (message as Record<string, unknown>).subtype });
                 // Successful message received — reset API error counter
                 consecutiveApiErrors = 0;
                 const event = mapSdkMessageToEvent(message, session.id);
                 if (event) {
                     onEvent(event);
                 }
+            }
+            if (messageCount === 0) {
+                log.warn(`SDK query completed with 0 messages for session ${session.id}`, { prompt: prompt.slice(0, 100) });
             }
             onExit(0);
         } catch (err) {
