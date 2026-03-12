@@ -8,7 +8,7 @@
  *  - KeyProvider production validation
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { queryAuditLog } from '../db/audit';
@@ -194,13 +194,11 @@ describe('Key access audit actions', () => {
     });
 
     it('key rotation creates key_access entries for each agent', async () => {
-        // Mock readKeystore to return empty object so rotation only processes DB entries
-        // (the real keystore contains production-encrypted entries that can't be decrypted with test passphrase)
-        mock.module('../lib/wallet-keystore', () => ({
-            readKeystore: () => ({}),
-            getKeystorePath: () => '/tmp/test-keystore.json',
-        }));
-        const { rotateWalletEncryptionKey } = require('../lib/key-rotation');
+        // Point keystore to a non-existent file so readKeystore() returns {} —
+        // avoids mock.module which leaks across test files in Bun.
+        const origPath = process.env.WALLET_KEYSTORE_PATH;
+        process.env.WALLET_KEYSTORE_PATH = '/tmp/test-keystore-nonexistent-' + Date.now() + '.json';
+        const { rotateWalletEncryptionKey } = await import('../lib/key-rotation');
 
         const OLD = 'a'.repeat(32) + '-old-passphrase';
         const NEW = 'b'.repeat(32) + '-new-passphrase';
@@ -226,6 +224,10 @@ describe('Key access audit actions', () => {
 
         const agentIds = accessEntries.entries.map(e => e.resourceId).sort();
         expect(agentIds).toEqual(['a1', 'a2']);
+
+        // Restore env
+        if (origPath === undefined) delete process.env.WALLET_KEYSTORE_PATH;
+        else process.env.WALLET_KEYSTORE_PATH = origPath;
     });
 });
 
