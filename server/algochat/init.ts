@@ -213,12 +213,57 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
         // Self-register this corvid-agent instance
         const serverUrl = process.env.SERVER_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
         const agentName = process.env.AGENT_NAME ?? 'corvid-agent';
+        const selfAddress = service.chatAccount.address;
         await flockDirectoryService.selfRegister({
-            address: service.chatAccount.address,
+            address: selfAddress,
             name: agentName,
             description: 'CorvidAgent — autonomous AI development agent on Algorand',
             instanceUrl: serverUrl,
             capabilities: ['code', 'review', 'test', 'deploy', 'algochat', 'mcp'],
+        });
+
+        // ── Periodic heartbeat + stale sweep ────────────────────────────
+        // Heartbeat every 10 minutes to keep this agent active in the directory.
+        // Stale sweep every 15 minutes to mark unresponsive agents as inactive.
+        const HEARTBEAT_INTERVAL_MS = 10 * 60 * 1000;
+        const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
+
+        const heartbeatTimer = setInterval(() => {
+            flockDirectoryService.selfRegister({
+                address: selfAddress,
+                name: agentName,
+                description: 'CorvidAgent — autonomous AI development agent on Algorand',
+                instanceUrl: serverUrl,
+                capabilities: ['code', 'review', 'test', 'deploy', 'algochat', 'mcp'],
+            }).catch(err => {
+                log.debug('Flock Directory heartbeat failed', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }, HEARTBEAT_INTERVAL_MS);
+
+        const sweepTimer = setInterval(() => {
+            try {
+                flockDirectoryService.sweepStaleAgents();
+            } catch (err) {
+                log.debug('Flock Directory stale sweep failed', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }, SWEEP_INTERVAL_MS);
+
+        shutdownCoordinator.register({
+            name: 'FlockDirectoryTimers',
+            priority: 0,
+            handler: () => {
+                clearInterval(heartbeatTimer);
+                clearInterval(sweepTimer);
+            },
+        });
+
+        log.info('Flock Directory heartbeat and sweep timers started', {
+            heartbeatIntervalMin: HEARTBEAT_INTERVAL_MS / 60_000,
+            sweepIntervalMin: SWEEP_INTERVAL_MS / 60_000,
         });
     } catch (err) {
         log.warn('Flock Directory on-chain init failed (off-chain still works)', {
