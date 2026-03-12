@@ -303,5 +303,7 @@ export function requiresAdminRole(pathname: string): boolean {
     if (pathname.startsWith('/api/performance')) return true;
     // Network switch can activate mainnet — admin-only to prevent accidental ALGO expenditure
     if (pathname === '/api/algochat/network') return true;
+    // Permission broker controls capability grants — admin-only to prevent privilege escalation
+    if (pathname.startsWith('/api/permissions')) return true;
     return false;
 }
