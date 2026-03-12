@@ -321,7 +321,7 @@ async function handleRoutes(
     const githubAllowlistResponse = handleGitHubAllowlistRoutes(req, url, db);
     if (githubAllowlistResponse) return githubAllowlistResponse;
 
-    const repoBlocklistResponse = handleRepoBlocklistRoutes(req, url, db);
+    const repoBlocklistResponse = handleRepoBlocklistRoutes(req, url, db, context);
     if (repoBlocklistResponse) return repoBlocklistResponse;
 
     const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
