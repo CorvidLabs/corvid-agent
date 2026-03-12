@@ -562,6 +562,34 @@ describe('requiresAdminRole api-key paths', () => {
     });
 });
 
+// --- requiresAdminRole includes permission broker paths ----------------------
+
+describe('requiresAdminRole permission paths', () => {
+    it('returns true for /api/permissions/grant', () => {
+        expect(requiresAdminRole('/api/permissions/grant')).toBe(true);
+    });
+
+    it('returns true for /api/permissions/revoke', () => {
+        expect(requiresAdminRole('/api/permissions/revoke')).toBe(true);
+    });
+
+    it('returns true for /api/permissions/emergency-revoke', () => {
+        expect(requiresAdminRole('/api/permissions/emergency-revoke')).toBe(true);
+    });
+
+    it('returns true for /api/permissions/check', () => {
+        expect(requiresAdminRole('/api/permissions/check')).toBe(true);
+    });
+
+    it('returns true for /api/permissions/:agentId', () => {
+        expect(requiresAdminRole('/api/permissions/agent-123')).toBe(true);
+    });
+
+    it('returns true for /api/permissions/actions', () => {
+        expect(requiresAdminRole('/api/permissions/actions')).toBe(true);
+    });
+});
+
 // --- createRequestContext ---------------------------------------------------
 
 describe('createRequestContext', () => {
