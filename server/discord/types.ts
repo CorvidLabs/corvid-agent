@@ -140,6 +140,8 @@ export interface DiscordMessageData {
     thread?: { id: string };
     /** Users mentioned in this message — used for @mention detection */
     mentions?: DiscordAuthor[];
+    /** Role IDs mentioned in this message — used for role @mention detection */
+    mention_roles?: string[];
     /** Guild member info — includes roles when GUILD_MEMBERS intent is present */
     member?: { roles: string[] };
 }

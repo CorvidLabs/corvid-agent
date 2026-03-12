@@ -159,6 +159,7 @@ export class DiscordGateway {
 
             case GatewayOp.HEARTBEAT_ACK:
                 this.heartbeatAcked = true;
+                log.debug('Heartbeat ACK received');
                 break;
 
             case GatewayOp.DISPATCH:
@@ -207,6 +208,13 @@ export class DiscordGateway {
 
             case 'MESSAGE_CREATE': {
                 const data = payload.d as DiscordMessageData;
+                log.debug('MESSAGE_CREATE dispatch', {
+                    channelId: data.channel_id,
+                    username: data.author?.username,
+                    isBot: data.author?.bot,
+                    mentionCount: data.mentions?.length ?? 0,
+                    mentionRoleCount: data.mention_roles?.length ?? 0,
+                });
                 this.handlers.onMessage(data);
                 break;
             }
