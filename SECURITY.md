@@ -13,19 +13,19 @@ CorvidAgent runs as a **local sandbox** -- on your machine, in a VM, or on a pri
 │  Your Machine / VM / Sandbox                         │
 │                                                      │
 │  ┌──────────┐    ┌──────────────────────────┐        │
-│  │ Dashboard │<-->│    CorvidAgent API       │        │
-│  │ (browser) │    │   localhost:3000         │        │
+│  │ Dashboard│<-->│    CorvidAgent API       │        │
+│  │ (browser)│    │   localhost:3000         │        │
 │  └──────────┘    └──────────┬───────────────┘        │
 │                             │                        │
 │              ┌──────────────┼──────────────┐         │
-│              │              │              │          │
+│              │              │              │         │
 │         AlgoChat       Telegram       Discord        │
 └──────────────┼──────────────┼──────────────┼─────────┘
                │              │              │
-     ┌─────────▼──────┐  ┌───▼────┐  ┌──────▼───┐
-     │ Algorand Node  │  │Telegram│  │ Discord  │
-     │(on-chain ident)│  │  API   │  │ Gateway  │
-     └────────────────┘  └────────┘  └──────────┘
+     ┌─────────▼──────┐   ┌───▼────┐  ┌──────▼───┐
+     │ Algorand Node  │   │Telegram│  │ Discord  │
+     │(on-chain ident)│   │  API   │  │ Gateway  │
+     └────────────────┘   └────────┘  └──────────┘
 ```
 
 The API server, agent sessions, database, and wallet keystore all reside within the same trust boundary. All outbound connections are initiated by the server -- there are no inbound connections except HTTP/WebSocket requests to the API port.
@@ -90,10 +90,10 @@ The API server, agent sessions, database, and wallet keystore all reside within 
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │  Server Process                                     │    │
 │  │                                                     │    │
-│  │  ┌───────────┐  ┌──────────┐  ┌──────────────────┐ │    │
-│  │  │ API Layer │  │ Bridges  │  │ Agent Sessions   │ │    │
-│  │  │ (authed)  │  │ (TG/DC)  │  │ (sandboxed SDK)  │ │    │
-│  │  └───────────┘  └──────────┘  └──────────────────┘ │    │
+│  │  ┌───────────┐  ┌──────────┐  ┌──────────────────┐  │    │
+│  │  │ API Layer │  │ Bridges  │  │ Agent Sessions   │  │    │
+│  │  │ (authed)  │  │ (TG/DC)  │  │ (sandboxed SDK)  │  │    │
+│  │  └───────────┘  └──────────┘  └──────────────────┘  │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                             │
 ├─────────────────────── TRUST BOUNDARY ──────────────────────┤
