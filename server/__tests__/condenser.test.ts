@@ -1,22 +1,16 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { condenseMessage } from '../algochat/condenser';
+import { LlmProviderRegistry } from '../providers/registry';
 
 // --- Mock the LLM provider registry so tests don't hit real LLMs -----------
 
-// We mock at the module level via dynamic import interception.
-// The condenser uses `await import('../providers/registry')` so we
-// mock the registry singleton.
+// Instead of mock.module (which poisons the module cache for all test files
+// in the process), we replace getInstance temporarily and restore it after
+// each test. The condenser calls `LlmProviderRegistry.getInstance()` via
+// dynamic import, so this intercepts it without replacing the class itself.
 
 let mockProviders: any[] = [];
-
-mock.module('../providers/registry', () => ({
-    LlmProviderRegistry: {
-        getInstance: () => ({
-            getDefault: () => mockProviders[0] ?? null,
-            getAll: () => mockProviders,
-        }),
-    },
-}));
+const _originalGetInstance = LlmProviderRegistry.getInstance;
 
 // --- Helpers ----------------------------------------------------------------
 
@@ -43,6 +37,17 @@ function makeProvider(overrides?: {
 describe('condenseMessage', () => {
     beforeEach(() => {
         mockProviders = [];
+        (LlmProviderRegistry as any).getInstance = () => ({
+            getDefault: () => mockProviders[0] ?? undefined,
+            getAll: () => mockProviders,
+            get: () => undefined,
+            register: () => {},
+        });
+    });
+
+    afterEach(() => {
+        // Restore original getInstance so other test files are not affected
+        (LlmProviderRegistry as any).getInstance = _originalGetInstance;
     });
 
     // ── Short content (no condensation needed) ───────────────────────
