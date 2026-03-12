@@ -172,6 +172,8 @@ export function validateStartupSecurity(config: AuthConfig): void {
 
     if (config.allowedOrigins.length > 0) {
         log.info(`CORS restricted to origins: ${config.allowedOrigins.join(', ')}`);
+    } else if (!isLocalhost) {
+        log.warn('CORS allows all origins (Access-Control-Allow-Origin: *). Set ALLOWED_ORIGINS to restrict access in production.');
     }
 }
 
