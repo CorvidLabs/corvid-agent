@@ -35,11 +35,15 @@ jobs:
           FORCE_PUSH=$(echo "$RESULT" | jq -r '.allow_force_pushes.enabled // false')
           DELETIONS=$(echo "$RESULT" | jq -r '.allow_deletions.enabled // false')
           STATUS_CHECKS=$(echo "$RESULT" | jq -r '.required_status_checks.contexts // [] | length')
+          ENFORCE_ADMINS=$(echo "$RESULT" | jq -r '.enforce_admins.enabled // false')
+          DISMISS_STALE=$(echo "$RESULT" | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')
 
-          echo "PR reviews required:  $PR_REVIEWS"
-          echo "Force push allowed:   $FORCE_PUSH"
-          echo "Deletions allowed:    $DELETIONS"
-          echo "Status check count:   $STATUS_CHECKS"
+          echo "PR reviews required:    $PR_REVIEWS"
+          echo "Dismiss stale reviews:  $DISMISS_STALE"
+          echo "Force push allowed:     $FORCE_PUSH"
+          echo "Deletions allowed:      $DELETIONS"
+          echo "Status check count:     $STATUS_CHECKS"
+          echo "Enforce admins:         $ENFORCE_ADMINS"
 
           FAIL=0
           if [ "$PR_REVIEWS" = "none" ] || [ "$PR_REVIEWS" = "0" ]; then
@@ -55,7 +59,15 @@ jobs:
             FAIL=1
           fi
           if [ "$STATUS_CHECKS" = "0" ]; then
-            echo "::warning::No required status checks on main branch"
+            echo "::error::No required status checks on main branch"
+            FAIL=1
+          fi
+          if [ "$ENFORCE_ADMINS" != "true" ]; then
+            echo "::error::Admin enforcement not enabled on main branch"
+            FAIL=1
+          fi
+          if [ "$DISMISS_STALE" != "true" ]; then
+            echo "::warning::Stale review dismissal not enabled"
           fi
 
           if [ "$FAIL" -gt 0 ]; then
