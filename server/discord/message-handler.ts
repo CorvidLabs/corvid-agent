@@ -131,7 +131,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     // If this message is in a thread we're tracking, route to that thread's session
     if (isOurThread) {
         sendFirstInteractionTip(ctx, userId, channelId);
-        sendTypingIndicator(ctx.config.botToken, channelId).catch(() => {});
+        sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
         await routeToThread(ctx, channelId, userId, text);
         return;
     }
@@ -156,7 +156,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     }
 
     sendFirstInteractionTip(ctx, userId, channelId);
-    sendTypingIndicator(ctx.config.botToken, channelId).catch(() => {});
+    sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
 
     const mode = ctx.config.mode ?? 'chat';
     if (mode === 'work_intake') {
@@ -186,7 +186,7 @@ function sendFirstInteractionTip(ctx: MessageHandlerContext, userId: string, cha
         ].join('\n'),
         color: 0x57f287,
         footer: { text: 'This tip only appears once' },
-    }).catch(() => {});
+    }).catch((err) => log.debug('First-interaction tip failed', { error: err instanceof Error ? err.message : String(err) }));
 }
 
 async function handleWorkIntake(

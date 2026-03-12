@@ -150,7 +150,7 @@ export class SchedulerService {
 
     async stop(): Promise<void> {
         if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
-        if (this.tickPromise) { await this.tickPromise.catch(() => {}); this.tickPromise = null; }
+        if (this.tickPromise) { await this.tickPromise.catch((err) => log.debug('Pending tick error during shutdown', { error: err instanceof Error ? err.message : String(err) })); this.tickPromise = null; }
         log.info('Scheduler stopped');
     }
 
