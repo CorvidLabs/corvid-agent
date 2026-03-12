@@ -423,6 +423,31 @@ export function scanGitHubContent(body: string): InjectionResult & { warning: st
     return { ...result, warning: lines.length > 0 ? lines.join('\n') : null };
 }
 
+// ─── Markdown code span detection ─────────────────────────────────────────
+
+/**
+ * Check if a byte offset falls inside a markdown code span (fenced or inline).
+ * Used to suppress false positives from code snippets shared in chat.
+ */
+function isInsideMarkdownCode(text: string, offset: number): boolean {
+    // Check fenced code blocks (```...```)
+    const fencedRegex = /```[\s\S]*?```/g;
+    let m;
+    while ((m = fencedRegex.exec(text)) !== null) {
+        if (offset >= m.index && offset < m.index + m[0].length) {
+            return true;
+        }
+    }
+    // Check inline code (`...`)
+    const inlineRegex = /`[^`\n]+`/g;
+    while ((m = inlineRegex.exec(text)) !== null) {
+        if (offset >= m.index && offset < m.index + m[0].length) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // ─── Scanner ──────────────────────────────────────────────────────────────
 
 /**
@@ -451,6 +476,11 @@ export function scanForInjection(message: string): InjectionResult {
     for (const rule of PATTERNS) {
         const match = rule.regex.exec(message);
         if (match) {
+            // Skip command_injection matches inside markdown code spans —
+            // users frequently share shell commands in backtick formatting
+            if (rule.category === 'command_injection' && isInsideMarkdownCode(message, match.index)) {
+                continue;
+            }
             matches.push({
                 pattern: rule.label,
                 category: rule.category,
