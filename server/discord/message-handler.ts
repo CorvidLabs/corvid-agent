@@ -68,6 +68,10 @@ export interface MessageHandlerContext {
     threadLastActivity: Map<string, number>;
 }
 
+/** Cooldown for permission-denial replies: only notify a user once per window. */
+const PERM_DENY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+const permDenyCooldowns = new Map<string, number>();
+
 export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMessageData): Promise<void> {
     // Ignore bot messages
     if (data.author.bot) return;
@@ -87,11 +91,34 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     }
     if (!isMonitored && !isOurThread) return;
 
-    // Resolve permission level
+    // For monitored channels (not threads), check if the bot was mentioned
+    // BEFORE doing permission checks. Messages without a mention are silently
+    // ignored — we should not spam permission denials for casual chat.
+    const isBotUserMentioned = ctx.botUserId
+        ? data.mentions?.some(m => m.id === ctx.botUserId) ?? false
+        : false;
+    const hasRoleMention = (data.mention_roles?.length ?? 0) > 0;
+    const isBotMentioned = isBotUserMentioned || hasRoleMention;
+
+    if (isMonitored && !isOurThread && !isBotMentioned) {
+        log.debug('Message in monitored channel without bot mention', {
+            channelId, userId, isBotUserMentioned, hasRoleMention,
+            textPreview: text.slice(0, 50),
+        });
+        return;
+    }
+
+    // Resolve permission level (only reached when bot is actually addressed)
     const permLevel = resolvePermissionLevel(ctx.config, ctx.mutedUsers, userId, data.member?.roles);
     if (permLevel <= 0) {
         log.warn('Blocked Discord user', { userId, username: data.author.username, permLevel });
-        await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'You do not have permission to interact with this bot.');
+        // Only send the denial once per cooldown window to avoid spamming
+        const now = Date.now();
+        const lastDenied = permDenyCooldowns.get(userId);
+        if (!lastDenied || now - lastDenied >= PERM_DENY_COOLDOWN_MS) {
+            permDenyCooldowns.set(userId, now);
+            await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'You do not have permission to interact with this bot.');
+        }
         return;
     }
 
@@ -133,25 +160,6 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
         sendFirstInteractionTip(ctx, userId, channelId);
         sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
         await routeToThread(ctx, channelId, userId, text);
-        return;
-    }
-
-    // Passive channel mode: only respond to @mentions in the main channel.
-    // Check direct user mentions AND role mentions (users often tag the bot role).
-    const isBotUserMentioned = ctx.botUserId
-        ? data.mentions?.some(m => m.id === ctx.botUserId) ?? false
-        : false;
-    // Bot's managed role has a different snowflake than botUserId, so we check
-    // if ANY role was mentioned. This is intentional — if someone tags a role
-    // in a monitored channel, they likely want the bot to respond.
-    const hasRoleMention = (data.mention_roles?.length ?? 0) > 0;
-    const isBotMentioned = isBotUserMentioned || hasRoleMention;
-
-    if (!isBotMentioned) {
-        log.debug('Message in monitored channel without bot mention', {
-            channelId, userId, isBotUserMentioned, hasRoleMention,
-            textPreview: text.slice(0, 50),
-        });
         return;
     }
 
