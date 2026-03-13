@@ -8,10 +8,10 @@
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | 5,920 across 240 files |
-| Assertions | 16,378 |
+| Unit tests | 6,573 across 274 files |
+| Assertions | 18,030 |
 | E2E tests | 360 across 31 Playwright specs |
-| Module specs | 116 with automated validation |
+| Module specs | 123 with automated validation |
 | Test:code ratio | **1.14x** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI.
@@ -61,7 +61,7 @@ We don't treat tests as a tax. They're the product. A 1.14x ratio means every li
 ```bash
 git clone https://github.com/CorvidLabs/corvid-agent.git
 cd corvid-agent
-bun install && bun test    # see the 5,920 tests pass
+bun install && bun test    # see the 6,573 tests pass
 ```
 
 The test suite runs in ~120 seconds on a modern machine. Every test is deterministic — no flaky network calls, no sleep-and-hope timing.

@@ -22,7 +22,7 @@ files:
 db_tables:
   - table_name
 depends_on:
-  - specs/other/module.spec.md
+  - specs/db/sessions.spec.md
 ---
 ```
 
