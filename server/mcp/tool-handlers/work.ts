@@ -5,7 +5,6 @@ import { textResult, errorResult } from './types';
 import { createLogger } from '../../lib/logger';
 import { queryCount } from '../../db/types';
 import { getProjectByName, listProjects } from '../../db/projects';
-import { ConflictError } from '../../lib/errors';
 
 const log = createLogger('McpToolHandlers');
 
@@ -18,7 +17,7 @@ function checkWorkTaskRateLimit(db: Database, agentId: string): boolean {
 
 export async function handleCreateWorkTask(
     ctx: McpToolContext,
-    args: { description: string; project_id?: string; project_name?: string; issue_ref?: { repo: string; number: number } },
+    args: { description: string; project_id?: string; project_name?: string },
 ): Promise<CallToolResult> {
     if (!ctx.workTaskService) {
         return errorResult('Work task service is not available.');
@@ -51,7 +50,6 @@ export async function handleCreateWorkTask(
             description: args.description,
             projectId,
             source: 'agent',
-            issueRef: args.issue_ref,
         });
 
         log.info('MCP create_work_task succeeded', {
@@ -69,17 +67,6 @@ export async function handleCreateWorkTask(
         );
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (err instanceof ConflictError) {
-            // Surface deduplication conflicts as structured responses (not failures)
-            const ctx_info = err.context as Record<string, unknown> | undefined;
-            const prUrl = ctx_info?.prUrl as string | undefined;
-            const existingTaskId = ctx_info?.existingTaskId as string | undefined;
-            let detail = message;
-            if (prUrl) detail += `\n  Existing PR: ${prUrl}`;
-            if (existingTaskId) detail += `\n  Existing task ID: ${existingTaskId}`;
-            log.info('MCP create_work_task rejected (duplicate)', { error: message, prUrl, existingTaskId });
-            return errorResult(detail);
-        }
         log.error('MCP create_work_task failed', { error: message });
         return errorResult(`Failed to create work task: ${message}`);
     }
