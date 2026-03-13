@@ -122,6 +122,14 @@ check('security', 'Injection detection active on all channels', () => {
     };
 });
 
+check('security', 'Jailbreak prevention tests pass', () => {
+    const { stdout, exitCode } = exec('bun test server/__tests__/prompt-injection.test.ts 2>&1 | tail -3');
+    return {
+        passed: exitCode === 0,
+        detail: exitCode === 0 ? 'Jailbreak prevention tests passed' : stdout.slice(-200),
+    };
+});
+
 // ─── 2. Access Control & Spending ──────────────────────────────────────────
 
 check('access-control', 'Spending cap tests pass', () => {
@@ -147,6 +155,41 @@ check('access-control', 'RBAC / permission broker tests pass', () => {
     return {
         passed: exitCode === 0,
         detail: exitCode === 0 ? 'Permission broker tests passed' : stdout.slice(-200),
+    };
+});
+
+check('access-control', 'Guards tests pass (auth, role, rate-limit)', () => {
+    const { stdout, exitCode } = exec('bun test server/__tests__/guards.test.ts 2>&1 | tail -3');
+    return {
+        passed: exitCode === 0,
+        detail: exitCode === 0 ? 'Guards tests passed' : stdout.slice(-200),
+    };
+});
+
+check('access-control', 'RBAC guards applied to all route modules', () => {
+    // Verify every route module (except public endpoints) imports guards.
+    // Routes are registered centrally via index.ts which applies authGuard,
+    // but individual modules should use tenantRoleGuard or RequestContext for
+    // tenant-scoped access control.
+    const routeDir = join(ROOT, 'server/routes');
+    const publicRoutes = new Set(['health.ts', 'index.ts', 'auth-flow.ts', 'onboarding.ts']);
+    const files = readdirSync(routeDir).filter(f => f.endsWith('.ts') && !publicRoutes.has(f));
+    const missing: string[] = [];
+
+    for (const file of files) {
+        const content = readFileSync(join(routeDir, file), 'utf-8');
+        const hasGuardImport = content.includes('guards') || content.includes('Guard');
+        const hasRequestContext = content.includes('RequestContext');
+        if (!hasGuardImport && !hasRequestContext) {
+            missing.push(file);
+        }
+    }
+
+    return {
+        passed: missing.length === 0,
+        detail: missing.length === 0
+            ? `All ${files.length} route modules have guard/context imports`
+            : `Missing guards: ${missing.join(', ')}`,
     };
 });
 
@@ -176,6 +219,43 @@ check('crypto', 'Crypto audit tests pass', () => {
     };
 });
 
+check('crypto', 'Key rotation tests pass', () => {
+    const { stdout, exitCode } = exec('bun test server/__tests__/key-rotation.test.ts 2>&1 | tail -3');
+    return {
+        passed: exitCode === 0,
+        detail: exitCode === 0 ? 'Key rotation tests passed' : stdout.slice(-200),
+    };
+});
+
+check('crypto', 'Key provider tests pass', () => {
+    const { stdout, exitCode } = exec('bun test server/__tests__/key-provider.test.ts 2>&1 | tail -3');
+    return {
+        passed: exitCode === 0,
+        detail: exitCode === 0 ? 'Key provider tests passed' : stdout.slice(-200),
+    };
+});
+
+check('crypto', 'Key access audit tests pass', () => {
+    const { stdout, exitCode } = exec('bun test server/__tests__/key-access-audit.test.ts 2>&1 | tail -3');
+    return {
+        passed: exitCode === 0,
+        detail: exitCode === 0 ? 'Key access audit tests passed' : stdout.slice(-200),
+    };
+});
+
+check('crypto', 'Wallet encryption uses AES-256-GCM', () => {
+    // Verify the crypto module uses AES-256-GCM for wallet encryption.
+    const cryptoPath = join(ROOT, 'server/lib/crypto.ts');
+    if (!existsSync(cryptoPath)) return { passed: false, detail: 'server/lib/crypto.ts not found' };
+    const content = readFileSync(cryptoPath, 'utf-8');
+    const hasAes256Gcm = content.includes('aes-256-gcm');
+    const hasPbkdf2 = content.includes('pbkdf2');
+    return {
+        passed: hasAes256Gcm && hasPbkdf2,
+        detail: `AES-256-GCM: ${hasAes256Gcm ? 'yes' : 'NO'}, PBKDF2: ${hasPbkdf2 ? 'yes' : 'NO'}`,
+    };
+});
+
 // ─── 4. Payments ────────────────────────────────────────────────────────────
 
 check('payments', 'Marketplace escrow tests pass', () => {
@@ -183,6 +263,18 @@ check('payments', 'Marketplace escrow tests pass', () => {
     return {
         passed: exitCode === 0,
         detail: exitCode === 0 ? 'Escrow tests passed' : stdout.slice(-200),
+    };
+});
+
+check('payments', 'Escrow auto-release (72h) tested', () => {
+    // Verify the escrow test file covers processAutoReleases.
+    const escrowTest = join(ROOT, 'server/__tests__/marketplace-escrow.test.ts');
+    if (!existsSync(escrowTest)) return { passed: false, detail: 'Escrow test file not found' };
+    const content = readFileSync(escrowTest, 'utf-8');
+    const hasAutoRelease = content.includes('processAutoReleases') || content.includes('auto-release') || content.includes('autoRelease');
+    return {
+        passed: hasAutoRelease,
+        detail: hasAutoRelease ? 'Auto-release test coverage present' : 'No auto-release test coverage found',
     };
 });
 
@@ -252,12 +344,23 @@ check('deliverables', 'Mainnet config template exists (.env.mainnet.example)', (
     };
 });
 
+// ─── 7. Manual Checks (informational — not gating) ─────────────────────────
+// These items from #310 require human verification and are listed for reference.
+
+const manualChecks = [
+    '3+ external testnet users running stable instances',
+    'Zero critical issues reported by testnet users',
+    'Self-hosting docs validated by external users',
+    'Owner security posture review complete',
+    'Owner sign-off on mainnet readiness',
+];
+
 // ─── Report ─────────────────────────────────────────────────────────────────
 
 if (jsonMode) {
     const passed = results.filter(r => r.passed).length;
     const failed = results.filter(r => !r.passed).length;
-    console.log(JSON.stringify({ results, summary: { passed, failed, total: results.length } }, null, 2));
+    console.log(JSON.stringify({ results, manualChecks, summary: { passed, failed, total: results.length } }, null, 2));
 } else {
     console.log('\n╔══════════════════════════════════════════════════════════════╗');
     console.log('║            v1.0.0-rc — Release Candidate Checklist          ║');
@@ -274,13 +377,19 @@ if (jsonMode) {
         console.log(`      ${r.detail}`);
     }
 
+    console.log('\n  [MANUAL — requires human verification]');
+    for (const item of manualChecks) {
+        console.log(`    \x1b[33m○\x1b[0m ${item}`);
+    }
+
     const passed = results.filter(r => r.passed).length;
     const failed = results.filter(r => !r.passed).length;
     const total = results.length;
 
     console.log('\n' + '─'.repeat(62));
     if (failed === 0) {
-        console.log(`\x1b[32m  ALL ${total} CHECKS PASSED — RC criteria met.\x1b[0m`);
+        console.log(`\x1b[32m  ALL ${total} AUTOMATED CHECKS PASSED — RC criteria met.\x1b[0m`);
+        console.log(`\x1b[33m  ${manualChecks.length} manual checks still require human sign-off.\x1b[0m`);
     } else {
         console.log(`\x1b[31m  ${failed}/${total} CHECKS FAILED — RC criteria NOT met.\x1b[0m`);
         console.log(`\x1b[32m  ${passed}/${total} passed.\x1b[0m`);
