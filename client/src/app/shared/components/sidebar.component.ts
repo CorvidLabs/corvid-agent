@@ -385,6 +385,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             display: flex;
             flex-direction: column;
             transition: width 0.2s ease;
+            overflow-y: auto;
         }
         .sidebar__list {
             list-style: none;
