@@ -50,11 +50,9 @@ describe('Fallback chains', () => {
         }
     });
 
-    it('local chain includes expected models in priority order', () => {
+    it('local chain includes single qwen3:14b model', () => {
         const models = DEFAULT_FALLBACK_CHAINS['local'].chain.map((e) => e.model);
-        expect(models[0]).toBe('qwen3:32b');
-        expect(models).toContain('qwen3:8b');
-        expect(models).toContain('qwen3:4b');
+        expect(models).toEqual(['qwen3:14b']);
     });
 
     it('existing chains are unchanged', () => {

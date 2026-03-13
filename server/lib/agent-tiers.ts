@@ -96,6 +96,8 @@ const STANDARD_TIER_FAMILIES = new Set<ModelFamily>([
     'mistral',
     'command-r',
     'deepseek',
+    'minimax',
+    'kimi',
 ]);
 
 /**
@@ -107,17 +109,29 @@ const LIMITED_TIER_FAMILIES = new Set<ModelFamily>([
     'gemma',
     'hermes',
     'nemotron',
+    'glm',
+    'devstral',
+    'gemini',
     'unknown',
 ]);
+
+/**
+ * Check if a model is a cloud model (hosted remotely via Ollama cloud proxy).
+ * Cloud models are large remote models that deserve a tier boost.
+ */
+function isCloudModel(name: string): boolean {
+    return name.includes(':cloud') || name.endsWith('-cloud');
+}
 
 /**
  * Determine the agent tier from a model identifier.
  *
  * Heuristic:
  *  1. If the model name matches a known high-tier provider → high
- *  2. Detect the Ollama model family and map to standard/limited
- *  3. Check for large parameter counts in the name (70b, 72b → standard)
- *  4. Default to limited (conservative)
+ *  2. Cloud models (`:cloud` suffix) get boosted to at least standard
+ *  3. Detect the Ollama model family and map to standard/limited
+ *  4. Check for large parameter counts in the name (70b, 72b → standard)
+ *  5. Default to limited (conservative)
  */
 export function getAgentTier(model: string): AgentTier {
     const lower = model.toLowerCase();
@@ -127,21 +141,30 @@ export function getAgentTier(model: string): AgentTier {
         if (lower.includes(provider)) return 'high';
     }
 
+    // Cloud models are large remote models — boost to at least standard
+    const cloud = isCloudModel(lower);
+
     // Detect model family
     const family = detectModelFamily(model);
 
     // Standard-tier families
     if (STANDARD_TIER_FAMILIES.has(family)) {
-        // But small variants of standard families should be limited
+        // Cloud models from standard families get high tier (frontier-class)
+        if (cloud) return 'high';
+        // But small local variants of standard families should be limited
         if (isSmallModel(lower)) return 'limited';
         return 'standard';
     }
 
-    // Limited-tier families — but allow large models to be standard
+    // Limited-tier families — but cloud models and large locals get boosted
     if (LIMITED_TIER_FAMILIES.has(family)) {
+        if (cloud) return 'standard';
         if (isLargeModel(lower)) return 'standard';
         return 'limited';
     }
+
+    // Unknown family — cloud models still get standard
+    if (cloud) return 'standard';
 
     // Fallback: check for large parameter counts
     if (isLargeModel(lower)) return 'standard';

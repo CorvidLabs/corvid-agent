@@ -66,6 +66,29 @@ describe('agent-tiers', () => {
         it('classifies deepseek as standard (large)', () => {
             expect(getAgentTier('deepseek-coder:33b')).toBe('standard');
         });
+
+        it('classifies cloud models from standard families as high tier', () => {
+            expect(getAgentTier('qwen3.5:cloud')).toBe('high');
+            expect(getAgentTier('deepseek-v3.2:cloud')).toBe('high');
+            expect(getAgentTier('qwen3-coder-next:cloud')).toBe('high');
+            expect(getAgentTier('minimax-m2.5:cloud')).toBe('high');
+            expect(getAgentTier('kimi-k2.5:cloud')).toBe('high');
+        });
+
+        it('classifies cloud models from limited families as standard tier', () => {
+            expect(getAgentTier('glm-5:cloud')).toBe('standard');
+            expect(getAgentTier('devstral-small-2:cloud')).toBe('standard');
+            expect(getAgentTier('nemotron-3-super:cloud')).toBe('standard');
+            expect(getAgentTier('gemini-3-flash-preview:cloud')).toBe('standard');
+        });
+
+        it('classifies new families correctly without cloud suffix', () => {
+            expect(getAgentTier('minimax-m2.5')).toBe('standard');
+            expect(getAgentTier('kimi-k2.5')).toBe('standard');
+            expect(getAgentTier('glm-5')).toBe('limited');
+            expect(getAgentTier('devstral-small')).toBe('limited');
+            expect(getAgentTier('gemini-flash')).toBe('limited');
+        });
     });
 
     describe('getAgentTierConfig', () => {
