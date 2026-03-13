@@ -6,6 +6,7 @@ import { listProjects, createProject } from '../db/projects';
 import { listAgents, createAgent, updateAgent } from '../db/agents';
 import { createSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
+import { saveExamRun } from '../db/model-exams';
 import { examCases } from './cases';
 import type {
     ExamCase,
@@ -132,7 +133,7 @@ export class ExamRunner {
         }
     }
 
-    async runExam(model: string, categories?: ExamCategory[]): Promise<ExamScorecard> {
+    async runExam(model: string, categories?: ExamCategory[], persistDb?: Database): Promise<ExamScorecard> {
         const startTime = Date.now();
 
         // Enforce minimum model size (cloud models are exempt — they're huge)
@@ -180,6 +181,18 @@ export class ExamRunner {
             overall: scorecard.overall,
             durationMs: scorecard.durationMs,
         });
+
+        // Persist results if a database handle was provided
+        if (persistDb) {
+            try {
+                saveExamRun(persistDb, scorecard);
+                log.info('Exam results persisted', { model });
+            } catch (err) {
+                log.error('Failed to persist exam results', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
 
         return scorecard;
     }
