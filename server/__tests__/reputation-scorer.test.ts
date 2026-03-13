@@ -223,6 +223,141 @@ describe('ReputationScorer', () => {
         const validLevels: TrustLevel[] = ['untrusted', 'low', 'medium', 'high', 'verified'];
         expect(validLevels).toContain(score.trustLevel);
     });
+
+    // ─── Task Completion Edge Cases ──────────────────────────────────────────
+
+    test('task completion returns 50 with fewer than 3 tasks (insufficient data)', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('few-tasks', 'A')").run();
+        db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES ('t1', 'few-tasks', 'p1', 'd', 'completed')").run();
+        db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES ('t2', 'few-tasks', 'p1', 'd', 'failed')").run();
+
+        const score = scorer.computeScore('few-tasks');
+        expect(score.components.taskCompletion).toBe(50);
+    });
+
+    test('task completion computes correct rate with >= 3 tasks', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('many-tasks', 'A')").run();
+        for (let i = 0; i < 3; i++) {
+            db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES (?, 'many-tasks', 'p1', 'd', 'completed')").run(`tc${i}`);
+        }
+        db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES ('tf1', 'many-tasks', 'p1', 'd', 'failed')").run();
+
+        const score = scorer.computeScore('many-tasks');
+        expect(score.components.taskCompletion).toBe(75); // 3/4 = 75%
+    });
+
+    // ─── Peer Rating Edge Cases ──────────────────────────────────────────────
+
+    test('perfect 5-star reviews give 100 peer rating', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('star', 'A')").run();
+        db.query("INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES ('l1', 'star', 'L', 'D', 'code')").run();
+        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r1', 'l1', 5)").run();
+        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r2', 'l1', 5)").run();
+
+        const score = scorer.computeScore('star');
+        expect(score.components.peerRating).toBe(100);
+    });
+
+    test('1-star reviews give 0 peer rating', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('bad', 'A')").run();
+        db.query("INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES ('l1', 'bad', 'L', 'D', 'code')").run();
+        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r1', 'l1', 1)").run();
+
+        const score = scorer.computeScore('bad');
+        expect(score.components.peerRating).toBe(0);
+    });
+
+    test('3-star average gives 50 peer rating', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('mid', 'A')").run();
+        db.query("INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES ('l1', 'mid', 'L', 'D', 'code')").run();
+        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r1', 'l1', 3)").run();
+
+        const score = scorer.computeScore('mid');
+        expect(score.components.peerRating).toBe(50);
+    });
+
+    // ─── Activity Level Edge Cases ───────────────────────────────────────────
+
+    test('5 sessions = 50 activity level', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('active5', 'A')").run();
+        for (let i = 0; i < 5; i++) {
+            db.query("INSERT INTO sessions (id, agent_id) VALUES (?, 'active5')").run(`s${i}`);
+        }
+        const score = scorer.computeScore('active5');
+        expect(score.components.activityLevel).toBe(50);
+    });
+
+    test('10+ sessions caps activity at 100', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('active15', 'A')").run();
+        for (let i = 0; i < 15; i++) {
+            db.query("INSERT INTO sessions (id, agent_id) VALUES (?, 'active15')").run(`s${i}`);
+        }
+        const score = scorer.computeScore('active15');
+        expect(score.components.activityLevel).toBe(100);
+    });
+
+    // ─── Security Compliance Edge Cases ──────────────────────────────────────
+
+    test('5 security violations floor compliance at 0', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('viol5', 'A')").run();
+        for (let i = 0; i < 5; i++) {
+            scorer.recordEvent({
+                agentId: 'viol5',
+                eventType: 'security_violation',
+                scoreImpact: -20,
+            });
+        }
+        const score = scorer.computeScore('viol5');
+        expect(score.components.securityCompliance).toBe(0);
+    });
+
+    // ─── Custom Weights ──────────────────────────────────────────────────────
+
+    test('custom weights: all weight on security with violations yields low overall', () => {
+        const customScorer = new ReputationScorer(db, {
+            taskCompletion: 0,
+            peerRating: 0,
+            creditPattern: 0,
+            securityCompliance: 1.0,
+            activityLevel: 0,
+        });
+
+        db.query("INSERT INTO agents (id, name) VALUES ('sec-only', 'A')").run();
+        for (let i = 0; i < 5; i++) {
+            customScorer.recordEvent({
+                agentId: 'sec-only',
+                eventType: 'security_violation',
+                scoreImpact: -20,
+            });
+        }
+
+        const score = customScorer.computeScore('sec-only');
+        expect(score.components.securityCompliance).toBe(0);
+        expect(score.overallScore).toBeLessThanOrEqual(1);
+    });
+
+    // ─── Bulk Operations ─────────────────────────────────────────────────────
+
+    test('computeAll computes scores for all agents sorted descending', () => {
+        db.query("INSERT INTO agents (id, name) VALUES ('bulk1', 'A')").run();
+        db.query("INSERT INTO agents (id, name) VALUES ('bulk2', 'B')").run();
+
+        const scores = scorer.computeAll();
+        expect(scores).toHaveLength(2);
+        expect(scores[0].overallScore).toBeGreaterThanOrEqual(scores[1].overallScore);
+    });
+
+    test('getAllScores returns empty when no scores computed', () => {
+        expect(scorer.getAllScores()).toEqual([]);
+    });
+
+    test('computeScore preserves existing attestation hash on recompute', () => {
+        scorer.computeScore('preserve-hash');
+        scorer.setAttestationHash('preserve-hash', '0xkeep');
+
+        const recomputed = scorer.computeScore('preserve-hash');
+        expect(recomputed.attestationHash).toBe('0xkeep');
+    });
 });
 
 // ─── Attestation Tests ───────────────────────────────────────────────────────
