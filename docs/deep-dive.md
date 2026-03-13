@@ -38,12 +38,12 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Server modules | 47 |
 | API routes | 44 modules (~205 endpoints) |
 | Database tables | 90 |
-| Database migrations | 4 (squashed baseline) |
+| Database migrations | 5 (squashed baseline) |
 | MCP tools | 41 corvid_* handlers |
 | Unit tests | 6,573 across 274 files |
 | E2E tests | 360 across 31 Playwright specs |
 | Security tests | 232 dedicated |
-| Module specs | 123 .spec.md files |
+| Module specs | 124 .spec.md files |
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
 | Version | 0.26.0 |
@@ -69,7 +69,7 @@ work/            1 file   — Self-improvement pipeline (worktrees, validation, 
 process/         —          Session lifecycle, SDK + Ollama, approval flow, personas
 mcp/             17 files — 41 corvid_* tool handlers
 routes/          44 files — REST API (~205 endpoints)
-db/              —          SQLite schema, 4 migrations, 90 tables
+db/              —          SQLite schema, 5 migrations, 90 tables
 reputation/      5 files  — Scoring, attestation, verification, identity proofs
 memory/          8 files  — Vector embeddings, FTS5 search, decay, sync
 permissions/     —          Capability broker, tenant role guards

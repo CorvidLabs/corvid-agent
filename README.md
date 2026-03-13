@@ -138,7 +138,7 @@ See `.env.example` for the full list of 30+ configuration options.
 |--------|-------|
 | Unit tests | **6,573** across 274 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **123** with automated validation |
+| Module specs | **124** with automated validation |
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
@@ -153,7 +153,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 |--------|-------|
 | MCP tools | **41** corvid_* tool handlers |
 | API endpoints | **~300** across 44 route modules |
-| DB migrations | **4** (squashed baseline + 3 post-squash, 90 tables) |
+| DB migrations | **5** (squashed baseline + 3 post-squash, 90 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
@@ -349,7 +349,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  4 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  5 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -364,7 +364,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (4 migrations) and query modules
+  db/            SQLite schema (5 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -508,7 +508,7 @@ bun run spec:check    # Validate all module specs in specs/
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**123 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**124 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 
@@ -518,7 +518,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 4 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 5 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
