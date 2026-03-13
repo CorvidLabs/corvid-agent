@@ -1,4 +1,3 @@
-import { resolve, dirname } from 'node:path';
 import { existsSync } from 'node:fs';
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
@@ -33,6 +32,7 @@ import { runBunInstall, runValidation } from './validation';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AstParserService } from '../ast/service';
 import { generateRepoMap, extractRelevantSymbols } from './repo-map';
+import { createWorktree, removeWorktree } from '../lib/worktree';
 
 const log = createLogger('WorkTaskService');
 
@@ -313,15 +313,6 @@ export class WorkTaskService {
         }
     }
 
-    /**
-     * Resolve the base directory for git worktrees.
-     * Defaults to a `.corvid-worktrees` sibling directory next to the project.
-     */
-    private getWorktreeBaseDir(projectWorkingDir: string): string {
-        return process.env.WORKTREE_BASE_DIR
-            ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
-    }
-
     async create(input: CreateWorkTaskInput, tenantId?: string): Promise<WorkTask> {
         if (this._shuttingDown) {
             throw new ValidationError('Server is shutting down — new work tasks are not accepted');
@@ -560,35 +551,21 @@ export class WorkTaskService {
         updateWorkTaskStatus(this.db, task.id, 'branching');
 
         // Create git worktree (isolated directory — does not touch the main working tree)
-        const worktreeBase = this.getWorktreeBaseDir(project.workingDir);
-        const worktreeDir = resolve(worktreeBase, task.id);
+        const worktreeResult = await createWorktree({
+            projectWorkingDir: project.workingDir,
+            branchName,
+            worktreeId: task.id,
+        });
 
-        try {
-            const worktreeProc = Bun.spawn(
-                ['git', 'worktree', 'add', '-b', branchName, worktreeDir],
-                {
-                    cwd: project.workingDir,
-                    stdout: 'pipe',
-                    stderr: 'pipe',
-                },
-            );
-            const stderr = await new Response(worktreeProc.stderr).text();
-            const exitCode = await worktreeProc.exited;
-
-            if (exitCode !== 0) {
-                updateWorkTaskStatus(this.db, task.id, 'failed', {
-                    error: `Failed to create worktree: ${stderr.trim()}`,
-                });
-                const failed = getWorkTask(this.db, task.id);
-                return failed ?? task;
-            }
-        } catch (err) {
+        if (!worktreeResult.success) {
             updateWorkTaskStatus(this.db, task.id, 'failed', {
-                error: `Failed to create worktree: ${err instanceof Error ? err.message : String(err)}`,
+                error: worktreeResult.error ?? 'Failed to create worktree',
             });
             const failed = getWorkTask(this.db, task.id);
             return failed ?? task;
         }
+
+        const worktreeDir = worktreeResult.worktreeDir;
 
         // Install dependencies in the worktree (worktrees don't share node_modules).
         try {
@@ -1050,30 +1027,7 @@ Important: You MUST ensure all validation passes and output the PR URL.`;
         const project = getProject(this.db, task.projectId);
         if (!project?.workingDir) return;
 
-        try {
-            const proc = Bun.spawn(
-                ['git', 'worktree', 'remove', '--force', task.worktreeDir],
-                {
-                    cwd: project.workingDir,
-                    stdout: 'pipe',
-                    stderr: 'pipe',
-                },
-            );
-            const stderr = await new Response(proc.stderr).text();
-            const exitCode = await proc.exited;
-
-            if (exitCode !== 0) {
-                log.warn('Failed to remove worktree', { taskId, worktreeDir: task.worktreeDir, stderr: stderr.trim() });
-            } else {
-                log.info('Removed worktree', { taskId, worktreeDir: task.worktreeDir });
-            }
-        } catch (err) {
-            log.warn('Error removing worktree', {
-                taskId,
-                worktreeDir: task.worktreeDir,
-                error: err instanceof Error ? err.message : String(err),
-            });
-        }
+        await removeWorktree(project.workingDir, task.worktreeDir);
     }
 
     private buildWorkPrompt(branchName: string, description: string, repoMap?: string, relevantSymbols?: string): string {

@@ -13,14 +13,14 @@ import { LlmProviderRegistry } from '../providers/registry';
 import type { LlmProviderType } from '../providers/types';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
-import { getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage } from '../db/sessions';
+import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession } from '../db/sessions';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import { recordApiCost } from '../db/spending';
 import { getActiveServersForAgent } from '../db/mcp-servers';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
-import { getParticipantForSession } from '../db/sessions';
+import { removeWorktree } from '../lib/worktree';
 import { createLogger } from '../lib/logger';
 import { SessionEventBus } from './event-bus';
 import { SessionTimerManager } from './session-timer-manager';
@@ -878,6 +878,9 @@ export class ProcessManager {
             num_turns: 0,
         } as ClaudeStreamEvent);
 
+        // Clean up chat worktrees (work task worktrees are cleaned by WorkTaskService)
+        this.cleanupChatWorktree(sessionId);
+
         if (code !== 0 && meta?.source === 'algochat') {
             this.processes.delete(sessionId);
             this.eventBus.removeSessionSubscribers(sessionId);
@@ -894,6 +897,27 @@ export class ProcessManager {
         } else {
             this.cleanupSessionState(sessionId);
         }
+    }
+
+    /**
+     * Clean up worktrees created for chat sessions (not work tasks).
+     * Chat worktree directories contain `/chat-` in the path.
+     * Fire-and-forget — errors are logged but do not block session cleanup.
+     */
+    private cleanupChatWorktree(sessionId: string): void {
+        const session = getSession(this.db, sessionId);
+        if (!session?.workDir || !session.workDir.includes('/chat-')) return;
+
+        const project = session.projectId ? getProject(this.db, session.projectId) : null;
+        if (!project?.workingDir) return;
+
+        removeWorktree(project.workingDir, session.workDir).catch((err) => {
+            log.warn('Failed to clean up chat worktree', {
+                sessionId,
+                workDir: session.workDir,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        });
     }
 
     /** Extend a running session's timeout. Returns false if session not found. */

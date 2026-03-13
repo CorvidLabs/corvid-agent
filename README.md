@@ -508,7 +508,7 @@ bun run spec:check    # Validate all module specs in specs/
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**122 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
+**123 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. Runs in CI on every commit.
 
 ---
 

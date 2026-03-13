@@ -16,6 +16,7 @@ import { listAgents } from '../db/agents';
 import { createSession, getSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
 import { scanForInjection } from '../lib/prompt-injection';
+import { createWorktree, generateChatBranchName } from '../lib/worktree';
 import { recordAudit } from '../db/audit';
 import { updateDiscordConfig } from '../db/discord-config';
 import { createLogger } from '../lib/logger';
@@ -328,12 +329,31 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
     const cleanText = resolveMentions(text, mentions, ctx.botUserId);
     if (!cleanText) return;
 
+    // Create an isolated git worktree so this chat session doesn't pollute
+    // the main working tree (prevents branch collisions across sessions).
+    let workDir: string | undefined;
+    if (project.workingDir) {
+        const sessionId = crypto.randomUUID();
+        const branchName = generateChatBranchName(agent.name, sessionId);
+        const result = await createWorktree({
+            projectWorkingDir: project.workingDir,
+            branchName,
+            worktreeId: `chat-${sessionId.slice(0, 12)}`,
+        });
+        if (result.success) {
+            workDir = result.worktreeDir;
+        }
+        // If worktree creation fails, fall through to using the main working dir.
+        // This is non-fatal — the session still works, just without isolation.
+    }
+
     const session = createSession(ctx.db, {
         projectId: project.id,
         agentId: agent.id,
         name: `Discord mention:${messageId}`,
         initialPrompt: cleanText,
         source: 'discord' as SessionSource,
+        workDir,
     });
 
     ctx.processManager.startProcess(session, cleanText);
