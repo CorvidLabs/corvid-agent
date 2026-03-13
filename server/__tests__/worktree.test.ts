@@ -1,7 +1,7 @@
 import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
 import { getWorktreeBaseDir, generateChatBranchName, createWorktree, removeWorktree } from '../lib/worktree';
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 
 describe('worktree utilities', () => {
@@ -21,20 +21,23 @@ describe('worktree utilities', () => {
 
         test('defaults to .corvid-worktrees sibling directory', () => {
             delete process.env.WORKTREE_BASE_DIR;
-            const result = getWorktreeBaseDir('/home/user/my-project');
-            expect(result).toBe('/home/user/.corvid-worktrees');
+            const projectDir = join(tmpdir(), 'my-project');
+            const result = getWorktreeBaseDir(projectDir);
+            expect(result).toBe(resolve(dirname(projectDir), '.corvid-worktrees'));
         });
 
         test('respects WORKTREE_BASE_DIR env override', () => {
-            process.env.WORKTREE_BASE_DIR = '/custom/worktrees';
-            const result = getWorktreeBaseDir('/home/user/my-project');
-            expect(result).toBe('/custom/worktrees');
+            const overrideDir = join(tmpdir(), 'custom-worktrees');
+            process.env.WORKTREE_BASE_DIR = overrideDir;
+            const result = getWorktreeBaseDir(join(tmpdir(), 'my-project'));
+            expect(result).toBe(overrideDir);
         });
 
         test('handles nested project paths', () => {
             delete process.env.WORKTREE_BASE_DIR;
-            const result = getWorktreeBaseDir('/opt/repos/org/corvid-agent');
-            expect(result).toBe('/opt/repos/org/.corvid-worktrees');
+            const projectDir = join(tmpdir(), 'repos', 'org', 'corvid-agent');
+            const result = getWorktreeBaseDir(projectDir);
+            expect(result).toBe(resolve(dirname(projectDir), '.corvid-worktrees'));
         });
     });
 
