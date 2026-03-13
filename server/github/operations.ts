@@ -175,13 +175,16 @@ export async function searchOpenPrsForIssue(
 
     try {
         const raw = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
-        // Filter to PRs that actually reference #NNN (not just any mention of the number)
+        // Match PRs that close/fix/resolve the issue (body) or mention it in the title.
+        // Body pattern: "Closes #N", "Fixes #N", "Resolves #N" (case-insensitive).
+        // Title pattern: any mention of "#N".
         const issueRef = `#${issueNumber}`;
+        const bodyPattern = new RegExp(`(closes|fixes|resolves)\\s+#${issueNumber}\\b`, 'i');
         const prs: PullRequest[] = raw
             .filter((pr) => {
                 const title = (pr.title as string) ?? '';
                 const body = (pr.body as string) ?? '';
-                return title.includes(issueRef) || body.includes(issueRef);
+                return title.includes(issueRef) || bodyPattern.test(body);
             })
             .map((pr) => ({
                 number: pr.number as number,

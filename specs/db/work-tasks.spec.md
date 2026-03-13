@@ -39,6 +39,7 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 | `countPendingTasks` | `db: Database` | `number` | Count globally pending work tasks |
 | `dispatchCandidates` | `db: Database, limit: number` | `WorkTask[]` | Find pending tasks eligible for dispatch whose project has no active task; ordered by priority DESC, created_at ASC |
 | `getActiveTasksByProject` | `db: Database` | `Record<string, string>` | Map each project with an active task to its task ID |
+| `findActiveTasksForIssue` | `db: Database, issueNumber: number` | `WorkTask[]` | Find active/pending tasks whose description references a given issue number; used for duplicate-PR deduplication |
 | `listWorkTasks` | `db: Database, agentId?: string, tenantId?: string` | `WorkTask[]` | Lists work tasks, optionally filtered by agent ID, ordered by created_at DESC |
 
 ### Exported Types
@@ -97,7 +98,7 @@ Provides CRUD, query, and lifecycle operations for work tasks -- autonomous agen
 ### Consumed By
 | Module | What is used |
 |--------|-------------|
-| `server/work/service.ts` | `createWorkTask`, `createWorkTaskAtomic`, `getWorkTask`, `getWorkTaskBySessionId`, `updateWorkTaskStatus`, `cleanupStaleWorkTasks`, `listWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks` |
+| `server/work/service.ts` | `createWorkTask`, `createWorkTaskAtomic`, `getWorkTask`, `getWorkTaskBySessionId`, `updateWorkTaskStatus`, `cleanupStaleWorkTasks`, `listWorkTasks`, `dequeueNextTask`, `getPendingTasksForProject`, `getActiveTaskForProject`, `pauseWorkTask`, `resumePausedTask`, `getPausedTasks`, `countQueuedTasks`, `findActiveTasksForIssue` |
 | `server/feedback/outcome-tracker.ts` | `listWorkTasks` |
 | `server/routes/work-tasks.ts` (implied) | Work task listing and retrieval via routes |
 

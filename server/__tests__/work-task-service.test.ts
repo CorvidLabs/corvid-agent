@@ -1552,7 +1552,7 @@ describe('PR dedup check', () => {
                 description: 'Fix the council race condition (#710)',
                 projectId: project.id,
             }),
-        ).rejects.toThrow('PR #716 already addresses issue #710');
+        ).rejects.toThrow('An open PR (or active work task) already addresses issue #710. Skipping.');
     });
 
     test('proceeds when no open PR references the issue', async () => {

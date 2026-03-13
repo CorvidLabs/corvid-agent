@@ -403,6 +403,20 @@ export function getActiveTasksByProject(db: Database): Record<string, string> {
     return result;
 }
 
+/**
+ * Find active or pending work tasks whose description references the given issue number.
+ * Used for deduplication: prevents creating a new task when one already exists for the same issue.
+ */
+export function findActiveTasksForIssue(db: Database, issueNumber: number): WorkTask[] {
+    const pattern = `%#${issueNumber}%`;
+    const rows = db.query(
+        `SELECT * FROM work_tasks
+         WHERE status IN ('pending', 'queued', 'branching', 'running', 'validating', 'paused')
+         AND description LIKE ?`
+    ).all(pattern) as WorkTaskRow[];
+    return rows.map(rowToWorkTask);
+}
+
 export function listWorkTasks(db: Database, agentId?: string, tenantId: string = DEFAULT_TENANT_ID): WorkTask[] {
     if (agentId) {
         const { query, bindings } = withTenantFilter('SELECT * FROM work_tasks WHERE agent_id = ? ORDER BY created_at DESC', tenantId);
