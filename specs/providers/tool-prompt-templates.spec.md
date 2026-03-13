@@ -20,7 +20,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 
 | Type | Description |
 |------|-------------|
-| `ModelFamily` | Union: `'llama' \| 'qwen2' \| 'qwen3' \| 'mistral' \| 'command-r' \| 'hermes' \| 'nemotron' \| 'phi' \| 'gemma' \| 'deepseek' \| 'unknown'` |
+| `ModelFamily` | Union: `'llama' \| 'qwen2' \| 'qwen3' \| 'mistral' \| 'command-r' \| 'hermes' \| 'nemotron' \| 'phi' \| 'gemma' \| 'deepseek' \| 'minimax' \| 'glm' \| 'kimi' \| 'devstral' \| 'gemini' \| 'unknown'` |
 
 ### Exported Functions
 
@@ -39,7 +39,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 4. **Qwen3 anti-hallucination instructions**: Qwen3 prompt explicitly warns: no code fences around JSON, no prose before tool calls, no inventing tool names, never generate fake tool results
 5. **Response routing only when corvid_send_message present**: `getResponseRoutingPrompt()` is only appended when `corvid_send_message` is in the tool names list
 6. **Coding guidance only when read_file present**: `getCodingToolPrompt()` is only appended when `read_file` is in the tool names list
-7. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek) receives family-specific prompt guidance. Only `unknown` returns null
+7. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
 8. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
 
 ## Behavioral Examples

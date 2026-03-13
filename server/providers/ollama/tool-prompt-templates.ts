@@ -14,7 +14,7 @@
 
 import type { JsonSchemaObject } from '../types';
 
-export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'unknown';
+export type ModelFamily = 'llama' | 'qwen2' | 'qwen3' | 'mistral' | 'command-r' | 'hermes' | 'nemotron' | 'phi' | 'gemma' | 'deepseek' | 'minimax' | 'glm' | 'kimi' | 'devstral' | 'gemini' | 'unknown';
 
 /**
  * Detect model family from a model name string.
@@ -33,6 +33,11 @@ export function detectModelFamily(modelName: string): ModelFamily {
     if (lower.includes('phi')) return 'phi';
     if (lower.includes('gemma')) return 'gemma';
     if (lower.includes('deepseek')) return 'deepseek';
+    if (lower.includes('minimax')) return 'minimax';
+    if (lower.includes('glm')) return 'glm';
+    if (lower.includes('kimi')) return 'kimi';
+    if (lower.includes('devstral')) return 'devstral';
+    if (lower.includes('gemini')) return 'gemini';
 
     return 'unknown';
 }
@@ -227,6 +232,56 @@ function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []):
 
         case 'deepseek':
             return `### DeepSeek-specific guidance
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Call one tool at a time and wait for its result before calling the next.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
+        case 'minimax':
+            return `### MiniMax-specific guidance
+- You are MiniMax M2.5, a large cloud-hosted model. Use the native tool calling format.
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Call one tool at a time and wait for its result before calling the next.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
+        case 'glm':
+            return `### GLM-specific guidance
+- You are GLM-5, a large cloud-hosted model from Zhipu AI. Use the native tool calling format.
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Do not wrap tool calls in code blocks or add surrounding text. Output raw JSON only.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
+        case 'kimi':
+            return `### Kimi-specific guidance
+- You are Kimi K2.5, a large cloud-hosted model from Moonshot AI. Use the native tool calling format.
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- CRITICAL: After receiving a tool result, you MUST continue working. Evaluate the result and immediately make the next tool call.
+- Call one tool at a time and wait for its result before calling the next.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
+        case 'devstral':
+            return `### Devstral-specific guidance
+- You are Devstral, a coding-focused cloud model from Mistral AI. Use the native tool calling format.
+- You have strong coding capabilities. Use them for file operations and code analysis.
+- To call a tool, output a JSON array with this exact format:
+[{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
+- Use the exact tool names from the available tools list. Do not invent tool names.
+- After receiving a tool result, evaluate the result and continue with the next tool call if needed.
+- Provide your final answer as plain text only after all tool operations are complete.`;
+
+        case 'gemini':
+            return `### Gemini-specific guidance
+- You are a Gemini model from Google. Use the native tool calling format.
 - To call a tool, output a JSON array with this exact format:
 [{"name": "${exampleTool}", "arguments": {"param1": "value1"}}]
 - Use the exact tool names from the available tools list. Do not invent tool names.

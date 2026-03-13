@@ -38,7 +38,7 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
             { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'anthropic', model: 'claude-sonnet-4-6' },
             { provider: 'openai', model: 'o3' },
-            { provider: 'ollama', model: 'qwen3:32b' },
+            { provider: 'ollama', model: 'qwen3:14b' },
         ],
     },
     'balanced': {
@@ -60,19 +60,20 @@ export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
     },
     'local': {
         chain: [
-            { provider: 'ollama', model: 'qwen3:32b' },
-            { provider: 'ollama', model: 'qwen3:8b' },
-            { provider: 'ollama', model: 'llama3.1:8b' },
-            { provider: 'ollama', model: 'qwen3:4b' },
+            { provider: 'ollama', model: 'qwen3:14b' },
         ],
     },
     'cloud': {
         chain: [
             { provider: 'ollama', model: 'qwen3.5:cloud' },
-            { provider: 'ollama', model: 'minimax-m2.5:cloud' },
             { provider: 'ollama', model: 'deepseek-v3.2:cloud' },
             { provider: 'ollama', model: 'qwen3-coder-next:cloud' },
+            { provider: 'ollama', model: 'minimax-m2.5:cloud' },
+            { provider: 'ollama', model: 'kimi-k2.5:cloud' },
             { provider: 'ollama', model: 'glm-5:cloud' },
+            { provider: 'ollama', model: 'nemotron-3-super:cloud' },
+            { provider: 'ollama', model: 'gemini-3-flash-preview:cloud' },
+            // devstral-small-2:cloud not yet available on Ollama cloud
         ],
     },
 };

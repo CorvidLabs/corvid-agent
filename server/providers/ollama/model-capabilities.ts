@@ -36,12 +36,19 @@ const TOOL_CAPABLE_FAMILIES = new Set([
     'qwen2',     // Qwen 2/2.5
     'qwen3',     // Qwen 3
     'qwen3moe',  // Qwen 3 MoE (e.g. qwen3-coder:480b)
+    'qwen3next', // Qwen 3 Coder Next
     'mistral',   // Mistral/Mixtral
     'command-r', // Cohere Command R
     'firefunction', // Fireworks FireFunction
     'hermes',    // Nous Hermes
     'nemotron',  // NVIDIA Nemotron
     'deepseek2', // DeepSeek V2/V3
+    'deepseek3.2', // DeepSeek V3.2
+    'minimax',   // MiniMax M2.5
+    'glm',       // Zhipu GLM-5
+    'kimi',      // Moonshot Kimi K2.5
+    'devstral',  // Mistral Devstral
+    'gemini',    // Google Gemini
 ]);
 
 /** Models known to NOT support tool calling even if family might. */
@@ -271,6 +278,11 @@ export class ModelCapabilityDetector {
         else if (lowerName.includes('nemotron')) family = 'nemotron';
         else if (lowerName.includes('hermes')) family = 'hermes';
         else if (lowerName.includes('firefunction')) family = 'firefunction';
+        else if (lowerName.includes('minimax')) family = 'minimax';
+        else if (lowerName.includes('glm')) family = 'glm';
+        else if (lowerName.includes('kimi')) family = 'kimi';
+        else if (lowerName.includes('devstral')) family = 'devstral';
+        else if (lowerName.includes('gemini')) family = 'gemini';
         else if (lowerName.includes('phi')) family = 'phi';
         else if (lowerName.includes('gemma')) family = 'gemma';
 
