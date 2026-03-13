@@ -3,16 +3,21 @@
  *
  * All endpoints require ADMIN_API_KEY authentication (handled by the route guard).
  *
- * POST /api/permissions/grant      — Grant a capability to an agent
- * POST /api/permissions/revoke     — Revoke a specific grant or all grants for an agent
- * GET  /api/permissions/:agentId   — List active grants for an agent
- * POST /api/permissions/check      — Check if an agent can use a tool
- * POST /api/permissions/emergency-revoke — Revoke ALL grants for an agent immediately
+ * POST /api/permissions/grant             — Grant a capability to an agent
+ * POST /api/permissions/revoke            — Revoke a specific grant or all grants for an agent
+ * GET  /api/permissions/:agentId          — List active grants for an agent
+ * POST /api/permissions/check             — Check if an agent can use a tool
+ * POST /api/permissions/emergency-revoke  — Revoke ALL grants for an agent immediately
+ * GET  /api/permissions/roles             — List available role templates
+ * GET  /api/permissions/roles/:name       — Get a specific role template
+ * POST /api/permissions/roles/apply       — Apply a role template to an agent
+ * POST /api/permissions/roles/revoke      — Revoke a role template from an agent
  */
 
 import type { Database } from 'bun:sqlite';
 import { PermissionBroker } from '../permissions/broker';
 import { TOOL_ACTION_MAP } from '../permissions/types';
+import { listRoleTemplates, getRoleTemplate, applyRoleTemplate, revokeRoleTemplate } from '../permissions/role-templates';
 import { json, badRequest, notFound } from '../lib/response';
 
 export function handlePermissionRoutes(
@@ -48,6 +53,29 @@ export function handlePermissionRoutes(
     // GET /api/permissions/actions — list the action taxonomy
     if (url.pathname === '/api/permissions/actions' && method === 'GET') {
         return json({ actions: TOOL_ACTION_MAP });
+    }
+
+    // GET /api/permissions/roles — list available role templates
+    if (url.pathname === '/api/permissions/roles' && method === 'GET') {
+        return json({ templates: listRoleTemplates() });
+    }
+
+    // GET /api/permissions/roles/:name — get a specific role template
+    const roleMatch = url.pathname.match(/^\/api\/permissions\/roles\/([^/]+)$/);
+    if (roleMatch && method === 'GET') {
+        const template = getRoleTemplate(roleMatch[1]);
+        if (!template) return notFound(`Role template "${roleMatch[1]}" not found`);
+        return json({ template });
+    }
+
+    // POST /api/permissions/roles/apply — apply a role template to an agent
+    if (url.pathname === '/api/permissions/roles/apply' && method === 'POST') {
+        return handleApplyRole(req, db);
+    }
+
+    // POST /api/permissions/roles/revoke — revoke a role template from an agent
+    if (url.pathname === '/api/permissions/roles/revoke' && method === 'POST') {
+        return handleRevokeRole(req, db);
     }
 
     // GET /api/permissions/:agentId — list active grants
@@ -134,4 +162,59 @@ async function handleCheck(req: Request, broker: PermissionBroker): Promise<Resp
     });
 
     return json({ ...result });
+}
+
+async function handleApplyRole(req: Request, db: Database): Promise<Response> {
+    const body = await req.json().catch(() => null);
+    if (!body) return badRequest('Invalid JSON body');
+
+    const { agent_id, role, granted_by, tenant_id, expires_at, reason } = body;
+    if (!agent_id || !role) return badRequest('agent_id and role are required');
+
+    try {
+        const result = await applyRoleTemplate(db, agent_id, role, granted_by ?? 'api', {
+            tenantId: tenant_id ?? 'default',
+            expiresAt: expires_at ?? null,
+            reason,
+        });
+
+        return json({
+            template: result.template.name,
+            agent_id,
+            granted: result.grants.length,
+            skipped: result.skipped,
+            grants: result.grants,
+        }, 201);
+    } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Unknown role template')) {
+            return notFound(err.message);
+        }
+        throw err;
+    }
+}
+
+async function handleRevokeRole(req: Request, db: Database): Promise<Response> {
+    const body = await req.json().catch(() => null);
+    if (!body) return badRequest('Invalid JSON body');
+
+    const { agent_id, role, revoked_by, tenant_id, reason } = body;
+    if (!agent_id || !role) return badRequest('agent_id and role are required');
+
+    try {
+        const result = revokeRoleTemplate(db, agent_id, role, revoked_by ?? 'api', {
+            tenantId: tenant_id ?? 'default',
+            reason,
+        });
+
+        return json({
+            template: result.template.name,
+            agent_id,
+            revoked: result.revoked,
+        });
+    } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Unknown role template')) {
+            return notFound(err.message);
+        }
+        throw err;
+    }
 }
