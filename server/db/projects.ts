@@ -1,6 +1,6 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import { writeTransaction } from './pool';
-import type { Project, CreateProjectInput, UpdateProjectInput } from '../../shared/types';
+import type { Project, CreateProjectInput, UpdateProjectInput, DirStrategy } from '../../shared/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { withTenantFilter, validateTenantOwnership, tenantQuery } from '../tenant/db-filter';
 import { encryptEnvVars, decryptEnvVars } from '../lib/env-encryption';
@@ -12,9 +12,14 @@ interface ProjectRow {
     working_dir: string;
     claude_md: string;
     env_vars: string;
+    git_url: string | null;
+    dir_strategy: string;
+    base_clone_path: string | null;
     created_at: string;
     updated_at: string;
 }
+
+const VALID_DIR_STRATEGIES: DirStrategy[] = ['persistent', 'clone_on_demand', 'ephemeral', 'worktree'];
 
 function rowToProject(row: ProjectRow): Project {
     return {
@@ -24,6 +29,9 @@ function rowToProject(row: ProjectRow): Project {
         workingDir: row.working_dir,
         claudeMd: row.claude_md,
         envVars: JSON.parse(decryptEnvVars(row.env_vars)),
+        gitUrl: row.git_url ?? null,
+        dirStrategy: (VALID_DIR_STRATEGIES.includes(row.dir_strategy as DirStrategy) ? row.dir_strategy : 'persistent') as DirStrategy,
+        baseClonePath: row.base_clone_path ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -54,11 +62,12 @@ export function getProjectByName(db: Database, name: string, tenantId: string = 
 export function createProject(db: Database, input: CreateProjectInput, tenantId: string = DEFAULT_TENANT_ID): Project {
     const id = crypto.randomUUID();
     const envVars = encryptEnvVars(JSON.stringify(input.envVars ?? {}));
+    const dirStrategy = input.dirStrategy && VALID_DIR_STRATEGIES.includes(input.dirStrategy) ? input.dirStrategy : 'persistent';
 
     db.query(
-        `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, input.name, input.description ?? '', input.workingDir, input.claudeMd ?? '', envVars, tenantId);
+        `INSERT INTO projects (id, name, description, working_dir, claude_md, env_vars, git_url, dir_strategy, base_clone_path, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, input.name, input.description ?? '', input.workingDir, input.claudeMd ?? '', envVars, input.gitUrl ?? null, dirStrategy, input.baseClonePath ?? null, tenantId);
 
     return getProject(db, id) as Project;
 }
@@ -89,6 +98,20 @@ export function updateProject(db: Database, id: string, input: UpdateProjectInpu
     if (input.envVars !== undefined) {
         fields.push('env_vars = ?');
         values.push(encryptEnvVars(JSON.stringify(input.envVars)));
+    }
+    if (input.gitUrl !== undefined) {
+        fields.push('git_url = ?');
+        values.push(input.gitUrl);
+    }
+    if (input.dirStrategy !== undefined) {
+        if (VALID_DIR_STRATEGIES.includes(input.dirStrategy)) {
+            fields.push('dir_strategy = ?');
+            values.push(input.dirStrategy);
+        }
+    }
+    if (input.baseClonePath !== undefined) {
+        fields.push('base_clone_path = ?');
+        values.push(input.baseClonePath);
     }
 
     if (fields.length === 0) return existing;

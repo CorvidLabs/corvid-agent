@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 84;
+const SCHEMA_VERSION = 85;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -711,15 +711,18 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
 
         `CREATE TABLE IF NOT EXISTS projects (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            working_dir TEXT NOT NULL,
-            claude_md   TEXT DEFAULT '',
-            env_vars    TEXT DEFAULT '{}',
-            tenant_id   TEXT NOT NULL DEFAULT 'default',
-            created_at  TEXT DEFAULT (datetime('now')),
-            updated_at  TEXT DEFAULT (datetime('now'))
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL,
+            description     TEXT DEFAULT '',
+            working_dir     TEXT NOT NULL,
+            claude_md       TEXT DEFAULT '',
+            env_vars        TEXT DEFAULT '{}',
+            git_url         TEXT DEFAULT NULL,
+            dir_strategy    TEXT NOT NULL DEFAULT 'persistent',
+            base_clone_path TEXT DEFAULT NULL,
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
         )`,
 
         `CREATE TABLE IF NOT EXISTS psk_contacts (
@@ -1146,6 +1149,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_work_task ON pr_outcomes(work_task_id)`,
         `CREATE INDEX IF NOT EXISTS idx_project_skills_project ON project_skills(project_id)`,
         `CREATE INDEX IF NOT EXISTS idx_projects_tenant ON projects(tenant_id)`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_tenant_name ON projects(tenant_id, name)`,
         `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
         `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
         `CREATE INDEX IF NOT EXISTS idx_question_dispatches_question ON owner_question_dispatches(question_id)`,

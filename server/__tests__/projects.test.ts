@@ -40,6 +40,9 @@ describe('createProject', () => {
         expect(project.description).toBe('');
         expect(project.claudeMd).toBe('');
         expect(project.envVars).toEqual({});
+        expect(project.gitUrl).toBeNull();
+        expect(project.dirStrategy).toBe('persistent');
+        expect(project.baseClonePath).toBeNull();
     });
 
     test('creates with all fields', () => {
@@ -51,6 +54,36 @@ describe('createProject', () => {
         expect(project.description).toBe('A test project');
         expect(project.claudeMd).toBe('# Instructions');
         expect(project.envVars).toEqual({ API_KEY: 'secret' });
+    });
+
+    test('creates with dir strategy fields', () => {
+        const project = makeProject({
+            gitUrl: 'https://github.com/example/repo.git',
+            dirStrategy: 'clone_on_demand',
+            baseClonePath: '/tmp/my-clones',
+        });
+        expect(project.gitUrl).toBe('https://github.com/example/repo.git');
+        expect(project.dirStrategy).toBe('clone_on_demand');
+        expect(project.baseClonePath).toBe('/tmp/my-clones');
+    });
+
+    test('creates with ephemeral strategy', () => {
+        const project = makeProject({
+            gitUrl: 'https://github.com/example/repo.git',
+            dirStrategy: 'ephemeral',
+        });
+        expect(project.dirStrategy).toBe('ephemeral');
+        expect(project.baseClonePath).toBeNull();
+    });
+
+    test('creates with worktree strategy', () => {
+        const project = makeProject({ dirStrategy: 'worktree' });
+        expect(project.dirStrategy).toBe('worktree');
+    });
+
+    test('invalid dirStrategy falls back to persistent', () => {
+        const project = makeProject({ dirStrategy: 'invalid_strategy' });
+        expect(project.dirStrategy).toBe('persistent');
     });
 });
 
@@ -106,6 +139,37 @@ describe('updateProject', () => {
 
     test('returns null for unknown id', () => {
         expect(updateProject(db, 'nonexistent', { name: 'X' })).toBeNull();
+    });
+
+    test('updates gitUrl', () => {
+        const project = makeProject();
+        const updated = updateProject(db, project.id, { gitUrl: 'https://github.com/test/repo.git' });
+        expect(updated!.gitUrl).toBe('https://github.com/test/repo.git');
+    });
+
+    test('updates dirStrategy', () => {
+        const project = makeProject();
+        const updated = updateProject(db, project.id, { dirStrategy: 'clone_on_demand' });
+        expect(updated!.dirStrategy).toBe('clone_on_demand');
+    });
+
+    test('updates baseClonePath', () => {
+        const project = makeProject();
+        const updated = updateProject(db, project.id, { baseClonePath: '/tmp/clones' });
+        expect(updated!.baseClonePath).toBe('/tmp/clones');
+    });
+
+    test('clears gitUrl with null', () => {
+        const project = makeProject({ gitUrl: 'https://github.com/test/repo.git' });
+        const updated = updateProject(db, project.id, { gitUrl: null });
+        expect(updated!.gitUrl).toBeNull();
+    });
+
+    test('rejects invalid dirStrategy on update', () => {
+        const project = makeProject({ dirStrategy: 'clone_on_demand' });
+        // Invalid strategy is silently ignored (no update applied for that field)
+        const updated = updateProject(db, project.id, { dirStrategy: 'bogus' as any });
+        expect(updated!.dirStrategy).toBe('clone_on_demand');
     });
 });
 

@@ -21,6 +21,7 @@ import { recordApiCost } from '../db/spending';
 import { getActiveServersForAgent } from '../db/mcp-servers';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { removeWorktree } from '../lib/worktree';
+import { resolveProjectDir, cleanupEphemeralDir, type ResolvedDir } from '../lib/project-dir';
 import { createLogger } from '../lib/logger';
 import { SessionEventBus } from './event-bus';
 import { SessionTimerManager } from './session-timer-manager';
@@ -57,6 +58,7 @@ export class ProcessManager {
     private processes: Map<string, SdkProcess> = new Map();
     private readonly eventBus = new SessionEventBus();
     private sessionMeta: Map<string, SessionMeta> = new Map();
+    private ephemeralDirs: Map<string, ResolvedDir> = new Map();
     private db: Database;
     readonly approvalManager: ApprovalManager;
     readonly ownerQuestionManager: OwnerQuestionManager;
@@ -195,17 +197,67 @@ export class ProcessManager {
             }
         }
 
-        // Use a minimal default project when session has no project
-        const effectiveProject = project ?? {
+        const defaultProject = {
             id: 'general',
             name: 'General',
             description: '',
             workingDir: process.cwd(),
             claudeMd: '',
             envVars: {},
+            gitUrl: null,
+            dirStrategy: 'persistent' as const,
+            baseClonePath: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
+
+        const baseProject = project ?? defaultProject;
+
+        // Resolve project directory for non-persistent strategies (async)
+        if (baseProject.dirStrategy !== 'persistent' && baseProject.dirStrategy !== 'worktree') {
+            this.startProcessWithResolvedDir(session, baseProject, effectiveAgent, resolvedPrompt, provider, options);
+            return;
+        }
+
+        // Use a minimal default project when session has no project
+        const effectiveProject = baseProject;
+
+        if (provider && provider.executionMode === 'direct') {
+            this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType);
+        } else {
+            this.startSdkProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, options?.depth, options?.schedulerMode, options?.schedulerActionType);
+        }
+    }
+
+    /**
+     * Resolve project directory for non-persistent strategies (clone_on_demand, ephemeral)
+     * then dispatch to the normal process start flow.
+     */
+    private async startProcessWithResolvedDir(
+        session: Session,
+        project: import('../../shared/types').Project,
+        effectiveAgent: import('../../shared/types').Agent | null,
+        resolvedPrompt: string,
+        provider: import('../providers/types').LlmProvider | undefined,
+        options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType },
+    ): Promise<void> {
+        const resolved = await resolveProjectDir(project);
+
+        if (resolved.error) {
+            log.warn('Failed to resolve project directory', { projectId: project.id, error: resolved.error });
+            this.eventBus.emit(session.id, {
+                type: 'error',
+                error: { message: `Failed to resolve project directory: ${resolved.error}`, type: 'dir_resolution_error' },
+            } as ClaudeStreamEvent);
+            return;
+        }
+
+        const effectiveProject = { ...project, workingDir: resolved.dir };
+
+        // Store cleanup reference for ephemeral dirs
+        if (resolved.ephemeral) {
+            this.ephemeralDirs.set(session.id, resolved);
+        }
 
         if (provider && provider.executionMode === 'direct') {
             this.startDirectProcessWrapped(session, effectiveProject, effectiveAgent, resolvedPrompt, provider, options?.depth, options?.schedulerMode, options?.schedulerActionType);
@@ -408,6 +460,9 @@ export class ProcessManager {
             workingDir: process.cwd(),
             claudeMd: '',
             envVars: {},
+            gitUrl: null,
+            dirStrategy: 'persistent' as const,
+            baseClonePath: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -902,9 +957,24 @@ export class ProcessManager {
     /**
      * Clean up worktrees created for chat sessions (not work tasks).
      * Chat worktree directories contain `/chat-` in the path.
+     * Also cleans up ephemeral project directories.
      * Fire-and-forget — errors are logged but do not block session cleanup.
      */
     private cleanupChatWorktree(sessionId: string): void {
+        // Clean up ephemeral project directories
+        const ephemeral = this.ephemeralDirs.get(sessionId);
+        if (ephemeral) {
+            this.ephemeralDirs.delete(sessionId);
+            cleanupEphemeralDir(ephemeral).catch((err) => {
+                log.warn('Failed to clean up ephemeral directory', {
+                    sessionId,
+                    dir: ephemeral.dir,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            });
+        }
+
+        // Clean up chat worktrees
         const session = getSession(this.db, sessionId);
         if (!session?.workDir || !session.workDir.includes('/chat-')) return;
 
