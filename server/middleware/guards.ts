@@ -281,6 +281,7 @@ export const ADMIN_PATHS = new Set([
     '/api/settings/credits',
     '/api/settings/api-key/rotate',
     '/api/settings/api-key/status',
+    '/api/settings/purge-test-data',
     // System logs expose escalation queue, work task details, and credit transactions
     '/api/system-logs',
     '/api/system-logs/credit-transactions',

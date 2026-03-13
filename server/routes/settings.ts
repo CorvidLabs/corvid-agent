@@ -8,6 +8,7 @@ import { json } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, UpdateCreditConfigSchema } from '../lib/validation';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
+import { purgeTestData } from '../db/purge-test-data';
 import {
     rotateApiKey,
     getApiKeyRotationStatus,
@@ -74,6 +75,11 @@ export function handleSettingsRoutes(req: Request, url: URL, db: Database, conte
             if (denied) return denied;
         }
         return handleDeleteDiscordConfigKey(db, discordKeyMatch[1], context);
+    }
+
+    // POST /api/settings/purge-test-data — remove test/sample data (admin-only via ADMIN_PATHS)
+    if (url.pathname === '/api/settings/purge-test-data' && req.method === 'POST') {
+        return handlePurgeTestData(req, db, context);
     }
 
     return null;
@@ -260,4 +266,23 @@ function handleDeleteDiscordConfigKey(db: Database, key: string, context?: Reque
     const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
     recordAudit(db, 'discord_config_delete', actor, 'discord_config', null, key);
     return json({ ok: true, deleted: key });
+}
+
+async function handlePurgeTestData(req: Request, db: Database, context?: RequestContext): Promise<Response> {
+    let dryRun = true;
+    try {
+        const body = await req.json() as { force?: boolean };
+        if (body.force === true) dryRun = false;
+    } catch {
+        // Empty body = dry run
+    }
+
+    const result = purgeTestData(db, { dryRun });
+
+    if (!dryRun) {
+        const actor = context?.walletAddress ?? context?.tenantId ?? 'admin';
+        recordAudit(db, 'purge_test_data', actor, 'database', null, JSON.stringify(result));
+    }
+
+    return json(result);
 }

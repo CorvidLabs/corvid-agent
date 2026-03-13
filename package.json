@@ -36,7 +36,8 @@
     "stats:check": "bun scripts/collect-stats.ts",
     "stats:update": "bun scripts/collect-stats.ts --update",
     "version:check": "bun scripts/version-check.ts",
-    "migrate:keys": "bun scripts/migrate-keys.ts"
+    "migrate:keys": "bun scripts/migrate-keys.ts",
+    "purge:test-data": "bun scripts/purge-test-data.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"
