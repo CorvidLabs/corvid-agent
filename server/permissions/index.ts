@@ -8,3 +8,11 @@ export type {
     GrantOptions,
     RevokeOptions,
 } from './types';
+export {
+    ROLE_TEMPLATES,
+    getRoleTemplate,
+    listRoleTemplates,
+    applyRoleTemplate,
+    revokeRoleTemplate,
+} from './role-templates';
+export type { RoleTemplate } from './role-templates';
