@@ -44,6 +44,9 @@ beforeAll(() => {
             mcp_servers TEXT DEFAULT '[]',
             claude_md TEXT DEFAULT '',
             env_vars TEXT DEFAULT '{}',
+            git_url TEXT DEFAULT NULL,
+            dir_strategy TEXT NOT NULL DEFAULT 'persistent',
+            base_clone_path TEXT DEFAULT NULL,
             tenant_id TEXT NOT NULL DEFAULT 'default',
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))

@@ -1149,7 +1149,6 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_pr_outcomes_work_task ON pr_outcomes(work_task_id)`,
         `CREATE INDEX IF NOT EXISTS idx_project_skills_project ON project_skills(project_id)`,
         `CREATE INDEX IF NOT EXISTS idx_projects_tenant ON projects(tenant_id)`,
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_tenant_name ON projects(tenant_id, name)`,
         `CREATE INDEX IF NOT EXISTS idx_psk_contacts_active ON psk_contacts(active, network)`,
         `CREATE INDEX IF NOT EXISTS idx_psk_contacts_network ON psk_contacts(network)`,
         `CREATE INDEX IF NOT EXISTS idx_question_dispatches_question ON owner_question_dispatches(question_id)`,
