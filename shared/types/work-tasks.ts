@@ -51,4 +51,7 @@ export interface CreateWorkTaskInput {
     maxRetries?: number;
     retryBackoff?: RetryBackoff;
     dependsOn?: string[];
+    /** Explicit issue reference for deduplication. If provided, the service will reject
+     *  the task if an open PR or active work task already addresses this issue. */
+    issueRef?: { repo: string; number: number };
 }

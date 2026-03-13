@@ -22,6 +22,7 @@ import {
     resumePausedTask,
     getPendingTasksForProject,
     countQueuedTasks,
+    findActiveTasksForIssue,
 } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { recordAudit } from '../db/audit';
@@ -368,31 +369,50 @@ export class WorkTaskService {
             );
         }
 
-        // Dedup check: if description references a GitHub issue (#NNN), skip if an open PR already exists
-        if (repoSlug) {
-            const issueMatch = input.description.match(/#(\d+)/);
-            if (issueMatch) {
-                const issueNumber = parseInt(issueMatch[1], 10);
+        // Dedup check: reject if an open PR or active work task already addresses the same issue.
+        // Resolve issue ref from explicit input first, then fall back to parsing description.
+        const dedupRepo = input.issueRef?.repo ?? repoSlug;
+        const issueMatch = input.description.match(/#(\d+)/);
+        const dedupIssueNumber = input.issueRef?.number ?? (issueMatch ? parseInt(issueMatch[1], 10) : null);
+
+        if (dedupIssueNumber !== null) {
+            // 1. Check for an active/pending work task already targeting this issue
+            const existingTasks = findActiveTasksForIssue(this.db, dedupIssueNumber);
+            if (existingTasks.length > 0) {
+                const existing = existingTasks[0];
+                log.info('Skipping work task — active task already addresses issue', {
+                    issueNumber: dedupIssueNumber,
+                    existingTaskId: existing.id,
+                    existingTaskStatus: existing.status,
+                });
+                throw new ConflictError(
+                    `An active work task already addresses issue #${dedupIssueNumber}. Skipping.`,
+                    { issueNumber: dedupIssueNumber, existingTaskId: existing.id, existingTaskStatus: existing.status },
+                );
+            }
+
+            // 2. Check for an open PR already addressing this issue
+            if (dedupRepo) {
                 try {
-                    const search = await searchOpenPrsForIssue(repoSlug, issueNumber);
+                    const search = await searchOpenPrsForIssue(dedupRepo, dedupIssueNumber);
                     if (search.ok && search.prs.length > 0) {
                         const existingPr = search.prs[0];
-                        log.info('Skipping work task — PR already addresses issue', {
-                            issueNumber,
+                        log.info('Skipping work task — open PR already addresses issue', {
+                            issueNumber: dedupIssueNumber,
                             existingPr: existingPr.number,
                             prUrl: existingPr.url,
-                            repo: repoSlug,
+                            repo: dedupRepo,
                         });
                         throw new ConflictError(
-                            `Skipping work task — PR #${existingPr.number} already addresses issue #${issueNumber}`,
-                            { issueNumber, existingPr: existingPr.number, prUrl: existingPr.url },
+                            `An open PR (or active work task) already addresses issue #${dedupIssueNumber}. Skipping.`,
+                            { issueNumber: dedupIssueNumber, existingPr: existingPr.number, prUrl: existingPr.url },
                         );
                     }
                 } catch (err) {
                     if (err instanceof ConflictError) throw err;
-                    // Non-fatal: if we can't check, proceed with task creation
+                    // Non-fatal: if the GitHub check fails, proceed with task creation
                     log.warn('Failed to check for existing PRs', {
-                        issueNumber,
+                        issueNumber: dedupIssueNumber,
                         error: err instanceof Error ? err.message : String(err),
                     });
                 }
