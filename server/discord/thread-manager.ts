@@ -65,7 +65,8 @@ export function subscribeForResponseWithEmbed(
     let receivedAnyContent = false;
     const STATUS_DEBOUNCE_MS = 3000;
     const TYPING_REFRESH_MS = 8000;
-    const TYPING_TIMEOUT_MS = 2 * 60 * 1000; // 2 minute safety timeout
+    const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
+    let receivedAnyActivity = false; // tracks any activity (content OR tool use)
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
@@ -91,7 +92,7 @@ export function subscribeForResponseWithEmbed(
     const typingSafetyTimeout = setTimeout(() => {
         clearInterval(typingInterval);
         log.warn('Typing indicator safety timeout reached', { sessionId, threadId });
-        if (!receivedAnyContent) {
+        if (!receivedAnyActivity) {
             sendEmbed(delivery, botToken, threadId, {
                 description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
                 color: 0xf0b232,
@@ -128,6 +129,7 @@ export function subscribeForResponseWithEmbed(
 
             if (content) {
                 receivedAnyContent = true;
+                receivedAnyActivity = true;
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
@@ -143,6 +145,7 @@ export function subscribeForResponseWithEmbed(
         }
 
         if (event.type === 'tool_status' && event.statusMessage) {
+            receivedAnyActivity = true;
             const now = Date.now();
             if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
                 lastStatusTime = now;
@@ -230,7 +233,8 @@ export function subscribeForInlineResponse(
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let receivedAnyContent = false;
     const TYPING_REFRESH_MS = 8000;
-    const TYPING_TIMEOUT_MS = 2 * 60 * 1000; // 2 minute safety timeout
+    const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
+    let receivedAnyActivity = false; // tracks any activity (content OR tool use)
     const color = agentColor(agentName);
 
     // Keep typing indicator alive continuously until response completes
@@ -256,7 +260,7 @@ export function subscribeForInlineResponse(
     const typingSafetyTimeout = setTimeout(() => {
         clearInterval(typingInterval);
         log.warn('Typing indicator safety timeout reached (inline)', { sessionId, channelId });
-        if (!receivedAnyContent) {
+        if (!receivedAnyActivity) {
             sendEmbed(delivery, botToken, channelId, {
                 description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
                 color: 0xf0b232,
@@ -301,10 +305,15 @@ export function subscribeForInlineResponse(
             const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
             if (content) {
                 receivedAnyContent = true;
+                receivedAnyActivity = true;
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
             }
+        }
+
+        if (event.type === 'tool_status') {
+            receivedAnyActivity = true;
         }
 
         if (event.type === 'result') {
