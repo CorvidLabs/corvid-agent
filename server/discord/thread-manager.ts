@@ -62,12 +62,26 @@ export function subscribeForResponseWithEmbed(
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let lastStatusTime = 0;
     let lastTypingTime = 0;
+    let receivedAnyContent = false;
     const STATUS_DEBOUNCE_MS = 3000;
     const TYPING_REFRESH_MS = 8000;
-    const TYPING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minute safety timeout
+    const TYPING_TIMEOUT_MS = 2 * 60 * 1000; // 2 minute safety timeout
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
+        // Check if the process is still alive
+        if (!processManager.isRunning(sessionId)) {
+            clearTyping();
+            log.warn('Process died while typing indicator active', { sessionId, threadId });
+            if (!receivedAnyContent) {
+                sendEmbed(delivery, botToken, threadId, {
+                    description: 'The agent session ended unexpectedly. Send a message to start a new session.',
+                    color: 0xff3355,
+                }).catch(() => {});
+            }
+            threadCallbacks.delete(threadId);
+            return;
+        }
         sendTypingIndicator(botToken, threadId).catch((err) => {
             log.debug('Typing indicator failed', { threadId, error: err instanceof Error ? err.message : String(err) });
         });
@@ -77,6 +91,12 @@ export function subscribeForResponseWithEmbed(
     const typingSafetyTimeout = setTimeout(() => {
         clearInterval(typingInterval);
         log.warn('Typing indicator safety timeout reached', { sessionId, threadId });
+        if (!receivedAnyContent) {
+            sendEmbed(delivery, botToken, threadId, {
+                description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
+                color: 0xf0b232,
+            }).catch(() => {});
+        }
     }, TYPING_TIMEOUT_MS);
 
     const clearTyping = () => {
@@ -107,6 +127,7 @@ export function subscribeForResponseWithEmbed(
             const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
 
             if (content) {
+                receivedAnyContent = true;
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
@@ -207,12 +228,25 @@ export function subscribeForInlineResponse(
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let receivedAnyContent = false;
     const TYPING_REFRESH_MS = 8000;
-    const TYPING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minute safety timeout
+    const TYPING_TIMEOUT_MS = 2 * 60 * 1000; // 2 minute safety timeout
     const color = agentColor(agentName);
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
+        // Check if the process is still alive
+        if (!processManager.isRunning(sessionId)) {
+            clearTyping();
+            log.warn('Process died while typing indicator active (inline)', { sessionId, channelId });
+            if (!receivedAnyContent) {
+                sendEmbed(delivery, botToken, channelId, {
+                    description: 'The agent session ended unexpectedly. Send a message to start a new session.',
+                    color: 0xff3355,
+                }).catch(() => {});
+            }
+            return;
+        }
         sendTypingIndicator(botToken, channelId).catch((err) => {
             log.debug('Typing indicator failed (inline)', { channelId, error: err instanceof Error ? err.message : String(err) });
         });
@@ -222,6 +256,12 @@ export function subscribeForInlineResponse(
     const typingSafetyTimeout = setTimeout(() => {
         clearInterval(typingInterval);
         log.warn('Typing indicator safety timeout reached (inline)', { sessionId, channelId });
+        if (!receivedAnyContent) {
+            sendEmbed(delivery, botToken, channelId, {
+                description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
+                color: 0xf0b232,
+            }).catch(() => {});
+        }
     }, TYPING_TIMEOUT_MS);
 
     const clearTyping = () => {
@@ -260,6 +300,7 @@ export function subscribeForInlineResponse(
             const msg = event.message as { content?: unknown };
             const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
             if (content) {
+                receivedAnyContent = true;
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
