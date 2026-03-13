@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { migrateUp } from '../db/migrate';
-import { PermissionBroker } from '../permissions/broker';
+import { PermissionBroker, _resetHmacSecretForTesting } from '../permissions/broker';
 import { TOOL_ACTION_MAP } from '../permissions/types';
 
 let db: Database;
@@ -486,6 +486,77 @@ describe('permission routes', () => {
         const req = new Request(url, { method: 'GET' });
         const res = handlePermissionRoutes(req, url, db);
         expect(res).toBeNull();
+    });
+});
+
+// ─── HMAC secret management ─────────────────────────────────────────
+
+describe('HMAC secret', () => {
+    const origEnv = process.env.PERMISSION_HMAC_SECRET;
+
+    afterEach(() => {
+        // Restore env and reset cached secret
+        if (origEnv !== undefined) {
+            process.env.PERMISSION_HMAC_SECRET = origEnv;
+        } else {
+            delete process.env.PERMISSION_HMAC_SECRET;
+        }
+        _resetHmacSecretForTesting();
+    });
+
+    test('uses env var when set', async () => {
+        process.env.PERMISSION_HMAC_SECRET = 'test-secret-value';
+        _resetHmacSecretForTesting();
+
+        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
+        expect(grant.signature).toBeTruthy();
+
+        // Verify the grant checks out
+        const result = await broker.checkAction(AGENT_ID, 'git:read');
+        expect(result.allowed).toBe(true);
+    });
+
+    test('generates ephemeral secret when env var is unset', async () => {
+        delete process.env.PERMISSION_HMAC_SECRET;
+        _resetHmacSecretForTesting();
+
+        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
+        expect(grant.signature).toBeTruthy();
+        expect(grant.signature.length).toBe(64);
+
+        // Grant should still verify within the same session
+        const result = await broker.checkAction(AGENT_ID, 'git:read');
+        expect(result.allowed).toBe(true);
+    });
+
+    test('ephemeral secret is consistent within a session', async () => {
+        delete process.env.PERMISSION_HMAC_SECRET;
+        _resetHmacSecretForTesting();
+
+        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
+        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
+
+        // Both should verify correctly (same secret used)
+        const r1 = await broker.checkAction(AGENT_ID, 'git:read');
+        const r2 = await broker.checkAction(AGENT_ID, 'msg:send');
+        expect(r1.allowed).toBe(true);
+        expect(r2.allowed).toBe(true);
+    });
+
+    test('grants from one ephemeral secret fail after reset', async () => {
+        delete process.env.PERMISSION_HMAC_SECRET;
+        _resetHmacSecretForTesting();
+
+        // Create a grant with one ephemeral secret
+        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
+
+        // Reset = simulate server restart with no env var
+        _resetHmacSecretForTesting();
+
+        // The old grant's HMAC should no longer verify
+        const result = await broker.checkAction(AGENT_ID, 'git:read');
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toContain('invalid HMAC signature');
     });
 });
 

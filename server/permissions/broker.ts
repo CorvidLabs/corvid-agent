@@ -21,9 +21,35 @@ import { TOOL_ACTION_MAP } from './types';
 
 const log = createLogger('PermissionBroker');
 
-/** HMAC secret — from env or a safe default for local dev. */
+/**
+ * HMAC secret — from env, or auto-generated per startup for local dev.
+ * In production, the env var is required; a missing secret logs a warning
+ * and falls back to a random ephemeral key (grants won't survive restarts).
+ */
+let _cachedHmacSecret: string | null = null;
 function getHmacSecret(): string {
-    return process.env.PERMISSION_HMAC_SECRET || 'corvid-agent-dev-hmac-secret';
+    if (_cachedHmacSecret) return _cachedHmacSecret;
+
+    const envSecret = process.env.PERMISSION_HMAC_SECRET;
+    if (envSecret) {
+        _cachedHmacSecret = envSecret;
+        return envSecret;
+    }
+
+    // No env var — generate a random ephemeral secret
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+        log.warn('PERMISSION_HMAC_SECRET not set in production — using ephemeral random key. Permission grants will not survive restarts. Set PERMISSION_HMAC_SECRET to a stable secret.');
+    } else {
+        log.warn('PERMISSION_HMAC_SECRET not set — using ephemeral random key for local dev.');
+    }
+    _cachedHmacSecret = crypto.randomUUID() + crypto.randomUUID();
+    return _cachedHmacSecret;
+}
+
+/** Reset cached HMAC secret (for tests only). */
+export function _resetHmacSecretForTesting(): void {
+    _cachedHmacSecret = null;
 }
 
 /** Sign a grant payload with HMAC-SHA256. */
