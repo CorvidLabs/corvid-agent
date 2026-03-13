@@ -25,7 +25,10 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| (none — all functionality is on the `PermissionBroker` class) | | | |
+| `getRoleTemplate` | `(name: string)` | `RoleTemplate \| undefined` | Look up a role template by name (re-exported from `role-templates`) |
+| `listRoleTemplates` | `()` | `readonly RoleTemplate[]` | List all available role templates (re-exported from `role-templates`) |
+| `applyRoleTemplate` | `(db, agentId, templateName, grantedBy, opts?)` | `Promise<{...}>` | Apply a role template to an agent (re-exported from `role-templates`) |
+| `revokeRoleTemplate` | `(db, agentId, templateName, revokedBy, opts?)` | `{...}` | Revoke all grants matching a role template (re-exported from `role-templates`) |
 
 ### Exported Types
 
@@ -37,12 +40,14 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | `PermissionCheckResult` | Check result with allowed, grantId, reason, checkMs |
 | `GrantOptions` | Options for creating a grant: agentId, action, grantedBy, reason?, expiresAt?, tenantId? |
 | `RevokeOptions` | Options for revoking: grantId?, agentId?, action?, revokedBy, reason?, tenantId? |
+| `RoleTemplate` | A role template with `name`, `description`, and `actions` (re-exported from `role-templates`) |
 
 ### Exported Constants
 
 | Constant | Type | Description |
 |----------|------|-------------|
 | `TOOL_ACTION_MAP` | `Record<string, PermissionAction>` | Maps MCP tool names (e.g. `corvid_github_create_pr`) to their required permission action (e.g. `git:create_pr`). Currently maps 30+ tools across 11 namespaces |
+| `ROLE_TEMPLATES` | `readonly RoleTemplate[]` | Built-in role templates: owner, operator, viewer, developer, communicator (re-exported from `role-templates`) |
 
 ### Exported Classes
 

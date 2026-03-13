@@ -4,7 +4,6 @@ version: 1
 status: active
 files:
   - server/permissions/role-templates.ts
-  - server/permissions/index.ts
 depends_on:
   - specs/permissions/broker.spec.md
 ---
