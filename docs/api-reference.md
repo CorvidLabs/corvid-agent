@@ -12,7 +12,6 @@ Role-based access levels:
 - **any** — any authenticated user
 - **operator** — operator or owner role
 - **owner** — owner role only
-- **admin** — requires the admin API key (`ADMIN_API_KEY`)
 
 ---
 
@@ -1312,14 +1311,6 @@ The following modules are fully documented in the interactive API explorer at `/
 | Bridge Delivery | `/api/bridges/delivery` | Bridge delivery metrics |
 | Backup | `POST /api/backup` | Database backup trigger |
 | Self-Test | `POST /api/selftest/run` | Self-test suite runner |
-| Projects | `/api/projects/*` | Project CRUD and directory browsing |
-| Proposals | `/api/proposals/*` | Governance proposal CRUD, transitions, evaluation |
-| Exam | `/api/exam/*` | Model exam runner and category listing |
-| Plugins | `/api/plugins/*` | Plugin load/unload, capability grant/revoke |
-| Providers | `/api/providers/*` | LLM provider listing and model discovery |
-| Operational Mode | `/api/operational-mode` | Get/set operational mode |
-| Memories | `POST /api/memories/backfill` | Memory embedding backfill |
-| Slack | `POST /slack/events` | Slack Events API webhook |
 
 ---
 
