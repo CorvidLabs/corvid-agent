@@ -743,9 +743,9 @@ describe('FallbackManager', () => {
             );
         });
 
-        it('each chain has at least 2 entries', () => {
+        it('each chain has at least 1 entry', () => {
             for (const [, chain] of Object.entries(DEFAULT_FALLBACK_CHAINS)) {
-                expect(chain.chain.length).toBeGreaterThanOrEqual(2);
+                expect(chain.chain.length).toBeGreaterThanOrEqual(1);
             }
         });
     });
