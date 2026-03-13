@@ -13,6 +13,7 @@ function createMockProcessManager() {
         subscribe: mock(() => {}),
         unsubscribe: mock(() => {}),
         resumeProcess: mock(() => {}),
+        isRunning: mock(() => true),
     } as unknown as import('../process/manager').ProcessManager;
 }
 
