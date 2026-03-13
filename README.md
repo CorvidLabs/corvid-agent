@@ -153,7 +153,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 |--------|-------|
 | MCP tools | **41** corvid_* tool handlers |
 | API endpoints | **~300** across 44 route modules |
-| DB migrations | **6** (squashed baseline + 3 post-squash, 90 tables) |
+| DB migrations | **7** (squashed baseline + 3 post-squash, 90 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
