@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.26.0] - 2026-03-12
+## [0.26.0] - 2026-03-13
 
 ### Added
 - **Agent security hardening** — tier-based agent permissions (untrusted/standard/trusted/admin), per-agent session limits, and input sanitization (#986)
@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - **RC checklist expansion** — 9 additional gating criteria checks for v1.0.0-rc (#310, #977)
 
 ### Security
+- **Ephemeral HMAC key** — replace hardcoded HMAC fallback with ephemeral random key (#982)
 - **Plaintext wallet key removal** — eliminate plaintext wallet key escape hatch entirely (#924, #973)
 - **Branch protection** — enable branch protection on main branch (#966)
 - **CORS production warning** — repo-blocklist tenant scoping and CORS hardening (#963)
@@ -20,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - **SECURITY.md formatting** — fix formatting issues in security documentation (#976)
 
 ### Fixed
+- **Discord typing indicator** — fix typing indicator liveness checks (#995)
 - **Discord permission spam** — stop spamming permission denials in monitored channels (#980)
 - **Discord role mentions** — respond to role mentions, not just direct bot mentions (#964)
 - **Duplicate work tasks** — prevent duplicate work tasks and PRs for the same issue (#974, #978)
@@ -29,18 +31,20 @@ All notable changes to this project will be documented in this file.
 - **Silent catches** — add debug logging to silent fire-and-forget catch handlers (#975)
 
 ### Tests
-- **+127 new tests** — expanded coverage for 5 untested modules (+67), worktree isolation, role templates, work task dedup (#971, #978, #979, #983)
+- **+209 new tests** — expanded coverage for 5 untested modules (+67), worktree isolation, role templates, work task dedup, tenant route tests (#971, #978, #979, #983, #994)
 
 ### Documentation
+- **API module docs** — add 8 undocumented API modules and fix stale refs (#993)
 - **README + API sync** — sync README and API reference with current codebase (#968)
 - **TaskQueueService spec** — document exports for TaskQueueService module (#969)
+- **Module specs** — add specs for bash-security, code-scanner, fetch-detector, github-searcher (#997)
 
 ### Stats
-- **6,573** unit tests across 274 files (18,030 assertions)
+- **6,655** unit tests across 278 files (18,335 assertions)
 - **360** E2E tests across 31 Playwright specs
-- **123** module specs with automated validation
+- **127** module specs with automated validation
 - **41** MCP tools, **~300** API endpoints, **44** route modules, **90** tables
-- **14** commits on main, **2** PRs open
+- **27** commits on main
 
 ## [0.25.4] - 2026-03-11
 
