@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resolveProjectDir, cleanupEphemeralDir, type ResolvedDir } from '../lib/project-dir';
 import type { Project } from '../../shared/types';
 
-const TEST_BASE = resolve(tmpdir(), `corvid-test-project-dir-${Date.now()}`);
+const TEST_BASE = mkdtempSync(resolve(tmpdir(), 'corvid-test-project-dir-'));
 const FAKE_REPO = resolve(TEST_BASE, 'fake-repo');
 
 function makeTestProject(overrides: Partial<Project> = {}): Project {
