@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 84;
+const SCHEMA_VERSION = 85;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -711,15 +711,18 @@ const MIGRATIONS: Record<number, string[]> = {
         )`,
 
         `CREATE TABLE IF NOT EXISTS projects (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            working_dir TEXT NOT NULL,
-            claude_md   TEXT DEFAULT '',
-            env_vars    TEXT DEFAULT '{}',
-            tenant_id   TEXT NOT NULL DEFAULT 'default',
-            created_at  TEXT DEFAULT (datetime('now')),
-            updated_at  TEXT DEFAULT (datetime('now'))
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL,
+            description     TEXT DEFAULT '',
+            working_dir     TEXT NOT NULL,
+            claude_md       TEXT DEFAULT '',
+            env_vars        TEXT DEFAULT '{}',
+            git_url         TEXT DEFAULT NULL,
+            dir_strategy    TEXT NOT NULL DEFAULT 'persistent',
+            base_clone_path TEXT DEFAULT NULL,
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
         )`,
 
         `CREATE TABLE IF NOT EXISTS psk_contacts (

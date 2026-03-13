@@ -100,12 +100,17 @@ export function parseQuery<T extends z.ZodType>(
 
 // ─── Projects ──────────────────────────────────────────────────────────────────
 
+const DirStrategySchema = z.enum(['persistent', 'clone_on_demand', 'ephemeral', 'worktree']);
+
 export const CreateProjectSchema = z.object({
     name: z.string().min(1, 'name is required'),
     workingDir: z.string().min(1, 'workingDir is required'),
     description: z.string().optional(),
     allowedTools: z.array(z.string()).optional(),
     customInstructions: z.string().optional(),
+    gitUrl: z.string().url().optional(),
+    dirStrategy: DirStrategySchema.optional(),
+    baseClonePath: z.string().optional(),
     mcpServers: z.array(z.object({
         name: z.string().min(1),
         command: z.string().min(1).optional(),
@@ -121,6 +126,9 @@ export const UpdateProjectSchema = z.object({
     description: z.string().optional(),
     allowedTools: z.array(z.string()).optional(),
     customInstructions: z.string().optional(),
+    gitUrl: z.string().url().nullable().optional(),
+    dirStrategy: DirStrategySchema.optional(),
+    baseClonePath: z.string().nullable().optional(),
     mcpServers: z.array(z.object({
         name: z.string().min(1),
         command: z.string().min(1).optional(),
