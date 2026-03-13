@@ -143,10 +143,12 @@ ${toolList}
 
 ### Rules for tool calls:
 1. When calling a tool, ONLY make the tool call. Do not include narration, explanation, or commentary text alongside the tool call. Either respond with text OR make a tool call, not both.
-2. When a task requires multiple steps, complete ALL steps. After receiving each tool result, continue with the next action. Do not stop after a single tool call if more steps are needed.
+2. When a task requires multiple steps, complete ALL steps. After receiving each tool result, IMMEDIATELY continue with the next action. Do not stop after a single tool call if more steps are needed. You MUST keep going until the task is fully complete.
 3. Pass tool arguments as proper JSON objects with the correct parameter names and types.
 4. If a tool call fails, read the error message carefully and retry with corrected arguments.
-5. Do not invent or hallucinate tool names — only use tools from the available list.`;
+5. Do not invent or hallucinate tool names — only use tools from the available list.
+6. Stay focused on the task. Do NOT explore directories or read files unrelated to what you were asked to do.
+7. When you receive a tool result, evaluate it and take the next logical action. Do NOT stop to narrate or explain — just call the next tool.`;
 }
 
 function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []): string | null {
@@ -157,9 +159,12 @@ function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []):
         case 'llama':
             return `### Llama-specific guidance
 - You have native tool calling support. Use the tool call format provided by the system.
-- After receiving a tool result, evaluate whether the task is complete. If not, make the next tool call immediately.
-- Do NOT narrate what you are about to do before making a tool call. Just make the call directly.
-- When you have finished all necessary tool calls and have the information needed, provide your final response as plain text.`;
+- CRITICAL: After receiving a tool result, you MUST continue working. Evaluate the result and immediately make the next tool call. Do NOT stop after one tool call.
+- Do NOT narrate what you are about to do. Do NOT describe your plan. Just make the tool call directly.
+- Do NOT ask for permission or confirmation. Take action immediately.
+- Do NOT explore the entire project. Only read files directly needed for your specific task.
+- When you have finished ALL necessary tool calls and have completed the task, provide your final response as plain text.
+- If the task involves creating a PR or making changes, you must actually use the tools to do it — do not just describe what you would do.`;
 
         case 'qwen2':
             return `### Qwen-specific guidance

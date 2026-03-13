@@ -17,11 +17,13 @@ import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '..
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
 import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { ExternalMcpClientManager } from '../mcp/external-client';
+import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
+import { AgentSessionLimiter } from '../lib/agent-session-limits';
+import { sanitizeAgentInput } from '../lib/agent-input-sanitizer';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('DirectProcess');
 
-const MAX_TOOL_ITERATIONS = 25;
 const MAX_MESSAGES = 40;
 const KEEP_RECENT = 30;
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -269,6 +271,15 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
     const model = modelOverride ?? agent?.model ?? provider.getInfo().defaultModel;
 
+    // Tier-based limits for this agent's model
+    const tierConfig = getAgentTierConfig(model);
+    const sessionLimiter = new AgentSessionLimiter(session.id, model);
+    log.info(`Agent tier: ${tierConfig.tier} for model ${model}`, {
+        maxIterations: tierConfig.maxToolIterations,
+        maxNudges: tierConfig.maxNudges,
+        sessionId: session.id,
+    });
+
     // Connect external MCP servers and merge their tools before starting the loop
     const initPromise = (async () => {
         if (!isDeliberationSession && externalMcpConfigs && externalMcpConfigs.length > 0) {
@@ -291,12 +302,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     const messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }> = [];
 
     // For AlgoChat/agent-sourced sessions, prepend routing context to the initial prompt
-    const effectivePrompt = prependRoutingContext(prompt, session.source);
+    const effectivePrompt = prependRoutingContext(prompt, session.source, tierConfig);
 
     // Wait for external MCP initialization, then build system prompt and start loop
     initPromise.then(() => {
         const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-        systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt);
+        systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt, tierConfig);
         return runLoop(effectivePrompt);
     }).catch((err) => {
         if (aborted) return;
@@ -378,8 +389,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let needsSummary = false; // Set true when loop breaks abnormally (repeat/max-iter)
         const MAX_REPEATS = 2; // Break if same tool+args called 3 times in a row
         const MAX_SAME_TOOL = 4; // Break if same tool name called 5 times (even with different args)
-        const MAX_NUDGES = 2; // Don't nudge more than twice — model isn't going to start using tools
-        const MAX_MID_CHAIN_NUDGES = 2; // Allow nudging mid-chain when model hallucinates results
+        // Tier-based nudge limits: weaker models get more nudges (they need more guidance)
+        const MAX_NUDGES = tierConfig.maxNudges;
+        const MAX_MID_CHAIN_NUDGES = tierConfig.maxMidChainNudges;
+        const MAX_TOOL_ITERATIONS = tierConfig.maxToolIterations;
+        let explorationToolCalls = 0; // Track how many list_files/search_files calls
 
         try {
 
@@ -523,6 +537,14 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         continue;
                     }
 
+                    // Session rate limiting (tier-based)
+                    const rateLimitError = sessionLimiter.checkAndIncrement(toolCall.name);
+                    if (rateLimitError) {
+                        messages.push({ role: 'tool', content: rateLimitError, toolCallId: toolCall.id });
+                        emitToolStatus(toolCall.name, rateLimitError, true);
+                        continue;
+                    }
+
                     // Permission check via approval flow
                     const permitted = await checkToolPermission(
                         toolCall, session, agent, approvalManager, onApprovalRequest,
@@ -569,6 +591,26 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
                         emitToolStatus(toolCall.name, errorText, true);
                     }
+                }
+
+                // Exploration drift detection: if the agent is calling exploration
+                // tools excessively, inject a focus reminder
+                const explorationTools = new Set(['list_files', 'search_files']);
+                const driftCalls = result.toolCalls.filter(tc => explorationTools.has(tc.name));
+                explorationToolCalls += driftCalls.length;
+                if (explorationToolCalls >= 5 && tierConfig.tier !== 'high') {
+                    log.info('Exploration drift detected — injecting focus reminder', {
+                        explorationCalls: explorationToolCalls,
+                        tier: tierConfig.tier,
+                        sessionId: session.id,
+                    });
+                    messages.push({
+                        role: 'user',
+                        content: 'FOCUS: You have been exploring many directories. Stop browsing and focus on the specific task. '
+                            + 'Only read files that are directly relevant to completing the task. '
+                            + 'If you have enough information, proceed to take action now.',
+                    });
+                    explorationToolCalls = 0; // Reset so we don't spam
                 }
 
                 // Continue loop to let the model process tool results
@@ -800,7 +842,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
 // ── Nudge system ──────────────────────────────────────────────────────────
 
-type NudgeReason = 'promisedAction' | 'tooShort' | 'wroteButDidntAct' | 'askedInsteadOfActing';
+type NudgeReason = 'promisedAction' | 'tooShort' | 'wroteButDidntAct' | 'askedInsteadOfActing' | 'explorationDrift';
 
 /**
  * Detect if the model's response indicates it should have called a tool but didn't.
@@ -865,6 +907,12 @@ function buildNudgeMessage(reason: NudgeReason, tools: DirectToolDefinition[]): 
             }
             return 'You wrote a text response, but this task requires using tools. ' +
                 'Call the appropriate tool now as a JSON array: [{"name": "tool_name", "arguments": {...}}]';
+
+        case 'explorationDrift':
+            return 'FOCUS: You are exploring too many files and directories. ' +
+                'Stop browsing and focus on the specific task you were given. ' +
+                'Only read files that are directly needed to complete the task. ' +
+                'Take action now — do not explore further.';
     }
 }
 
@@ -902,11 +950,19 @@ function normalizeArgsForComparison(obj: unknown): string {
  * knows to reply with text directly rather than wrapping responses in
  * corvid_send_message tool calls.
  */
-function prependRoutingContext(message: string, source: string): string {
-    if (source === 'algochat' || source === 'agent') {
-        return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${message}`;
+function prependRoutingContext(message: string, source: string, tierConfig?: AgentTierConfig): string {
+    let sanitizedMessage = message;
+
+    // Sanitize external content for non-high-tier agents
+    if (tierConfig && tierConfig.tier !== 'high') {
+        const result = sanitizeAgentInput(message, source);
+        sanitizedMessage = result.text;
     }
-    return message;
+
+    if (source === 'algochat' || source === 'agent') {
+        return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${sanitizedMessage}`;
+    }
+    return sanitizedMessage;
 }
 
 interface ToolDef {
@@ -924,6 +980,7 @@ function buildSystemPrompt(
     isDeliberation = false,
     personaPrompt?: string,
     skillPrompt?: string,
+    agentTierConfig?: AgentTierConfig,
 ): string {
     const parts: string[] = [];
 
@@ -978,6 +1035,41 @@ function buildSystemPrompt(
         if (toolNames.includes('read_file')) {
             parts.push('', getCodingToolPrompt());
         }
+    }
+
+    // Add focus/scoping instructions for non-high-tier agents
+    if (agentTierConfig && agentTierConfig.tier !== 'high') {
+        parts.push('', getAgentScopingInstructions(agentTierConfig));
+    }
+
+    return parts.join('\n');
+}
+
+/**
+ * Generate scoping/focus instructions for non-high-tier agents.
+ * These help prevent unfocused exploration and tool misuse.
+ */
+function getAgentScopingInstructions(tierConfig: AgentTierConfig): string {
+    const parts = [
+        '## Task Focus Guidelines',
+        '',
+        'IMPORTANT: Stay focused on the specific task you were given.',
+        '- Do NOT explore directories or files unrelated to the task.',
+        '- Do NOT browse the entire project structure. Only read files directly relevant to completing the task.',
+        '- Before reading a file, ask yourself: "Is this file necessary for completing my specific task?"',
+        '- If the task is about a specific file or module, focus only on that area.',
+        '- Complete the task as efficiently as possible with the minimum number of tool calls.',
+    ];
+
+    if (tierConfig.tier === 'limited') {
+        parts.push(
+            '',
+            'CRITICAL CONSTRAINTS:',
+            `- You have a maximum of ${tierConfig.maxToolIterations} tool calls. Use them wisely.`,
+            `- You may create at most ${tierConfig.maxPrsPerSession} PR(s) and ${tierConfig.maxIssuesPerSession} issue(s) per session.`,
+            '- Plan your approach before making tool calls. Do not explore randomly.',
+            '- If you are unsure what to do, state your uncertainty rather than exploring blindly.',
+        );
     }
 
     return parts.join('\n');
