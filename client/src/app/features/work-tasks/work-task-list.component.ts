@@ -97,7 +97,12 @@ import { WorkTask } from '../../core/models/work-task.model';
                                     </span>
                                 }
                                 <span class="task-agent">{{ getAgentName(task.agentId) }}</span>
-                                <span class="task-time">{{ task.createdAt | relativeTime }}</span>
+                                <span class="task-time">
+                                    {{ task.createdAt | relativeTime }}
+                                    @if (task.completedAt) {
+                                        <span class="task-duration">{{ getDuration(task) }}</span>
+                                    }
+                                </span>
                             </div>
                             <p class="task-desc">{{ task.description }}</p>
                             @if (task.status === 'running' || task.status === 'branching' || task.status === 'validating') {
@@ -302,6 +307,18 @@ import { WorkTask } from '../../core/models/work-task.model';
         .task-time {
             font-size: 0.65rem;
             color: var(--text-tertiary);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .task-duration {
+            font-size: 0.6rem;
+            color: var(--text-tertiary);
+            background: var(--bg-raised);
+            padding: 1px 5px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-family: var(--font-mono, monospace);
         }
 
         .task-desc {
@@ -502,6 +519,20 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
         if (!task.branchName) return '#';
         const repo = task.projectId || 'CorvidLabs/corvid-agent';
         return `https://github.com/${repo}/tree/${encodeURIComponent(task.branchName)}`;
+    }
+
+    protected getDuration(task: WorkTask): string {
+        if (!task.completedAt) return '';
+        const ms = new Date(task.completedAt).getTime() - new Date(task.createdAt).getTime();
+        if (ms < 0) return '';
+        const seconds = Math.floor(ms / 1000);
+        if (seconds < 60) return `${seconds}s`;
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m`;
     }
 
     protected getErrorFirstLine(error: string): string {

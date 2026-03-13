@@ -14,6 +14,7 @@ import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { Agent } from '../../core/models/agent.model';
 import type { Session } from '../../core/models/session.model';
@@ -53,10 +54,14 @@ interface ActivityEvent {
 @Component({
     selector: 'app-dashboard',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent],
+    imports: [RouterLink, DecimalPipe, StatusBadgeComponent, RelativeTimePipe, AbsoluteTimePipe, WelcomeWizardComponent, SkeletonComponent],
     template: `
         @if (showWelcome()) {
             <app-welcome-wizard (agentCreated)="onWizardComplete()" />
+        } @else if (loading()) {
+            <div class="dashboard">
+                <app-skeleton variant="card" [count]="8" />
+            </div>
         } @else {
         <div class="dashboard">
             <!-- Top Metrics Row -->
@@ -160,7 +165,10 @@ interface ActivityEvent {
                         <h3>Recent Activity</h3>
                     </div>
                     @if (activityFeed().length === 0) {
-                        <p class="empty">No recent activity.</p>
+                        <div class="empty-activity">
+                            <p class="empty-activity__title">No recent activity</p>
+                            <p class="empty-activity__hint">Start a conversation, create a work task, or launch a council to see activity here.</p>
+                        </div>
                     } @else {
                         <div class="activity-feed">
                             @for (event of activityFeed(); track $index) {
@@ -235,6 +243,12 @@ interface ActivityEvent {
                                 <span class="status-row__label">Active Councils</span>
                                 <span class="status-row__value">{{ activeCouncilLaunches().length }}</span>
                             </div>
+                            @if (serverVersion()) {
+                                <div class="status-row">
+                                    <span class="status-row__label">Version</span>
+                                    <span class="status-row__value status-row__value--version">v{{ serverVersion() }}</span>
+                                </div>
+                            }
                         </div>
                     </div>
 
@@ -310,6 +324,9 @@ interface ActivityEvent {
         .section__link { font-size: 0.7rem; color: var(--accent-cyan); text-decoration: none; }
         .section__link:hover { text-decoration: underline; }
         .empty { color: var(--text-tertiary); font-size: 0.8rem; }
+        .empty-activity { text-align: center; padding: 2rem 1rem; }
+        .empty-activity__title { color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; margin: 0 0 0.35rem; }
+        .empty-activity__hint { color: var(--text-tertiary); font-size: 0.75rem; margin: 0; line-height: 1.5; }
 
         /* Agent Activity Grid */
         .agent-grid {
@@ -422,6 +439,7 @@ interface ActivityEvent {
         .status-row__indicator[data-ok="true"] { color: var(--accent-green); }
         .status-row__indicator[data-ok="false"] { color: var(--accent-red); }
         .status-row__value { font-weight: 600; color: var(--text-primary); }
+        .status-row__value--version { font-family: var(--font-mono, monospace); font-size: 0.75rem; color: var(--text-tertiary); }
 
         /* Running items */
         .running-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
@@ -471,6 +489,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly overview = signal<OverviewData | null>(null);
     protected readonly agentSummaries = signal<AgentSummary[]>([]);
     protected readonly selfTestRunning = signal(false);
+    protected readonly loading = signal(true);
+    protected readonly serverVersion = signal<string | null>(null);
 
     protected readonly activeWorkTaskCount = computed(() => {
         const tasks = this.overview()?.workTasks;
@@ -544,15 +564,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private unsubscribeWs: (() => void) | null = null;
 
     ngOnInit(): void {
-        this.projectService.loadProjects();
-        this.agentService.loadAgents().then(() => this.loadAgentSummaries());
-        this.sessionService.loadSessions();
-        this.sessionService.loadAlgoChatStatus();
-        this.councilService.loadCouncils();
-        this.scheduleService.loadSchedules();
-        this.workTaskService.loadTasks();
-        this.loadActiveCouncilLaunches();
-        this.loadOverview();
+        const loads = [
+            this.projectService.loadProjects(),
+            this.agentService.loadAgents().then(() => this.loadAgentSummaries()),
+            this.sessionService.loadSessions(),
+            this.sessionService.loadAlgoChatStatus(),
+            this.councilService.loadCouncils(),
+            this.scheduleService.loadSchedules(),
+            this.workTaskService.loadTasks(),
+            this.loadActiveCouncilLaunches(),
+            this.loadOverview(),
+            this.loadServerVersion(),
+        ];
+        Promise.allSettled(loads).then(() => this.loading.set(false));
 
         this.unsubscribeWs = this.wsService.onMessage((msg: ServerWsMessage) => {
             if (msg.type === 'agent_balance') {
@@ -658,6 +682,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
         );
 
         this.agentSummaries.set(summaries);
+    }
+
+    private async loadServerVersion(): Promise<void> {
+        try {
+            const health = await firstValueFrom(
+                this.apiService.get<{ version?: string }>('/health'),
+            );
+            if (health.version) this.serverVersion.set(health.version);
+        } catch {
+            // Non-critical
+        }
     }
 
     private async loadActiveCouncilLaunches(): Promise<void> {
