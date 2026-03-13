@@ -138,7 +138,7 @@ See `.env.example` for the full list of 30+ configuration options.
 |--------|-------|
 | Unit tests | **6,446** across 267 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **123** with automated validation |
+| Module specs | **124** with automated validation |
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
