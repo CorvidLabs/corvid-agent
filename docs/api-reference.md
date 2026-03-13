@@ -33,6 +33,19 @@ Role-based access levels:
 - [Webhooks](#webhooks)
 - [Mention Polling](#mention-polling)
 - [Auth Flow](#auth-flow)
+- [Flock Directory](#flock-directory)
+- [Marketplace Tiers](#marketplace-tiers)
+- [Performance](#performance)
+- [Usage](#usage)
+- [Feedback](#feedback)
+- [Audit](#audit)
+- [Onboarding](#onboarding)
+- [Security Overview](#security-overview)
+- [Bridge Delivery](#bridge-delivery)
+- [A2A](#a2a)
+- [Backup](#backup)
+- [Self-Test](#self-test)
+- [Dashboard](#dashboard)
 
 ---
 
@@ -1283,6 +1296,1293 @@ curl -X POST http://localhost:3000/api/auth/device/token \
 
 ---
 
+## Flock Directory
+
+Cross-instance agent discovery registry with search, heartbeat, and CRUD operations for agent entries.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/flock-directory/search` | Search agents | any |
+| GET | `/api/flock-directory/stats` | Directory statistics | any |
+| GET | `/api/flock-directory/agents` | List active agents | any |
+| POST | `/api/flock-directory/agents` | Register agent | any |
+| GET | `/api/flock-directory/agents/{id}` | Get agent by ID | any |
+| PATCH | `/api/flock-directory/agents/{id}` | Update agent | any |
+| DELETE | `/api/flock-directory/agents/{id}` | Deregister agent | any |
+| POST | `/api/flock-directory/agents/{id}/heartbeat` | Send heartbeat | any |
+| GET | `/api/flock-directory/lookup/{address}` | Lookup by Algorand address | any |
+
+### Search Agents
+
+```bash
+curl "http://localhost:3000/api/flock-directory/search?q=code-review&status=active&capability=testing&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agents": [
+    {
+      "id": "fd-abc123",
+      "address": "ALGO...",
+      "name": "code-reviewer",
+      "description": "Automated code review agent",
+      "instanceUrl": "https://agent.example.com",
+      "capabilities": ["code-review", "testing"],
+      "status": "active",
+      "lastHeartbeat": "2026-03-13T10:00:00Z",
+      "registeredAt": "2026-03-01T00:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Query Parameters: Search Agents
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `q` | string | — | Free-text search query |
+| `status` | enum | — | Filter by status (`active`, `inactive`, `deregistered`) |
+| `capability` | string | — | Filter by capability tag |
+| `minReputation` | number | — | Minimum reputation score |
+| `limit` | number | 50 | Max results per page |
+| `offset` | number | 0 | Pagination offset |
+
+### Get Directory Stats
+
+```bash
+curl http://localhost:3000/api/flock-directory/stats \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "totalRegistered": 42,
+  "active": 35,
+  "inactive": 5,
+  "deregistered": 2,
+  "uniqueCapabilities": 12
+}
+```
+
+### Register Agent
+
+```bash
+curl -X POST http://localhost:3000/api/flock-directory/agents \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address": "ALGO_ADDRESS_58_CHARS...",
+    "name": "my-agent",
+    "description": "General-purpose coding agent",
+    "instanceUrl": "https://my-agent.example.com",
+    "capabilities": ["code-review", "testing", "docs"]
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "fd-abc123",
+  "address": "ALGO_ADDRESS_58_CHARS...",
+  "name": "my-agent",
+  "description": "General-purpose coding agent",
+  "instanceUrl": "https://my-agent.example.com",
+  "capabilities": ["code-review", "testing", "docs"],
+  "status": "active",
+  "registeredAt": "2026-03-13T10:00:00Z"
+}
+```
+
+### Request Body: Register Agent
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `address` | string | yes | Algorand address (58-char format) |
+| `name` | string | yes | Agent display name (min 1 char) |
+| `description` | string | no | Agent description |
+| `instanceUrl` | string | no | URL of agent instance (must be valid URL) |
+| `capabilities` | string[] | no | List of capability tags |
+
+### Update Agent
+
+```bash
+curl -X PATCH http://localhost:3000/api/flock-directory/agents/fd-abc123 \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated description",
+    "capabilities": ["code-review", "testing", "docs", "security"]
+  }'
+```
+
+**Response (200):** Returns the updated agent object.
+
+### Request Body: Update Agent
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | no | Agent display name |
+| `description` | string | no | Agent description |
+| `instanceUrl` | string\|null | no | Instance URL (null to clear) |
+| `capabilities` | string[] | no | Capability tags |
+
+### Deregister Agent
+
+```bash
+curl -X DELETE http://localhost:3000/api/flock-directory/agents/fd-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Send Heartbeat
+
+```bash
+curl -X POST http://localhost:3000/api/flock-directory/agents/fd-abc123/heartbeat \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Lookup by Address
+
+```bash
+curl http://localhost:3000/api/flock-directory/lookup/ALGO_ADDRESS_58_CHARS... \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the agent object matching the given Algorand address.
+
+---
+
+## Marketplace Tiers
+
+Pricing tier management for marketplace listings. Tiers allow listings to offer multiple pricing levels with different feature sets, rate limits, and billing cycles.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/marketplace/listings/{id}/tiers` | List tiers for listing | any |
+| POST | `/api/marketplace/listings/{id}/tiers` | Create tier | operator |
+| GET | `/api/marketplace/tiers/{id}` | Get tier by ID | any |
+| PUT | `/api/marketplace/tiers/{id}` | Update tier | operator |
+| DELETE | `/api/marketplace/tiers/{id}` | Delete tier | operator |
+| POST | `/api/marketplace/listings/{id}/tier-use` | Record tier-based use | any |
+| POST | `/api/marketplace/listings/{id}/tier-subscribe` | Subscribe via tier | operator |
+| POST | `/api/marketplace/listings/{id}/trial` | Start free trial | any |
+| GET | `/api/marketplace/listings/{id}/trial` | Get trial status | any |
+
+### Create Tier
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/tiers \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Pro",
+    "description": "Professional tier with higher limits",
+    "priceCredits": 500,
+    "billingCycle": "monthly",
+    "rateLimit": 1000,
+    "features": ["priority-support", "advanced-analytics"],
+    "sortOrder": 2
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "tier-xyz",
+  "listingId": "listing-abc",
+  "name": "Pro",
+  "description": "Professional tier with higher limits",
+  "priceCredits": 500,
+  "billingCycle": "monthly",
+  "rateLimit": 1000,
+  "features": ["priority-support", "advanced-analytics"],
+  "sortOrder": 2,
+  "createdAt": "2026-03-13T10:00:00Z"
+}
+```
+
+### Request Body: Create Tier
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Tier name (min 1 char) |
+| `description` | string | no | Tier description |
+| `priceCredits` | integer | yes | Price in credits (>= 0) |
+| `billingCycle` | enum | no | `one_time`, `daily`, `weekly`, `monthly` (default: `one_time`) |
+| `rateLimit` | integer | no | Max uses per billing cycle (>= 0) |
+| `features` | string[] | no | List of feature tags |
+| `sortOrder` | integer | no | Display ordering (>= 0) |
+
+### Update Tier
+
+```bash
+curl -X PUT http://localhost:3000/api/marketplace/tiers/tier-xyz \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "priceCredits": 750,
+    "rateLimit": 2000
+  }'
+```
+
+**Response (200):** Returns the updated tier object.
+
+### Request Body: Update Tier
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | no | Tier name |
+| `description` | string | no | Tier description |
+| `priceCredits` | integer | no | Price in credits |
+| `billingCycle` | enum | no | `one_time`, `daily`, `weekly`, `monthly` |
+| `rateLimit` | integer | no | Max uses per billing cycle |
+| `features` | string[] | no | Feature tags |
+| `sortOrder` | integer | no | Display ordering |
+
+### Delete Tier
+
+```bash
+curl -X DELETE http://localhost:3000/api/marketplace/tiers/tier-xyz \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** `{ "ok": true }`
+
+### Record Tier-Based Use
+
+Record a per-use billing event against a specific tier. Credits are deducted at the tier's price.
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/tier-use \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "tierId": "tier-xyz" }'
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "creditsDeducted": 500,
+  "escrowId": "escrow-123"
+}
+```
+
+**Error (402):** `{ "error": "Insufficient credits", "required": 500 }`
+
+**Error (429):** `{ "error": "Rate limit exceeded", "limit": 1000 }`
+
+### Request Body: Tier Use
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tierId` | string | yes | ID of the tier to bill against |
+
+### Subscribe via Tier
+
+Create a subscription using a specific tier's pricing and billing cycle.
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/tier-subscribe \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tierId": "tier-xyz",
+    "subscriberTenantId": "tenant-123"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "sub-abc",
+  "listingId": "listing-abc",
+  "subscriberTenantId": "tenant-123",
+  "status": "active",
+  "billingCycle": "monthly",
+  "priceCredits": 500,
+  "createdAt": "2026-03-13T10:00:00Z",
+  "nextBillingAt": "2026-04-13T10:00:00Z"
+}
+```
+
+### Request Body: Tier Subscribe
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tierId` | string | yes | ID of the tier |
+| `subscriberTenantId` | string | yes | Subscribing tenant ID |
+
+### Start Free Trial
+
+```bash
+curl -X POST http://localhost:3000/api/marketplace/listings/listing-abc/trial \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "tenantId": "tenant-123" }'
+```
+
+**Response (201):**
+
+```json
+{
+  "id": "trial-abc",
+  "listingId": "listing-abc",
+  "tenantId": "tenant-123",
+  "status": "active",
+  "usesRemaining": 10,
+  "expiresAt": "2026-03-20T10:00:00Z",
+  "createdAt": "2026-03-13T10:00:00Z"
+}
+```
+
+### Request Body: Start Trial
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tenantId` | string | yes | Tenant requesting the trial |
+
+### Get Trial Status
+
+```bash
+curl "http://localhost:3000/api/marketplace/listings/listing-abc/trial?tenantId=tenant-123" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):** Returns the trial object with current status and remaining uses.
+
+---
+
+## Performance
+
+Performance monitoring with snapshots, time-series trends, regression detection, and metric collection.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/performance/snapshot` | Current performance snapshot | any |
+| GET | `/api/performance/trends` | Time-series trend data | any |
+| GET | `/api/performance/regressions` | Detect performance regressions | any |
+| GET | `/api/performance/report` | Full performance report | any |
+| GET | `/api/performance/metrics` | List available metric names | any |
+| POST | `/api/performance/collect` | Trigger manual collection | any |
+
+### Get Snapshot
+
+```bash
+curl http://localhost:3000/api/performance/snapshot \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "timestamp": "2026-03-13T10:00:00Z",
+  "memory": {
+    "heapUsed": 52428800,
+    "heapTotal": 67108864,
+    "rss": 104857600,
+    "external": 2097152
+  },
+  "db": {
+    "sizeBytes": 10485760,
+    "latencyMs": 0.5,
+    "tableCount": 42
+  },
+  "uptime": 86400
+}
+```
+
+### Get Trends
+
+```bash
+curl "http://localhost:3000/api/performance/trends?days=7&metric=memory_rss" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200) — single metric:**
+
+```json
+{
+  "metric": "memory_rss",
+  "days": 7,
+  "series": [
+    { "timestamp": "2026-03-06T10:00:00Z", "value": 104857600 },
+    { "timestamp": "2026-03-07T10:00:00Z", "value": 105906176 }
+  ]
+}
+```
+
+**Response (200) — all metrics (omit `metric` param):**
+
+```json
+{
+  "days": 7,
+  "trends": {
+    "memory_rss": [{ "timestamp": "...", "value": 104857600 }],
+    "memory_heap_used": [{ "timestamp": "...", "value": 52428800 }],
+    "db_size": [{ "timestamp": "...", "value": 10485760 }],
+    "db_latency": [{ "timestamp": "...", "value": 0.5 }],
+    "uptime": [{ "timestamp": "...", "value": 86400 }]
+  }
+}
+```
+
+### Query Parameters: Get Trends
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 7 | Number of days of history (1-365) |
+| `metric` | string | — | Specific metric name; omit for all key metrics |
+
+### Detect Regressions
+
+```bash
+curl "http://localhost:3000/api/performance/regressions?threshold=25" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "threshold": 25,
+  "regressions": [
+    {
+      "metric": "memory_rss",
+      "currentAvg": 115343360,
+      "previousAvg": 89128960,
+      "changePercent": 29.4,
+      "severity": "warning"
+    }
+  ],
+  "hasRegressions": true,
+  "criticalCount": 0
+}
+```
+
+### Query Parameters: Detect Regressions
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `threshold` | number | 25 | Percentage threshold for regression detection |
+
+### Get Performance Report
+
+```bash
+curl http://localhost:3000/api/performance/report \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "snapshot": { "timestamp": "...", "memory": {...}, "db": {...}, "uptime": 86400 },
+  "regressions": [],
+  "slowQueriestoday": 0,
+  "metricsStoredTotal": 1440
+}
+```
+
+### List Metric Names
+
+```bash
+curl http://localhost:3000/api/performance/metrics \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "metrics": ["db_latency", "db_size", "memory_heap_used", "memory_rss", "uptime"]
+}
+```
+
+### Trigger Manual Collection
+
+```bash
+curl -X POST http://localhost:3000/api/performance/collect \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "snapshot": {
+    "timestamp": "2026-03-13T10:00:00Z",
+    "memory": {...},
+    "db": {...},
+    "uptime": 86400
+  }
+}
+```
+
+---
+
+## Usage
+
+Per-schedule and per-day usage aggregates for scheduled sessions, including cost tracking and anomaly detection.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/usage/summary` | Per-schedule usage summary | any |
+| GET | `/api/usage/daily` | Daily usage breakdown | any |
+| GET | `/api/usage/anomalies` | Anomaly detection flags | any |
+| GET | `/api/usage/schedule/{id}` | Detailed usage for one schedule | any |
+
+### Get Usage Summary
+
+```bash
+curl "http://localhost:3000/api/usage/summary?days=30" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "days": 30,
+  "totals": {
+    "executions": 142,
+    "completed": 135,
+    "failed": 5,
+    "running": 2,
+    "costUsd": 12.75,
+    "turns": 4280
+  },
+  "schedules": [
+    {
+      "scheduleId": "sched-abc",
+      "scheduleName": "nightly-maintenance",
+      "agentId": "agent-1",
+      "executionCount": 30,
+      "completedCount": 29,
+      "failedCount": 1,
+      "totalCostUsd": 4.50,
+      "avgCostUsd": 0.15,
+      "totalDurationSec": 5400,
+      "avgDurationSec": 180,
+      "totalTurns": 900,
+      "avgTurns": 30,
+      "lastExecutionAt": "2026-03-13T06:00:00Z"
+    }
+  ]
+}
+```
+
+### Query Parameters: Usage Summary
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 30 | Lookback period in days (1-365) |
+
+### Get Daily Usage
+
+```bash
+curl "http://localhost:3000/api/usage/daily?days=7" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "days": 7,
+  "daily": [
+    {
+      "date": "2026-03-07",
+      "executionCount": 18,
+      "completedCount": 17,
+      "failedCount": 1,
+      "totalCostUsd": 2.10,
+      "totalDurationSec": 1800,
+      "totalTurns": 540,
+      "uniqueSchedules": 6
+    }
+  ]
+}
+```
+
+### Get Anomalies
+
+```bash
+curl "http://localhost:3000/api/usage/anomalies?days=7" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "days": 7,
+  "anomalies": [
+    {
+      "executionId": "exec-xyz",
+      "scheduleId": "sched-abc",
+      "scheduleName": "nightly-maintenance",
+      "actionType": "session",
+      "durationSec": 2400,
+      "costUsd": 0.85,
+      "startedAt": "2026-03-12T06:00:00Z",
+      "completedAt": "2026-03-12T06:40:00Z",
+      "anomalyType": "long_running"
+    }
+  ],
+  "counts": {
+    "longRunning": 1,
+    "costSpikes": 0,
+    "total": 1
+  }
+}
+```
+
+Anomaly types:
+- `long_running` — execution exceeded 30 minutes
+- `cost_spike` — latest execution cost >2x the rolling average
+
+### Query Parameters: Anomalies
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 7 | Lookback period in days (1-30) |
+
+### Get Schedule Usage Detail
+
+```bash
+curl "http://localhost:3000/api/usage/schedule/sched-abc?days=30" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "schedule": {
+    "id": "sched-abc",
+    "name": "nightly-maintenance",
+    "agentId": "agent-1",
+    "status": "active",
+    "cronExpression": "0 6 * * *",
+    "maxBudgetPerRun": 1.00
+  },
+  "days": 30,
+  "stats": {
+    "executionCount": 30,
+    "completedCount": 29,
+    "failedCount": 1,
+    "totalCostUsd": 4.50,
+    "avgCostUsd": 0.15,
+    "avgDurationSec": 180,
+    "totalTurns": 900
+  },
+  "daily": [
+    { "date": "2026-03-12", "execution_count": 1, "cost_usd": 0.14, "turns": 28 }
+  ],
+  "recent": [
+    {
+      "id": "exec-001",
+      "status": "completed",
+      "actionType": "session",
+      "sessionId": "session-xyz",
+      "costUsd": 0.14,
+      "turns": 28,
+      "durationSec": 165,
+      "startedAt": "2026-03-12T06:00:00Z",
+      "completedAt": "2026-03-12T06:02:45Z"
+    }
+  ]
+}
+```
+
+---
+
+## Feedback
+
+PR outcome tracking metrics, weekly analysis, and context generation for agent prompt improvement.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/feedback/metrics` | Current outcome metrics | any |
+| GET | `/api/feedback/analysis` | Weekly analysis | any |
+| GET | `/api/feedback/context` | Outcome context for prompts | any |
+
+### Get Metrics
+
+```bash
+curl "http://localhost:3000/api/feedback/metrics?since=2026-03-06T00:00:00Z" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "overall": {
+    "total": 25,
+    "merged": 20,
+    "closed": 3,
+    "open": 2,
+    "mergeRate": 0.87
+  },
+  "byRepo": {
+    "CorvidLabs/corvid-agent": {
+      "total": 20,
+      "merged": 17,
+      "closed": 2,
+      "open": 1,
+      "mergeRate": 0.89
+    }
+  },
+  "failureReasons": {
+    "test_failure": 2,
+    "style_issues": 1
+  },
+  "recentOutcomes": [
+    {
+      "prNumber": 998,
+      "repo": "CorvidLabs/corvid-agent",
+      "status": "merged",
+      "title": "chore: v0.26.0 release prep"
+    }
+  ],
+  "workTaskSuccessRate": 0.92
+}
+```
+
+### Query Parameters: Get Metrics
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `since` | string | — | ISO 8601 date to filter outcomes from |
+
+### Get Weekly Analysis
+
+```bash
+curl "http://localhost:3000/api/feedback/analysis?agentId=agent-1" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "period": { "start": "2026-03-06T00:00:00Z", "end": "2026-03-13T00:00:00Z" },
+  "prOutcomes": {
+    "total": 25,
+    "merged": 20,
+    "closed": 3,
+    "open": 2,
+    "mergeRate": 0.87
+  },
+  "byRepo": {...},
+  "failureReasons": {...},
+  "workTasks": {
+    "total": 15,
+    "completed": 14,
+    "failed": 1,
+    "successRate": 0.93
+  }
+}
+```
+
+### Query Parameters: Weekly Analysis
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `agentId` | string | — | Filter to a specific agent |
+
+### Get Outcome Context
+
+Returns a formatted text string summarizing PR outcomes for injection into agent prompts.
+
+```bash
+curl http://localhost:3000/api/feedback/context \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "context": "## PR Outcome Feedback (past 7 days)\n- Total PRs tracked: 25\n- Merged: 20 | Closed: 3 | Open: 2\n- Merge rate: 87%\n\n### By Repository\n- CorvidLabs/corvid-agent: 20 PRs (89% merged)"
+}
+```
+
+---
+
+## Audit
+
+Read-only query interface for the immutable audit log.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/audit-log` | Query audit log entries | any |
+
+### Query Audit Log
+
+```bash
+curl "http://localhost:3000/api/audit-log?action=session.create&actor=agent-1&start_date=2026-03-01&limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "entries": [
+    {
+      "id": 1234,
+      "timestamp": "2026-03-13T10:00:00Z",
+      "action": "session.create",
+      "actor": "agent-1",
+      "resourceType": "session",
+      "resourceId": "session-abc",
+      "detail": "Created new session for project proj-1",
+      "traceId": "trace-xyz",
+      "ipAddress": "127.0.0.1"
+    }
+  ],
+  "total": 156,
+  "offset": 0,
+  "limit": 20
+}
+```
+
+### Query Parameters: Audit Log
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `action` | string | — | Filter by action type (e.g. `session.create`, `agent.update`) |
+| `actor` | string | — | Filter by actor ID |
+| `resource_type` | string | — | Filter by resource type (e.g. `session`, `agent`) |
+| `start_date` | string | — | ISO date; return entries after this date |
+| `end_date` | string | — | ISO date; return entries before this date |
+| `offset` | number | 0 | Pagination offset |
+| `limit` | number | 50 | Page size (max 500) |
+
+---
+
+## Onboarding
+
+Returns the current setup progress for new users, checking wallet, bridge, agent, and project configuration.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/onboarding/status` | Get onboarding status | any |
+
+### Get Onboarding Status
+
+```bash
+curl http://localhost:3000/api/onboarding/status \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "wallet": {
+    "configured": true,
+    "address": "ALGO_ADDRESS_58_CHARS...",
+    "funded": true
+  },
+  "bridge": {
+    "running": true,
+    "network": "testnet"
+  },
+  "agent": {
+    "exists": true,
+    "count": 3,
+    "walletConfigured": true
+  },
+  "project": {
+    "exists": true,
+    "count": 5
+  },
+  "complete": true
+}
+```
+
+The `complete` field is `true` when all four conditions are met: wallet configured and funded, bridge running, at least one agent exists, and at least one project exists.
+
+---
+
+## Security Overview
+
+Read-only aggregation of all security configuration: protected paths, code scanner patterns, approved domains, governance tiers, branch protection, and allowlist/blocklist counts.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/security/overview` | Get security configuration | any |
+
+### Get Security Overview
+
+```bash
+curl http://localhost:3000/api/security/overview \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "protectedBasenames": [".env", "id_rsa", "credentials.json"],
+  "protectedSubstrings": ["secret", "private_key"],
+  "approvedDomains": ["api.github.com", "registry.npmjs.org"],
+  "blockedPatterns": [
+    {
+      "name": "hardcoded-secret",
+      "category": "secrets",
+      "severity": "critical"
+    }
+  ],
+  "governanceTiers": [
+    {
+      "tier": 0,
+      "label": "Layer 0 — Constitutional",
+      "description": "Core protocol changes requiring full council approval",
+      "quorumThreshold": 1.0,
+      "requiresHumanApproval": true,
+      "allowsAutomation": false
+    }
+  ],
+  "governancePaths": {
+    "layer0": {
+      "basenames": ["constitution.md"],
+      "substrings": ["governance"]
+    },
+    "layer1": {
+      "basenames": ["package.json"],
+      "substrings": ["migration"]
+    }
+  },
+  "autoMergeEnabled": true,
+  "branchProtection": {
+    "enforced": true,
+    "requiredReviews": 1,
+    "dismissStaleReviews": true,
+    "blockForcePushes": true,
+    "blockDeletions": true,
+    "enforceAdmins": true,
+    "requiredStatusChecks": [
+      "Build & Test (ubuntu-latest)",
+      "Build & Test (macos-latest)",
+      "Build & Test (windows-latest)"
+    ]
+  },
+  "allowlistCount": 12,
+  "blocklistCount": 3
+}
+```
+
+---
+
+## Bridge Delivery
+
+Delivery receipt metrics for all bridge platforms (Discord, Telegram, Slack).
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/bridges/delivery` | Get delivery metrics | any |
+
+### Get Delivery Metrics
+
+```bash
+curl http://localhost:3000/api/bridges/delivery \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "discord": {
+    "total": 150,
+    "success": 148,
+    "failure": 2,
+    "successRate": 0.987,
+    "recentFailures": [
+      { "timestamp": 1710300000000, "error": "Rate limited by Discord API" }
+    ]
+  },
+  "telegram": {
+    "total": 0,
+    "success": 0,
+    "failure": 0,
+    "successRate": 0,
+    "recentFailures": []
+  },
+  "slack": {
+    "total": 25,
+    "success": 25,
+    "failure": 0,
+    "successRate": 1.0,
+    "recentFailures": []
+  }
+}
+```
+
+---
+
+## A2A
+
+Agent-to-Agent (A2A) protocol inbound task handling. Allows external agents to send tasks and poll for results.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/a2a/tasks/send` | Create and start a task | any |
+| GET | `/a2a/tasks/{id}` | Poll task status/result | any |
+
+### Send Task
+
+```bash
+curl -X POST http://localhost:3000/a2a/tasks/send \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "params": {
+      "message": "Review the PR at https://github.com/org/repo/pull/42",
+      "skill": "code-review",
+      "timeoutMs": 300000
+    }
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "id": "a2a-task-abc123",
+  "status": "working",
+  "message": "Review the PR at https://github.com/org/repo/pull/42"
+}
+```
+
+### Request Body: Send Task
+
+The body accepts either a top-level format or a `params` wrapper:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `params.message` | string | yes* | Task instruction message (min 1 char) |
+| `params.skill` | string | no | Requested skill/capability |
+| `params.timeoutMs` | integer | no | Timeout in ms (1000-600000) |
+| `message` | string | yes* | Alternative top-level message field |
+| `skill` | string | no | Alternative top-level skill field |
+| `timeoutMs` | integer | no | Alternative top-level timeout field |
+
+*Either `params.message` or top-level `message` must be provided.
+
+### Poll Task Status
+
+```bash
+curl http://localhost:3000/a2a/tasks/a2a-task-abc123 \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200) — in progress:**
+
+```json
+{
+  "id": "a2a-task-abc123",
+  "status": "working",
+  "message": "Review the PR at https://github.com/org/repo/pull/42"
+}
+```
+
+**Response (200) — completed:**
+
+```json
+{
+  "id": "a2a-task-abc123",
+  "status": "completed",
+  "message": "Review the PR at https://github.com/org/repo/pull/42",
+  "result": "PR looks good. Approved with minor suggestions..."
+}
+```
+
+Task statuses: `submitted`, `working`, `input-required`, `completed`, `failed`, `canceled`
+
+---
+
+## Backup
+
+Trigger a database backup. Creates a timestamped copy and prunes old backups.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/backup` | Create database backup | any |
+
+### Create Backup
+
+```bash
+curl -X POST http://localhost:3000/api/backup \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "path": "backups/corvid-agent-2026-03-13T10-00-00-000Z.db",
+  "timestamp": "2026-03-13T10:00:00.000Z",
+  "sizeBytes": 10485760,
+  "pruned": 2
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | string | Path to the created backup file |
+| `timestamp` | string | ISO 8601 timestamp of the backup |
+| `sizeBytes` | number | Size of the backup in bytes |
+| `pruned` | number | Number of old backups removed |
+
+---
+
+## Self-Test
+
+Trigger the self-test suite to run unit tests, end-to-end tests, or both.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/selftest/run` | Run self-test suite | any |
+
+### Run Self-Test
+
+```bash
+curl -X POST http://localhost:3000/api/selftest/run \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "testType": "all" }'
+```
+
+**Response (200):**
+
+```json
+{
+  "sessionId": "session-test-abc123"
+}
+```
+
+The test runs asynchronously in an agent session. Poll the session endpoint to check progress and results.
+
+### Request Body: Run Self-Test
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `testType` | enum | no | `unit`, `e2e`, or `all` (default: `all`) |
+
+---
+
+## Dashboard
+
+Aggregated dashboard summary providing agent, session, council, and work task counts plus a recent activity feed in a single request.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/dashboard/summary` | Get dashboard summary | any |
+
+### Get Dashboard Summary
+
+```bash
+curl "http://localhost:3000/api/dashboard/summary?activityLimit=10" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "agents": {
+    "total": 3
+  },
+  "sessions": {
+    "active": 2,
+    "byStatus": {
+      "running": 2,
+      "completed": 145,
+      "failed": 3,
+      "paused": 0
+    }
+  },
+  "councils": {
+    "active": 1
+  },
+  "workTasks": {
+    "total": 42,
+    "byStatus": {
+      "pending": 2,
+      "running": 1,
+      "completed": 35,
+      "failed": 4
+    }
+  },
+  "recentActivity": [
+    {
+      "id": 5678,
+      "timestamp": "2026-03-13T10:00:00Z",
+      "action": "session.create",
+      "actor": "agent-1",
+      "resource_type": "session",
+      "resource_id": "session-xyz",
+      "detail": "Started scheduled session"
+    }
+  ]
+}
+```
+
+### Query Parameters: Dashboard Summary
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `activityLimit` | number | 20 | Number of recent activity entries (1-100) |
+
+---
+
 ## Additional Modules
 
 The following modules are fully documented in the interactive API explorer at `/api/docs`. Each module has OpenAPI metadata including summaries, auth requirements, and request body schemas.
@@ -1300,18 +2600,6 @@ The following modules are fully documented in the interactive API explorer at `/
 | Wallets | `/api/wallets/*` | Summary, messages, credits |
 | Feed | `/api/feed/history` | Activity feed |
 | Escalation | `/api/escalation-queue` | Escalation queue management |
-| A2A | `/a2a/tasks/*` | Agent-to-Agent protocol inbound tasks |
-| Flock Directory | `/api/flock-directory/*` | Cross-instance agent discovery, search, heartbeat |
-| Dashboard | `/api/dashboard/summary` | Aggregated dashboard summary |
-| Performance | `/api/performance/*` | Snapshots, trends, regression detection |
-| Usage | `/api/usage/*` | Schedule usage monitoring, anomaly detection |
-| Feedback | `/api/feedback/*` | PR outcome metrics and analysis |
-| Audit | `/api/audit-log` | Immutable audit log queries |
-| Onboarding | `/api/onboarding/status` | Onboarding status check |
-| Security | `/api/security/overview` | Security configuration overview |
-| Bridge Delivery | `/api/bridges/delivery` | Bridge delivery metrics |
-| Backup | `POST /api/backup` | Database backup trigger |
-| Self-Test | `POST /api/selftest/run` | Self-test suite runner |
 | Projects | `/api/projects/*` | Project CRUD and directory browsing |
 | Proposals | `/api/proposals/*` | Governance proposal CRUD, transitions, evaluation |
 | Exam | `/api/exam/*` | Model exam runner and category listing |
