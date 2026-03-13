@@ -29,6 +29,7 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | `listRoleTemplates` | `()` | `readonly RoleTemplate[]` | List all available role templates (re-exported from `role-templates`) |
 | `applyRoleTemplate` | `(db, agentId, templateName, grantedBy, opts?)` | `Promise<{...}>` | Apply a role template to an agent (re-exported from `role-templates`) |
 | `revokeRoleTemplate` | `(db, agentId, templateName, revokedBy, opts?)` | `{...}` | Revoke all grants matching a role template (re-exported from `role-templates`) |
+| `_resetHmacSecretForTesting` | `()` | `void` | Reset the cached HMAC secret (test-only helper to simulate server restarts) |
 
 ### Exported Types
 
