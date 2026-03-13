@@ -46,7 +46,7 @@ if (!diffOutput.trim()) {
 }
 
 /**
- * Strip diff sections for test files — they contain malicious patterns
+ * Strip diff sections for test and spec files — they contain malicious patterns
  * and unapproved URLs as test fixtures, not real code.
  */
 function stripTestFiles(diff: string): string {
@@ -56,7 +56,7 @@ function stripTestFiles(diff: string): string {
 
     for (const line of lines) {
         if (line.startsWith('diff --git')) {
-            skip = /\b__tests__\//.test(line) || /\.test\.ts\b/.test(line);
+            skip = /\b__tests__\//.test(line) || /\.test\.ts\b/.test(line) || /\bspecs\//.test(line) || /\.spec\.(md|ts)\b/.test(line);
         }
         if (!skip) result.push(line);
     }
