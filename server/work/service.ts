@@ -510,7 +510,8 @@ export class WorkTaskService {
         if (this.agentMessenger) {
             const snippet = input.description.slice(0, 100);
             const priorityLabel = ['P0', 'P1', 'P2', 'P3'][task.priority];
-            this.agentMessenger.sendOnChainToSelf(input.agentId, `[WORK_TASK:created:${priorityLabel}] ${snippet}`).catch(() => {});
+            this.agentMessenger.sendOnChainToSelf(input.agentId, `[WORK_TASK:created:${priorityLabel}] ${snippet}`)
+                .catch((err) => log.debug('AlgoChat task-created notification failed', { error: err instanceof Error ? err.message : String(err) }));
         }
 
         recordAudit(
@@ -920,7 +921,8 @@ export class WorkTaskService {
                 const msg = task.status === 'completed'
                     ? `[WORK_TASK:completed] ${task.prUrl ? `PR: ${task.prUrl}` : task.description.slice(0, 100)}`
                     : `[WORK_TASK:failed] ${(task.error ?? task.description).slice(0, 100)}`;
-                this.agentMessenger.sendOnChainToSelf(task.agentId, msg).catch(() => {});
+                this.agentMessenger.sendOnChainToSelf(task.agentId, msg)
+                    .catch((err) => log.debug('AlgoChat task-completion notification failed', { error: err instanceof Error ? err.message : String(err) }));
             }
 
             const callbacks = this.completionCallbacks.get(taskId);

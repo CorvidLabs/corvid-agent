@@ -406,7 +406,7 @@ export async function handleInteraction(
                 buildActionRow(
                     { label: 'Stop', customId: 'stop_session', style: ButtonStyle.DANGER, emoji: '⏹' },
                 ),
-            ]).catch(() => {});
+            ]).catch((err) => log.debug('Failed to send welcome embed', { error: err instanceof Error ? err.message : String(err) }));
 
             await respondToInteraction(interaction,
                 `Session started in <#${threadId}> with **${agent.name}**.\nTopic: ${topic}`);
