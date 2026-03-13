@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.27.0] - 2026-03-13
+
+### Added
+- **Cloud model families & tier boosting** — support cloud model family grouping and tier-based model selection (#1005)
+- **Auto-clone projects** — automatically clone projects to temp/worktree directories on demand (#1004)
+- **Ollama exam persistence** — persist model exam results to SQLite for tracking cloud model capabilities (#999)
+
+### Fixed
+- **Discord typing timeout** — reduce false typing timeout warnings (#1002)
+
+### Documentation
+- **API reference expansion** — add detailed API reference for 13 undocumented modules (#1000)
+
+### Tests
+- **+3 test suites** — coverage for DbPool, OwnerQuestionManager, and expanded ReputationScorer tests (#1003)
+
 ## [0.26.0] - 2026-03-13
 
 ### Added
