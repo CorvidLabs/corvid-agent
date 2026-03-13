@@ -78,12 +78,14 @@ async function checkKeyConfig(dbPath: string, network: string): Promise<void> {
     const allowPlaintext = process.env.ALLOW_PLAINTEXT_KEYS === 'true' || process.env.ALLOW_PLAINTEXT_KEYS === '1';
 
     console.log(`\nKey source: ${hasEnvKey ? 'WALLET_ENCRYPTION_KEY (env var)' : 'default/server-mnemonic fallback'}`);
-    console.log(`ALLOW_PLAINTEXT_KEYS: ${allowPlaintext ? 'true (explicitly allowed)' : 'false'}`);
 
-    if (network === 'mainnet' && !allowPlaintext) {
-        console.log('\n⚠  WARNING: Server will refuse to start on mainnet without:');
-        console.log('   - ALLOW_PLAINTEXT_KEYS=true, OR');
-        console.log('   - A KMS-backed key provider (future)');
+    if (allowPlaintext) {
+        console.log('\n⚠  ALLOW_PLAINTEXT_KEYS is set but deprecated (#924). Remove it from your environment.');
+    }
+
+    if (network === 'mainnet' && !hasEnvKey) {
+        console.log('\n⚠  WARNING: Server will refuse to start on mainnet without WALLET_ENCRYPTION_KEY.');
+        console.log('   Generate one with: openssl rand -hex 32');
     }
 
     if (hasEnvKey) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { EnvKeyProvider, createKeyProvider, type KeyProvider } from '../lib/key-provider';
+import { EnvKeyProvider, createKeyProvider, detectPlaintextKeyConfig, type KeyProvider } from '../lib/key-provider';
 import {
     encryptMnemonicWithPassphrase,
     decryptMnemonicWithPassphrase,
@@ -102,26 +102,103 @@ describe('KeyProvider', () => {
             expect(passphrase).toBe(TEST_PASSPHRASE);
         });
 
-        it('throws on mainnet without ALLOW_PLAINTEXT_KEYS', () => {
-            delete process.env.ALLOW_PLAINTEXT_KEYS;
+        it('throws on mainnet without WALLET_ENCRYPTION_KEY', () => {
+            delete process.env.WALLET_ENCRYPTION_KEY;
             expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
         });
 
-        it('allows mainnet with ALLOW_PLAINTEXT_KEYS=true', () => {
+        it('allows mainnet with WALLET_ENCRYPTION_KEY set', () => {
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+            delete process.env.ALLOW_PLAINTEXT_KEYS;
+            const provider = createKeyProvider('mainnet');
+            expect(provider).toBeInstanceOf(EnvKeyProvider);
+        });
+
+        it('ignores deprecated ALLOW_PLAINTEXT_KEYS on mainnet (still requires key)', () => {
+            // ALLOW_PLAINTEXT_KEYS is deprecated — mainnet now requires WALLET_ENCRYPTION_KEY
+            delete process.env.WALLET_ENCRYPTION_KEY;
+            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+            expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
+        });
+
+        it('allows mainnet with WALLET_ENCRYPTION_KEY even when ALLOW_PLAINTEXT_KEYS is set', () => {
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
             process.env.ALLOW_PLAINTEXT_KEYS = 'true';
             const provider = createKeyProvider('mainnet');
             expect(provider).toBeInstanceOf(EnvKeyProvider);
         });
+    });
 
-        it('allows mainnet with ALLOW_PLAINTEXT_KEYS=1', () => {
-            process.env.ALLOW_PLAINTEXT_KEYS = '1';
-            const provider = createKeyProvider('mainnet');
-            expect(provider).toBeInstanceOf(EnvKeyProvider);
+    describe('detectPlaintextKeyConfig', () => {
+        let originalKey: string | undefined;
+        let originalAllow: string | undefined;
+        let originalMnemonic: string | undefined;
+
+        beforeEach(() => {
+            originalKey = process.env.WALLET_ENCRYPTION_KEY;
+            originalAllow = process.env.ALLOW_PLAINTEXT_KEYS;
+            originalMnemonic = process.env.ALGOCHAT_MNEMONIC;
         });
 
-        it('rejects mainnet with ALLOW_PLAINTEXT_KEYS=false', () => {
-            process.env.ALLOW_PLAINTEXT_KEYS = 'false';
-            expect(() => createKeyProvider('mainnet')).toThrow('Refusing to start on mainnet');
+        afterEach(() => {
+            if (originalKey === undefined) delete process.env.WALLET_ENCRYPTION_KEY;
+            else process.env.WALLET_ENCRYPTION_KEY = originalKey;
+            if (originalAllow === undefined) delete process.env.ALLOW_PLAINTEXT_KEYS;
+            else process.env.ALLOW_PLAINTEXT_KEYS = originalAllow;
+            if (originalMnemonic === undefined) delete process.env.ALGOCHAT_MNEMONIC;
+            else process.env.ALGOCHAT_MNEMONIC = originalMnemonic;
+        });
+
+        it('returns no warnings on localnet', () => {
+            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+            const warnings = detectPlaintextKeyConfig('localnet');
+            expect(warnings).toEqual([]);
+        });
+
+        it('warns about deprecated ALLOW_PLAINTEXT_KEYS on testnet', () => {
+            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+            const warnings = detectPlaintextKeyConfig('testnet');
+            expect(warnings.some(w => w.includes('ALLOW_PLAINTEXT_KEYS'))).toBe(true);
+        });
+
+        it('warns about deprecated ALLOW_PLAINTEXT_KEYS on mainnet', () => {
+            process.env.ALLOW_PLAINTEXT_KEYS = 'true';
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+            const warnings = detectPlaintextKeyConfig('mainnet');
+            expect(warnings.some(w => w.includes('ALLOW_PLAINTEXT_KEYS'))).toBe(true);
+        });
+
+        it('warns about raw 25-word mnemonic on mainnet', () => {
+            delete process.env.ALLOW_PLAINTEXT_KEYS;
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+            process.env.ALGOCHAT_MNEMONIC = TEST_MNEMONIC;
+            const warnings = detectPlaintextKeyConfig('mainnet');
+            expect(warnings.some(w => w.includes('raw 25-word mnemonic'))).toBe(true);
+        });
+
+        it('does not warn about mnemonic on testnet', () => {
+            delete process.env.ALLOW_PLAINTEXT_KEYS;
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+            process.env.ALGOCHAT_MNEMONIC = TEST_MNEMONIC;
+            const warnings = detectPlaintextKeyConfig('testnet');
+            expect(warnings.some(w => w.includes('raw 25-word mnemonic'))).toBe(false);
+        });
+
+        it('warns about short WALLET_ENCRYPTION_KEY', () => {
+            delete process.env.ALLOW_PLAINTEXT_KEYS;
+            delete process.env.ALGOCHAT_MNEMONIC;
+            process.env.WALLET_ENCRYPTION_KEY = 'short-key';
+            const warnings = detectPlaintextKeyConfig('testnet');
+            expect(warnings.some(w => w.includes('only 9 chars'))).toBe(true);
+        });
+
+        it('returns no warnings when everything is properly configured', () => {
+            delete process.env.ALLOW_PLAINTEXT_KEYS;
+            delete process.env.ALGOCHAT_MNEMONIC;
+            process.env.WALLET_ENCRYPTION_KEY = TEST_PASSPHRASE;
+            const warnings = detectPlaintextKeyConfig('testnet');
+            expect(warnings).toEqual([]);
         });
     });
 

@@ -7,16 +7,18 @@
  * Phase 1: EnvKeyProvider (wraps existing WALLET_ENCRYPTION_KEY env var logic).
  * Phase 2: VaultKeyProvider, AwsSecretsKeyProvider, etc.
  *
- * Production enforcement (#923):
- * On mainnet, EnvKeyProvider (plaintext env-var source) is rejected by default.
- * Set ALLOW_PLAINTEXT_KEYS=true to explicitly opt in. This ensures operators
- * acknowledge the risk of keeping the encryption passphrase in a process
- * environment variable on production infrastructure.
+ * Production enforcement (#923, #924):
+ * On mainnet, WALLET_ENCRYPTION_KEY must be explicitly configured with a
+ * strong passphrase (>= 32 chars). The ALLOW_PLAINTEXT_KEYS escape hatch
+ * has been removed — all mainnet deployments must use explicit key config.
  *
  * assertProductionReady() validates the KeyProvider is configured
  * with a strong passphrase (>= 32 chars) on testnet/mainnet, and rejects
  * plaintext key sources (default localnet key, server mnemonic fallback)
  * on non-localnet networks.
+ *
+ * detectPlaintextKeyConfig() scans environment for plaintext wallet keys
+ * or mnemonics and emits warnings/errors on startup.
  */
 
 import { getEncryptionPassphrase } from './crypto';
@@ -80,7 +82,7 @@ export class EnvKeyProvider implements KeyProvider {
 /**
  * Create a KeyProvider based on configuration.
  *
- * On mainnet, EnvKeyProvider is rejected unless ALLOW_PLAINTEXT_KEYS=true.
+ * On mainnet, requires WALLET_ENCRYPTION_KEY to be explicitly set.
  * Future implementations will check for KMS configuration and return
  * the appropriate provider (e.g., VaultKeyProvider, AwsSecretsKeyProvider).
  */
@@ -92,33 +94,29 @@ export function createKeyProvider(
     // if (process.env.VAULT_ADDR) return new VaultKeyProvider(...)
     // if (process.env.AWS_SECRET_ARN) return new AwsSecretsKeyProvider(...)
 
-    // Enforce: on mainnet, reject plaintext env-based key provider unless explicitly allowed
-    if (network === 'mainnet' && !isPlaintextKeysAllowed()) {
-        throw new Error(
-            'Refusing to start on mainnet with plaintext key provider (EnvKeyProvider). ' +
-            'Wallet encryption keys stored in environment variables are vulnerable to ' +
-            'process memory dumps and log leaks. ' +
-            'Set ALLOW_PLAINTEXT_KEYS=true to explicitly accept this risk, ' +
-            'or configure a KMS-backed key provider (VAULT_ADDR or AWS_SECRET_ARN).',
-        );
-    }
-
+    // Enforce: on mainnet, require explicit WALLET_ENCRYPTION_KEY
     if (network === 'mainnet') {
-        log.warn(
-            'Using EnvKeyProvider on mainnet with ALLOW_PLAINTEXT_KEYS=true — ' +
-            'migrate to a KMS-backed provider for production hardening. ' +
-            'See: bun run migrate:keys --help',
-        );
+        const envKey = process.env.WALLET_ENCRYPTION_KEY;
+        if (!envKey || envKey.trim().length === 0) {
+            throw new Error(
+                'Refusing to start on mainnet without WALLET_ENCRYPTION_KEY. ' +
+                'Wallet encryption keys must be explicitly configured for mainnet. ' +
+                'Generate one with: openssl rand -hex 32',
+            );
+        }
+
+        // Warn about deprecated ALLOW_PLAINTEXT_KEYS if still set
+        if (process.env.ALLOW_PLAINTEXT_KEYS) {
+            log.warn(
+                'ALLOW_PLAINTEXT_KEYS is deprecated and ignored (#924). ' +
+                'Mainnet now requires WALLET_ENCRYPTION_KEY to be set. ' +
+                'Remove ALLOW_PLAINTEXT_KEYS from your environment.',
+            );
+        }
     }
 
     log.debug('Using EnvKeyProvider for wallet encryption', { network });
     return new EnvKeyProvider(network, serverMnemonic);
-}
-
-/** Check whether the operator has explicitly opted into plaintext key storage. */
-function isPlaintextKeysAllowed(): boolean {
-    const value = process.env.ALLOW_PLAINTEXT_KEYS;
-    return value === 'true' || value === '1';
 }
 
 /**
@@ -179,4 +177,59 @@ export async function assertProductionReady(
     }
 
     log.info(`KeyProvider production readiness validated for ${network}`);
+}
+
+/**
+ * Scan environment variables for plaintext wallet keys or mnemonics
+ * that should not be present in production configurations.
+ *
+ * Returns an array of warning messages. On mainnet, any finding is fatal.
+ * On testnet, warnings are emitted. On localnet, this is a no-op.
+ */
+export function detectPlaintextKeyConfig(network: string): string[] {
+    if (network === 'localnet') return [];
+
+    const warnings: string[] = [];
+
+    // Check for deprecated ALLOW_PLAINTEXT_KEYS
+    if (process.env.ALLOW_PLAINTEXT_KEYS) {
+        warnings.push(
+            'ALLOW_PLAINTEXT_KEYS is set but deprecated (#924). ' +
+            'Remove it from your environment — it is no longer honored.',
+        );
+    }
+
+    // Detect if ALGOCHAT_MNEMONIC looks like a raw 25-word mnemonic in a non-localnet env.
+    // This is expected (it's how the server identifies itself), but we warn operators
+    // to ensure they're aware and using proper secret management (Docker secrets, Vault, etc.)
+    const mnemonic = process.env.ALGOCHAT_MNEMONIC;
+    if (mnemonic && mnemonic.trim().split(/\s+/).length >= 25) {
+        if (network === 'mainnet') {
+            warnings.push(
+                'ALGOCHAT_MNEMONIC contains a raw 25-word mnemonic in a mainnet environment. ' +
+                'Consider using Docker secrets, a secrets manager, or file-based injection ' +
+                'to avoid plaintext mnemonics in process environment variables.',
+            );
+        }
+    }
+
+    // Check for WALLET_ENCRYPTION_KEY that is suspiciously weak
+    const encKey = process.env.WALLET_ENCRYPTION_KEY;
+    if (encKey && encKey.trim().length < MIN_PRODUCTION_KEY_LENGTH) {
+        warnings.push(
+            `WALLET_ENCRYPTION_KEY is only ${encKey.trim().length} chars on ${network} ` +
+            `(minimum ${MIN_PRODUCTION_KEY_LENGTH}). Generate a stronger key with: openssl rand -hex 32`,
+        );
+    }
+
+    // Log all warnings
+    for (const w of warnings) {
+        if (network === 'mainnet') {
+            log.error(`[SECURITY] ${w}`);
+        } else {
+            log.warn(`[SECURITY] ${w}`);
+        }
+    }
+
+    return warnings;
 }

@@ -37,7 +37,7 @@ import { broadcastAlgoChatMessage } from '../ws/handler';
 import { publishToTenant } from '../events/broadcasting';
 import { resolveAgentTenant } from '../tenant/resolve';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
-import { createKeyProvider, assertProductionReady } from '../lib/key-provider';
+import { createKeyProvider, assertProductionReady, detectPlaintextKeyConfig } from '../lib/key-provider';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import { createFlockClient } from '../flock-directory/deploy';
 import { createLogger } from '../lib/logger';
@@ -106,6 +106,14 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
         : algochatConfig;
 
     algochatState.bridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
+
+    // Scan for plaintext key configuration issues (#924)
+    const plaintextWarnings = detectPlaintextKeyConfig(agentNetworkConfig.network);
+    if (plaintextWarnings.length > 0 && agentNetworkConfig.network === 'mainnet') {
+        log.error('Plaintext key configuration issues detected on mainnet', {
+            warnings: plaintextWarnings,
+        });
+    }
 
     // Initialize agent wallet service on the agent network (localnet for funding/keys)
     const keyProvider = createKeyProvider(agentNetworkConfig.network, agentNetworkConfig.mnemonic);

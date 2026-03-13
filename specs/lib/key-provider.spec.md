@@ -23,6 +23,7 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 |----------|-----------|---------|-------------|
 | `createKeyProvider` | `(network?: string, serverMnemonic?: string \| null)` | `KeyProvider` | Factory that returns the appropriate provider based on config |
 | `assertProductionReady` | `(keyProvider: KeyProvider \| null, network: string)` | `Promise<void>` | Validates KeyProvider is configured with a strong passphrase on testnet/mainnet; no-op on localnet |
+| `detectPlaintextKeyConfig` | `(network: string)` | `string[]` | Scans env for plaintext key issues; returns warning messages. No-op on localnet |
 
 ### Exported Types
 
@@ -61,6 +62,9 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 6. `assertProductionReady` is a no-op on localnet
 7. `assertProductionReady` throws if no KeyProvider is supplied on testnet/mainnet
 8. `assertProductionReady` throws if WALLET_ENCRYPTION_KEY is missing or shorter than 32 chars on non-localnet
+9. `ALLOW_PLAINTEXT_KEYS` is deprecated and ignored — mainnet requires WALLET_ENCRYPTION_KEY (#924)
+10. `detectPlaintextKeyConfig` returns no warnings on localnet
+11. `AgentWalletService` legacy fallback (no KeyProvider) is only allowed on localnet; throws on testnet/mainnet
 
 ## Behavioral Examples
 
@@ -120,4 +124,5 @@ Abstraction layer for wallet encryption key management. Decouples the encryption
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-12 | CorvidAgent | #924 — remove ALLOW_PLAINTEXT_KEYS, add detectPlaintextKeyConfig, enforce KeyProvider on non-localnet |
 | 2026-03-08 | CorvidAgent | Initial spec — KeyProvider interface + EnvKeyProvider |
