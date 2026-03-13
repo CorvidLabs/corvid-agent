@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 81;
+const SCHEMA_VERSION = 82;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -1047,6 +1047,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
         `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_agent_messages_from ON agent_messages(from_agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status)`,
         `CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id)`,
         `CREATE INDEX IF NOT EXISTS idx_agent_messages_to ON agent_messages(to_agent_id)`,
@@ -1061,6 +1062,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_algochat_messages_created ON algochat_messages(created_at)`,
         `CREATE INDEX IF NOT EXISTS idx_algochat_messages_participant ON algochat_messages(participant)`,
+        `CREATE INDEX IF NOT EXISTS idx_algochat_conversations_created ON algochat_conversations(created_at DESC)`,
         `CREATE INDEX IF NOT EXISTS idx_algochat_participant ON algochat_conversations(participant_addr)`,
         `CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)`,
@@ -1069,6 +1071,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_cdm_launch ON council_discussion_messages(launch_id)`,
         `CREATE INDEX IF NOT EXISTS idx_council_launch_logs_launch ON council_launch_logs(launch_id)`,
         `CREATE INDEX IF NOT EXISTS idx_council_launches_council ON council_launches(council_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_council_launches_council_created ON council_launches(council_id, created_at DESC)`,
         `CREATE INDEX IF NOT EXISTS idx_council_launches_tenant ON council_launches(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_council_members_council ON council_members(council_id)`,
         `CREATE INDEX IF NOT EXISTS idx_councils_tenant ON councils(tenant_id)`,
@@ -1076,6 +1079,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_credit_txn_session ON credit_transactions(session_id)`,
         `CREATE INDEX IF NOT EXISTS idx_credit_txn_type ON credit_transactions(type)`,
         `CREATE INDEX IF NOT EXISTS idx_credit_txn_wallet ON credit_transactions(wallet_address)`,
+        `CREATE INDEX IF NOT EXISTS idx_credit_txn_wallet_type_created ON credit_transactions(wallet_address, type, created_at DESC)`,
         `CREATE INDEX IF NOT EXISTS idx_dedup_state_expires ON dedup_state(expires_at)`,
         `CREATE INDEX IF NOT EXISTS idx_dedup_state_ns_expires ON dedup_state(namespace, expires_at)`,
         `CREATE INDEX IF NOT EXISTS idx_escalation_queue_session ON escalation_queue(session_id)`,
@@ -1154,11 +1158,13 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_reputation_events_type ON reputation_events(event_type)`,
         `CREATE INDEX IF NOT EXISTS idx_sandbox_configs_tenant ON sandbox_configs(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule ON schedule_executions(schedule_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_schedule_executions_schedule_status ON schedule_executions(schedule_id, status, started_at DESC)`,
         `CREATE INDEX IF NOT EXISTS idx_schedule_executions_status ON schedule_executions(status)`,
         `CREATE INDEX IF NOT EXISTS idx_schedule_executions_tenant ON schedule_executions(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_status ON server_health_snapshots(status)`,
         `CREATE INDEX IF NOT EXISTS idx_server_health_snapshots_timestamp ON server_health_snapshots(timestamp)`,
         `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_session_messages_session_timestamp ON session_messages(session_id, timestamp ASC)`,
         `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
@@ -1185,6 +1191,7 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_runs_tenant ON workflow_runs(tenant_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow_started ON workflow_runs(workflow_id, started_at DESC)`,
         `CREATE INDEX IF NOT EXISTS idx_workflows_agent ON workflows(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status)`,
         `CREATE INDEX IF NOT EXISTS idx_workflows_tenant ON workflows(tenant_id)`,
