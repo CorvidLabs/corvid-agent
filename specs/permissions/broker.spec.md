@@ -29,6 +29,7 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | `listRoleTemplates` | `()` | `readonly RoleTemplate[]` | List all available role templates (re-exported from `role-templates`) |
 | `applyRoleTemplate` | `(db, agentId, templateName, grantedBy, opts?)` | `Promise<{...}>` | Apply a role template to an agent (re-exported from `role-templates`) |
 | `revokeRoleTemplate` | `(db, agentId, templateName, revokedBy, opts?)` | `{...}` | Revoke all grants matching a role template (re-exported from `role-templates`) |
+| `_resetHmacSecretForTesting` | `()` | `void` | Reset the cached HMAC secret (test-only helper to simulate server restarts) |
 
 ### Exported Types
 
@@ -70,7 +71,7 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 
 ## Invariants
 
-1. Every grant is HMAC-SHA256 signed over `agentId:action:createdAt` using `PERMISSION_HMAC_SECRET` env var (falls back to dev secret for local)
+1. Every grant is HMAC-SHA256 signed over `agentId:action:createdAt` using `PERMISSION_HMAC_SECRET` env var (falls back to a random ephemeral key per startup if unset, with a warning)
 2. Permission checks verify HMAC signature integrity; grants with invalid signatures are rejected as potential tampering
 3. Grant matching uses three-level resolution: exact action match, namespace wildcard (`ns:*`), superuser wildcard (`*`). First match wins (ordered by `created_at DESC`)
 4. Tools with no entry in `TOOL_ACTION_MAP` are allowed by default (not gated)
@@ -177,7 +178,7 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `PERMISSION_HMAC_SECRET` | `'corvid-agent-dev-hmac-secret'` | HMAC secret used to sign and verify permission grants |
+| `PERMISSION_HMAC_SECRET` | (random ephemeral key) | HMAC secret used to sign and verify permission grants. **Required in production** for grant persistence across restarts |
 
 ## Change Log
 
