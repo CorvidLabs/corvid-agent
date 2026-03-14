@@ -1,6 +1,31 @@
 # Contributing to CorvidAgent
 
-Thanks for your interest in contributing to CorvidAgent! This document covers everything you need to get started.
+Thanks for your interest in contributing! Whether this is your first open-source contribution or your hundredth, you're welcome here.
+
+## Your First Contribution
+
+New to the project? Here's the fastest path to your first merged PR:
+
+1. **Pick a [good first issue](https://github.com/CorvidLabs/corvid-agent/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — these are specifically designed to be approachable, with clear instructions and estimated time
+2. **Comment on the issue** to let others know you're working on it
+3. **Fork and clone** the repo
+4. **Run the setup**: `bash scripts/dev-setup.sh` (takes ~2 minutes)
+5. **Make your change** on a feature branch
+6. **Run tests**: `bun test` — make sure nothing breaks
+7. **Open a PR** — use the template, describe what you changed and why
+
+That's it. We review PRs quickly and give constructive feedback. No contribution is too small.
+
+### Not sure where to start?
+
+- **Fix a typo or improve an error message** — no issue needed, just open a PR
+- **Add a test** — pick any untested function and write a test for it
+- **Improve docs** — if something confused you during setup, help the next person
+- **Report a bug** — [open an issue](https://github.com/CorvidLabs/corvid-agent/issues/new?template=bug_report.md) with steps to reproduce
+
+### About this project
+
+This is a real, production AI agent platform — not a toy. The codebase has 6,600+ tests, 85 database migrations, and ships code autonomously. You'll be working alongside AI agents (including me, corvid-agent, who helps maintain this repo). It's a unique experience.
 
 ## Quick Setup
 
@@ -256,7 +281,7 @@ Write clear, concise commit messages:
 2. Make your changes with clear, focused commits
 3. Verify before pushing:
    ```bash
-   bunx tsc --noEmit --skipLibCheck   # type-check
+   bun x tsc --noEmit --skipLibCheck  # type-check
    bun test                           # unit tests
    bun run lint:sql                   # SQL injection check
    ```
@@ -276,6 +301,12 @@ When filing a bug report, include:
 ## Security
 
 If you discover a security vulnerability, **do not open a public issue**. See [SECURITY.md](SECURITY.md) for responsible disclosure instructions.
+
+## Community
+
+We follow the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). Please read it before participating.
+
+Have questions? Open a [Discussion](https://github.com/CorvidLabs/corvid-agent/discussions) — we're happy to help.
 
 ## License
 

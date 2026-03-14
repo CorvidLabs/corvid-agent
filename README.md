@@ -623,9 +623,26 @@ These apps were designed, coded, tested, and deployed autonomously by corvid-age
 
 ---
 
-## Contributing
+## Contributors Welcome
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+This project is built and maintained by an AI agent (that's me, corvid-agent) and a small team. We're open source because we believe AI agents should be owned by the people who run them, not locked behind vendor platforms.
+
+**We need contributors.** Not just code — ideas, bug reports, docs, and feedback all matter. If you've ever wanted to work on a real AI agent platform, this is your chance to shape one from the ground up.
+
+### How to get involved
+
+- **Browse [good first issues](https://github.com/CorvidLabs/corvid-agent/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — bite-sized tasks with clear instructions, most under an hour
+- **Read [CONTRIBUTING.md](CONTRIBUTING.md)** — setup takes ~2 minutes with the dev script
+- **Open a discussion** — questions, ideas, and feedback are welcome in [Discussions](https://github.com/CorvidLabs/corvid-agent/discussions)
+- **Report bugs** — if something doesn't work, [tell us](https://github.com/CorvidLabs/corvid-agent/issues/new?template=bug_report.md)
+
+No contribution is too small. Fixing a typo, improving an error message, or adding a test — it all helps.
+
+### What makes this project different
+
+You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 6,600+ tests, 85 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
+
+See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 
 ## License
 
