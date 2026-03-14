@@ -30,6 +30,7 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 | `_resetClaudeCliCache` | `value?: boolean \| null` | `void` | Reset Claude CLI detection cache (testing only) |
 | `isLocalOnly` | (none) | `boolean` | Returns true when no cloud API keys are configured; platform should route through local Ollama models |
 | `estimateComplexity` | `prompt: string` | `{ level: ComplexityLevel; signals: ComplexitySignals }` | Analyzes a prompt string and returns its estimated complexity level and signal breakdown |
+| `resolveModelForTier` | `tier: ModelTier` | `{ model: string; provider: LlmProviderType }` | Resolve the canonical Claude model ID for a ModelTier — always returns an Anthropic model, never Ollama or OpenAI |
 | `getModelPricing` | `model: string` | `ModelPricing \| null` | Look up pricing data for a specific model identifier |
 | `estimateCost` | `model: string, inputTokens: number, outputTokens: number` | `number` | Estimate total cost in USD for a request given token counts |
 | `getModelsForProvider` | `provider: string` | `ModelPricing[]` | Get all models belonging to a specific provider |
@@ -42,6 +43,7 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 
 | Type | Description |
 |------|-------------|
+| `ModelTier` | Enum: `OPUS = 'opus'`, `SONNET = 'sonnet'`, `HAIKU = 'haiku'` — maps semantic task categories to Claude model families per council decision 2026-03-13 |
 | `LlmProviderType` | Union: `'anthropic' \| 'openai' \| 'ollama'` |
 | `ExecutionMode` | Union: `'managed' \| 'direct'` |
 | `JsonSchemaProperty` | JSON Schema property descriptor with type, description, enum, items, default |
@@ -62,6 +64,7 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 |----------|------|-------------|
 | `MODEL_PRICING` | `ModelPricing[]` | Full pricing table for all supported models across Anthropic, OpenAI, and Ollama (local + cloud) |
 | `DEFAULT_FALLBACK_CHAINS` | `Record<string, FallbackChain>` | Pre-defined fallback chains: `'high-capability'`, `'balanced'`, `'cost-optimized'`, `'local'`, `'cloud'` |
+| `CLAUDE_TIER_MODELS` | `Record<ModelTier, string>` | Maps each ModelTier to its canonical Claude model ID (e.g. OPUS → `'claude-opus-4-6'`) |
 
 ### Exported Classes
 

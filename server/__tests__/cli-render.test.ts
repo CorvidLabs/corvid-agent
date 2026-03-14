@@ -671,11 +671,17 @@ describe('renderToolUse', () => {
 // ─── renderThinking ─────────────────────────────────────────────────────────
 
 describe('renderThinking', () => {
-    test('is a no-op (does not write to stderr)', () => {
-        // renderThinking was intentionally made a no-op to avoid
-        // escape sequences erasing streamed content
+    test('is a no-op when state unchanged (avoids clobbering streamed content)', () => {
+        // renderThinking was intentionally changed to a no-op to avoid
+        // \r\x1b[K erasing streamed content mid-output
         const output = captureStderr(() => {
             renderThinking(true);
+        });
+        expect(output).toBe('');
+    });
+
+    test('tracks state changes without writing to stderr', () => {
+        const output = captureStderr(() => {
             renderThinking(false);
         });
         expect(output).toBe('');

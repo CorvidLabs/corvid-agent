@@ -12,9 +12,10 @@ import {
     getModelsForProvider,
     getModelsByCost,
 } from '../providers/cost-table';
-import { estimateComplexity, ModelRouter } from '../providers/router';
+import { estimateComplexity, ModelRouter, resolveModelForTier, CLAUDE_TIER_MODELS, _resetClaudeCliCache } from '../providers/router';
 import { FallbackManager, DEFAULT_FALLBACK_CHAINS } from '../providers/fallback';
 import { LlmProviderRegistry } from '../providers/registry';
+import { ModelTier } from '../providers/types';
 import type { LlmProvider, LlmProviderType, LlmCompletionParams, LlmCompletionResult, LlmProviderInfo } from '../providers/types';
 
 // ─── Mock Provider ───────────────────────────────────────────────────────────
@@ -313,5 +314,190 @@ describe('FallbackManager', () => {
         } catch (err: unknown) {
             expect((err as Error).message).toContain('All providers in fallback chain failed');
         }
+    });
+
+    // Council decision 2026-03-13: production chains must not contain Ollama
+    test('production fallback chains do not contain Ollama entries', () => {
+        const productionChains = ['high-capability', 'balanced', 'cost-optimized'];
+        for (const name of productionChains) {
+            const chain = DEFAULT_FALLBACK_CHAINS[name];
+            expect(chain).toBeTruthy();
+            const ollamaEntries = chain.chain.filter((e) => e.provider === 'ollama');
+            expect(ollamaEntries).toHaveLength(0);
+        }
+    });
+
+    test('local and cloud chains retain Ollama entries for experimental use', () => {
+        const experimentalChains = ['local', 'cloud'];
+        for (const name of experimentalChains) {
+            const chain = DEFAULT_FALLBACK_CHAINS[name];
+            expect(chain).toBeTruthy();
+            const ollamaEntries = chain.chain.filter((e) => e.provider === 'ollama');
+            expect(ollamaEntries.length).toBeGreaterThan(0);
+        }
+    });
+});
+
+// ─── ModelTier Dispatch Tests ─────────────────────────────────────────────────
+
+describe('ModelTier', () => {
+    test('CLAUDE_TIER_MODELS maps all tiers to claude model IDs', () => {
+        expect(CLAUDE_TIER_MODELS[ModelTier.OPUS]).toBe('claude-opus-4-6');
+        expect(CLAUDE_TIER_MODELS[ModelTier.SONNET]).toBe('claude-sonnet-4-6');
+        expect(CLAUDE_TIER_MODELS[ModelTier.HAIKU]).toBe('claude-haiku-4-5-20251001');
+    });
+
+    test('all CLAUDE_TIER_MODELS values start with "claude-"', () => {
+        for (const model of Object.values(CLAUDE_TIER_MODELS)) {
+            expect(model.startsWith('claude-')).toBe(true);
+        }
+    });
+
+    test('resolveModelForTier returns correct model and anthropic provider', () => {
+        expect(resolveModelForTier(ModelTier.OPUS)).toEqual({
+            model: 'claude-opus-4-6',
+            provider: 'anthropic',
+        });
+        expect(resolveModelForTier(ModelTier.SONNET)).toEqual({
+            model: 'claude-sonnet-4-6',
+            provider: 'anthropic',
+        });
+        expect(resolveModelForTier(ModelTier.HAIKU)).toEqual({
+            model: 'claude-haiku-4-5-20251001',
+            provider: 'anthropic',
+        });
+    });
+
+    test('resolveModelForTier never returns an Ollama model', () => {
+        for (const tier of Object.values(ModelTier)) {
+            const { model } = resolveModelForTier(tier);
+            expect(model).not.toContain('ollama');
+            expect(model).not.toContain('llama');
+            expect(model).not.toContain('qwen');
+        }
+    });
+
+    test('ModelTier enum values are correct strings', () => {
+        expect(ModelTier.OPUS as string).toBe('opus');
+        expect(ModelTier.SONNET as string).toBe('sonnet');
+        expect(ModelTier.HAIKU as string).toBe('haiku');
+    });
+});
+
+// ─── selectModelByTier Tests ──────────────────────────────────────────────────
+
+describe('ModelRouter.selectModelByTier', () => {
+    let registry: LlmProviderRegistry;
+    let router: ModelRouter;
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const savedOpenaiKey = process.env.OPENAI_API_KEY;
+    const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+
+    beforeEach(() => {
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+        process.env.OPENAI_API_KEY = 'sk-test-dummy';
+        delete process.env.ENABLED_PROVIDERS;
+        _resetClaudeCliCache(null);
+        registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        registry.register(createMockProvider('anthropic', ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']));
+        router = new ModelRouter(registry);
+    });
+
+    afterEach(() => {
+        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = savedOpenaiKey;
+        if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
+        else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+    });
+
+    test('OPUS tier selects claude-opus-4-6 via anthropic', () => {
+        const result = router.selectModelByTier(ModelTier.OPUS);
+        expect(result.model).toBe('claude-opus-4-6');
+        expect(result.provider).toBe('anthropic');
+    });
+
+    test('SONNET tier selects claude-sonnet-4-6 via anthropic', () => {
+        const result = router.selectModelByTier(ModelTier.SONNET);
+        expect(result.model).toBe('claude-sonnet-4-6');
+        expect(result.provider).toBe('anthropic');
+    });
+
+    test('HAIKU tier selects claude-haiku-4-5-20251001 via anthropic', () => {
+        const result = router.selectModelByTier(ModelTier.HAIKU);
+        expect(result.model).toBe('claude-haiku-4-5-20251001');
+        expect(result.provider).toBe('anthropic');
+    });
+
+    test('throws when Anthropic provider is unavailable rather than degrading', () => {
+        const emptyRegistry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        // No providers registered — simulates Claude API being unavailable
+        const routerWithoutAnthropic = new ModelRouter(emptyRegistry);
+        expect(() => routerWithoutAnthropic.selectModelByTier(ModelTier.SONNET)).toThrow();
+    });
+
+    test('error message references TaskQueueService', () => {
+        const emptyRegistry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        const routerWithoutAnthropic = new ModelRouter(emptyRegistry);
+        try {
+            routerWithoutAnthropic.selectModelByTier(ModelTier.SONNET);
+            expect(true).toBe(false); // should not reach
+        } catch (err: unknown) {
+            expect((err as Error).message).toContain('TaskQueueService');
+        }
+    });
+});
+
+// ─── Ollama Feature Flag Tests ────────────────────────────────────────────────
+
+describe('Ollama OLLAMA_LOCAL_EXPERIMENTAL gate', () => {
+    const savedFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+
+    beforeEach(() => {
+        process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
+        delete process.env.ENABLED_PROVIDERS;
+        _resetClaudeCliCache(null);
+    });
+
+    afterEach(() => {
+        if (savedFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+        else process.env.OLLAMA_LOCAL_EXPERIMENTAL = savedFlag;
+        if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+        else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+        if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
+        else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+    });
+
+    test('Ollama provider is NOT registered when OLLAMA_LOCAL_EXPERIMENTAL is unset', () => {
+        delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        registry.register(createMockProvider('ollama', ['llama3.3']));
+        expect(registry.get('ollama')).toBeUndefined();
+    });
+
+    test('Ollama provider is NOT registered when OLLAMA_LOCAL_EXPERIMENTAL=false', () => {
+        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'false';
+        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        registry.register(createMockProvider('ollama', ['llama3.3']));
+        expect(registry.get('ollama')).toBeUndefined();
+    });
+
+    test('Ollama provider IS registered when OLLAMA_LOCAL_EXPERIMENTAL=true', () => {
+        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
+        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        registry.register(createMockProvider('ollama', ['llama3.3']));
+        expect(registry.get('ollama')).toBeDefined();
+    });
+
+    test('non-Ollama providers are unaffected by the feature flag', () => {
+        delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+        const registry = new (LlmProviderRegistry as new () => LlmProviderRegistry)();
+        registry.register(createMockProvider('anthropic', ['claude-sonnet-4-6']));
+        registry.register(createMockProvider('openai', ['gpt-4.1']));
+        expect(registry.get('anthropic')).toBeDefined();
+        expect(registry.get('openai')).toBeDefined();
     });
 });

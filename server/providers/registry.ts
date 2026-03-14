@@ -19,9 +19,25 @@ export class LlmProviderRegistry {
     register(provider: LlmProvider): void {
         const enabledRaw = process.env.ENABLED_PROVIDERS;
 
+        // Gate Ollama behind feature flag (council decision 2026-03-13).
+        // Ollama must not appear in any production dispatch path unless the
+        // operator explicitly opts in via OLLAMA_LOCAL_EXPERIMENTAL=true.
+        if (provider.type === 'ollama') {
+            const ollamaEnabled = process.env.OLLAMA_LOCAL_EXPERIMENTAL === 'true';
+            if (!ollamaEnabled) {
+                log.info(
+                    'Skipping OllamaProvider — set OLLAMA_LOCAL_EXPERIMENTAL=true to enable ' +
+                    '(experimental, not on production dispatch path)',
+                );
+                return;
+            }
+        }
+
         // Determine the effective enabled set:
         // 1. Explicit ENABLED_PROVIDERS env var takes priority
         // 2. If no cloud API keys exist, auto-restrict to ollama only
+        //    (only reachable when OLLAMA_LOCAL_EXPERIMENTAL=true, since Ollama
+        //    is gated above)
         let enabled: string[] | null = null;
         if (enabledRaw) {
             enabled = enabledRaw.split(',').map((s) => s.trim().toLowerCase());

@@ -5,6 +5,7 @@
  * and selects the most cost-effective model that can handle it.
  */
 import type { LlmProviderType } from './types';
+import { ModelTier } from './types';
 import type { LlmProviderRegistry } from './registry';
 import { MODEL_PRICING, estimateCost } from './cost-table';
 import { FallbackManager, DEFAULT_FALLBACK_CHAINS, type FallbackChain } from './fallback';
@@ -143,6 +144,24 @@ export function estimateComplexity(prompt: string): { level: ComplexityLevel; si
 }
 
 /**
+ * Canonical Claude model IDs for each ModelTier.
+ * Council decision 2026-03-13: Opus/Sonnet/Haiku tiered dispatch.
+ */
+export const CLAUDE_TIER_MODELS: Record<ModelTier, string> = {
+    [ModelTier.OPUS]:   'claude-opus-4-6',
+    [ModelTier.SONNET]: 'claude-sonnet-4-6',
+    [ModelTier.HAIKU]:  'claude-haiku-4-5-20251001',
+};
+
+/**
+ * Resolve the canonical Claude model ID for a given ModelTier.
+ * Always returns a Claude model — never an Ollama or OpenAI model.
+ */
+export function resolveModelForTier(tier: ModelTier): { model: string; provider: LlmProviderType } {
+    return { model: CLAUDE_TIER_MODELS[tier], provider: 'anthropic' };
+}
+
+/**
  * Map complexity levels to minimum capability tiers.
  */
 function minTierForComplexity(level: ComplexityLevel): number {
@@ -267,6 +286,34 @@ export class ModelRouter {
             complexity: level,
             estimatedCost: estimateCost(selected.model, signals.inputTokenEstimate, 1000),
         };
+    }
+
+    /**
+     * Select a Claude model directly by ModelTier, bypassing complexity analysis.
+     *
+     * Use this for call sites where the appropriate tier is known in advance:
+     *   - Council/architecture sessions → OPUS
+     *   - Work task/code generation → SONNET
+     *   - Routing/triage/classification → HAIKU
+     *
+     * If the Anthropic provider is unavailable, throws rather than degrading
+     * to a lower-quality model. Callers should enqueue via TaskQueueService.
+     */
+    selectModelByTier(
+        tier: ModelTier,
+    ): { model: string; provider: LlmProviderType } {
+        const resolved = resolveModelForTier(tier);
+
+        const provider = this.registry.get('anthropic');
+        if (!provider) {
+            throw new ValidationError(
+                `Anthropic provider unavailable — cannot dispatch ${tier} tier. ` +
+                'Enqueue via TaskQueueService rather than degrading to a lower-quality model.',
+            );
+        }
+
+        log.debug('Tier-based model selected', { tier, model: resolved.model });
+        return resolved;
     }
 
     /**

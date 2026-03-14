@@ -233,6 +233,7 @@ describe('Provider registry auto-restrict', () => {
             ANTHROPIC_API_KEY: undefined,
             OPENAI_API_KEY: undefined,
             ENABLED_PROVIDERS: undefined,
+            OLLAMA_LOCAL_EXPERIMENTAL: 'true',
         });
         env.setup();
         _resetClaudeCliCache(false);
