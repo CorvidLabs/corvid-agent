@@ -397,13 +397,29 @@ export class AgentMessenger {
                 responseBuffer = '';
             }
 
-            // Only finalize when the session fully exits
-            if (event.type === 'session_exited') {
+            // Finalize when the session exits or is stopped
+            if (event.type === 'session_exited' || event.type === 'session_stopped') {
                 finish();
             }
         };
 
         this.processManager.subscribe(sessionId, callback);
+
+        // Safety timeout: clean up the subscription if the session never exits.
+        // This prevents indefinite orphaned subscriptions (e.g., target agent hangs).
+        const SUBSCRIBE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+        setTimeout(() => {
+            if (!completed) {
+                log.warn('Agent response subscription timed out', { messageId, sessionId });
+                // Stop the process if still running
+                if (this.processManager.isRunning(sessionId)) {
+                    this.processManager.stopProcess(sessionId);
+                } else {
+                    // Process already gone but we never got the exit event — clean up manually
+                    finish();
+                }
+            }
+        }, SUBSCRIBE_TIMEOUT_MS);
     }
 
     /**
@@ -443,6 +459,11 @@ export class AgentMessenger {
 
             const timer = setTimeout(() => {
                 const response = (responseBuffer.trim() || lastTurnResponse.trim());
+                // Stop the orphaned session so it doesn't run indefinitely
+                if (this.processManager.isRunning(sessionId)) {
+                    log.warn('Stopping orphaned agent session on timeout', { sessionId, timeoutMs });
+                    this.processManager.stopProcess(sessionId);
+                }
                 settle(response || null, `Agent invoke timed out after ${timeoutMs}ms`);
             }, timeoutMs);
 
@@ -459,8 +480,8 @@ export class AgentMessenger {
                     responseBuffer = '';
                 }
 
-                // Only resolve when the session fully exits
-                if (event.type === 'session_exited') {
+                // Resolve when the session exits or is stopped
+                if (event.type === 'session_exited' || event.type === 'session_stopped') {
                     const response = (responseBuffer.trim() || lastTurnResponse.trim());
                     settle(response || null);
                 }

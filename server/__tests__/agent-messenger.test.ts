@@ -596,6 +596,89 @@ describe('invokeAndWait()', () => {
 
         expect(result.response).toBe('Turn 1 response');
     });
+
+    test('returns partial response on timeout and stops orphaned session', async () => {
+        // Simulate a session that sends content but never exits
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(
+            (sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+                setTimeout(() => {
+                    cb(sessionId, {
+                        type: 'assistant',
+                        message: { role: 'assistant', content: 'Partial response before timeout' },
+                    });
+                    // No session_exited — simulates a stuck session
+                }, 10);
+            },
+        );
+
+        // Mark the session as still running so stopProcess gets called
+        (mockProcessManager.isRunning as ReturnType<typeof mock>).mockReturnValue(true);
+
+        // Use a very short timeout (50ms) so the test doesn't take 5 minutes
+        const result = await messenger.invokeAndWait(
+            {
+                fromAgentId: agentA.id,
+                toAgentId: agentB.id,
+                content: 'This will timeout',
+                projectId,
+            },
+            50,
+        );
+
+        expect(result.response).toBe('Partial response before timeout');
+        // stopProcess should have been called to clean up the orphaned session
+        expect(mockProcessManager.stopProcess).toHaveBeenCalled();
+
+        // Reset isRunning to default
+        (mockProcessManager.isRunning as ReturnType<typeof mock>).mockReturnValue(false);
+    });
+
+    test('rejects with error on timeout when no content was buffered', async () => {
+        // Simulate a session that never produces output
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(() => {
+            // No events emitted at all
+        });
+
+        await expect(
+            messenger.invokeAndWait(
+                {
+                    fromAgentId: agentA.id,
+                    toAgentId: agentB.id,
+                    content: 'This will timeout empty',
+                    projectId,
+                },
+                50,
+            ),
+        ).rejects.toThrow('Agent invoke timed out after 50ms');
+    });
+
+    test('resolves on session_stopped event with buffered content', async () => {
+        (mockProcessManager.subscribe as ReturnType<typeof mock>).mockImplementation(
+            (sessionId: string, cb: (sid: string, event: ClaudeStreamEvent) => void) => {
+                setTimeout(() => {
+                    cb(sessionId, {
+                        type: 'assistant',
+                        message: { role: 'assistant', content: 'Response before stop' },
+                    });
+                    cb(sessionId, { type: 'result', total_cost_usd: 0 });
+                    // session_stopped instead of session_exited
+                    cb(sessionId, { type: 'session_stopped' } as ClaudeStreamEvent);
+                }, 10);
+            },
+        );
+
+        const result = await messenger.invokeAndWait(
+            {
+                fromAgentId: agentA.id,
+                toAgentId: agentB.id,
+                content: 'Stopped session test',
+                projectId,
+            },
+            5000,
+        );
+
+        expect(result.response).toBe('Response before stop');
+    });
 });
 
 // ─── setWorkCommandRouter() ──────────────────────────────────────────────────
