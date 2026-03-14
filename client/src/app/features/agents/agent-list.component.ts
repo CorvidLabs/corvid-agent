@@ -249,6 +249,13 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             .agent-grid { grid-template-columns: 1fr; }
             .filters { flex-direction: column; align-items: stretch; }
             .sort-group { margin-left: 0; }
+            .page__header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+        }
+        @media (max-width: 480px) {
+            .page { padding: 1rem; }
+            .filter-group { flex-wrap: wrap; }
+            .agent-card__top { flex-direction: column; gap: 0.35rem; }
+            .agent-card__badges { order: -1; }
         }
     `,
 })

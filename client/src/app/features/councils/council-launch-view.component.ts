@@ -385,8 +385,8 @@ import type { ServerWsMessage, StreamEvent } from '@shared/ws-protocol';
         .stage-step--active[data-stage="responding"] .stage-label { color: #00e5ff; }
         .stage-step--active[data-stage="discussing"] .stage-dot { border-color: #fbbf24; background: #fbbf24; }
         .stage-step--active[data-stage="discussing"] .stage-label { color: #fbbf24; }
-        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: #a78bfa; background: #a78bfa; }
-        .stage-step--active[data-stage="reviewing"] .stage-label { color: #a78bfa; }
+        .stage-step--active[data-stage="reviewing"] .stage-dot { border-color: var(--accent-purple); background: var(--accent-purple); }
+        .stage-step--active[data-stage="reviewing"] .stage-label { color: var(--accent-purple); }
         .stage-step--active[data-stage="synthesizing"] .stage-dot { border-color: #f472b6; background: #f472b6; }
         .stage-step--active[data-stage="synthesizing"] .stage-label { color: #f472b6; }
         .stage-step--active[data-stage="complete"] .stage-dot { border-color: var(--accent-green); background: var(--accent-green); }

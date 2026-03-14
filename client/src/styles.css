@@ -61,6 +61,10 @@
     --accent-amber-dim: rgba(255, 170, 0, 0.15);
     --accent-orange: #ff8800;
     --accent-orange-dim: rgba(255, 136, 0, 0.15);
+    --accent-purple: #a78bfa;
+    --accent-purple-dim: rgba(167, 139, 250, 0.15);
+    --accent-gold: #f5a623;
+    --accent-gold-dim: rgba(245, 166, 35, 0.15);
 
     /* Status colors — WCAG AAA on --bg-surface */
     --status-running: #5ddb72;
@@ -124,6 +128,11 @@ html, body {
 
 /* Scale up for 1080p displays — the 8px base is too small at this resolution */
 @media (max-height: 1200px) and (min-width: 769px) {
+    html { font-size: 10px; }
+}
+
+/* Mobile: bump base font so tiny labels stay readable */
+@media (max-width: 480px) {
     html { font-size: 10px; }
 }
 
@@ -236,4 +245,16 @@ button:active:not(:disabled) {
 @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
+}
+
+/* ── Responsive table wrapper ── */
+.table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile: tighten page padding, improve touch targets */
+@media (max-width: 480px) {
+    .page-title { font-size: var(--text-xl); }
+    .section-header { font-size: var(--text-lg); }
 }

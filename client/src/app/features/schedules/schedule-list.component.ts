@@ -363,7 +363,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 .expand-indicator{font-size:.55rem;color:var(--text-tertiary);margin-left:.25rem}.exec-row--clickable{cursor:pointer}.exec-row--clickable:hover{background:var(--bg-hover)}
 .schedule-execs{margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem}.execs-heading{margin:0 0 .5rem;color:var(--text-secondary);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}.loading-execs,.no-execs{font-size:.7rem;color:var(--text-tertiary);margin:0}
 .exec-detail{padding:.5rem;background:var(--bg-base);border-radius:var(--radius);margin-top:.25rem;margin-bottom:.35rem}.exec-detail__result{margin:0;font-size:.7rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}
-@media(max-width:768px){.form-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.action-row{flex-direction:column}.schedule-meta{flex-direction:column;gap:.5rem}}`,
+@media(max-width:768px){.form-grid{grid-template-columns:1fr}.span-2{grid-column:span 1}.action-row{flex-direction:column}.schedule-meta{flex-direction:column;gap:.5rem}.schedules__header{flex-direction:column;align-items:flex-start;gap:.75rem}.exec-stats{gap:.75rem}.schedule-card__header{flex-direction:column;gap:.5rem}.schedule-card__actions{flex-wrap:wrap}}
+@media(max-width:480px){.schedules{padding:1rem}.exec-stats__item{min-width:0}.exec-stats__bar{min-width:80px;flex-basis:100%}.approval-card{flex-direction:column;gap:.5rem;align-items:flex-start}}`,
 })
 export class ScheduleListComponent implements OnInit, OnDestroy {
     protected readonly scheduleService = inject(ScheduleService);
