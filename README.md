@@ -153,7 +153,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 |--------|-------|
 | MCP tools | **41** corvid_* tool handlers |
 | API endpoints | **~300** across 44 route modules |
-| DB migrations | **85** (squashed baseline + incremental, 90 tables) |
+| DB migrations | **7** (squashed baseline + incremental, 90 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
@@ -349,7 +349,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  85 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  7 migrations   | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -364,7 +364,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (85 migrations) and query modules
+  db/            SQLite schema (7 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -518,7 +518,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 85 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 7 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
@@ -640,7 +640,7 @@ No contribution is too small. Fixing a typo, improving an error message, or addi
 
 ### What makes this project different
 
-You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 6,600+ tests, 85 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
+You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 6,600+ tests, 7 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
 
 See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 
