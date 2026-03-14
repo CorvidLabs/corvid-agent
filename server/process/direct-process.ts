@@ -15,7 +15,7 @@ import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
-import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getMessagingSafetyPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { ExternalMcpClientManager } from '../mcp/external-client';
 import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
 import { AgentSessionLimiter } from '../lib/agent-session-limits';
@@ -1035,6 +1035,9 @@ function buildSystemPrompt(
         if (toolNames.includes('read_file')) {
             parts.push('', getCodingToolPrompt());
         }
+
+        // Always add messaging safety instructions when tools are available
+        parts.push('', getMessagingSafetyPrompt());
     }
 
     // Add focus/scoping instructions for non-high-tier agents
