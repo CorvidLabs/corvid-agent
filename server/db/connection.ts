@@ -32,8 +32,9 @@ function setDbFilePermissions(path: string): void {
 export function getDb(path?: string): Database {
     if (db) return db;
 
-    const dbPath =
-        path ?? process.env.DATABASE_PATH ?? (process.env.TRY_MODE === 'true' ? ':memory:' : 'corvid-agent.db');
+    const isTest = process.env.BUN_TEST === '1' || process.env.NODE_ENV === 'test';
+    const defaultPath = isTest || process.env.TRY_MODE === 'true' ? ':memory:' : 'corvid-agent.db';
+    const dbPath = path ?? process.env.DATABASE_PATH ?? defaultPath;
     db = new Database(dbPath, { create: true });
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA busy_timeout = 5000');

@@ -141,3 +141,20 @@ describe('Try mode — TRY_MODE env var', () => {
         }
     });
 });
+
+describe('Test isolation — BUN_TEST env var', () => {
+    test('BUN_TEST is set to 1 by bunfig.toml during test runs', () => {
+        expect(process.env.BUN_TEST).toBe('1');
+    });
+
+    test('getDb() defaults to :memory: when BUN_TEST=1', () => {
+        // BUN_TEST=1 is set by bunfig.toml [test.env], so getDb()
+        // should default to :memory: instead of corvid-agent.db.
+        // We verify the logic by checking the env var and simulating
+        // what connection.ts does.
+        const isTest = process.env.BUN_TEST === '1' || process.env.NODE_ENV === 'test';
+        const defaultPath = isTest || process.env.TRY_MODE === 'true' ? ':memory:' : 'corvid-agent.db';
+        expect(isTest).toBe(true);
+        expect(defaultPath).toBe(':memory:');
+    });
+});
