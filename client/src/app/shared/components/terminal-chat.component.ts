@@ -188,7 +188,12 @@ interface AutocompleteItem {
             color: #484f58;
             font-family: inherit;
             font-size: 0.65rem;
-            padding: 1px 4px;
+            padding: 4px 8px;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             border-radius: 3px;
             cursor: pointer;
             transition: opacity 0.15s;
@@ -208,7 +213,13 @@ interface AutocompleteItem {
         @media (max-width: 480px) {
             .terminal__output { padding: 0.5rem; }
             .terminal__input-area { padding: 0.5rem 0.75rem; }
-            .terminal__line { padding-right: 1.5rem; }
+            .terminal__line { padding-right: 0; }
+            .terminal__copy {
+                position: static;
+                margin-top: 0.25rem;
+                min-width: 44px;
+                min-height: 44px;
+            }
         }
         .terminal__cursor {
             display: inline-block;
@@ -313,8 +324,8 @@ interface AutocompleteItem {
             font-family: inherit;
             font-size: 0.75rem;
             font-weight: 700;
-            width: 22px;
-            height: 22px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             cursor: pointer;
             display: flex;
@@ -446,12 +457,16 @@ export class TerminalChatComponent implements AfterViewChecked {
 
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                this.autocompleteIndex.set((idx + 1) % items.length);
+                const nextIdx = (idx + 1) % items.length;
+                this.autocompleteIndex.set(nextIdx);
+                this.scrollAutocompleteIntoView(nextIdx);
                 return;
             }
             if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                this.autocompleteIndex.set((idx - 1 + items.length) % items.length);
+                const prevIdx = (idx - 1 + items.length) % items.length;
+                this.autocompleteIndex.set(prevIdx);
+                this.scrollAutocompleteIntoView(prevIdx);
                 return;
             }
             if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey)) {
@@ -579,6 +594,15 @@ export class TerminalChatComponent implements AfterViewChecked {
         }
 
         this.dismissAutocomplete();
+    }
+
+    private scrollAutocompleteIntoView(index: number): void {
+        // Defer to next frame so the DOM reflects the new active state
+        requestAnimationFrame(() => {
+            const container = this.inputEl?.nativeElement.parentElement?.querySelector('.autocomplete');
+            const active = container?.querySelectorAll('.autocomplete__item')[index] as HTMLElement | undefined;
+            active?.scrollIntoView({ block: 'nearest' });
+        });
     }
 
     private dismissAutocomplete(): void {

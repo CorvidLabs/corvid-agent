@@ -92,6 +92,51 @@ import { firstValueFrom } from 'rxjs';
                 </div>
 
                 <fieldset class="form__fieldset">
+                    <legend class="form__legend">Appearance</legend>
+                    <div class="form__field">
+                        <label for="displayColor" class="form__label">Accent Color</label>
+                        <div class="color-picker">
+                            <input id="displayColor" formControlName="displayColor" type="color"
+                                   class="color-picker__input"
+                                   [value]="form.get('displayColor')?.value || '#00e5ff'" />
+                            <input formControlName="displayColor" class="form__input color-picker__hex"
+                                   placeholder="#00e5ff" maxlength="7"
+                                   aria-label="Hex color value" />
+                            <button type="button" class="btn btn--secondary btn--sm" (click)="clearColor()"
+                                    aria-label="Reset to auto-generated color">Reset</button>
+                        </div>
+                    </div>
+                    <div class="form__field">
+                        <label for="displayIcon" class="form__label">Icon / Emoji</label>
+                        <div class="icon-picker">
+                            @for (emoji of commonEmoji; track emoji) {
+                                <button type="button"
+                                        class="icon-picker__option"
+                                        [class.icon-picker__option--active]="form.get('displayIcon')?.value === emoji"
+                                        (click)="form.get('displayIcon')?.setValue(emoji)"
+                                        [attr.aria-label]="'Select ' + emoji + ' as agent icon'"
+                                        [attr.aria-pressed]="form.get('displayIcon')?.value === emoji">
+                                    {{ emoji }}
+                                </button>
+                            }
+                            <input id="displayIcon" formControlName="displayIcon" class="form__input icon-picker__custom"
+                                   placeholder="Custom..." maxlength="32" aria-label="Custom icon or emoji" />
+                        </div>
+                    </div>
+                    <div class="form__field">
+                        <label for="avatarUrl" class="form__label">Avatar URL</label>
+                        <input id="avatarUrl" formControlName="avatarUrl" class="form__input"
+                               placeholder="https://example.com/avatar.png" type="url" />
+                        @if (form.get('avatarUrl')?.value) {
+                            <div class="avatar-preview">
+                                <img [src]="form.get('avatarUrl')?.value" alt="Avatar preview"
+                                     class="avatar-preview__img" (error)="onAvatarError($event)" />
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+
+                <fieldset class="form__fieldset">
                     <legend class="form__legend">AlgoChat</legend>
                     <label class="form__checkbox">
                         <input type="checkbox" formControlName="algochatEnabled" />
@@ -150,6 +195,30 @@ import { firstValueFrom } from 'rxjs';
         .btn--primary:disabled { opacity: 0.3; cursor: not-allowed; }
         .btn--secondary { background: transparent; color: var(--text-secondary); border-color: var(--border-bright); }
         .btn--secondary:hover { background: var(--bg-hover); }
+        .btn--sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; min-height: 44px; }
+        .color-picker { display: flex; align-items: center; gap: 0.5rem; }
+        .color-picker__input {
+            width: 44px; height: 44px; padding: 2px; border: 1px solid var(--border-bright);
+            border-radius: var(--radius); background: var(--bg-input); cursor: pointer;
+        }
+        .color-picker__input::-webkit-color-swatch-wrapper { padding: 2px; }
+        .color-picker__input::-webkit-color-swatch { border-radius: 3px; border: none; }
+        .color-picker__hex { width: 100px; font-family: 'Courier New', monospace; }
+        .icon-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+        .icon-picker__option {
+            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; border: 1px solid var(--border); border-radius: var(--radius);
+            background: var(--bg-input); cursor: pointer; transition: all 0.15s;
+        }
+        .icon-picker__option:hover { border-color: var(--border-bright); background: var(--bg-hover); }
+        .icon-picker__option--active { border-color: var(--accent-cyan); background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
+        .icon-picker__option:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+        .icon-picker__custom { width: 100px; }
+        .avatar-preview { margin-top: 0.5rem; }
+        .avatar-preview__img {
+            width: 64px; height: 64px; border-radius: var(--radius);
+            border: 1px solid var(--border-bright); object-fit: cover;
+        }
     `,
 })
 export class AgentFormComponent implements OnInit {
@@ -181,7 +250,16 @@ export class AgentFormComponent implements OnInit {
         algochatEnabled: [false],
         algochatAuto: [false],
         defaultProjectId: [null as string | null],
+        displayColor: [null as string | null],
+        displayIcon: [null as string | null],
+        avatarUrl: [null as string | null],
     });
+
+    protected readonly commonEmoji = [
+        '\u{1F916}', '\u{1F47E}', '\u{1F680}', '\u{2699}\uFE0F', '\u{1F9E0}', '\u{26A1}',
+        '\u{1F525}', '\u{1F4A1}', '\u{1F3AF}', '\u{1F6E1}\uFE0F', '\u{1F50D}', '\u{1F4BB}',
+        '\u{1F310}', '\u{2728}', '\u{1F9EA}', '\u{1F426}',
+    ];
 
     async ngOnInit(): Promise<void> {
         await this.projectService.loadProjects();
@@ -212,6 +290,9 @@ export class AgentFormComponent implements OnInit {
                 algochatEnabled: agent.algochatEnabled,
                 algochatAuto: agent.algochatAuto,
                 defaultProjectId: agent.defaultProjectId,
+                displayColor: agent.displayColor,
+                displayIcon: agent.displayIcon,
+                avatarUrl: agent.avatarUrl,
             });
             // Load models for the agent's current provider
             await this.loadModelsForProvider(agent.provider ?? '');
@@ -277,5 +358,13 @@ export class AgentFormComponent implements OnInit {
 
     onCancel(): void {
         this.router.navigate(['/agents']);
+    }
+
+    protected clearColor(): void {
+        this.form.get('displayColor')?.setValue(null);
+    }
+
+    protected onAvatarError(event: Event): void {
+        (event.target as HTMLImageElement).style.display = 'none';
     }
 }

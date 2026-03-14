@@ -82,6 +82,26 @@ describe('createAgent', () => {
         expect(agent.voiceEnabled).toBe(true);
         expect(agent.voicePreset).toBe('nova');
     });
+
+    test('creates with display customization fields', () => {
+        const agent = makeAgent({
+            displayColor: '#FF5733',
+            displayIcon: 'robot',
+            avatarUrl: 'https://example.com/avatar.png',
+        });
+        expect(agent.displayColor).toBe('#FF5733');
+        expect(agent.displayIcon).toBe('robot');
+        expect(agent.avatarUrl).toBe('https://example.com/avatar.png');
+        expect(agent.disabled).toBe(false);
+    });
+
+    test('display fields default to null when not provided', () => {
+        const agent = makeAgent();
+        expect(agent.displayColor).toBeNull();
+        expect(agent.displayIcon).toBeNull();
+        expect(agent.avatarUrl).toBeNull();
+        expect(agent.disabled).toBe(false);
+    });
 });
 
 // ── getAgent / listAgents ────────────────────────────────────────────
@@ -103,6 +123,20 @@ describe('getAgent and listAgents', () => {
         makeAgent({ name: 'Agent2' });
         const agents = listAgents(db);
         expect(agents).toHaveLength(2);
+    });
+
+    test('getAgent maps display fields from row (rowToAgent)', () => {
+        const agent = makeAgent({
+            displayColor: '#123456',
+            displayIcon: 'bolt',
+            avatarUrl: 'https://example.com/bolt.png',
+        });
+        const fetched = getAgent(db, agent.id);
+        expect(fetched).not.toBeNull();
+        expect(fetched!.displayColor).toBe('#123456');
+        expect(fetched!.displayIcon).toBe('bolt');
+        expect(fetched!.avatarUrl).toBe('https://example.com/bolt.png');
+        expect(fetched!.disabled).toBe(false);
     });
 
     test('listAgents returns agents ordered by updated_at', () => {
@@ -157,6 +191,72 @@ describe('updateAgent', () => {
 
     test('returns null for unknown id', () => {
         expect(updateAgent(db, 'nonexistent', { name: 'X' })).toBeNull();
+    });
+
+    test('updates displayColor', () => {
+        const agent = makeAgent();
+        const updated = updateAgent(db, agent.id, { displayColor: '#00FF00' });
+        expect(updated).not.toBeNull();
+        expect(updated!.displayColor).toBe('#00FF00');
+    });
+
+    test('updates displayIcon', () => {
+        const agent = makeAgent();
+        const updated = updateAgent(db, agent.id, { displayIcon: 'shield' });
+        expect(updated).not.toBeNull();
+        expect(updated!.displayIcon).toBe('shield');
+    });
+
+    test('updates avatarUrl', () => {
+        const agent = makeAgent();
+        const updated = updateAgent(db, agent.id, { avatarUrl: 'https://example.com/new-avatar.png' });
+        expect(updated).not.toBeNull();
+        expect(updated!.avatarUrl).toBe('https://example.com/new-avatar.png');
+    });
+
+    test('updates disabled flag', () => {
+        const agent = makeAgent();
+        expect(agent.disabled).toBe(false);
+        const updated = updateAgent(db, agent.id, { disabled: true });
+        expect(updated).not.toBeNull();
+        expect(updated!.disabled).toBe(true);
+
+        const reEnabled = updateAgent(db, agent.id, { disabled: false });
+        expect(reEnabled!.disabled).toBe(false);
+    });
+
+    test('updates all display fields together', () => {
+        const agent = makeAgent();
+        const updated = updateAgent(db, agent.id, {
+            displayColor: '#AABBCC',
+            displayIcon: 'star',
+            avatarUrl: 'https://example.com/star.png',
+            disabled: true,
+        });
+        expect(updated).not.toBeNull();
+        expect(updated!.displayColor).toBe('#AABBCC');
+        expect(updated!.displayIcon).toBe('star');
+        expect(updated!.avatarUrl).toBe('https://example.com/star.png');
+        expect(updated!.disabled).toBe(true);
+    });
+
+    test('clears display fields by setting to null', () => {
+        const agent = makeAgent({
+            displayColor: '#FF0000',
+            displayIcon: 'fire',
+            avatarUrl: 'https://example.com/fire.png',
+        });
+        expect(agent.displayColor).toBe('#FF0000');
+
+        const updated = updateAgent(db, agent.id, {
+            displayColor: null as unknown as string,
+            displayIcon: null as unknown as string,
+            avatarUrl: null as unknown as string,
+        });
+        expect(updated).not.toBeNull();
+        expect(updated!.displayColor).toBeNull();
+        expect(updated!.displayIcon).toBeNull();
+        expect(updated!.avatarUrl).toBeNull();
     });
 });
 

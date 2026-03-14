@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { runMigrations } from '../db/schema';
 import { handleProjectRoutes } from '../routes/projects';
 import { handleAgentRoutes } from '../routes/agents';
 import { handleAllowlistRoutes } from '../routes/allowlist';
@@ -33,56 +34,8 @@ async function getJson(res: Response | Promise<Response>): Promise<Record<string
 
 beforeAll(() => {
     db = new Database(':memory:');
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            working_dir TEXT NOT NULL,
-            allowed_tools TEXT DEFAULT '[]',
-            custom_instructions TEXT DEFAULT '',
-            mcp_servers TEXT DEFAULT '[]',
-            claude_md TEXT DEFAULT '',
-            env_vars TEXT DEFAULT '{}',
-            git_url TEXT DEFAULT NULL,
-            dir_strategy TEXT NOT NULL DEFAULT 'persistent',
-            base_clone_path TEXT DEFAULT NULL,
-            tenant_id TEXT NOT NULL DEFAULT 'default',
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS agents (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            system_prompt TEXT DEFAULT '',
-            append_prompt TEXT DEFAULT '',
-            model TEXT DEFAULT '',
-            provider TEXT DEFAULT '',
-            allowed_tools TEXT DEFAULT '',
-            disallowed_tools TEXT DEFAULT '',
-            permission_mode TEXT DEFAULT 'default',
-            max_budget_usd REAL DEFAULT NULL,
-            algochat_enabled INTEGER DEFAULT 0,
-            algochat_auto INTEGER DEFAULT 0,
-            custom_flags TEXT DEFAULT '{}',
-            default_project_id TEXT DEFAULT NULL,
-            wallet_address TEXT DEFAULT NULL,
-            wallet_mnemonic_encrypted TEXT DEFAULT NULL,
-            wallet_funded_algo REAL DEFAULT 0,
-            mcp_tool_permissions TEXT DEFAULT NULL,
-            voice_enabled INTEGER DEFAULT 0,
-            voice_preset TEXT DEFAULT 'alloy',
-            tenant_id TEXT NOT NULL DEFAULT 'default',
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        );
-        CREATE TABLE IF NOT EXISTS algochat_allowlist (
-            address TEXT PRIMARY KEY,
-            label TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-    `);
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
 });
 
 afterAll(() => {

@@ -16,6 +16,58 @@ interface HealthStatus {
     apiKey: boolean;
 }
 
+interface AgentTemplate {
+    id: string;
+    name: string;
+    suggestedName: string;
+    description: string;
+    icon: string;
+    skillBundleIds: string[];
+}
+
+const AGENT_TEMPLATES: AgentTemplate[] = [
+    {
+        id: 'full-stack',
+        name: 'Full Stack Developer',
+        suggestedName: 'Builder',
+        description: 'Reads and edits code, manages PRs and issues, creates work tasks. The all-rounder.',
+        icon: '{}',
+        skillBundleIds: ['preset-full-stack'],
+    },
+    {
+        id: 'code-reviewer',
+        name: 'Code Reviewer',
+        suggestedName: 'Reviewer',
+        description: 'Reviews pull requests, catches bugs, and provides actionable feedback on code quality.',
+        icon: '?!',
+        skillBundleIds: ['preset-code-reviewer', 'preset-github-ops'],
+    },
+    {
+        id: 'researcher',
+        name: 'Researcher',
+        suggestedName: 'Scout',
+        description: 'Deep web research, information gathering, and knowledge management.',
+        icon: '>>',
+        skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
+    },
+    {
+        id: 'devops',
+        name: 'DevOps Engineer',
+        suggestedName: 'Ops',
+        description: 'CI/CD automation, infrastructure tasks, deployment pipelines, and repo management.',
+        icon: '#!',
+        skillBundleIds: ['preset-devops', 'preset-github-ops'],
+    },
+    {
+        id: 'custom',
+        name: 'Custom Agent',
+        suggestedName: '',
+        description: 'Start from scratch. Pick your own name, model, and skills.',
+        icon: '**',
+        skillBundleIds: [],
+    },
+];
+
 @Component({
     selector: 'app-welcome-wizard',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,24 +116,58 @@ interface HealthStatus {
                         </div>
 
                         @if (health()?.apiKey || health()?.llm) {
-                            <button class="wizard__btn wizard__btn--primary" (click)="step.set('create')">
+                            <button class="wizard__btn wizard__btn--primary" (click)="step.set('templates')">
                                 Create Your First Agent
                             </button>
                         } @else {
                             <div class="wizard__warning">
                                 <p>Set <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> file or install Claude Code CLI to get started.</p>
                             </div>
-                            <button class="wizard__btn" (click)="step.set('create')">
+                            <button class="wizard__btn" (click)="step.set('templates')">
                                 Continue Anyway
                             </button>
                         }
                     </div>
                 }
 
+                @case ('templates') {
+                    <div class="wizard__step wizard__step--wide">
+                        <h2 class="step__title">Choose a Template</h2>
+                        <p class="step__desc">Pick a starting point — you can customize everything later.</p>
+
+                        <div class="template-grid">
+                            @for (t of templates; track t.id) {
+                                <button class="template-card"
+                                        [attr.data-selected]="selectedTemplate()?.id === t.id"
+                                        (click)="selectTemplate(t)">
+                                    <span class="template-card__icon">{{ t.icon }}</span>
+                                    <span class="template-card__name">{{ t.name }}</span>
+                                    <span class="template-card__desc">{{ t.description }}</span>
+                                </button>
+                            }
+                        </div>
+
+                        <div class="wizard__actions">
+                            <button type="button" class="wizard__btn" (click)="step.set('status')">Back</button>
+                            <button class="wizard__btn wizard__btn--primary"
+                                    [disabled]="!selectedTemplate()"
+                                    (click)="applyTemplate()">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                }
+
                 @case ('create') {
                     <div class="wizard__step">
                         <h2 class="step__title">Create Your First Agent</h2>
-                        <p class="step__desc">Give your agent a name and choose a model.</p>
+                        <p class="step__desc">
+                            @if (selectedTemplate() && selectedTemplate()!.id !== 'custom') {
+                                Customize your {{ selectedTemplate()!.name }} agent.
+                            } @else {
+                                Give your agent a name and choose a model.
+                            }
+                        </p>
 
                         <form [formGroup]="form" (ngSubmit)="onCreateAgent()" class="wizard__form">
                             <div class="field">
@@ -119,8 +205,19 @@ interface HealthStatus {
                                 </select>
                             </div>
 
+                            @if (selectedTemplate() && selectedTemplate()!.skillBundleIds.length > 0) {
+                                <div class="field">
+                                    <span class="field__label">Skills</span>
+                                    <div class="skill-tags">
+                                        @for (id of selectedTemplate()!.skillBundleIds; track id) {
+                                            <span class="skill-tag">{{ formatBundleId(id) }}</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
                             <div class="wizard__actions">
-                                <button type="button" class="wizard__btn" (click)="step.set('status')">Back</button>
+                                <button type="button" class="wizard__btn" (click)="step.set('templates')">Back</button>
                                 <button type="submit" class="wizard__btn wizard__btn--primary"
                                         [disabled]="form.invalid || creating()">
                                     {{ creating() ? 'Creating...' : 'Create Agent' }}
@@ -193,6 +290,7 @@ interface HealthStatus {
             border-radius: var(--radius-lg);
             padding: 1.5rem;
         }
+        .wizard__step--wide { max-width: 560px; }
         .wizard__step--done { text-align: center; }
 
         .step__title {
@@ -275,6 +373,71 @@ interface HealthStatus {
             padding: 0.1rem 0.35rem;
             border-radius: 3px;
             font-size: 0.75rem;
+        }
+
+        /* Template Grid */
+        .template-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.65rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .template-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.75rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text-primary);
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .template-card:hover {
+            border-color: var(--border-bright);
+            background: var(--bg-hover);
+        }
+        .template-card[data-selected="true"] {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 229, 255, 0.06);
+            box-shadow: var(--glow-cyan);
+        }
+        .template-card:last-child:nth-child(odd) {
+            grid-column: 1 / -1;
+        }
+        .template-card__icon {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            font-family: monospace;
+        }
+        .template-card__name {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .template-card__desc {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            line-height: 1.35;
+        }
+
+        /* Skill Tags */
+        .skill-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+        .skill-tag {
+            padding: 0.2rem 0.5rem;
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            border-radius: var(--radius);
+            font-size: 0.7rem;
+            color: var(--accent-cyan);
+            font-weight: 600;
         }
 
         /* Form */
@@ -378,6 +541,7 @@ interface HealthStatus {
             .wizard { padding: 1rem; }
             .wizard__logo { font-size: 0.25rem; }
             .wizard__step { padding: 1rem; }
+            .template-grid { grid-template-columns: 1fr; }
         }
     `,
 })
@@ -391,12 +555,14 @@ export class WelcomeWizardComponent implements OnInit {
 
     readonly agentCreated = output<void>();
 
-    protected readonly step = signal<'status' | 'create' | 'done'>('status');
+    protected readonly step = signal<'status' | 'templates' | 'create' | 'done'>('status');
     protected readonly health = signal<HealthStatus | null>(null);
     protected readonly providers = signal<ProviderInfo[]>([]);
     protected readonly availableModels = signal<string[]>([]);
     protected readonly creating = signal(false);
     protected readonly createdAgentName = signal('');
+    protected readonly selectedTemplate = signal<AgentTemplate | null>(null);
+    protected readonly templates = AGENT_TEMPLATES;
     private createdAgentId = '';
 
     protected readonly form = this.fb.nonNullable.group({
@@ -449,6 +615,21 @@ export class WelcomeWizardComponent implements OnInit {
         }
     }
 
+    protected selectTemplate(template: AgentTemplate): void {
+        this.selectedTemplate.set(template);
+    }
+
+    protected applyTemplate(): void {
+        const template = this.selectedTemplate();
+        if (!template) return;
+        if (template.suggestedName) {
+            this.form.patchValue({ name: template.suggestedName });
+        } else {
+            this.form.patchValue({ name: '' });
+        }
+        this.step.set('create');
+    }
+
     protected onProviderChange(): void {
         const selected = this.providers().find((p) => p.type === this.form.value.provider);
         if (selected) {
@@ -471,11 +652,39 @@ export class WelcomeWizardComponent implements OnInit {
             });
             this.createdAgentId = agent.id;
             this.createdAgentName.set(agent.name);
+
+            // Assign skill bundles from the selected template
+            const template = this.selectedTemplate();
+            if (template) {
+                await this.assignSkillBundles(agent.id, template.skillBundleIds);
+            }
+
             this.agentCreated.emit();
             this.step.set('done');
         } finally {
             this.creating.set(false);
         }
+    }
+
+    private async assignSkillBundles(agentId: string, bundleIds: string[]): Promise<void> {
+        for (let i = 0; i < bundleIds.length; i++) {
+            try {
+                await firstValueFrom(
+                    this.apiService.post(`/agents/${agentId}/skills`, {
+                        bundleId: bundleIds[i],
+                        sortOrder: i,
+                    }),
+                );
+            } catch {
+                // Bundle may not exist — skip silently
+            }
+        }
+    }
+
+    protected formatBundleId(id: string): string {
+        return id.replace('preset-', '').split('-').map(
+            (w) => w.charAt(0).toUpperCase() + w.slice(1),
+        ).join(' ');
     }
 
     protected startSession(): void {

@@ -258,3 +258,61 @@ button:active:not(:disabled) {
     .page-title { font-size: var(--text-xl); }
     .section-header { font-size: var(--text-lg); }
 }
+
+/* ── WCAG AAA: Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .card-hover:hover {
+        transform: none;
+    }
+    button:active:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* ── WCAG AAA: Touch target sizing (WCAG 2.5.8) ── */
+@media (pointer: coarse) {
+    button,
+    a,
+    select,
+    input[type="checkbox"],
+    input[type="radio"],
+    [role="option"],
+    [role="tab"],
+    summary {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    /* Inline text links inside paragraphs are exempt from target size */
+    p a, li a, td a, .terminal__text a {
+        min-height: unset;
+        min-width: unset;
+    }
+}
+
+/* ── Scroll indicators for horizontal scroll containers ── */
+.table-scroll {
+    position: relative;
+}
+.table-scroll::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, var(--bg-deep));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+.table-scroll:not(:has(:last-child:is(:last-child))) .table-scroll::after {
+    opacity: 1;
+}

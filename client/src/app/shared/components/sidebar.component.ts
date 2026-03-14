@@ -575,6 +575,13 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
             justify-content: center;
         }
 
+        /* Touch: ensure 44px minimum tap targets */
+        @media (pointer: coarse) {
+            .sidebar__link { min-height: 44px; display: flex; align-items: center; }
+            .sidebar__section-toggle { min-height: 44px; }
+            .sidebar__help-btn { min-height: 44px; }
+            .sidebar__collapse-btn { min-height: 44px; }
+        }
         /* Mobile (<768px): slide-out overlay */
         @media (max-width: 767px) {
             .sidebar-backdrop {
@@ -631,6 +638,7 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
     `,
     host: {
         '(document:keydown.escape)': 'onEscape()',
+        '(document:keydown.tab)': 'onTab($event)',
     },
 })
 export class SidebarComponent implements AfterViewInit, OnDestroy {
@@ -648,6 +656,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     private readonly router = inject(Router);
     private readonly shortcutsService = inject(KeyboardShortcutsService);
     private readonly firstLink = viewChild<ElementRef<HTMLAnchorElement>>('firstLink');
+    private readonly sidebarEl = viewChild<ElementRef<HTMLElement>>('sidebarEl');
     private routerSub: Subscription | null = null;
 
     /** Reference to the hamburger button for focus return — set by parent */
@@ -715,6 +724,33 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
     protected onEscape(): void {
         this.closeSidebar();
+    }
+
+    /** Focus trap: keep Tab cycling within the sidebar overlay on mobile */
+    protected onTab(event: Event): void {
+        if (!this.sidebarOpen()) return;
+        // Only trap focus when sidebar is an overlay (mobile <768px)
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
+
+        const nav = this.sidebarEl()?.nativeElement;
+        if (!nav) return;
+
+        const focusable = nav.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const ke = event as KeyboardEvent;
+
+        if (ke.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!ke.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
     }
 
     /** Load section states from localStorage, falling back to defaults */

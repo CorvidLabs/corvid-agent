@@ -350,9 +350,11 @@ export async function handleInteraction(
                 break;
             }
 
+            // Strip model suffix like " (claude-opus-4-6)" if user typed the full display name
+            const cleanAgentName = agentName.split(' (')[0].trim();
             const agent = agents.find(a =>
-                a.name.toLowerCase() === agentName.toLowerCase() ||
-                a.name.toLowerCase().replace(/\s+/g, '') === agentName.toLowerCase().replace(/\s+/g, '')
+                a.name.toLowerCase() === cleanAgentName.toLowerCase() ||
+                a.name.toLowerCase().replace(/\s+/g, '') === cleanAgentName.toLowerCase().replace(/\s+/g, '')
             );
             if (!agent) {
                 const names = agents.map(a => a.name).join(', ');
@@ -446,9 +448,11 @@ export async function handleInteraction(
             const allAgents = listAgents(ctx.db);
             let workAgent;
             if (workAgentName) {
+                // Strip model suffix like " (claude-opus-4-6)" if user typed the full display name
+                const cleanWorkAgentName = workAgentName.split(' (')[0].trim();
                 workAgent = allAgents.find(a =>
-                    a.name.toLowerCase() === workAgentName.toLowerCase() ||
-                    a.name.toLowerCase().replace(/\s+/g, '') === workAgentName.toLowerCase().replace(/\s+/g, '')
+                    a.name.toLowerCase() === cleanWorkAgentName.toLowerCase() ||
+                    a.name.toLowerCase().replace(/\s+/g, '') === cleanWorkAgentName.toLowerCase().replace(/\s+/g, '')
                 );
                 if (!workAgent) {
                     const names = allAgents.map(a => a.name).join(', ');

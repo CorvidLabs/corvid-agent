@@ -172,3 +172,102 @@ describe('Discord /config command', () => {
         expect(content).toContain('Only admins');
     });
 });
+
+describe('Discord /session model suffix stripping', () => {
+    test('finds agent when name includes model suffix like "(claude-opus-4-6)"', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'TestAgent', systemPrompt: 'test', model: 'claude-opus-4-6' });
+        createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+
+        await handleInteraction(ctx, makeInteraction('session', [
+            { name: 'agent', value: 'TestAgent (claude-opus-4-6)' },
+            { name: 'topic', value: 'Test topic' },
+        ]));
+
+        expect(capturedResponse).not.toBeNull();
+        const content = capturedResponse!.data?.content as string;
+        // Should succeed and mention the agent, not show "Agent not found"
+        expect(content).toContain('TestAgent');
+        expect(content).not.toContain('Agent not found');
+    });
+
+    test('finds agent when name includes arbitrary model suffix', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'MyAssistant', systemPrompt: 'test', model: 'some-model' });
+        createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+
+        await handleInteraction(ctx, makeInteraction('session', [
+            { name: 'agent', value: 'MyAssistant (some-model)' },
+            { name: 'topic', value: 'Debug issue' },
+        ]));
+
+        expect(capturedResponse).not.toBeNull();
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('MyAssistant');
+        expect(content).not.toContain('Agent not found');
+    });
+
+    test('still rejects truly unknown agent names with suffix', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'RealAgent', systemPrompt: 'test', model: 'test-model' });
+
+        await handleInteraction(ctx, makeInteraction('session', [
+            { name: 'agent', value: 'FakeAgent (claude-opus-4-6)' },
+            { name: 'topic', value: 'Test topic' },
+        ]));
+
+        expect(capturedResponse).not.toBeNull();
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('Agent not found');
+        expect(content).toContain('FakeAgent');
+    });
+});
+
+describe('Discord /work model suffix stripping', () => {
+    test('finds agent when name includes model suffix', async () => {
+        const ctx = createTestContext();
+        const agent = createAgent(db, { name: 'WorkerBot', systemPrompt: 'test', model: 'claude-opus-4-6' });
+        createProject(db, { name: 'test-project', workingDir: '/tmp/test' });
+
+        // Provide a workTaskService mock so the /work command proceeds
+        ctx.workTaskService = {
+            create: mock(async (params: Record<string, unknown>) => ({
+                id: 'task-123',
+                agentId: agent.id,
+                description: params.description,
+                status: 'running',
+                branchName: null,
+            })),
+        } as unknown as InteractionContext['workTaskService'];
+
+        await handleInteraction(ctx, makeInteraction('work', [
+            { name: 'description', value: 'Fix the tests' },
+            { name: 'agent', value: 'WorkerBot (claude-opus-4-6)' },
+        ]));
+
+        expect(capturedResponse).not.toBeNull();
+        const content = capturedResponse!.data?.content as string;
+        // Should succeed — mentions the agent name, not "Agent not found"
+        expect(content).toContain('WorkerBot');
+        expect(content).not.toContain('Agent not found');
+    });
+
+    test('still rejects unknown agent names with suffix in /work', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'RealWorker', systemPrompt: 'test', model: 'test-model' });
+
+        ctx.workTaskService = {
+            create: mock(async () => ({})),
+        } as unknown as InteractionContext['workTaskService'];
+
+        await handleInteraction(ctx, makeInteraction('work', [
+            { name: 'description', value: 'Do something' },
+            { name: 'agent', value: 'GhostAgent (claude-opus-4-6)' },
+        ]));
+
+        expect(capturedResponse).not.toBeNull();
+        const content = capturedResponse!.data?.content as string;
+        expect(content).toContain('Agent not found');
+        expect(content).toContain('GhostAgent');
+    });
+});
