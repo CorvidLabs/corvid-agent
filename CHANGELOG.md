@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.28.0] - 2026-03-14
+
+### Added
+- **Tiered Claude model dispatch** — Opus/Sonnet/Haiku routing based on task complexity with fallback chains (#1052)
+- **Ollama feature flag** — gate Ollama behind `ENABLE_OLLAMA` flag per council decision; provider abstraction preserved (#1052)
+- **Discord slash commands** — `/tasks`, `/schedule`, `/config` commands for server interaction (#1025)
+- **Dashboard UI polish** — duration display, empty states, skeleton loading, mobile responsiveness (#1023, #1024, #1026, #1027)
+- **Council list enhancements** — search, sort, pagination + schedule execution stats (#1024)
+- **Test data purge utility** — admin endpoint for purging test data (#1017)
+- **In-memory test DB** — use in-memory SQLite for test runs to prevent production pollution (#1016)
+
+### Changed
+- **CLI utilities deduplicated** — extracted shared helpers (`truncate`, `formatUptime`, `resolveProjectFromCwd`, `handleError`) into `cli/utils.ts` (#1055)
+- **Cross-platform path resolution** — use `path.sep` for Windows compatibility in `resolveProjectFromCwd`
+
+### Fixed
+- **CLI streaming** — fix streaming display and WebSocket keepalive (#1033)
+- **Discord gateway intents** — correct privileged intent configuration (#1033)
+- **Sidebar scrolling** — fix sidebar not scrollable on desktop (#1015)
+- **Unique project names** — sync unique name index across schema layers (#1008)
+- **Insecure temp file** — fix code scanning alert #307 (#1010)
+
+### Documentation
+- **Contributor welcome** — make project welcoming to new contributors (#1040)
+
+### Chores
+- **Repo hygiene** — unique project names, doc updates, CLI fixes (#1028)
+- **Dead code removal** — remove dead `execMarketplaceTrialExpiry` handler (#1009)
+
 ## [0.27.0] - 2026-03-13
 
 ### Added
