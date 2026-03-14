@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { createWebSocketHandler, broadcastAlgoChatMessage, HEARTBEAT_INTERVAL_MS, PONG_TIMEOUT_MS, AUTH_TIMEOUT_MS, type WsData } from '../ws/handler';
+import { createWebSocketHandler, broadcastAlgoChatMessage, tenantTopic, HEARTBEAT_INTERVAL_MS, PONG_TIMEOUT_MS, AUTH_TIMEOUT_MS, type WsData } from '../ws/handler';
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { SessionErrorRecoveryEvent } from '../process/types';
 import type { ProcessManager } from '../process/manager';
@@ -877,6 +877,30 @@ describe('auth timeout', () => {
     });
 });
 
+// ─── tenantTopic utility ───────────────────────────────────────────────────
+
+describe('tenantTopic', () => {
+    it('returns base topic with no tenantId argument', () => {
+        expect(tenantTopic('council')).toBe('council');
+    });
+
+    it('returns base topic when tenantId is undefined', () => {
+        expect(tenantTopic('council', undefined)).toBe('council');
+    });
+
+    it('returns base topic when tenantId is "default"', () => {
+        expect(tenantTopic('council', 'default')).toBe('council');
+    });
+
+    it('returns namespaced topic when tenantId is a real tenant', () => {
+        expect(tenantTopic('council', 'tenant-123')).toBe('council:tenant-123');
+    });
+
+    it('namespaces algochat topic correctly', () => {
+        expect(tenantTopic('algochat', 'org-abc')).toBe('algochat:org-abc');
+    });
+});
+
 // ─── broadcastAlgoChatMessage ──────────────────────────────────────────────
 
 describe('broadcastAlgoChatMessage', () => {
@@ -1043,5 +1067,408 @@ describe('error severity', () => {
         expect(msg.message).toContain('not found');
         // severity and errorCode are optional — should be present in type but may be undefined
         expect('severity' in msg || msg.severity === undefined).toBe(true);
+    });
+});
+
+// ─── schedule_approval success paths ──────────────────────────────────────
+
+describe('schedule_approval — success paths', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('sends schedule_execution_update when execution is found', () => {
+        const mockExecution = { id: 'e1', status: 'approved' };
+        const mockScheduler = { resolveApproval: mock(() => mockExecution) };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, () => mockScheduler as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'schedule_approval',
+            executionId: 'e1',
+            approved: true,
+        }));
+
+        expect(mockScheduler.resolveApproval).toHaveBeenCalledWith('e1', true);
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('schedule_execution_update');
+        expect(msg.execution).toEqual(mockExecution);
+    });
+
+    it('sends error when execution is not found (resolveApproval returns null)', () => {
+        const mockScheduler = { resolveApproval: mock(() => null) };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, () => mockScheduler as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'schedule_approval',
+            executionId: 'missing-exec',
+            approved: false,
+        }));
+
+        expect(mockScheduler.resolveApproval).toHaveBeenCalledWith('missing-exec', false);
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('not found');
+    });
+});
+
+// ─── question_response success paths ──────────────────────────────────────
+
+describe('question_response — success paths', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('sends no message when question is resolved successfully', () => {
+        const mockQM = { resolveQuestion: mock(() => true) };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, undefined, () => mockQM as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'question_response',
+            questionId: 'q1',
+            answer: 'yes',
+        }));
+
+        expect(mockQM.resolveQuestion).toHaveBeenCalledWith('q1', {
+            questionId: 'q1',
+            answer: 'yes',
+            selectedOption: null,
+        });
+        // No error — resolved successfully, no response message sent
+        const errors = sent.filter(s => JSON.parse(s).type === 'error');
+        expect(errors.length).toBe(0);
+    });
+
+    it('sends error when question is not found (resolveQuestion returns false)', () => {
+        const mockQM = { resolveQuestion: mock(() => false) };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, undefined, () => mockQM as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'question_response',
+            questionId: 'q-missing',
+            answer: 'no',
+        }));
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('not found');
+    });
+
+    it('passes selectedOption to resolveQuestion', () => {
+        const mockQM = { resolveQuestion: mock(() => true) };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, undefined, () => mockQM as any);
+        const { ws } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'question_response',
+            questionId: 'q2',
+            answer: 'option-a',
+            selectedOption: 'option-a',
+        }));
+
+        expect(mockQM.resolveQuestion).toHaveBeenCalledWith('q2', {
+            questionId: 'q2',
+            answer: 'option-a',
+            selectedOption: 'option-a',
+        });
+    });
+});
+
+// ─── agent_reward — range validation and success ───────────────────────────
+
+describe('agent_reward — range validation and wallet path', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('sends error when microAlgos is below minimum (< 1000)', () => {
+        const mockWallet = {
+            fundAgent: mock(async () => {}),
+            getBalance: mock(async () => 5000),
+        };
+        const mockBridge = { getAgentWalletService: () => mockWallet, db: {} };
+        const handler = createWebSocketHandler(pm, () => mockBridge as any, noAuthConfig);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'agent_reward',
+            agentId: 'a1',
+            microAlgos: 500,
+        }));
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('microAlgos must be between');
+        // fundAgent should NOT have been called
+        expect(mockWallet.fundAgent).not.toHaveBeenCalled();
+    });
+
+    it('sends error when microAlgos is above maximum (> 100000000)', () => {
+        const mockWallet = {
+            fundAgent: mock(async () => {}),
+            getBalance: mock(async () => 5000),
+        };
+        const mockBridge = { getAgentWalletService: () => mockWallet, db: {} };
+        const handler = createWebSocketHandler(pm, () => mockBridge as any, noAuthConfig);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'agent_reward',
+            agentId: 'a1',
+            microAlgos: 200_000_000,
+        }));
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('microAlgos must be between');
+        expect(mockWallet.fundAgent).not.toHaveBeenCalled();
+    });
+
+    it('calls fundAgent for a valid microAlgos amount', async () => {
+        let fundResolve: () => void;
+        const fundPromise = new Promise<void>(res => { fundResolve = res; });
+        const mockWallet = {
+            fundAgent: mock(async () => { await fundPromise; }),
+            getBalance: mock(async () => 5000),
+        };
+        const mockBridge = { getAgentWalletService: () => mockWallet, db: {} };
+        const handler = createWebSocketHandler(pm, () => mockBridge as any, noAuthConfig);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'agent_reward',
+            agentId: 'a1',
+            microAlgos: 5000,
+        }));
+
+        // fundAgent should have been called with valid amount
+        expect(mockWallet.fundAgent).toHaveBeenCalledWith('a1', 5000);
+        // No synchronous error
+        const errors = sent.filter(s => JSON.parse(s).type === 'error');
+        expect(errors.length).toBe(0);
+
+        // Resolve the promise to avoid dangling async
+        fundResolve!();
+    });
+});
+
+// ─── create_work_task success path ─────────────────────────────────────────
+
+describe('create_work_task — success path', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('sends work_task_update on successful task creation', async () => {
+        const mockTask = { id: 'task-1', agentId: 'a1', description: 'fix bug', status: 'pending' };
+        const mockWorkTaskService = {
+            create: mock(async () => mockTask),
+            onComplete: mock((_id: string, _cb: (t: typeof mockTask) => void) => {}),
+        };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, () => mockWorkTaskService as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'create_work_task',
+            agentId: 'a1',
+            description: 'fix bug',
+        }));
+
+        // Wait for the async create to resolve
+        await new Promise(res => setTimeout(res, 0));
+
+        expect(mockWorkTaskService.create).toHaveBeenCalledWith({
+            agentId: 'a1',
+            description: 'fix bug',
+            projectId: undefined,
+        });
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('work_task_update');
+        expect(msg.task.id).toBe('task-1');
+    });
+
+    it('sends work_task_update when onComplete fires', async () => {
+        const mockTask = { id: 'task-2', agentId: 'a1', description: 'refactor', status: 'pending' };
+        const completedTask = { ...mockTask, status: 'completed' };
+        let onCompleteCallback: ((t: typeof completedTask) => void) | undefined;
+        const mockWorkTaskService = {
+            create: mock(async () => mockTask),
+            onComplete: mock((_id: string, cb: (t: typeof completedTask) => void) => { onCompleteCallback = cb; }),
+        };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, () => mockWorkTaskService as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'create_work_task',
+            agentId: 'a1',
+            description: 'refactor',
+        }));
+
+        await new Promise(res => setTimeout(res, 0));
+        sent.length = 0; // Clear the initial work_task_update
+
+        // Simulate completion
+        onCompleteCallback!(completedTask);
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('work_task_update');
+        expect(msg.task.status).toBe('completed');
+    });
+
+    it('sends error when work task creation fails', async () => {
+        const mockWorkTaskService = {
+            create: mock(async () => { throw new Error('DB full'); }),
+            onComplete: mock(() => {}),
+        };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, () => mockWorkTaskService as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'create_work_task',
+            agentId: 'a1',
+            description: 'bad task',
+        }));
+
+        await new Promise(res => setTimeout(res, 0));
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('Work task creation failed');
+    });
+});
+
+// ─── agent_invoke success path ─────────────────────────────────────────────
+
+describe('agent_invoke — success path', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager();
+    });
+
+    it('sends agent_message_update on successful invoke', async () => {
+        const mockMessage = { id: 'msg-1', fromAgentId: 'a1', toAgentId: 'a2', content: 'do something', status: 'sent' };
+        const mockMessenger = {
+            invoke: mock(async () => ({ message: mockMessage, sessionId: null })),
+            db: {},
+        };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, () => mockMessenger as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'agent_invoke',
+            fromAgentId: 'a1',
+            toAgentId: 'a2',
+            content: 'do something',
+        }));
+
+        await new Promise(res => setTimeout(res, 0));
+
+        expect(mockMessenger.invoke).toHaveBeenCalledWith({
+            fromAgentId: 'a1',
+            toAgentId: 'a2',
+            content: 'do something',
+            paymentMicro: undefined,
+            projectId: undefined,
+        });
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('agent_message_update');
+        expect(msg.message.id).toBe('msg-1');
+    });
+
+    it('sends error when agent invoke rejects', async () => {
+        const mockMessenger = {
+            invoke: mock(async () => { throw new Error('agent offline'); }),
+            db: {},
+        };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, () => mockMessenger as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'agent_invoke',
+            fromAgentId: 'a1',
+            toAgentId: 'a2',
+            content: 'do something',
+        }));
+
+        await new Promise(res => setTimeout(res, 0));
+
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('Agent invocation failed');
+    });
+});
+
+// ─── send_message auto-resume path ────────────────────────────────────────
+
+describe('send_message — auto-resume', () => {
+    let pm: ProcessManager;
+
+    beforeEach(() => {
+        pm = createMockProcessManager({
+            sendMessage: mock(() => false),
+        } as unknown as Partial<ProcessManager>);
+    });
+
+    it('exercises the getDb code path when sendMessage returns false', () => {
+        // Provide a getDb that returns a minimal stub with a query method that returns null,
+        // simulating a real DB that simply has no matching session row.
+        const stubDb = {
+            query: (_sql: string) => ({ get: () => null }),
+            prepare: (_sql: string) => ({ get: () => null, all: () => [] }),
+        };
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig, undefined, undefined, undefined, undefined, () => stubDb as any);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'send_message',
+            sessionId: 'sess-1',
+            content: 'hello',
+        }));
+
+        expect(pm.sendMessage).toHaveBeenCalledWith('sess-1', 'hello');
+        // getSession returns null → handler sends "not found" error
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('not found');
+    });
+
+    it('sends error when DB is not provided and sendMessage returns false', () => {
+        const handler = createWebSocketHandler(pm, () => null, noAuthConfig);
+        const { ws, sent } = createMockWs();
+
+        handler.message(ws, JSON.stringify({
+            type: 'send_message',
+            sessionId: 'sess-missing',
+            content: 'hello',
+        }));
+
+        expect(pm.sendMessage).toHaveBeenCalledWith('sess-missing', 'hello');
+        expect(sent.length).toBe(1);
+        const msg = JSON.parse(sent[0]);
+        expect(msg.type).toBe('error');
+        expect(msg.message).toContain('not found');
     });
 });
