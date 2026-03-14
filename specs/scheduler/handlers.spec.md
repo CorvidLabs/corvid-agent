@@ -9,6 +9,7 @@ files:
   - server/scheduler/handlers/github.ts
   - server/scheduler/handlers/improvement.ts
   - server/scheduler/handlers/maintenance.ts
+  - server/scheduler/handlers/blog.ts
   - server/scheduler/handlers/review.ts
   - server/scheduler/handlers/work-task.ts
 db_tables:
@@ -76,6 +77,12 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 |----------|-----------|---------|-------------|
 | `execImprovementLoop` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Runs the autonomous improvement loop via `AutonomousLoopService.run` with optional `maxTasks` and `focusArea` |
 
+#### blog.ts
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `execBlogWrite` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Creates an agent session that researches recent project activity and writes a blog post, committing to the corvid-pages repo |
+
 #### marketplace-billing.ts (re-exported via index.ts)
 
 | Function | Parameters | Returns | Description |
@@ -96,8 +103,8 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 ## Invariants
 
 1. Every handler updates the execution status to either `completed` or `failed` before returning (or on error).
-2. Handlers that require an agent (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`, `execStatusCheckin`) fail with "Agent not found" if `getAgent` returns null.
-3. Handlers that create sessions (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execCustom`) require a project ID (from action or agent default) and fail with "No project configured" if unavailable.
+2. Handlers that require an agent (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execBlogWrite`, `execCustom`, `execStatusCheckin`) fail with "Agent not found" if `getAgent` returns null.
+3. Handlers that create sessions (`execReviewPrs`, `execGithubSuggest`, `execCodebaseReview`, `execDependencyAudit`, `execBlogWrite`, `execCustom`) require a project ID (from action or agent default) and fail with "No project configured" if unavailable.
 4. Session-based handlers set execution status to `running` with a `sessionId` before starting the process, then immediately mark `completed` (the session runs asynchronously).
 5. `execWorkTask` requires `ctx.workTaskService` to be non-null; fails with "Work task service not available" otherwise.
 6. `execImprovementLoop` requires `ctx.improvementLoopService` to be non-null; fails with "Improvement loop service not configured" otherwise.

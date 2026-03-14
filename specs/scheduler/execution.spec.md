@@ -53,7 +53,7 @@ Provides the execution lifecycle layer for scheduled actions. `execution.ts` wra
 1. `runAction` always removes the execution from `runningExecutions` and releases all repo locks in the `finally` block, regardless of success or failure.
 2. After `MAX_CONSECUTIVE_FAILURES` (5), the schedule is auto-paused and `consecutiveFailures` is reset.
 3. On successful completion, `consecutiveFailures` for that schedule is cleared.
-4. AlgoChat broadcast is only sent for action types in `BROADCAST_ACTION_TYPES`: `work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`.
+4. AlgoChat broadcast is only sent for action types in `BROADCAST_ACTION_TYPES`: `work_task`, `council_launch`, `daily_review`, `review_prs`, `github_suggest`, `codebase_review`, `dependency_audit`, `improvement_loop`, `custom`, `status_checkin`, `blog_write`.
 5. Notifications to `notifyAddress` are fire-and-forget; failures are logged but do not affect execution status.
 6. Unknown action types result in the execution being marked as `failed`.
 7. `needsApproval` returns false for `auto` policy, checks destructive actions list for `owner_approve`, and returns true for `council_approve`.

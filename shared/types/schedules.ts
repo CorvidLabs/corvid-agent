@@ -17,6 +17,7 @@ export type ScheduleActionType =
     | 'daily_review'
     | 'status_checkin'
     | 'marketplace_billing'
+    | 'blog_write'
     | 'custom';
 
 export type ScheduleApprovalPolicy = 'auto' | 'owner_approve' | 'council_approve';
