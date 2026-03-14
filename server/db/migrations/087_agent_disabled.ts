@@ -12,8 +12,15 @@ import { Database } from 'bun:sqlite';
  * The agent record is preserved for history/audit but is effectively offline.
  */
 
+function hasColumn(db: Database, table: string, column: string): boolean {
+    const cols = db.query(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    return cols.some((c) => c.name === column);
+}
+
 export function up(db: Database): void {
-    db.exec(`ALTER TABLE agents ADD COLUMN disabled INTEGER DEFAULT 0`);
+    if (!hasColumn(db, 'agents', 'disabled')) {
+        db.exec(`ALTER TABLE agents ADD COLUMN disabled INTEGER DEFAULT 0`);
+    }
 }
 
 export function down(_db: Database): void {

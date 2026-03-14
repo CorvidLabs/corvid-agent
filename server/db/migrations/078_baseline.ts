@@ -175,6 +175,7 @@ const TABLES = [
         voice_enabled            INTEGER DEFAULT 0,
         voice_preset             TEXT DEFAULT 'alloy',
         tenant_id                TEXT NOT NULL DEFAULT 'default',
+        disabled                 INTEGER DEFAULT 0,
         created_at               TEXT DEFAULT (datetime('now')),
         updated_at               TEXT DEFAULT (datetime('now'))
     )`,
