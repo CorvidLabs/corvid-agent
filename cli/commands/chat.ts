@@ -4,6 +4,7 @@ import { pickAgent } from './pick-agent';
 import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
 import { printError, renderStreamChunk, renderToolUse, renderThinking, flushStreamBuffer, Spinner } from '../render';
+import { stripFirstChunkNewlines } from './interactive';
 
 interface ChatOptions {
     agent?: string;
@@ -73,7 +74,7 @@ export async function chatCommand(prompt: string, options: ChatOptions): Promise
     console.log(); // Final newline
 }
 
-function handleMessage(
+export function handleMessage(
     msg: ServerMessage,
     agentId: string,
     spinner: Spinner,
@@ -94,7 +95,7 @@ function handleMessage(
                     }
                 } else if (msg.chunk) {
                     // Strip leading newlines from first chunk
-                    const text = hasStreamContent ? msg.chunk : msg.chunk.replace(/^\n+/, '');
+                    const text = stripFirstChunkNewlines(msg.chunk, !hasStreamContent);
                     if (text) {
                         onContent();
                         renderStreamChunk(text);

@@ -9,6 +9,17 @@ import { createInterface, type Interface as ReadlineInterface } from 'readline';
 const VERSION = require('../../package.json').version as string;
 const MAX_HISTORY_CHARS = 12_000; // Trim oldest turns when history exceeds this
 
+/**
+ * Strip leading newlines from the first chunk of a stream response.
+ * Models often prepend \n\n which looks bad in the terminal.
+ * Returns null if the chunk becomes empty after stripping.
+ */
+export function stripFirstChunkNewlines(chunk: string, isFirstChunk: boolean): string | null {
+    if (!isFirstChunk) return chunk;
+    const stripped = chunk.replace(/^\n+/, '');
+    return stripped || null;
+}
+
 interface InteractiveOptions {
     agent?: string;
 }
@@ -144,11 +155,8 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
         // the server sent the same response multiple times
         if (responseBuffer.length > 0 && chunk === responseBuffer) return false;
         // Strip leading whitespace/newlines from the first chunk
-        let text = chunk;
-        if (responseBuffer.length === 0) {
-            text = text.replace(/^\n+/, '');
-            if (!text) return false;
-        }
+        const text = stripFirstChunkNewlines(chunk, responseBuffer.length === 0);
+        if (text === null) return false;
         ensureHeader();
         hasStreamContent = true;
         responseBuffer += text;

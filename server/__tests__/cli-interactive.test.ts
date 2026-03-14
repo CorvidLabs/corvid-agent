@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeEach, mock } from 'bun:test';
-import { buildPromptWithHistory, handleMessage } from '../../cli/commands/interactive';
+import { buildPromptWithHistory, handleMessage, stripFirstChunkNewlines } from '../../cli/commands/interactive';
 import type { Turn } from '../../cli/commands/interactive';
 import type { ServerMessage } from '../../shared/ws-protocol';
 import { resetStreamState } from '../../cli/render';
@@ -472,5 +472,29 @@ describe('handleMessage', () => {
             const plain = errorLines.map(stripAnsi).join('\n');
             expect(plain).toContain('Something went wrong');
         });
+    });
+});
+
+// ─── stripFirstChunkNewlines ────────────────────────────────────────────────
+
+describe('stripFirstChunkNewlines', () => {
+    test('strips leading newlines from first chunk', () => {
+        expect(stripFirstChunkNewlines('\n\nHello', true)).toBe('Hello');
+    });
+
+    test('returns null when first chunk is only newlines', () => {
+        expect(stripFirstChunkNewlines('\n\n\n', true)).toBeNull();
+    });
+
+    test('passes through non-first chunks unchanged', () => {
+        expect(stripFirstChunkNewlines('\n\nMore text', false)).toBe('\n\nMore text');
+    });
+
+    test('passes through first chunk with no leading newlines', () => {
+        expect(stripFirstChunkNewlines('Hello world', true)).toBe('Hello world');
+    });
+
+    test('strips single leading newline', () => {
+        expect(stripFirstChunkNewlines('\nContent', true)).toBe('Content');
     });
 });
