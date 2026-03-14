@@ -23,6 +23,36 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                 </button>
             </div>
 
+            <!-- Execution Stats Summary -->
+            @if (execStats().total > 0) {
+                <div class="exec-stats">
+                    <div class="exec-stats__item">
+                        <span class="exec-stats__value">{{ execStats().total }}</span>
+                        <span class="exec-stats__label">Total Runs</span>
+                    </div>
+                    <div class="exec-stats__item exec-stats__item--success">
+                        <span class="exec-stats__value">{{ execStats().successRate }}%</span>
+                        <span class="exec-stats__label">Success Rate</span>
+                    </div>
+                    <div class="exec-stats__item">
+                        <span class="exec-stats__value">{{ execStats().completed }}</span>
+                        <span class="exec-stats__label">Completed</span>
+                    </div>
+                    <div class="exec-stats__item exec-stats__item--fail">
+                        <span class="exec-stats__value">{{ execStats().failed }}</span>
+                        <span class="exec-stats__label">Failed</span>
+                    </div>
+                    <div class="exec-stats__item">
+                        <span class="exec-stats__value">{{ execStats().running }}</span>
+                        <span class="exec-stats__label">Running</span>
+                    </div>
+                    <div class="exec-stats__bar">
+                        <div class="exec-stats__bar-fill exec-stats__bar-fill--success" [style.width.%]="execStats().successRate"></div>
+                        <div class="exec-stats__bar-fill exec-stats__bar-fill--fail" [style.width.%]="execStats().failRate"></div>
+                    </div>
+                </div>
+            }
+
             <!-- Pending Approvals Banner -->
             @if (scheduleService.pendingApprovals().length > 0) {
                 <div class="approvals-banner">
@@ -283,6 +313,11 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
         </div>
     `,
     styles: `.schedules{padding:1.5rem;max-width:1100px}.schedules__header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}.schedules__header h2{margin:0;color:var(--text-primary)}.loading{color:var(--text-secondary)}
+.exec-stats{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;padding:.75rem 1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem}
+.exec-stats__item{display:flex;flex-direction:column;gap:.1rem}.exec-stats__value{font-size:1rem;font-weight:700;color:var(--text-primary)}.exec-stats__label{font-size:.55rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
+.exec-stats__item--success .exec-stats__value{color:var(--accent-green)}.exec-stats__item--fail .exec-stats__value{color:var(--accent-red)}
+.exec-stats__bar{flex:1;min-width:100px;height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden;display:flex;margin-left:auto}
+.exec-stats__bar-fill--success{background:var(--accent-green);transition:width .3s}.exec-stats__bar-fill--fail{background:var(--accent-red);transition:width .3s}
 .create-btn,.save-btn{padding:.5rem 1rem;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:var(--radius);font-size:.75rem;font-weight:600;cursor:pointer}
 .create-btn:hover,.save-btn:hover:not(:disabled){background:rgba(0,229,255,.2)}.save-btn:disabled{opacity:.5;cursor:not-allowed}
 .approvals-banner{background:var(--accent-amber-dim);border:1px solid var(--accent-amber);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1.25rem}.approvals-banner h3{margin:0 0 .75rem;color:var(--accent-amber);font-size:.8rem}
@@ -363,6 +398,16 @@ export class ScheduleListComponent implements OnInit, OnDestroy {
     ];
     readonly cronPreview = computed(() => this.cronToHuman(this.formCron));
     private agentNameMap: Record<string, string> = {};
+    readonly execStats = computed(() => {
+        const execs = this.scheduleService.executions();
+        const total = execs.length;
+        const completed = execs.filter((e) => e.status === 'completed' || e.status === 'approved').length;
+        const failed = execs.filter((e) => e.status === 'failed').length;
+        const running = execs.filter((e) => e.status === 'running').length;
+        const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        const failRate = total > 0 ? Math.round((failed / total) * 100) : 0;
+        return { total, completed, failed, running, successRate, failRate };
+    });
     readonly executionsBySchedule = computed(() => {
         const map: Record<string, ScheduleExecution[]> = {};
         for (const exec of this.scheduleService.executions()) {

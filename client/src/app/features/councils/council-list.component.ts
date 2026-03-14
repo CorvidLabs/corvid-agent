@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { CouncilService } from '../../core/services/council.service';
 import { AgentService } from '../../core/services/agent.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
@@ -23,7 +24,7 @@ interface CouncilCard {
 @Component({
     selector: 'app-council-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
     template: `
         <div class="page">
             <div class="page__header">
@@ -52,59 +53,97 @@ interface CouncilCard {
                     actionLabel="+ Create a council"
                     actionRoute="/councils/new"
                     actionAriaLabel="Create your first multi-agent council" />
-            } @else if (filteredCards().length === 0) {
-                <p class="empty-filtered">All councils are hidden by the test-data filter.
-                    <button class="link-btn" (click)="toggleTestFilter()">Show all</button>
-                </p>
             } @else {
-                <div class="council-grid">
-                    @for (card of filteredCards(); track card.council.id) {
-                        <a class="council-card" [routerLink]="['/councils', card.council.id]">
-                            <div class="council-card__top">
-                                <h3 class="council-card__name">{{ card.council.name }}</h3>
-                                @if (card.lastLaunch) {
-                                    <span class="stage-badge" [attr.data-stage]="card.lastLaunch.stage">{{ card.lastLaunch.stage }}</span>
-                                } @else {
-                                    <span class="stage-badge" data-stage="idle">idle</span>
-                                }
-                            </div>
-                            @if (card.council.description) {
-                                <p class="council-card__desc" appTooltip>{{ card.council.description }}</p>
-                            }
-                            @if (card.synthesisSummary) {
-                                <p class="council-card__synthesis">{{ card.synthesisSummary }}</p>
-                            }
-                            <div class="council-card__meta">
-                                <span class="meta-item" title="Participants">
-                                    <span class="meta-icon" aria-hidden="true">&#x1D5D4;</span>
-                                    {{ card.memberCount }}
-                                </span>
-                                <span class="meta-item" title="Discussion rounds">
-                                    <span class="meta-icon" aria-hidden="true">&#x21BB;</span>
-                                    {{ card.council.discussionRounds }}
-                                </span>
-                                @if (card.chairmanName) {
-                                    <span class="meta-item meta-item--chairman" title="Chairman">
-                                        {{ card.chairmanName }}
-                                    </span>
-                                }
-                            </div>
-                            <div class="council-card__members">
-                                @for (name of card.memberNames; track name) {
-                                    <span class="member-chip" [class.member-chip--chairman]="name === card.chairmanName">{{ name }}</span>
-                                }
-                            </div>
-                            <div class="council-card__footer">
-                                @if (card.lastLaunch) {
-                                    <span class="council-card__last-launch">Last: {{ card.lastLaunch.createdAt | relativeTime }}</span>
-                                } @else {
-                                    <span class="council-card__last-launch">Never launched</span>
-                                }
-                                <span class="council-card__time">{{ card.council.updatedAt | relativeTime }}</span>
-                            </div>
-                        </a>
-                    }
+                <!-- Search & Filters -->
+                <div class="search-bar">
+                    <input
+                        class="search-input"
+                        placeholder="Search councils..."
+                        [(ngModel)]="searchQuery"
+                        (input)="searchQuery = $any($event.target).value; currentPage.set(1)" />
                 </div>
+                <div class="filters">
+                    <div class="filter-group">
+                        <button class="filter-chip" [class.filter-chip--active]="filterStage() === null" (click)="filterStage.set(null); currentPage.set(1)">All</button>
+                        @for (stage of stageOptions; track stage) {
+                            <button class="filter-chip" [class.filter-chip--active]="filterStage() === stage" (click)="filterStage.set(filterStage() === stage ? null : stage); currentPage.set(1)">{{ stage }}</button>
+                        }
+                    </div>
+                    <div class="sort-group">
+                        <select class="sort-select" [(ngModel)]="sortBy" (ngModelChange)="sortBy = $event">
+                            <option value="name">Sort: Name</option>
+                            <option value="updated">Sort: Updated</option>
+                            <option value="lastLaunch">Sort: Last Launch</option>
+                            <option value="members">Sort: Members</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if (sortedCards().length === 0) {
+                    <p class="empty-filtered">No councils match your filters.
+                        @if (hideTestData() && hasTestCouncils()) {
+                            <button class="link-btn" (click)="toggleTestFilter()">Show test data</button>
+                        }
+                    </p>
+                } @else {
+                    <div class="council-grid">
+                        @for (card of paginatedCards(); track card.council.id) {
+                            <a class="council-card" [routerLink]="['/councils', card.council.id]">
+                                <div class="council-card__top">
+                                    <h3 class="council-card__name">{{ card.council.name }}</h3>
+                                    @if (card.lastLaunch) {
+                                        <span class="stage-badge" [attr.data-stage]="card.lastLaunch.stage">{{ card.lastLaunch.stage }}</span>
+                                    } @else {
+                                        <span class="stage-badge" data-stage="idle">idle</span>
+                                    }
+                                </div>
+                                @if (card.council.description) {
+                                    <p class="council-card__desc" appTooltip>{{ card.council.description }}</p>
+                                }
+                                @if (card.synthesisSummary) {
+                                    <p class="council-card__synthesis">{{ card.synthesisSummary }}</p>
+                                }
+                                <div class="council-card__meta">
+                                    <span class="meta-item" title="Participants">
+                                        <span class="meta-icon" aria-hidden="true">&#x1D5D4;</span>
+                                        {{ card.memberCount }}
+                                    </span>
+                                    <span class="meta-item" title="Discussion rounds">
+                                        <span class="meta-icon" aria-hidden="true">&#x21BB;</span>
+                                        {{ card.council.discussionRounds }}
+                                    </span>
+                                    @if (card.chairmanName) {
+                                        <span class="meta-item meta-item--chairman" title="Chairman">
+                                            {{ card.chairmanName }}
+                                        </span>
+                                    }
+                                </div>
+                                <div class="council-card__members">
+                                    @for (name of card.memberNames; track name) {
+                                        <span class="member-chip" [class.member-chip--chairman]="name === card.chairmanName">{{ name }}</span>
+                                    }
+                                </div>
+                                <div class="council-card__footer">
+                                    @if (card.lastLaunch) {
+                                        <span class="council-card__last-launch">Last: {{ card.lastLaunch.createdAt | relativeTime }}</span>
+                                    } @else {
+                                        <span class="council-card__last-launch">Never launched</span>
+                                    }
+                                    <span class="council-card__time">{{ card.council.updatedAt | relativeTime }}</span>
+                                </div>
+                            </a>
+                        }
+                    </div>
+
+                    <!-- Pagination -->
+                    @if (totalPages() > 1) {
+                        <div class="pagination">
+                            <button class="pagination__btn" [disabled]="currentPage() === 1" (click)="currentPage.set(currentPage() - 1)">&laquo; Prev</button>
+                            <span class="pagination__info">{{ currentPage() }} / {{ totalPages() }}</span>
+                            <button class="pagination__btn" [disabled]="currentPage() === totalPages()" (click)="currentPage.set(currentPage() + 1)">Next &raquo;</button>
+                        </div>
+                    }
+                }
             }
         </div>
     `,
@@ -123,6 +162,42 @@ interface CouncilCard {
         .btn--ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
         .btn--ghost:hover { border-color: var(--text-tertiary); color: var(--text-primary); }
         .loading { color: var(--text-tertiary); font-size: 0.85rem; }
+
+        /* Search */
+        .search-bar { margin-bottom: 0.75rem; }
+        .search-input {
+            width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-bright); border-radius: var(--radius);
+            font-size: 0.85rem; font-family: inherit; background: var(--bg-input); color: var(--text-primary);
+            box-sizing: border-box;
+        }
+        .search-input:focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); outline: none; }
+
+        /* Filters */
+        .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
+        .filter-group { display: flex; gap: 0.25rem; }
+        .filter-chip {
+            padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+            cursor: pointer; transition: all 0.15s; text-transform: capitalize;
+        }
+        .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
+        .filter-chip--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .sort-group { margin-left: auto; }
+        .sort-select {
+            padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-input); color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
+        }
+        .sort-select:focus { border-color: var(--accent-cyan); outline: none; }
+
+        /* Pagination */
+        .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.25rem; }
+        .pagination__btn {
+            padding: 0.35rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit; cursor: pointer;
+        }
+        .pagination__btn:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .pagination__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .pagination__info { font-size: 0.7rem; color: var(--text-tertiary); }
 
         .empty-filtered { color: var(--text-tertiary); font-size: 0.85rem; }
         .link-btn {
@@ -175,7 +250,11 @@ interface CouncilCard {
         }
         .council-card__time { margin-left: auto; }
 
-        @media (max-width: 768px) { .council-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            .council-grid { grid-template-columns: 1fr; }
+            .filters { flex-direction: column; align-items: stretch; }
+            .sort-group { margin-left: 0; }
+        }
     `,
 })
 export class CouncilListComponent implements OnInit {
@@ -184,6 +263,13 @@ export class CouncilListComponent implements OnInit {
 
     private readonly lastLaunches = signal<Record<string, CouncilLaunch | null>>({});
     protected readonly hideTestData = signal(true);
+    protected searchQuery = '';
+    protected sortBy: 'name' | 'updated' | 'lastLaunch' | 'members' = 'updated';
+    protected readonly filterStage = signal<string | null>(null);
+    protected readonly currentPage = signal(1);
+    private readonly pageSize = 12;
+
+    protected readonly stageOptions = ['idle', 'responding', 'discussing', 'synthesizing', 'complete'];
 
     protected readonly hasTestCouncils = computed(() =>
         this.councilService.councils().some((c) => TEST_COUNCIL_RE.test(c.name)),
@@ -212,10 +298,64 @@ export class CouncilListComponent implements OnInit {
         });
     });
 
-    protected readonly filteredCards = computed(() => {
-        const all = this.cards();
-        if (!this.hideTestData()) return all;
-        return all.filter((c) => !TEST_COUNCIL_RE.test(c.council.name));
+    protected readonly sortedCards = computed(() => {
+        let all = this.cards();
+
+        // Test data filter
+        if (this.hideTestData()) {
+            all = all.filter((c) => !TEST_COUNCIL_RE.test(c.council.name));
+        }
+
+        // Search filter
+        const query = this.searchQuery.toLowerCase();
+        if (query) {
+            all = all.filter((c) =>
+                c.council.name.toLowerCase().includes(query) ||
+                (c.council.description ?? '').toLowerCase().includes(query) ||
+                c.memberNames.some((n) => n.toLowerCase().includes(query)),
+            );
+        }
+
+        // Stage filter
+        const stage = this.filterStage();
+        if (stage) {
+            if (stage === 'idle') {
+                all = all.filter((c) => !c.lastLaunch);
+            } else {
+                all = all.filter((c) => c.lastLaunch?.stage === stage);
+            }
+        }
+
+        // Sort
+        const sorted = [...all];
+        switch (this.sortBy) {
+            case 'name':
+                sorted.sort((a, b) => a.council.name.localeCompare(b.council.name));
+                break;
+            case 'updated':
+                sorted.sort((a, b) => new Date(b.council.updatedAt).getTime() - new Date(a.council.updatedAt).getTime());
+                break;
+            case 'lastLaunch':
+                sorted.sort((a, b) => {
+                    const aTime = a.lastLaunch ? new Date(a.lastLaunch.createdAt).getTime() : 0;
+                    const bTime = b.lastLaunch ? new Date(b.lastLaunch.createdAt).getTime() : 0;
+                    return bTime - aTime;
+                });
+                break;
+            case 'members':
+                sorted.sort((a, b) => b.memberCount - a.memberCount);
+                break;
+        }
+        return sorted;
+    });
+
+    protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.sortedCards().length / this.pageSize)));
+
+    protected readonly paginatedCards = computed(() => {
+        const all = this.sortedCards();
+        const page = Math.min(this.currentPage(), this.totalPages());
+        const start = (page - 1) * this.pageSize;
+        return all.slice(start, start + this.pageSize);
     });
 
     async ngOnInit(): Promise<void> {
@@ -228,6 +368,7 @@ export class CouncilListComponent implements OnInit {
 
     protected toggleTestFilter(): void {
         this.hideTestData.update((v) => !v);
+        this.currentPage.set(1);
     }
 
     private async loadLastLaunches(): Promise<void> {
