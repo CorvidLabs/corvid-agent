@@ -5,7 +5,8 @@ import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
 import { isProtectedPath, extractFilePathsFromInput, BASH_WRITE_OPERATORS } from './protected-paths';
 import { query, type Query, type SDKMessage, type PermissionResult, type CanUseTool, type McpSdkServerConfigWithInstance, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
-import { getMessagingSafetyPrompt } from '../providers/ollama/tool-prompt-templates';
+import { getMessagingSafetyPrompt, getResponseRoutingPrompt } from '../providers/ollama/tool-prompt-templates';
+import { prependRoutingContext } from './direct-process';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('SdkProcess');
@@ -232,6 +233,9 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         sdkOptions.model = agent.model;
     }
 
+    // For AlgoChat/agent/Discord-sourced sessions, prepend routing context to the prompt
+    const effectivePrompt = prependRoutingContext(prompt, session.source);
+
     // Build combined append content from agent config + persona + skills
     const appendParts: string[] = [];
     if (agent?.systemPrompt) appendParts.push(agent.systemPrompt);
@@ -241,6 +245,8 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     // Always append messaging safety — unconditional guard preventing agents from
     // generating scripts to bypass MCP tool-only messaging. See spec invariant #7.
     appendParts.push(getMessagingSafetyPrompt());
+    // Add channel affinity routing guidance to system prompt
+    appendParts.push(getResponseRoutingPrompt());
 
     if (appendParts.length > 0) {
         const combinedAppend = appendParts.join('\n\n');
@@ -315,7 +321,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
 
     // Start the SDK query
     const q: Query = query({
-        prompt,
+        prompt: effectivePrompt,
         options: sdkOptions,
     });
 

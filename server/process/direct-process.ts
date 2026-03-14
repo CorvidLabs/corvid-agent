@@ -950,7 +950,8 @@ function normalizeArgsForComparison(obj: unknown): string {
  * knows to reply with text directly rather than wrapping responses in
  * corvid_send_message tool calls.
  */
-function prependRoutingContext(message: string, source: string, tierConfig?: AgentTierConfig): string {
+/** Exported for testing. */
+export function prependRoutingContext(message: string, source: string, tierConfig?: AgentTierConfig): string {
     let sanitizedMessage = message;
 
     // Sanitize external content for non-high-tier agents
@@ -961,6 +962,9 @@ function prependRoutingContext(message: string, source: string, tierConfig?: Age
 
     if (source === 'algochat' || source === 'agent') {
         return `[This message was sent to you via AlgoChat. Reply directly with text. Do NOT use corvid_send_message to respond — your text reply will be automatically routed back to the sender.]\n\n${sanitizedMessage}`;
+    }
+    if (source === 'discord') {
+        return `[This message came from Discord. Reply directly in this conversation — do NOT use corvid_send_message or other cross-channel tools to respond. Your text reply will be posted back to the Discord thread automatically.]\n\n${sanitizedMessage}`;
     }
     return sanitizedMessage;
 }

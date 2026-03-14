@@ -118,7 +118,11 @@ Use corvid_send_message ONLY when:
 Do NOT use corvid_send_message when:
 - You are replying to someone who just messaged you — just write your response as text
 - You are answering a question — just answer directly
-- You are providing information that was requested — just provide it as text`;
+- You are providing information that was requested — just provide it as text
+
+## Channel Affinity
+
+Always respond via the same channel the message originated from. If a message came from Discord, reply directly so your response goes back to Discord. If a message came from AlgoChat, reply directly so it goes back to AlgoChat. Never use corvid_send_message to "bridge" a reply to a different channel than the one the conversation started on.`;
 }
 
 /**

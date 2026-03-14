@@ -29,6 +29,7 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `startDirectProcess` | `(options: DirectProcessOptions)` | `SdkProcess` | Start a direct process, returns handle with pid/sendMessage/kill |
+| `prependRoutingContext` | `(message: string, source: string, tierConfig?: AgentTierConfig)` | `string` | Prepend channel-affinity routing hints (Discord/AlgoChat) to a user prompt, with optional input sanitization for non-high-tier agents |
 
 ## Invariants
 
@@ -116,6 +117,7 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | Module | What is used |
 |--------|-------------|
 | `server/process/manager.ts` | `startDirectProcess` — called for all direct-mode provider sessions |
+| `server/process/sdk-process.ts` | `prependRoutingContext` — applies channel affinity routing hints in the Claude/SDK path |
 
 ## Configuration
 
