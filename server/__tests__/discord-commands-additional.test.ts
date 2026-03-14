@@ -9,6 +9,7 @@ import { createProject } from '../db/projects';
 
 let db: Database;
 let capturedResponse: { type: number; data: Record<string, unknown> } | null = null;
+const originalFetch = globalThis.fetch;
 
 function createTestConfig(): DiscordBridgeConfig {
     return {
@@ -81,6 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
     db.close();
+    globalThis.fetch = originalFetch;
 });
 
 describe('Discord /tasks command', () => {
