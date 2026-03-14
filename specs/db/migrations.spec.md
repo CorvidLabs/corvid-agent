@@ -6,6 +6,14 @@ files:
   - server/db/migrate.ts
   - server/db/migrate-cli.ts
   - server/db/migrate-create.ts
+  - server/db/migrations/078_baseline.ts
+  - server/db/migrations/079_flock_directory_config.ts
+  - server/db/migrations/080_discord_config.ts
+  - server/db/migrations/081_task_queue.ts
+  - server/db/migrations/082_index_optimization.ts
+  - server/db/migrations/083_unique_project_names.ts
+  - server/db/migrations/084_model_exams.ts
+  - server/db/migrations/085_project_dir_strategy.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -150,8 +158,101 @@ File-based database migration system for managing SQLite schema evolution. Migra
 |----------|---------|-------------|
 | `DB_PATH` (env) | `corvid-agent.db` | Database file path, used by `migrate-cli.ts` only |
 
+## Migration Files
+
+Each migration file exports `up(db: Database): void` and `down(db: Database): void`.
+
+### 078_baseline.ts
+
+Squashed baseline migration capturing the full schema at v78 (v0.21.0 boundary). Replaces 29 incremental migration files (001-078) with a single idempotent pass. Uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` throughout. For existing databases already at version 78+, this migration is skipped by the runner.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates all tables and indexes for the full schema at v78 |
+| `down` | `(db: Database)` | `void` | Drops all tables and indexes created by the baseline |
+
+### 079_flock_directory_config.ts
+
+Creates the `flock_directory_config` key-value table for Flock Directory runtime settings.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `flock_directory_config` table with columns `key` (PK), `value`, `updated_at` |
+| `down` | `(db: Database)` | `void` | Drops `flock_directory_config` table |
+
+### 080_discord_config.ts
+
+Creates the `discord_config` key-value table for Discord runtime settings.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `discord_config` table with columns `key` (PK), `value`, `updated_at` |
+| `down` | `(db: Database)` | `void` | Drops `discord_config` table |
+
+### 081_task_queue.ts
+
+Adds `priority` and `queued_at` columns to `work_tasks` for TaskQueueService dispatch, plus a compound index for efficient pending-task queries.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `priority` (INTEGER, default 2) and `queued_at` (TEXT, nullable) columns; creates `idx_work_tasks_pending_dispatch` index |
+| `down` | `(db: Database)` | `void` | Drops the index and both columns (with `hasColumn` guard) |
+
+### 082_index_optimization.ts
+
+Adds 7 compound indexes to optimize common multi-column query patterns identified during the v0.23.0 stabilization audit (#742).
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates indexes: `idx_agent_messages_from`, `idx_schedule_executions_schedule_status`, `idx_credit_txn_wallet_type_created`, `idx_council_launches_council_created`, `idx_workflow_runs_workflow_started`, `idx_session_messages_session_timestamp`, `idx_algochat_conversations_created` |
+| `down` | `(db: Database)` | `void` | Drops all 7 indexes |
+
+### 083_unique_project_names.ts
+
+Enforces unique project names per tenant by deduplicating existing rows and adding a case-insensitive unique index. Fixes #991.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Deletes duplicate projects (keeps most recent per tenant+name), then creates `idx_projects_tenant_name` unique index with `COLLATE NOCASE` |
+| `down` | `(db: Database)` | `void` | Drops `idx_projects_tenant_name` index |
+
+### 084_model_exams.ts
+
+Creates `model_exam_runs` and `model_exam_results` tables for persisting exam scorecards and per-case results.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `model_exam_runs` and `model_exam_results` tables with 4 indexes |
+| `down` | `(db: Database)` | `void` | Drops all indexes and both tables in reverse order |
+
+### 085_project_dir_strategy.ts
+
+Adds `git_url`, `dir_strategy`, and `base_clone_path` columns to the `projects` table for flexible directory strategies (persistent, clone-on-demand, ephemeral, worktree).
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds 3 columns: `git_url` (TEXT, nullable), `dir_strategy` (TEXT, default `'persistent'`), `base_clone_path` (TEXT, nullable) |
+| `down` | `(db: Database)` | `void` | Recreates the `projects` table without the new columns via backup-and-restore |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-13 | corvid-agent | Add 8 migration files (078-085) to spec coverage |
 | 2026-03-04 | corvid-agent | Initial spec |

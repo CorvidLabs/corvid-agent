@@ -36,6 +36,17 @@ files:
   - server/routes/slack.ts
   - server/routes/tenants.ts
   - server/routes/usage.ts
+  - server/routes/bridge-delivery.ts
+  - server/routes/dashboard.ts
+  - server/routes/feedback.ts
+  - server/routes/flock-directory.ts
+  - server/routes/health.ts
+  - server/routes/marketplace-analytics.ts
+  - server/routes/onboarding.ts
+  - server/routes/permissions.ts
+  - server/routes/proposals.ts
+  - server/routes/repo-blocklist.ts
+  - server/routes/security-overview.ts
 db_tables: []
 depends_on:
   - specs/middleware/auth.spec.md
@@ -46,7 +57,7 @@ depends_on:
 
 ## Purpose
 
-Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 32 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
+Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 43 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
 
 ## Public API
 
@@ -103,6 +114,17 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSlackRoutes` | slack.ts | Slack events API handler |
 | `handleTenantRoutes` | tenants.ts | Tenant registration and members |
 | `handleUsageRoutes` | usage.ts | Usage summaries and anomalies |
+| `handleBridgeDeliveryRoutes` | bridge-delivery.ts | Bridge delivery receipt metrics |
+| `handleDashboardRoutes` | dashboard.ts | Dashboard summary aggregation |
+| `handleFeedbackRoutes` | feedback.ts | PR outcome tracking and analysis |
+| `handleFlockDirectoryRoutes` | flock-directory.ts | Flock Directory agent registry CRUD and search |
+| `handleHealthRoutes` | health.ts | Health checks (liveness, readiness, history) |
+| `handleMarketplaceAnalyticsRoutes` | marketplace-analytics.ts | Marketplace seller analytics and buyer usage |
+| `handleOnboardingRoutes` | onboarding.ts | Onboarding setup progress status |
+| `handlePermissionRoutes` | permissions.ts | Permission broker capability grants |
+| `handleProposalRoutes` | proposals.ts | Governance proposal CRUD and evaluation |
+| `handleRepoBlocklistRoutes` | repo-blocklist.ts | Repository blocklist management |
+| `handleSecurityOverviewRoutes` | security-overview.ts | Security configuration overview |
 
 ### Exported Functions (projects.ts)
 
@@ -150,6 +172,12 @@ Each route module exports a handler function with the signature `(req, url, db, 
 |----------|-----------|---------|-------------|
 | `handleGitHubWebhook` | `(req, db, services)` | `Promise<Response>` | Process incoming GitHub webhook payloads (HMAC validated) |
 | `_resetRepoRateMap` | `()` | `void` | Reset webhook per-repo rate map (test-only) |
+
+### Exported Types (onboarding.ts)
+
+| Type | Description |
+|------|-------------|
+| `OnboardingStatus` | Interface describing wallet, bridge, agent, project setup status and overall completion flag |
 
 ## Request Pipeline
 
@@ -469,6 +497,104 @@ Every request passes through these stages in order:
 | POST | `/api/exam/run` | exam.ts | Run live model exam |
 | GET | `/api/exam/categories` | exam.ts | List exam categories |
 
+### Bridge Delivery
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/bridges/delivery` | bridge-delivery.ts | Get delivery receipt metrics for all bridge platforms |
+
+### Dashboard
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/dashboard/summary` | dashboard.ts | Aggregated dashboard summary (agents, sessions, councils, work tasks, activity) |
+
+### Feedback
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/feedback/metrics` | feedback.ts | Current PR outcome metrics |
+| GET | `/api/feedback/analysis` | feedback.ts | Weekly outcome analysis |
+| GET | `/api/feedback/context` | feedback.ts | Outcome context string for prompts |
+
+### Flock Directory
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/flock-directory/search` | flock-directory.ts | Search agents by query, status, capability, reputation |
+| GET | `/api/flock-directory/stats` | flock-directory.ts | Get directory statistics |
+| GET | `/api/flock-directory/agents` | flock-directory.ts | List active agents |
+| POST | `/api/flock-directory/agents` | flock-directory.ts | Register a new agent |
+| GET | `/api/flock-directory/agents/:id` | flock-directory.ts | Get agent by ID |
+| PATCH | `/api/flock-directory/agents/:id` | flock-directory.ts | Update agent |
+| DELETE | `/api/flock-directory/agents/:id` | flock-directory.ts | Deregister agent |
+| POST | `/api/flock-directory/agents/:id/heartbeat` | flock-directory.ts | Send agent heartbeat |
+| GET | `/api/flock-directory/lookup/:address` | flock-directory.ts | Lookup agent by Algorand address |
+
+### Health
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/health/live` | health.ts | Liveness probe |
+| GET | `/health/ready` | health.ts | Readiness probe |
+| GET | `/api/health/history` | health.ts | Health history snapshots and uptime stats |
+| GET | `/health` | health.ts | Full health check |
+| GET | `/api/health` | health.ts | Full health check (alias) |
+
+### Marketplace Analytics
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/marketplace/listings/:id/analytics` | marketplace-analytics.ts | Seller analytics for a listing |
+| GET | `/api/marketplace/usage` | marketplace-analytics.ts | Buyer usage for a tenant |
+
+### Onboarding
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/onboarding/status` | onboarding.ts | Get onboarding setup progress |
+
+### Permissions
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| POST | `/api/permissions/grant` | permissions.ts | Grant a capability to an agent |
+| POST | `/api/permissions/revoke` | permissions.ts | Revoke a specific grant or all grants |
+| POST | `/api/permissions/emergency-revoke` | permissions.ts | Emergency revoke ALL grants for an agent |
+| POST | `/api/permissions/check` | permissions.ts | Check if an agent can use a tool |
+| GET | `/api/permissions/actions` | permissions.ts | List the action taxonomy |
+| GET | `/api/permissions/roles` | permissions.ts | List available role templates |
+| GET | `/api/permissions/roles/:name` | permissions.ts | Get a specific role template |
+| POST | `/api/permissions/roles/apply` | permissions.ts | Apply a role template to an agent |
+| POST | `/api/permissions/roles/revoke` | permissions.ts | Revoke a role template from an agent |
+| GET | `/api/permissions/:agentId` | permissions.ts | List active grants for an agent |
+
+### Proposals
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/proposals` | proposals.ts | List proposals (filter by councilId, status) |
+| POST | `/api/proposals` | proposals.ts | Create a new proposal |
+| GET | `/api/proposals/:id` | proposals.ts | Get proposal by ID |
+| PUT | `/api/proposals/:id` | proposals.ts | Update proposal (draft/open only) |
+| DELETE | `/api/proposals/:id` | proposals.ts | Delete proposal (draft only) |
+| POST | `/api/proposals/:id/transition` | proposals.ts | Advance proposal lifecycle |
+| GET | `/api/proposals/:id/evaluate` | proposals.ts | Evaluate current vote status |
+
+### Repo Blocklist
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/repo-blocklist` | repo-blocklist.ts | List blocklisted repositories |
+| POST | `/api/repo-blocklist` | repo-blocklist.ts | Add repository to blocklist |
+| DELETE | `/api/repo-blocklist/:repo` | repo-blocklist.ts | Remove repository from blocklist |
+
+### Security Overview
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/security/overview` | security-overview.ts | Get aggregated security configuration |
+
 ### Inline Routes (index.ts)
 
 | Method | Path | Description |
@@ -631,3 +757,4 @@ Every request passes through these stages in order:
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-02-21 | corvid-agent | Add POST /api/reputation/scores for bulk recompute; update GET /scores description to reflect auto-compute behavior |
 | 2026-03-08 | corvid-agent | Documented council re-exports: `HEARTBEAT_INTERVAL_MS`, `SAFETY_TIMEOUT_MS`, `WaitForSessionsOptions` |
+| 2026-03-13 | corvid-agent | Added 11 route modules for 100% spec coverage |

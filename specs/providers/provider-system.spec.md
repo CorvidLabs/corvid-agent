@@ -70,11 +70,10 @@ Core LLM provider abstraction layer that defines the provider interface, manages
 
 | Class | Description |
 |-------|-------------|
+| `BaseLlmProvider` | Abstract base class implementing `LlmProvider`; validates params before delegating to `doComplete()` |
 | `LlmProviderRegistry` | Singleton registry for provider instances; filters by `ENABLED_PROVIDERS` env or auto-restricts to Ollama in local-only mode |
 | `ModelRouter` | Selects the cheapest qualified model for a prompt based on complexity estimation, capability requirements, and provider health |
 | `FallbackManager` | Executes completions with fallback support; tracks provider health with cooldowns and exponential backoff |
-
-Note: `BaseLlmProvider` is an `export abstract class` implementing `LlmProvider` that validates params before delegating to `doComplete()`. It is exported from `base.ts` but uses the `abstract` keyword.
 
 #### BaseLlmProvider Methods
 

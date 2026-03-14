@@ -29,6 +29,7 @@
     "migrate:create": "bun server/db/migrate-create.ts",
     "spec:check": "bun scripts/spec-check.ts",
     "spec:coverage": "bun scripts/spec-check.ts --coverage",
+    "spec:coverage:require": "bun scripts/spec-check.ts --require-coverage 100",
     "spec:generate": "bun scripts/spec-check.ts --generate",
     "openapi:validate": "bun scripts/openapi-validate.ts",
     "openapi:export": "bun scripts/openapi-validate.ts --export",
@@ -39,7 +40,8 @@
     "stats:update": "bun scripts/collect-stats.ts --update",
     "version:check": "bun scripts/version-check.ts",
     "migrate:keys": "bun scripts/migrate-keys.ts",
-    "purge:test-data": "bun scripts/purge-test-data.ts"
+    "purge:test-data": "bun scripts/purge-test-data.ts",
+    "governance:check": "bun scripts/governance-check.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"

@@ -7,6 +7,7 @@ files:
   - server/improvement/health-store.ts
   - server/improvement/prompt-builder.ts
   - server/improvement/service.ts
+  - server/improvement/daily-review.ts
 db_tables:
   - health_snapshots
 depends_on:
@@ -56,6 +57,7 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 | `PromptOptions` | Prompt configuration: `maxTasks` (number) and optional `focusArea` (string). |
 | `ImprovementLoopOptions` | Run options: optional `maxTasks` and `focusArea`. |
 | `ImprovementRunResult` | Result of an improvement run: `sessionId`, `health`, `reputationScore`, `trustLevel`, `pastAttemptCount`, `maxTasksAllowed`. |
+| `DailyReviewResult` | Result of a daily review: `date`, `executions` (ExecutionStats), `prs` (DailyPrStats), `health` (HealthDelta), `observations` (string[]), `summary` (string). |
 
 ### Exported Classes
 
@@ -63,6 +65,7 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 |-------|-------------|
 | `CodebaseHealthCollector` | Collects codebase health metrics by spawning subprocesses (`tsc`, `bun test`, `grep`, `wc`, `bun outdated`) in parallel. Individual collector failures are non-fatal. |
 | `AutonomousLoopService` | Orchestrates the full improvement cycle: validates agent/project, collects health, computes trends, recalls past attempts from memory, gates on reputation, builds prompt, creates session, and registers feedback hooks for outcome tracking. |
+| `DailyReviewService` | Generates end-of-day retrospectives summarizing schedule executions, PR outcomes, and health trends, then saves to memory. |
 
 #### CodebaseHealthCollector Methods
 
@@ -77,6 +80,13 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 | `constructor` | `db: Database, processManager: ProcessManager, workTaskService: WorkTaskService, memoryManager: MemoryManager, reputationScorer: ReputationScorer` | `AutonomousLoopService` | Creates the service with all required collaborators. Internally instantiates a `CodebaseHealthCollector`. |
 | `setOutcomeTrackerService` | `service: OutcomeTrackerService` | `void` | Injects the optional outcome tracker for PR feedback tracking. |
 | `run` | `agentId: string, projectId: string, options?: ImprovementLoopOptions` | `Promise<ImprovementRunResult>` | Executes a full improvement loop cycle: validate, collect health, save snapshot, compute trends, recall memories, compute reputation, gate tasks, build prompt, create session, start process, and register feedback hooks. |
+
+#### DailyReviewService Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `constructor` | `db: Database, memoryManager: MemoryManager` | `DailyReviewService` | Creates the service with database and memory manager. |
+| `run` | `agentId: string, date?: string` | `DailyReviewResult` | Run a daily review for the given date (defaults to today UTC). Collects execution stats, PR stats, and health delta, generates observations, formats a summary, and saves to memory with key `review:daily:{date}`. |
 
 ## Invariants
 
@@ -159,3 +169,4 @@ Orchestrates the autonomous codebase improvement loop by collecting programmatic
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-13 | corvid-agent | Added daily-review.ts: DailyReviewService class and DailyReviewResult type for end-of-day retrospectives |

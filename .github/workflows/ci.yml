@@ -36,8 +36,18 @@ jobs:
         # use 30s per-test timeout there to avoid flaky failures (default 10s via bunfig).
         run: bun test ${{ matrix.os == 'windows-latest' && '--timeout 30000' || '' }}
 
+      - name: Governance tier check
+        if: github.event_name == 'pull_request'
+        run: bun run governance:check
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
       - name: Spec check (strict — warnings fail the build)
         run: bun run spec:check -- --strict
+
+      - name: Spec coverage (100% required)
+        run: bun run spec:coverage:require
 
       - name: Version alignment check
         run: bun run version:check
