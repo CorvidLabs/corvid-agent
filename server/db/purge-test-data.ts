@@ -55,7 +55,7 @@ export function purgeTestData(db: Database, options: { dryRun?: boolean } = {}):
     const councilWhere = buildLikeClause('name');
     const testCouncils = db
         .query(`SELECT id, name FROM councils WHERE ${councilWhere}`)
-        .all(likeParams()) as { id: string; name: string }[];
+        .all(...likeParams()) as { id: string; name: string }[];
 
     // Find test sessions (by name or linked to test councils)
     const sessionWhere = buildLikeClause('name');
@@ -68,7 +68,7 @@ export function purgeTestData(db: Database, options: { dryRun?: boolean } = {}):
                 SELECT id FROM council_launches WHERE council_id IN (${councilPlaceholders})
             )`
         )
-        .all([...likeParams(), ...councilIds]) as { id: string; name: string }[];
+        .all(...likeParams(), ...councilIds) as { id: string; name: string }[];
 
     const sessionIds = testSessions.map((s) => s.id);
 
