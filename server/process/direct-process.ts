@@ -15,7 +15,7 @@ import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
-import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getMessagingSafetyPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { ExternalMcpClientManager } from '../mcp/external-client';
 import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
 import { AgentSessionLimiter } from '../lib/agent-session-limits';
@@ -965,13 +965,13 @@ function prependRoutingContext(message: string, source: string, tierConfig?: Age
     return sanitizedMessage;
 }
 
-interface ToolDef {
+export interface ToolDef {
     name: string;
     description: string;
     parameters: Record<string, unknown>;
 }
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
     agent: Agent | null,
     project: Project,
     model: string,
@@ -1035,6 +1035,12 @@ function buildSystemPrompt(
         if (toolNames.includes('read_file')) {
             parts.push('', getCodingToolPrompt());
         }
+
+        // Always add messaging safety instructions when tools are available.
+        // Unlike response routing (gated on corvid_send_message) or coding guidance
+        // (gated on read_file), this is unconditional — any agent with tools must not
+        // generate scripts to bypass MCP tool-only messaging. See spec invariant #7.
+        parts.push('', getMessagingSafetyPrompt());
     }
 
     // Add focus/scoping instructions for non-high-tier agents

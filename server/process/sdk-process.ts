@@ -5,6 +5,7 @@ import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
 import { isProtectedPath, extractFilePathsFromInput, BASH_WRITE_OPERATORS } from './protected-paths';
 import { query, type Query, type SDKMessage, type PermissionResult, type CanUseTool, type McpSdkServerConfigWithInstance, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
+import { getMessagingSafetyPrompt } from '../providers/ollama/tool-prompt-templates';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('SdkProcess');
@@ -237,6 +238,9 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     if (agent?.appendPrompt) appendParts.push(agent.appendPrompt);
     if (personaPrompt) appendParts.push(personaPrompt);
     if (skillPrompt) appendParts.push(`## Skill Instructions\n${skillPrompt}`);
+    // Always append messaging safety — unconditional guard preventing agents from
+    // generating scripts to bypass MCP tool-only messaging. See spec invariant #7.
+    appendParts.push(getMessagingSafetyPrompt());
 
     if (appendParts.length > 0) {
         const combinedAppend = appendParts.join('\n\n');

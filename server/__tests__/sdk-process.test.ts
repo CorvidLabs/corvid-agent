@@ -21,6 +21,7 @@ import {
     API_ERROR_PATTERNS,
     API_FAILURE_THRESHOLD,
 } from '../process/sdk-process';
+import { getMessagingSafetyPrompt } from '../providers/ollama/tool-prompt-templates';
 import type { ClaudeStreamEvent } from '../process/types';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
@@ -580,5 +581,40 @@ describe('buildSafeEnv edge cases', () => {
         const env = buildSafeEnv();
 
         expect(env.BUN_INSTALL).toBe('/home/test/.bun');
+    });
+});
+
+// ── Messaging safety integration with sdk-process ─────────────────────────
+
+describe('messaging safety prompt for sdk-process', () => {
+    test('getMessagingSafetyPrompt returns content used by sdk-process appendParts', () => {
+        // sdk-process unconditionally appends getMessagingSafetyPrompt() to appendParts.
+        // Verify the prompt content is valid and non-empty so appendParts always includes it.
+        const prompt = getMessagingSafetyPrompt();
+        expect(prompt).toContain('## Messaging Safety');
+        expect(prompt).toContain('NEVER write scripts');
+        expect(prompt).toContain('ONLY use your provided MCP tools');
+    });
+
+    test('messaging safety prompt is always non-empty (unconditional append contract)', () => {
+        // sdk-process appends this unconditionally — it must never return empty
+        const prompt = getMessagingSafetyPrompt();
+        expect(prompt.length).toBeGreaterThan(100);
+    });
+
+    test('messaging safety prompt integrates correctly with appendParts pattern', () => {
+        // Simulate the sdk-process appendParts assembly
+        const appendParts: string[] = [];
+        const agentSystemPrompt = 'You are a helpful agent.';
+        const agentAppendPrompt = 'Always be concise.';
+
+        appendParts.push(agentSystemPrompt);
+        appendParts.push(agentAppendPrompt);
+        appendParts.push(getMessagingSafetyPrompt());
+
+        const combined = appendParts.join('\n\n');
+        expect(combined).toContain(agentSystemPrompt);
+        expect(combined).toContain(agentAppendPrompt);
+        expect(combined).toContain('## Messaging Safety');
     });
 });

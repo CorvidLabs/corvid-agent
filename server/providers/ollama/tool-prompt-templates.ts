@@ -135,6 +135,26 @@ export function getCodingToolPrompt(): string {
 6. Some files are protected and cannot be modified.`;
 }
 
+/**
+ * Get messaging safety instructions that prevent agents from generating
+ * scripts or code to send messages outside of provided MCP tools.
+ *
+ * NOTE: This prompt is always appended whenever tools are available, regardless
+ * of which tools are present or which model family is in use. This is an
+ * intentional side effect — callers (sdk-process, direct-process) unconditionally
+ * append this to every tool-bearing prompt to enforce the messaging safety invariant.
+ */
+export function getMessagingSafetyPrompt(): string {
+    return `## Messaging Safety
+
+You must ONLY use your provided MCP tools to send messages or communicate through external channels. Specifically:
+
+- NEVER write scripts, shell commands, or code that sends messages, posts to APIs, calls webhooks, or communicates through any protocol (HTTP, SMTP, WebSocket, etc.).
+- NEVER use coding tools (write_file, run_command, etc.) to create scripts that send messages on your behalf.
+- If you are asked to send a message through a channel for which you have no MCP tool, respond with a clear explanation that you cannot send messages through that channel because no tool is available. Do NOT attempt to work around this limitation.
+- This rule applies to ALL channels: Discord, Slack, email, SMS, social media, HTTP endpoints, and any other communication protocol.`;
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────
 
 function getCommonToolInstructions(toolNames: string[]): string {
@@ -153,7 +173,8 @@ ${toolList}
 4. If a tool call fails, read the error message carefully and retry with corrected arguments.
 5. Do not invent or hallucinate tool names — only use tools from the available list.
 6. Stay focused on the task. Do NOT explore directories or read files unrelated to what you were asked to do.
-7. When you receive a tool result, evaluate it and take the next logical action. Do NOT stop to narrate or explain — just call the next tool.`;
+7. When you receive a tool result, evaluate it and take the next logical action. Do NOT stop to narrate or explain — just call the next tool.
+8. NEVER write scripts, code, or shell commands to send messages, post to APIs, or communicate through any channel (Discord, Slack, email, HTTP, webhooks, etc.). You may ONLY send messages using your provided MCP tools (e.g. corvid_send_message). If no tool exists for the target channel or protocol, inform the user that you cannot send messages through that channel — do NOT generate a workaround script.`;
 }
 
 function getFamilySpecificPrompt(family: ModelFamily, toolNames: string[] = []): string | null {
