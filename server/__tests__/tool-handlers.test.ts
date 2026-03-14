@@ -38,6 +38,8 @@ import {
     handleCreditConfig,
     handleManageSchedule,
     handleCreateWorkTask,
+    handleCheckWorkStatus,
+    handleListWorkTasks,
     handleRecallMemory,
     handleListAgents,
     type McpToolContext,
@@ -565,6 +567,273 @@ describe('handleCreateWorkTask', () => {
         const result = await handleCreateWorkTask(ctx, { description: 'one more' });
         expect(result.isError).toBe(true);
         expect((result.content[0] as { text: string }).text).toContain('Rate limit');
+    });
+});
+
+// ─── Check Work Status ───────────────────────────────────────────────────────
+
+describe('handleCheckWorkStatus', () => {
+    test('returns error when service not available', async () => {
+        const ctx = createMockContext({ workTaskService: undefined });
+        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-123' });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('not available');
+    });
+
+    test('returns error for nonexistent task', async () => {
+        const ctx = createMockContext({
+            workTaskService: {
+                getTask: mock(() => null),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-nonexistent' });
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('not found');
+    });
+
+    test('returns task details for existing task', async () => {
+        const mockTask = {
+            id: 'wt-abc',
+            status: 'running',
+            projectId: 'proj-1',
+            branchName: 'fix/bug-42',
+            iterationCount: 2,
+            createdAt: '2026-03-14T10:00:00Z',
+            prUrl: null,
+            error: null,
+            completedAt: null,
+        };
+        const ctx = createMockContext({
+            workTaskService: {
+                getTask: mock(() => mockTask),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-abc' });
+        expect(result.isError).toBeUndefined();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('wt-abc');
+        expect(text).toContain('running');
+        expect(text).toContain('fix/bug-42');
+        expect(text).toContain('Iteration: 2');
+    });
+
+    test('includes PR url and error when present', async () => {
+        const mockTask = {
+            id: 'wt-def',
+            status: 'failed',
+            projectId: 'proj-1',
+            branchName: 'fix/crash',
+            iterationCount: 1,
+            createdAt: '2026-03-14T10:00:00Z',
+            prUrl: 'https://github.com/org/repo/pull/99',
+            error: 'Branch creation failed',
+            completedAt: '2026-03-14T11:00:00Z',
+        };
+        const ctx = createMockContext({
+            workTaskService: {
+                getTask: mock(() => mockTask),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleCheckWorkStatus(ctx, { task_id: 'wt-def' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('PR: https://github.com/org/repo/pull/99');
+        expect(text).toContain('Error: Branch creation failed');
+        expect(text).toContain('Completed:');
+    });
+});
+
+// ─── List Work Tasks ─────────────────────────────────────────────────────────
+
+describe('handleListWorkTasks', () => {
+    test('returns error when service not available', async () => {
+        const ctx = createMockContext({ workTaskService: undefined });
+        const result = await handleListWorkTasks(ctx, {});
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('not available');
+    });
+
+    test('returns empty message when no tasks exist', async () => {
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => []),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, {});
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('No work tasks found');
+    });
+
+    test('returns empty message with status filter', async () => {
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => []),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, { status: 'running' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('No work tasks with status "running"');
+    });
+
+    test('lists tasks with details', async () => {
+        const mockTasks = [
+            { id: 'wt-1', status: 'completed', description: 'Fix login bug', prUrl: 'https://github.com/org/repo/pull/1', error: null },
+            { id: 'wt-2', status: 'running', description: 'Add search feature', prUrl: null, error: null },
+        ];
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => mockTasks),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, {});
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Work tasks (2)');
+        expect(text).toContain('wt-1');
+        expect(text).toContain('completed');
+        expect(text).toContain('Fix login bug');
+        expect(text).toContain('PR: https://github.com/org/repo/pull/1');
+        expect(text).toContain('wt-2');
+        expect(text).toContain('Add search feature');
+    });
+
+    test('filters by status', async () => {
+        const mockTasks = [
+            { id: 'wt-1', status: 'completed', description: 'Done task', prUrl: null, error: null },
+            { id: 'wt-2', status: 'running', description: 'Active task', prUrl: null, error: null },
+        ];
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => mockTasks),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, { status: 'running' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Work tasks (1)');
+        expect(text).toContain('wt-2');
+        expect(text).not.toContain('wt-1');
+    });
+
+    test('respects limit parameter', async () => {
+        const mockTasks = Array.from({ length: 10 }, (_, i) => ({
+            id: `wt-${i}`, status: 'pending', description: `Task ${i}`, prUrl: null, error: null,
+        }));
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => mockTasks),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, { limit: 3 });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Work tasks (3)');
+        expect(text).toContain('wt-0');
+        expect(text).toContain('wt-2');
+        expect(text).not.toContain('wt-3');
+    });
+
+    test('caps limit at 50', async () => {
+        const mockTasks = Array.from({ length: 60 }, (_, i) => ({
+            id: `wt-${i}`, status: 'pending', description: `Task ${i}`, prUrl: null, error: null,
+        }));
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => mockTasks),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, { limit: 100 });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Work tasks (50)');
+    });
+
+    test('includes error snippet in task listing', async () => {
+        const mockTasks = [
+            { id: 'wt-fail', status: 'failed', description: 'Broken task', prUrl: null, error: 'Something went very wrong with the branch checkout' },
+        ];
+        const ctx = createMockContext({
+            workTaskService: {
+                listTasks: mock(() => mockTasks),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+        const result = await handleListWorkTasks(ctx, {});
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Error: Something went very wrong');
+    });
+});
+
+// ─── model_tier validation (handleCreateWorkTask) ────────────────────────────
+
+describe('handleCreateWorkTask model_tier validation', () => {
+    function createWorkCtx(): McpToolContext {
+        return createMockContext({
+            workTaskService: {
+                create: mock(() => Promise.resolve({
+                    id: 'wt-new',
+                    status: 'pending',
+                    projectId: 'proj-1',
+                    branchName: null,
+                })),
+            } as unknown as McpToolContext['workTaskService'],
+        });
+    }
+
+    test('rejects invalid model_tier value', async () => {
+        const ctx = createWorkCtx();
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'fix bug',
+            model_tier: 'turbo',
+        });
+        expect(result.isError).toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Invalid model_tier');
+        expect(text).toContain('turbo');
+    });
+
+    test('accepts "heavy" as valid model_tier', async () => {
+        const ctx = createWorkCtx();
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'refactor auth',
+            model_tier: 'heavy',
+        });
+        expect(result.isError).toBeUndefined();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Model tier: heavy');
+    });
+
+    test('accepts "standard" as valid model_tier', async () => {
+        const ctx = createWorkCtx();
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'update docs',
+            model_tier: 'standard',
+        });
+        expect(result.isError).toBeUndefined();
+    });
+
+    test('accepts "light" as valid model_tier', async () => {
+        const ctx = createWorkCtx();
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'lint fix',
+            model_tier: 'light',
+        });
+        expect(result.isError).toBeUndefined();
+    });
+
+    test('accepts raw tier names (opus, sonnet, haiku)', async () => {
+        const ctx = createWorkCtx();
+        for (const tier of ['opus', 'sonnet', 'haiku']) {
+            const result = await handleCreateWorkTask(ctx, {
+                description: `test ${tier}`,
+                model_tier: tier,
+            });
+            expect(result.isError).toBeUndefined();
+        }
+    });
+
+    test('omitting model_tier defaults to auto', async () => {
+        const ctx = createWorkCtx();
+        const result = await handleCreateWorkTask(ctx, {
+            description: 'auto tier task',
+        });
+        expect(result.isError).toBeUndefined();
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('Model tier: auto');
     });
 });
 
