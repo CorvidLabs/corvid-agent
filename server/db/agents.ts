@@ -27,6 +27,10 @@ interface AgentRow {
     wallet_address: string | null;
     wallet_mnemonic_encrypted: string | null;
     wallet_funded_algo: number;
+    display_color: string | null;
+    display_icon: string | null;
+    avatar_url: string | null;
+    disabled: number;
     created_at: string;
     updated_at: string;
 }
@@ -53,6 +57,10 @@ function rowToAgent(row: AgentRow): Agent {
         voicePreset: (row.voice_preset || 'alloy') as Agent['voicePreset'],
         walletAddress: row.wallet_address ?? null,
         walletFundedAlgo: row.wallet_funded_algo ?? 0,
+        displayColor: row.display_color ?? null,
+        displayIcon: row.display_icon ?? null,
+        avatarUrl: row.avatar_url ?? null,
+        disabled: row.disabled === 1,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -80,8 +88,8 @@ export function createAgent(db: Database, input: CreateAgentInput, tenantId: str
         `INSERT INTO agents (id, name, description, system_prompt, append_prompt, model, provider,
          allowed_tools, disallowed_tools, permission_mode, max_budget_usd,
          algochat_enabled, algochat_auto, custom_flags, default_project_id, mcp_tool_permissions,
-         voice_enabled, voice_preset, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         voice_enabled, voice_preset, display_color, display_icon, avatar_url, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
         id,
         input.name,
@@ -101,6 +109,9 @@ export function createAgent(db: Database, input: CreateAgentInput, tenantId: str
         mcpToolPermissions,
         input.voiceEnabled ? 1 : 0,
         input.voicePreset ?? 'alloy',
+        input.displayColor ?? null,
+        input.displayIcon ?? null,
+        input.avatarUrl ?? null,
         tenantId,
     );
 
@@ -166,6 +177,22 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput, t
     if (input.voicePreset !== undefined) {
         fields.push('voice_preset = ?');
         values.push(input.voicePreset);
+    }
+    if (input.displayColor !== undefined) {
+        fields.push('display_color = ?');
+        values.push(input.displayColor);
+    }
+    if (input.displayIcon !== undefined) {
+        fields.push('display_icon = ?');
+        values.push(input.displayIcon);
+    }
+    if (input.avatarUrl !== undefined) {
+        fields.push('avatar_url = ?');
+        values.push(input.avatarUrl);
+    }
+    if (input.disabled !== undefined) {
+        fields.push('disabled = ?');
+        values.push(input.disabled ? 1 : 0);
     }
 
     if (fields.length === 0) return existing;

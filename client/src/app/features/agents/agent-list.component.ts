@@ -111,12 +111,23 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             } @else {
                 <div class="agent-grid">
                     @for (card of filteredAgents(); track card.agent.id) {
-                        <a class="agent-card" [routerLink]="['/agents', card.agent.id]">
+                        <a class="agent-card" [routerLink]="['/agents', card.agent.id]"
+                           [style.--agent-accent]="card.agent.displayColor || ''">
                             <div class="agent-card__top">
                                 <div class="agent-card__title-row">
-                                    <span class="agent-card__name">{{ card.agent.name }}</span>
+                                    @if (card.agent.avatarUrl) {
+                                        <img class="agent-card__avatar" [src]="card.agent.avatarUrl"
+                                             [alt]="card.agent.name + ' avatar'" (error)="onAvatarError($event)" />
+                                    } @else if (card.agent.displayIcon) {
+                                        <span class="agent-card__icon">{{ card.agent.displayIcon }}</span>
+                                    }
+                                    <span class="agent-card__name"
+                                          [style.color]="card.agent.displayColor || ''">{{ card.agent.name }}</span>
                                     @if (card.runningSessions > 0) {
-                                        <span class="status-dot status-dot--active" title="Active sessions"></span>
+                                        <span class="status-indicator status-indicator--active" title="Active sessions">
+                                            <span class="status-dot status-dot--active" aria-hidden="true"></span>
+                                            <span class="status-indicator__label">Active</span>
+                                        </span>
                                     }
                                 </div>
                                 <div class="agent-card__badges">
@@ -189,9 +200,9 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .filters { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem; }
         .filter-group { display: flex; gap: 0.25rem; }
         .filter-chip {
-            padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius-sm);
             background: transparent; color: var(--text-secondary); font-size: 0.7rem; font-family: inherit;
-            cursor: pointer; transition: all 0.15s; text-transform: capitalize;
+            cursor: pointer; transition: all 0.15s; text-transform: capitalize; display: flex; align-items: center;
         }
         .filter-chip:hover { border-color: var(--border-bright); color: var(--text-primary); }
         .filter-chip--active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: var(--accent-cyan); }
@@ -218,10 +229,15 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
             border-radius: var(--radius-lg); padding: 1rem; text-decoration: none; color: inherit;
             transition: border-color 0.15s, box-shadow 0.15s; cursor: pointer;
         }
-        .agent-card:hover { border-color: var(--accent-cyan); box-shadow: 0 0 12px rgba(0, 229, 255, 0.08); }
+        .agent-card:hover { border-color: var(--agent-accent, var(--accent-cyan)); box-shadow: 0 0 12px rgba(0, 229, 255, 0.08); }
+        .agent-card__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-bright); flex-shrink: 0; }
+        .agent-card__icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
         .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem; }
         .agent-card__title-row { display: flex; align-items: center; gap: 0.4rem; }
         .agent-card__name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+        .status-indicator { display: flex; align-items: center; gap: 0.25rem; }
+        .status-indicator__label { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+        .status-indicator--active .status-indicator__label { color: var(--accent-green); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .status-dot--active { background: var(--accent-green); box-shadow: 0 0 6px rgba(0, 255, 136, 0.4); }
         .agent-card__badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
@@ -239,10 +255,10 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
         .agent-card__footer { display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid var(--border); }
         .agent-card__perm { font-size: 0.65rem; color: var(--text-tertiary); text-transform: capitalize; }
         .agent-card__start-btn {
-            padding: 0.25rem 0.6rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            padding: 0.5rem 0.75rem; min-height: 44px; font-size: 0.6rem; font-weight: 600; font-family: inherit;
             text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
             background: transparent; border: 1px solid var(--accent-cyan); border-radius: var(--radius-sm);
-            color: var(--accent-cyan); transition: all 0.15s;
+            color: var(--accent-cyan); transition: all 0.15s; display: flex; align-items: center;
         }
         .agent-card__start-btn:hover { background: var(--accent-cyan-dim); box-shadow: var(--glow-cyan); }
 
@@ -334,6 +350,10 @@ export class AgentListComponent implements OnInit {
 
     protected getProviderColor(provider?: string): { color: string; border: string; bg: string } {
         return PROVIDER_COLORS[provider ?? 'anthropic'] ?? DEFAULT_PROVIDER_COLOR;
+    }
+
+    protected onAvatarError(event: Event): void {
+        (event.target as HTMLImageElement).style.display = 'none';
     }
 
     protected startSession(agentId: string, event: Event): void {

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 85;
+const SCHEMA_VERSION = 86;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -163,6 +163,9 @@ const MIGRATIONS: Record<number, string[]> = {
             provider                  TEXT DEFAULT '',
             voice_enabled             INTEGER DEFAULT 0,
             voice_preset              TEXT DEFAULT 'alloy',
+            display_color             TEXT DEFAULT NULL,
+            display_icon              TEXT DEFAULT NULL,
+            avatar_url                TEXT DEFAULT NULL,
             tenant_id                 TEXT NOT NULL DEFAULT 'default',
             created_at                TEXT DEFAULT (datetime('now')),
             updated_at                TEXT DEFAULT (datetime('now'))

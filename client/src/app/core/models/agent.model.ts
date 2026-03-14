@@ -18,6 +18,9 @@ export interface Agent {
     defaultProjectId: string | null;
     walletAddress: string | null;
     walletFundedAlgo: number;
+    displayColor: string | null;
+    displayIcon: string | null;
+    avatarUrl: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -37,6 +40,9 @@ export interface CreateAgentInput {
     algochatAuto?: boolean;
     customFlags?: Record<string, string>;
     defaultProjectId?: string | null;
+    displayColor?: string | null;
+    displayIcon?: string | null;
+    avatarUrl?: string | null;
 }
 
 export type UpdateAgentInput = Partial<CreateAgentInput>;

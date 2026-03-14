@@ -1,138 +1,224 @@
-/**
- * Tests for ReputationVerifier — on-chain attestation scanning and trust derivation.
- *
- * Mocks global fetch to simulate Algorand indexer responses.
- */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { ReputationVerifier } from '../reputation/verifier';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+function makeIndexerResponse(transactions: Array<{ id: string; note?: string; 'confirmed-round'?: number; 'round-time'?: number }>) {
+    return new Response(JSON.stringify({ transactions }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
 
-const TEST_WALLET = 'TESTWALLETADDRESS1234567890ABCDEFGHIJKLMNOPQRST';
-const INDEXER_URL = 'https://test-indexer.example.com';
+function makeAttestation(agentId: string, hash: string): string {
+    return Buffer.from(`corvid-reputation:${agentId}:${hash}`).toString('base64');
+}
 
-const originalFetch = globalThis.fetch;
+let originalFetch: typeof global.fetch;
 
 beforeEach(() => {
-    // Reset fetch mock between tests
-    globalThis.fetch = originalFetch;
+    originalFetch = global.fetch;
 });
 
 afterEach(() => {
-    globalThis.fetch = originalFetch;
+    global.fetch = originalFetch;
 });
 
-afterAll(() => {
-    // Ensure global fetch is restored after this file completes
-    globalThis.fetch = originalFetch;
-});
+// ─── scanAttestations ───────────────────────────────────────────────────────
 
-/**
- * Build a mock Algorand transaction with a corvid-reputation note.
- * Note fields in Algorand are base64-encoded.
- */
-function makeAttestation(agentId: string, hash: string, txId: string, round: number, roundTime: number) {
-    const noteText = `corvid-reputation:${agentId}:${hash}`;
-    const noteB64 = Buffer.from(noteText).toString('base64');
-    return {
-        id: txId,
-        note: noteB64,
-        'confirmed-round': round,
-        'round-time': roundTime,
-    };
-}
+describe('scanAttestations', () => {
+    test('parses valid attestation transactions', async () => {
+        global.fetch = mock(() => Promise.resolve(makeIndexerResponse([
+            {
+                id: 'txn-1',
+                note: makeAttestation('agent-1', 'abc123'),
+                'confirmed-round': 1000,
+                'round-time': 1710000000,
+            },
+            {
+                id: 'txn-2',
+                note: makeAttestation('agent-2', 'def456'),
+                'confirmed-round': 1001,
+                'round-time': 1710000100,
+            },
+        ]))) as unknown as typeof global.fetch;
 
-/**
- * Create N attestation transactions with unique IDs.
- */
-function makeAttestations(count: number) {
-    return Array.from({ length: count }, (_, i) =>
-        makeAttestation(`agent${i}`, `${String(i).padStart(4, '0')}abcdef0123456789`, `txn-${i}`, 10000 + i, 1700000000 + i),
-    );
-}
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
 
-/**
- * Mock globalThis.fetch to return the given transactions array.
- */
-function mockFetchTransactions(transactions: unknown[]) {
-    globalThis.fetch = (async () =>
-        new Response(JSON.stringify({ transactions }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        })) as unknown as typeof fetch;
-}
-
-// ─── Tests ──────────────────────────────────────────────────────────────────
-
-describe('ReputationVerifier', () => {
-    let verifier: ReputationVerifier;
-
-    beforeEach(() => {
-        verifier = new ReputationVerifier(INDEXER_URL);
+        expect(attestations).toHaveLength(2);
+        expect(attestations[0].txid).toBe('txn-1');
+        expect(attestations[0].agentId).toBe('agent-1');
+        expect(attestations[0].hash).toBe('abc123');
+        expect(attestations[0].round).toBe(1000);
+        expect(attestations[1].agentId).toBe('agent-2');
     });
 
-    it('returns untrusted when no attestations found', async () => {
-        mockFetchTransactions([]);
+    test('skips transactions without notes', async () => {
+        global.fetch = mock(() => Promise.resolve(makeIndexerResponse([
+            { id: 'txn-1' },
+            { id: 'txn-2', note: makeAttestation('agent-1', 'abc123') },
+        ]))) as unknown as typeof global.fetch;
 
-        const result = await verifier.checkRemoteTrust(TEST_WALLET);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
+
+        expect(attestations).toHaveLength(1);
+    });
+
+    test('skips malformed note prefix', async () => {
+        global.fetch = mock(() => Promise.resolve(makeIndexerResponse([
+            {
+                id: 'txn-1',
+                note: Buffer.from('not-corvid-format:data').toString('base64'),
+            },
+        ]))) as unknown as typeof global.fetch;
+
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
+
+        expect(attestations).toHaveLength(0);
+    });
+
+    test('returns empty on indexer HTTP error', async () => {
+        global.fetch = mock(() => Promise.resolve(new Response('Not Found', { status: 404 }))) as unknown as typeof global.fetch;
+
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
+
+        expect(attestations).toHaveLength(0);
+    });
+
+    test('returns empty on network failure', async () => {
+        global.fetch = mock(() => Promise.reject(new Error('Network error'))) as unknown as typeof global.fetch;
+
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
+
+        expect(attestations).toHaveLength(0);
+    });
+
+    test('handles empty transactions array', async () => {
+        global.fetch = mock(() => Promise.resolve(makeIndexerResponse([]))) as unknown as typeof global.fetch;
+
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
+
+        expect(attestations).toHaveLength(0);
+    });
+
+    test('handles missing round-time gracefully', async () => {
+        global.fetch = mock(() => Promise.resolve(makeIndexerResponse([
+            {
+                id: 'txn-1',
+                note: makeAttestation('agent-1', 'abc123'),
+                'confirmed-round': 500,
+            },
+        ]))) as unknown as typeof global.fetch;
+
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const attestations = await verifier.scanAttestations('WALLETADDR');
+
+        expect(attestations).toHaveLength(1);
+        expect(attestations[0].timestamp).toBe('');
+        expect(attestations[0].round).toBe(500);
+    });
+});
+
+// ─── checkRemoteTrust ───────────────────────────────────────────────────────
+
+describe('checkRemoteTrust', () => {
+    function mockAttestations(count: number): void {
+        const txns = Array.from({ length: count }, (_, i) => ({
+            id: `txn-${i}`,
+            note: makeAttestation(`agent-${i}`, `hash${i}`),
+            'confirmed-round': 1000 + i,
+            'round-time': 1710000000 + i,
+        }));
+        global.fetch = mock(() => Promise.resolve(makeIndexerResponse(txns))) as unknown as typeof global.fetch;
+    }
+
+    test('untrusted with 0 attestations', async () => {
+        mockAttestations(0);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET');
 
         expect(result.trustLevel).toBe('untrusted');
         expect(result.attestationCount).toBe(0);
-        expect(result.attestations).toEqual([]);
-        expect(result.walletAddress).toBe(TEST_WALLET);
+        expect(result.meetsMinimum).toBe(false);
     });
 
-    it('returns low trust for 1-2 attestations', async () => {
-        mockFetchTransactions(makeAttestations(2));
-
-        const result = await verifier.checkRemoteTrust(TEST_WALLET);
+    test('low trust with 1 attestation', async () => {
+        mockAttestations(1);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET');
 
         expect(result.trustLevel).toBe('low');
-        expect(result.attestationCount).toBe(2);
-        expect(result.attestations.length).toBe(2);
-        // Verify attestation structure
-        expect(result.attestations[0].txid).toBe('txn-0');
-        expect(result.attestations[0].agentId).toBe('agent0');
-        expect(result.attestations[0].round).toBe(10000);
-        expect(result.attestations[0].timestamp).toBeTruthy();
-    });
-
-    it('returns medium trust for 3-5 attestations', async () => {
-        mockFetchTransactions(makeAttestations(4));
-
-        const result = await verifier.checkRemoteTrust(TEST_WALLET);
-
-        expect(result.trustLevel).toBe('medium');
-        expect(result.attestationCount).toBe(4);
-    });
-
-    it('returns high trust for 6-9 attestations', async () => {
-        mockFetchTransactions(makeAttestations(7));
-
-        const result = await verifier.checkRemoteTrust(TEST_WALLET);
-
-        expect(result.trustLevel).toBe('high');
-        expect(result.attestationCount).toBe(7);
-    });
-
-    it('returns verified trust for 10+ attestations', async () => {
-        mockFetchTransactions(makeAttestations(12));
-
-        const result = await verifier.checkRemoteTrust(TEST_WALLET);
-
-        expect(result.trustLevel).toBe('verified');
-        expect(result.attestationCount).toBe(12);
         expect(result.meetsMinimum).toBe(true);
     });
 
-    it('checkRemoteTrust returns meetsMinimum=false when trust level is below minTrust', async () => {
-        // 2 attestations => 'low' trust
-        mockFetchTransactions(makeAttestations(2));
+    test('medium trust with 3 attestations', async () => {
+        mockAttestations(3);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET');
 
-        const result = await verifier.checkRemoteTrust(TEST_WALLET, 'high');
+        expect(result.trustLevel).toBe('medium');
+    });
+
+    test('high trust with 6 attestations', async () => {
+        mockAttestations(6);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET');
+
+        expect(result.trustLevel).toBe('high');
+    });
+
+    test('verified trust with 10+ attestations', async () => {
+        mockAttestations(12);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET');
+
+        expect(result.trustLevel).toBe('verified');
+        expect(result.attestationCount).toBe(12);
+    });
+
+    test('meetsMinimum is false when trust is below threshold', async () => {
+        mockAttestations(1);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET', 'high');
 
         expect(result.trustLevel).toBe('low');
         expect(result.meetsMinimum).toBe(false);
-        expect(result.attestationCount).toBe(2);
+    });
+
+    test('meetsMinimum is true when trust equals threshold', async () => {
+        mockAttestations(6);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('WALLET', 'high');
+
+        expect(result.meetsMinimum).toBe(true);
+    });
+
+    test('includes wallet address in result', async () => {
+        mockAttestations(0);
+        const verifier = new ReputationVerifier('https://mock-indexer');
+        const result = await verifier.checkRemoteTrust('MY_WALLET_ADDR');
+
+        expect(result.walletAddress).toBe('MY_WALLET_ADDR');
+    });
+});
+
+// ─── constructor defaults ───────────────────────────────────────────────────
+
+describe('constructor', () => {
+    test('uses provided indexer URL', async () => {
+        let calledUrl = '';
+        global.fetch = mock((url: string) => {
+            calledUrl = url;
+            return Promise.resolve(makeIndexerResponse([]));
+        }) as unknown as typeof global.fetch;
+
+        const verifier = new ReputationVerifier('https://custom-indexer.example.com');
+        await verifier.scanAttestations('WALLET');
+
+        expect(calledUrl).toContain('custom-indexer.example.com');
     });
 });

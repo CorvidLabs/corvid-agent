@@ -120,7 +120,8 @@ export interface ApprovalDecision {
         }
         .btn {
             flex: 1;
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 1rem;
+            min-height: 44px;
             border-radius: var(--radius, 6px);
             font-size: 0.8rem;
             font-weight: 700;
@@ -130,6 +131,18 @@ export interface ApprovalDecision {
             text-transform: uppercase;
             letter-spacing: 0.06em;
             transition: background 0.15s, box-shadow 0.15s;
+        }
+        @media (max-width: 360px) {
+            .approval-dialog {
+                width: 95vw;
+                padding: 1rem;
+            }
+            .approval-dialog__header h3 {
+                font-size: 0.75rem;
+            }
+            .approval-dialog__actions {
+                flex-direction: column;
+            }
         }
         .btn--allow {
             background: transparent;

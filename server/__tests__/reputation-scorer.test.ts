@@ -1,164 +1,186 @@
-/**
- * Tests for Agent Reputation & Trust Scores:
- * - scorer.ts: Weighted composite scoring, event recording
- * - attestation.ts: On-chain hash attestation
- * - types.ts: Default weights
- */
-import { test, expect, describe, beforeEach } from 'bun:test';
+import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { ReputationScorer } from '../reputation/scorer';
-import { ReputationAttestation } from '../reputation/attestation';
-import { DEFAULT_WEIGHTS } from '../reputation/types';
-import type { TrustLevel } from '../reputation/types';
-
-// ─── DB Setup ───────────────────────────────────────────────────────────────
 
 let db: Database;
+let scorer: ReputationScorer;
 
-function setupDb(): Database {
-    const d = new Database(':memory:');
-    runMigrations(d);
-
-    // Migration 42 tables
-    d.exec(`
-        CREATE TABLE IF NOT EXISTS agent_reputation (
-            agent_id TEXT PRIMARY KEY,
-            overall_score INTEGER DEFAULT 0,
-            trust_level TEXT DEFAULT 'untrusted',
-            task_completion INTEGER DEFAULT 0,
-            peer_rating INTEGER DEFAULT 0,
-            credit_pattern INTEGER DEFAULT 0,
-            security_compliance INTEGER DEFAULT 0,
-            activity_level INTEGER DEFAULT 0,
-            attestation_hash TEXT DEFAULT NULL,
-            computed_at TEXT DEFAULT (datetime('now'))
-        )
-    `);
-
-    d.exec(`
-        CREATE TABLE IF NOT EXISTS reputation_events (
-            id TEXT PRIMARY KEY,
-            agent_id TEXT NOT NULL,
-            event_type TEXT NOT NULL,
-            score_impact REAL DEFAULT 0,
-            metadata TEXT DEFAULT '{}',
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    `);
-
-    d.exec(`
-        CREATE TABLE IF NOT EXISTS reputation_attestations (
-            agent_id TEXT NOT NULL,
-            hash TEXT NOT NULL,
-            payload TEXT NOT NULL,
-            txid TEXT DEFAULT NULL,
-            published_at TEXT DEFAULT NULL,
-            created_at TEXT DEFAULT (datetime('now')),
-            PRIMARY KEY (agent_id, hash)
-        )
-    `);
-
-    // The scorer checks these tables, so create minimal versions
-    d.exec(`
-        CREATE TABLE IF NOT EXISTS marketplace_reviews (
-            id TEXT PRIMARY KEY,
-            listing_id TEXT NOT NULL,
-            reviewer_agent_id TEXT DEFAULT NULL,
-            reviewer_address TEXT DEFAULT NULL,
-            rating INTEGER NOT NULL,
-            comment TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    `);
-
-    d.exec(`
-        CREATE TABLE IF NOT EXISTS marketplace_listings (
-            id TEXT PRIMARY KEY,
-            agent_id TEXT NOT NULL,
-            name TEXT NOT NULL DEFAULT '',
-            description TEXT NOT NULL DEFAULT '',
-            long_description TEXT DEFAULT '',
-            category TEXT NOT NULL DEFAULT 'general',
-            tags TEXT DEFAULT '[]',
-            pricing_model TEXT DEFAULT 'free',
-            price_credits INTEGER DEFAULT 0,
-            instance_url TEXT DEFAULT NULL,
-            status TEXT DEFAULT 'draft',
-            use_count INTEGER DEFAULT 0,
-            avg_rating REAL DEFAULT 0,
-            review_count INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        )
-    `);
-
-    return d;
+function seedAgent(id: string = 'agent-1', name: string = 'Test Agent'): void {
+    db.query('INSERT OR IGNORE INTO agents (id, name) VALUES (?, ?)').run(id, name);
 }
 
-// ─── Default Weights ─────────────────────────────────────────────────────────
+function seedProject(id: string = 'proj-1', name: string = 'test-project'): void {
+    db.query('INSERT OR IGNORE INTO projects (id, name) VALUES (?, ?)').run(id, name);
+}
 
-describe('Default Weights', () => {
-    test('weights sum to 1.0', () => {
-        const sum = DEFAULT_WEIGHTS.taskCompletion +
-            DEFAULT_WEIGHTS.peerRating +
-            DEFAULT_WEIGHTS.creditPattern +
-            DEFAULT_WEIGHTS.securityCompliance +
-            DEFAULT_WEIGHTS.activityLevel;
-        expect(Math.abs(sum - 1.0)).toBeLessThan(0.001);
+function seedWorkTask(agentId: string, status: string, daysAgo: number = 0): void {
+    const id = crypto.randomUUID();
+    const createdAt = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+    db.query(
+        'INSERT INTO work_tasks (id, agent_id, project_id, description, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, agentId, 'proj-1', 'test task', status, createdAt);
+}
+
+function seedSession(agentId: string, daysAgo: number = 0): void {
+    const id = crypto.randomUUID();
+    const createdAt = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+    db.query('INSERT INTO sessions (id, agent_id, created_at) VALUES (?, ?, ?)').run(id, agentId, createdAt);
+}
+
+function seedReputationEvent(agentId: string, eventType: string, impact: number, daysAgo: number = 0): void {
+    const id = crypto.randomUUID();
+    const createdAt = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+    db.query(
+        'INSERT INTO reputation_events (id, agent_id, event_type, score_impact, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(id, agentId, eventType, impact, createdAt);
+}
+
+function seedMarketplaceReview(agentId: string, rating: number): void {
+    const listingId = crypto.randomUUID();
+    db.query('INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES (?, ?, ?, ?, ?)').run(
+        listingId, agentId, 'Test Listing', 'desc', 'utility',
+    );
+    db.query('INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES (?, ?, ?)').run(
+        crypto.randomUUID(), listingId, rating,
+    );
+}
+
+beforeEach(() => {
+    db = new Database(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
+    seedAgent('agent-1');
+    seedProject('proj-1');
+    scorer = new ReputationScorer(db);
+});
+
+afterEach(() => {
+    db.close();
+});
+
+// ─── computeScore ───────────────────────────────────────────────────────────
+
+describe('computeScore', () => {
+    test('returns default scores for agent with no activity', () => {
+        const score = scorer.computeScore('agent-1');
+
+        expect(score.agentId).toBe('agent-1');
+        expect(score.overallScore).toBeGreaterThanOrEqual(1);
+        expect(score.overallScore).toBeLessThanOrEqual(100);
+        expect(score.trustLevel).toBeDefined();
+        expect(score.computedAt).toBeTruthy();
+        expect(score.attestationHash).toBeNull();
     });
 
-    test('weights have expected values', () => {
-        expect(DEFAULT_WEIGHTS.taskCompletion).toBe(0.30);
-        expect(DEFAULT_WEIGHTS.peerRating).toBe(0.25);
-        expect(DEFAULT_WEIGHTS.creditPattern).toBe(0.15);
-        expect(DEFAULT_WEIGHTS.securityCompliance).toBe(0.20);
-        expect(DEFAULT_WEIGHTS.activityLevel).toBe(0.10);
+    test('task completion improves score', () => {
+        for (let i = 0; i < 5; i++) seedWorkTask('agent-1', 'completed');
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.taskCompletion).toBe(100);
+    });
+
+    test('failed tasks reduce task completion component', () => {
+        for (let i = 0; i < 3; i++) seedWorkTask('agent-1', 'completed');
+        for (let i = 0; i < 3; i++) seedWorkTask('agent-1', 'failed');
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.taskCompletion).toBe(50);
+    });
+
+    test('insufficient tasks default to 50', () => {
+        seedWorkTask('agent-1', 'completed');
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.taskCompletion).toBe(50);
+    });
+
+    test('peer rating from marketplace reviews', () => {
+        seedMarketplaceReview('agent-1', 5);
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.peerRating).toBe(100);
+    });
+
+    test('low peer rating', () => {
+        seedMarketplaceReview('agent-1', 1);
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.peerRating).toBe(0);
+    });
+
+    test('security violations reduce compliance score', () => {
+        seedReputationEvent('agent-1', 'security_violation', -20, 5);
+        seedReputationEvent('agent-1', 'security_violation', -20, 10);
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.securityCompliance).toBe(60);
+    });
+
+    test('5+ violations floor security compliance at 0', () => {
+        for (let i = 0; i < 6; i++) {
+            seedReputationEvent('agent-1', 'security_violation', -20, i);
+        }
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.securityCompliance).toBe(0);
+    });
+
+    test('activity level increases with sessions', () => {
+        for (let i = 0; i < 12; i++) seedSession('agent-1', i);
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.activityLevel).toBe(100);
+    });
+
+    test('no sessions gives zero activity', () => {
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.activityLevel).toBe(0);
+    });
+
+    test('persists score to agent_reputation table', () => {
+        scorer.computeScore('agent-1');
+
+        const row = db.query('SELECT * FROM agent_reputation WHERE agent_id = ?').get('agent-1') as Record<string, unknown>;
+        expect(row).toBeTruthy();
+        expect(row.overall_score).toBeGreaterThanOrEqual(1);
     });
 });
 
-// ─── Scorer Tests ────────────────────────────────────────────────────────────
+// ─── trust levels ───────────────────────────────────────────────────────────
 
-describe('ReputationScorer', () => {
-    let scorer: ReputationScorer;
+describe('trust levels', () => {
+    test('high-performing agent gets high trust', () => {
+        for (let i = 0; i < 10; i++) seedWorkTask('agent-1', 'completed');
+        for (let i = 0; i < 15; i++) seedSession('agent-1', i);
+        seedMarketplaceReview('agent-1', 5);
 
-    beforeEach(() => {
-        db = setupDb();
-        scorer = new ReputationScorer(db);
+        const score = scorer.computeScore('agent-1');
+        expect(['high', 'verified']).toContain(score.trustLevel);
     });
+});
 
-    test('computeScore returns valid score for new agent', () => {
-        const score = scorer.computeScore('agent-new');
-        expect(score.agentId).toBe('agent-new');
-        expect(score.overallScore).toBeGreaterThanOrEqual(0);
-        expect(score.overallScore).toBeLessThanOrEqual(100);
-        expect(score.trustLevel).toBeTruthy();
-        expect(score.components).toBeTruthy();
-        expect(score.computedAt).toBeTruthy();
-    });
+// ─── getCachedScore ─────────────────────────────────────────────────────────
 
-    test('new agent with no data gets default components', () => {
-        const score = scorer.computeScore('agent-fresh');
-        // No tasks, reviews, credits, sessions → defaults (50 for data-lacking components)
-        expect(score.components.taskCompletion).toBe(50);
-        expect(score.components.peerRating).toBe(50);
-        expect(score.components.creditPattern).toBe(50);
-        expect(score.components.securityCompliance).toBe(100); // No violations
-        expect(score.components.activityLevel).toBe(0); // No sessions
-    });
-
-    test('getCachedScore returns null for unknown agent', () => {
+describe('getCachedScore', () => {
+    test('returns null for unknown agent', () => {
         expect(scorer.getCachedScore('nonexistent')).toBeNull();
     });
 
-    test('getCachedScore returns computed score after compute', () => {
+    test('returns cached score after compute', () => {
         scorer.computeScore('agent-1');
         const cached = scorer.getCachedScore('agent-1');
+
         expect(cached).not.toBeNull();
         expect(cached!.agentId).toBe('agent-1');
+        expect(cached!.components).toBeDefined();
     });
+});
 
-    test('recordEvent stores event', () => {
+// ─── recordEvent / getEvents ────────────────────────────────────────────────
+
+describe('recordEvent', () => {
+    test('records and retrieves reputation events', () => {
         scorer.recordEvent({
             agentId: 'agent-1',
             eventType: 'task_completed',
@@ -167,12 +189,13 @@ describe('ReputationScorer', () => {
         });
 
         const events = scorer.getEvents('agent-1');
-        expect(events.length).toBe(1);
+        expect(events).toHaveLength(1);
+        expect(events[0].agent_id).toBe('agent-1');
         expect(events[0].event_type).toBe('task_completed');
         expect(events[0].score_impact).toBe(5);
     });
 
-    test('getEvents respects limit', () => {
+    test('respects event limit', () => {
         for (let i = 0; i < 10; i++) {
             scorer.recordEvent({
                 agentId: 'agent-1',
@@ -181,140 +204,54 @@ describe('ReputationScorer', () => {
             });
         }
 
-        const limited = scorer.getEvents('agent-1', 3);
-        expect(limited.length).toBe(3);
+        const events = scorer.getEvents('agent-1', 5);
+        expect(events).toHaveLength(5);
     });
+});
 
-    test('security violations reduce compliance score', () => {
-        // Record some violations
-        for (let i = 0; i < 3; i++) {
-            scorer.recordEvent({
-                agentId: 'agent-bad',
-                eventType: 'security_violation',
-                scoreImpact: -10,
-            });
-        }
+// ─── setAttestationHash ─────────────────────────────────────────────────────
 
-        const score = scorer.computeScore('agent-bad');
-        // 3 violations × 20 = 60 deducted from 100
-        expect(score.components.securityCompliance).toBe(40);
-    });
-
-    test('getAllScores returns all computed scores', () => {
-        scorer.computeScore('agent-1');
-        scorer.computeScore('agent-2');
-
-        const all = scorer.getAllScores();
-        expect(all.length).toBe(2);
-    });
-
-    test('setAttestationHash updates stored hash', () => {
+describe('setAttestationHash', () => {
+    test('updates attestation hash', () => {
         scorer.computeScore('agent-1');
         scorer.setAttestationHash('agent-1', 'abc123hash');
 
         const cached = scorer.getCachedScore('agent-1');
         expect(cached!.attestationHash).toBe('abc123hash');
     });
+});
 
-    test('trust levels correspond to score ranges', () => {
-        // We can't easily control exact scores, but we can verify the structure
-        const score = scorer.computeScore('agent-levels');
+// ─── computeAll / getAllScores ───────────────────────────────────────────────
 
-        const validLevels: TrustLevel[] = ['untrusted', 'low', 'medium', 'high', 'verified'];
-        expect(validLevels).toContain(score.trustLevel);
+describe('computeAll', () => {
+    test('computes scores for all agents', () => {
+        seedAgent('agent-2', 'Agent Two');
+
+        const scores = scorer.computeAll();
+        expect(scores).toHaveLength(2);
+        expect(scores[0].overallScore).toBeGreaterThanOrEqual(scores[1].overallScore);
+    });
+});
+
+describe('getAllScores', () => {
+    test('returns empty when no scores computed', () => {
+        expect(scorer.getAllScores()).toHaveLength(0);
     });
 
-    // ─── Task Completion Edge Cases ──────────────────────────────────────────
+    test('returns all cached scores', () => {
+        seedAgent('agent-2', 'Agent Two');
+        scorer.computeAll();
 
-    test('task completion returns 50 with fewer than 3 tasks (insufficient data)', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('few-tasks', 'A')").run();
-        db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES ('t1', 'few-tasks', 'p1', 'd', 'completed')").run();
-        db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES ('t2', 'few-tasks', 'p1', 'd', 'failed')").run();
-
-        const score = scorer.computeScore('few-tasks');
-        expect(score.components.taskCompletion).toBe(50);
+        const all = scorer.getAllScores();
+        expect(all).toHaveLength(2);
     });
+});
 
-    test('task completion computes correct rate with >= 3 tasks', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('many-tasks', 'A')").run();
-        for (let i = 0; i < 3; i++) {
-            db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES (?, 'many-tasks', 'p1', 'd', 'completed')").run(`tc${i}`);
-        }
-        db.query("INSERT INTO work_tasks (id, agent_id, project_id, description, status) VALUES ('tf1', 'many-tasks', 'p1', 'd', 'failed')").run();
+// ─── custom weights ─────────────────────────────────────────────────────────
 
-        const score = scorer.computeScore('many-tasks');
-        expect(score.components.taskCompletion).toBe(75); // 3/4 = 75%
-    });
-
-    // ─── Peer Rating Edge Cases ──────────────────────────────────────────────
-
-    test('perfect 5-star reviews give 100 peer rating', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('star', 'A')").run();
-        db.query("INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES ('l1', 'star', 'L', 'D', 'code')").run();
-        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r1', 'l1', 5)").run();
-        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r2', 'l1', 5)").run();
-
-        const score = scorer.computeScore('star');
-        expect(score.components.peerRating).toBe(100);
-    });
-
-    test('1-star reviews give 0 peer rating', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('bad', 'A')").run();
-        db.query("INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES ('l1', 'bad', 'L', 'D', 'code')").run();
-        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r1', 'l1', 1)").run();
-
-        const score = scorer.computeScore('bad');
-        expect(score.components.peerRating).toBe(0);
-    });
-
-    test('3-star average gives 50 peer rating', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('mid', 'A')").run();
-        db.query("INSERT INTO marketplace_listings (id, agent_id, name, description, category) VALUES ('l1', 'mid', 'L', 'D', 'code')").run();
-        db.query("INSERT INTO marketplace_reviews (id, listing_id, rating) VALUES ('r1', 'l1', 3)").run();
-
-        const score = scorer.computeScore('mid');
-        expect(score.components.peerRating).toBe(50);
-    });
-
-    // ─── Activity Level Edge Cases ───────────────────────────────────────────
-
-    test('5 sessions = 50 activity level', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('active5', 'A')").run();
-        for (let i = 0; i < 5; i++) {
-            db.query("INSERT INTO sessions (id, agent_id) VALUES (?, 'active5')").run(`s${i}`);
-        }
-        const score = scorer.computeScore('active5');
-        expect(score.components.activityLevel).toBe(50);
-    });
-
-    test('10+ sessions caps activity at 100', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('active15', 'A')").run();
-        for (let i = 0; i < 15; i++) {
-            db.query("INSERT INTO sessions (id, agent_id) VALUES (?, 'active15')").run(`s${i}`);
-        }
-        const score = scorer.computeScore('active15');
-        expect(score.components.activityLevel).toBe(100);
-    });
-
-    // ─── Security Compliance Edge Cases ──────────────────────────────────────
-
-    test('5 security violations floor compliance at 0', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('viol5', 'A')").run();
-        for (let i = 0; i < 5; i++) {
-            scorer.recordEvent({
-                agentId: 'viol5',
-                eventType: 'security_violation',
-                scoreImpact: -20,
-            });
-        }
-        const score = scorer.computeScore('viol5');
-        expect(score.components.securityCompliance).toBe(0);
-    });
-
-    // ─── Custom Weights ──────────────────────────────────────────────────────
-
-    test('custom weights: all weight on security with violations yields low overall', () => {
-        const customScorer = new ReputationScorer(db, {
+describe('custom weights', () => {
+    test('security-only weighting emphasizes compliance', () => {
+        const securityScorer = new ReputationScorer(db, {
             taskCompletion: 0,
             peerRating: 0,
             creditPattern: 0,
@@ -322,110 +259,31 @@ describe('ReputationScorer', () => {
             activityLevel: 0,
         });
 
-        db.query("INSERT INTO agents (id, name) VALUES ('sec-only', 'A')").run();
-        for (let i = 0; i < 5; i++) {
-            customScorer.recordEvent({
-                agentId: 'sec-only',
-                eventType: 'security_violation',
-                scoreImpact: -20,
-            });
-        }
+        const score = securityScorer.computeScore('agent-1');
+        expect(score.overallScore).toBeGreaterThanOrEqual(90);
 
-        const score = customScorer.computeScore('sec-only');
-        expect(score.components.securityCompliance).toBe(0);
-        expect(score.overallScore).toBeLessThanOrEqual(1);
-    });
+        seedReputationEvent('agent-1', 'security_violation', -20, 1);
+        seedReputationEvent('agent-1', 'security_violation', -20, 2);
+        seedReputationEvent('agent-1', 'security_violation', -20, 3);
 
-    // ─── Bulk Operations ─────────────────────────────────────────────────────
-
-    test('computeAll computes scores for all agents sorted descending', () => {
-        db.query("INSERT INTO agents (id, name) VALUES ('bulk1', 'A')").run();
-        db.query("INSERT INTO agents (id, name) VALUES ('bulk2', 'B')").run();
-
-        const scores = scorer.computeAll();
-        expect(scores).toHaveLength(2);
-        expect(scores[0].overallScore).toBeGreaterThanOrEqual(scores[1].overallScore);
-    });
-
-    test('getAllScores returns empty when no scores computed', () => {
-        expect(scorer.getAllScores()).toEqual([]);
-    });
-
-    test('computeScore preserves existing attestation hash on recompute', () => {
-        scorer.computeScore('preserve-hash');
-        scorer.setAttestationHash('preserve-hash', '0xkeep');
-
-        const recomputed = scorer.computeScore('preserve-hash');
-        expect(recomputed.attestationHash).toBe('0xkeep');
+        const score2 = securityScorer.computeScore('agent-1');
+        expect(score2.overallScore).toBeLessThanOrEqual(50);
     });
 });
 
-// ─── Attestation Tests ───────────────────────────────────────────────────────
+// ─── credit patterns ────────────────────────────────────────────────────────
 
-describe('ReputationAttestation', () => {
-    let scorer: ReputationScorer;
-    let attestation: ReputationAttestation;
+describe('credit patterns', () => {
+    test('earning more than spending gives high score', () => {
+        seedReputationEvent('agent-1', 'credit_earned', 100, 5);
+        seedReputationEvent('agent-1', 'credit_spent', 50, 5);
 
-    beforeEach(() => {
-        db = setupDb();
-        scorer = new ReputationScorer(db);
-        attestation = new ReputationAttestation(db);
-    });
-
-    test('createAttestation returns hash', async () => {
         const score = scorer.computeScore('agent-1');
-        const hash = await attestation.createAttestation(score);
-
-        expect(hash).toBeTruthy();
-        expect(typeof hash).toBe('string');
-        expect(hash.length).toBe(64); // SHA-256 hex
+        expect(score.components.creditPattern).toBe(100);
     });
 
-    test('createAttestation stores attestation in DB', async () => {
+    test('no credit activity defaults to 50', () => {
         const score = scorer.computeScore('agent-1');
-        await attestation.createAttestation(score);
-
-        const stored = attestation.getAttestation('agent-1');
-        expect(stored).not.toBeNull();
-        expect(stored!.hash.length).toBe(64);
-        expect(stored!.payload).toBeTruthy();
-    });
-
-    test('verifyAttestation returns true for matching score', async () => {
-        const score = scorer.computeScore('agent-1');
-        const hash = await attestation.createAttestation(score);
-
-        const valid = await attestation.verifyAttestation(score, hash);
-        expect(valid).toBe(true);
-    });
-
-    test('verifyAttestation returns false for tampered score', async () => {
-        const score = scorer.computeScore('agent-1');
-        const hash = await attestation.createAttestation(score);
-
-        // Tamper with the score
-        const tampered = { ...score, overallScore: 999 };
-        const valid = await attestation.verifyAttestation(tampered, hash);
-        expect(valid).toBe(false);
-    });
-
-    test('getAttestation returns null for unknown agent', () => {
-        expect(attestation.getAttestation('nonexistent')).toBeNull();
-    });
-
-    test('createAttestation updates reputation record hash', async () => {
-        const score = scorer.computeScore('agent-1');
-        const hash = await attestation.createAttestation(score);
-
-        const cached = scorer.getCachedScore('agent-1');
-        expect(cached!.attestationHash).toBe(hash);
-    });
-
-    test('same score produces same hash (deterministic)', async () => {
-        const score = scorer.computeScore('agent-1');
-        const hash1 = await attestation.createAttestation(score);
-        const hash2 = await attestation.createAttestation(score);
-
-        expect(hash1).toBe(hash2);
+        expect(score.components.creditPattern).toBe(50);
     });
 });

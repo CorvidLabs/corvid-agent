@@ -69,6 +69,9 @@ export class AgentDirectory {
         const entries: AgentDirectoryEntry[] = [];
 
         for (const agent of agents) {
+            // Skip disabled agents — they shouldn't appear in directory listings
+            // or be available as targets for corvid_send_message.
+            if (agent.disabled) continue;
             const entry = await this.resolve(agent.id);
             if (entry) entries.push(entry);
         }

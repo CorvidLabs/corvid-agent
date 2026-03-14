@@ -160,6 +160,9 @@ export const CreateAgentSchema = z.object({
     mcpToolPermissions: z.array(z.string()).nullable().optional(),
     voiceEnabled: z.boolean().optional(),
     voicePreset: VoicePresetSchema.optional(),
+    displayColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'displayColor must be a hex color (e.g. #ff00aa)').nullable().optional(),
+    displayIcon: z.string().max(32, 'displayIcon must be 32 chars or less').nullable().optional(),
+    avatarUrl: z.string().url('avatarUrl must be a valid URL').max(2048).nullable().optional(),
 });
 
 export const UpdateAgentSchema = z.object({
@@ -180,6 +183,10 @@ export const UpdateAgentSchema = z.object({
     mcpToolPermissions: z.array(z.string()).nullable().optional(),
     voiceEnabled: z.boolean().optional(),
     voicePreset: VoicePresetSchema.optional(),
+    displayColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'displayColor must be a hex color (e.g. #ff00aa)').nullable().optional(),
+    displayIcon: z.string().max(32, 'displayIcon must be 32 chars or less').nullable().optional(),
+    avatarUrl: z.string().url('avatarUrl must be a valid URL').max(2048).nullable().optional(),
+    disabled: z.boolean().optional(),
 });
 
 export const FundAgentSchema = z.object({

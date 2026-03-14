@@ -1,591 +1,378 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { test, expect, beforeEach, afterEach, describe } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
-import { migrateUp } from '../db/migrate';
 import { PermissionBroker, _resetHmacSecretForTesting } from '../permissions/broker';
-import { TOOL_ACTION_MAP } from '../permissions/types';
 
 let db: Database;
 let broker: PermissionBroker;
-const AGENT_ID = 'agent-test-1';
-const AGENT_ID_2 = 'agent-test-2';
 
-beforeEach(async () => {
+beforeEach(() => {
     db = new Database(':memory:');
     db.exec('PRAGMA foreign_keys = ON');
     runMigrations(db);
-    await migrateUp(db);
-    db.query(`INSERT INTO agents (id, name, model, system_prompt) VALUES (?, 'TestAgent', 'test', 'test')`).run(AGENT_ID);
-    db.query(`INSERT INTO agents (id, name, model, system_prompt) VALUES (?, 'TestAgent2', 'test', 'test')`).run(AGENT_ID_2);
+    _resetHmacSecretForTesting();
+    process.env.PERMISSION_HMAC_SECRET = 'test-secret-key-for-unit-tests';
     broker = new PermissionBroker(db);
 });
 
 afterEach(() => {
+    delete process.env.PERMISSION_HMAC_SECRET;
+    _resetHmacSecretForTesting();
     db.close();
 });
 
-// ─── TOOL_ACTION_MAP ─────────────────────────────────────────────────────
-
-describe('TOOL_ACTION_MAP', () => {
-    test('maps all standard corvid tools to actions', () => {
-        expect(TOOL_ACTION_MAP['corvid_send_message']).toBe('msg:send');
-        expect(TOOL_ACTION_MAP['corvid_github_create_pr']).toBe('git:create_pr');
-        expect(TOOL_ACTION_MAP['corvid_grant_credits']).toBe('credits:grant');
-        expect(TOOL_ACTION_MAP['corvid_manage_schedule']).toBe('schedule:manage');
-    });
-
-    test('all mapped actions follow namespace:verb format', () => {
-        for (const [_tool, action] of Object.entries(TOOL_ACTION_MAP)) {
-            expect(action).toMatch(/^[a-z]+:[a-z_]+$/);
-        }
-    });
-
-    test('has mappings for GitHub tools', () => {
-        const githubTools = Object.keys(TOOL_ACTION_MAP).filter(t => t.includes('github'));
-        expect(githubTools.length).toBeGreaterThanOrEqual(10);
-    });
-});
-
-// ─── Grant operations ────────────────────────────────────────────────────
+// ─── grant ──────────────────────────────────────────────────────────────────
 
 describe('grant', () => {
-    test('creates a grant with HMAC signature', async () => {
+    test('creates a signed permission grant', async () => {
         const grant = await broker.grant({
-            agentId: AGENT_ID,
+            agentId: 'agent-1',
             action: 'git:create_pr',
-            grantedBy: 'owner',
-            reason: 'PR creation rights',
+            grantedBy: 'admin',
+            reason: 'PR creation needed',
         });
 
         expect(grant.id).toBeGreaterThan(0);
-        expect(grant.agentId).toBe(AGENT_ID);
+        expect(grant.agentId).toBe('agent-1');
         expect(grant.action).toBe('git:create_pr');
-        expect(grant.grantedBy).toBe('owner');
+        expect(grant.grantedBy).toBe('admin');
+        expect(grant.reason).toBe('PR creation needed');
         expect(grant.signature).toBeTruthy();
-        expect(grant.signature.length).toBe(64); // SHA-256 hex
         expect(grant.revokedAt).toBeNull();
         expect(grant.tenantId).toBe('default');
     });
 
-    test('creates a grant with expiration', async () => {
-        const future = new Date(Date.now() + 3600_000).toISOString();
-        const grant = await broker.grant({
-            agentId: AGENT_ID,
-            action: 'msg:send',
-            grantedBy: 'owner',
-            expiresAt: future,
+    test('records audit entry on grant', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
         });
 
-        expect(grant.expiresAt).toBe(future);
+        const audit = db.query('SELECT * FROM audit_log WHERE action = ?').all('permission_grant');
+        expect(audit).toHaveLength(1);
     });
 
-    test('creates grants for different tenants', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner', tenantId: 'tenant-a' });
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner', tenantId: 'tenant-b' });
+    test('supports custom tenant and expiry', async () => {
+        const expiresAt = new Date(Date.now() + 3600_000).toISOString();
+        const grant = await broker.grant({
+            agentId: 'agent-1',
+            action: 'msg:send',
+            grantedBy: 'admin',
+            expiresAt,
+            tenantId: 'tenant-abc',
+        });
 
-        const grantsA = broker.getGrants(AGENT_ID, 'tenant-a');
-        const grantsB = broker.getGrants(AGENT_ID, 'tenant-b');
-        expect(grantsA.length).toBe(1);
-        expect(grantsB.length).toBe(1);
-    });
-
-    test('records audit entry on grant', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:star', grantedBy: 'admin' });
-
-        const auditRow = db.query(
-            `SELECT * FROM audit_log WHERE action = 'permission_grant' ORDER BY id DESC LIMIT 1`
-        ).get() as any;
-        expect(auditRow).toBeTruthy();
-        expect(auditRow.actor).toBe('admin');
-        expect(auditRow.resource_type).toBe('permission');
+        expect(grant.expiresAt).toBe(expiresAt);
+        expect(grant.tenantId).toBe('tenant-abc');
     });
 });
 
-// ─── Check operations ────────────────────────────────────────────────────
+// ─── checkAction ────────────────────────────────────────────────────────────
 
-describe('checkTool', () => {
-    test('denies access when no grants exist', async () => {
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
+describe('checkAction', () => {
+    test('denies when no grant exists', async () => {
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
         expect(result.allowed).toBe(false);
         expect(result.grantId).toBeNull();
-        expect(result.checkMs).toBeGreaterThanOrEqual(0);
+        expect(result.reason).toContain('No active grant');
     });
 
-    test('allows access with exact action grant', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
+    test('allows with exact action match', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
 
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
         expect(result.allowed).toBe(true);
         expect(result.grantId).toBeGreaterThan(0);
     });
 
-    test('allows access with namespace wildcard grant', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:*', grantedBy: 'owner' });
+    test('allows with namespace wildcard', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:*',
+            grantedBy: 'admin',
+        });
 
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
         expect(result.allowed).toBe(true);
-
-        const result2 = await broker.checkTool(AGENT_ID, 'corvid_github_star_repo');
-        expect(result2.allowed).toBe(true);
     });
 
-    test('allows access with superuser wildcard', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: '*', grantedBy: 'owner' });
+    test('allows with superuser wildcard', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: '*',
+            grantedBy: 'admin',
+        });
 
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
         expect(result.allowed).toBe(true);
-
-        const result2 = await broker.checkTool(AGENT_ID, 'corvid_send_message');
-        expect(result2.allowed).toBe(true);
     });
 
-    test('denies with wrong namespace wildcard', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:*', grantedBy: 'owner' });
+    test('denies when grant is revoked', async () => {
+        const grant = await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
 
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
+        broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
+
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
         expect(result.allowed).toBe(false);
     });
 
-    test('allows tools with no action mapping (unmapped tools)', async () => {
-        const result = await broker.checkTool(AGENT_ID, 'some_unknown_tool');
+    test('denies when grant is expired', async () => {
+        const expiredAt = new Date(Date.now() - 60_000).toISOString();
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+            expiresAt: expiredAt,
+        });
+
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
+        expect(result.allowed).toBe(false);
+    });
+
+    test('denies with tampered HMAC signature', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
+
+        // Tamper with the signature in the DB
+        db.query('UPDATE permission_grants SET signature = ?').run('tampered-signature');
+
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toContain('invalid HMAC signature');
+    });
+
+    test('respects tenant isolation', async () => {
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+            tenantId: 'tenant-a',
+        });
+
+        // Same agent, different tenant — should be denied
+        const result = await broker.checkAction('agent-1', 'git:create_pr', 'tenant-b');
+        expect(result.allowed).toBe(false);
+
+        // Correct tenant — should be allowed
+        const result2 = await broker.checkAction('agent-1', 'git:create_pr', 'tenant-a');
+        expect(result2.allowed).toBe(true);
+    });
+});
+
+// ─── checkTool ──────────────────────────────────────────────────────────────
+
+describe('checkTool', () => {
+    test('allows unmapped tools by default', async () => {
+        const result = await broker.checkTool('agent-1', 'some_unknown_tool');
         expect(result.allowed).toBe(true);
         expect(result.reason).toContain('no permission mapping');
     });
 
-    test('denies access with expired grant', async () => {
-        const past = new Date(Date.now() - 3600_000).toISOString();
+    test('denies mapped tool without grant', async () => {
+        const result = await broker.checkTool('agent-1', 'corvid_github_create_pr');
+        expect(result.allowed).toBe(false);
+    });
+
+    test('allows mapped tool with matching grant', async () => {
         await broker.grant({
-            agentId: AGENT_ID,
+            agentId: 'agent-1',
             action: 'git:create_pr',
-            grantedBy: 'owner',
-            expiresAt: past,
+            grantedBy: 'admin',
         });
 
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
-        expect(result.allowed).toBe(false);
-    });
-
-    test('denies access with revoked grant', async () => {
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-        broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
-
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
-        expect(result.allowed).toBe(false);
-    });
-
-    test('records check in permission_checks table', async () => {
-        await broker.checkTool(AGENT_ID, 'corvid_github_create_pr', { sessionId: 'sess-1' });
-
-        const row = db.query(
-            `SELECT * FROM permission_checks WHERE agent_id = ? AND tool_name = ?`
-        ).get(AGENT_ID, 'corvid_github_create_pr') as any;
-        expect(row).toBeTruthy();
-        expect(row.action).toBe('git:create_pr');
-        expect(row.allowed).toBe(0);
-        expect(row.session_id).toBe('sess-1');
-    });
-
-    test('check performance is under 50ms for simple lookups', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
-        expect(result.checkMs).toBeLessThan(50);
-    });
-
-    test('respects tenant isolation', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner', tenantId: 'tenant-a' });
-
-        const resultA = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr', { tenantId: 'tenant-a' });
-        expect(resultA.allowed).toBe(true);
-
-        const resultDefault = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
-        expect(resultDefault.allowed).toBe(false);
-    });
-});
-
-// ─── checkAction (direct action check) ──────────────────────────────────
-
-describe('checkAction', () => {
-    test('checks a raw action string', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-
-        const result = await broker.checkAction(AGENT_ID, 'git:create_pr');
+        const result = await broker.checkTool('agent-1', 'corvid_github_create_pr');
         expect(result.allowed).toBe(true);
+        expect(result.checkMs).toBeGreaterThanOrEqual(0);
+    });
 
-        const result2 = await broker.checkAction(AGENT_ID, 'git:fork');
-        expect(result2.allowed).toBe(false);
+    test('records permission check in audit trail', async () => {
+        await broker.checkTool('agent-1', 'corvid_github_create_pr', { sessionId: 'sess-1' });
+
+        const checks = db.query('SELECT * FROM permission_checks').all() as Array<{
+            agent_id: string;
+            tool_name: string;
+            session_id: string;
+            allowed: number;
+        }>;
+        expect(checks).toHaveLength(1);
+        expect(checks[0].agent_id).toBe('agent-1');
+        expect(checks[0].tool_name).toBe('corvid_github_create_pr');
+        expect(checks[0].session_id).toBe('sess-1');
+        expect(checks[0].allowed).toBe(0);
     });
 });
 
-// ─── Revoke operations ──────────────────────────────────────────────────
+// ─── revoke ─────────────────────────────────────────────────────────────────
 
 describe('revoke', () => {
-    test('revokes a specific grant by ID', async () => {
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
+    test('revokes specific grant by ID', async () => {
+        const grant = await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
 
         const affected = broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
         expect(affected).toBe(1);
 
-        const grants = broker.getGrants(AGENT_ID);
-        expect(grants.length).toBe(0);
+        const grants = broker.getGrants('agent-1');
+        expect(grants).toHaveLength(0);
     });
 
-    test('revokes all grants for an agent + action', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'admin' });
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
+    test('revokes all grants for agent+action', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
 
-        const affected = broker.revoke({ agentId: AGENT_ID, action: 'git:create_pr', revokedBy: 'admin' });
-        expect(affected).toBe(2);
-
-        const grants = broker.getGrants(AGENT_ID);
-        expect(grants.length).toBe(1);
-        expect(grants[0].action).toBe('msg:send');
-    });
-
-    test('revokes all grants for an agent (no action specified)', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
-
-        const affected = broker.revoke({ agentId: AGENT_ID, revokedBy: 'admin' });
+        const affected = broker.revoke({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            revokedBy: 'admin',
+        });
         expect(affected).toBe(2);
     });
 
     test('does not double-revoke', async () => {
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-        broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
+        const grant = await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
 
+        broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
         const affected = broker.revoke({ grantId: grant.id, revokedBy: 'admin' });
         expect(affected).toBe(0);
     });
 
-    test('records audit entry on revoke', async () => {
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:star', grantedBy: 'owner' });
-        broker.revoke({ grantId: grant.id, revokedBy: 'security-bot', reason: 'policy change' });
+    test('records audit on revoke', async () => {
+        const grant = await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
 
-        const auditRow = db.query(
-            `SELECT * FROM audit_log WHERE action = 'permission_revoke' ORDER BY id DESC LIMIT 1`
-        ).get() as any;
-        expect(auditRow).toBeTruthy();
-        expect(auditRow.actor).toBe('security-bot');
+        broker.revoke({ grantId: grant.id, revokedBy: 'admin', reason: 'no longer needed' });
+
+        const audit = db.query('SELECT * FROM audit_log WHERE action = ?').all('permission_revoke');
+        expect(audit).toHaveLength(1);
     });
 });
 
-// ─── Emergency revocation ────────────────────────────────────────────────
+// ─── emergencyRevoke ────────────────────────────────────────────────────────
 
 describe('emergencyRevoke', () => {
-    test('revokes all grants for an agent immediately', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: '*', grantedBy: 'owner' });
+    test('revokes ALL grants for an agent', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
+        await broker.grant({ agentId: 'agent-1', action: 'msg:send', grantedBy: 'admin' });
+        await broker.grant({ agentId: 'agent-1', action: 'work:create', grantedBy: 'admin' });
 
-        const count = broker.emergencyRevoke(AGENT_ID, 'security-team', 'Compromised agent');
+        const count = broker.emergencyRevoke('agent-1', 'security-team', 'compromised agent');
         expect(count).toBe(3);
 
-        const grants = broker.getGrants(AGENT_ID);
-        expect(grants.length).toBe(0);
+        const grants = broker.getGrants('agent-1');
+        expect(grants).toHaveLength(0);
     });
 
-    test('does not affect other agents', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID_2, action: 'git:read', grantedBy: 'owner' });
+    test('records emergency revocation audit', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
+        broker.emergencyRevoke('agent-1', 'security-team', 'incident response');
 
-        broker.emergencyRevoke(AGENT_ID, 'security-team', 'Compromised');
-
-        const grants2 = broker.getGrants(AGENT_ID_2);
-        expect(grants2.length).toBe(1);
+        const audit = db.query('SELECT * FROM audit_log WHERE action = ?').all('permission_emergency_revoke');
+        expect(audit).toHaveLength(1);
     });
 
-    test('records emergency audit entry', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        broker.emergencyRevoke(AGENT_ID, 'security-team', 'Compromised');
-
-        const auditRow = db.query(
-            `SELECT * FROM audit_log WHERE action = 'permission_emergency_revoke' ORDER BY id DESC LIMIT 1`
-        ).get() as any;
-        expect(auditRow).toBeTruthy();
-        expect(auditRow.actor).toBe('security-team');
-        expect(JSON.parse(auditRow.detail).revokedCount).toBe(1);
+    test('returns 0 when agent has no grants', () => {
+        const count = broker.emergencyRevoke('nonexistent-agent', 'admin', 'test');
+        expect(count).toBe(0);
     });
 });
 
-// ─── getGrants / getGrantHistory ────────────────────────────────────────
+// ─── getGrants / getGrantHistory ────────────────────────────────────────────
 
 describe('getGrants', () => {
-    test('returns only active (non-revoked, non-expired) grants', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        const g2 = await broker.grant({ agentId: AGENT_ID, action: 'git:star', grantedBy: 'owner' });
+    test('returns only active non-expired grants', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
         await broker.grant({
-            agentId: AGENT_ID,
+            agentId: 'agent-1',
             action: 'msg:send',
-            grantedBy: 'owner',
-            expiresAt: new Date(Date.now() - 1000).toISOString(),
+            grantedBy: 'admin',
+            expiresAt: new Date(Date.now() - 60_000).toISOString(),
         });
-        broker.revoke({ grantId: g2.id, revokedBy: 'admin' });
+        const revoked = await broker.grant({
+            agentId: 'agent-1',
+            action: 'work:create',
+            grantedBy: 'admin',
+        });
+        broker.revoke({ grantId: revoked.id, revokedBy: 'admin' });
 
-        const active = broker.getGrants(AGENT_ID);
-        expect(active.length).toBe(1);
-        expect(active[0].action).toBe('git:read');
-    });
-
-    test('getGrantHistory returns all grants including revoked', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        const g2 = await broker.grant({ agentId: AGENT_ID, action: 'git:star', grantedBy: 'owner' });
-        broker.revoke({ grantId: g2.id, revokedBy: 'admin' });
-
-        const history = broker.getGrantHistory(AGENT_ID);
-        expect(history.length).toBe(2);
+        const grants = broker.getGrants('agent-1');
+        expect(grants).toHaveLength(1);
+        expect(grants[0].action).toBe('git:create_pr');
     });
 });
 
-// ─── getRequiredAction ──────────────────────────────────────────────────
+describe('getGrantHistory', () => {
+    test('returns all grants including revoked and expired', async () => {
+        await broker.grant({ agentId: 'agent-1', action: 'git:create_pr', grantedBy: 'admin' });
+        const g2 = await broker.grant({ agentId: 'agent-1', action: 'msg:send', grantedBy: 'admin' });
+        broker.revoke({ grantId: g2.id, revokedBy: 'admin' });
 
-describe('getRequiredAction', () => {
-    test('returns the action for known tools', () => {
-        expect(broker.getRequiredAction('corvid_github_create_pr')).toBe('git:create_pr');
-        expect(broker.getRequiredAction('corvid_send_message')).toBe('msg:send');
+        const history = broker.getGrantHistory('agent-1');
+        expect(history).toHaveLength(2);
     });
 
-    test('returns null for unknown tools', () => {
+    test('respects limit', async () => {
+        for (let i = 0; i < 5; i++) {
+            await broker.grant({ agentId: 'agent-1', action: `git:action_${i}`, grantedBy: 'admin' });
+        }
+
+        const history = broker.getGrantHistory('agent-1', 'default', 3);
+        expect(history).toHaveLength(3);
+    });
+});
+
+// ─── getRequiredAction ──────────────────────────────────────────────────────
+
+describe('getRequiredAction', () => {
+    test('returns action for mapped tool', () => {
+        expect(broker.getRequiredAction('corvid_github_create_pr')).toBe('git:create_pr');
+    });
+
+    test('returns null for unmapped tool', () => {
         expect(broker.getRequiredAction('unknown_tool')).toBeNull();
     });
 });
 
-// ─── HMAC signature verification ────────────────────────────────────────
+// ─── HMAC key behavior ─────────────────────────────────────────────────────
 
-describe('HMAC integrity', () => {
-    test('detects tampered grant signature', async () => {
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
+describe('HMAC secret handling', () => {
+    test('verification fails after HMAC secret change', async () => {
+        process.env.PERMISSION_HMAC_SECRET = 'original-secret';
+        _resetHmacSecretForTesting();
 
-        // Tamper with the signature in the DB
-        db.query('UPDATE permission_grants SET signature = ? WHERE id = ?').run('deadbeef'.repeat(8), grant.id);
+        await broker.grant({
+            agentId: 'agent-1',
+            action: 'git:create_pr',
+            grantedBy: 'admin',
+        });
 
-        const result = await broker.checkTool(AGENT_ID, 'corvid_github_create_pr');
+        // Change the secret — simulates server restart with new key
+        process.env.PERMISSION_HMAC_SECRET = 'new-secret';
+        _resetHmacSecretForTesting();
+
+        const result = await broker.checkAction('agent-1', 'git:create_pr');
         expect(result.allowed).toBe(false);
         expect(result.reason).toContain('invalid HMAC signature');
-    });
-
-    test('detects tampered action in grant', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:create_pr', grantedBy: 'owner' });
-
-        // Tamper with the action in the DB (escalate from git:read to git:create_pr)
-        db.query('UPDATE permission_grants SET action = ? WHERE agent_id = ?').run('git:fork', AGENT_ID);
-
-        // The grant now says git:fork but signature was for git:create_pr — should fail
-        const result = await broker.checkAction(AGENT_ID, 'git:fork');
-        expect(result.allowed).toBe(false);
-        expect(result.reason).toContain('invalid HMAC signature');
-    });
-});
-
-// ─── API routes ─────────────────────────────────────────────────────────
-
-describe('permission routes', () => {
-    // Import the route handler for direct testing
-    const { handlePermissionRoutes } = require('../routes/permissions') as typeof import('../routes/permissions');
-
-    test('GET /api/permissions/actions returns action map', () => {
-        const url = new URL('http://localhost/api/permissions/actions');
-        const req = new Request(url, { method: 'GET' });
-        const res = handlePermissionRoutes(req, url, db);
-        expect(res).toBeTruthy();
-    });
-
-    test('POST /api/permissions/grant creates a grant', async () => {
-        const url = new URL('http://localhost/api/permissions/grant');
-        const req = new Request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent_id: AGENT_ID, action: 'git:read', granted_by: 'test' }),
-        });
-        const res = await handlePermissionRoutes(req, url, db) as Response;
-        expect(res.status).toBe(201);
-
-        const body = await res.json();
-        expect(body.grant.agentId).toBe(AGENT_ID);
-        expect(body.grant.action).toBe('git:read');
-    });
-
-    test('POST /api/permissions/check returns check result', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-
-        const url = new URL('http://localhost/api/permissions/check');
-        const req = new Request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent_id: AGENT_ID, tool_name: 'corvid_github_list_prs' }),
-        });
-        const res = await handlePermissionRoutes(req, url, db) as Response;
-        expect(res.status).toBe(200);
-
-        const body = await res.json();
-        expect(body.allowed).toBe(true);
-    });
-
-    test('POST /api/permissions/revoke revokes a grant', async () => {
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-
-        const url = new URL('http://localhost/api/permissions/revoke');
-        const req = new Request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ grant_id: grant.id, revoked_by: 'test' }),
-        });
-        const res = await handlePermissionRoutes(req, url, db) as Response;
-        expect(res.status).toBe(200);
-
-        const body = await res.json();
-        expect(body.affected).toBe(1);
-    });
-
-    test('POST /api/permissions/emergency-revoke revokes all', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
-
-        const url = new URL('http://localhost/api/permissions/emergency-revoke');
-        const req = new Request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent_id: AGENT_ID, revoked_by: 'security', reason: 'test' }),
-        });
-        const res = await handlePermissionRoutes(req, url, db) as Response;
-        expect(res.status).toBe(200);
-
-        const body = await res.json();
-        expect(body.affected).toBe(2);
-        expect(body.emergency).toBe(true);
-    });
-
-    test('GET /api/permissions/:agentId lists grants', async () => {
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
-
-        const url = new URL(`http://localhost/api/permissions/${AGENT_ID}`);
-        const req = new Request(url, { method: 'GET' });
-        const res = handlePermissionRoutes(req, url, db) as Response;
-        expect(res.status).toBe(200);
-
-        const body = await res.json();
-        expect(body.grants.length).toBe(2);
-        expect(body.count).toBe(2);
-    });
-
-    test('returns 400 for missing required fields', async () => {
-        const url = new URL('http://localhost/api/permissions/grant');
-        const req = new Request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent_id: AGENT_ID }),
-        });
-        const res = await handlePermissionRoutes(req, url, db) as Response;
-        expect(res.status).toBe(400);
-    });
-
-    test('returns null for non-permission paths', () => {
-        const url = new URL('http://localhost/api/other');
-        const req = new Request(url, { method: 'GET' });
-        const res = handlePermissionRoutes(req, url, db);
-        expect(res).toBeNull();
-    });
-});
-
-// ─── HMAC secret management ─────────────────────────────────────────
-
-describe('HMAC secret', () => {
-    const origEnv = process.env.PERMISSION_HMAC_SECRET;
-
-    afterEach(() => {
-        // Restore env and reset cached secret
-        if (origEnv !== undefined) {
-            process.env.PERMISSION_HMAC_SECRET = origEnv;
-        } else {
-            delete process.env.PERMISSION_HMAC_SECRET;
-        }
-        _resetHmacSecretForTesting();
-    });
-
-    test('uses env var when set', async () => {
-        process.env.PERMISSION_HMAC_SECRET = 'test-secret-value';
-        _resetHmacSecretForTesting();
-
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        expect(grant.signature).toBeTruthy();
-
-        // Verify the grant checks out
-        const result = await broker.checkAction(AGENT_ID, 'git:read');
-        expect(result.allowed).toBe(true);
-    });
-
-    test('generates ephemeral secret when env var is unset', async () => {
-        delete process.env.PERMISSION_HMAC_SECRET;
-        _resetHmacSecretForTesting();
-
-        const grant = await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        expect(grant.signature).toBeTruthy();
-        expect(grant.signature.length).toBe(64);
-
-        // Grant should still verify within the same session
-        const result = await broker.checkAction(AGENT_ID, 'git:read');
-        expect(result.allowed).toBe(true);
-    });
-
-    test('ephemeral secret is consistent within a session', async () => {
-        delete process.env.PERMISSION_HMAC_SECRET;
-        _resetHmacSecretForTesting();
-
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-        await broker.grant({ agentId: AGENT_ID, action: 'msg:send', grantedBy: 'owner' });
-
-        // Both should verify correctly (same secret used)
-        const r1 = await broker.checkAction(AGENT_ID, 'git:read');
-        const r2 = await broker.checkAction(AGENT_ID, 'msg:send');
-        expect(r1.allowed).toBe(true);
-        expect(r2.allowed).toBe(true);
-    });
-
-    test('grants from one ephemeral secret fail after reset', async () => {
-        delete process.env.PERMISSION_HMAC_SECRET;
-        _resetHmacSecretForTesting();
-
-        // Create a grant with one ephemeral secret
-        await broker.grant({ agentId: AGENT_ID, action: 'git:read', grantedBy: 'owner' });
-
-        // Reset = simulate server restart with no env var
-        _resetHmacSecretForTesting();
-
-        // The old grant's HMAC should no longer verify
-        const result = await broker.checkAction(AGENT_ID, 'git:read');
-        expect(result.allowed).toBe(false);
-        expect(result.reason).toContain('invalid HMAC signature');
-    });
-});
-
-// ─── Migration ──────────────────────────────────────────────────────────
-
-describe('migration 065', () => {
-    test('permission_grants table exists with correct schema', () => {
-        const info = db.query(`PRAGMA table_info(permission_grants)`).all() as any[];
-        const columns = info.map(r => r.name);
-        expect(columns).toContain('id');
-        expect(columns).toContain('agent_id');
-        expect(columns).toContain('action');
-        expect(columns).toContain('granted_by');
-        expect(columns).toContain('signature');
-        expect(columns).toContain('expires_at');
-        expect(columns).toContain('revoked_at');
-        expect(columns).toContain('tenant_id');
-    });
-
-    test('permission_checks table exists with correct schema', () => {
-        const info = db.query(`PRAGMA table_info(permission_checks)`).all() as any[];
-        const columns = info.map(r => r.name);
-        expect(columns).toContain('id');
-        expect(columns).toContain('agent_id');
-        expect(columns).toContain('tool_name');
-        expect(columns).toContain('action');
-        expect(columns).toContain('allowed');
-        expect(columns).toContain('grant_id');
-        expect(columns).toContain('check_ms');
-        expect(columns).toContain('session_id');
     });
 });

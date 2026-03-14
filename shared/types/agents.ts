@@ -21,6 +21,10 @@ export interface Agent {
     voicePreset: VoicePreset;
     walletAddress: string | null;
     walletFundedAlgo: number;
+    displayColor: string | null;
+    displayIcon: string | null;
+    avatarUrl: string | null;
+    disabled: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -43,6 +47,10 @@ export interface CreateAgentInput {
     mcpToolPermissions?: string[] | null;
     voiceEnabled?: boolean;
     voicePreset?: VoicePreset;
+    displayColor?: string | null;
+    displayIcon?: string | null;
+    avatarUrl?: string | null;
+    disabled?: boolean;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
