@@ -1,6 +1,6 @@
 {
   "name": "corvid-agent",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "description": "AI agent framework with on-chain identity and messaging via AlgoChat on Algorand",
   "repository": {
     "type": "git",
@@ -28,6 +28,8 @@
     "migrate:status": "bun server/db/migrate-cli.ts status",
     "migrate:create": "bun server/db/migrate-create.ts",
     "spec:check": "bun scripts/spec-check.ts",
+    "spec:coverage": "bun scripts/spec-check.ts --coverage",
+    "spec:generate": "bun scripts/spec-check.ts --generate",
     "openapi:validate": "bun scripts/openapi-validate.ts",
     "openapi:export": "bun scripts/openapi-validate.ts --export",
     "lint:sql": "bash scripts/check-sql-injection.sh",

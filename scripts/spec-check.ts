@@ -7,12 +7,14 @@
  *   3. Dependencies: Referenced specs and consumed-by files exist
  *
  * Usage: bun scripts/spec-check.ts
- *        bun scripts/spec-check.ts --strict   # warnings also fail
+ *        bun scripts/spec-check.ts --strict     # warnings also fail
+ *        bun scripts/spec-check.ts --coverage   # show file/module coverage report
+ *        bun scripts/spec-check.ts --generate   # scaffold specs for unspecced modules
  * Exit code 0 = all passed (warnings OK unless --strict), 1 = errors found
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, existsSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, resolve, relative } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
 const SPECS_DIR = join(ROOT, 'specs');
@@ -391,10 +393,266 @@ function validateSpec(specPath: string, schemaTables: Set<string>): ValidationRe
     return result;
 }
 
+// ─── Level 4: Coverage ───────────────────────────────────────────────────
+
+/** Directories inside server/ that are excluded from spec coverage requirements */
+const COVERAGE_EXCLUDE_DIRS = new Set(['__tests__', 'public']);
+
+/** File patterns excluded from coverage (test files, standalone entry points) */
+function isExcludedFile(filePath: string): boolean {
+    return (
+        filePath.includes('__tests__') ||
+        filePath.endsWith('.test.ts') ||
+        filePath.endsWith('.spec.ts') ||
+        filePath === 'server/index.ts' ||
+        filePath === 'server/bootstrap.ts'
+    );
+}
+
+/** Collect all files referenced by specs' files: frontmatter */
+function collectSpeccedFiles(specFiles: string[]): Set<string> {
+    const speccedFiles = new Set<string>();
+    for (const specFile of specFiles) {
+        const content = readFileSync(specFile, 'utf-8').replace(/\r\n/g, '\n');
+        const parsed = parseFrontmatter(content);
+        if (!parsed) continue;
+        const { frontmatter: fm } = parsed;
+        if (fm.files && Array.isArray(fm.files)) {
+            for (const f of fm.files) {
+                speccedFiles.add(f);
+            }
+        }
+    }
+    return speccedFiles;
+}
+
+/** Find all .ts files in server/ recursively */
+function findServerFiles(dir: string): string[] {
+    const results: string[] = [];
+    if (!existsSync(dir)) return results;
+    for (const entry of readdirSync(dir)) {
+        const fullPath = join(dir, entry);
+        const stat = statSync(fullPath);
+        if (stat.isDirectory()) {
+            results.push(...findServerFiles(fullPath));
+        } else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) {
+            results.push(fullPath);
+        }
+    }
+    return results;
+}
+
+/** Get server module directories (top-level dirs inside server/) */
+function getServerModuleDirs(): string[] {
+    const serverDir = join(ROOT, 'server');
+    if (!existsSync(serverDir)) return [];
+    return readdirSync(serverDir)
+        .filter((entry) => {
+            const fullPath = join(serverDir, entry);
+            return statSync(fullPath).isDirectory() && !COVERAGE_EXCLUDE_DIRS.has(entry);
+        })
+        .sort();
+}
+
+/** Get spec module directories (top-level dirs inside specs/) */
+function getSpecModuleDirs(): string[] {
+    if (!existsSync(SPECS_DIR)) return [];
+    return readdirSync(SPECS_DIR)
+        .filter((entry) => {
+            const fullPath = join(SPECS_DIR, entry);
+            return statSync(fullPath).isDirectory();
+        })
+        .sort();
+}
+
+interface CoverageReport {
+    totalServerFiles: number;
+    speccedFileCount: number;
+    unspeccedFiles: string[];
+    unspeccedModules: string[];
+    coveragePercent: number;
+}
+
+function computeCoverage(specFiles: string[]): CoverageReport {
+    const speccedFiles = collectSpeccedFiles(specFiles);
+    const serverDir = join(ROOT, 'server');
+    const allServerFiles = findServerFiles(serverDir)
+        .map((f) => relative(ROOT, f))
+        .filter((f) => !isExcludedFile(f));
+
+    const unspeccedFiles = allServerFiles.filter((f) => !speccedFiles.has(f)).sort();
+
+    const serverModules = getServerModuleDirs();
+    const specModules = new Set(getSpecModuleDirs());
+    const unspeccedModules = serverModules.filter((m) => !specModules.has(m));
+
+    const speccedFileCount = allServerFiles.length - unspeccedFiles.length;
+    const coveragePercent =
+        allServerFiles.length > 0 ? Math.round((speccedFileCount / allServerFiles.length) * 100) : 100;
+
+    return {
+        totalServerFiles: allServerFiles.length,
+        speccedFileCount,
+        unspeccedFiles,
+        unspeccedModules,
+        coveragePercent,
+    };
+}
+
+// ─── Spec Generation ─────────────────────────────────────────────────────
+
+function generateSpec(moduleName: string, serverFiles: string[]): string {
+    const templatePath = join(SPECS_DIR, '_template.spec.md');
+    let template = existsSync(templatePath)
+        ? readFileSync(templatePath, 'utf-8')
+        : '';
+
+    if (!template) {
+        // Minimal fallback template
+        template = `---
+module: module-name
+version: 1
+status: draft
+files: []
+db_tables: []
+depends_on: []
+---
+
+# Module Name
+
+## Purpose
+
+<!-- TODO: describe what this module does -->
+
+## Public API
+
+### Exported Functions
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+
+## Invariants
+
+1. <!-- TODO -->
+
+## Behavioral Examples
+
+### Scenario: TODO
+
+- **Given** precondition
+- **When** action
+- **Then** result
+
+## Error Cases
+
+| Condition | Behavior |
+|-----------|----------|
+
+## Dependencies
+
+### Consumes
+
+| Module | What is used |
+|--------|-------------|
+
+### Consumed By
+
+| Module | What is used |
+|--------|-------------|
+
+## Change Log
+
+| Date | Author | Change |
+|------|--------|--------|
+`;
+    }
+
+    // Populate from template
+    const titleCase = moduleName
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+
+    const filesYaml = serverFiles.map((f) => `  - ${f}`).join('\n');
+
+    // Replace frontmatter values
+    let spec = template
+        .replace(/^module:\s*.+$/m, `module: ${moduleName}`)
+        .replace(/^status:\s*.+$/m, 'status: draft')
+        .replace(/^version:\s*.+$/m, 'version: 1');
+
+    // Replace files list
+    spec = spec.replace(
+        /^files:\n(?:\s+-\s+.+\n?)*/m,
+        `files:\n${filesYaml}\n`,
+    );
+
+    // Replace title
+    spec = spec.replace(/^# .+$/m, `# ${titleCase}`);
+
+    // Clear db_tables placeholder
+    spec = spec.replace(
+        /^db_tables:\n(?:\s+-\s+.+\n?)*/m,
+        'db_tables: []\n',
+    );
+
+    return spec;
+}
+
+function generateSpecsForUnspeccedModules(report: CoverageReport): number {
+    let generated = 0;
+    for (const moduleName of report.unspeccedModules) {
+        const specDir = join(SPECS_DIR, moduleName);
+        const specFile = join(specDir, `${moduleName}.spec.md`);
+
+        if (existsSync(specFile)) continue;
+
+        // Find server files for this module
+        const moduleDir = join(ROOT, 'server', moduleName);
+        const moduleFiles = findServerFiles(moduleDir)
+            .map((f) => relative(ROOT, f))
+            .filter((f) => !isExcludedFile(f));
+
+        if (moduleFiles.length === 0) continue;
+
+        mkdirSync(specDir, { recursive: true });
+        writeFileSync(specFile, generateSpec(moduleName, moduleFiles));
+        console.log(`  \u2713 Generated ${relative(ROOT, specFile)} (${moduleFiles.length} files)`);
+        generated++;
+    }
+
+    // Also generate for unspecced files in existing modules
+    // Group unspecced files by module
+    const byModule = new Map<string, string[]>();
+    for (const file of report.unspeccedFiles) {
+        const parts = file.split('/');
+        if (parts.length >= 3 && parts[0] === 'server') {
+            const mod = parts[1];
+            if (!byModule.has(mod)) byModule.set(mod, []);
+            byModule.get(mod)!.push(file);
+        }
+    }
+
+    // For modules that have a spec dir but files aren't covered, log them
+    for (const [mod, files] of byModule) {
+        if (report.unspeccedModules.includes(mod)) continue; // already handled
+        if (files.length > 0) {
+            console.log(`  \u26A0 ${mod}: ${files.length} file(s) not in any spec's files: frontmatter`);
+            for (const f of files) {
+                console.log(`    - ${f}`);
+            }
+        }
+    }
+
+    return generated;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────
 
 function main(): void {
     const strict = process.argv.includes('--strict');
+    const showCoverage = process.argv.includes('--coverage');
+    const generate = process.argv.includes('--generate');
     const specFiles = findSpecFiles(SPECS_DIR);
 
     if (specFiles.length === 0) {
@@ -485,19 +743,61 @@ function main(): void {
         if (result.errors.length === 0) passed++;
     }
 
+    // ─── Level 4: Coverage ──────────────────────────────────────────────
+    const coverage = computeCoverage(realSpecs);
+    let coverageWarnings = 0;
+
+    if (showCoverage || generate) {
+        console.log('\n─── Coverage Report ────────────────────────────────────');
+
+        if (coverage.unspeccedModules.length > 0) {
+            console.log(`\n  Modules without specs (${coverage.unspeccedModules.length}):`);
+            for (const mod of coverage.unspeccedModules) {
+                console.log(`    \u26A0 server/${mod}/`);
+                coverageWarnings++;
+            }
+        } else {
+            console.log('\n  \u2713 All server modules have spec directories');
+        }
+
+        if (coverage.unspeccedFiles.length > 0) {
+            console.log(`\n  Files not in any spec (${coverage.unspeccedFiles.length}):`);
+            for (const file of coverage.unspeccedFiles) {
+                console.log(`    \u26A0 ${file}`);
+                coverageWarnings++;
+            }
+        } else {
+            console.log('  \u2713 All server files referenced by specs');
+        }
+    }
+
+    if (generate) {
+        console.log('\n─── Generating Specs ───────────────────────────────────');
+        const generated = generateSpecsForUnspeccedModules(coverage);
+        if (generated === 0 && coverage.unspeccedModules.length === 0) {
+            console.log('  \u2713 No specs to generate — full module coverage');
+        } else if (generated > 0) {
+            console.log(`\n  Generated ${generated} spec file(s) — edit them to fill in details`);
+        }
+    }
+
     // Summary
     const total = realSpecs.length;
     const failed = total - passed;
+    const allWarnings = totalWarnings + coverageWarnings;
     console.log(
-        `\n${total} specs checked: ${passed} passed, ${totalWarnings} warning(s), ${failed} failed`,
+        `\n${total} specs checked: ${passed} passed, ${allWarnings} warning(s), ${failed} failed`,
+    );
+    console.log(
+        `File coverage: ${coverage.speccedFileCount}/${coverage.totalServerFiles} (${coverage.coveragePercent}%)`,
     );
 
     if (totalErrors > 0) {
         process.exit(1);
     }
 
-    if (strict && totalWarnings > 0) {
-        console.log(`\n--strict mode: ${totalWarnings} warning(s) treated as errors`);
+    if (strict && allWarnings > 0) {
+        console.log(`\n--strict mode: ${allWarnings} warning(s) treated as errors`);
         process.exit(1);
     }
 }
