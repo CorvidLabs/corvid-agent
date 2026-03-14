@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Good First Issues
+    url: https://github.com/CorvidLabs/corvid-agent/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
+    about: Browse beginner-friendly issues to get started
+  - name: Discussions
+    url: https://github.com/CorvidLabs/corvid-agent/discussions
+    about: Ask questions, share ideas, or just say hi
