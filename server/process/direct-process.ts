@@ -965,13 +965,13 @@ function prependRoutingContext(message: string, source: string, tierConfig?: Age
     return sanitizedMessage;
 }
 
-interface ToolDef {
+export interface ToolDef {
     name: string;
     description: string;
     parameters: Record<string, unknown>;
 }
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
     agent: Agent | null,
     project: Project,
     model: string,

@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'bun:test';
+import { buildSystemPrompt, type ToolDef } from '../process/direct-process';
 
 /**
  * Tests for utility functions from direct-process.ts.
  *
- * These functions are module-private, so we test them indirectly by
+ * Some functions are module-private, so we test them indirectly by
  * re-implementing the logic here (matching the source) and verifying
- * the behavioral contracts. When a function becomes exported, these
- * tests can switch to direct imports.
+ * the behavioral contracts. Exported functions like buildSystemPrompt
+ * are tested via direct imports.
  */
 
 // ── Re-implementation of module-private functions ──────────────────────────
@@ -238,5 +239,54 @@ describe('trimMessages', () => {
         // Should not have duplicate first message
         // All messages have same content, but check no extra was added
         expect(messages.length).toBeLessThanOrEqual(5);
+    });
+});
+
+// ── buildSystemPrompt ─────────────────────────────────────────────────────
+
+describe('buildSystemPrompt', () => {
+    const project = { workingDir: '/test/project' } as any;
+    const makeTool = (name: string): ToolDef => ({
+        name,
+        description: `${name} tool`,
+        parameters: {},
+    });
+
+    it('includes messaging safety prompt when tools are available', () => {
+        const tools = [makeTool('corvid_send_message'), makeTool('read_file')];
+        const result = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', tools, true);
+        expect(result).toContain('## Messaging Safety');
+        expect(result).toContain('NEVER write scripts');
+    });
+
+    it('includes messaging safety even without corvid_send_message or read_file', () => {
+        const tools = [makeTool('some_other_tool')];
+        const result = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', tools, true);
+        expect(result).toContain('## Messaging Safety');
+    });
+
+    it('does not include messaging safety when no tools are available', () => {
+        const result = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', [], false);
+        expect(result).not.toContain('## Messaging Safety');
+    });
+
+    it('does not include messaging safety in deliberation mode', () => {
+        const tools = [makeTool('corvid_send_message')];
+        const result = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', tools, true, true);
+        expect(result).not.toContain('## Messaging Safety');
+    });
+
+    it('includes response routing only when corvid_send_message present', () => {
+        const withMsg = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', [makeTool('corvid_send_message')], true);
+        const withoutMsg = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', [makeTool('read_file')], true);
+        expect(withMsg).toContain('corvid_send_message');
+        expect(withoutMsg).not.toContain('response routing');
+    });
+
+    it('includes coding tool prompt only when read_file present', () => {
+        const withReadFile = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', [makeTool('read_file')], true);
+        const withoutReadFile = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', [makeTool('other_tool')], true);
+        expect(withReadFile).toContain('protected');
+        expect(withoutReadFile).not.toContain('File operations');
     });
 });
