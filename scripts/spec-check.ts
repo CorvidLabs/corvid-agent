@@ -478,7 +478,7 @@ function computeCoverage(specFiles: string[]): CoverageReport {
     const speccedFiles = collectSpeccedFiles(specFiles);
     const serverDir = join(ROOT, 'server');
     const allServerFiles = findServerFiles(serverDir)
-        .map((f) => relative(ROOT, f))
+        .map((f) => relative(ROOT, f).replace(/\\/g, '/'))
         .filter((f) => !isExcludedFile(f));
 
     const unspeccedFiles = allServerFiles.filter((f) => !speccedFiles.has(f)).sort();
@@ -611,7 +611,7 @@ function generateSpecsForUnspeccedModules(report: CoverageReport): number {
         // Find server files for this module
         const moduleDir = join(ROOT, 'server', moduleName);
         const moduleFiles = findServerFiles(moduleDir)
-            .map((f) => relative(ROOT, f))
+            .map((f) => relative(ROOT, f).replace(/\\/g, '/'))
             .filter((f) => !isExcludedFile(f));
 
         if (moduleFiles.length === 0) continue;
