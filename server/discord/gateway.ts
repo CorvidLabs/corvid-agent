@@ -230,10 +230,11 @@ export class DiscordGateway {
     // ── Identify / Resume ─────────────────────────────────────────────────
 
     private identify(): void {
-        // Request GUILD_MEMBERS intent when public mode is enabled (needed for role data)
-        let intents = GatewayIntent.GUILD_MESSAGES | GatewayIntent.MESSAGE_CONTENT;
+        // GUILDS is always needed for the bot to receive guild dispatch events.
+        // GUILD_MEMBERS is added when public mode is enabled (for role data).
+        let intents = GatewayIntent.GUILDS | GatewayIntent.GUILD_MESSAGES | GatewayIntent.MESSAGE_CONTENT;
         if (this.config.publicMode) {
-            intents |= GatewayIntent.GUILDS | GatewayIntent.GUILD_MEMBERS;
+            intents |= GatewayIntent.GUILD_MEMBERS;
         }
         this.send({
             op: GatewayOp.IDENTIFY,

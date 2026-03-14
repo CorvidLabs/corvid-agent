@@ -106,6 +106,11 @@ export class CorvidClient {
         ws.onmessage = (event) => {
             try {
                 const msg = JSON.parse(String(event.data)) as ServerMessage;
+                // Respond to server heartbeat pings to keep connection alive
+                if (msg.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong' }));
+                    return;
+                }
                 onMessage(msg);
             } catch {
                 // Ignore non-JSON messages

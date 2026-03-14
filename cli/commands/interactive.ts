@@ -6,7 +6,7 @@ import type { ServerMessage } from '../../shared/ws-protocol';
 import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, flushStreamBuffer, Spinner } from '../render';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
 
-const VERSION = '0.9.0';
+const VERSION = require('../../package.json').version as string;
 const MAX_HISTORY_CHARS = 12_000; // Trim oldest turns when history exceeds this
 
 interface InteractiveOptions {
@@ -143,9 +143,15 @@ export async function interactiveCommand(options?: InteractiveOptions): Promise<
         // Deduplicate: if this exact chunk matches content already accumulated,
         // the server sent the same response multiple times
         if (responseBuffer.length > 0 && chunk === responseBuffer) return false;
+        // Strip leading whitespace/newlines from the first chunk
+        let text = chunk;
+        if (responseBuffer.length === 0) {
+            text = text.replace(/^\n+/, '');
+            if (!text) return false;
+        }
         ensureHeader();
         hasStreamContent = true;
-        responseBuffer += chunk;
+        responseBuffer += text;
         return true;
     };
 

@@ -170,12 +170,14 @@ function truncateStr(s: string, max: number): string {
     return s.length > max ? s.slice(0, max) + '...' : s;
 }
 
+let _thinkingActive = false;
+
 export function renderThinking(active: boolean): void {
-    if (active) {
-        process.stderr.write(`${c.cyan('│')} ${c.yellow('thinking...')}\r`);
-    } else {
-        process.stderr.write('\r\x1b[K');
-    }
+    if (active === _thinkingActive) return;
+    _thinkingActive = active;
+    // Only show thinking indicator when no streamed content is on screen.
+    // When streaming is active, the chunks themselves show activity and
+    // the \r\x1b[K used to clear thinking would erase streamed content.
 }
 
 // ─── Agent Framing ─────────────────────────────────────────────────────────
@@ -183,6 +185,7 @@ export function renderThinking(active: boolean): void {
 const FRAME_WIDTH = 48;
 
 export function renderAgentPrefix(): void {
+    _isFirstChunk = true;
     _atLineStart = true;
     _currentCol = 0;
     const bar = '─'.repeat(FRAME_WIDTH - 9);
@@ -202,8 +205,10 @@ export function renderAgentSuffix(): void {
 let _atLineStart = true;
 let _currentCol = 0;
 let _toolCallBuffer = '';
+let _isFirstChunk = true;
 
 export function resetStreamState(): void {
+    _isFirstChunk = true;
     _atLineStart = true;
     _currentCol = 0;
     _toolCallBuffer = '';
@@ -238,7 +243,14 @@ function couldBeToolCallStart(text: string): boolean {
 }
 
 export function renderStreamChunk(chunk: string): void {
-    _toolCallBuffer += chunk;
+    let text = chunk;
+    // Strip leading newlines from the very first chunk (models often prepend \n\n)
+    if (_isFirstChunk) {
+        text = text.replace(/^\n+/, '');
+        if (text) _isFirstChunk = false;
+        if (!text) return;
+    }
+    _toolCallBuffer += text;
     drainToolCallBuffer();
 }
 
