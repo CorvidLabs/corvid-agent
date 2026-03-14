@@ -69,6 +69,7 @@ export class AgentDirectory {
         const entries: AgentDirectoryEntry[] = [];
 
         for (const agent of agents) {
+            if (agent.disabled) continue;
             const entry = await this.resolve(agent.id);
             if (entry) entries.push(entry);
         }

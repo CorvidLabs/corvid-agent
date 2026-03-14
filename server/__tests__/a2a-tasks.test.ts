@@ -24,6 +24,7 @@ const MOCK_AGENT = {
     walletFundedAlgo: 0,
     voiceEnabled: false,
     voicePreset: 'alloy' as const,
+    disabled: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
 };

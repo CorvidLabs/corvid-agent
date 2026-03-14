@@ -21,6 +21,7 @@ export interface Agent {
     voicePreset: VoicePreset;
     walletAddress: string | null;
     walletFundedAlgo: number;
+    disabled: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -43,6 +44,7 @@ export interface CreateAgentInput {
     mcpToolPermissions?: string[] | null;
     voiceEnabled?: boolean;
     voicePreset?: VoicePreset;
+    disabled?: boolean;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {}

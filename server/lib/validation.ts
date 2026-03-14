@@ -180,6 +180,7 @@ export const UpdateAgentSchema = z.object({
     mcpToolPermissions: z.array(z.string()).nullable().optional(),
     voiceEnabled: z.boolean().optional(),
     voicePreset: VoicePresetSchema.optional(),
+    disabled: z.boolean().optional(),
 });
 
 export const FundAgentSchema = z.object({

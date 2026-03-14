@@ -27,6 +27,7 @@ interface AgentRow {
     wallet_address: string | null;
     wallet_mnemonic_encrypted: string | null;
     wallet_funded_algo: number;
+    disabled: number;
     created_at: string;
     updated_at: string;
 }
@@ -53,6 +54,7 @@ function rowToAgent(row: AgentRow): Agent {
         voicePreset: (row.voice_preset || 'alloy') as Agent['voicePreset'],
         walletAddress: row.wallet_address ?? null,
         walletFundedAlgo: row.wallet_funded_algo ?? 0,
+        disabled: row.disabled === 1,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -166,6 +168,10 @@ export function updateAgent(db: Database, id: string, input: UpdateAgentInput, t
     if (input.voicePreset !== undefined) {
         fields.push('voice_preset = ?');
         values.push(input.voicePreset);
+    }
+    if (input.disabled !== undefined) {
+        fields.push('disabled = ?');
+        values.push(input.disabled ? 1 : 0);
     }
 
     if (fields.length === 0) return existing;
