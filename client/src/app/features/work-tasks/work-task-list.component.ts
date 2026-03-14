@@ -5,6 +5,7 @@ import { WorkTaskService } from '../../core/services/work-task.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { WorkTask } from '../../core/models/work-task.model';
@@ -12,7 +13,7 @@ import { WorkTask } from '../../core/models/work-task.model';
 @Component({
     selector: 'app-work-task-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="tasks">
             <div class="tasks__header">
@@ -97,12 +98,10 @@ import { WorkTask } from '../../core/models/work-task.model';
                                     </span>
                                 }
                                 <span class="task-agent">{{ getAgentName(task.agentId) }}</span>
-                                <span class="task-time">
-                                    {{ task.createdAt | relativeTime }}
-                                    @if (task.completedAt) {
-                                        <span class="task-duration">{{ getDuration(task) }}</span>
-                                    }
-                                </span>
+                                @if (task.completedAt || isActiveStatus(task.status)) {
+                                    <span class="task-duration" [class.task-duration--active]="isActiveStatus(task.status)">{{ task.createdAt | duration:task.completedAt }}</span>
+                                }
+                                <span class="task-time">{{ task.createdAt | relativeTime }}</span>
                             </div>
                             <p class="task-desc">{{ task.description }}</p>
                             @if (task.status === 'running' || task.status === 'branching' || task.status === 'validating') {
@@ -304,21 +303,26 @@ import { WorkTask } from '../../core/models/work-task.model';
         .status-icon--ok::before { content: '\\2713'; }
         .status-icon--fail::before { content: '\\2717'; }
 
+        .task-duration {
+            font-size: 0.6rem;
+            color: var(--text-tertiary);
+            background: var(--bg-raised);
+            padding: 1px 6px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-family: var(--font-mono, monospace);
+        }
+        .task-duration--active {
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            animation: progress-pulse 1.5s ease-in-out infinite;
+        }
         .task-time {
             font-size: 0.65rem;
             color: var(--text-tertiary);
             display: inline-flex;
             align-items: center;
             gap: 0.35rem;
-        }
-        .task-duration {
-            font-size: 0.6rem;
-            color: var(--text-tertiary);
-            background: var(--bg-raised);
-            padding: 1px 5px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            font-family: var(--font-mono, monospace);
         }
 
         .task-desc {
@@ -500,6 +504,10 @@ export class WorkTaskListComponent implements OnInit, OnDestroy {
 
     protected getAgentName(agentId: string): string {
         return this.agentNameCache[agentId] ?? agentId.slice(0, 8);
+    }
+
+    protected isActiveStatus(status: string): boolean {
+        return ['pending', 'branching', 'running', 'validating'].includes(status);
     }
 
     protected isInterrupted(task: WorkTask): boolean {

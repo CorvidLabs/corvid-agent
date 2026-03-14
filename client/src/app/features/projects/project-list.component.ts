@@ -2,13 +2,14 @@ import { Component, ChangeDetectionStrategy, inject, OnInit } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { ProjectService } from '../../core/services/project.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { TooltipDirective } from '../../shared/directives/tooltip.directive';
 
 @Component({
     selector: 'app-project-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, SkeletonComponent, TooltipDirective],
+    imports: [RouterLink, RelativeTimePipe, EmptyStateComponent, SkeletonComponent, TooltipDirective],
     template: `
         <div class="page">
             <div class="page__header">
@@ -19,7 +20,13 @@ import { TooltipDirective } from '../../shared/directives/tooltip.directive';
             @if (projectService.loading()) {
                 <app-skeleton variant="table" [count]="5" />
             } @else if (projectService.projects().length === 0) {
-                <p class="empty">No projects yet. Create one to get started.</p>
+                <app-empty-state
+                    icon="  [===]\n  |   |\n  [===]"
+                    title="No projects yet."
+                    description="Projects define working directories and CLAUDE.md configs for your agents."
+                    actionLabel="+ Create a project"
+                    actionRoute="/projects/new"
+                    actionAriaLabel="Create your first project" />
             } @else {
                 <div class="list" role="list">
                     @for (project of projectService.projects(); track project.id) {
