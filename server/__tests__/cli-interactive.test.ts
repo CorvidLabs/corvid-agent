@@ -401,8 +401,10 @@ describe('handleMessage', () => {
                 handleMessage(msg, agentId, cbs.getHasStreamContent, cbs.onDone, cbs.onChunk, cbs.ensureHeader);
             });
 
+            // renderThinking is now a no-op to avoid escape sequences erasing
+            // streamed content, but ensureHeader is still called
             expect(headerEnsured).toBe(true);
-            expect(stripAnsi(stderrOutput)).toContain('thinking...');
+            expect(stderrOutput).toBe('');
         });
 
         test('clears thinking when inactive', () => {
@@ -417,8 +419,9 @@ describe('handleMessage', () => {
                 handleMessage(msg, agentId, cbs.getHasStreamContent, cbs.onDone, cbs.onChunk, cbs.ensureHeader);
             });
 
+            // renderThinking is now a no-op
             expect(headerEnsured).toBe(true);
-            expect(stderrOutput).toContain('\x1b[K');
+            expect(stderrOutput).toBe('');
         });
 
         test('ignores thinking from different agent', () => {
