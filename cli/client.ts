@@ -85,6 +85,7 @@ export class CorvidClient {
             const err: ApiError = { status: res.status, message };
             throw err;
         }
+        if (!text) return undefined as T;
         return JSON.parse(text) as T;
     }
 

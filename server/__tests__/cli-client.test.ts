@@ -131,6 +131,21 @@ describe('CorvidClient', () => {
         }
     });
 
+    test('handles empty response body without crashing', async () => {
+        const mockResponse = new Response('', { status: 200 });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mockFetch(() => Promise.resolve(mockResponse));
+
+        try {
+            const client = new CorvidClient(makeConfig());
+            const result = await client.delete('/api/sessions/123');
+            expect(result).toBeUndefined();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
     test('put method sends body with PUT method', async () => {
         const mockResponse = new Response(JSON.stringify({ ok: true }), { status: 200 });
 
