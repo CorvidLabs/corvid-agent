@@ -516,11 +516,11 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         tool(
             'corvid_flock_directory',
             'Manage the Flock Directory — an on-chain agent registry for discovery and reputation. ' +
-            'Actions: register, deregister, heartbeat, lookup, search, list, stats.',
+            'Actions: register, deregister, heartbeat, lookup, search, list, stats, compute_reputation.',
             {
-                action: z.enum(['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats'])
+                action: z.enum(['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats', 'compute_reputation'])
                     .describe('Operation to perform'),
-                agent_id: z.string().optional().describe('Agent ID (for deregister, heartbeat, lookup)'),
+                agent_id: z.string().optional().describe('Agent ID (for deregister, heartbeat, lookup, compute_reputation)'),
                 address: z.string().optional().describe('Algorand address (for register, lookup)'),
                 name: z.string().optional().describe('Agent name (for register)'),
                 description: z.string().optional().describe('Agent description (for register)'),
@@ -529,6 +529,8 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 query: z.string().optional().describe('Search query (for search)'),
                 capability: z.string().optional().describe('Filter by capability (for search)'),
                 min_reputation: z.number().optional().describe('Minimum reputation score (for search)'),
+                sort_by: z.enum(['reputation', 'name', 'uptime', 'registered', 'attestations']).optional().describe('Sort field (for search, default: reputation)'),
+                sort_order: z.enum(['asc', 'desc']).optional().describe('Sort order (for search, default: desc)'),
                 limit: z.number().optional().describe('Max results to return (default 20)'),
             },
             async (args) => handleFlockDirectory(ctx, args),

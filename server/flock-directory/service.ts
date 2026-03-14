@@ -13,6 +13,8 @@ import type {
     FlockAgent,
     FlockDirectorySearchParams,
     FlockDirectorySearchResult,
+    FlockSortField,
+    FlockSortOrder,
 } from '../../shared/types/flock-directory';
 import type {
     FlockAgentRecord,
@@ -60,6 +62,31 @@ function recordToAgent(row: FlockAgentRecord): FlockAgent {
 
 /** Stale threshold: agents without heartbeat for 30 minutes are marked inactive. */
 const HEARTBEAT_STALE_MINUTES = 30;
+
+/** Map sort field names to SQL columns. */
+const SORT_COLUMN_MAP: Record<FlockSortField, string> = {
+    reputation: 'reputation_score',
+    name: 'name',
+    uptime: 'uptime_pct',
+    registered: 'registered_at',
+    attestations: 'attestation_count',
+};
+
+/** Validate sort order — only 'asc' or 'desc' are valid. */
+function safeSortOrder(order?: FlockSortOrder): 'ASC' | 'DESC' {
+    return order === 'asc' ? 'ASC' : 'DESC';
+}
+
+/**
+ * Reputation weights for composite score calculation.
+ * Total weights = 100; score output is 0–100.
+ */
+const REPUTATION_WEIGHTS = {
+    uptime: 35,
+    attestations: 25,
+    council: 20,
+    heartbeatConsistency: 20,
+} as const;
 
 export class FlockDirectoryService {
     private onChainClient: OnChainFlockClient | null = null;
@@ -256,10 +283,14 @@ export class FlockDirectoryService {
         const limit = params.limit ?? 50;
         const offset = params.offset ?? 0;
 
+        // Sort by specified field or default to reputation desc
+        const sortCol = params.sortBy ? SORT_COLUMN_MAP[params.sortBy] : 'reputation_score';
+        const sortDir = params.sortBy ? safeSortOrder(params.sortOrder) : 'DESC';
+
         const total = queryCount(this.db, `SELECT COUNT(*) as cnt FROM flock_agents ${where}`, ...bindParams);
         const rows = this.db.query(`
             SELECT * FROM flock_agents ${where}
-            ORDER BY reputation_score DESC, registered_at ASC
+            ORDER BY ${sortCol} ${sortDir}, registered_at ASC
             LIMIT ? OFFSET ?
         `).all(...bindParams, limit, offset) as FlockAgentRecord[];
 
@@ -284,6 +315,61 @@ export class FlockDirectoryService {
             log.info('Swept stale agents', { count: result.changes });
         }
         return result.changes;
+    }
+
+    /**
+     * Compute and persist a composite reputation score for an agent.
+     * Combines uptime, attestation count, council participations,
+     * and heartbeat consistency into a single 0–100 score.
+     *
+     * Returns the updated agent, or null if not found / deregistered.
+     */
+    computeReputation(id: string): FlockAgent | null {
+        const agent = this.getById(id);
+        if (!agent || agent.status === 'deregistered') return null;
+
+        // Uptime component: direct percentage (0–100) → weighted
+        const uptimeScore = Math.min(agent.uptimePct, 100) * (REPUTATION_WEIGHTS.uptime / 100);
+
+        // Attestation component: logarithmic scale, cap at 20 attestations
+        const attestCapped = Math.min(agent.attestationCount, 20);
+        const attestScore = (attestCapped > 0
+            ? Math.log(attestCapped + 1) / Math.log(21) // normalized 0–1
+            : 0) * REPUTATION_WEIGHTS.attestations;
+
+        // Council component: linear scale, cap at 10 participations
+        const councilCapped = Math.min(agent.councilParticipations, 10);
+        const councilScore = (councilCapped / 10) * REPUTATION_WEIGHTS.council;
+
+        // Heartbeat consistency: based on status — active = full marks, inactive = half
+        const heartbeatScore = agent.status === 'active'
+            ? REPUTATION_WEIGHTS.heartbeatConsistency
+            : REPUTATION_WEIGHTS.heartbeatConsistency * 0.5;
+
+        const total = Math.round(uptimeScore + attestScore + councilScore + heartbeatScore);
+        const clamped = Math.max(0, Math.min(100, total));
+
+        return this.update(id, { reputationScore: clamped });
+    }
+
+    /**
+     * Recompute reputation scores for all non-deregistered agents.
+     * Returns the number of agents updated.
+     */
+    recomputeAllReputations(): number {
+        const rows = this.db.query(
+            `SELECT id FROM flock_agents WHERE status != 'deregistered'`,
+        ).all() as { id: string }[];
+
+        let updated = 0;
+        for (const row of rows) {
+            if (this.computeReputation(row.id)) updated++;
+        }
+
+        if (updated > 0) {
+            log.info('Recomputed reputation scores', { count: updated });
+        }
+        return updated;
     }
 
     /** Get directory statistics. */

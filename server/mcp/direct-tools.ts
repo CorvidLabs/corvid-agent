@@ -664,12 +664,12 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         // ─── Flock Directory ────────────────────────────────────────────
         tools.push({
             name: 'corvid_flock_directory',
-            description: 'Manage the Flock Directory — on-chain agent registry for discovery and reputation. Actions: register, deregister, heartbeat, lookup, search, list, stats.',
+            description: 'Manage the Flock Directory — on-chain agent registry for discovery and reputation. Actions: register, deregister, heartbeat, lookup, search, list, stats, compute_reputation.',
             parameters: {
                 type: 'object',
                 properties: {
-                    action: { type: 'string', enum: ['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats'], description: 'Operation to perform' },
-                    agent_id: { type: 'string', description: 'Agent ID (for deregister, heartbeat, lookup)' },
+                    action: { type: 'string', enum: ['register', 'deregister', 'heartbeat', 'lookup', 'search', 'list', 'stats', 'compute_reputation'], description: 'Operation to perform' },
+                    agent_id: { type: 'string', description: 'Agent ID (for deregister, heartbeat, lookup, compute_reputation)' },
                     address: { type: 'string', description: 'Algorand address (for register, lookup)' },
                     name: { type: 'string', description: 'Agent name (for register)' },
                     description: { type: 'string', description: 'Agent description (for register)' },
@@ -678,6 +678,8 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                     query: { type: 'string', description: 'Search query (for search)' },
                     capability: { type: 'string', description: 'Filter by capability (for search)' },
                     min_reputation: { type: 'number', description: 'Minimum reputation score (for search)' },
+                    sort_by: { type: 'string', enum: ['reputation', 'name', 'uptime', 'registered', 'attestations'], description: 'Sort field (for search, default: reputation)' },
+                    sort_order: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order (for search, default: desc)' },
                     limit: { type: 'number', description: 'Max results (default 20)' },
                 },
                 required: ['action'],
