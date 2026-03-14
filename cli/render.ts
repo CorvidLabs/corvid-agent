@@ -1,3 +1,5 @@
+import { truncate } from './utils';
+
 // ─── ANSI Colors ────────────────────────────────────────────────────────────
 
 const ESC = '\x1b[';
@@ -68,8 +70,8 @@ function sanitize(s: string): string {
     const withoutAnsi = input.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
     // Strip newlines/carriage returns explicitly (CodeQL log-injection barrier)
     const noNewlines = withoutAnsi.replace(/[\r\n]/g, '');
-    // Drop remaining control characters outside safe printable ASCII + tab
-    return noNewlines.replace(/[^ -~\t]/g, '');
+    // Drop remaining control characters outside safe printable ASCII, tab, and common Unicode punctuation
+    return noNewlines.replace(/[^ -~\t\u2026]/g, '');
 }
 
 // ─── Output Helpers ─────────────────────────────────────────────────────────
@@ -150,24 +152,20 @@ function summarizeToolInput(_toolName: string, input: string): string {
         const parsed = JSON.parse(input) as Record<string, unknown>;
         // Show the most relevant field based on tool name
         if (parsed.command && typeof parsed.command === 'string') {
-            return truncateStr(parsed.command, 200);
+            return truncate(parsed.command, 200);
         }
         if (parsed.path && typeof parsed.path === 'string') {
-            return truncateStr(parsed.path, 200);
+            return truncate(parsed.path, 200);
         }
         if (parsed.query && typeof parsed.query === 'string') {
-            return truncateStr(parsed.query, 200);
+            return truncate(parsed.query, 200);
         }
         // Fallback: show truncated JSON
-        return truncateStr(input, 200);
+        return truncate(input, 200);
     } catch {
         // Not JSON — plain text status message from direct-mode
-        return truncateStr(input, 200);
+        return truncate(input, 200);
     }
-}
-
-function truncateStr(s: string, max: number): string {
-    return s.length > max ? s.slice(0, max) + '...' : s;
 }
 
 let _thinkingActive = false;

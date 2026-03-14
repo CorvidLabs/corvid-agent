@@ -2,6 +2,7 @@ import { CorvidClient } from '../client';
 import { loadConfig } from '../config';
 import type { Session } from '../../shared/types';
 import { c, printError, printTable, Spinner } from '../render';
+import { handleError } from '../utils';
 
 type SessionAction = 'list' | 'get' | 'stop' | 'resume';
 
@@ -112,8 +113,3 @@ function formatStatus(status: string): string {
     }
 }
 
-function handleError(err: unknown): void {
-    const message = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : String(err);
-    printError(message);
-    process.exit(1);
-}
