@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-6655%20unit%20%7C%20360%20E2E-brightgreen" alt="6655 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-6803%20unit%20%7C%20360%20E2E-brightgreen" alt="6803 Unit | 360 E2E Tests">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
 
@@ -136,7 +136,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,655** across 278 files |
+| Unit tests | **6,803** across 286 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **128** with automated validation |
 | Test:code ratio | **1.14×** |
@@ -498,7 +498,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 6655 server tests (~100s)
+bun test              # 6803 server tests (~100s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/

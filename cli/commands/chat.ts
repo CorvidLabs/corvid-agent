@@ -1,10 +1,10 @@
 import { CorvidClient } from '../client';
 import { loadConfig } from '../config';
 import { pickAgent } from './pick-agent';
-import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
 import { printError, renderStreamChunk, renderToolUse, renderThinking, flushStreamBuffer, Spinner } from '../render';
 import { stripFirstChunkNewlines } from './interactive';
+import { resolveProjectFromCwd } from '../utils';
 
 interface ChatOptions {
     agent?: string;
@@ -144,16 +144,3 @@ export function handleMessage(
     }
 }
 
-async function resolveProjectFromCwd(client: CorvidClient): Promise<string | undefined> {
-    try {
-        const projects = await client.get<Project[]>('/api/projects');
-        const cwd = process.cwd();
-        const exact = projects.find(p => p.workingDir === cwd);
-        if (exact) return exact.id;
-        const prefix = projects.find(p => cwd.startsWith(p.workingDir + '/'));
-        if (prefix) return prefix.id;
-    } catch {
-        // Silently ignore — fall back to server default
-    }
-    return undefined;
-}

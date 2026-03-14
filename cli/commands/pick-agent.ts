@@ -3,6 +3,7 @@ import type { CliConfig } from '../config';
 import { updateConfig } from '../config';
 import type { Agent } from '../../shared/types';
 import { c, printError, Spinner } from '../render';
+import { truncate } from '../utils';
 import { createInterface } from 'readline';
 
 /**
@@ -80,10 +81,6 @@ export async function fetchAgent(client: CorvidClient, agentId: string): Promise
     } catch {
         return null;
     }
-}
-
-function truncate(s: string, max: number): string {
-    return s.length > max ? s.slice(0, max - 1) + '…' : s;
 }
 
 function readLine(prompt: string): Promise<string> {

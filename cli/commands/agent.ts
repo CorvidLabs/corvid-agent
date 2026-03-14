@@ -2,6 +2,7 @@ import { CorvidClient } from '../client';
 import { loadConfig } from '../config';
 import type { Agent } from '../../shared/types';
 import { c, printError, printTable, Spinner } from '../render';
+import { truncate, handleError } from '../utils';
 
 type AgentAction = 'list' | 'get' | 'create';
 
@@ -72,10 +73,6 @@ async function listAgents(client: CorvidClient): Promise<void> {
     }
 }
 
-function truncate(s: string, max: number): string {
-    return s.length > max ? s.slice(0, max - 1) + '…' : s;
-}
-
 async function getAgent(client: CorvidClient, id: string): Promise<void> {
     const spinner = new Spinner('Fetching agent...');
     spinner.start();
@@ -117,8 +114,3 @@ async function createAgent(client: CorvidClient, options: CreateOptions): Promis
     }
 }
 
-function handleError(err: unknown): void {
-    const message = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : String(err);
-    printError(message);
-    process.exit(1);
-}

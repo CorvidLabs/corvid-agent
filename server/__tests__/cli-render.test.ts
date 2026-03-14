@@ -635,8 +635,8 @@ describe('renderToolUse', () => {
             renderToolUse('tool', longInput);
         });
         const plain = stripAnsi(lines[0]);
-        expect(plain).toContain('...');
-        // The input portion should be at most ~203 chars (200 + "...")
+        expect(plain).toContain('…');
+        // The input portion should be at most 200 chars (199 content + ellipsis)
     });
 
     test('filters "Done" status messages', () => {

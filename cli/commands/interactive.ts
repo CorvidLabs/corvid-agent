@@ -4,6 +4,7 @@ import { pickAgent, fetchAgent } from './pick-agent';
 import type { Project } from '../../shared/types';
 import type { ServerMessage } from '../../shared/ws-protocol';
 import { c, printError, renderStreamChunk, renderToolUse, renderThinking, renderAgentPrefix, renderAgentSuffix, flushStreamBuffer, Spinner } from '../render';
+import { formatUptime, resolveProjectFromCwd } from '../utils';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
 
 const VERSION = require('../../package.json').version as string;
@@ -27,20 +28,6 @@ interface InteractiveOptions {
 export interface Turn {
     role: 'user' | 'assistant';
     content: string;
-}
-
-async function resolveProjectFromCwd(client: CorvidClient): Promise<string | undefined> {
-    try {
-        const projects = await client.get<Project[]>('/api/projects');
-        const cwd = process.cwd();
-        const exact = projects.find(p => p.workingDir === cwd);
-        if (exact) return exact.id;
-        const prefix = projects.find(p => cwd.startsWith(p.workingDir + '/'));
-        if (prefix) return prefix.id;
-    } catch {
-        // Fall back to server default
-    }
-    return undefined;
 }
 
 /**
@@ -389,11 +376,3 @@ async function runShellCommand(cmd: string): Promise<void> {
     }
 }
 
-function formatUptime(seconds: number): string {
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor((seconds % 86400) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (d > 0) return `${d}d ${h}h`;
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
-}
