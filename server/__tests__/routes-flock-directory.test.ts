@@ -125,9 +125,39 @@ describe('Flock Directory Routes', () => {
             status: 'active',
             capability: 'code',
             minReputation: 5,
+            sortBy: undefined,
+            sortOrder: undefined,
             limit: 10,
             offset: 2,
         });
+    });
+
+    it('GET /api/flock-directory/search passes sort params', async () => {
+        const svc = createMockService();
+        const { req, url } = fakeReq('GET', '/api/flock-directory/search?sortBy=name&sortOrder=asc');
+        const res = await callRoute(req, url, db, svc);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        expect(svc.search).toHaveBeenCalledWith(expect.objectContaining({
+            sortBy: 'name',
+            sortOrder: 'asc',
+        }));
+    });
+
+    it('GET /api/flock-directory/search rejects invalid sortBy', async () => {
+        const svc = createMockService();
+        const { req, url } = fakeReq('GET', '/api/flock-directory/search?sortBy=invalid');
+        const res = await callRoute(req, url, db, svc);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(400);
+    });
+
+    it('GET /api/flock-directory/search rejects invalid sortOrder', async () => {
+        const svc = createMockService();
+        const { req, url } = fakeReq('GET', '/api/flock-directory/search?sortOrder=invalid');
+        const res = await callRoute(req, url, db, svc);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(400);
     });
 
     // ─── Stats ───────────────────────────────────────────────────────────────
@@ -309,6 +339,28 @@ describe('Flock Directory Routes', () => {
     it('DELETE /api/flock-directory/agents/:id returns 404 when not found', async () => {
         const svc = createMockService();
         const { req, url } = fakeReq('DELETE', '/api/flock-directory/agents/nonexistent');
+        const res = await callRoute(req, url, db, svc);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(404);
+    });
+
+    // ─── Compute Reputation ─────────────────────────────────────────────────
+
+    it('POST /api/flock-directory/agents/:id/reputation computes score', async () => {
+        const agent = { id: 'agent-1', name: 'Test', reputationScore: 75 };
+        const svc = createMockService({ computeReputation: mock(() => agent as any) });
+        const { req, url } = fakeReq('POST', '/api/flock-directory/agents/agent-1/reputation');
+        const res = await callRoute(req, url, db, svc);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.reputationScore).toBe(75);
+        expect(svc.computeReputation).toHaveBeenCalledWith('agent-1');
+    });
+
+    it('POST /api/flock-directory/agents/:id/reputation returns 404 for missing agent', async () => {
+        const svc = createMockService({ computeReputation: mock(() => null) });
+        const { req, url } = fakeReq('POST', '/api/flock-directory/agents/nonexistent/reputation');
         const res = await callRoute(req, url, db, svc);
         expect(res).not.toBeNull();
         expect(res!.status).toBe(404);

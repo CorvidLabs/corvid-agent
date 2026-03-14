@@ -270,3 +270,171 @@ describe('sweepStaleAgents', () => {
         expect(count).toBe(0);
     });
 });
+
+// ─── Search Sorting ─────────────────────────────────────────────────────────
+
+describe('search sorting', () => {
+    test('sorts by name ascending', () => {
+        svc.register({ address: 'ALGO_SORT1', name: 'Zebra' });
+        svc.register({ address: 'ALGO_SORT2', name: 'Alpha' });
+        svc.register({ address: 'ALGO_SORT3', name: 'Middle' });
+
+        const result = svc.search({ sortBy: 'name', sortOrder: 'asc' });
+        expect(result.agents[0].name).toBe('Alpha');
+        expect(result.agents[1].name).toBe('Middle');
+        expect(result.agents[2].name).toBe('Zebra');
+    });
+
+    test('sorts by name descending', () => {
+        svc.register({ address: 'ALGO_SORTD1', name: 'Zebra' });
+        svc.register({ address: 'ALGO_SORTD2', name: 'Alpha' });
+
+        const result = svc.search({ sortBy: 'name', sortOrder: 'desc' });
+        expect(result.agents[0].name).toBe('Zebra');
+        expect(result.agents[1].name).toBe('Alpha');
+    });
+
+    test('sorts by uptime descending', () => {
+        const a1 = svc.register({ address: 'ALGO_UP1', name: 'LowUp' });
+        const a2 = svc.register({ address: 'ALGO_UP2', name: 'HighUp' });
+        svc.update(a1.id, { uptimePct: 50 });
+        svc.update(a2.id, { uptimePct: 99 });
+
+        const result = svc.search({ sortBy: 'uptime', sortOrder: 'desc' });
+        expect(result.agents[0].name).toBe('HighUp');
+        expect(result.agents[1].name).toBe('LowUp');
+    });
+
+    test('sorts by registered date ascending', () => {
+        const a1 = svc.register({ address: 'ALGO_REG1', name: 'First' });
+        // Manually backdate the first agent
+        db.query(`UPDATE flock_agents SET registered_at = datetime('now', '-1 day') WHERE id = ?`).run(a1.id);
+        svc.register({ address: 'ALGO_REG2', name: 'Second' });
+
+        const result = svc.search({ sortBy: 'registered', sortOrder: 'asc' });
+        expect(result.agents[0].name).toBe('First');
+        expect(result.agents[1].name).toBe('Second');
+    });
+
+    test('sorts by attestations descending', () => {
+        const a1 = svc.register({ address: 'ALGO_ATT1', name: 'FewAttest' });
+        const a2 = svc.register({ address: 'ALGO_ATT2', name: 'ManyAttest' });
+        svc.update(a1.id, { attestationCount: 2 });
+        svc.update(a2.id, { attestationCount: 15 });
+
+        const result = svc.search({ sortBy: 'attestations', sortOrder: 'desc' });
+        expect(result.agents[0].name).toBe('ManyAttest');
+        expect(result.agents[1].name).toBe('FewAttest');
+    });
+
+    test('defaults to reputation desc when no sort specified', () => {
+        const a1 = svc.register({ address: 'ALGO_DEF1', name: 'LowRep' });
+        const a2 = svc.register({ address: 'ALGO_DEF2', name: 'HighRep' });
+        svc.update(a1.id, { reputationScore: 10 });
+        svc.update(a2.id, { reputationScore: 90 });
+
+        const result = svc.search({});
+        expect(result.agents[0].name).toBe('HighRep');
+    });
+});
+
+// ─── Reputation Computation ─────────────────────────────────────────────────
+
+describe('computeReputation', () => {
+    test('computes score from component metrics', () => {
+        const agent = svc.register({ address: 'ALGO_REP1', name: 'RepAgent' });
+        svc.update(agent.id, {
+            uptimePct: 95,
+            attestationCount: 10,
+            councilParticipations: 5,
+        });
+
+        const updated = svc.computeReputation(agent.id);
+        expect(updated).not.toBeNull();
+        // Score should be > 0 and <= 100
+        expect(updated!.reputationScore).toBeGreaterThan(0);
+        expect(updated!.reputationScore).toBeLessThanOrEqual(100);
+    });
+
+    test('returns 0-based score for brand new agent', () => {
+        const agent = svc.register({ address: 'ALGO_REP_NEW', name: 'NewAgent' });
+
+        const updated = svc.computeReputation(agent.id);
+        expect(updated).not.toBeNull();
+        // New agent with 0 uptime, 0 attestations, 0 council: only heartbeat score
+        expect(updated!.reputationScore).toBe(20); // active heartbeat = 20 points
+    });
+
+    test('returns null for deregistered agent', () => {
+        const agent = svc.register({ address: 'ALGO_REP_DEREG', name: 'DeregAgent' });
+        svc.deregister(agent.id);
+
+        expect(svc.computeReputation(agent.id)).toBeNull();
+    });
+
+    test('returns null for non-existent agent', () => {
+        expect(svc.computeReputation('nonexistent')).toBeNull();
+    });
+
+    test('higher uptime increases score', () => {
+        const a1 = svc.register({ address: 'ALGO_REP_LOW', name: 'LowUptime' });
+        const a2 = svc.register({ address: 'ALGO_REP_HIGH', name: 'HighUptime' });
+        svc.update(a1.id, { uptimePct: 20 });
+        svc.update(a2.id, { uptimePct: 95 });
+
+        const s1 = svc.computeReputation(a1.id)!;
+        const s2 = svc.computeReputation(a2.id)!;
+        expect(s2.reputationScore).toBeGreaterThan(s1.reputationScore);
+    });
+
+    test('inactive agent gets lower heartbeat score', () => {
+        const agent = svc.register({ address: 'ALGO_REP_INACTIVE', name: 'InactiveAgent' });
+        svc.update(agent.id, { uptimePct: 50, attestationCount: 5 });
+
+        // Compute while active
+        const activeScore = svc.computeReputation(agent.id)!.reputationScore;
+
+        // Mark inactive via stale heartbeat
+        db.query(`UPDATE flock_agents SET last_heartbeat = datetime('now', '-60 minutes') WHERE id = ?`).run(agent.id);
+        svc.sweepStaleAgents();
+
+        const inactiveScore = svc.computeReputation(agent.id)!.reputationScore;
+        expect(inactiveScore).toBeLessThan(activeScore);
+    });
+
+    test('score is clamped to 0-100 range', () => {
+        const agent = svc.register({ address: 'ALGO_REP_MAX', name: 'MaxAgent' });
+        svc.update(agent.id, {
+            uptimePct: 100,
+            attestationCount: 20,
+            councilParticipations: 10,
+        });
+
+        const updated = svc.computeReputation(agent.id)!;
+        expect(updated.reputationScore).toBeLessThanOrEqual(100);
+        expect(updated.reputationScore).toBeGreaterThanOrEqual(0);
+    });
+});
+
+// ─── Recompute All Reputations ──────────────────────────────────────────────
+
+describe('recomputeAllReputations', () => {
+    test('updates all non-deregistered agents', () => {
+        const a1 = svc.register({ address: 'ALGO_RECOMP1', name: 'Agent1' });
+        const a2 = svc.register({ address: 'ALGO_RECOMP2', name: 'Agent2' });
+        const a3 = svc.register({ address: 'ALGO_RECOMP3', name: 'Agent3' });
+        svc.deregister(a3.id);
+
+        svc.update(a1.id, { uptimePct: 80 });
+        svc.update(a2.id, { uptimePct: 60, attestationCount: 5 });
+
+        const count = svc.recomputeAllReputations();
+        expect(count).toBe(2); // excludes deregistered
+
+        // Verify scores were actually updated
+        const updated1 = svc.getById(a1.id)!;
+        const updated2 = svc.getById(a2.id)!;
+        expect(updated1.reputationScore).toBeGreaterThan(0);
+        expect(updated2.reputationScore).toBeGreaterThan(0);
+    });
+});

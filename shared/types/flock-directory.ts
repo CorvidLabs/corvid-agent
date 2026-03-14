@@ -17,11 +17,16 @@ export interface FlockAgent {
     updatedAt: string;
 }
 
+export type FlockSortField = 'reputation' | 'name' | 'uptime' | 'registered' | 'attestations';
+export type FlockSortOrder = 'asc' | 'desc';
+
 export interface FlockDirectorySearchParams {
     query?: string;
     status?: FlockAgentStatus;
     capability?: string;
     minReputation?: number;
+    sortBy?: FlockSortField;
+    sortOrder?: FlockSortOrder;
     limit?: number;
     offset?: number;
 }

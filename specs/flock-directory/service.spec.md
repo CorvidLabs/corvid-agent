@@ -54,7 +54,9 @@ _No standalone exported functions. All functionality is exposed via the exported
 | `getById` | `(id: string)` | `FlockAgent \| null` | Lookup by UUID |
 | `getByAddress` | `(address: string)` | `FlockAgent \| null` | Lookup by Algorand address |
 | `listActive` | `(limit?: number, offset?: number)` | `FlockAgent[]` | Lists active agents sorted by reputation desc |
-| `search` | `(params: FlockDirectorySearchParams)` | `FlockDirectorySearchResult` | Filtered search with pagination |
+| `search` | `(params: FlockDirectorySearchParams)` | `FlockDirectorySearchResult` | Filtered search with pagination and sorting |
+| `computeReputation` | `(id: string)` | `FlockAgent \| null` | Computes composite 0–100 reputation score from uptime, attestations, council, heartbeat |
+| `recomputeAllReputations` | `()` | `number` | Recomputes scores for all non-deregistered agents |
 | `sweepStaleAgents` | `()` | `number` | Marks agents inactive if no heartbeat for 30 minutes |
 | `getStats` | `()` | `{ total, active, inactive, onChainAppId }` | Directory statistics |
 | `selfRegister` | `(opts: { address, name, description, instanceUrl, capabilities })` | `Promise<FlockAgent>` | Idempotent self-registration for this corvid-agent instance |
@@ -68,6 +70,9 @@ _No standalone exported functions. All functionality is exposed via the exported
 4. Heartbeat only updates agents not in 'deregistered' status.
 5. `selfRegister` is idempotent — if already registered at the given address, it sends a heartbeat instead.
 6. Stale sweep threshold is 30 minutes without heartbeat.
+7. `computeReputation` score is always clamped to 0–100.
+8. Reputation weights: uptime 35%, attestations 25% (log scale, cap 20), council 20% (linear, cap 10), heartbeat 20% (active=full, inactive=half).
+9. Search defaults to sorting by reputation_score DESC when no sortBy is specified.
 
 ## Behavioral Examples
 
@@ -88,6 +93,18 @@ _No standalone exported functions. All functionality is exposed via the exported
 - **Given** agent is already registered at the given address with status 'active'
 - **When** `selfRegister()` is called with the same address
 - **Then** a heartbeat is sent instead of creating a duplicate, the existing agent is returned
+
+### Scenario: Search with custom sort
+
+- **Given** multiple agents are registered with varying uptime
+- **When** `search({ sortBy: 'uptime', sortOrder: 'desc' })` is called
+- **Then** results are sorted by uptime_pct descending
+
+### Scenario: Compute reputation score
+
+- **Given** an active agent with uptimePct=95, attestationCount=10, councilParticipations=5
+- **When** `computeReputation(id)` is called
+- **Then** a composite score is calculated from weighted components (uptime 35%, attestations 25%, council 20%, heartbeat 20%) and persisted
 
 ### Scenario: Stale agent sweep
 

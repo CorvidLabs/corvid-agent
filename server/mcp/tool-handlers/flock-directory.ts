@@ -21,6 +21,8 @@ export async function handleFlockDirectory(
         query?: string;
         capability?: string;
         min_reputation?: number;
+        sort_by?: string;
+        sort_order?: string;
         limit?: number;
     },
 ): Promise<CallToolResult> {
@@ -73,11 +75,22 @@ export async function handleFlockDirectory(
                 return textResult(JSON.stringify(agent, null, 2));
             }
 
+            case 'compute_reputation': {
+                if (!args.agent_id) return errorResult('compute_reputation requires agent_id');
+                const agent = svc.computeReputation(args.agent_id);
+                if (!agent) return errorResult(`Agent ${args.agent_id} not found or deregistered.`);
+                return textResult(`Reputation score for "${agent.name}": ${agent.reputationScore}/100`);
+            }
+
             case 'search': {
+                const sortBy = args.sort_by as import('../../../shared/types/flock-directory').FlockSortField | undefined;
+                const sortOrder = args.sort_order as import('../../../shared/types/flock-directory').FlockSortOrder | undefined;
                 const result = svc.search({
                     query: args.query,
                     capability: args.capability,
                     minReputation: args.min_reputation,
+                    sortBy,
+                    sortOrder,
                     limit: args.limit ?? 20,
                 });
                 const lines = [
@@ -117,7 +130,7 @@ export async function handleFlockDirectory(
 
             default:
                 return errorResult(
-                    `Unknown action "${args.action}". Valid actions: register, deregister, heartbeat, lookup, search, list, stats, sync`,
+                    `Unknown action "${args.action}". Valid actions: register, deregister, heartbeat, lookup, search, list, stats, sync, compute_reputation`,
                 );
         }
     } catch (err) {

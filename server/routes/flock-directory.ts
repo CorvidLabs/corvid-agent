@@ -4,7 +4,7 @@
 import type { Database } from 'bun:sqlite';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import type { RequestContext } from '../middleware/guards';
-import type { FlockAgentStatus } from '../../shared/types/flock-directory';
+import type { FlockAgentStatus, FlockSortField, FlockSortOrder } from '../../shared/types/flock-directory';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, AlgorandAddressSchema, isAlgorandAddressFormat } from '../lib/validation';
 import { z } from 'zod';
@@ -47,13 +47,24 @@ export function handleFlockDirectoryRoutes(
         const capability = url.searchParams.get('capability') ?? undefined;
         const minRepParam = url.searchParams.get('minReputation');
         const minReputation = minRepParam !== null ? safeNumParam(minRepParam, 0) : undefined;
+        const sortBy = (url.searchParams.get('sortBy') ?? undefined) as FlockSortField | undefined;
+        const sortOrder = (url.searchParams.get('sortOrder') ?? undefined) as FlockSortOrder | undefined;
         const limitParam = url.searchParams.get('limit');
         const limit = limitParam !== null ? safeNumParam(limitParam, 50) : undefined;
         const offsetParam = url.searchParams.get('offset');
         const offset = offsetParam !== null ? safeNumParam(offsetParam, 0) : undefined;
 
+        // Validate sort field if provided
+        const validSortFields: FlockSortField[] = ['reputation', 'name', 'uptime', 'registered', 'attestations'];
+        if (sortBy && !validSortFields.includes(sortBy)) {
+            return badRequest(`Invalid sortBy value. Valid values: ${validSortFields.join(', ')}`);
+        }
+        if (sortOrder && sortOrder !== 'asc' && sortOrder !== 'desc') {
+            return badRequest('Invalid sortOrder value. Valid values: asc, desc');
+        }
+
         return json(flockDirectory.search({
-            query, status, capability, minReputation, limit, offset,
+            query, status, capability, minReputation, sortBy, sortOrder, limit, offset,
         }));
     }
 
@@ -119,6 +130,15 @@ export function handleFlockDirectoryRoutes(
             if (!ok) return notFound('Agent not found or already deregistered');
             return json({ ok: true });
         }
+    }
+
+    // ─── Compute Reputation ──────────────────────────────────────────────────
+
+    const reputationMatch = path.match(/^\/api\/flock-directory\/agents\/([^/]+)\/reputation$/);
+    if (reputationMatch && method === 'POST') {
+        const agent = flockDirectory.computeReputation(reputationMatch[1]);
+        if (!agent) return notFound('Agent not found or deregistered');
+        return json(agent);
     }
 
     // ─── Heartbeat ──────────────────────────────────────────────────────────
