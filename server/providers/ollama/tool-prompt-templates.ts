@@ -138,7 +138,11 @@ export function getCodingToolPrompt(): string {
 /**
  * Get messaging safety instructions that prevent agents from generating
  * scripts or code to send messages outside of provided MCP tools.
- * This should be appended to any agent system prompt regardless of model family.
+ *
+ * NOTE: This prompt is always appended whenever tools are available, regardless
+ * of which tools are present or which model family is in use. This is an
+ * intentional side effect — callers (sdk-process, direct-process) unconditionally
+ * append this to every tool-bearing prompt to enforce the messaging safety invariant.
  */
 export function getMessagingSafetyPrompt(): string {
     return `## Messaging Safety

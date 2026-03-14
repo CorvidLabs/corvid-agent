@@ -40,9 +40,9 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 4. **Qwen3 anti-hallucination instructions**: Qwen3 prompt explicitly warns: no code fences around JSON, no prose before tool calls, no inventing tool names, never generate fake tool results
 5. **Response routing only when corvid_send_message present**: `getResponseRoutingPrompt()` is only appended when `corvid_send_message` is in the tool names list
 6. **Coding guidance only when read_file present**: `getCodingToolPrompt()` is only appended when `read_file` is in the tool names list
-6b. **Messaging safety always appended**: `getMessagingSafetyPrompt()` is always appended when tools are available, preventing agents from writing scripts to send messages outside of MCP tools
-7. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
-8. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
+7. **Messaging safety always appended**: `getMessagingSafetyPrompt()` is always appended when tools are available (in `direct-process.ts`) or unconditionally to append content (in `sdk-process.ts`), preventing agents from writing scripts to send messages outside of MCP tools. This is an always-on guard -- unlike response routing (conditional on `corvid_send_message`) or coding guidance (conditional on `read_file`), messaging safety is never gated on specific tool presence
+8. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
+9. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
 
 ## Behavioral Examples
 
