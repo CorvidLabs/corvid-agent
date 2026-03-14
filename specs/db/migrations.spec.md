@@ -14,6 +14,7 @@ files:
   - server/db/migrations/083_unique_project_names.ts
   - server/db/migrations/084_model_exams.ts
   - server/db/migrations/085_project_dir_strategy.ts
+  - server/db/migrations/086_agent_display_customization.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -250,9 +251,21 @@ Adds `git_url`, `dir_strategy`, and `base_clone_path` columns to the `projects` 
 | `up` | `(db: Database)` | `void` | Adds 3 columns: `git_url` (TEXT, nullable), `dir_strategy` (TEXT, default `'persistent'`), `base_clone_path` (TEXT, nullable) |
 | `down` | `(db: Database)` | `void` | Recreates the `projects` table without the new columns via backup-and-restore |
 
+### 086_agent_display_customization.ts
+
+Adds display customization fields to the `agents` table: `display_color`, `display_icon`, `avatar_url`, and `disabled`.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds 4 columns: `display_color` (TEXT, nullable), `display_icon` (TEXT, nullable), `avatar_url` (TEXT, nullable), `disabled` (INTEGER, default 0) |
+| `down` | `(db: Database)` | `void` | Recreates the `agents` table without the new columns via backup-and-restore |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-14 | corvid-agent | Add migration 086 to spec coverage |
 | 2026-03-13 | corvid-agent | Add 8 migration files (078-085) to spec coverage |
 | 2026-03-04 | corvid-agent | Initial spec |

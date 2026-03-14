@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-6832%20unit%20%7C%20360%20E2E-brightgreen" alt="6832 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-6861%20unit%20%7C%20360%20E2E-brightgreen" alt="6861 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -137,9 +137,9 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,832** across 288 files |
+| Unit tests | **6,861** across 289 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **138** with automated validation (100% file coverage) |
+| Module specs | **139** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
@@ -152,7 +152,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 
 | Metric | Count |
 |--------|-------|
-| MCP tools | **41** corvid_* tool handlers |
+| MCP tools | **43** corvid_* tool handlers |
 | API endpoints | **~300** across 44 route modules |
 | DB migrations | **9** (squashed baseline + incremental, 90 tables) |
 | Test:code ratio | **1.14×** — more test code than production code |

@@ -56,6 +56,14 @@ Uses basename matching for unique filenames and substring matching for paths.
 - `.env`, `corvid-agent.db`, `wallet-keystore.json`
 - `server/selftest/`
 
+## Repository Boundaries
+
+The **Flock Directory smart contract** source code lives in [`CorvidLabs/flock-directory-contract`](https://github.com/CorvidLabs/flock-directory-contract) — **not** in this repo. This repo only contains:
+- The **generated client** (`server/flock-directory/contract/FlockDirectoryClient.generated.ts`) for interacting with the deployed contract via ABI
+- The **on-chain client facade** (`server/flock-directory/on-chain-client.ts`) that wraps the generated client
+
+Do **not** add TEALScript source, TEAL bytecode, or any smart contract authoring artifacts to this repo. Contract development, compilation, and deployment artifacts belong in `flock-directory-contract`.
+
 ## Module Specifications
 
 Specs in `specs/` are the source of truth for module behavior.
@@ -131,6 +139,41 @@ Both are initialized in `server/index.ts` when their env vars are set. Both use 
 - `server/voice/tts.ts` — `synthesize()` and `synthesizeWithCache()` (hashes text, checks `voice_cache` table)
 - `server/voice/stt.ts` — `transcribe()` calls OpenAI Whisper API
 - Both gated behind `OPENAI_API_KEY`
+
+## Delegation & MCP Tool Usage
+
+### Model-Aware Delegation
+
+When delegating work via `corvid_create_work_task`, select the appropriate model tier based on task complexity:
+
+| Tier | When to Use | Examples |
+|------|-------------|---------|
+| `heavy` | Architecture changes, multi-file refactors, spec authoring, security-sensitive work | New features, spec creation, complex bug fixes |
+| `standard` | Single-file changes, routine fixes, test additions, documentation | Bug fixes, adding tests, updating configs |
+| `light` | Trivial edits, formatting, renaming, README updates, ticket triage | Typo fixes, label changes, simple renames |
+
+The primary orchestrating agent should always prefer delegation over doing everything itself. If a task can be handled by a lighter model, delegate it — this saves tokens and credits.
+
+### MCP Tool-First Principle
+
+Agents **must** use MCP tools (`corvid_*`) for operations that have corresponding tools, rather than shelling out or using raw APIs directly. Specifically:
+
+- **GitHub operations**: Use `corvid_github_*` tools, not raw `gh` CLI (except inside work task sessions where `gh` is the execution mechanism)
+- **Work delegation**: Use `corvid_create_work_task`, not manual worktree creation
+- **Scheduling**: Use `corvid_manage_schedule`, not cron or manual timers
+- **Agent communication**: Use `corvid_send_message`, not direct API calls
+- **Search/research**: Use `corvid_web_search` or `corvid_deep_research` for external lookups
+- **Work monitoring**: Use `corvid_check_work_status` to poll delegated task results
+- **Reputation**: Use `corvid_check_reputation` / `corvid_publish_attestation` for on-chain operations
+
+This applies regardless of which model or provider is running the session. The MCP tools are the canonical interface for all agent operations.
+
+### Delegation Checklist
+
+Before starting a complex task directly, ask:
+1. Can this be broken into subtasks delegated via `corvid_create_work_task`?
+2. Is there a lighter model tier that can handle any of these subtasks?
+3. Am I using MCP tools for all operations that have tool equivalents?
 
 ## Self-Improvement Workflow
 

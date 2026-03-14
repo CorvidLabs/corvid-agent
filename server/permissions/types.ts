@@ -53,6 +53,8 @@ export const TOOL_ACTION_MAP: Record<string, PermissionAction> = {
     corvid_manage_schedule: 'schedule:manage',
     corvid_manage_workflow: 'workflow:manage',
     corvid_create_work_task: 'work:create',
+    corvid_check_work_status: 'work:read',
+    corvid_list_work_tasks: 'work:read',
     // Search
     corvid_web_search: 'search:web',
     corvid_deep_research: 'search:deep',
