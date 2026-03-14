@@ -25,7 +25,7 @@ export { handleCheckCredits, handleGrantCredits, handleCreditConfig } from './cr
 export { handleListProjects, handleCurrentProject } from './projects';
 
 // ─── Work tasks ──────────────────────────────────────────────────────────────
-export { handleCreateWorkTask } from './work';
+export { handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks } from './work';
 
 // ─── Scheduling ──────────────────────────────────────────────────────────────
 export { handleManageSchedule } from './scheduling';

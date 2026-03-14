@@ -54,4 +54,7 @@ export interface CreateWorkTaskInput {
     /** Explicit issue reference for deduplication. If provided, the service will reject
      *  the task if an open PR or active work task already addresses this issue. */
     issueRef?: { repo: string; number: number };
+    /** Model tier for the work task session: 'opus', 'sonnet', or 'haiku'.
+     *  If omitted, the router uses complexity analysis to auto-select. */
+    modelTier?: string;
 }

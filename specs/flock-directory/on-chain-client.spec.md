@@ -132,6 +132,7 @@ Typed client facade for the FlockDirectory smart contract on Algorand. Wraps the
 3. `fundContract` wipes the signed transaction buffer after submission via `wipeBuffer`.
 4. `createFlockClient` never auto-deploys on mainnet — returns null if no app ID is persisted.
 5. All BigInt conversions (tier, score, stake) are cast to `number` before returning.
+6. **No smart contract source code in this repo.** The FlockDirectory TEALScript source, TEAL bytecode, and compilation artifacts live in `CorvidLabs/flock-directory-contract`. This repo only contains the generated ABI client and the typed facade that wraps it.
 
 ## Behavioral Examples
 

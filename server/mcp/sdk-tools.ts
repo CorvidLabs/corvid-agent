@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { getAgent } from '../db/agents';
@@ -17,6 +17,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_list_projects',
     'corvid_current_project',
     'corvid_create_work_task',
+    'corvid_check_work_status',
+    'corvid_list_work_tasks',
     'corvid_manage_schedule',
     'corvid_web_search',
     'corvid_deep_research',
@@ -155,13 +157,32 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 'corvid_create_work_task',
                 'Create a work task that spawns a new agent session on a dedicated branch. ' +
                 'The agent will implement the described changes, run validation, and open a PR. ' +
-                'Use corvid_list_projects to discover available projects first.',
+                'Use corvid_list_projects to discover available projects first. ' +
+                'Set model_tier to control cost: "light" for trivial tasks, "standard" for normal work, "heavy" for complex architecture.',
                 {
                     description: z.string().describe('A clear description of the work to be done'),
                     project_id: z.string().optional().describe('Project ID to work on. Omit to use the agent default project.'),
                     project_name: z.string().optional().describe('Project name (alternative to project_id). Use corvid_list_projects to discover names.'),
+                    model_tier: z.string().optional().describe('Model tier: "light" (Haiku, trivial tasks), "standard" (Sonnet, normal work), "heavy" (Opus, complex architecture). Omit for auto-select.'),
                 },
                 async (args) => handleCreateWorkTask(ctx, args),
+            ),
+            tool(
+                'corvid_check_work_status',
+                'Check the status of a work task by ID. Returns status, branch, iteration count, PR URL (if completed), and error (if failed).',
+                {
+                    task_id: z.string().describe('The work task ID to check'),
+                },
+                async (args) => handleCheckWorkStatus(ctx, args),
+            ),
+            tool(
+                'corvid_list_work_tasks',
+                'List work tasks for this agent. Optionally filter by status (pending, branching, running, validating, completed, failed).',
+                {
+                    status: z.string().optional().describe('Filter by status: pending, branching, running, validating, completed, failed'),
+                    limit: z.number().optional().describe('Maximum number of tasks to return (default 20, max 50)'),
+                },
+                async (args) => handleListWorkTasks(ctx, args),
             ),
         ] : []),
         tool(

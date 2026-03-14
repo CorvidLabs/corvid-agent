@@ -97,6 +97,29 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the AgentMessenger instance for lifecycle notifications |
 | `onComplete` | `(taskId: string, callback: (task: WorkTask) => void)` | `void` | Register a completion callback |
 
+## MCP Tool Interface
+
+Three MCP tools expose the work task system to agents:
+
+| Tool | Description |
+|------|-------------|
+| `corvid_create_work_task` | Create a work task with optional `model_tier` (light/standard/heavy) for cost-aware delegation |
+| `corvid_check_work_status` | Poll a work task by ID — returns status, branch, PR URL, errors |
+| `corvid_list_work_tasks` | List work tasks for the calling agent, optionally filtered by status |
+
+### Model Tier Parameter
+
+The `model_tier` parameter on `corvid_create_work_task` maps to `ModelTier`:
+
+| User Value | ModelTier | Model | Use Case |
+|-----------|-----------|-------|----------|
+| `light` | HAIKU | claude-haiku-4-5 | Trivial edits, formatting, renames |
+| `standard` | SONNET | claude-sonnet-4-6 | Normal work tasks, bug fixes, tests |
+| `heavy` | OPUS | claude-opus-4-6 | Architecture, multi-file refactors, specs |
+| _(omitted)_ | _(auto)_ | _(complexity-based)_ | Router analyzes description to select |
+
+When `modelTier` is set on `CreateWorkTaskInput`, the `WorkTaskService` passes it through to `ProcessManager.startProcess()` to select the appropriate model for the spawned session.
+
 ## Invariants
 
 1. **One active task per project**: `createWorkTaskAtomic` enforces that only one task can be in an active state (pending/branching/running/validating) per project at a time
@@ -251,3 +274,4 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | 2026-03-07 | corvid-agent | Extracted `runValidation` and `runBunInstall` into `server/work/validation.ts` |
 | 2026-03-08 | corvid-agent | Documented repo-map.ts exports: constants, `generateRepoMap`, `extractRelevantSymbols`, `tokenizeDescription`, `filePathPriority` |
 | 2026-03-13 | corvid-agent | Added verification.ts: PR test plan verification tasks — parseTestPlanItems, createVerificationTasks, handleVerificationComplete, and helpers |
+| 2026-03-14 | corvid-agent | Added MCP Tool Interface section: corvid_check_work_status, corvid_list_work_tasks tools; model_tier parameter on corvid_create_work_task for tiered dispatch |

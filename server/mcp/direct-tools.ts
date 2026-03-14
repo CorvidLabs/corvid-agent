@@ -17,6 +17,8 @@ import {
     handleGrantCredits,
     handleCreditConfig,
     handleCreateWorkTask,
+    handleCheckWorkStatus,
+    handleListWorkTasks,
     handleManageSchedule,
     handleManageWorkflow,
     handleWebSearch,
@@ -63,6 +65,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_list_projects',
     'corvid_current_project',
     'corvid_create_work_task',
+    'corvid_check_work_status',
+    'corvid_list_work_tasks',
     'corvid_manage_schedule',
     'corvid_manage_workflow',
     'corvid_web_search',
@@ -258,24 +262,55 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
     );
 
-    // Conditionally add work task tool
+    // Conditionally add work task tools
     if (ctx.workTaskService) {
         tools.push({
             name: 'corvid_create_work_task',
-            description: 'Create a work task that spawns a new agent session on a dedicated branch. Use corvid_list_projects to discover available projects first.',
+            description: 'Create a work task that spawns a new agent session on a dedicated branch. Set model_tier to control cost. Use corvid_list_projects to discover available projects first.',
             parameters: {
                 type: 'object',
                 properties: {
                     description: { type: 'string', description: 'A clear description of the work to be done' },
                     project_id: { type: 'string', description: 'Project ID to work on. Omit to use agent default.' },
                     project_name: { type: 'string', description: 'Project name (alternative to project_id). Use corvid_list_projects to discover names.' },
+                    model_tier: { type: 'string', description: 'Model tier: "light" (Haiku), "standard" (Sonnet), "heavy" (Opus). Omit for auto-select.' },
                 },
                 required: ['description'],
             },
             handler: async (args) => {
                 const err = validateRequired('corvid_create_work_task', args, ['description']);
                 if (err) return err;
-                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; project_name?: string }));
+                return unwrapResult(await handleCreateWorkTask(ctx, args as { description: string; project_id?: string; project_name?: string; model_tier?: string }));
+            },
+        });
+        tools.push({
+            name: 'corvid_check_work_status',
+            description: 'Check the status of a work task by ID.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    task_id: { type: 'string', description: 'The work task ID to check' },
+                },
+                required: ['task_id'],
+            },
+            handler: async (args) => {
+                const err = validateRequired('corvid_check_work_status', args, ['task_id']);
+                if (err) return err;
+                return unwrapResult(await handleCheckWorkStatus(ctx, args as { task_id: string }));
+            },
+        });
+        tools.push({
+            name: 'corvid_list_work_tasks',
+            description: 'List work tasks for this agent. Optionally filter by status.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    status: { type: 'string', description: 'Filter by status: pending, branching, running, validating, completed, failed' },
+                    limit: { type: 'number', description: 'Max number of tasks to return (default 20, max 50)' },
+                },
+            },
+            handler: async (args) => {
+                return unwrapResult(await handleListWorkTasks(ctx, args as { status?: string; limit?: number }));
             },
         });
     }
