@@ -85,7 +85,7 @@ See `.env.example` for the full list of 50+ configuration options with descripti
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  70 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  7 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -108,14 +108,14 @@ server/           Bun HTTP + WebSocket server
   algochat/       On-chain messaging (bridge, wallet, directory)
   ast/            Tree-sitter AST parser for code understanding
   billing/        Usage metering and Stripe billing
-  db/             SQLite schema (70 migrations) and query modules
+  db/             SQLite schema (7 migrations) and query modules
   discord/        Bidirectional Discord bridge (raw WebSocket)
   github/         GitHub API operations (PRs, issues, reviews)
   lib/            Shared utilities (logger, crypto, validation, dedup)
-  mcp/            MCP tool server and 27 corvid_* tool handlers
+  mcp/            MCP tool server and 41 corvid_* tool handlers
   middleware/     Auth, CORS, rate limiting, startup validation
   process/        Agent lifecycle (SDK + Ollama, persona/skill injection)
-  routes/         REST API route handlers (34 modules)
+  routes/         REST API route handlers (44 modules)
   scheduler/      Cron/interval execution engine
   telegram/       Bidirectional Telegram bridge (long-polling, voice)
   voice/          TTS (OpenAI) and STT (Whisper) with caching
@@ -146,7 +146,7 @@ specs/            Module specification documents (38 specs)
 
 ### Database
 
-SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 70 with 81 tables.
+SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 7 with 81 tables.
 
 Key patterns:
 - All queries use parameterized statements (no string interpolation)
@@ -184,7 +184,7 @@ bun run dev:client
 cd client && npx vitest run
 
 # Type-check the entire project
-bunx tsc --noEmit --skipLibCheck
+bun x tsc --noEmit --skipLibCheck
 
 # Validate module specs
 bun run spec:check
@@ -198,7 +198,7 @@ bun run lint:sql
 1. **Start the server**: `bun run dev` — starts on `http://localhost:3000` with file watching
 2. **Make changes** — the server restarts automatically on save
 3. **Test your changes** — run the relevant tests (see Testing section)
-4. **Type-check before committing**: `bunx tsc --noEmit --skipLibCheck`
+4. **Type-check before committing**: `bun x tsc --noEmit --skipLibCheck`
 
 ### Code Patterns
 
@@ -211,7 +211,7 @@ bun run lint:sql
 
 ## Testing
 
-### Unit Tests (4931+)
+### Unit Tests (6500+)
 
 ```bash
 bun test                              # Run all tests (~30s)
@@ -219,7 +219,7 @@ bun test server/__tests__/db.test.ts  # Run a specific file
 bun test --watch                      # Watch mode
 ```
 
-Tests live in `server/__tests__/` (194 test files) and cover API routes, authentication, billing, database, bridges (Discord/Telegram/Slack), GitHub tools, MCP handlers, scheduling, workflows, and more.
+Tests live in `server/__tests__/` (274+ test files) and cover API routes, authentication, billing, database, bridges (Discord/Telegram/Slack), GitHub tools, MCP handlers, scheduling, workflows, and more. All tests use in-memory databases — your local data is never touched.
 
 ### E2E Tests (360)
 
@@ -241,10 +241,10 @@ cd client && npx vitest               # Watch mode
 ### Module Spec Validation
 
 ```bash
-bun run spec:check                    # Validate 38 module specs in specs/
+bun run spec:check                    # Validate 123 module specs in specs/
 ```
 
-Checks YAML frontmatter, required sections, API surface coverage, file existence, and dependency graph integrity.
+Checks YAML frontmatter, required sections, API surface coverage, file existence, and dependency graph integrity. All 123 specs should pass before merging.
 
 ### Writing Tests
 

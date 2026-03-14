@@ -671,22 +671,14 @@ describe('renderToolUse', () => {
 // ─── renderThinking ─────────────────────────────────────────────────────────
 
 describe('renderThinking', () => {
-    test('writes thinking indicator when active', () => {
+    test('is a no-op (does not write to stderr)', () => {
+        // renderThinking was intentionally made a no-op to avoid
+        // escape sequences erasing streamed content
         const output = captureStderr(() => {
             renderThinking(true);
-        });
-        const plain = stripAnsi(output);
-        expect(plain).toContain('thinking...');
-        expect(plain).toContain('│');
-    });
-
-    test('clears line when inactive', () => {
-        const output = captureStderr(() => {
             renderThinking(false);
         });
-        // Should write carriage return and clear line escape
-        expect(output).toContain('\r');
-        expect(output).toContain('\x1b[K');
+        expect(output).toBe('');
     });
 });
 

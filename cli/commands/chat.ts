@@ -93,8 +93,12 @@ function handleMessage(
                         onDone();
                     }
                 } else if (msg.chunk) {
-                    onContent();
-                    renderStreamChunk(msg.chunk);
+                    // Strip leading newlines from first chunk
+                    const text = hasStreamContent ? msg.chunk : msg.chunk.replace(/^\n+/, '');
+                    if (text) {
+                        onContent();
+                        renderStreamChunk(text);
+                    }
                 }
             }
             break;
