@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-6813%20unit%20%7C%20360%20E2E-brightgreen" alt="6813 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-6832%20unit%20%7C%20360%20E2E-brightgreen" alt="6832 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -131,13 +131,13 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## 6,000+ Tests. 1.14× Test-to-Code Ratio. Open Source.
+## 6,800+ Tests. 1.14× Test-to-Code Ratio. Open Source.
 
 > More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,803** across 286 files |
+| Unit tests | **6,832** across 288 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **138** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
@@ -487,6 +487,9 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 | Wallets | `/api/wallets/summary`, `/api/wallets/:address/*` | External wallet summaries, messages, and credit grants |
 | Feed | `GET /api/feed/history` | Combined agent + AlgoChat message history |
 | Escalation | `/api/escalation-queue`, `/api/operational-mode` | Approval queue management and operational mode control |
+| Proposals | `/api/proposals` | Governance proposals with lifecycle transitions |
+| Onboarding | `GET /api/onboarding/status` | Onboarding status and checklist |
+| Slack | `POST /slack/events` | Slack event webhook endpoint |
 | Backup | `POST /api/backup` | Trigger database backup |
 | Self-Test | `POST /api/selftest/run` | Run self-test suite (unit/e2e/all) |
 | Health | `GET /api/health`, `/health/live`, `/health/ready` | Health check, liveness and readiness probes |
@@ -505,11 +508,11 @@ bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**6,655 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**6,832 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**137 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage enforced in CI via `--require-coverage 100`.
+**138 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage enforced in CI via `--require-coverage 100`.
 
 ---
 
@@ -641,7 +644,7 @@ No contribution is too small. Fixing a typo, improving an error message, or addi
 
 ### What makes this project different
 
-You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 6,600+ tests, 7 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
+You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 6,800+ tests, 8 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
 
 See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 
