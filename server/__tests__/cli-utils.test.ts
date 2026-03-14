@@ -58,7 +58,8 @@ describe('resolveProjectFromCwd', () => {
 
     test('returns prefix match project id', async () => {
         const cwd = process.cwd();
-        const parentDir = cwd.split('/').slice(0, -1).join('/');
+        const sep = require('node:path').sep;
+        const parentDir = cwd.split(sep).slice(0, -1).join(sep);
         const client = mockClient([{ id: 'proj-2', workingDir: parentDir }]);
         expect(await resolveProjectFromCwd(client)).toBe('proj-2');
     });

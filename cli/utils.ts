@@ -1,3 +1,4 @@
+import { sep } from 'node:path';
 import type { Project } from '../shared/types';
 import type { CorvidClient } from './client';
 
@@ -29,7 +30,7 @@ export async function resolveProjectFromCwd(client: CorvidClient): Promise<strin
         const cwd = process.cwd();
         const exact = projects.find(p => p.workingDir === cwd);
         if (exact) return exact.id;
-        const prefix = projects.find(p => cwd.startsWith(p.workingDir + '/'));
+        const prefix = projects.find(p => cwd.startsWith(p.workingDir + sep));
         if (prefix) return prefix.id;
     } catch {
         // Fall back to server default
