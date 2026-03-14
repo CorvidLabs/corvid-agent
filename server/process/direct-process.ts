@@ -1036,7 +1036,10 @@ function buildSystemPrompt(
             parts.push('', getCodingToolPrompt());
         }
 
-        // Always add messaging safety instructions when tools are available
+        // Always add messaging safety instructions when tools are available.
+        // Unlike response routing (gated on corvid_send_message) or coding guidance
+        // (gated on read_file), this is unconditional — any agent with tools must not
+        // generate scripts to bypass MCP tool-only messaging. See spec invariant #7.
         parts.push('', getMessagingSafetyPrompt());
     }
 

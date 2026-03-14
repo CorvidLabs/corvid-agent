@@ -238,6 +238,8 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     if (agent?.appendPrompt) appendParts.push(agent.appendPrompt);
     if (personaPrompt) appendParts.push(personaPrompt);
     if (skillPrompt) appendParts.push(`## Skill Instructions\n${skillPrompt}`);
+    // Always append messaging safety — unconditional guard preventing agents from
+    // generating scripts to bypass MCP tool-only messaging. See spec invariant #7.
     appendParts.push(getMessagingSafetyPrompt());
 
     if (appendParts.length > 0) {
