@@ -162,9 +162,9 @@ import type { Council, CouncilLaunch } from '../../core/models/council.model';
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid;
         }
         .launch-card__stage[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .launch-card__stage[data-stage="discussing"] { color: #a78bfa; border-color: #a78bfa; }
+        .launch-card__stage[data-stage="discussing"] { color: var(--accent-purple); border-color: var(--accent-purple); }
         .launch-card__stage[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
-        .launch-card__stage[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
+        .launch-card__stage[data-stage="synthesizing"] { color: var(--accent-gold); border-color: var(--accent-gold); }
         .launch-card__stage[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
         .launch-card__meta { font-size: 0.7rem; color: var(--text-tertiary); }
         .launch-card__time { font-size: 0.7rem; color: var(--text-tertiary); margin-left: auto; }

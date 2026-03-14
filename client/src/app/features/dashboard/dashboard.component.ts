@@ -453,7 +453,7 @@ interface ActivityEvent {
         }
         .stage-badge[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .stage-badge[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
-        .stage-badge[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
+        .stage-badge[data-stage="synthesizing"] { color: var(--accent-gold); border-color: var(--accent-gold); }
         .stage-badge[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
 
         @media (max-width: 768px) {
@@ -461,6 +461,15 @@ interface ActivityEvent {
             .metrics-row { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
             .agent-grid { grid-template-columns: 1fr; }
             .two-col { grid-template-columns: 1fr; }
+            .quick-actions { flex-direction: row; flex-wrap: wrap; }
+            .action-btn { flex: 1 1 calc(50% - 0.25rem); min-width: 0; text-align: center; }
+        }
+        @media (max-width: 480px) {
+            .dashboard { padding: 0.75rem; }
+            .metrics-row { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+            .metric-card { padding: 0.5rem 0.75rem; }
+            .metric-card__value { font-size: 1.2rem; }
+            .section { padding: 0.75rem; }
         }
     `,
 })

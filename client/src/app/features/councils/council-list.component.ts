@@ -224,16 +224,16 @@ interface CouncilCard {
         .council-card__meta { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.4rem; font-size: 0.7rem; color: var(--text-secondary); }
         .meta-item { display: flex; align-items: center; gap: 0.2rem; }
         .meta-icon { font-size: 0.75rem; }
-        .meta-item--chairman { color: #f5a623; }
+        .meta-item--chairman { color: var(--accent-gold); }
 
         .stage-badge {
             font-size: 0.6rem; padding: 2px 8px; border-radius: var(--radius-sm); font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid; flex-shrink: 0;
         }
         .stage-badge[data-stage="responding"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .stage-badge[data-stage="discussing"] { color: #a78bfa; border-color: #a78bfa; }
+        .stage-badge[data-stage="discussing"] { color: var(--accent-purple); border-color: var(--accent-purple); }
         .stage-badge[data-stage="reviewing"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
-        .stage-badge[data-stage="synthesizing"] { color: #f5a623; border-color: #f5a623; }
+        .stage-badge[data-stage="synthesizing"] { color: var(--accent-gold); border-color: var(--accent-gold); }
         .stage-badge[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
         .stage-badge[data-stage="idle"] { color: var(--text-tertiary); border-color: var(--border); }
 
@@ -242,7 +242,7 @@ interface CouncilCard {
             font-size: 0.65rem; padding: 2px 6px; border-radius: var(--radius-sm);
             background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-secondary);
         }
-        .member-chip--chairman { color: #f5a623; border-color: rgba(245, 166, 35, 0.3); background: rgba(245, 166, 35, 0.08); }
+        .member-chip--chairman { color: var(--accent-gold); border-color: var(--accent-gold-dim); background: var(--accent-gold-dim); }
 
         .council-card__footer {
             display: flex; gap: 0.75rem; padding-top: 0.4rem; border-top: 1px solid var(--border);
@@ -254,6 +254,13 @@ interface CouncilCard {
             .council-grid { grid-template-columns: 1fr; }
             .filters { flex-direction: column; align-items: stretch; }
             .sort-group { margin-left: 0; }
+            .page__header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+            .page__actions { width: 100%; }
+            .page__actions .btn { flex: 1; text-align: center; }
+        }
+        @media (max-width: 480px) {
+            .page { padding: 1rem; }
+            .filter-group { flex-wrap: wrap; }
         }
     `,
 })
