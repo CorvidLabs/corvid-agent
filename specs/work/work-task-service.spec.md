@@ -6,6 +6,7 @@ files:
   - server/work/service.ts
   - server/work/validation.ts
   - server/work/repo-map.ts
+  - server/work/verification.ts
 db_tables:
   - work_tasks
 depends_on:
@@ -50,6 +51,26 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `generateRepoMap` | `(astParserService: AstParserService, projectDir: string)` | `Promise<string \| null>` | Generate a lightweight repo map showing exported symbols per file, grouped by directory. Returns null if AST service unavailable or no exported symbols found |
 | `extractRelevantSymbols` | `(repoMap: string, description: string)` | `string` | Extract symbols from the repo map that are relevant to a task description using keyword matching |
 | `tokenizeDescription` | `(description: string)` | `string[]` | Tokenize a task description into lowercase keywords, filtering out stop words and short tokens |
+
+### Exported Types (server/work/verification.ts)
+
+| Type | Description |
+|------|-------------|
+| `TestPlanItem` | Parsed checkbox item from PR body: `text` (raw text without prefix) and `index` (0-based position) |
+| `VerificationResult` | Created verification task: `itemText` and `taskId` |
+
+### Exported Functions (server/work/verification.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `parseTestPlanItems` | `(prBody: string)` | `TestPlanItem[]` | Parse unchecked `- [ ]` test plan items from a PR body |
+| `parsePrUrl` | `(prUrl: string)` | `{ repo: string; prNumber: number } \| null` | Extract owner/repo and PR number from a GitHub PR URL |
+| `fetchPrBody` | `(repo: string, prNumber: number)` | `Promise<string \| null>` | Fetch the PR body from GitHub via `gh pr view` |
+| `checkOffPrItem` | `(repo: string, prNumber: number, itemText: string)` | `Promise<boolean>` | Check off a specific checkbox item in the PR body by replacing `- [ ]` with `- [x]` |
+| `buildVerificationPrompt` | `(prUrl: string, prNumber: number, branchName: string, itemText: string)` | `string` | Build the agent prompt for a verification work task with instructions to check out branch and verify the item |
+| `createVerificationTasks` | `(db: Database, parentTaskId: string, prUrl: string)` | `Promise<VerificationResult[]>` | Create verification work tasks for all unchecked test plan items in a PR. Called from finalizeTask() after PR creation |
+| `handleVerificationComplete` | `(db: Database, taskId: string, sessionOutput: string)` | `Promise<boolean>` | Check if a completed verification task passed (output ends with VERIFICATION_PASSED) and check off the PR item |
+| `isVerificationTask` | `(sourceId: string \| null)` | `boolean` | Check if a work task is a verification task by sourceId pattern (`verify:` prefix) |
 
 #### WorkTaskService Constructor
 
@@ -229,3 +250,4 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | 2026-03-06 | corvid-agent | Added AlgoChat notifications for work task lifecycle events |
 | 2026-03-07 | corvid-agent | Extracted `runValidation` and `runBunInstall` into `server/work/validation.ts` |
 | 2026-03-08 | corvid-agent | Documented repo-map.ts exports: constants, `generateRepoMap`, `extractRelevantSymbols`, `tokenizeDescription`, `filePathPriority` |
+| 2026-03-13 | corvid-agent | Added verification.ts: PR test plan verification tasks — parseTestPlanItems, createVerificationTasks, handleVerificationComplete, and helpers |

@@ -2,17 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.29.0] - 2026-03-13
+## [0.28.0] - 2026-03-14
 
 ### Added
 - **Spec coverage detection** — scan `server/` for `.ts` files not referenced in any spec's `files:` frontmatter, with per-module grouping (#1058)
 - **Spec scaffold generation** — `--generate` flag creates draft `.spec.md` files for uncovered modules from template (#1058)
 - **Coverage reporting** — `--coverage` flag shows full unspecced file report; summary always shows file coverage percentage (#1058)
-- **Convenience scripts** — `bun run spec:coverage` and `bun run spec:generate` shortcuts (#1058)
-
-## [0.28.0] - 2026-03-14
-
-### Added
+- **100% spec coverage** — all 368 server files covered by 137 module specs with CI enforcement via `--require-coverage 100`
+- **Spec coverage badge** — shields.io badge in README showing 100% spec coverage
+- **Convenience scripts** — `bun run spec:coverage`, `bun run spec:generate`, and `bun run spec:coverage:require` shortcuts (#1058)
 - **Tiered Claude model dispatch** — Opus/Sonnet/Haiku routing based on task complexity with fallback chains (#1052)
 - **Ollama feature flag** — gate Ollama behind `ENABLE_OLLAMA` flag per council decision; provider abstraction preserved (#1052)
 - **Discord slash commands** — `/tasks`, `/schedule`, `/config` commands for server interaction (#1025)

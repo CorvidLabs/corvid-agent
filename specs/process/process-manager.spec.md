@@ -6,6 +6,8 @@ files:
   - server/process/manager.ts
   - server/process/mcp-service-container.ts
   - server/process/session-config-resolver.ts
+  - server/process/session-resilience-manager.ts
+  - server/process/session-timer-manager.ts
 db_tables:
   - sessions
   - session_messages
@@ -33,6 +35,10 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `BuildContextOptions` | Options for building MCP tool context (from mcp-service-container.ts) |
 | `SessionPrompts` | Resolved persona + skill prompts for a session (from session-config-resolver.ts) |
 | `ResolvedSessionConfig` | Complete resolved configuration for a session (from session-config-resolver.ts) |
+| `PausedSessionInfo` | Paused session tracking info: pausedAt, resumeAttempts, nextResumeAt (from session-resilience-manager.ts) |
+| `SessionResilienceCallbacks` | Callback interface for resilience manager: resumeProcess, stopProcess, isRunning, clearTimers, cancelApprovals (from session-resilience-manager.ts) |
+| `SessionTimerCallbacks` | Callback interface for timer manager: onTimeout, onStablePeriod, isRunning, getLastActivityAt (from session-timer-manager.ts) |
+| `SessionTimerConfig` | Timer configuration: agentTimeoutMs, stablePeriodMs, timeoutCheckIntervalMs (from session-timer-manager.ts) |
 
 ### Exported Classes
 
@@ -40,6 +46,8 @@ This is the most complex module in the system (~1135 lines after decomposition).
 |-------|-------------|
 | `ProcessManager` | Session lifecycle orchestrator |
 | `McpServiceContainer` | Manages MCP service registration and tool context building (from mcp-service-container.ts) |
+| `SessionResilienceManager` | Handles session recovery: API outage pause/resume, crash restart with exponential backoff, orphan pruning (from session-resilience-manager.ts) |
+| `SessionTimerManager` | Manages timer-based session concerns: stable-period timers, per-session inactivity timeouts, fallback timeout checker (from session-timer-manager.ts) |
 
 ### Exported Functions (from session-config-resolver.ts)
 
@@ -48,6 +56,45 @@ This is the most complex module in the system (~1135 lines after decomposition).
 | `resolveSessionPrompts` | `(db, agent, projectId)` | `SessionPrompts` | Resolve persona and skill prompts for a session |
 | `resolveToolPermissions` | `(db, agentId, projectId)` | `string[] \| null` | Resolve merged tool permissions from agent and project skill bundles |
 | `resolveSessionConfig` | `(db, agent, agentId, projectId)` | `ResolvedSessionConfig` | Resolve complete session config (prompts + tools + MCP servers) |
+
+### Exported Constants (server/process/session-resilience-manager.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `MAX_RESTARTS` | `number` (3) | Maximum number of crash restarts before giving up |
+
+#### SessionResilienceManager Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `constructor` | `db: Database, eventBus: ISessionEventBus, callbacks: SessionResilienceCallbacks` | `SessionResilienceManager` | Creates resilience manager with database, event bus, and lifecycle callbacks |
+| `handleApiOutage` | `(sessionId: string)` | `void` | Pause a session due to API outage. Clears timers, cancels approvals, sets status to 'paused', schedules auto-resume |
+| `resumeSession` | `(sessionId: string)` | `boolean` | Manually resume a paused session. Returns false if not paused |
+| `isPaused` | `(sessionId: string)` | `boolean` | Check if a session is currently paused |
+| `getPausedSessionIds` | `()` | `string[]` | Get IDs of all currently paused sessions |
+| `pausedSessionCount` | _(getter)_ | `number` | Number of currently paused sessions |
+| `deletePausedSession` | `(sessionId: string)` | `void` | Remove a session from the paused tracking map |
+| `attemptRestart` | `(sessionId: string, restartCount: number)` | `boolean` | Schedule a crash restart with exponential backoff (5s * 3^n). Returns false if max restarts exceeded |
+| `startAutoResumeChecker` | `()` | `void` | Start periodic checker that resumes paused sessions with exponential backoff (5min base, 3x multiplier, 60min cap, max 10 attempts) |
+| `startOrphanPruner` | `(pruneCallback: () => number)` | `void` | Start periodic orphan pruner (every 5 minutes) |
+| `checkApiHealth` | `()` | `Promise<boolean>` | Quick connectivity check to Anthropic API. Returns true if status < 500 |
+| `shutdown` | `()` | `void` | Clear all timers and paused session state |
+
+#### SessionTimerManager Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `constructor` | `callbacks: SessionTimerCallbacks, config?: Partial<SessionTimerConfig>` | `SessionTimerManager` | Creates timer manager with callbacks and optional config overrides |
+| `startStableTimer` | `(sessionId: string)` | `void` | Start stable-period timer. After continuous uptime (default 10min), fires onStablePeriod to reset restart counter |
+| `clearStableTimer` | `(sessionId: string)` | `void` | Clear the stable-period timer for a session |
+| `startSessionTimeout` | `(sessionId: string, timeoutMs?: number)` | `void` | Start or reset per-session inactivity timeout (default 30min via AGENT_TIMEOUT_MS) |
+| `extendTimeout` | `(sessionId: string, additionalMs: number)` | `boolean` | Extend a running session's timeout (clamped to 4x agentTimeoutMs). Returns false if not running |
+| `clearSessionTimeout` | `(sessionId: string)` | `void` | Clear the inactivity timeout for a session |
+| `startTimeoutChecker` | `(getSessionIds?: () => string[])` | `void` | Start polling fallback that catches sessions surviving past their inactivity timeout (safety net, every 60s) |
+| `checkTimeouts` | `(sessionIds: string[])` | `void` | Check all provided session IDs for timeout violations |
+| `cleanupSession` | `(sessionId: string)` | `void` | Clean up all timers for a session to prevent timer leaks |
+| `getStats` | `()` | `{ sessionTimeouts: number; stableTimers: number }` | Get count of active timers for monitoring |
+| `shutdown` | `()` | `void` | Shut down all timers |
 
 #### ProcessManager Constructor
 
@@ -239,3 +286,4 @@ Internal constants (not env-configurable):
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Extracted McpServiceContainer and SessionConfigResolver (#453) |
+| 2026-03-13 | corvid-agent | Added session-resilience-manager.ts (SessionResilienceManager: API outage handling, crash restart, orphan pruning) and session-timer-manager.ts (SessionTimerManager: stable timers, inactivity timeouts, fallback checker) |

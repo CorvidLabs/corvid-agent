@@ -5,6 +5,7 @@ status: draft
 files:
   - server/councils/discussion.ts
   - server/councils/synthesis.ts
+  - server/councils/governance.ts
 db_tables: []
 depends_on:
   - specs/db/connection.spec.md
@@ -66,6 +67,44 @@ Orchestrates multi-agent council deliberation lifecycle including launch, parall
 | `GovernanceVoteCastEvent` | `{ launchId: string; agentId: string; vote: 'approve' \| 'reject' \| 'abstain'; weight: number; weightedApprovalRatio: number; totalVotesCast: number; totalMembers: number }` — emitted when an agent casts a governance vote. |
 | `GovernanceVoteResolvedEvent` | `{ launchId: string; status: 'approved' \| 'rejected' \| 'awaiting_human'; weightedApprovalRatio: number; effectiveThreshold: number; reason: string }` — emitted when a governance vote is resolved. |
 | `GovernanceQuorumReachedEvent` | `{ launchId: string; weightedApprovalRatio: number; threshold: number }` — emitted when a governance vote reaches quorum. |
+
+### Exported Functions (server/councils/governance.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `classifyPath` | `(filePath: string)` | `GovernanceTier` | Classify a file path into its governance tier (0=Constitutional, 1=Structural, 2=Operational). Returns the most restrictive tier that matches. |
+| `classifyPaths` | `(filePaths: string[])` | `GovernanceTier` | Classify multiple paths and return the most restrictive tier. Returns 2 for empty arrays. |
+| `assessImpact` | `(filePaths: string[])` | `GovernanceImpact` | Assess the governance impact of a set of file changes. Used by work task validation and council vote classification. |
+| `evaluateVote` | `(tier: GovernanceTier, totalMembers: number, votes: GovernanceVoteRecord[], humanApproved?: boolean)` | `GovernanceVoteCheck` | Evaluate whether a governance vote has met quorum requirements for its tier. Layer 0 always fails. |
+| `evaluateWeightedVote` | `(tier: GovernanceTier, totalMembers: number, votes: WeightedVoteRecord[], humanApproved?: boolean, customThreshold?: number \| null, minimumVoters?: number \| null)` | `WeightedGovernanceVoteCheck` | Evaluate a governance vote using reputation-weighted voting. Falls back to unweighted if no weights provided. |
+| `evaluateProposalVote` | `(tier: GovernanceTier, totalMembers: number, votes: WeightedVoteRecord[], humanApproved: boolean, quorum?: QuorumConfig)` | `ProposalEvaluationResult` | Evaluate a proposal's vote using its quorum configuration with priority: proposal-level > council-level > tier default. |
+| `checkAutomationAllowed` | `(filePaths: string[])` | `AutomationCheckResult` | Check whether automated workflows may modify a set of paths. Layer 0 and Layer 1 are blocked. |
+
+### Exported Types (server/councils/governance.ts)
+
+| Type | Description |
+|------|-------------|
+| `GovernanceTier` | `0 \| 1 \| 2` — governance tier level (0=Constitutional, 1=Structural, 2=Operational) |
+| `GovernanceTierInfo` | Tier metadata: tier, label, description, quorumThreshold, requiresHumanApproval, allowsAutomation |
+| `GovernanceImpact` | Impact assessment result: tier, tierLabel, affectedPaths, blockedFromAutomation, requiresHumanApproval, quorumThreshold |
+| `GovernanceVoteStatus` | `'pending' \| 'approved' \| 'rejected' \| 'expired' \| 'awaiting_human'` |
+| `GovernanceVoteRecord` | Individual vote: agentId, vote ('approve'/'reject'/'abstain'), reason, votedAt |
+| `GovernanceVoteCheck` | Vote evaluation result: passed, approvalRatio, requiredThreshold, awaitingHumanApproval, reason |
+| `WeightedVoteRecord` | Extends GovernanceVoteRecord with `weight` (0–100 reputation score) |
+| `WeightedGovernanceVoteCheck` | Extends GovernanceVoteCheck with weightedApprovalRatio and voteWeights |
+| `QuorumConfig` | Custom quorum settings: optional threshold (0.0–1.0) and minimumVoters |
+| `AutomationCheckResult` | Automation check result: allowed, tier, reason, blockedPaths |
+| `ProposalEvaluationResult` | Extends WeightedGovernanceVoteCheck with minimumVotersMet, effectiveThreshold, effectiveMinimumVoters |
+
+### Exported Constants (server/councils/governance.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `GOVERNANCE_TIERS` | `Record<GovernanceTier, GovernanceTierInfo>` | Tier definitions: Layer 0 (Constitutional, 100% quorum, human-only), Layer 1 (Structural, 75% quorum, human approval), Layer 2 (Operational, 50% quorum, automation allowed) |
+| `LAYER_0_BASENAMES` | `Set<string>` | Basenames classified as Layer 0 (e.g., spending.ts, schema.ts, governance.ts) |
+| `LAYER_0_SUBSTRINGS` | `string[]` | Path substrings classified as Layer 0 (e.g., server/councils/, .env) |
+| `LAYER_1_BASENAMES` | `Set<string>` | Basenames classified as Layer 1 (e.g., package.json, CLAUDE.md) |
+| `LAYER_1_SUBSTRINGS` | `string[]` | Path substrings classified as Layer 1 (e.g., server/db/migrations/) |
 
 ### Exported Classes
 
@@ -214,3 +253,4 @@ _(none)_
 | 2026-03-06 | corvid-agent | Added on-chain mode (off/attestation/full) for council communication |
 | 2026-03-08 | corvid-agent | Governance v2: weighted voting, quorum config, vote resolution on synthesis completion |
 | 2026-03-09 | corvid-agent | Governance v2 WS events: vote cast, vote resolved, quorum reached listener/broadcaster pattern |
+| 2026-03-13 | corvid-agent | Added governance.ts: tiered path classification, vote evaluation (weighted/unweighted), automation enforcement, proposal evaluation |

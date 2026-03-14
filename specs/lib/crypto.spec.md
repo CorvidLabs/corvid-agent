@@ -8,6 +8,7 @@ files:
   - server/lib/secure-wipe.ts
   - server/lib/wallet-keystore.ts
   - server/lib/key-rotation.ts
+  - server/lib/env-encryption.ts
 db_tables: []
 depends_on:
   - specs/lib/infra.spec.md
@@ -45,6 +46,9 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | `encryptMnemonicWithPassphrase` | `plaintext: string, passphrase: string` | `Promise<string>` | Encrypts a mnemonic with an explicit passphrase (bypasses env-based resolution). Used by KeyProvider-aware callers. |
 | `decryptMnemonicWithPassphrase` | `encrypted: string, passphrase: string` | `Promise<string>` | Decrypts a mnemonic with an explicit passphrase (v2 format only). Used by KeyProvider-aware callers. |
 | `rotateWalletEncryptionKey` | `db: Database, oldPassphrase: string, newPassphrase: string, _network: string` | `Promise<RotationResult>` | Re-encrypts all wallet mnemonics (DB + keystore) from old passphrase to new. All-or-nothing with round-trip verification. Records audit log entry. |
+| `encryptEnvVars` | `jsonStr: string` | `string` | Encrypts a JSON env_vars string using AES-256-GCM with PBKDF2 (600k iterations). Returns `"enc:" + base64(salt + iv + authTag + ciphertext)`. Skips encryption for empty objects (`{}`). Uses `WALLET_ENCRYPTION_KEY` via `getEncryptionPassphrase`. |
+| `decryptEnvVars` | `stored: string` | `string` | Decrypts an env_vars string from storage. Handles both encrypted (`enc:` prefix) and legacy plaintext JSON transparently. |
+| `isEncrypted` | `stored: string` | `boolean` | Checks whether a stored env_vars value is already encrypted (starts with `enc:` prefix). |
 
 ### Exported Types
 
@@ -53,6 +57,12 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | `KeystoreEntry` | `{ address: string; encryptedMnemonic: string }` -- a single wallet entry in the keystore file. |
 | `KeystoreData` | `Record<string, KeystoreEntry>` -- the full keystore keyed by agent name. |
 | `RotationResult` | `{ success: boolean; agentsRotated: number; keystoreEntriesRotated: number; error?: string }` -- result of a key rotation operation. |
+
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `ENCRYPTED_PREFIX` | `string` | `'enc:'` — prefix that marks an encrypted env_vars blob, used to distinguish from legacy plaintext JSON. |
 
 ### Exported Classes
 
@@ -77,6 +87,11 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 15. Mnemonic redaction shows only first and last words; strings shorter than 3 words are fully redacted to `'***'`.
 16. `sanitizeLogMessage` detects runs of 20+ consecutive lowercase words and slides a 25-word window to find and redact mnemonic-shaped substrings.
 17. Algorand mnemonics are defined as exactly 25 lowercase alpha words for detection purposes.
+18. `encryptEnvVars` uses synchronous `node:crypto` (not Web Crypto) to avoid async cascades in DB accessors.
+19. `encryptEnvVars` skips encryption for empty objects (`{}`) — no secrets to protect.
+20. `encryptEnvVars` format is `"enc:" + base64(salt(16) + iv(12) + authTag(16) + ciphertext)` using AES-256-GCM with PBKDF2 at 600,000 iterations.
+21. `decryptEnvVars` transparently passes through legacy plaintext JSON (strings not starting with `enc:`).
+22. `encryptEnvVars` uses the same key material as wallet encryption (`WALLET_ENCRYPTION_KEY` via `getEncryptionPassphrase`) but with independent per-entry salt.
 
 ## Behavioral Examples
 
@@ -125,6 +140,21 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 - **When** `sanitizeLogMessage` is called
 - **Then** the mnemonic portion is replaced with a redacted form showing only first and last words
 
+### Scenario: Encrypting and decrypting env vars
+- **Given** a JSON string `'{"API_KEY":"secret123"}'` and `WALLET_ENCRYPTION_KEY` is set
+- **When** `encryptEnvVars` is called followed by `decryptEnvVars` on the result
+- **Then** the decrypted output matches the original JSON string, and the encrypted form starts with `enc:`
+
+### Scenario: Skipping encryption for empty env vars
+- **Given** an empty JSON object string `'{}'`
+- **When** `encryptEnvVars('{}')` is called
+- **Then** it returns `'{}'` unchanged (no encryption applied)
+
+### Scenario: Decrypting legacy plaintext env vars
+- **Given** a stored env_vars string `'{"KEY":"value"}'` (no `enc:` prefix)
+- **When** `decryptEnvVars` is called
+- **Then** the string is returned as-is (plaintext pass-through)
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -141,6 +171,9 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | New passphrase shorter than 32 chars in rotation | Returns `{ success: false }` immediately |
 | `wipeBuffer` called with null/undefined | No-op (guard clause) |
 | Keystore write fails (disk error) | Error logged; temp file cleanup attempted |
+| `decryptEnvVars` with wrong passphrase | `createDecipheriv` throws; error propagates to caller |
+| `decryptEnvVars` with corrupted `enc:` payload | Buffer slicing or decryption fails; error propagates |
+| `isEncrypted` on empty string | Returns false (does not start with `enc:`) |
 
 ## Dependencies
 
@@ -153,6 +186,7 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | `lib/wallet-keystore` | `readKeystore`, `getKeystorePath`, `KeystoreData` used by key-rotation.ts |
 | `db/audit` | `recordAudit` used by key-rotation.ts to log rotation events |
 | Web Crypto API | `crypto.subtle` for PBKDF2, AES-256-GCM encrypt/decrypt |
+| `node:crypto` | Synchronous `createCipheriv`, `createDecipheriv`, `pbkdf2Sync`, `randomBytes` in env-encryption.ts |
 | `node:fs` | File system operations in wallet-keystore.ts and key-rotation.ts |
 | `bun:sqlite` | `Database` type used by key-rotation.ts for DB queries |
 
@@ -169,6 +203,7 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 | `lib/crypto` | `wipeBuffer` from secure-wipe used internally |
 | `lib/logger` | `sanitizeLogMessage` as safety net in structured logging |
 | `middleware/startup` | `looksLikeMnemonic` for startup env validation |
+| `db/projects`, `db/agents` | `encryptEnvVars`, `decryptEnvVars` for encrypting env_vars JSON blobs before DB storage and decrypting on read |
 
 ## Change Log
 
@@ -176,3 +211,4 @@ Provides wallet-level cryptographic operations for the corvid-agent platform: AE
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-08 | CorvidAgent | Added encryptMnemonicWithPassphrase, decryptMnemonicWithPassphrase for KeyProvider integration (#383) |
+| 2026-03-13 | corvid-agent | Added env-encryption (encryptEnvVars, decryptEnvVars, isEncrypted, ENCRYPTED_PREFIX) for env_vars at-rest encryption |

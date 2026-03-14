@@ -5,6 +5,7 @@ status: active
 files:
   - server/flock-directory/on-chain-client.ts
   - server/flock-directory/deploy.ts
+  - server/flock-directory/contract/FlockDirectoryClient.generated.ts
 db_tables:
   - flock_directory_config
 depends_on:
@@ -77,6 +78,52 @@ Typed client facade for the FlockDirectory smart contract on Algorand. Wraps the
 | `TIER_ESTABLISHED` | `3` | Agent has significant test history |
 | `TIER_TRUSTED` | `4` | Highest reputation tier |
 | `TIER_NAMES` | `Record<number, string>` | Maps tier numbers to human-readable names |
+
+### Exported Constants (server/flock-directory/contract/FlockDirectoryClient.generated.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `APP_SPEC` | `Arc56Contract` | ARC-56 application specification for the FlockDirectory smart contract (methods, state schema, byte code) |
+
+### Exported Types (server/flock-directory/contract/FlockDirectoryClient.generated.ts)
+
+| Type | Description |
+|------|-------------|
+| `BinaryState` | Interface for state records containing binary data with `asByteArray()` and `asString()` methods |
+| `Expand` | Utility type that expands types for IntelliSense readability |
+| `AgentRecord` | ARC-56 struct: name, endpoint, metadata, tier, totalScore, totalMaxScore, testCount, lastHeartbeatRound, registrationRound, stake (all bigint) |
+| `TestResult` | ARC-56 struct: score, maxScore (bigint), category (string), round (bigint) |
+| `Challenge` | ARC-56 struct: category, description (string), maxScore, active (bigint) |
+| `FlockDirectoryArgs` | Method argument mappings in both object and tuple form for all contract methods |
+| `FlockDirectoryReturns` | Return type mapping for each contract method |
+| `FlockDirectoryTypes` | Complete type definition: methods (args/returns) and state (global keys, box maps) |
+| `FlockDirectorySignatures` | Union of all valid ABI method signatures |
+| `FlockDirectoryNonVoidMethodSignatures` | Union of method signatures that return non-void values |
+| `CallParams` | Generic call parameter type for ABI method calls |
+| `MethodArgs` | Maps a method signature to its argument types |
+| `MethodReturn` | Maps a method signature to its return type |
+| `GlobalKeysState` | Shape of global state keys: agentCount, minStake, admin, challengeCount, registrationOpen |
+| `BoxKeysState` | Shape of box state keys |
+| `FlockDirectoryCreateCallParams` | Create method parameter types |
+| `FlockDirectoryDeployParams` | Deploy method parameter types |
+| `FlockDirectoryComposer` | Transaction composer type for batching multiple contract calls |
+| `FlockDirectoryComposerResults` | Results type from composed transaction execution |
+
+### Exported Functions (server/flock-directory/contract/FlockDirectoryClient.generated.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `AgentRecordFromTuple` | `(abiTuple: [string, string, string, bigint, bigint, bigint, bigint, bigint, bigint, bigint])` | `AgentRecord` | Converts ABI tuple representation to AgentRecord struct |
+| `TestResultFromTuple` | `(abiTuple: [bigint, bigint, string, bigint])` | `TestResult` | Converts ABI tuple representation to TestResult struct |
+| `ChallengeFromTuple` | `(abiTuple: [string, string, bigint, bigint])` | `Challenge` | Converts ABI tuple representation to Challenge struct |
+
+### Exported Classes (server/flock-directory/contract/FlockDirectoryClient.generated.ts)
+
+| Class | Description |
+|-------|-------------|
+| `FlockDirectoryParamsFactory` | Abstract factory for constructing `AppClient` params objects for all ABI calls |
+| `FlockDirectoryFactory` | Factory for deploying and creating FlockDirectory app clients via AlgoKit AppFactory |
+| `FlockDirectoryClient` | Full typed client for the FlockDirectory smart contract — send calls, compose transactions, read state |
 
 ## Invariants
 
@@ -156,3 +203,4 @@ Typed client facade for the FlockDirectory smart contract on Algorand. Wraps the
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-11 | corvid-agent | Initial spec |
+| 2026-03-13 | corvid-agent | Added FlockDirectoryClient.generated.ts: APP_SPEC, ARC-56 struct types/converters, FlockDirectoryParamsFactory, FlockDirectoryFactory, FlockDirectoryClient, composer types |

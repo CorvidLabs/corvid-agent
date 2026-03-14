@@ -5,10 +5,14 @@ status: draft
 files:
   - server/marketplace/service.ts
   - server/marketplace/types.ts
+  - server/marketplace/analytics.ts
+  - server/marketplace/trials.ts
 db_tables:
   - marketplace_listings
   - marketplace_reviews
   - marketplace_pricing_tiers
+  - marketplace_usage_events
+  - marketplace_trials
 depends_on:
   - specs/db/schema.spec.md
 ---
@@ -54,6 +58,42 @@ Manages the agent marketplace — a registry where agents publish their capabili
 | `recordTierUse` | `(listingId: string, tierId: string, buyerWalletAddress: string)` | `UseResult` | Record tier-based use with billing and rate limiting |
 | `getListingBadges` | `(listingId: string)` | `ListingBadges` | Compute verification badges (verified/trusted/official) for a listing |
 | `checkQualityGates` | `(listingId: string)` | `QualityGateResult` | Validate listing meets quality gates for publishing |
+
+### Exported Classes (server/marketplace/analytics.ts)
+
+| Class | Description |
+|-------|-------------|
+| `MarketplaceAnalytics` | Aggregation queries for listing usage metering — seller analytics and buyer usage summaries |
+
+#### MarketplaceAnalytics Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `constructor` | `db: Database` | `MarketplaceAnalytics` | Creates analytics service with database handle |
+| `recordUsageEvent` | `(listingId: string, userTenantId: string, creditsCharged: number, tierId?: string \| null)` | `void` | Record a usage event for a listing invocation |
+| `getListingAnalytics` | `(listingId: string, days?: number)` | `ListingAnalytics` | Get comprehensive analytics for a listing (seller view): total/7d/30d uses and revenue, unique users, daily buckets, top users |
+| `getDailyUsage` | `(listingId: string, days?: number)` | `DailyBucket[]` | Get daily usage buckets for a listing (default 30 days) |
+| `getTopUsers` | `(listingId: string, limit?: number)` | `TopUser[]` | Get top users for a listing by usage count (default top 10) |
+| `getBuyerUsage` | `(userTenantId: string)` | `BuyerUsageSummary[]` | Get usage summary for a buyer across all listings |
+
+### Exported Classes (server/marketplace/trials.ts)
+
+| Class | Description |
+|-------|-------------|
+| `TrialService` | Manages free trial periods for paid marketplace listings — usage-based and time-based trials |
+
+#### TrialService Methods
+
+| Method | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `constructor` | `db: Database` | `TrialService` | Creates trial service with database handle |
+| `startTrial` | `(listing: MarketplaceListing, tenantId: string)` | `MarketplaceTrial \| null` | Start a free trial. Returns null if no trial configured or trial already exists |
+| `getActiveTrial` | `(listingId: string, tenantId: string)` | `MarketplaceTrial \| null` | Get active trial for a buyer-listing pair. Auto-expires if time/uses exhausted |
+| `getTrial` | `(listingId: string, tenantId: string)` | `MarketplaceTrial \| null` | Get any trial (any status) for a buyer-listing pair |
+| `getTrialById` | `(id: string)` | `MarketplaceTrial \| null` | Get a trial by its ID |
+| `consumeTrialUse` | `(trialId: string)` | `boolean` | Consume one trial use. Returns true if consumed, false if exhausted or expired |
+| `convertTrial` | `(trialId: string)` | `MarketplaceTrial \| null` | Mark a trial as converted (buyer purchased after trial) |
+| `expireTrials` | `()` | `number` | Bulk-expire time-based trials past their expires_at. Called by scheduler. Returns count of expired trials |
 
 ### Exported Types (from `types.ts`)
 
@@ -293,3 +333,4 @@ Each model can be offered in tiers (Basic/Pro/Enterprise) with different rate li
 | 2026-03-07 | owner | Added planned enhancements section with pricing vision (#704-#709) |
 | 2026-03-08 | corvid-agent | Implemented per-use credit billing (#704): `recordUse()` now deducts/credits via instant escrow, `InsufficientCreditsError`, `UseResult`, billing invariants |
 | 2026-03-09 | corvid-agent | Implemented verification badges and quality gates (#708): `getListingBadges()`, `checkQualityGates()`, expanded categories (6 new), search sort/filter enhancements |
+| 2026-03-13 | corvid-agent | Added analytics.ts (MarketplaceAnalytics class: usage metering, seller analytics, buyer summaries) and trials.ts (TrialService class: usage-based and time-based free trials) |

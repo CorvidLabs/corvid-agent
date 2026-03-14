@@ -10,6 +10,7 @@
  *        bun scripts/spec-check.ts --strict     # warnings also fail
  *        bun scripts/spec-check.ts --coverage   # show file/module coverage report
  *        bun scripts/spec-check.ts --generate   # scaffold specs for unspecced modules
+ *        bun scripts/spec-check.ts --require-coverage 100  # fail if coverage < threshold
  * Exit code 0 = all passed (warnings OK unless --strict), 1 = errors found
  */
 
@@ -132,9 +133,9 @@ function getExportedSymbols(filePath: string): string[] {
     const content = stripComments(readFileSync(filePath, 'utf-8'));
     const symbols: string[] = [];
 
-    // Match: export function name, export class name, export interface name,
-    //        export type name, export const name, export enum name
-    const regex = /export\s+(?:async\s+)?(?:function|class|interface|type|const|enum)\s+(\w+)/g;
+    // Match: export function name, export class name, export abstract class name,
+    //        export interface name, export type name, export const name, export enum name
+    const regex = /export\s+(?:async\s+)?(?:abstract\s+)?(?:function|class|interface|type|const|enum)\s+(\w+)/g;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(content)) !== null) {
         symbols.push(match[1]);
@@ -653,6 +654,17 @@ function main(): void {
     const strict = process.argv.includes('--strict');
     const showCoverage = process.argv.includes('--coverage');
     const generate = process.argv.includes('--generate');
+
+    // --require-coverage <N>: fail if file coverage % < N
+    let requiredCoverage: number | null = null;
+    const rcIdx = process.argv.indexOf('--require-coverage');
+    if (rcIdx !== -1 && process.argv[rcIdx + 1]) {
+        requiredCoverage = parseInt(process.argv[rcIdx + 1], 10);
+        if (isNaN(requiredCoverage) || requiredCoverage < 0 || requiredCoverage > 100) {
+            console.error('--require-coverage must be a number between 0 and 100');
+            process.exit(1);
+        }
+    }
     const specFiles = findSpecFiles(SPECS_DIR);
 
     if (specFiles.length === 0) {
@@ -798,6 +810,18 @@ function main(): void {
 
     if (strict && allWarnings > 0) {
         console.log(`\n--strict mode: ${allWarnings} warning(s) treated as errors`);
+        process.exit(1);
+    }
+
+    if (requiredCoverage !== null && coverage.coveragePercent < requiredCoverage) {
+        console.log(
+            `\n--require-coverage ${requiredCoverage}%: actual coverage is ${coverage.coveragePercent}% (${coverage.unspeccedFiles.length} file(s) missing specs)`,
+        );
+        if (coverage.unspeccedFiles.length > 0) {
+            for (const f of coverage.unspeccedFiles) {
+                console.log(`  ✗ ${f}`);
+            }
+        }
         process.exit(1);
     }
 }
