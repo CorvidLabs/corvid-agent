@@ -85,7 +85,7 @@ See `.env.example` for the full list of 50+ configuration options with descripti
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  85 migrations | FTS5 search | WAL mode | foreign keys    |  |
+|  |  7 migrations | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -108,7 +108,7 @@ server/           Bun HTTP + WebSocket server
   algochat/       On-chain messaging (bridge, wallet, directory)
   ast/            Tree-sitter AST parser for code understanding
   billing/        Usage metering and Stripe billing
-  db/             SQLite schema (85 migrations) and query modules
+  db/             SQLite schema (7 migrations) and query modules
   discord/        Bidirectional Discord bridge (raw WebSocket)
   github/         GitHub API operations (PRs, issues, reviews)
   lib/            Shared utilities (logger, crypto, validation, dedup)
@@ -146,7 +146,7 @@ specs/            Module specification documents (38 specs)
 
 ### Database
 
-SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 85 with 81 tables.
+SQLite with embedded migrations in `server/db/schema.ts`. The database is auto-created and migrated on first server start — no separate migration step needed. The current schema version is 7 with 81 tables.
 
 Key patterns:
 - All queries use parameterized statements (no string interpolation)
