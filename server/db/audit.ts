@@ -58,7 +58,8 @@ export type AuditAction =
     | 'key_access_encrypt'
     | 'key_access_sign'
     | 'key_access'
-    | 'key_access_denied';
+    | 'key_access_denied'
+    | 'purge_test_data';
 
 export interface AuditEntry {
     id: number;
