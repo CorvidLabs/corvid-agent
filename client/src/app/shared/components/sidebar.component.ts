@@ -727,7 +727,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     }
 
     /** Focus trap: keep Tab cycling within the sidebar overlay on mobile */
-    protected onTab(event: KeyboardEvent): void {
+    protected onTab(event: Event): void {
         if (!this.sidebarOpen()) return;
         // Only trap focus when sidebar is an overlay (mobile <768px)
         if (typeof window !== 'undefined' && window.innerWidth >= 768) return;
@@ -742,11 +742,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
+        const ke = event as KeyboardEvent;
 
-        if (event.shiftKey && document.activeElement === first) {
+        if (ke.shiftKey && document.activeElement === first) {
             event.preventDefault();
             last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
+        } else if (!ke.shiftKey && document.activeElement === last) {
             event.preventDefault();
             first.focus();
         }
