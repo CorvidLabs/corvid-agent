@@ -6,6 +6,7 @@ import { AgentService } from '../../core/services/agent.service';
 import { SessionService } from '../../core/services/session.service';
 import { PersonaService } from '../../core/services/persona.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { Agent } from '../../core/models/agent.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -33,7 +34,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 @Component({
     selector: 'app-agent-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, DecimalPipe, RelativeTimePipe, AbsoluteTimePipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -149,7 +150,7 @@ const INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
                                     <span class="agent-card__stat-label">Total Cost</span>
                                 </div>
                                 <div class="agent-card__stat">
-                                    <span class="agent-card__stat-value--time">{{ card.lastActive | relativeTime }}</span>
+                                    <span class="agent-card__stat-value--time" [title]="card.lastActive | absoluteTime">{{ card.lastActive | relativeTime }}</span>
                                     <span class="agent-card__stat-label">Last Active</span>
                                 </div>
                             </div>

@@ -6,6 +6,7 @@ import { ScheduleService } from '../../core/services/schedule.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { AgentSchedule, ScheduleExecution, ScheduleAction, ScheduleActionType, ScheduleApprovalPolicy, ScheduleTriggerEvent } from '../../core/models/schedule.model';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
@@ -13,7 +14,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 @Component({
     selector: 'app-schedule-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent, SkeletonComponent],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, DurationPipe, EmptyStateComponent, SkeletonComponent],
     template: `
         <div class="schedules">
             <div class="schedules__header">
@@ -274,6 +275,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                                                                 <span class="exec-type">{{ exec.actionType }}</span>
                                                                 <span class="exec-status" [attr.data-status]="exec.status">{{ exec.status }}</span>
                                                                 <span class="exec-time">{{ exec.startedAt | relativeTime }}</span>
+                                                                <span class="exec-duration">{{ exec.startedAt | duration:exec.completedAt }}</span>
                                                                 @if (exec.result && expandedExecId() !== exec.id) { <span class="exec-result">{{ exec.result | slice:0:100 }}</span> }
                                                                 @if (exec.status === 'running') { <button class="action-btn action-btn--danger" (click)="cancelExecution(exec.id); $event.stopPropagation()">Cancel</button> }
                                                                 @if (exec.sessionId) { <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]" (click)="$event.stopPropagation()">Session</a> }
@@ -301,6 +303,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
                                 <span class="exec-type">{{ exec.actionType }}</span>
                                 <span class="exec-status" [attr.data-status]="exec.status">{{ exec.status }}</span>
                                 <span class="exec-time">{{ exec.startedAt | relativeTime }}</span>
+                                <span class="exec-duration">{{ exec.startedAt | duration:exec.completedAt }}</span>
                                 @if (exec.result && expandedExecId() !== exec.id) { <span class="exec-result">{{ exec.result | slice:0:100 }}</span> }
                                 @if (exec.status === 'running') { <button class="action-btn action-btn--danger" (click)="cancelExecution(exec.id); $event.stopPropagation()">Cancel</button> }
                                 @if (exec.sessionId) { <a class="exec-link" [routerLink]="['/sessions', exec.sessionId]" (click)="$event.stopPropagation()">Session</a> }
@@ -359,7 +362,7 @@ import { SkeletonComponent } from '../../shared/components/skeleton.component';
 .exec-section{margin-top:2rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}.exec-section h3{margin:0 0 .75rem;color:var(--text-primary);font-size:.85rem}.exec-list{display:flex;flex-direction:column;gap:.35rem}
 .exec-row{display:flex;align-items:center;gap:.5rem;padding:.5rem;background:var(--bg-raised);border-radius:var(--radius);font-size:.7rem}.exec-type{font-weight:600;color:var(--text-secondary);min-width:100px}.exec-status{font-size:.6rem;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:var(--radius-sm)}
 .exec-status[data-status="running"]{color:var(--accent-cyan);background:var(--accent-cyan-dim)}.exec-status[data-status="completed"]{color:var(--accent-green);background:var(--accent-green-dim)}.exec-status[data-status="failed"]{color:var(--accent-red);background:var(--accent-red-dim)}.exec-status[data-status="cancelled"]{color:var(--text-tertiary)}.exec-status[data-status="awaiting_approval"]{color:var(--accent-amber);background:var(--accent-amber-dim)}
-.exec-time{color:var(--text-tertiary);font-size:.65rem}.exec-result{color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-link{font-size:.65rem;color:var(--accent-cyan);text-decoration:none;border:1px solid var(--accent-cyan);padding:1px 6px;border-radius:var(--radius-sm)}
+.exec-time{color:var(--text-tertiary);font-size:.65rem}.exec-duration{font-size:.6rem;color:var(--text-tertiary);background:var(--bg-base);padding:1px 5px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:monospace}.exec-result{color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-link{font-size:.65rem;color:var(--accent-cyan);text-decoration:none;border:1px solid var(--accent-cyan);padding:1px 6px;border-radius:var(--radius-sm)}
 .expand-indicator{font-size:.55rem;color:var(--text-tertiary);margin-left:.25rem}.exec-row--clickable{cursor:pointer}.exec-row--clickable:hover{background:var(--bg-hover)}
 .schedule-execs{margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem}.execs-heading{margin:0 0 .5rem;color:var(--text-secondary);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}.loading-execs,.no-execs{font-size:.7rem;color:var(--text-tertiary);margin:0}
 .exec-detail{padding:.5rem;background:var(--bg-base);border-radius:var(--radius);margin-top:.25rem;margin-bottom:.35rem}.exec-detail__result{margin:0;font-size:.7rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}

@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Project } from '../../core/models/project.model';
 import type { Session } from '../../core/models/session.model';
@@ -10,7 +11,7 @@ import type { Session } from '../../core/models/session.model';
 @Component({
     selector: 'app-project-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, StatusBadgeComponent, RelativeTimePipe],
+    imports: [RouterLink, StatusBadgeComponent, SkeletonComponent, RelativeTimePipe],
     template: `
         @if (project(); as p) {
             <div class="page">
@@ -62,7 +63,8 @@ import type { Session } from '../../core/models/session.model';
             </div>
         } @else {
             <div class="page">
-                <p>Loading...</p>
+                <app-skeleton variant="card" [count]="1" />
+                <app-skeleton variant="table" [count]="3" />
             </div>
         }
     `,

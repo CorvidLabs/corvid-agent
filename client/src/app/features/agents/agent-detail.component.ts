@@ -11,6 +11,7 @@ import { PersonaService } from '../../core/services/persona.service';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
+import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import type { Agent } from '../../core/models/agent.model';
 import type { AgentMessage } from '../../core/models/agent-message.model';
@@ -25,7 +26,7 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
 @Component({
     selector: 'app-agent-detail',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent],
+    imports: [RouterLink, RelativeTimePipe, DecimalPipe, FormsModule, StatusBadgeComponent, SkeletonComponent],
     template: `
         @if (agent(); as a) {
             <div class="page">
@@ -296,7 +297,10 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
                 }
             </div>
         } @else {
-            <div class="page"><p>Loading...</p></div>
+            <div class="page">
+                <app-skeleton variant="card" [count]="1" />
+                <app-skeleton variant="table" [count]="4" />
+            </div>
         }
     `,
     styles: `
