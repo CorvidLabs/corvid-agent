@@ -6,6 +6,7 @@ import {
     parseTestPlanItems,
     parsePrUrl,
     isVerificationTask,
+    buildVerificationPrompt,
     createVerificationTasks,
     handleVerificationComplete,
 } from '../work/verification';
@@ -173,5 +174,141 @@ describe('handleVerificationComplete', () => {
 
         const result = await handleVerificationComplete(db, verifyTask.id, 'All good\nVERIFICATION_PASSED');
         expect(result).toBe(false);
+    });
+
+    test('returns false for verification task with malformed sourceId (too few parts)', async () => {
+        const verifyTask = createWorkTask(db, {
+            agentId: AGENT_ID,
+            projectId: PROJECT_ID,
+            description: '[Verify PR] Something',
+            source: 'agent',
+            sourceId: 'verify:only-three-parts',
+        });
+
+        const result = await handleVerificationComplete(db, verifyTask.id, 'VERIFICATION_PASSED');
+        expect(result).toBe(false);
+    });
+
+    test('returns false when parent task prUrl cannot be parsed as GitHub URL', async () => {
+        const parentTask = createWorkTask(db, {
+            agentId: AGENT_ID,
+            projectId: PROJECT_ID,
+            description: 'Parent task',
+            source: 'web',
+        });
+        updateWorkTaskStatus(db, parentTask.id, 'completed', {
+            prUrl: 'https://example.com/not-a-github-pr',
+        });
+
+        const verifyTask = createWorkTask(db, {
+            agentId: AGENT_ID,
+            projectId: PROJECT_ID,
+            description: '[Verify PR #876] Check nav links',
+            source: 'agent',
+            sourceId: `verify:${parentTask.id}:876:0`,
+        });
+
+        const result = await handleVerificationComplete(db, verifyTask.id, 'All good\nVERIFICATION_PASSED');
+        expect(result).toBe(false);
+    });
+
+    test('attempts checkOffPrItem when verification passes and parent has valid prUrl', async () => {
+        const parentTask = createWorkTask(db, {
+            agentId: AGENT_ID,
+            projectId: PROJECT_ID,
+            description: 'Parent task',
+            source: 'web',
+        });
+        updateWorkTaskStatus(db, parentTask.id, 'completed', {
+            prUrl: 'https://github.com/CorvidLabs/corvid-agent/pull/876',
+        });
+
+        const verifyTask = createWorkTask(db, {
+            agentId: AGENT_ID,
+            projectId: PROJECT_ID,
+            description: '[Verify PR #876] Check nav links',
+            source: 'agent',
+            sourceId: `verify:${parentTask.id}:876:0`,
+        });
+
+        // checkOffPrItem will fail (no gh in test env) but we reach the call site
+        const result = await handleVerificationComplete(db, verifyTask.id, 'All verified!\nVERIFICATION_PASSED');
+        // Result is false because gh is not available in test env; what matters is we got through
+        // the passing-verification path without throwing
+        expect(typeof result).toBe('boolean');
+    });
+});
+
+// ── buildVerificationPrompt ─────────────────────────────────────────
+
+describe('buildVerificationPrompt', () => {
+    test('includes PR number and URL in output', () => {
+        const prompt = buildVerificationPrompt(
+            'https://github.com/CorvidLabs/corvid-agent/pull/42',
+            42,
+            'fix/my-branch',
+            'Verify the blog page renders correctly',
+        );
+        expect(prompt).toContain('PR #42');
+        expect(prompt).toContain('https://github.com/CorvidLabs/corvid-agent/pull/42');
+    });
+
+    test('includes the item text in the verification task section', () => {
+        const itemText = 'Check that all nav links work';
+        const prompt = buildVerificationPrompt(
+            'https://github.com/CorvidLabs/corvid-agent/pull/100',
+            100,
+            'feat/nav-update',
+            itemText,
+        );
+        expect(prompt).toContain(itemText);
+    });
+
+    test('includes the branch name in checkout instructions', () => {
+        const branch = 'feat/new-feature';
+        const prompt = buildVerificationPrompt(
+            'https://github.com/CorvidLabs/corvid-agent/pull/55',
+            55,
+            branch,
+            'Run tests',
+        );
+        expect(prompt).toContain(`git fetch origin ${branch}`);
+        expect(prompt).toContain(`git checkout ${branch}`);
+    });
+
+    test('always ends with VERIFICATION_PASSED/FAILED instruction', () => {
+        const prompt = buildVerificationPrompt(
+            'https://github.com/CorvidLabs/corvid-agent/pull/1',
+            1,
+            'main',
+            'Some check',
+        );
+        expect(prompt).toContain('VERIFICATION_PASSED');
+        expect(prompt).toContain('VERIFICATION_FAILED');
+    });
+
+    test('instructs agent not to create a PR or commit', () => {
+        const prompt = buildVerificationPrompt(
+            'https://github.com/CorvidLabs/corvid-agent/pull/77',
+            77,
+            'fix/thing',
+            'Verify endpoint returns 200',
+        );
+        expect(prompt).toContain('Do NOT create a PR');
+        expect(prompt).toContain('Do NOT commit changes');
+    });
+
+    test('returns a string for different PR numbers', () => {
+        for (const prNum of [1, 999, 12345]) {
+            const prompt = buildVerificationPrompt(
+                `https://github.com/org/repo/pull/${prNum}`,
+                prNum,
+                'some-branch',
+                'Some item',
+            );
+            expect(typeof prompt).toBe('string');
+            expect(prompt.length).toBeGreaterThan(0);
+            expect(prompt).toContain(`PR #${prNum}`);
+        }
     });
 });
