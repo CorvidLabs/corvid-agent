@@ -1,5 +1,5 @@
-import { describe, test, expect } from 'bun:test';
-import { truncate, formatUptime } from '../../cli/utils';
+import { describe, test, expect, mock, spyOn } from 'bun:test';
+import { truncate, formatUptime, resolveProjectFromCwd, handleError } from '../../cli/utils';
 
 describe('truncate', () => {
     test('returns string unchanged when under max', () => {
@@ -42,5 +42,60 @@ describe('formatUptime', () => {
 
     test('omits zero minutes for hours', () => {
         expect(formatUptime(7200)).toBe('2h 0m');
+    });
+});
+
+describe('resolveProjectFromCwd', () => {
+    function mockClient(projects: Array<{ id: string; workingDir: string }>) {
+        return { get: mock(() => Promise.resolve(projects)) } as unknown as import('../../cli/client').CorvidClient;
+    }
+
+    test('returns exact match project id', async () => {
+        const cwd = process.cwd();
+        const client = mockClient([{ id: 'proj-1', workingDir: cwd }]);
+        expect(await resolveProjectFromCwd(client)).toBe('proj-1');
+    });
+
+    test('returns prefix match project id', async () => {
+        const cwd = process.cwd();
+        const parentDir = cwd.split('/').slice(0, -1).join('/');
+        const client = mockClient([{ id: 'proj-2', workingDir: parentDir }]);
+        expect(await resolveProjectFromCwd(client)).toBe('proj-2');
+    });
+
+    test('returns undefined when no match', async () => {
+        const client = mockClient([{ id: 'proj-3', workingDir: '/nonexistent/path' }]);
+        expect(await resolveProjectFromCwd(client)).toBeUndefined();
+    });
+
+    test('returns undefined on client error', async () => {
+        const client = { get: mock(() => Promise.reject(new Error('network error'))) } as unknown as import('../../cli/client').CorvidClient;
+        expect(await resolveProjectFromCwd(client)).toBeUndefined();
+    });
+});
+
+describe('handleError', () => {
+    test('extracts message from Error object and exits', () => {
+        const exitSpy = spyOn(process, 'exit').mockImplementation(() => undefined as never);
+        const stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+        try {
+            handleError(new Error('test error'));
+            expect(exitSpy).toHaveBeenCalledWith(1);
+        } finally {
+            exitSpy.mockRestore();
+            stderrSpy.mockRestore();
+        }
+    });
+
+    test('converts non-Error value to string', () => {
+        const exitSpy = spyOn(process, 'exit').mockImplementation(() => undefined as never);
+        const stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+        try {
+            handleError('plain string error');
+            expect(exitSpy).toHaveBeenCalledWith(1);
+        } finally {
+            exitSpy.mockRestore();
+            stderrSpy.mockRestore();
+        }
     });
 });
