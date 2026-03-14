@@ -19,6 +19,8 @@ import { listCouncils, getCouncilLaunch } from '../db/councils';
 import { launchCouncil, onCouncilStageChange } from '../councils/discussion';
 import { createSession } from '../db/sessions';
 import { listProjects } from '../db/projects';
+import { getActiveWorkTasks, countPendingTasks, countActiveTasks } from '../db/work-tasks';
+import { listActiveSchedules } from '../db/schedules';
 import { createLogger } from '../lib/logger';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import {
@@ -101,6 +103,14 @@ export async function registerSlashCommands(
         },
         { name: 'agents', description: 'List all available agents', type: 1 },
         { name: 'status', description: 'Show bot status and active sessions', type: 1 },
+        { name: 'tasks', description: 'View active work tasks and queue status', type: 1 },
+        { name: 'schedule', description: 'Show schedule status and next runs', type: 1 },
+        {
+            name: 'config',
+            description: 'Show current bot configuration (non-sensitive)',
+            type: 1,
+            default_member_permissions: '8',
+        },
         {
             name: 'council',
             description: 'Launch a council deliberation on a topic',
@@ -541,6 +551,101 @@ export async function handleInteraction(
             break;
         }
 
+        case 'tasks': {
+            const active = getActiveWorkTasks(ctx.db);
+            const pendingCount = countPendingTasks(ctx.db);
+            const activeCount = countActiveTasks(ctx.db);
+
+            if (active.length === 0 && pendingCount === 0) {
+                await respondToInteraction(interaction, 'No active or pending work tasks.');
+                break;
+            }
+
+            const statusEmoji: Record<string, string> = {
+                running: '\u{1F7E2}', branching: '\u{1F7E1}', validating: '\u{1F535}',
+                queued: '\u{23F3}', paused: '\u{23F8}',
+            };
+
+            const taskLines = active.slice(0, 10).map(t => {
+                const emoji = statusEmoji[t.status] || '\u{26AA}';
+                const desc = t.description.slice(0, 80) + (t.description.length > 80 ? '...' : '');
+                return `${emoji} **${t.status}** — ${desc}`;
+            });
+
+            const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+                { name: 'Active', value: String(activeCount), inline: true },
+                { name: 'Pending', value: String(pendingCount), inline: true },
+            ];
+
+            if (taskLines.length > 0) {
+                fields.push({ name: 'Tasks', value: taskLines.join('\n'), inline: false });
+            }
+
+            await respondToInteractionEmbed(interaction, {
+                title: 'Work Tasks',
+                color: 0x5865f2,
+                fields,
+                footer: { text: `Showing up to 10 active tasks` },
+            });
+            break;
+        }
+
+        case 'schedule': {
+            const schedules = listActiveSchedules(ctx.db);
+            if (schedules.length === 0) {
+                await respondToInteraction(interaction, 'No active schedules configured.');
+                break;
+            }
+
+            const lines = schedules.slice(0, 15).map(s => {
+                const nextRun = s.nextRunAt
+                    ? `<t:${Math.floor(new Date(s.nextRunAt).getTime() / 1000)}:R>`
+                    : 'not scheduled';
+                const lastRun = s.lastRunAt
+                    ? `<t:${Math.floor(new Date(s.lastRunAt).getTime() / 1000)}:R>`
+                    : 'never';
+                return `\u2022 **${s.name}** — next: ${nextRun} · last: ${lastRun} · runs: ${s.executionCount}`;
+            });
+
+            await respondToInteractionEmbed(interaction, {
+                title: 'Schedules',
+                description: lines.join('\n'),
+                color: 0x57f287,
+                footer: { text: `${schedules.length} active schedule${schedules.length === 1 ? '' : 's'}` },
+            });
+            break;
+        }
+
+        case 'config': {
+            if (permLevel < PermissionLevel.ADMIN) {
+                await respondToInteraction(interaction, 'Only admins can view bot configuration.');
+                break;
+            }
+            const configFields: Array<{ name: string; value: string; inline?: boolean }> = [
+                { name: 'Mode', value: ctx.config.mode || 'chat', inline: true },
+                { name: 'Public Mode', value: ctx.config.publicMode ? 'enabled' : 'disabled', inline: true },
+                { name: 'Active Sessions', value: String(ctx.threadSessions.size), inline: true },
+                { name: 'Channel', value: `<#${ctx.config.channelId}>`, inline: true },
+                { name: 'Default Permission', value: String(ctx.config.defaultPermissionLevel ?? 1), inline: true },
+            ];
+
+            const additionalChannels = ctx.config.additionalChannelIds ?? [];
+            if (additionalChannels.length > 0) {
+                configFields.push({
+                    name: 'Additional Channels',
+                    value: additionalChannels.map(id => `<#${id}>`).join(', '),
+                    inline: false,
+                });
+            }
+
+            await respondToInteractionEmbed(interaction, {
+                title: 'Bot Configuration',
+                color: 0x5865f2,
+                fields: configFields,
+            }, true); // ephemeral — only visible to the admin
+            break;
+        }
+
         case 'council': {
             if (permLevel < PermissionLevel.ADMIN) {
                 await respondToInteraction(interaction, 'Council deliberation requires admin permissions.');
@@ -686,6 +791,8 @@ export async function handleInteraction(
                         value: [
                             '`/agents` — List all available agents and models',
                             '`/status` — Show active sessions and bot status',
+                            '`/tasks` — View active work tasks and queue status',
+                            '`/schedule` — Show schedule status and next runs',
                             '`/help` — Show this help message',
                         ].join('\n'),
                         inline: false,
@@ -702,6 +809,7 @@ export async function handleInteraction(
                     {
                         name: 'Admin Configuration',
                         value: [
+                            '`/config` — Show current bot configuration',
                             '`/admin channels add/remove/list` — Manage monitored channels',
                             '`/admin users add/remove/list` — Manage allowed users',
                             '`/admin roles set/remove/list` — Manage role permissions',

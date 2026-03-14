@@ -221,7 +221,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 21. **Role-based access control**: Permission levels (BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3). In legacy mode, `allowedUserIds` grants ADMIN level. In `publicMode`, permissions are resolved from Discord roles via `rolePermissions` config. Highest matching role wins. Muted users are always BLOCKED
 22. **Tiered rate limiting**: Each user is limited per 60-second sliding window. Default is 10 messages. Can be customized per permission level via `rateLimitByLevel` config (e.g., BASIC=3, STANDARD=10, ADMIN=50)
 23. **Prompt injection scanning**: All incoming messages (channel @mentions and thread messages) are scanned via `scanForInjection()`. Blocked messages are audited and rejected
-24. **Permission-gated commands**: `/session` requires STANDARD or higher. `/council`, `/mute`, `/unmute`, `/admin` require ADMIN. `/agents`, `/status`, `/help` require BASIC
+24. **Permission-gated commands**: `/session` requires STANDARD or higher. `/council`, `/mute`, `/unmute`, `/admin`, `/config` require ADMIN. `/agents`, `/status`, `/tasks`, `/schedule`, `/help` require BASIC
 25. **User muting**: Admins can mute/unmute users via `/mute` and `/unmute` slash commands. Muted users cannot interact with the bot regardless of their role permissions
 
 ### Response Formatting
@@ -237,12 +237,15 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 ### Commands
 
-32. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/work`, `/agents`, `/status`, `/council`, `/mute`, `/unmute`, `/help`, `/admin`
+32. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/work`, `/agents`, `/status`, `/tasks`, `/schedule`, `/config`, `/council`, `/mute`, `/unmute`, `/help`, `/admin`
 33. **`/session` command** (interactive chat): Creates a new Discord thread with a live agent session. The user can go back and forth with the agent in real-time. Required options: `agent` (dropdown, capped at 25), `topic` (string, thread name). Optional: `project` (dropdown). The thread is created in the configured channel with the selected agent bound to it. Use `/session` when you want to **discuss, explore, or guide** the agent interactively
 34. **`/work` command** (autonomous task): Creates an async work task — the agent works autonomously (clones repo, makes changes, creates a PR) without further interaction. Required: `description` (what to do). Optional: `agent` (dropdown), `project` (dropdown). Responds with a rich confirmation embed showing task ID, agent, and status. Sends a completion notification with PR link (or error details) when done, mentioning the requester. Use `/work` when you want to **assign a task** and get notified with a PR
 35. **`/agents` command**: Lists all available agents with their models. Does not create a session
 36. **`/status` command**: Shows the bot's current status and active sessions
-37. **`/council` command**: Launches a council discussion on a given topic
+37. **`/tasks` command**: Shows active work tasks and queue status as a rich embed with task descriptions, statuses, and counts
+38. **`/schedule` command**: Shows all active schedules with next/last run times (using Discord relative timestamps) and execution counts
+39. **`/config` command** (admin-only): Shows current bot configuration (mode, public mode, channels, default permission level) as an ephemeral embed. Does not expose sensitive values (tokens, secrets)
+40. **`/council` command**: Launches a council discussion on a given topic
 38. **`/help` command**: Shows available commands and usage
 39. **Text commands deprecated**: Text commands (messages starting with `/`) are no longer parsed from regular channel messages. All commands use Discord's slash command system (requires `appId`)
 40. **Work intake mode**: When `mode='work_intake'`, @mentions and thread messages create async work tasks via `WorkTaskService` instead of chat sessions. Embeds are used for task status feedback
@@ -264,7 +267,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 - **Given** a Discord bridge with `appId` configured
 - **When** `start()` is called
-- **Then** slash commands (`session`, `work`, `agents`, `status`, `council`, `help`, `mute`, `unmute`) are registered via PUT to the Discord API
+- **Then** slash commands (`session`, `work`, `agents`, `status`, `tasks`, `schedule`, `config`, `council`, `help`, `mute`, `unmute`) are registered via PUT to the Discord API
 - **When** a guild ID is also configured
 - **Then** commands are registered as guild-scoped (instant availability) instead of global (up to 1 hour propagation)
 
@@ -433,3 +436,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-10 | corvid-agent | v8: Added `/work` slash command for autonomous task creation (agent works independently, creates PR, notifies on completion). Added optional `project` dropdown to `/session`. Rich embed confirmations for `/work` with task status, agent, branch. Completion notifications @mention the requester. Added `sendMessageWithEmbed` for content+embed messages. AlgoChat `/work` now supports `--project <name>` flag. Clear documentation differentiating `/session` (interactive chat) vs `/work` (fire-and-forget task) |
 | 2026-03-10 | corvid-agent | v9: `/admin` slash command with subcommand groups for managing channels (add/remove/list), users (add/remove/list), roles (set/remove/list), bridge mode, and public mode — all from within Discord using native mentions. `DiscordInteractionOption` recursive type for nested subcommands. Audit logging on every config mutation. `/help` updated with Admin Configuration section. 20 new tests |
 | 2026-03-11 | corvid-agent | v10: Decomposed bridge.ts (2688→367 lines) into 6 extracted modules: `commands.ts` (slash command registration & handling), `admin-commands.ts` (/admin subcommands), `embeds.ts` (Discord API helpers & embed builders), `message-handler.ts` (message routing & dispatch), `permissions.ts` (RBAC & rate limiting), `thread-manager.ts` (thread lifecycle & streaming). Bridge.ts retained as thin orchestration layer. No behavioral changes — pure refactoring. Closes #932 |
+| 2026-03-14 | corvid-agent | v11: Added `/tasks`, `/schedule`, `/config` slash commands. `/tasks` shows active work tasks with status emojis and queue counts. `/schedule` shows active schedules with Discord relative timestamps for next/last runs. `/config` is admin-only ephemeral embed showing mode, channels, and permission settings. Updated `/help` embed. 6 new tests. Closes #894 |
