@@ -86,12 +86,15 @@ describe('ProviderRegistry', () => {
     const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
     const savedOpenaiKey = process.env.OPENAI_API_KEY;
     const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+    const savedOllamaFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
     let registry: LlmProviderRegistry;
 
     beforeEach(() => {
         // Ensure cloud keys are set so register() doesn't auto-restrict
         process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
         process.env.OPENAI_API_KEY = 'sk-test';
+        // Enable Ollama for tests that explicitly register it
+        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
         delete process.env.ENABLED_PROVIDERS;
         // Reset cached claude CLI detection so hasClaudeAccess() re-evaluates
         _resetClaudeCliCache(null);
@@ -107,6 +110,8 @@ describe('ProviderRegistry', () => {
         else process.env.OPENAI_API_KEY = savedOpenaiKey;
         if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
         else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+        if (savedOllamaFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+        else process.env.OLLAMA_LOCAL_EXPERIMENTAL = savedOllamaFlag;
     });
 
     test('register and get a provider', () => {
@@ -492,6 +497,7 @@ describe('FallbackManager', () => {
     const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
     const savedOpenaiKey = process.env.OPENAI_API_KEY;
     const savedEnabledProviders = process.env.ENABLED_PROVIDERS;
+    const savedOllamaFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
     let registry: LlmProviderRegistry;
     let fallback: FallbackManager;
 
@@ -500,6 +506,8 @@ describe('FallbackManager', () => {
         process.env.OPENAI_API_KEY = 'sk-test';
         // Explicitly allow all providers to avoid env interference from other test files
         process.env.ENABLED_PROVIDERS = 'anthropic,openai,ollama';
+        // Enable Ollama for fallback chain tests (experimental flag required)
+        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
         _resetClaudeCliCache(null);
         registry = freshRegistry();
     });
@@ -512,6 +520,8 @@ describe('FallbackManager', () => {
         else process.env.OPENAI_API_KEY = savedOpenaiKey;
         if (savedEnabledProviders === undefined) delete process.env.ENABLED_PROVIDERS;
         else process.env.ENABLED_PROVIDERS = savedEnabledProviders;
+        if (savedOllamaFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+        else process.env.OLLAMA_LOCAL_EXPERIMENTAL = savedOllamaFlag;
     });
 
     // ─── Provider health tracking ─────────────────────────────────────

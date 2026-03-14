@@ -30,39 +30,56 @@ export interface FallbackChain {
 
 /**
  * Default fallback chains for common scenarios.
+ *
+ * Council decision 2026-03-13: Claude-First dispatch.
+ *   - Production chains use Claude (Anthropic) exclusively.
+ *   - OpenAI is retained as a secondary fallback for resilience.
+ *   - Ollama entries are removed from production paths; they only appear in the
+ *     'local' and 'local-experimental' chains, which are only reachable when
+ *     OLLAMA_LOCAL_EXPERIMENTAL=true.
+ *   - Fallback = task queue (TaskQueueService), NOT model degradation.
  */
 export const DEFAULT_FALLBACK_CHAINS: Record<string, FallbackChain> = {
+    /** High-capability chain: council sessions, architecture decisions. */
     'high-capability': {
         chain: [
             { provider: 'anthropic', model: 'claude-opus-4-6' },
-            { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+            { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'openai', model: 'o3' },
-            { provider: 'ollama', model: 'qwen3:14b' },
         ],
     },
+    /** Balanced chain: work tasks, code generation, specialist agents. */
     'balanced': {
         chain: [
             { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-            { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+            { provider: 'openai', model: 'gpt-4.1' },
             { provider: 'openai', model: 'gpt-4.1-mini' },
-            { provider: 'ollama', model: 'llama3.3' },
         ],
     },
+    /** Cost-optimized chain: routing, triage, lightweight classification. */
     'cost-optimized': {
         chain: [
-            { provider: 'ollama', model: 'llama3.3' },
+            { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
             { provider: 'openai', model: 'gpt-4.1-nano' },
             { provider: 'openai', model: 'gpt-4o-mini' },
-            { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
         ],
     },
+    /**
+     * Local chain: only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
+     * Not on production dispatch path.
+     */
     'local': {
         chain: [
             { provider: 'ollama', model: 'qwen3:14b' },
         ],
     },
+    /**
+     * Cloud chain: Ollama cloud relay models.
+     * Only used when OLLAMA_LOCAL_EXPERIMENTAL=true.
+     * Not on production dispatch path.
+     */
     'cloud': {
         chain: [
             { provider: 'ollama', model: 'qwen3.5:cloud' },

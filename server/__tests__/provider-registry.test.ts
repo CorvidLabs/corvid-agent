@@ -67,6 +67,7 @@ function resetRegistrySingleton(): void {
 describe('LlmProviderRegistry', () => {
     const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
     const savedOpenaiKey = process.env.OPENAI_API_KEY;
+    const savedOllamaFlag = process.env.OLLAMA_LOCAL_EXPERIMENTAL;
 
     beforeEach(() => {
         resetRegistrySingleton();
@@ -74,6 +75,8 @@ describe('LlmProviderRegistry', () => {
         // Set dummy API keys so auto-restrict to ollama-only doesn't kick in
         process.env.ANTHROPIC_API_KEY = 'sk-ant-test-dummy';
         process.env.OPENAI_API_KEY = 'sk-test-dummy';
+        // Enable Ollama for registry tests that explicitly register it
+        process.env.OLLAMA_LOCAL_EXPERIMENTAL = 'true';
     });
 
     afterEach(() => {
@@ -82,6 +85,8 @@ describe('LlmProviderRegistry', () => {
         else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
         if (savedOpenaiKey === undefined) delete process.env.OPENAI_API_KEY;
         else process.env.OPENAI_API_KEY = savedOpenaiKey;
+        if (savedOllamaFlag === undefined) delete process.env.OLLAMA_LOCAL_EXPERIMENTAL;
+        else process.env.OLLAMA_LOCAL_EXPERIMENTAL = savedOllamaFlag;
     });
 
     // ── Singleton ────────────────────────────────────────────────────────

@@ -1,6 +1,22 @@
 export type LlmProviderType = 'anthropic' | 'openai' | 'ollama';
 export type ExecutionMode = 'managed' | 'direct';
 
+/**
+ * ModelTier — Structured Claude-First dispatch tiers.
+ *
+ * Maps semantic task categories to the appropriate Claude model family.
+ * Council decision 2026-03-13 (5-0): Opus/Sonnet/Haiku tiered dispatch.
+ *
+ *   OPUS   — council sessions, architecture decisions, complex reasoning
+ *   SONNET — work tasks, code generation, specialist agents
+ *   HAIKU  — routing decisions, triage, lightweight classification
+ */
+export enum ModelTier {
+    OPUS   = 'opus',   // claude-opus-4-6
+    SONNET = 'sonnet', // claude-sonnet-4-6
+    HAIKU  = 'haiku',  // claude-haiku-4-5-20251001
+}
+
 export interface JsonSchemaProperty {
     type: string;
     description?: string;
