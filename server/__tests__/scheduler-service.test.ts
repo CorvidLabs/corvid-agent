@@ -41,15 +41,15 @@ function createMockProcessManager(): ProcessManager {
     } as unknown as ProcessManager;
 }
 
-let projectCounter = 0;
+let _testCounter = 0;
 function createTestAgentAndProject() {
-    projectCounter++;
+    _testCounter++;
     const project = createProject(db, {
-        name: `TestProject-${projectCounter}`,
+        name: `TestProject-${_testCounter}-${Date.now()}`,
         workingDir: '/tmp/test-project',
     });
     const agent = createAgent(db, {
-        name: `TestAgent-${projectCounter}`,
+        name: `TestAgent-${_testCounter}`,
         defaultProjectId: project.id,
     });
     return { agent, project };
