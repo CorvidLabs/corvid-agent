@@ -5,6 +5,7 @@ import { chatCommand } from './commands/chat';
 import { sessionCommand } from './commands/session';
 import { agentCommand } from './commands/agent';
 import { configCommand } from './commands/config';
+import { loginCommand, logoutCommand } from './commands/login';
 import { interactiveCommand } from './commands/interactive';
 import { initCommand } from './commands/init';
 import { demoCommand } from './commands/demo';
@@ -66,6 +67,8 @@ ${c.bold}Commands:${c.reset}
   ${c.cyan('chat')} <prompt>                     Send a message to an agent
   ${c.cyan('session')} list|get|stop|resume      Manage sessions
   ${c.cyan('agent')} list|get|create             Manage agents
+  ${c.cyan('login')}                             Log in to CorvidAgent Cloud
+  ${c.cyan('logout')}                            Log out (remove saved token)
   ${c.cyan('config')} show|get|set               Manage CLI configuration
 
 ${c.bold}Global Options:${c.reset}
@@ -190,6 +193,14 @@ async function main(): Promise<void> {
             }
             break;
         }
+
+        case 'login':
+            await loginCommand(getFlag('server'));
+            break;
+
+        case 'logout':
+            await logoutCommand();
+            break;
 
         case 'config': {
             const action = (getPositional(0) ?? 'show') as 'show' | 'get' | 'set';

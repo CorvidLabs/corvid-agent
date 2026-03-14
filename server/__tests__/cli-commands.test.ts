@@ -109,4 +109,14 @@ describe('CLI Command Modules', () => {
         const { agentCommand } = await import('../../cli/commands/agent');
         expect(typeof agentCommand).toBe('function');
     });
+
+    test('login command module exports loginCommand', async () => {
+        const { loginCommand } = await import('../../cli/commands/login');
+        expect(typeof loginCommand).toBe('function');
+    });
+
+    test('login command module exports logoutCommand', async () => {
+        const { logoutCommand } = await import('../../cli/commands/login');
+        expect(typeof logoutCommand).toBe('function');
+    });
 });
