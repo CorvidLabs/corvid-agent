@@ -606,8 +606,6 @@ function generateSpecsForUnspeccedModules(report: CoverageReport): number {
         const specDir = join(SPECS_DIR, moduleName);
         const specFile = join(specDir, `${moduleName}.spec.md`);
 
-        if (existsSync(specFile)) continue;
-
         // Find server files for this module
         const moduleDir = join(ROOT, 'server', moduleName);
         const moduleFiles = findServerFiles(moduleDir)
@@ -617,7 +615,13 @@ function generateSpecsForUnspeccedModules(report: CoverageReport): number {
         if (moduleFiles.length === 0) continue;
 
         mkdirSync(specDir, { recursive: true });
-        writeFileSync(specFile, generateSpec(moduleName, moduleFiles));
+        // Use wx flag to atomically create-or-fail, avoiding TOCTOU race (CWE-367)
+        try {
+            writeFileSync(specFile, generateSpec(moduleName, moduleFiles), { flag: 'wx' });
+        } catch (e: unknown) {
+            if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'EEXIST') continue;
+            throw e;
+        }
         console.log(`  \u2713 Generated ${relative(ROOT, specFile)} (${moduleFiles.length} files)`);
         generated++;
     }
