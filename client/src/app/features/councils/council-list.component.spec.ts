@@ -192,7 +192,7 @@ describe('CouncilListComponent', () => {
 
         const msg = hostEl.querySelector('.empty-filtered');
         expect(msg).toBeTruthy();
-        expect(msg!.textContent).toContain('test-data filter');
+        expect(msg!.textContent).toContain('No councils match');
     });
 
     it('should render member chips with chairman highlighted', () => {
