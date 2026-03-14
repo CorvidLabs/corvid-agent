@@ -33,6 +33,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AstParserService } from '../ast/service';
 import { generateRepoMap, extractRelevantSymbols } from './repo-map';
 import { createWorktree, removeWorktree } from '../lib/worktree';
+import { assessImpact, GOVERNANCE_TIERS, type GovernanceImpact } from '../councils/governance';
 
 const log = createLogger('WorkTaskService');
 
@@ -595,8 +596,37 @@ export class WorkTaskService {
             ? extractRelevantSymbols(this.astParserService, worktreeDir, task.description)
             : null;
 
-        // Build work prompt
-        const prompt = this.buildWorkPrompt(branchName, task.description, repoMap ?? undefined, relevantSymbols ?? undefined);
+        // Assess governance impact of the task
+        const governanceImpact = this.assessGovernanceImpact(task.description);
+        if (governanceImpact) {
+            log.info('Work task governance impact assessed', {
+                taskId: task.id,
+                tier: governanceImpact.tier,
+                tierLabel: governanceImpact.tierLabel,
+                blockedFromAutomation: governanceImpact.blockedFromAutomation,
+                affectedPaths: governanceImpact.affectedPaths.map((p) => `${p.path} (Layer ${p.tier})`),
+            });
+
+            // Hard-block tasks that explicitly target Layer 0 files
+            if (governanceImpact.tier === 0) {
+                updateWorkTaskStatus(this.db, task.id, 'failed', {
+                    error: `Blocked: task references Layer 0 (Constitutional) files that require human-only commits — ${governanceImpact.affectedPaths.filter((p) => p.tier === 0).map((p) => p.path).join(', ')}`,
+                });
+                recordAudit(
+                    this.db,
+                    'work_task_governance_blocked',
+                    `agent:${agent.id}`,
+                    'work_task',
+                    task.id,
+                    `Layer 0 governance block: ${governanceImpact.affectedPaths.filter((p) => p.tier === 0).map((p) => p.path).join(', ')}`,
+                );
+                const failed = getWorkTask(this.db, task.id);
+                return failed ?? task;
+            }
+        }
+
+        // Build work prompt (includes governance warnings for Layer 1 paths)
+        const prompt = this.buildWorkPrompt(branchName, task.description, repoMap ?? undefined, relevantSymbols ?? undefined, governanceImpact);
 
         // Create session with workDir pointing to the worktree
         const session = createSession(this.db, {
@@ -1030,7 +1060,30 @@ Important: You MUST ensure all validation passes and output the PR URL.`;
         await removeWorktree(project.workingDir, task.worktreeDir);
     }
 
-    private buildWorkPrompt(branchName: string, description: string, repoMap?: string, relevantSymbols?: string): string {
+    /**
+     * Extract file paths referenced in a task description.
+     * Matches patterns like `server/foo/bar.ts`, `src/component.tsx`, etc.
+     */
+    private extractReferencedPaths(description: string): string[] {
+        const pathPattern = /(?:^|\s|`|"|'|\()((?:server|src|shared|cli|specs|scripts)\/[\w./-]+\.(?:ts|tsx|js|json|md|sql)|(?:CLAUDE\.md|package\.json|tsconfig\.json|\.env\b[\w.]*))/g;
+        const paths = new Set<string>();
+        let match: RegExpExecArray | null;
+        while ((match = pathPattern.exec(description)) !== null) {
+            paths.add(match[1]);
+        }
+        return [...paths];
+    }
+
+    /**
+     * Assess governance impact of a work task based on file paths in its description.
+     */
+    private assessGovernanceImpact(description: string): GovernanceImpact | null {
+        const referencedPaths = this.extractReferencedPaths(description);
+        if (referencedPaths.length === 0) return null;
+        return assessImpact(referencedPaths);
+    }
+
+    private buildWorkPrompt(branchName: string, description: string, repoMap?: string, relevantSymbols?: string, governanceImpact?: GovernanceImpact | null): string {
         const repoMapSection = repoMap
             ? `\n## Repository Map\nTop-level exported symbols per file (with line ranges):\n\`\`\`\n${repoMap}\`\`\`\n`
             : '';
@@ -1039,11 +1092,21 @@ Important: You MUST ensure all validation passes and output the PR URL.`;
             ? `\n## Relevant Symbols\nSymbols matching keywords from the task description — likely starting points:\n\`\`\`\n${relevantSymbols}\n\`\`\`\nUse \`corvid_code_symbols\` and \`corvid_find_references\` tools for deeper exploration of these symbols.\n`
             : '';
 
+        // Build governance warning section if there are restricted paths
+        let governanceSection = '';
+        if (governanceImpact && governanceImpact.tier < 2) {
+            const restrictedPaths = governanceImpact.affectedPaths
+                .filter((p) => p.tier < 2)
+                .map((p) => `- \`${p.path}\` — Layer ${p.tier} (${GOVERNANCE_TIERS[p.tier].label})`)
+                .join('\n');
+            governanceSection = `\n## Governance Restrictions\nThe following files are protected by governance tiers and MUST NOT be modified by automated workflows:\n${restrictedPaths}\nLayer 0 (Constitutional) files require human-only commits. Layer 1 (Structural) files require supermajority council vote + human approval.\nIf your task requires changes to these files, document the needed changes in the PR description but do NOT modify them directly.\n`;
+        }
+
         return `You are working on a task. A git branch "${branchName}" has been created and checked out.
 
 ## Task
 ${description}
-${repoMapSection}${relevantSymbolsSection}
+${repoMapSection}${relevantSymbolsSection}${governanceSection}
 ## Instructions
 1. Explore the codebase as needed to understand the context.
 2. Implement the changes on this branch.

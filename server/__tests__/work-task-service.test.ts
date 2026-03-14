@@ -1771,3 +1771,95 @@ describe('Startup recovery with iteration limit', () => {
         expect(maxed?.error).toBe('Interrupted by server restart');
     });
 });
+
+// ─── Governance impact classification ────────────────────────────────────────
+
+describe('governance impact classification', () => {
+    test('blocks task referencing Layer 0 file (governance.ts)', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Refactor server/councils/governance.ts to add new tier',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('failed');
+        expect(task.error).toContain('Layer 0');
+        expect(task.error).toContain('Constitutional');
+    });
+
+    test('blocks task referencing Layer 0 file (spending.ts via substring)', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Modify server/algochat/spending.ts limits',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('failed');
+        expect(task.error).toContain('Layer 0');
+    });
+
+    test('allows task referencing Layer 1 file (proceeds with governance warning)', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Update server/db/migrations/077_foo.sql for new column',
+            projectId: project.id,
+        });
+
+        expect(task.status).not.toBe('failed');
+    });
+
+    test('allows task with no file path references', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Fix the login bug in the auth flow',
+            projectId: project.id,
+        });
+
+        expect(task.status).not.toBe('failed');
+    });
+
+    test('blocks task referencing protected-paths.ts (Layer 0 substring)', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Update server/process/protected-paths.ts to add new path',
+            projectId: project.id,
+        });
+
+        expect(task.status).toBe('failed');
+        expect(task.error).toContain('Layer 0');
+    });
+
+    test('allows task referencing Layer 2 file (server/routes/analytics.ts)', async () => {
+        const agent = createAgent(db, { name: 'TestAgent' });
+        const project = createProject(db, { name: 'P', workingDir: '/tmp/p' });
+        queueSuccessfulSpawns(2);
+
+        const task = await service.create({
+            agentId: agent.id,
+            description: 'Add new endpoint in server/routes/analytics.ts',
+            projectId: project.id,
+        });
+
+        expect(task.status).not.toBe('failed');
+    });
+});

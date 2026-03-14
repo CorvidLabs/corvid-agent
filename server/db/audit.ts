@@ -26,6 +26,7 @@ export type AuditAction =
     | 'work_task_create'
     | 'work_task_complete'
     | 'work_task_retry'
+    | 'work_task_governance_blocked'
     | 'workflow_create'
     | 'workflow_trigger'
     | 'agent_message_send'
