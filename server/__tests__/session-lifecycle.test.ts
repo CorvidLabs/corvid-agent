@@ -14,7 +14,7 @@ let db: Database;
 let manager: SessionLifecycleManager;
 
 function insertProject(id = 'proj-1') {
-    db.query("INSERT OR IGNORE INTO projects (id, name, working_dir) VALUES (?, 'Test', '/tmp')").run(id);
+    db.query("INSERT OR IGNORE INTO projects (id, name, working_dir) VALUES (?, ?, '/tmp')").run(id, `Project ${id}`);
 }
 
 function insertSession(id: string, projectId = 'proj-1', status = 'idle', updatedAt?: string) {
