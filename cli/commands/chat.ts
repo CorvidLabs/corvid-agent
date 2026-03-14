@@ -27,11 +27,13 @@ export async function chatCommand(prompt: string, options: ChatOptions): Promise
 
     let done = false;
     let hasStreamContent = false;
+    let resolveCompletion: (() => void) | null = null;
 
     const markDone = () => {
         if (done) return;
         flushStreamBuffer();
         done = true;
+        resolveCompletion?.();
     };
 
     const ws = client.connectWebSocket((msg: ServerMessage) => {
@@ -60,15 +62,17 @@ export async function chatCommand(prompt: string, options: ChatOptions): Promise
         projectId: projectId ?? undefined,
     });
 
-    // Wait for completion
+    // Wait for completion via direct callback (no polling)
     await new Promise<void>((resolve) => {
-        const check = setInterval(() => {
-            if (done) {
-                clearInterval(check);
-                ws.close();
-                resolve();
-            }
-        }, 100);
+        if (done) {
+            ws.close();
+            resolve();
+            return;
+        }
+        resolveCompletion = () => {
+            ws.close();
+            resolve();
+        };
     });
 
     console.log(); // Final newline
