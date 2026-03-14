@@ -40,7 +40,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Database tables | 92 |
 | Database migrations | 8 (squashed baseline) |
 | MCP tools | 41 corvid_* handlers |
-| Unit tests | 6,655 across 278 files |
+| Unit tests | 6,803 across 286 files |
 | E2E tests | 360 across 31 Playwright specs |
 | Security tests | 232 dedicated |
 | Module specs | 128 .spec.md files |
