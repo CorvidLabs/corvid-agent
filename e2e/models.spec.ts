@@ -79,18 +79,22 @@ test.describe('Models', () => {
     });
 
     test('API status and models endpoints', async ({}) => {
-        // Status
+        // Status — may return 503 when Ollama is gated behind feature flag
         const statusRes = await authedFetch(`${BASE_URL}/api/ollama/status`);
-        expect(statusRes.ok).toBe(true);
+        expect([200, 503]).toContain(statusRes.status);
         const status = await statusRes.json();
-        expect(typeof status.available).toBe('boolean');
+        if (statusRes.ok) {
+            expect(typeof status.available).toBe('boolean');
+        } else {
+            // Ollama provider not registered (feature flag off)
+            expect(status.available).toBe(false);
+        }
 
-        // Models list (may be empty if Ollama not running)
+        // Models list (may be empty if Ollama not running, or 503 if gated)
         const modelsRes = await authedFetch(`${BASE_URL}/api/ollama/models`);
-        // Accept 200 (ok) or 502/503 (Ollama unavailable)
         expect([200, 502, 503]).toContain(modelsRes.status);
 
-        // Library search
+        // Library search — works even without Ollama provider
         const libraryRes = await authedFetch(`${BASE_URL}/api/ollama/library?q=test`);
         expect(libraryRes.ok).toBe(true);
     });
