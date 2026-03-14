@@ -55,7 +55,7 @@ export function purgeTestData(db: Database, options: { dryRun?: boolean } = {}):
     const councilWhere = buildLikeClause('name');
     const testCouncils = db
         .query(`SELECT id, name FROM councils WHERE ${councilWhere}`)
-        .all(...likeParams()) as { id: string; name: string }[];
+        .all(likeParams()) as { id: string; name: string }[];
 
     // Find test sessions (by name or linked to test councils)
     const sessionWhere = buildLikeClause('name');
@@ -68,7 +68,7 @@ export function purgeTestData(db: Database, options: { dryRun?: boolean } = {}):
                 SELECT id FROM council_launches WHERE council_id IN (${councilPlaceholders})
             )`
         )
-        .all(...likeParams(), ...councilIds) as { id: string; name: string }[];
+        .all([...likeParams(), ...councilIds]) as { id: string; name: string }[];
 
     const sessionIds = testSessions.map((s) => s.id);
 
@@ -98,28 +98,28 @@ export function purgeTestData(db: Database, options: { dryRun?: boolean } = {}):
         // 1. Delete session messages for matched sessions
         if (sessionIds.length > 0) {
             const ph = sessionIds.map(() => '?').join(',');
-            const r = db.run(`DELETE FROM session_messages WHERE session_id IN (${ph})`, ...sessionIds);
+            const r = db.run(`DELETE FROM session_messages WHERE session_id IN (${ph})`, sessionIds);
             sessionMessages = r.changes;
         }
 
         // 2. Delete matched sessions
         if (sessionIds.length > 0) {
             const ph = sessionIds.map(() => '?').join(',');
-            const r = db.run(`DELETE FROM sessions WHERE id IN (${ph})`, ...sessionIds);
+            const r = db.run(`DELETE FROM sessions WHERE id IN (${ph})`, sessionIds);
             sessions = r.changes;
         }
 
         // 3. Delete council launches (cascade handles logs + discussion messages)
         if (councilIds.length > 0) {
             const ph = councilIds.map(() => '?').join(',');
-            const r = db.run(`DELETE FROM council_launches WHERE council_id IN (${ph})`, ...councilIds);
+            const r = db.run(`DELETE FROM council_launches WHERE council_id IN (${ph})`, councilIds);
             councilLaunches = r.changes;
         }
 
         // 4. Delete councils (cascade handles council_members)
         if (councilIds.length > 0) {
             const ph = councilIds.map(() => '?').join(',');
-            const r = db.run(`DELETE FROM councils WHERE id IN (${ph})`, ...councilIds);
+            const r = db.run(`DELETE FROM councils WHERE id IN (${ph})`, councilIds);
             councils = r.changes;
         }
 

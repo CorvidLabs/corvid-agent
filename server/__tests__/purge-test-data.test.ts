@@ -17,30 +17,30 @@ afterEach(() => {
 
 function seedProject(name = 'Real Project'): string {
     const id = crypto.randomUUID();
-    db.run('INSERT INTO projects (id, name, working_dir) VALUES (?, ?, ?)', id, name, '/tmp');
+    db.run('INSERT INTO projects (id, name, working_dir) VALUES (?, ?, ?)', [id, name, '/tmp']);
     return id;
 }
 
 function seedAgent(name = 'Real Agent'): string {
     const id = crypto.randomUUID();
-    db.run('INSERT INTO agents (id, name) VALUES (?, ?)', id, name);
+    db.run('INSERT INTO agents (id, name) VALUES (?, ?)', [id, name]);
     return id;
 }
 
 function seedCouncil(name: string, agentId: string): string {
     const id = crypto.randomUUID();
-    db.run('INSERT INTO councils (id, name, chairman_agent_id) VALUES (?, ?, ?)', id, name, agentId);
+    db.run('INSERT INTO councils (id, name, chairman_agent_id) VALUES (?, ?, ?)', [id, name, agentId]);
     return id;
 }
 
 function seedSession(name: string, projectId: string, agentId: string): string {
     const id = crypto.randomUUID();
-    db.run('INSERT INTO sessions (id, name, project_id, agent_id) VALUES (?, ?, ?, ?)', id, name, projectId, agentId);
+    db.run('INSERT INTO sessions (id, name, project_id, agent_id) VALUES (?, ?, ?, ?)', [id, name, projectId, agentId]);
     return id;
 }
 
 function seedMessage(sessionId: string, content: string): void {
-    db.run("INSERT INTO session_messages (session_id, role, content, tenant_id) VALUES (?, 'user', ?, 'default')", sessionId, content);
+    db.run("INSERT INTO session_messages (session_id, role, content, tenant_id) VALUES (?, 'user', ?, 'default')", [sessionId, content]);
 }
 
 describe('purgeTestData', () => {
@@ -61,7 +61,7 @@ describe('purgeTestData', () => {
     });
 
     test('deletes test councils and their sessions', () => {
-        const projectId = seedProject();
+        seedProject();
         const agentId = seedAgent();
         seedCouncil('Test Council Alpha', agentId);
         seedCouncil('Real Council', agentId);
@@ -130,7 +130,7 @@ describe('purgeTestData', () => {
     test('cascades council_members on council delete', () => {
         const agentId = seedAgent();
         const councilId = seedCouncil('Test Council', agentId);
-        db.run('INSERT INTO council_members (council_id, agent_id) VALUES (?, ?)', councilId, agentId);
+        db.run('INSERT INTO council_members (council_id, agent_id) VALUES (?, ?)', [councilId, agentId]);
 
         purgeTestData(db);
 
