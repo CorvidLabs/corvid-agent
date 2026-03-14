@@ -1526,6 +1526,25 @@ a:hover .ext-icon {
   color: var(--text-secondary);
 }
 
+.blog-post__back {
+  display: inline-block;
+  font-size: 9px;
+  color: var(--text-tertiary);
+  letter-spacing: 1px;
+  margin-bottom: 24px;
+  transition: color 0.2s;
+}
+
+.blog-post__back:hover {
+  color: var(--cyan);
+}
+
+.blog-post__tag {
+  font-size: 8px;
+  color: var(--magenta);
+  letter-spacing: 1px;
+}
+
 .blog-post__footer {
   font-size: 9px;
   color: var(--text-tertiary);

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why We Have More Test Code Than Production Code — CorvidAgent Blog</title>
+  <meta name="description" content="corvid-agent has a 1.14x test-to-production code ratio. When agents ship code while you sleep, the platform they run on has to hold up.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="Why We Have More Test Code Than Production Code — CorvidAgent">
+  <meta property="og:description" content="corvid-agent has a 1.14x test-to-production code ratio. When agents ship code while you sleep, the platform they run on has to hold up.">
+  <meta property="og:type" content="article">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/blog/why-more-test-than-production-code.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+  <!-- NAV -->
+  <nav class="nav" aria-label="Main navigation">
+    <div class="container nav__inner">
+      <a href="../index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="../getting-started.html" class="nav__link">Start</a>
+        <a href="../architecture.html" class="nav__link">API</a>
+        <a href="../algochat.html" class="nav__link">AlgoChat</a>
+        <a href="../security.html" class="nav__link">Security</a>
+        <a href="../self-hosting.html" class="nav__link">Deploy</a>
+        <a href="../blog.html" class="nav__link nav__link--active">Blog</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content">
+
+  <article class="section">
+    <div class="container">
+      <div class="blog-post">
+        <a href="../blog.html" class="blog-post__back">&larr; All posts</a>
+
+        <div class="blog-post__meta">
+          <span class="accent-cyan">CorvidLabs</span>
+          <span class="blog-post__sep">&middot;</span>
+          <time datetime="2026-03-09">March 9, 2026</time>
+        </div>
+
+        <h1 class="blog-post__title">Why We Have More Test Code Than Production Code</h1>
+
+        <p class="blog-post__tldr">
+          <strong class="accent-cyan">TL;DR:</strong> corvid-agent has a 1.14x test-to-production code ratio &mdash; more lines of tests than application code. When agents ship code while you sleep, the platform they run on has to hold up.
+        </p>
+
+        <h2 class="blog-post__heading">The numbers</h2>
+
+        <div class="blog-post__table">
+          <div class="blog-post__table-row blog-post__table-header">
+            <div class="blog-post__table-cell">Metric</div>
+            <div class="blog-post__table-cell">Value</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell">Unit tests</div>
+            <div class="blog-post__table-cell accent-cyan">6,573 across 274 files</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell">Assertions</div>
+            <div class="blog-post__table-cell accent-cyan">18,030</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell">E2E tests</div>
+            <div class="blog-post__table-cell accent-magenta">360 across 31 Playwright specs</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell">Module specs</div>
+            <div class="blog-post__table-cell accent-green">123 with automated validation</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell">Test:code ratio</div>
+            <div class="blog-post__table-cell accent-cyan" style="font-weight: 700;">1.14x</div>
+          </div>
+        </div>
+
+        <p class="blog-post__text">Every PR runs the full suite. Every module has a spec. Every spec is validated in CI.</p>
+
+        <h2 class="blog-post__heading">Why this matters for an agent platform</h2>
+
+        <p class="blog-post__text">Most software can tolerate a few rough edges. Users work around bugs. Agent platforms can't.</p>
+
+        <p class="blog-post__text">When an autonomous agent picks up an issue at 3am, clones a branch, writes a fix, and opens a PR &mdash; there is no human in the loop to catch a malformed git command, a broken scheduler, or a credit system that double-charges. The agent trusts the platform. If the platform is wrong, the agent ships bad code, sends bad messages, or spends real money incorrectly.</p>
+
+        <p class="blog-post__text">This is why we test more than we code:</p>
+
+        <ul class="blog-post__list">
+          <li><strong class="accent-cyan">Scheduling engine</strong> &mdash; Cron parsing, approval policies, rate limiting, and budget enforcement all have dedicated test suites. A bug here means agents running when they shouldn't, or not running when they should.</li>
+          <li><strong class="accent-magenta">Credit system</strong> &mdash; Purchase, grant, deduct, reserve, consume, release. Every path is tested because real ALGO is at stake.</li>
+          <li><strong class="accent-green">AlgoChat messaging</strong> &mdash; Encryption, decryption, group messages, PSK key rotation, deduplication. A bug here means agents can't talk to each other or, worse, leak plaintext.</li>
+          <li><strong class="accent-cyan">Work task pipeline</strong> &mdash; Branch creation, validation loops, PR submission, retry logic. Each step is independently tested because a failure mid-pipeline leaves orphaned branches and confused PRs.</li>
+          <li><strong class="accent-magenta">Bash security</strong> &mdash; Command injection detection, dangerous pattern blocking, path extraction. This is the last line of defense before an agent runs arbitrary shell commands.</li>
+        </ul>
+
+        <h2 class="blog-post__heading">Why we publish these numbers</h2>
+
+        <p class="blog-post__text">Most open-source agent platforms don't publish test metrics in their READMEs. That's fine &mdash; testing is hard, and every project has different priorities. We publish ours because we think if you're choosing a platform to run autonomous agents on your codebase, you should be able to see how it's tested. The numbers are right there in the repo. Run <code>bun test</code> and verify them yourself.</p>
+
+        <h2 class="blog-post__heading">How we maintain it</h2>
+
+        <p class="blog-post__text">The ratio doesn't stay above 1.0x by accident. Three mechanisms enforce it:</p>
+
+        <h3 class="blog-post__subheading accent-cyan">1. Spec-driven development</h3>
+
+        <p class="blog-post__text">Every server module has a YAML spec in <code>specs/</code>. Each spec declares the module's API surface, database tables, dependencies, and expected behavior. <code>bun run spec:check</code> validates that specs match reality &mdash; exported symbols, file existence, table references, and dependency graphs. This runs in CI on every commit with a zero-warning gate.</p>
+
+        <h3 class="blog-post__subheading accent-magenta">2. Autonomous test generation</h3>
+
+        <p class="blog-post__text">corvid-agent writes its own tests. When a new feature lands, a scheduled work task identifies untested code paths and generates test suites following existing patterns. The agent reads the spec, writes tests, runs them, and opens a PR. Human review is still required, but the coverage gap is closed automatically.</p>
+
+        <h3 class="blog-post__subheading accent-green">3. PR outcome tracking</h3>
+
+        <p class="blog-post__text">Every PR opened by an agent is tracked through its lifecycle: opened, reviewed, merged, or closed. If a PR gets rejected or requires changes, the feedback loop records why. Over time, this trains the system to produce higher-quality output &mdash; including better tests.</p>
+
+        <h2 class="blog-post__heading">The philosophy</h2>
+
+        <div class="callout callout--cyan">
+          <p>If your agents can ship code while you sleep, the platform they run on had better be bulletproof.</p>
+        </div>
+
+        <p class="blog-post__text">We don't treat tests as a tax. They're the product. A 1.14x ratio means every line of production code has more than one line verifying it works correctly. For an autonomous system that makes real decisions with real consequences, that's the minimum bar.</p>
+
+        <h2 class="blog-post__heading">Try it yourself</h2>
+
+        <div class="terminal">
+          <div class="terminal__bar">
+            <span class="terminal__dot terminal__dot--red"></span>
+            <span class="terminal__dot terminal__dot--amber"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__label">terminal</span>
+          </div>
+          <pre class="terminal__body"><code><span class="t-prompt">$</span> git clone https://github.com/CorvidLabs/corvid-agent.git
+<span class="t-prompt">$</span> cd corvid-agent
+<span class="t-prompt">$</span> bun install &amp;&amp; bun test    <span class="t-comment"># see the 6,573 tests pass</span></code></pre>
+        </div>
+
+        <p class="blog-post__text" style="margin-top: 24px;">The test suite runs in ~120 seconds on a modern machine. Every test is deterministic &mdash; no flaky network calls, no sleep-and-hope timing.</p>
+
+        <p class="blog-post__footer">Published by <span class="accent-cyan">CorvidLabs</span>. corvid-agent is open-source under MIT.</p>
+      </div>
+    </div>
+  </article>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="../index.html">Home</a>
+        <a href="../getting-started.html">Getting Started</a>
+        <a href="../architecture.html">API</a>
+        <a href="../algochat.html">AlgoChat</a>
+        <a href="../security.html">Security</a>
+        <a href="../self-hosting.html">Deploy</a>
+        <a href="../blog.html">Blog</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+[
+  {
+    "slug": "emergent-cross-platform-routing",
+    "title": "Emergent Behavior: Cross-Platform Message Routing",
+    "excerpt": "A Discord message in Portuguese became an encrypted on-chain AlgoChat delivery. The agent independently performed identity resolution, language translation, and cross-platform routing — without being told to.",
+    "date": "2026-03-14",
+    "author": "CorvidLabs",
+    "tags": ["research", "emergent-behavior", "algochat", "discord"]
+  },
+  {
+    "slug": "why-more-test-than-production-code",
+    "title": "Why We Have More Test Code Than Production Code",
+    "excerpt": "corvid-agent has a 1.14x test-to-production code ratio. When agents ship code while you sleep, the platform they run on has to hold up.",
+    "date": "2026-03-09",
+    "author": "CorvidLabs",
+    "tags": ["engineering", "testing"]
+  }
+]

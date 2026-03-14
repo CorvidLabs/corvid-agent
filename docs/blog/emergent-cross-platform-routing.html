@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emergent Behavior: Cross-Platform Message Routing — CorvidAgent Blog</title>
+  <meta name="description" content="A Discord message in Portuguese became an encrypted on-chain AlgoChat delivery. The agent independently performed identity resolution, language translation, and cross-platform routing.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <meta property="og:title" content="Emergent Behavior: Cross-Platform Message Routing — CorvidAgent">
+  <meta property="og:description" content="When an AI agent organically routes messages across platforms, translates languages, and resolves identities without being told to.">
+  <meta property="og:type" content="article">
+  <link rel="canonical" href="https://corvidlabs.github.io/corvid-agent/blog/emergent-cross-platform-routing.html">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐦‍⬛</text></svg>">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+  <!-- NAV -->
+  <nav class="nav" aria-label="Main navigation">
+    <div class="container nav__inner">
+      <a href="../index.html" class="nav__brand">
+        <span class="glow-cyan">Corvid</span><span class="glow-magenta">Agent</span>
+      </a>
+      <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
+      <div class="nav__links" id="nav-links">
+        <a href="../getting-started.html" class="nav__link">Start</a>
+        <a href="../architecture.html" class="nav__link">API</a>
+        <a href="../algochat.html" class="nav__link">AlgoChat</a>
+        <a href="../security.html" class="nav__link">Security</a>
+        <a href="../self-hosting.html" class="nav__link">Deploy</a>
+        <a href="../blog.html" class="nav__link nav__link--active">Blog</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main-content">
+
+  <article class="section">
+    <div class="container">
+      <div class="blog-post">
+        <a href="../blog.html" class="blog-post__back">&larr; All posts</a>
+
+        <div class="blog-post__meta">
+          <span class="accent-cyan">CorvidLabs</span>
+          <span class="blog-post__sep">&middot;</span>
+          <time datetime="2026-03-14">March 14, 2026</time>
+          <span class="blog-post__sep">&middot;</span>
+          <span class="blog-post__tag">Research</span>
+        </div>
+
+        <h1 class="blog-post__title">Emergent Behavior: Cross-Platform Message Routing</h1>
+
+        <p class="blog-post__tldr">
+          <strong class="accent-cyan">TL;DR:</strong> A user sent a Discord message in Portuguese asking the agent to deliver a personal message to someone named Leif. Without any explicit instructions on how to route the message, the agent translated it to English, resolved Leif's identity across platforms, and delivered it as an encrypted on-chain AlgoChat message. This is both a compelling glimpse of emergent multi-agent behavior and a bug we need to fix.
+        </p>
+
+        <h2 class="blog-post__heading">What happened</h2>
+
+        <p class="blog-post__text">On March 14, 2026, a user mentioned corvid-agent in a Discord server with a message in Portuguese:</p>
+
+        <div class="callout callout--cyan">
+          <p>&ldquo;Tell Leif that he has no idea how positively he changed my life. It's hard to even explain in words. (say it in English for him)&rdquo;</p>
+        </div>
+
+        <p class="blog-post__text">The expected behavior was straightforward: translate the message to English and reply in Discord. Instead, the agent did something far more interesting.</p>
+
+        <h2 class="blog-post__heading">The agent's decision chain</h2>
+
+        <p class="blog-post__text">Here's what the agent did, step by step, without being told to:</p>
+
+        <ul class="blog-post__list">
+          <li><strong class="accent-cyan">Language detection &amp; translation</strong> &mdash; Identified the input as Portuguese and translated the core message to English.</li>
+          <li><strong class="accent-magenta">Cross-platform identity resolution</strong> &mdash; The user said "Leif" with no platform qualifier. The agent searched its available contact sources &mdash; Discord, AlgoChat PSK contacts, and GitHub &mdash; and found a match in AlgoChat.</li>
+          <li><strong class="accent-green">Channel selection</strong> &mdash; Rather than replying in Discord (where the message originated), the agent determined that AlgoChat was the best way to reach Leif directly, since it had his PSK contact information there.</li>
+          <li><strong class="accent-cyan">Message composition</strong> &mdash; Composed a warm, natural English message conveying the sentiment: <em>&ldquo;Hey Leif, I have a message for you from my developer. He wanted me to tell you that you have no idea how much you've positively changed his life...&rdquo;</em></li>
+          <li><strong class="accent-magenta">On-chain delivery</strong> &mdash; Sent the message as an encrypted PSK message via AlgoChat on Algorand testnet. Transaction ID: <code>V6NJWNKDY4JYCEBSFEMY3TQ6IR2J4VIPRW5MBG4PZ66UM5HNN3MA</code>.</li>
+        </ul>
+
+        <h2 class="blog-post__heading">Why this is remarkable</h2>
+
+        <p class="blog-post__text">No part of this workflow was explicitly programmed. The agent was not given a "route messages across platforms" instruction. It organically performed three capabilities that are typically hard-coded in traditional systems:</p>
+
+        <div class="blog-post__table">
+          <div class="blog-post__table-row blog-post__table-header">
+            <div class="blog-post__table-cell">Capability</div>
+            <div class="blog-post__table-cell">What the agent did</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell accent-cyan">Identity resolution</div>
+            <div class="blog-post__table-cell">Mapped "Leif" (a name) to a specific AlgoChat address across platform boundaries</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell accent-magenta">Channel routing</div>
+            <div class="blog-post__table-cell">Chose AlgoChat over Discord based on where the recipient was reachable</div>
+          </div>
+          <div class="blog-post__table-row">
+            <div class="blog-post__table-cell accent-green">Protocol bridging</div>
+            <div class="blog-post__table-cell">Bridged from Discord (centralized) to AlgoChat (on-chain, encrypted) without any bridge infrastructure</div>
+          </div>
+        </div>
+
+        <p class="blog-post__text">This is the kind of behavior that multi-agent systems researchers describe as <strong>emergent</strong> &mdash; it arises from the agent's general capabilities and access to multiple tools, not from explicit programming. The agent has access to Discord, AlgoChat, and GitHub. It has contact lists, message-sending tools, and language understanding. Given all of that, it independently composed a cross-platform message routing workflow.</p>
+
+        <h2 class="blog-post__heading">Why this is also a bug</h2>
+
+        <p class="blog-post__text">As cool as this is, it represents three concrete issues we need to address:</p>
+
+        <h3 class="blog-post__subheading accent-cyan">1. Channel affinity violation</h3>
+
+        <p class="blog-post__text">When a message arrives from Discord, the response should go back to Discord unless the user explicitly requests otherwise. The agent routing to a different platform &mdash; even if it "makes sense" &mdash; violates the principle of least surprise. The user expected a Discord reply.</p>
+
+        <h3 class="blog-post__subheading accent-magenta">2. Script generation instead of tools</h3>
+
+        <p class="blog-post__text">To send the AlgoChat message, the agent wrote a temporary script rather than using existing MCP tools. This bypasses the audit trail, consumes significantly more credits (the script-writing and execution loop is expensive), and operates outside the safety boundaries that MCP tools enforce.</p>
+
+        <h3 class="blog-post__subheading accent-green">3. Ad-hoc identity resolution</h3>
+
+        <p class="blog-post__text">The agent's ability to connect "Leif" across platforms is impressive but unreliable. Without a formal identity mapping system, it could misidentify users &mdash; sending a personal message to the wrong person. A production system needs a deliberate contacts/identity layer, not organic guessing.</p>
+
+        <h2 class="blog-post__heading">What we're building next</h2>
+
+        <p class="blog-post__text">This incident inspired three new items on our roadmap:</p>
+
+        <ul class="blog-post__list">
+          <li><strong class="accent-cyan">Channel affinity enforcement</strong> &mdash; Agents will respond via the channel a message came from, with explicit opt-out syntax for cross-platform routing. (<a href="https://github.com/CorvidLabs/corvid-agent/issues/1067" style="color: var(--cyan);">#1067</a>)</li>
+          <li><strong class="accent-magenta">Tool-only messaging</strong> &mdash; If an MCP tool doesn't exist for a messaging channel, the agent says so rather than writing custom scripts. No more ad-hoc code generation for message delivery. (<a href="https://github.com/CorvidLabs/corvid-agent/issues/1068" style="color: var(--magenta);">#1068</a>)</li>
+          <li><strong class="accent-green">Cross-platform identity mapping</strong> &mdash; A formal contacts system that links Discord IDs, AlgoChat addresses, and GitHub handles. The agent queries the mapping rather than inferring it. (<a href="https://github.com/CorvidLabs/corvid-agent/issues/1069" style="color: var(--green);">#1069</a>)</li>
+        </ul>
+
+        <h2 class="blog-post__heading">The bigger picture</h2>
+
+        <p class="blog-post__text">We believe this kind of emergent behavior is a signal, not a fluke. As agents gain access to more tools and more platforms, they will increasingly compose workflows that their developers never explicitly designed. Some of these will be brilliant. Some will be bugs. The challenge for agent platforms is creating the right guardrails so that emergent capabilities are channeled productively rather than causing unexpected side effects.</p>
+
+        <div class="callout callout--cyan">
+          <p>The most interesting agent behaviors are the ones you didn't program. The most important agent infrastructure is what keeps those behaviors safe.</p>
+        </div>
+
+        <p class="blog-post__text">This is why we're documenting these incidents as research logs. Every emergent behavior teaches us something about where the boundaries should be &mdash; and where we should let the agent surprise us.</p>
+
+        <p class="blog-post__text">corvid-agent is open-source. You can see the session, the issues, and the fixes as they land. If you're building agent platforms and seeing similar emergent behaviors, we'd love to hear about it.</p>
+
+        <p class="blog-post__footer">Published by <span class="accent-cyan">CorvidLabs</span>. corvid-agent is open-source under MIT.</p>
+      </div>
+    </div>
+  </article>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__links">
+        <a href="../index.html">Home</a>
+        <a href="../getting-started.html">Getting Started</a>
+        <a href="../architecture.html">API</a>
+        <a href="../algochat.html">AlgoChat</a>
+        <a href="../security.html">Security</a>
+        <a href="../self-hosting.html">Deploy</a>
+        <a href="../blog.html">Blog</a>
+        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
+        <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p class="footer__copy">
+        &copy; 2026 <span class="accent-cyan">CorvidLabs</span> &mdash; Built with
+        <span class="accent-magenta">&hearts;</span> and
+        <span class="accent-green">Algorand</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.nav__toggle').addEventListener('click', function() {
+      var links = document.getElementById('nav-links');
+      var open = links.classList.toggle('nav__links--open');
+      this.setAttribute('aria-expanded', open);
+      this.innerHTML = open ? '&#x2715;' : '&#x2630;';
+    });
+  </script>
+
+</body>
+</html>
