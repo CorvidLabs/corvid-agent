@@ -578,7 +578,7 @@ interface PSKContact {
         }
         .network-badge[data-network="testnet"] { color: #4a90d9; }
         .network-badge[data-network="mainnet"] { color: #50e3c2; }
-        .network-badge[data-network="localnet"] { color: #f5a623; }
+        .network-badge[data-network="localnet"] { color: var(--accent-gold); }
         .algo-balance--low { color: var(--accent-red, #ff4d4f) !important; }
 
         /* Connect Mobile — Contact List */

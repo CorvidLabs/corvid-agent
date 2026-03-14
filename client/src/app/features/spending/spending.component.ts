@@ -70,6 +70,7 @@ interface CreditTransaction {
                     <h3>Per-Agent Daily Spending Caps</h3>
                     <p class="spending__desc">Configure daily spending limits for each agent. Agents without a custom cap use the global default.</p>
 
+                    <div class="table-scroll">
                     <table class="spending__table">
                         <thead>
                             <tr>
@@ -112,6 +113,7 @@ interface CreditTransaction {
                             }
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 <!-- Edit Cap Modal -->
@@ -168,6 +170,7 @@ interface CreditTransaction {
                 <div class="spending__section">
                     <h3>USDC Deposit History</h3>
                     @if (usdcDeposits().length > 0) {
+                        <div class="table-scroll">
                         <table class="spending__table">
                             <thead>
                                 <tr>
@@ -188,6 +191,7 @@ interface CreditTransaction {
                                 }
                             </tbody>
                         </table>
+                        </div>
                     } @else {
                         <p class="spending__empty">No USDC deposits yet.</p>
                     }
@@ -197,6 +201,7 @@ interface CreditTransaction {
                 <div class="spending__section">
                     <h3>Recent Credit Transactions</h3>
                     @if (creditTransactions().length > 0) {
+                        <div class="table-scroll">
                         <table class="spending__table">
                             <thead>
                                 <tr>
@@ -219,6 +224,7 @@ interface CreditTransaction {
                                 }
                             </tbody>
                         </table>
+                        </div>
                     } @else {
                         <p class="spending__empty">No credit transactions yet.</p>
                     }
@@ -229,38 +235,48 @@ interface CreditTransaction {
     styles: [`
         .spending { padding: 1rem; }
         .spending__section { margin-bottom: 2rem; }
-        .spending__section h3 { margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-color, #333); padding-bottom: 0.25rem; }
-        .spending__desc { color: var(--text-muted, #888); font-size: 0.85rem; margin-bottom: 1rem; }
-        .spending__empty { color: var(--text-muted, #888); font-style: italic; }
+        .spending__section h3 { margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+        .spending__desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem; }
+        .spending__empty { color: var(--text-secondary); font-style: italic; }
         .spending__table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .spending__table th, .spending__table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color, #333); }
-        .spending__table th { color: var(--text-muted, #888); font-weight: 600; }
+        .spending__table th, .spending__table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+        .spending__table th { color: var(--text-secondary); font-weight: 600; }
         .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-top: 0.5rem; }
         .info-item { display: flex; flex-direction: column; gap: 0.25rem; }
-        .info-label { font-size: 0.75rem; color: var(--text-muted, #888); text-transform: uppercase; }
+        .info-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
         .info-value { font-size: 1.2rem; font-weight: 600; }
-        .progress-bar { width: 80px; height: 6px; background: var(--bg-elevated, #222); border-radius: 3px; display: inline-block; vertical-align: middle; }
-        .progress-bar__fill { height: 100%; background: var(--accent, #4af); border-radius: 3px; transition: width 0.3s; }
-        .progress-bar__fill--warning { background: #f90; }
-        .progress-bar__fill--danger { background: #f44; }
+        .progress-bar { width: 80px; height: 6px; background: var(--bg-raised); border-radius: 3px; display: inline-block; vertical-align: middle; }
+        .progress-bar__fill { height: 100%; background: var(--accent-cyan); border-radius: 3px; transition: width 0.3s; }
+        .progress-bar__fill--warning { background: var(--accent-amber); }
+        .progress-bar__fill--danger { background: var(--accent-red); }
         .progress-text { font-size: 0.75rem; margin-left: 0.5rem; }
-        .badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: var(--bg-elevated, #333); }
-        .badge--default { background: var(--bg-elevated, #333); color: var(--text-muted, #888); }
-        .badge--purchase, .badge--usdc_deposit, .badge--grant { background: #1a3a1a; color: #4c4; }
-        .badge--deduction, .badge--agent_message { background: #3a1a1a; color: #c44; }
-        .badge--reserve { background: #3a3a1a; color: #cc4; }
-        .badge--release, .badge--refund { background: #1a2a3a; color: #4ac; }
+        .badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: var(--bg-raised); }
+        .badge--default { background: var(--bg-raised); color: var(--text-secondary); }
+        .badge--purchase, .badge--usdc_deposit, .badge--grant { background: var(--accent-green-dim); color: var(--accent-green); }
+        .badge--deduction, .badge--agent_message { background: var(--accent-red-dim); color: var(--accent-red); }
+        .badge--reserve { background: var(--accent-amber-dim); color: var(--accent-amber); }
+        .badge--release, .badge--refund { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
         .txid { font-family: monospace; font-size: 0.8rem; }
         .btn--sm { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
-        .btn--danger { background: #c44; color: white; }
+        .btn--danger { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid var(--accent-red); }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-        .modal { background: var(--bg-primary, #1a1a1a); padding: 1.5rem; border-radius: 8px; min-width: 320px; border: 1px solid var(--border-color, #333); }
+        .modal { background: var(--bg-surface); padding: 1.5rem; border-radius: var(--radius-lg); min-width: 320px; border: 1px solid var(--border); }
         .modal h3 { margin-bottom: 1rem; }
         .modal__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; }
-        .form-group small { color: var(--text-muted, #888); font-size: 0.75rem; }
-        .loading { color: var(--text-muted, #888); }
+        .form-group small { color: var(--text-secondary); font-size: 0.75rem; }
+        .loading { color: var(--text-secondary); }
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .spending__table { min-width: 500px; }
+        @media (max-width: 768px) {
+            .spending { padding: 0.75rem; }
+            .info-grid { grid-template-columns: repeat(2, 1fr); }
+            .modal { min-width: auto; width: calc(100vw - 2rem); max-width: 400px; }
+        }
+        @media (max-width: 480px) {
+            .info-grid { grid-template-columns: 1fr; }
+        }
     `],
 })
 export class SpendingComponent implements OnInit {

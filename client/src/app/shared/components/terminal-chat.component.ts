@@ -204,6 +204,12 @@ interface AutocompleteItem {
             .terminal__copy { opacity: 0.4; }
             .terminal__copy:active { opacity: 1; }
         }
+        /* Mobile: reduce padding, improve touch input area */
+        @media (max-width: 480px) {
+            .terminal__output { padding: 0.5rem; }
+            .terminal__input-area { padding: 0.5rem 0.75rem; }
+            .terminal__line { padding-right: 1.5rem; }
+        }
         .terminal__cursor {
             display: inline-block;
             width: 7px;

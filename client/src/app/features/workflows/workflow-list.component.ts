@@ -362,7 +362,7 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
         .node-work_task { background: #1a2a3a; color: #60a5fa; }
         .node-condition { background: #3a3a1a; color: #facc15; }
         .node-delay { background: #2a2a2a; color: #94a3b8; }
-        .node-webhook_wait { background: #2a2a3a; color: #a78bfa; }
+        .node-webhook_wait { background: #2a2a3a; color: var(--accent-purple); }
         .node-transform { background: #1a3a3a; color: #2dd4bf; }
         .node-parallel { background: #2a1a3a; color: #c084fc; }
         .node-join { background: #2a1a3a; color: #c084fc; }
