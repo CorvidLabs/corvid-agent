@@ -9,12 +9,14 @@ import { Database } from 'bun:sqlite';
  * - display_color: Hex color string (e.g., '#ff00aa') for the agent's accent color
  * - display_icon: Short emoji or icon identifier (e.g., a single emoji character)
  * - avatar_url: URL to a custom avatar image
+ * - disabled: Whether the agent is disabled (0 = active, 1 = disabled)
  */
 
 export function up(db: Database): void {
     db.exec(`ALTER TABLE agents ADD COLUMN display_color TEXT DEFAULT NULL`);
     db.exec(`ALTER TABLE agents ADD COLUMN display_icon TEXT DEFAULT NULL`);
     db.exec(`ALTER TABLE agents ADD COLUMN avatar_url TEXT DEFAULT NULL`);
+    db.exec(`ALTER TABLE agents ADD COLUMN disabled INTEGER DEFAULT 0`);
 }
 
 export function down(db: Database): void {

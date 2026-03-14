@@ -11,7 +11,7 @@ function seedAgent(id: string = 'agent-1', name: string = 'Test Agent'): void {
 }
 
 function seedProject(id: string = 'proj-1', name: string = 'test-project'): void {
-    db.query('INSERT OR IGNORE INTO projects (id, name) VALUES (?, ?)').run(id, name);
+    db.query('INSERT OR IGNORE INTO projects (id, name, working_dir) VALUES (?, ?, ?)').run(id, name, '/tmp/test');
 }
 
 function seedWorkTask(agentId: string, status: string, daysAgo: number = 0): void {

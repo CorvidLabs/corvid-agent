@@ -129,7 +129,7 @@ describe('checkRemoteTrust', () => {
     function mockAttestations(count: number): void {
         const txns = Array.from({ length: count }, (_, i) => ({
             id: `txn-${i}`,
-            note: makeAttestation(`agent-${i}`, `hash${i}`),
+            note: makeAttestation(`agent-${i}`, `abcd${String(i).padStart(4, '0')}`),
             'confirmed-round': 1000 + i,
             'round-time': 1710000000 + i,
         }));

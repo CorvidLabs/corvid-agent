@@ -166,6 +166,7 @@ const MIGRATIONS: Record<number, string[]> = {
             display_color             TEXT DEFAULT NULL,
             display_icon              TEXT DEFAULT NULL,
             avatar_url                TEXT DEFAULT NULL,
+            disabled                  INTEGER DEFAULT 0,
             tenant_id                 TEXT NOT NULL DEFAULT 'default',
             created_at                TEXT DEFAULT (datetime('now')),
             updated_at                TEXT DEFAULT (datetime('now'))
