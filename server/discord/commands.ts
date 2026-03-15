@@ -37,6 +37,7 @@ import {
 import { resolvePermissionLevel } from './permissions';
 import { handleAdminCommand } from './admin-commands';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
+import { archiveThread } from './thread-manager';
 
 const log = createLogger('DiscordCommands');
 
@@ -966,6 +967,29 @@ async function handleComponentInteraction(
                 return;
             }
             await respondToInteraction(interaction, 'Use `/session` to start a new conversation with an agent.');
+            break;
+        }
+
+        case 'archive_thread': {
+            const threadId = interaction.channel_id;
+            const info = ctx.threadSessions.get(threadId);
+
+            // Clean up subscriptions if any
+            const cb = ctx.threadCallbacks.get(threadId);
+            if (cb) {
+                ctx.processManager.unsubscribe(cb.sessionId, cb.callback);
+                ctx.threadCallbacks.delete(threadId);
+            }
+            ctx.threadSessions.delete(threadId);
+            ctx.threadLastActivity.delete(threadId);
+
+            // Stop the process if still running
+            if (info && ctx.processManager.isRunning(info.sessionId)) {
+                ctx.processManager.stopProcess(info.sessionId);
+            }
+
+            await acknowledgeButton(interaction, 'Thread archived.');
+            await archiveThread(ctx.config.botToken, threadId);
             break;
         }
 

@@ -441,6 +441,16 @@ export class ProcessManager {
             const meta = this.sessionMeta.get(session.id);
             if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
                 log.info(`Context reset: killing session ${session.id} after ${meta.turnCount} turns`);
+                this.eventBus.emit(session.id, {
+                    type: 'session_error',
+                    session_id: session.id,
+                    error: {
+                        message: 'Session context limit reached — restarting with fresh context.',
+                        errorType: 'context_exhausted',
+                        severity: 'info',
+                        recoverable: true,
+                    },
+                } as ClaudeStreamEvent);
                 const cp = this.processes.get(session.id);
                 cp?.kill();
                 this.processes.delete(session.id);

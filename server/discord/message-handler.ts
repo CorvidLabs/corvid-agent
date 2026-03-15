@@ -384,7 +384,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
             color: 0x95a5a6,
         }, [
             buildActionRow(
-                { label: 'New Session', customId: 'new_session', style: ButtonStyle.PRIMARY, emoji: '➕' },
+                { label: 'Archive Thread', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' },
             ),
         ]);
         return;

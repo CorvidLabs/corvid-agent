@@ -140,7 +140,7 @@ export interface SessionErrorRecoveryEvent extends BaseStreamEvent {
     type: 'session_error';
     error: {
         message: string;
-        errorType: 'spawn_error' | 'credits_exhausted' | 'timeout' | 'crash' | 'unknown';
+        errorType: 'spawn_error' | 'credits_exhausted' | 'context_exhausted' | 'timeout' | 'crash' | 'unknown';
         severity: 'info' | 'warning' | 'error' | 'fatal';
         recoverable: boolean;
     };
