@@ -46,6 +46,7 @@ export function subscribeForResponseWithEmbed(
     processManager: ProcessManager,
     delivery: DeliveryTracker,
     botToken: string,
+    db: Database,
     threadCallbacks: Map<string, ThreadCallbackInfo>,
     sessionId: string,
     threadId: string,
@@ -172,9 +173,55 @@ export function subscribeForResponseWithEmbed(
             processManager.unsubscribe(sessionId, callback);
             threadCallbacks.delete(threadId);
 
+            // Fetch session stats for the completion embed
+            const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+            try {
+                const row = db.query<{
+                    total_cost_usd: number;
+                    total_turns: number;
+                    work_dir: string | null;
+                    created_at: string;
+                }, [string]>(
+                    'SELECT total_cost_usd, total_turns, work_dir, created_at FROM sessions WHERE id = ?',
+                ).get(sessionId);
+
+                if (row) {
+                    // Duration
+                    const startMs = new Date(row.created_at).getTime();
+                    const durationMs = Date.now() - startMs;
+                    const durationMin = Math.floor(durationMs / 60000);
+                    const durationSec = Math.floor((durationMs % 60000) / 1000);
+                    const durationStr = durationMin > 0 ? `${durationMin}m ${durationSec}s` : `${durationSec}s`;
+                    fields.push({ name: 'Duration', value: durationStr, inline: true });
+
+                    // Turns
+                    if (row.total_turns > 0) {
+                        fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
+                    }
+
+                    // Cost
+                    if (row.total_cost_usd > 0) {
+                        fields.push({ name: 'Cost', value: `$${row.total_cost_usd.toFixed(4)}`, inline: true });
+                    }
+
+                    // Worktree branch
+                    if (row.work_dir) {
+                        const branchMatch = row.work_dir.match(/\/([^/]+)$/);
+                        const branch = branchMatch ? branchMatch[1] : row.work_dir;
+                        fields.push({ name: 'Branch', value: `\`${branch}\``, inline: true });
+                    }
+                }
+            } catch (err) {
+                log.debug('Failed to fetch session stats for completion embed', {
+                    sessionId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+
             sendEmbedWithButtons(delivery, botToken, threadId, {
                 description: 'Session complete. Send a message to continue, or use the buttons below.',
                 color: 0x57f287,
+                ...(fields.length > 0 ? { fields } : {}),
                 footer: { text: `${agentName} · done` },
             }, [
                 buildActionRow(
@@ -405,7 +452,7 @@ export function recoverActiveThreadSubscriptions(
             }
 
             subscribeForResponseWithEmbed(
-                processManager, delivery, botToken, threadCallbacks,
+                processManager, delivery, botToken, db, threadCallbacks,
                 row.id, threadId, row.agent_name || 'Agent', row.agent_model || 'unknown',
             );
             recovered++;
