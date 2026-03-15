@@ -63,11 +63,30 @@ export interface ThinkingEvent extends BaseStreamEvent {
     thinking: boolean;
 }
 
+/** Structured metrics from direct-process execution */
+export interface DirectProcessMetrics {
+    model: string;
+    tier: string;
+    totalIterations: number;
+    toolCallCount: number;
+    maxChainDepth: number;
+    nudgeCount: number;
+    midChainNudgeCount: number;
+    explorationDriftCount: number;
+    stallDetected: boolean;
+    stallType: string | null;
+    terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'max_iterations' | 'abort' | 'error';
+    durationMs: number;
+    needsSummary: boolean;
+}
+
 /** Session completed successfully */
 export interface ResultEvent extends BaseStreamEvent {
     type: 'result';
     result?: string;
     total_cost_usd: number;
+    /** Structured session metrics from direct-process (when available). */
+    metrics?: DirectProcessMetrics;
 }
 
 /** Error occurred */

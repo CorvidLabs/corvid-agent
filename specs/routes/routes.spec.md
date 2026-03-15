@@ -466,6 +466,8 @@ Every request passes through these stages in order:
 | GET | `/api/analytics/overview` | analytics.ts | Overview stats (sessions, costs, agents, projects) |
 | GET | `/api/analytics/spending` | analytics.ts | Daily spending data |
 | GET | `/api/analytics/sessions` | analytics.ts | Session statistics |
+| GET | `/api/analytics/session-metrics` | analytics.ts | Aggregate tool-chain metrics (filterable by model, tier, days) |
+| GET | `/api/analytics/session-metrics/:id` | analytics.ts | Per-session tool-chain metrics |
 | GET | `/api/system-logs` | system-logs.ts | Aggregated system logs |
 | GET | `/api/system-logs/credit-transactions` | system-logs.ts | Credit transaction ledger |
 

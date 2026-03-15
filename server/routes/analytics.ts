@@ -6,6 +6,7 @@
 import type { Database } from 'bun:sqlite';
 import type { RequestContext } from '../middleware/guards';
 import { json, safeNumParam } from '../lib/response';
+import { getMetricsAggregate, getSessionMetrics, listRecentMetrics } from '../db/session-metrics';
 
 interface DailySpendingRow {
     date: string;
@@ -58,6 +59,17 @@ export function handleAnalyticsRoutes(req: Request, url: URL, db: Database, cont
     // GET /api/analytics/sessions — session stats
     if (url.pathname === '/api/analytics/sessions' && req.method === 'GET') {
         return handleSessionStats(db, tenantId);
+    }
+
+    // GET /api/analytics/session-metrics — aggregate tool-chain metrics
+    if (url.pathname === '/api/analytics/session-metrics' && req.method === 'GET') {
+        return handleSessionMetrics(db, url);
+    }
+
+    // GET /api/analytics/session-metrics/:sessionId — metrics for a specific session
+    const metricsMatch = url.pathname.match(/^\/api\/analytics\/session-metrics\/([^/]+)$/);
+    if (metricsMatch && req.method === 'GET') {
+        return handleSessionMetricsById(db, metricsMatch[1]);
     }
 
     return null;
@@ -234,4 +246,21 @@ function handleSessionStats(db: Database, tenantId: string): Response {
         byStatus,
         recent,
     });
+}
+
+function handleSessionMetrics(db: Database, url: URL): Response {
+    const model = url.searchParams.get('model') ?? undefined;
+    const tier = url.searchParams.get('tier') ?? undefined;
+    const days = url.searchParams.has('days') ? safeNumParam(url.searchParams.get('days'), 30) : undefined;
+    const limit = safeNumParam(url.searchParams.get('limit'), 20);
+
+    const aggregate = getMetricsAggregate(db, { model, tier, days });
+    const recent = listRecentMetrics(db, Math.min(limit, 100));
+
+    return json({ aggregate, recent });
+}
+
+function handleSessionMetricsById(db: Database, sessionId: string): Response {
+    const metrics = getSessionMetrics(db, sessionId);
+    return json({ metrics });
 }

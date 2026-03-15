@@ -18,6 +18,7 @@ import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
 import { recordApiCost } from '../db/spending';
+import { insertSessionMetrics } from '../db/session-metrics';
 import { getActiveServersForAgent } from '../db/mcp-servers';
 import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { removeWorktree } from '../lib/worktree';
@@ -830,6 +831,33 @@ export class ProcessManager {
                         }
                     }
                 }
+            }
+        }
+
+        // Persist session metrics from direct-process when available
+        if (event.type === 'result' && 'metrics' in event && event.metrics) {
+            try {
+                insertSessionMetrics(this.db, {
+                    sessionId,
+                    model: event.metrics.model,
+                    tier: event.metrics.tier,
+                    totalIterations: event.metrics.totalIterations,
+                    toolCallCount: event.metrics.toolCallCount,
+                    maxChainDepth: event.metrics.maxChainDepth,
+                    nudgeCount: event.metrics.nudgeCount,
+                    midChainNudgeCount: event.metrics.midChainNudgeCount,
+                    explorationDriftCount: event.metrics.explorationDriftCount,
+                    stallDetected: event.metrics.stallDetected,
+                    stallType: event.metrics.stallType,
+                    terminationReason: event.metrics.terminationReason,
+                    durationMs: event.metrics.durationMs,
+                    needsSummary: event.metrics.needsSummary,
+                });
+            } catch (err) {
+                log.warn('Failed to persist session metrics', {
+                    sessionId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
             }
         }
 

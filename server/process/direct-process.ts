@@ -6,7 +6,7 @@
  */
 
 import type { Session, Agent, Project, McpServerConfig } from '../../shared/types';
-import type { ClaudeStreamEvent } from './types';
+import type { ClaudeStreamEvent, DirectProcessMetrics } from './types';
 import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
@@ -394,6 +394,13 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         const MAX_MID_CHAIN_NUDGES = tierConfig.maxMidChainNudges;
         const MAX_TOOL_ITERATIONS = tierConfig.maxToolIterations;
         let explorationToolCalls = 0; // Track how many list_files/search_files calls
+        let totalExplorationDrifts = 0; // Cumulative exploration drift triggers
+        let toolCallCount = 0; // Total tool calls across all iterations
+        let currentChainDepth = 0; // Current unbroken tool-call sequence
+        let maxChainDepth = 0; // Longest unbroken tool-call sequence
+        let terminationReason: DirectProcessMetrics['terminationReason'] = 'normal';
+        let stallType: string | null = null;
+        const loopStartTime = Date.now();
 
         try {
 
@@ -481,6 +488,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             // Handle tool calls
             if (result.toolCalls && result.toolCalls.length > 0) {
                 toolsEverCalled = true;
+                toolCallCount += result.toolCalls.length;
+                currentChainDepth++;
+                if (currentChainDepth > maxChainDepth) {
+                    maxChainDepth = currentChainDepth;
+                }
                 // Detect repeated tool calls — uses normalized comparison to catch
                 // near-identical loops (same tool, args differ only in whitespace/order)
                 const callKey = normalizeToolCallKey(result.toolCalls);
@@ -490,6 +502,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         log.warn(`Breaking tool loop: same call repeated ${repeatCount + 1} times`, { calls: callKey.slice(0, 200) });
                         messages.push({ role: 'assistant', content: result.content || '' });
                         needsSummary = true;
+                        terminationReason = 'stall_repeat';
+                        stallType = 'repeat';
                         break;
                     }
                 } else {
@@ -506,6 +520,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                         log.warn(`Breaking tool loop: same tool name repeated ${sameToolNameCount + 1} times with varying args`, { tools: toolNames });
                         messages.push({ role: 'assistant', content: result.content || '' });
                         needsSummary = true;
+                        terminationReason = 'stall_same_tool';
+                        stallType = 'same_tool';
                         break;
                     }
                 } else {
@@ -599,6 +615,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 const driftCalls = result.toolCalls.filter(tc => explorationTools.has(tc.name));
                 explorationToolCalls += driftCalls.length;
                 if (explorationToolCalls >= 5 && tierConfig.tier !== 'high') {
+                    totalExplorationDrifts++;
                     log.info('Exploration drift detected — injecting focus reminder', {
                         explorationCalls: explorationToolCalls,
                         tier: tierConfig.tier,
@@ -616,6 +633,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 // Continue loop to let the model process tool results
                 continue;
             }
+
+            // No tool calls — reset chain depth counter
+            currentChainDepth = 0;
 
             // No tool calls — check if the model stopped prematurely
             const responseText = (result.content || '').trim();
@@ -675,6 +695,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         // Max iterations reached — also needs a summary epilogue
         if (iteration >= MAX_TOOL_ITERATIONS && toolsEverCalled) {
             needsSummary = true;
+            if (terminationReason === 'normal') {
+                terminationReason = 'max_iterations';
+            }
         }
 
         // Final summary epilogue: when the tool loop broke abnormally (repeat
@@ -728,14 +751,35 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         // Signal that the agent is done thinking
         onEvent({ type: 'thinking', thinking: false } as ClaudeStreamEvent);
 
-        // Emit result event
+        // Build session metrics
+        const loopDurationMs = Date.now() - loopStartTime;
+        const stallDetected = terminationReason === 'stall_repeat'
+            || terminationReason === 'stall_same_tool';
+        const sessionMetrics: DirectProcessMetrics = {
+            model,
+            tier: tierConfig.tier,
+            totalIterations: iteration,
+            toolCallCount,
+            maxChainDepth,
+            nudgeCount,
+            midChainNudgeCount,
+            explorationDriftCount: totalExplorationDrifts,
+            stallDetected,
+            stallType,
+            terminationReason,
+            durationMs: loopDurationMs,
+            needsSummary,
+        };
+
+        // Emit result event with metrics
         onEvent({
             type: 'result',
             subtype: 'success',
             total_cost_usd: 0, // Local models are free
-            duration_ms: 0,
+            duration_ms: loopDurationMs,
             num_turns: iteration,
             session_id: session.id,
+            metrics: sessionMetrics,
         } as ClaudeStreamEvent);
 
         processing = false;
