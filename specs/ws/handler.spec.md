@@ -76,6 +76,7 @@ Manages real-time bidirectional communication between the web UI/CLI clients and
 | `PingMessage` | `{ type: 'ping'; serverTime }` |
 | `WelcomeMessage` | `{ type: 'welcome'; serverTime }` |
 | `ErrorMessage` | `{ type: 'error'; message; severity?; errorCode? }` |
+| `ServerShutdownMessage` | `{ type: 'server_shutdown'; signal; activeSessions; message }` |
 | `SessionErrorMessage` | `{ type: 'session_error'; sessionId; error: SessionErrorInfo }` |
 | `CouncilAgentErrorMessage` | `{ type: 'council_agent_error'; launchId; agentId; agentName; error: CouncilAgentErrorInfo }` |
 | `ApprovalRequestWire` | Wire type for approval requests: `{ id; sessionId; toolName; description; createdAt; timeoutMs }` |
