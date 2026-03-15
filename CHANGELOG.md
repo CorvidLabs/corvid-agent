@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ### Chores
 - **Worktree cleanup** — remove 10 stale git worktrees from `.claude/worktrees/` (#1065)
+- **Discord worktree isolation** — add worktree isolation to Discord `/session` command (#1096)
 - **README stats** — fix stale stats and add missing API entries (#1063)
 
 ### Stats
@@ -94,7 +95,7 @@ All notable changes to this project will be documented in this file.
 - **Agent security hardening** — tier-based agent permissions (untrusted/standard/trusted/admin), per-agent session limits, and input sanitization (#986)
 - **RBAC role templates** — pre-built role templates for agent permission provisioning (#979)
 - **Typed WebSocket messages** — enforce typed `ServerMessage` emission in WS broadcasting (#957, #972)
-- **Git worktree session isolation** — isolate chat sessions with dedicated git worktrees (#983)
+- **Git worktree session isolation** — isolate chat sessions with dedicated git worktrees, including Discord `/session` command (#983, #1096)
 - **Flock Directory heartbeat** — periodic heartbeat and stale sweep for on-chain agent directory (#903, #961)
 - **RC checklist expansion** — 9 additional gating criteria checks for v1.0.0-rc (#310, #977)
 
