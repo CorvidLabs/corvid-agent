@@ -287,3 +287,137 @@ describe('credit patterns', () => {
         expect(score.components.creditPattern).toBe(50);
     });
 });
+
+// ─── computeAllIfStale ──────────────────────────────────────────────────────
+
+function seedResponseFeedback(agentId: string, sentiment: 'positive' | 'negative', daysAgo: number = 0): void {
+    const id = crypto.randomUUID();
+    const createdAt = new Date(Date.now() - daysAgo * 86400_000).toISOString();
+    db.query(
+        'INSERT INTO response_feedback (id, agent_id, session_id, sentiment, created_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(id, agentId, 'sess-1', sentiment, createdAt);
+}
+
+describe('computeAllIfStale', () => {
+    test('returns cached scores when they are fresh', () => {
+        // Compute scores first so they are fresh
+        scorer.computeScore('agent-1');
+
+        // computeAllIfStale should return cached scores without recomputing
+        const results = scorer.computeAllIfStale();
+        expect(results).toHaveLength(1);
+        expect(results[0].agentId).toBe('agent-1');
+    });
+
+    test('recomputes when scores are stale (older than 5 minutes)', () => {
+        // Compute score first
+        scorer.computeScore('agent-1');
+
+        // Manually backdate the computed_at timestamp to 10 minutes ago
+        const staleTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        db.query('UPDATE agent_reputation SET computed_at = ? WHERE agent_id = ?').run(staleTime, 'agent-1');
+
+        // Add new activity so recomputed score differs
+        for (let i = 0; i < 5; i++) seedSession('agent-1', 0);
+
+        const results = scorer.computeAllIfStale();
+        expect(results).toHaveLength(1);
+        // Should have recomputed — activity level should reflect new sessions
+        expect(results[0].components.activityLevel).toBeGreaterThan(0);
+    });
+
+    test('computes for agents with no prior score', () => {
+        seedAgent('agent-2', 'Agent Two');
+        // agent-2 has no score yet, should be computed
+        const results = scorer.computeAllIfStale();
+        expect(results).toHaveLength(2);
+
+        const agent2 = results.find((r) => r.agentId === 'agent-2');
+        expect(agent2).toBeDefined();
+        expect(agent2!.overallScore).toBeGreaterThanOrEqual(1);
+    });
+
+    test('returns scores sorted by overall score descending', () => {
+        seedAgent('agent-2', 'Agent Two');
+        // Give agent-2 better stats
+        for (let i = 0; i < 10; i++) seedWorkTask('agent-2', 'completed');
+        for (let i = 0; i < 12; i++) seedSession('agent-2', i);
+
+        const results = scorer.computeAllIfStale();
+        expect(results).toHaveLength(2);
+        expect(results[0].overallScore).toBeGreaterThanOrEqual(results[1].overallScore);
+    });
+});
+
+// ─── feedback score blending ────────────────────────────────────────────────
+
+describe('feedback score blending', () => {
+    test('feedback-only peer rating when no marketplace reviews exist', () => {
+        // Seed 3+ positive feedbacks (minimum threshold)
+        seedResponseFeedback('agent-1', 'positive', 0);
+        seedResponseFeedback('agent-1', 'positive', 1);
+        seedResponseFeedback('agent-1', 'positive', 2);
+
+        const score = scorer.computeScore('agent-1');
+        // All positive => feedback score = 100, no marketplace => feedback only
+        expect(score.components.peerRating).toBe(100);
+    });
+
+    test('blended score: 60% marketplace + 40% feedback when both exist', () => {
+        // Marketplace: rating 3 => (3-1)/4 * 100 = 50
+        seedMarketplaceReview('agent-1', 3);
+
+        // Feedback: 3 positive, 1 negative => 75% positive => 75
+        seedResponseFeedback('agent-1', 'positive', 0);
+        seedResponseFeedback('agent-1', 'positive', 1);
+        seedResponseFeedback('agent-1', 'positive', 2);
+        seedResponseFeedback('agent-1', 'negative', 3);
+
+        const score = scorer.computeScore('agent-1');
+        // Blended: round(50 * 0.6 + 75 * 0.4) = round(30 + 30) = 60
+        expect(score.components.peerRating).toBe(60);
+    });
+
+    test('marketplace-only when feedback count < 3', () => {
+        // Marketplace review present
+        seedMarketplaceReview('agent-1', 4); // (4-1)/4 * 100 = 75
+
+        // Only 2 feedbacks — below the 3 minimum
+        seedResponseFeedback('agent-1', 'positive', 0);
+        seedResponseFeedback('agent-1', 'positive', 1);
+
+        const score = scorer.computeScore('agent-1');
+        // Should use marketplace only since feedback < 3
+        expect(score.components.peerRating).toBe(75);
+    });
+});
+
+// ─── edge cases ─────────────────────────────────────────────────────────────
+
+describe('edge cases', () => {
+    test('credit pattern: earned > 0, spent = 0 gives ratio-based score of 100', () => {
+        // Earned credits but never spent any
+        seedReputationEvent('agent-1', 'credit_earned', 50, 5);
+
+        const score = scorer.computeScore('agent-1');
+        // ratio = 2.0 when earned > 0, spent = 0 => min(100, round(2.0 * 50)) = 100
+        expect(score.components.creditPattern).toBe(100);
+    });
+
+    test('activity level caps at 100 for 10+ sessions', () => {
+        // Seed 15 sessions in last 30 days — should cap at 100
+        for (let i = 0; i < 15; i++) seedSession('agent-1', i);
+
+        const score = scorer.computeScore('agent-1');
+        expect(score.components.activityLevel).toBe(100);
+    });
+
+    test('old tasks (> 90 days) do not count toward task completion', () => {
+        // Seed 5 completed tasks all older than 90 days
+        for (let i = 0; i < 5; i++) seedWorkTask('agent-1', 'completed', 100);
+
+        const score = scorer.computeScore('agent-1');
+        // Should default to 50 (insufficient recent data)
+        expect(score.components.taskCompletion).toBe(50);
+    });
+});
