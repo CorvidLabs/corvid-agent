@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.30.0] - 2026-03-15
+
+### Added
+- **Multi-tool chain continuation** — limited-tier models (Haiku/Sonnet) can now chain multiple tool calls across continuation rounds, enabling complex multi-step workflows (#1097, #1018)
+- **Session stats in Discord** — completion embeds now show token usage, tool call count, and duration for finished sessions (#1101)
+
+### Fixed
+- **Session view race condition** — subscribe to WebSocket before HTTP fetch in Angular session view to prevent missed updates (#1099)
+- **Disabled agent filtering** — `listAgents` and `getAlgochatEnabledAgents` now filter out disabled agents by default (#1100)
+- **Agent display columns** — hotfix migration 088 to add missing display customization columns (#1104)
+
 ## [0.29.0] - 2026-03-15
 
 ### Added
