@@ -66,8 +66,15 @@ function rowToAgent(row: AgentRow): Agent {
     };
 }
 
-export function listAgents(db: Database, tenantId: string = DEFAULT_TENANT_ID): Agent[] {
-    const { query, bindings } = withTenantFilter('SELECT * FROM agents ORDER BY updated_at DESC', tenantId);
+export function listAgents(
+    db: Database,
+    tenantId: string = DEFAULT_TENANT_ID,
+    options?: { includeDisabled?: boolean },
+): Agent[] {
+    const baseQuery = options?.includeDisabled
+        ? 'SELECT * FROM agents ORDER BY updated_at DESC'
+        : 'SELECT * FROM agents WHERE disabled = 0 ORDER BY updated_at DESC';
+    const { query, bindings } = withTenantFilter(baseQuery, tenantId);
     const rows = db.query(query).all(...bindings) as AgentRow[];
     return rows.map(rowToAgent);
 }
@@ -293,7 +300,7 @@ export function addAgentFunding(db: Database, agentId: string, algoAmount: numbe
 
 export function getAlgochatEnabledAgents(db: Database): Agent[] {
     const rows = db.query(
-        'SELECT * FROM agents WHERE algochat_enabled = 1 ORDER BY updated_at DESC'
+        'SELECT * FROM agents WHERE algochat_enabled = 1 AND disabled = 0 ORDER BY updated_at DESC'
     ).all() as AgentRow[];
     return rows.map(rowToAgent);
 }

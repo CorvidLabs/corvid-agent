@@ -125,6 +125,23 @@ describe('getAgent and listAgents', () => {
         expect(agents).toHaveLength(2);
     });
 
+    test('listAgents excludes disabled agents by default', () => {
+        makeAgent({ name: 'Enabled' });
+        const disabled = makeAgent({ name: 'Disabled' });
+        updateAgent(db, disabled.id, { disabled: true });
+        const agents = listAgents(db);
+        expect(agents).toHaveLength(1);
+        expect(agents[0].name).toBe('Enabled');
+    });
+
+    test('listAgents includes disabled agents when includeDisabled is true', () => {
+        makeAgent({ name: 'Enabled' });
+        const disabled = makeAgent({ name: 'Disabled' });
+        updateAgent(db, disabled.id, { disabled: true });
+        const agents = listAgents(db, undefined, { includeDisabled: true });
+        expect(agents).toHaveLength(2);
+    });
+
     test('getAgent maps display fields from row (rowToAgent)', () => {
         const agent = makeAgent({
             displayColor: '#123456',
