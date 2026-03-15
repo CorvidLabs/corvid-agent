@@ -34,6 +34,15 @@ import type { AstParserService } from '../ast/service';
 import { generateRepoMap, extractRelevantSymbols } from './repo-map';
 import { createWorktree, removeWorktree } from '../lib/worktree';
 import { assessImpact, GOVERNANCE_TIERS, type GovernanceImpact } from '../councils/governance';
+import {
+    StallDetector,
+    escalateTier,
+    inferModelTier,
+    modelForTier,
+    serializeChainState,
+    logEscalation,
+    type ModelTier,
+} from './chain-continuation';
 
 const log = createLogger('WorkTaskService');
 
@@ -64,6 +73,16 @@ export class WorkTaskService {
      * In-memory preemption tracking. Maps paused taskId → preempting taskId.
      */
     private preemptionMap = new Map<string, string>();
+
+    /**
+     * In-memory model tier overrides. Maps taskId → ModelTier.
+     * Used when a task is created with an explicit tier (e.g. via escalation).
+     * Not persisted — server restart falls back to agent's default model.
+     */
+    private tierMap = new Map<string, ModelTier>();
+
+    /** Stall detector — tracks per-session consecutive non-tool turns. */
+    private readonly stallDetector = new StallDetector();
 
     /** True when the service is draining — no new tasks accepted. */
     get shuttingDown(): boolean {
@@ -101,6 +120,24 @@ export class WorkTaskService {
     private setTaskPriority(task: WorkTask, priority: WorkTaskPriority): void {
         this.priorityMap.set(task.id, priority);
         task.priority = priority;
+    }
+
+    /**
+     * Store a model tier override for a task.
+     * Only stores when the tier string maps to a valid ModelTier.
+     */
+    private storeTierOverride(taskId: string, tier: string | undefined): void {
+        if (!tier) return;
+        const lower = tier.toLowerCase();
+        if (lower === 'opus' || lower === 'sonnet' || lower === 'haiku') {
+            this.tierMap.set(taskId, lower as ModelTier);
+        }
+    }
+
+    /** Get the model to use for a task, applying tier override if present. */
+    private resolveModelForTask(taskId: string, agentModel: string): string {
+        const tier = this.tierMap.get(taskId);
+        return tier ? modelForTier(tier) : agentModel;
     }
 
     /** Apply in-memory priority/preemption to a task loaded from DB. */
@@ -438,6 +475,7 @@ export class WorkTaskService {
 
             // Track priority in memory
             this.setTaskPriority(task, priority);
+            this.storeTierOverride(task.id, input.modelTier);
 
             log.info('Work task queued behind active task', {
                 taskId: task.id,
@@ -479,6 +517,7 @@ export class WorkTaskService {
 
             // Track priority in memory
             this.setTaskPriority(task, priority);
+            this.storeTierOverride(task.id, input.modelTier);
 
             // Pause the preempted task and track preemption in memory
             pauseWorkTask(this.db, activeTask.id);
@@ -510,6 +549,7 @@ export class WorkTaskService {
 
         // Track priority in memory
         this.setTaskPriority(task, priority);
+        this.storeTierOverride(task.id, input.modelTier);
 
         log.info('Work task created', { taskId: task.id, agentId: input.agentId, projectId, priority });
 
@@ -640,17 +680,36 @@ export class WorkTaskService {
 
         updateWorkTaskStatus(this.db, task.id, 'running', { sessionId: session.id, branchName });
 
-        // Subscribe for completion
+        // Subscribe for completion (includes stall detection for chain continuation)
         this.subscribeForCompletion(task.id, session.id);
+
+        // Resolve model: apply tier override if present (from chain continuation escalation).
+        // We temporarily patch the agent's model in the DB so that ProcessManager's
+        // synchronous getAgent() call inside startProcess() picks up the override.
+        // This is safe in single-threaded JS: getAgent runs before any async work,
+        // and we restore the original model immediately after startProcess returns.
+        const agentRecord = getAgent(this.db, agent.id);
+        const agentModel = agentRecord?.model ?? '';
+        const resolvedModel = this.resolveModelForTask(task.id, agentModel);
+        const hasModelOverride = !!agentModel && resolvedModel !== agentModel;
+
+        if (hasModelOverride) {
+            this.db.query('UPDATE agents SET model = ? WHERE id = ?').run(resolvedModel, agent.id);
+        }
 
         // Start the process
         this.processManager.startProcess(session, prompt);
+
+        if (hasModelOverride) {
+            this.db.query('UPDATE agents SET model = ? WHERE id = ?').run(agentModel, agent.id);
+        }
 
         log.info('Work task running', {
             taskId: task.id,
             sessionId: session.id,
             branchName,
             worktreeDir,
+            ...(hasModelOverride ? { resolvedModel } : {}),
         });
 
         const updated = getWorkTask(this.db, task.id);
@@ -753,6 +812,9 @@ export class WorkTaskService {
     private subscribeForCompletion(taskId: string, sessionId: string): void {
         let responseBuffer = '';
 
+        // Begin tracking stall state for this session
+        this.stallDetector.track(sessionId);
+
         const callback = (sid: string, event: ClaudeStreamEvent) => {
             if (sid !== sessionId) return;
 
@@ -760,8 +822,28 @@ export class WorkTaskService {
                 responseBuffer += extractContentText(event.message.content);
             }
 
+            // Feed event to stall detector. content_block_start events carry
+            // content_block.type which identifies tool_use vs text blocks.
+            const contentBlockType =
+                event.type === 'content_block_start'
+                    ? (event as { type: 'content_block_start'; content_block?: { type: string } }).content_block?.type
+                    : undefined;
+            const stalled = this.stallDetector.onEvent(sessionId, event.type, contentBlockType);
+            if (stalled) {
+                this.stallDetector.markEscalated(sessionId);
+                // Fire-and-forget escalation — don't block the event loop
+                this.escalateTask(taskId, sessionId, responseBuffer.trim()).catch((err) => {
+                    log.warn('Chain continuation escalation failed', {
+                        taskId,
+                        sessionId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            }
+
             if (event.type === 'result' || event.type === 'session_exited') {
                 this.processManager.unsubscribe(sessionId, callback);
+                this.stallDetector.remove(sessionId);
 
                 const fullOutput = responseBuffer.trim();
 
@@ -771,6 +853,84 @@ export class WorkTaskService {
         };
 
         this.processManager.subscribe(sessionId, callback);
+    }
+
+    /**
+     * Escalate a stalled work task to the next higher model tier.
+     *
+     * Security constraints:
+     *   - Chain state serialization redacts secrets via serializeChainState().
+     *   - The current task is failed BEFORE the new task is created, respecting
+     *     the 1-active-task-per-project invariant.
+     *   - Log line contains only tier-from/tier-to metadata — no session content.
+     */
+    private async escalateTask(taskId: string, sessionId: string, sessionSummary: string): Promise<void> {
+        const task = getWorkTask(this.db, taskId);
+        if (!task) return;
+
+        // Don't escalate if the task already completed or failed
+        if (task.status === 'completed' || task.status === 'failed') return;
+
+        const agent = getAgent(this.db, task.agentId);
+        if (!agent) return;
+
+        // Determine current and next tier
+        const storedTier = this.tierMap.get(taskId);
+        const currentTier: ModelTier = storedTier ?? inferModelTier(agent.model);
+        const nextTier = escalateTier(currentTier);
+
+        if (!nextTier) {
+            // Already at OPUS — cannot escalate further; let the session continue
+            log.info('Chain continuation: already at max tier, cannot escalate further', {
+                taskId,
+                sessionId,
+                tier: currentTier,
+                stalledSteps: this.stallDetector.getStalledSteps(sessionId),
+            });
+            return;
+        }
+
+        const stalledSteps = this.stallDetector.getStalledSteps(sessionId);
+
+        // Stop the stalled session process
+        if (this.processManager.isRunning(sessionId)) {
+            this.processManager.stopProcess(sessionId);
+        }
+
+        // Fail the current task (freed the project slot for the escalated task)
+        updateWorkTaskStatus(this.db, taskId, 'failed', {
+            error: `Auto-escalated after ${stalledSteps} stalled step(s): ${currentTier} → ${nextTier}`,
+        });
+
+        // Build escalated task description (safe — secrets are redacted)
+        const escalatedDescription = serializeChainState({
+            taskDescription: task.description,
+            fromTier: currentTier,
+            toTier: nextTier,
+            stalledSteps,
+            sessionSummary,
+        });
+
+        logEscalation({ taskId, sessionId, fromTier: currentTier, toTier: nextTier, stalledSteps });
+
+        // Create new task at the higher tier — goes through normal queue/concurrency checks
+        try {
+            const newTask = await this.create({
+                agentId: task.agentId,
+                description: escalatedDescription,
+                projectId: task.projectId,
+                source: task.source,
+                modelTier: nextTier,
+            });
+            logEscalation({ taskId, sessionId, fromTier: currentTier, toTier: nextTier, stalledSteps, newTaskId: newTask.id });
+        } catch (err) {
+            log.warn('Chain continuation: failed to create escalated task', {
+                taskId,
+                fromTier: currentTier,
+                toTier: nextTier,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     private async handleSessionEnd(taskId: string, sessionOutput: string): Promise<void> {
