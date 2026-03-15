@@ -234,6 +234,113 @@ describe('migrationStatus', () => {
     });
 });
 
+describe('initDb retry on failure', () => {
+    test('promise-caching pattern resets on rejection, allowing retry', async () => {
+        // This tests the exact pattern used by initDb():
+        //   _initPromise = (async () => { ... })();
+        //   _initPromise.catch(() => { _initPromise = null; });
+        //
+        // Without the .catch reset, _initPromise stays as a rejected promise
+        // and subsequent calls return the same rejection forever.
+
+        let _cachedPromise: Promise<void> | null = null;
+        let callCount = 0;
+
+        function initWithRetry(): Promise<void> {
+            if (!_cachedPromise) {
+                callCount++;
+                const attempt = callCount;
+                _cachedPromise = (async () => {
+                    if (attempt === 1) {
+                        throw new Error('Migration failed');
+                    }
+                    // Second attempt succeeds
+                })();
+                _cachedPromise.catch(() => {
+                    _cachedPromise = null; // The fix under test
+                });
+            }
+            return _cachedPromise;
+        }
+
+        // First call fails
+        try {
+            await initWithRetry();
+            expect(true).toBe(false); // Should not reach here
+        } catch (err) {
+            expect((err as Error).message).toBe('Migration failed');
+        }
+
+        // Wait a tick for the .catch handler to clear _cachedPromise
+        await new Promise((r) => setTimeout(r, 0));
+
+        // _cachedPromise should now be null, allowing retry
+        expect(_cachedPromise).toBeNull();
+
+        // Second call should retry (callCount increments to 2) and succeed
+        await initWithRetry();
+        expect(callCount).toBe(2);
+    });
+
+    test('without the fix, rejected promise would be cached forever', async () => {
+        // Demonstrates the bug: without .catch(() => { _p = null }),
+        // the second call returns the same rejected promise.
+
+        let _cachedPromise: Promise<void> | null = null;
+        let callCount = 0;
+
+        function initWithoutFix(): Promise<void> {
+            if (!_cachedPromise) {
+                callCount++;
+                const attempt = callCount;
+                _cachedPromise = (async () => {
+                    if (attempt === 1) {
+                        throw new Error('Migration failed');
+                    }
+                })();
+                // NO .catch reset — the bug
+            }
+            return _cachedPromise;
+        }
+
+        // First call fails
+        try {
+            await initWithoutFix();
+        } catch {
+            // expected
+        }
+
+        // _cachedPromise is still set (the bug)
+        expect(_cachedPromise).not.toBeNull();
+
+        // Second call returns the SAME rejected promise — never retries
+        expect(callCount).toBe(1);
+        try {
+            await initWithoutFix();
+        } catch {
+            // still fails with the same error
+        }
+        // migrateUp was never called again
+        expect(callCount).toBe(1);
+    });
+
+    test('real initDb succeeds and caches on success', async () => {
+        const { initDb, closeDb, getDb: getDbConn } = await import('../db/connection');
+
+        // Reset any existing state
+        closeDb();
+        getDbConn();
+
+        // initDb should succeed with real migrations on :memory:
+        await initDb();
+
+        // Calling again should not throw (returns cached resolved promise)
+        await initDb();
+
+        closeDb();
+    });
+});
+
 describe('baseline migration (001_baseline.ts)', () => {
     test('creates full schema from scratch', async () => {
         const result = await migrateUp(db);

@@ -69,6 +69,9 @@ export async function initDb(): Promise<void> {
                 }
             }
         })();
+        _initPromise.catch(() => {
+            _initPromise = null; // Allow retry on next call
+        });
     }
     return _initPromise;
 }
