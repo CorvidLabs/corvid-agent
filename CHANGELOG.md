@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.29.0] - 2026-03-15
+
+### Added
+- **MCP delegation tools** — delegate subtasks to specialist models with `corvid_delegate_task` and `corvid_dispatch_model`; automatic tier routing (Opus/Sonnet/Haiku) based on task complexity (#1082)
+- **Flock Directory search & sorting** — sort agents by reputation, name, or last-seen; aggregate reputation scores across the directory (#1077)
+- **Welcome wizard templates** — agent template selection during onboarding (Code Reviewer, DevOps, Researcher, etc.) for faster first-agent setup (#1076)
+
+### Fixed
+- **Stale session reaping** — reap orphaned sessions on startup to prevent ghost processes after restart
+- **Duplicate Discord messages** — unsubscribe event callbacks on session teardown to prevent duplicate message delivery (#1092)
+- **Discord channel affinity** — enforce channel affinity so Discord-originated sessions reply on the same channel (#1079)
+- **Messaging safety** — prevent agents from generating scripts that send messages outside MCP tools (#1086)
+- **CLI login/logout** — wire up login and logout commands in CLI dispatcher (#1083)
+- **CLI chat polling** — replace polling loop with direct callback for lower latency (#1084)
+- **Agent-to-agent messaging** — stop orphaned sessions and handle `session_stopped` events in A2A messaging (#1081)
+- **Spec scaffold TOCTOU** — eliminate race condition in spec scaffold generation (#1072)
+- **CLI empty response** — handle empty response body gracefully in CLI client (#1066)
+
+### Security
+- **CI checkout actions** — align all checkout actions to v6.0.2 and enforce dependency audit in CI (#1062)
+
+### Tests
+- **+150 tests** — close coverage gaps in 6 under-tested modules (#1091); total now **6,982** across 293 files
+
+### Chores
+- **Worktree cleanup** — remove 10 stale git worktrees from `.claude/worktrees/` (#1065)
+- **README stats** — fix stale stats and add missing API entries (#1063)
+
+### Stats
+- **6,982** unit tests across 293 files (18,918 assertions)
+- **360** E2E tests across 31 Playwright specs
+- **138** module specs with automated validation (100% file coverage: 369/369)
+- **43** MCP tools, **~300** API endpoints, **44** route modules, **90** tables
+- **16** commits on main
+
 ## [0.28.0] - 2026-03-14
 
 ### Added

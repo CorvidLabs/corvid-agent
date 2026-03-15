@@ -742,12 +742,12 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
-        const ke = event as KeyboardEvent;
+        const kbEvent = event as KeyboardEvent;
 
-        if (ke.shiftKey && document.activeElement === first) {
+        if (kbEvent.shiftKey && document.activeElement === first) {
             event.preventDefault();
             last.focus();
-        } else if (!ke.shiftKey && document.activeElement === last) {
+        } else if (!kbEvent.shiftKey && document.activeElement === last) {
             event.preventDefault();
             first.focus();
         }
