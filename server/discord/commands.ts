@@ -389,12 +389,30 @@ export async function handleInteraction(
                 break;
             }
 
+            // Create an isolated git worktree so /session doesn't run in the main working tree
+            const { createWorktree, generateChatBranchName } = await import('../lib/worktree');
+            let workDir: string | undefined;
+            if (project.workingDir) {
+                const sessionUuid = crypto.randomUUID();
+                const branchName = generateChatBranchName(agent.name, sessionUuid);
+                const wtResult = await createWorktree({
+                    projectWorkingDir: project.workingDir,
+                    branchName,
+                    worktreeId: `chat-${sessionUuid.slice(0, 12)}`,
+                });
+                if (wtResult.success) {
+                    workDir = wtResult.worktreeDir;
+                }
+                // If worktree creation fails, fall through to the main working dir (non-fatal).
+            }
+
             const session = createSession(ctx.db, {
                 projectId: project.id,
                 agentId: agent.id,
                 name: `Discord thread:${threadId}`,
                 initialPrompt: topic,
                 source: 'discord' as SessionSource,
+                workDir,
             });
 
             ctx.threadSessions.set(threadId, {

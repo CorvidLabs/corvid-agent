@@ -238,7 +238,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 ### Commands
 
 32. **Slash commands**: If `appId` is configured, commands are registered as Discord Application Commands via `PUT /applications/{appId}/commands` (or guild-scoped if `guildId` is set). Interactions are handled via gateway `INTERACTION_CREATE` events. Commands: `/session`, `/work`, `/agents`, `/status`, `/tasks`, `/schedule`, `/config`, `/council`, `/mute`, `/unmute`, `/help`, `/admin`
-33. **`/session` command** (interactive chat): Creates a new Discord thread with a live agent session. The user can go back and forth with the agent in real-time. Required options: `agent` (dropdown, capped at 25), `topic` (string, thread name). Optional: `project` (dropdown). The thread is created in the configured channel with the selected agent bound to it. Use `/session` when you want to **discuss, explore, or guide** the agent interactively
+33. **`/session` command** (interactive chat): Creates a new Discord thread with a live agent session. The user can go back and forth with the agent in real-time. Required options: `agent` (dropdown, capped at 25), `topic` (string, thread name). Optional: `project` (dropdown). The thread is created in the configured channel with the selected agent bound to it. A git worktree is created so the session runs in isolation from the main working tree (graceful fallback if worktree creation fails). Use `/session` when you want to **discuss, explore, or guide** the agent interactively
 34. **`/work` command** (autonomous task): Creates an async work task — the agent works autonomously (clones repo, makes changes, creates a PR) without further interaction. Required: `description` (what to do). Optional: `agent` (dropdown), `project` (dropdown). Responds with a rich confirmation embed showing task ID, agent, and status. Sends a completion notification with PR link (or error details) when done, mentioning the requester. Use `/work` when you want to **assign a task** and get notified with a PR
 35. **`/agents` command**: Lists all available agents with their models. Does not create a session
 36. **`/status` command**: Shows the bot's current status and active sessions
@@ -289,7 +289,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 - **Given** a running Discord bridge with agents "CorvidAgent" and "ResearchBot"
 - **When** a user invokes `/session` and selects agent "ResearchBot" with topic "Algorand governance"
 - **Then** a Discord thread is created named `ResearchBot — Algorand governance`
-- **And** a new session is created with source `discord`, bound to "ResearchBot"
+- **And** a git worktree is created for the session (so the main working tree is not modified)
+- **And** a new session is created with source `discord`, bound to "ResearchBot", with `workDir` set to the worktree path
 - **And** the bot posts an initial embed in the thread confirming the session is active
 - **And** subsequent messages in the thread are handled by "ResearchBot" automatically (no @mention needed)
 
