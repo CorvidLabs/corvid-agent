@@ -22,6 +22,7 @@ import { listProjects } from '../db/projects';
 import { getActiveWorkTasks, countPendingTasks, countActiveTasks } from '../db/work-tasks';
 import { listActiveSchedules } from '../db/schedules';
 import { createLogger } from '../lib/logger';
+import { createWorktree, generateChatBranchName } from '../lib/worktree';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import {
     respondToInteraction,
@@ -389,12 +390,29 @@ export async function handleInteraction(
                 break;
             }
 
+            // Create an isolated git worktree so this session doesn't
+            // pollute the main working tree (matches inline-mention pattern).
+            let workDir: string | undefined;
+            if (project.workingDir) {
+                const tempId = crypto.randomUUID();
+                const branchName = generateChatBranchName(agent.name, tempId);
+                const result = await createWorktree({
+                    projectWorkingDir: project.workingDir,
+                    branchName,
+                    worktreeId: `chat-${tempId.slice(0, 12)}`,
+                });
+                if (result.success) {
+                    workDir = result.worktreeDir;
+                }
+            }
+
             const session = createSession(ctx.db, {
                 projectId: project.id,
                 agentId: agent.id,
                 name: `Discord thread:${threadId}`,
                 initialPrompt: topic,
                 source: 'discord' as SessionSource,
+                workDir,
             });
 
             ctx.threadSessions.set(threadId, {
