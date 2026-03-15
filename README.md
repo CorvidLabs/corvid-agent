@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-6982%20unit%20%7C%20360%20E2E-brightgreen" alt="6982 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-7148%20unit%20%7C%20360%20E2E-brightgreen" alt="7148 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -45,7 +45,7 @@ bun run dev                 # → http://localhost:3000
   <img src="https://img.shields.io/badge/OpenCode-works-00e5ff" alt="OpenCode">
   <img src="https://img.shields.io/badge/Codex_CLI-works-00e5ff" alt="Codex CLI">
   <img src="https://img.shields.io/badge/Ollama-works-00e5ff" alt="Ollama">
-  <img src="https://img.shields.io/badge/MCP-41_tools-ff66c4" alt="MCP">
+  <img src="https://img.shields.io/badge/MCP-43_tools-ff66c4" alt="MCP">
   <img src="https://img.shields.io/badge/A2A_Protocol-compatible-00ff88" alt="A2A">
 </p>
 
@@ -143,8 +143,6 @@ See `.env.example` for the full list of 30+ configuration options.
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
-
-**[Read: Why we have more test code than production code](docs/blog/why-more-test-than-production-code.md)**
 
 ---
 
@@ -350,7 +348,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  11 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  13 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -365,7 +363,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (11 migrations) and query modules
+  db/            SQLite schema (13 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -522,7 +520,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 11 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 13 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |

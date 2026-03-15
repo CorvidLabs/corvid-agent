@@ -143,6 +143,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `TierSubscribeSchema` | Marketplace | Validates tier subscription: `tierId`, `subscriberTenantId` (required). |
 | `StartTrialSchema` | Marketplace | Validates trial start: `tenantId` (required). |
 | `RecordReputationEventSchema` | Reputation | Validates reputation event: `agentId`, `eventType`, `scoreImpact` (required). |
+| `SubmitFeedbackSchema` | Reputation | Validates feedback submission: `agentId` (required), `sessionId` (optional), `source` (enum: `api`/`discord`/`algochat`, default `api`), `sentiment` (enum: `positive`/`negative`, required), `category` (optional), `comment` (max 500, optional), `submittedBy` (optional). |
 | `CreateSubscriptionSchema` | Billing | Validates subscription creation: `tenantId`, `stripeSubscriptionId`, `plan`, `periodStart`, `periodEnd` (required). |
 | `UpsertPersonaSchema` | Personas | Validates persona upsert: optional `archetype`, `traits` (max 20), `voiceGuidelines`, `background`, `exampleMessages` (max 10). |
 | `CreateSkillBundleSchema` | Skill Bundles | Validates skill bundle creation: `name` (required), optional `description`, `tools` (max 50), `promptAdditions`. |

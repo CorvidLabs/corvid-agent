@@ -42,7 +42,7 @@ Indexes: `agent_id`, `created_at`.
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `up` | `(db: Database)` | `void` | Creates `response_feedback` table with indexes on `agent_id` and `created_at` |
+| `up` | `(db: Database)` | `void` | Creates `response_feedback` table with columns `id` (PK), `agent_id`, `session_id`, `source`, `sentiment`, `category`, `comment`, `submitted_by`, `created_at`; creates indexes on `agent_id` and `created_at` |
 | `down` | `(db: Database)` | `void` | Drops `response_feedback` table |
 
 ### Exported Schemas (in `server/lib/validation.ts`)
@@ -137,10 +137,14 @@ Feedback score requires a minimum of 3 feedbacks within 90 days to be included.
 
 ## Dependencies
 
-- `server/reputation/scorer.ts` — `ReputationScorer` for recording events and computing scores.
-- `server/lib/validation.ts` — `SubmitFeedbackSchema`, `parseBodyOrThrow`, `ValidationError`.
-- `server/lib/response.ts` — `json`, `badRequest`, `handleRouteError`.
-- `server/db/schema.ts` — inline migration 90 for `response_feedback` table.
+### Consumes
+| Module | What is used |
+|--------|-------------|
+| `server/reputation/scorer.ts` | `ReputationScorer` for recording events and computing scores |
+| `server/lib/validation.ts` | `SubmitFeedbackSchema`, `parseBodyOrThrow`, `ValidationError` |
+| `server/lib/response.ts` | `json`, `badRequest`, `handleRouteError` |
+| `server/routes/reputation.ts` | Route handler that wires feedback endpoints into the HTTP server |
+| `server/db/schema.ts` | Schema definition for `response_feedback` table |
 
 ## Change Log
 

@@ -155,7 +155,7 @@ describe('Reputation Routes', () => {
         expect(typeof data.overallScore).toBe('number');
     });
 
-    // ─── Feedback ─────────────────────────────────────────────────────────────
+    // ─── Feedback ──────────────────────────────────────────────────────────
 
     it('POST /api/reputation/feedback submits positive feedback', async () => {
         const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
@@ -191,6 +191,7 @@ describe('Reputation Routes', () => {
         const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
             agentId,
             sentiment: 'neutral',
+            source: 'api',
         });
         const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
         expect(res).not.toBeNull();
@@ -234,6 +235,7 @@ describe('Reputation Routes', () => {
         const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
             agentId,
             sentiment: 'positive',
+            source: 'api',
             submittedBy: submitter,
         });
         const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
@@ -259,7 +261,9 @@ describe('Reputation Routes', () => {
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json();
+        expect(data.feedback).toBeDefined();
         expect(Array.isArray(data.feedback)).toBe(true);
+        expect(data.aggregate).toBeDefined();
         expect(typeof data.aggregate.total).toBe('number');
         expect(typeof data.aggregate.positive).toBe('number');
         expect(typeof data.aggregate.negative).toBe('number');
