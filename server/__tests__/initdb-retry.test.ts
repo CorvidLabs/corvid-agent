@@ -23,8 +23,8 @@ mock.module('../db/migrate', () => {
         const files = readdirSync(dir).filter((f: string) => /^\d{3}_.*\.ts$/.test(f)).sort();
         return files.map((f: string) => ({
             version: parseInt(f.split('_')[0], 10),
+            name: f.replace(/^\d{3}_/, '').replace(/\.ts$/, '').replace(/_/g, ' '),
             filename: f,
-            path: join(dir, f),
         }));
     }
 
