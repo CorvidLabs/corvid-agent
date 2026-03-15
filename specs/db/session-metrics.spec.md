@@ -36,6 +36,13 @@ Persists structured tool-chain analytics collected during direct-process executi
 | `SessionMetrics` | Domain object returned by all queries |
 | `SessionMetricsRow` | Raw SQLite row shape |
 
+### Migration Exports (087_session_metrics.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates the `session_metrics` table with all columns and indexes |
+| `down` | `(db: Database)` | `void` | Drops the `session_metrics` table |
+
 ## Invariants
 
 1. **Session FK**: Every metrics row references a valid session via `session_id`
