@@ -165,6 +165,19 @@ describe('getMetricsAggregate', () => {
         const agg = getMetricsAggregate(db, { tier: 'high' });
         expect(agg.totalSessions).toBe(1);
     });
+
+    test('filters by days', () => {
+        insertSessionMetrics(db, makeMetricsInput({ model: 'recent' }));
+        const agg = getMetricsAggregate(db, { days: 7 });
+        expect(agg.totalSessions).toBe(1);
+    });
+
+    test('combines model and days filters', () => {
+        insertSessionMetrics(db, makeMetricsInput({ model: 'alpha' }));
+        insertSessionMetrics(db, makeMetricsInput({ model: 'beta' }));
+        const agg = getMetricsAggregate(db, { model: 'alpha', days: 30 });
+        expect(agg.totalSessions).toBe(1);
+    });
 });
 
 // ── listRecentMetrics ────────────────────────────────────────────────
