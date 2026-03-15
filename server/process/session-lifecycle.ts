@@ -60,6 +60,11 @@ export class SessionLifecycleManager {
             return;
         }
 
+        // Reap stale sessions left behind by a previous server crash or forced restart.
+        // This must run synchronously before we start accepting work, so that the
+        // process manager doesn't see ghost "running" sessions from a previous life.
+        this.reapStaleSessions();
+
         // Run initial cleanup
         this.runCleanup().catch(err => {
             log.error('Initial session cleanup failed', { error: err instanceof Error ? err.message : String(err) });
@@ -75,6 +80,63 @@ export class SessionLifecycleManager {
         log.info('Session lifecycle cleanup started', {
             intervalMs: this.config.cleanupIntervalMs
         });
+    }
+
+    /**
+     * Reap sessions stuck in 'running' status from a previous server instance.
+     *
+     * After a crash or forced restart (e.g. launchctl kickstart -k), child
+     * processes die but their DB status remains 'running'. This method finds
+     * those orphans and marks them 'stopped' so they show correct state in the
+     * UI and can be resumed.
+     *
+     * Detection: for each session with status='running' and a non-null pid,
+     * check if the process is still alive via `kill -0`. If the PID is dead
+     * (or belongs to a different process — unlikely to collide on macOS),
+     * mark the session stopped.
+     */
+    private reapStaleSessions(): void {
+        const staleSessions = this.db.query(`
+            SELECT id, pid, name, agent_id, source
+            FROM sessions
+            WHERE status = 'running'
+        `).all() as Array<{ id: string; pid: number | null; name: string; agent_id: string; source: string }>;
+
+        if (staleSessions.length === 0) return;
+
+        let reaped = 0;
+        for (const session of staleSessions) {
+            let alive = false;
+
+            if (session.pid) {
+                // Use `kill -0` to check PID liveness without sending a signal.
+                // Exit code 0 = process exists, non-zero = dead.
+                try {
+                    const result = Bun.spawnSync(['kill', '-0', String(session.pid)]);
+                    alive = result.exitCode === 0;
+                } catch {
+                    alive = false;
+                }
+            }
+
+            if (!alive) {
+                this.db.query(`
+                    UPDATE sessions SET status = 'stopped', pid = NULL, updated_at = datetime('now')
+                    WHERE id = ?
+                `).run(session.id);
+                reaped++;
+                log.info('Reaped stale session from previous server instance', {
+                    sessionId: session.id,
+                    name: session.name,
+                    pid: session.pid,
+                    source: session.source,
+                });
+            }
+        }
+
+        if (reaped > 0) {
+            log.info(`Reaped ${reaped} stale session(s) from previous server instance`);
+        }
     }
 
     /**

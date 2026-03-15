@@ -60,6 +60,7 @@ export interface GovernanceQuorumReachedMessage { type: 'governance_quorum_reach
 export interface PingMessage { type: 'ping'; serverTime: string }
 export interface WelcomeMessage { type: 'welcome'; serverTime: string }
 export interface ErrorMessage { type: 'error'; message: string; severity?: ErrorSeverity; errorCode?: string }
+export interface ServerShutdownMessage { type: 'server_shutdown'; signal: string; activeSessions: number; message: string }
 export interface SessionErrorMessage { type: 'session_error'; sessionId: string; error: SessionErrorInfo }
 export interface CouncilAgentErrorMessage { type: 'council_agent_error'; launchId: string; agentId: string; agentName: string; error: CouncilAgentErrorInfo }
 
@@ -97,6 +98,7 @@ export type ServerMessage =
     | PingMessage
     | WelcomeMessage
     | ErrorMessage
+    | ServerShutdownMessage
     | SessionErrorMessage
     | CouncilAgentErrorMessage;
 
