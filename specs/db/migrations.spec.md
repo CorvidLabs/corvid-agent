@@ -18,6 +18,7 @@ files:
   - server/db/migrations/087_session_metrics.ts
   - server/db/migrations/088_agent_display_columns_fixup.ts
   - server/db/migrations/089_flock_test_results.ts
+  - server/db/migrations/091_contact_identities.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -298,10 +299,22 @@ Creates `flock_test_results` and `flock_test_challenge_results` tables for stori
 | `up` | `(db: Database)` | `void` | Creates `flock_test_results` and `flock_test_challenge_results` tables with indexes for agent ID and test result lookups |
 | `down` | `(db: Database)` | `void` | Drops both tables and their indexes |
 
+### 091_contact_identities.ts
+
+Creates `contacts` and `contact_platform_links` tables for cross-platform identity mapping. Links Discord IDs, AlgoChat addresses, and GitHub handles to unified contact records.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `contacts` and `contact_platform_links` tables with indexes for tenant+name lookup and unique platform identity constraint |
+| `down` | `(db: Database)` | `void` | Drops `contact_platform_links` and `contacts` tables |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-15 | corvid-agent | Add migration 091 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migrations 087-089 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migration 086 to spec coverage |
 | 2026-03-13 | corvid-agent | Add 8 migration files (078-085) to spec coverage |

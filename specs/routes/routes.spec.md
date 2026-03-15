@@ -47,6 +47,7 @@ files:
   - server/routes/proposals.ts
   - server/routes/repo-blocklist.ts
   - server/routes/security-overview.ts
+  - server/routes/contacts.ts
 db_tables: []
 depends_on:
   - specs/middleware/auth.spec.md
@@ -125,6 +126,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleProposalRoutes` | proposals.ts | Governance proposal CRUD and evaluation |
 | `handleRepoBlocklistRoutes` | repo-blocklist.ts | Repository blocklist management |
 | `handleSecurityOverviewRoutes` | security-overview.ts | Security configuration overview |
+| `handleContactRoutes` | contacts.ts | Contact identity CRUD and cross-platform lookup |
 
 ### Exported Functions (projects.ts)
 
@@ -596,6 +598,20 @@ Every request passes through these stages in order:
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
 | GET | `/api/security/overview` | security-overview.ts | Get aggregated security configuration |
+
+### Contacts
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/contacts` | contacts.ts | List contacts with optional search and pagination |
+| POST | `/api/contacts` | contacts.ts | Create a new contact |
+| GET | `/api/contacts/lookup` | contacts.ts | Lookup contact by name or platform+platform_id |
+| GET | `/api/contacts/:id` | contacts.ts | Get a contact by ID |
+| PUT | `/api/contacts/:id` | contacts.ts | Update contact display name or notes |
+| DELETE | `/api/contacts/:id` | contacts.ts | Delete a contact and its platform links |
+| POST | `/api/contacts/:id/links` | contacts.ts | Add a platform link to a contact |
+| DELETE | `/api/contacts/:id/links/:linkId` | contacts.ts | Remove a platform link |
+| PUT | `/api/contacts/:id/links/:linkId/verify` | contacts.ts | Mark a platform link as verified |
 
 ### Inline Routes (index.ts)
 
