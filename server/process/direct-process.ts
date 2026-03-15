@@ -741,12 +741,65 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             }
         }
 
+        } catch (err) {
+            terminationReason = 'error';
+            const loopDurationMs = Date.now() - loopStartTime;
+            const sessionMetrics = buildSessionMetrics({
+                model,
+                tier: tierConfig.tier,
+                iteration,
+                toolCallCount,
+                maxChainDepth,
+                nudgeCount,
+                midChainNudgeCount,
+                totalExplorationDrifts,
+                stallType,
+                terminationReason,
+                loopDurationMs,
+                needsSummary,
+            });
+            onEvent({
+                type: 'result',
+                subtype: 'error',
+                total_cost_usd: 0,
+                duration_ms: loopDurationMs,
+                num_turns: iteration,
+                session_id: session.id,
+                metrics: sessionMetrics,
+            } as ClaudeStreamEvent);
+            throw err;
         } finally {
             // Release the slot so the next agent can run
             if (slotAcquired) provider.releaseSlot?.(model);
         }
 
-        if (aborted) return;
+        if (aborted) {
+            const loopDurationMs = Date.now() - loopStartTime;
+            const sessionMetrics = buildSessionMetrics({
+                model,
+                tier: tierConfig.tier,
+                iteration,
+                toolCallCount,
+                maxChainDepth,
+                nudgeCount,
+                midChainNudgeCount,
+                totalExplorationDrifts,
+                stallType,
+                terminationReason: 'abort',
+                loopDurationMs,
+                needsSummary,
+            });
+            onEvent({
+                type: 'result',
+                subtype: 'abort',
+                total_cost_usd: 0,
+                duration_ms: loopDurationMs,
+                num_turns: iteration,
+                session_id: session.id,
+                metrics: sessionMetrics,
+            } as ClaudeStreamEvent);
+            return;
+        }
 
         // Signal that the agent is done thinking
         onEvent({ type: 'thinking', thinking: false } as ClaudeStreamEvent);
