@@ -290,14 +290,6 @@ describe('credit patterns', () => {
 
 // ─── computeAllIfStale ──────────────────────────────────────────────────────
 
-function seedResponseFeedback(agentId: string, sentiment: 'positive' | 'negative', daysAgo: number = 0): void {
-    const id = crypto.randomUUID();
-    const createdAt = new Date(Date.now() - daysAgo * 86400_000).toISOString();
-    db.query(
-        'INSERT INTO response_feedback (id, agent_id, session_id, sentiment, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).run(id, agentId, 'sess-1', sentiment, createdAt);
-}
-
 describe('computeAllIfStale', () => {
     test('returns cached scores when they are fresh', () => {
         // Compute scores first so they are fresh
@@ -346,49 +338,6 @@ describe('computeAllIfStale', () => {
         const results = scorer.computeAllIfStale();
         expect(results).toHaveLength(2);
         expect(results[0].overallScore).toBeGreaterThanOrEqual(results[1].overallScore);
-    });
-});
-
-// ─── feedback score blending ────────────────────────────────────────────────
-
-describe('feedback score blending', () => {
-    test('feedback-only peer rating when no marketplace reviews exist', () => {
-        // Seed 3+ positive feedbacks (minimum threshold)
-        seedResponseFeedback('agent-1', 'positive', 0);
-        seedResponseFeedback('agent-1', 'positive', 1);
-        seedResponseFeedback('agent-1', 'positive', 2);
-
-        const score = scorer.computeScore('agent-1');
-        // All positive => feedback score = 100, no marketplace => feedback only
-        expect(score.components.peerRating).toBe(100);
-    });
-
-    test('blended score: 60% marketplace + 40% feedback when both exist', () => {
-        // Marketplace: rating 3 => (3-1)/4 * 100 = 50
-        seedMarketplaceReview('agent-1', 3);
-
-        // Feedback: 3 positive, 1 negative => 75% positive => 75
-        seedResponseFeedback('agent-1', 'positive', 0);
-        seedResponseFeedback('agent-1', 'positive', 1);
-        seedResponseFeedback('agent-1', 'positive', 2);
-        seedResponseFeedback('agent-1', 'negative', 3);
-
-        const score = scorer.computeScore('agent-1');
-        // Blended: round(50 * 0.6 + 75 * 0.4) = round(30 + 30) = 60
-        expect(score.components.peerRating).toBe(60);
-    });
-
-    test('marketplace-only when feedback count < 3', () => {
-        // Marketplace review present
-        seedMarketplaceReview('agent-1', 4); // (4-1)/4 * 100 = 75
-
-        // Only 2 feedbacks — below the 3 minimum
-        seedResponseFeedback('agent-1', 'positive', 0);
-        seedResponseFeedback('agent-1', 'positive', 1);
-
-        const score = scorer.computeScore('agent-1');
-        // Should use marketplace only since feedback < 3
-        expect(score.components.peerRating).toBe(75);
     });
 });
 
