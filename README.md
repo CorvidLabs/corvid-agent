@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-7148%20unit%20%7C%20360%20E2E-brightgreen" alt="7148 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-7375%20unit%20%7C%20360%20E2E-brightgreen" alt="7375 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -45,7 +45,7 @@ bun run dev                 # → http://localhost:3000
   <img src="https://img.shields.io/badge/OpenCode-works-00e5ff" alt="OpenCode">
   <img src="https://img.shields.io/badge/Codex_CLI-works-00e5ff" alt="Codex CLI">
   <img src="https://img.shields.io/badge/Ollama-works-00e5ff" alt="Ollama">
-  <img src="https://img.shields.io/badge/MCP-43_tools-ff66c4" alt="MCP">
+  <img src="https://img.shields.io/badge/MCP-44_tools-ff66c4" alt="MCP">
   <img src="https://img.shields.io/badge/A2A_Protocol-compatible-00ff88" alt="A2A">
 </p>
 
@@ -139,7 +139,7 @@ See `.env.example` for the full list of 30+ configuration options.
 |--------|-------|
 | Unit tests | **7,148** across 303 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **145** with automated validation (100% file coverage) |
+| Module specs | **147** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
@@ -150,9 +150,9 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 
 | Metric | Count |
 |--------|-------|
-| MCP tools | **43** corvid_* tool handlers |
+| MCP tools | **44** corvid_* tool handlers |
 | API endpoints | **279** across 44 route modules |
-| DB migrations | **13** (squashed baseline + incremental, 90+ tables) |
+| DB migrations | **14** (squashed baseline + incremental, 90+ tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
@@ -348,7 +348,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  13 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  14 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -363,7 +363,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (13 migrations) and query modules
+  db/            SQLite schema (14 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -374,7 +374,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 43 corvid_* tool handlers
+  mcp/           MCP tool server and 44 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -500,7 +500,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 7148 server tests (~110s)
+bun test              # 7375 server tests (~110s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
@@ -510,7 +510,7 @@ bun run spec:check    # Validate all module specs in specs/
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**145 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (379/379 files) enforced in CI via `--require-coverage 100`.
+**147 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (379/379 files) enforced in CI via `--require-coverage 100`.
 
 ---
 
