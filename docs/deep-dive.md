@@ -43,7 +43,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Unit tests | 6,861 across 289 files |
 | E2E tests | 360 across 31 Playwright specs |
 | Security tests | 232 dedicated |
-| Module specs | 144 .spec.md files |
+| Module specs | 145 .spec.md files |
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
 | Version | 0.30.0 |
