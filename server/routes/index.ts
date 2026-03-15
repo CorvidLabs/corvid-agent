@@ -38,6 +38,7 @@ import { handleOnboardingRoutes } from './onboarding';
 import { handleSecurityOverviewRoutes } from './security-overview';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
 import { handleFlockDirectoryRoutes } from './flock-directory';
+import { handleContactRoutes } from './contacts';
 import type { ProcessManager } from '../process/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { WebhookService } from '../webhooks/service';
@@ -323,6 +324,10 @@ async function handleRoutes(
 
     const repoBlocklistResponse = handleRepoBlocklistRoutes(req, url, db, context);
     if (repoBlocklistResponse) return repoBlocklistResponse;
+
+    // Contact identity routes (cross-platform identity mapping)
+    const contactResponse = handleContactRoutes(req, url, db, context);
+    if (contactResponse) return contactResponse;
 
     const securityOverviewResponse = handleSecurityOverviewRoutes(req, url, db);
     if (securityOverviewResponse) return securityOverviewResponse;

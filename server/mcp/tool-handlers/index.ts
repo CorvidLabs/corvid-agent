@@ -75,5 +75,8 @@ export { handleLaunchCouncil } from './councils';
 // ─── Flock Directory ────────────────────────────────────────────────────────
 export { handleFlockDirectory } from './flock-directory';
 
+// ─── Contacts / identity ────────────────────────────────────────────────────
+export { handleLookupContact } from './contacts';
+
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';
