@@ -168,16 +168,17 @@ describe('Reputation Routes', () => {
         expect(res!.status).toBe(201);
         const data = await res!.json();
         expect(data.ok).toBe(true);
-        expect(data.id).toBeDefined();
+        expect(typeof data.id).toBe('string');
     });
 
-    it('POST /api/reputation/feedback submits negative feedback with comment', async () => {
+    it('POST /api/reputation/feedback submits negative feedback with optional fields', async () => {
         const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
             agentId,
             sentiment: 'negative',
             source: 'discord',
             category: 'inaccurate',
-            comment: 'Wrong answer',
+            comment: 'Response was wrong',
+            submittedBy: 'user-1',
         });
         const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
         expect(res).not.toBeNull();
@@ -197,14 +198,38 @@ describe('Reputation Routes', () => {
         expect(res!.status).toBe(400);
     });
 
+    it('POST /api/reputation/feedback rejects missing agentId', async () => {
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            sentiment: 'positive',
+        });
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(400);
+    });
+
+    it('POST /api/reputation/feedback records reputation event', async () => {
+        const eventsBefore = scorer.getEvents(agentId);
+        const feedbackCountBefore = eventsBefore.filter((e) => e.event_type === 'feedback_received').length;
+
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            agentId,
+            sentiment: 'positive',
+        });
+        await handleReputationRoutes(req, url, db, scorer, attestation);
+
+        const eventsAfter = scorer.getEvents(agentId);
+        const feedbackCountAfter = eventsAfter.filter((e) => e.event_type === 'feedback_received').length;
+        expect(feedbackCountAfter).toBe(feedbackCountBefore + 1);
+    });
+
     it('POST /api/reputation/feedback enforces rate limit', async () => {
-        const submitter = 'rate-limit-wallet';
+        const submitter = `rate-limit-test-${crypto.randomUUID()}`;
         // Insert 10 feedbacks directly
         for (let i = 0; i < 10; i++) {
-            db.query(`
-                INSERT INTO response_feedback (id, agent_id, source, sentiment, submitted_by)
-                VALUES (?, ?, 'api', 'positive', ?)
-            `).run(crypto.randomUUID(), agentId, submitter);
+            db.query(
+                `INSERT INTO response_feedback (id, agent_id, source, sentiment, submitted_by, created_at)
+                 VALUES (?, ?, 'api', 'positive', ?, datetime('now'))`,
+            ).run(crypto.randomUUID(), agentId, submitter);
         }
 
         const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
@@ -220,7 +245,17 @@ describe('Reputation Routes', () => {
         expect(data.error).toContain('Rate limit');
     });
 
-    it('GET /api/reputation/feedback/:agentId returns feedback list and aggregate', async () => {
+    it('POST /api/reputation/feedback allows feedback without submittedBy (no rate limit check)', async () => {
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            agentId,
+            sentiment: 'positive',
+        });
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(201);
+    });
+
+    it('GET /api/reputation/feedback/:agentId returns feedback with aggregates', async () => {
         const { req, url } = fakeReq('GET', `/api/reputation/feedback/${agentId}`);
         const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
         expect(res).not.toBeNull();
@@ -235,12 +270,22 @@ describe('Reputation Routes', () => {
     });
 
     it('GET /api/reputation/feedback/:agentId respects limit param', async () => {
-        const { req, url } = fakeReq('GET', `/api/reputation/feedback/${agentId}?limit=1`);
+        const { req, url } = fakeReq('GET', `/api/reputation/feedback/${agentId}?limit=2`);
         const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
         expect(res).not.toBeNull();
         expect(res!.status).toBe(200);
         const data = await res!.json();
-        expect(data.feedback.length).toBeLessThanOrEqual(1);
+        expect(data.feedback.length).toBeLessThanOrEqual(2);
+    });
+
+    it('GET /api/reputation/feedback/:agentId returns empty for unknown agent', async () => {
+        const { req, url } = fakeReq('GET', '/api/reputation/feedback/nonexistent-agent');
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.feedback).toEqual([]);
+        expect(data.aggregate.total).toBe(0);
     });
 
     // ─── Unmatched path ──────────────────────────────────────────────────────

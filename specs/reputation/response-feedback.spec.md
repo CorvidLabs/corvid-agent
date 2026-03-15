@@ -38,12 +38,16 @@ Indexes: `agent_id`, `created_at`.
 
 ## Public API
 
-### Exported Functions (090_response_feedback.ts)
+### Migration Exports (090_response_feedback.ts)
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Creates `response_feedback` table with columns `id` (PK), `agent_id`, `session_id`, `source`, `sentiment`, `category`, `comment`, `submitted_by`, `created_at`; creates indexes on `agent_id` and `created_at` |
 | `down` | `(db: Database)` | `void` | Drops `response_feedback` table |
+
+### Exported Schemas (in `server/lib/validation.ts`)
+
+- `SubmitFeedbackSchema` — Zod schema for validating feedback submission requests.
 
 ### Route Handlers (internal to `handleReputationRoutes`)
 
