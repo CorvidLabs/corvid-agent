@@ -169,6 +169,7 @@ export function subscribeForResponseWithEmbed(
             clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
+            processManager.unsubscribe(sessionId, callback);
             threadCallbacks.delete(threadId);
 
             sendEmbedWithButtons(delivery, botToken, threadId, {
@@ -207,6 +208,7 @@ export function subscribeForResponseWithEmbed(
             clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
+            processManager.unsubscribe(sessionId, callback);
             threadCallbacks.delete(threadId);
         }
     };
@@ -299,7 +301,7 @@ export function subscribeForInlineResponse(
         }
     };
 
-    processManager.subscribe(sessionId, (_sid, event) => {
+    const inlineCallback: EventCallback = (_sid, event) => {
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
             const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
@@ -320,12 +322,16 @@ export function subscribeForInlineResponse(
             clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);
             flush();
+            processManager.unsubscribe(sessionId, inlineCallback);
         }
 
         if (event.type === 'session_error' || event.type === 'session_exited') {
             clearTyping();
+            processManager.unsubscribe(sessionId, inlineCallback);
         }
-    });
+    };
+
+    processManager.subscribe(sessionId, inlineCallback);
 }
 
 /**
