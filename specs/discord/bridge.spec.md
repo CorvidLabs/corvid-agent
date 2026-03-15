@@ -21,6 +21,7 @@ depends_on:
   - specs/process/process-manager.spec.md
   - specs/db/sessions.spec.md
   - specs/councils/councils.spec.md
+  - specs/lib/worktree.spec.md
 ---
 
 # Discord Bridge
