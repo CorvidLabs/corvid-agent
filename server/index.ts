@@ -1,4 +1,5 @@
 import { getDb, initDb } from './db/connection';
+import { getCurrentVersion } from './db/migrate';
 import { initDiscordConfigFromEnv } from './db/discord-config';
 import { handleRequest, initRateLimiterDb } from './routes/index';
 import { createWebSocketHandler } from './ws/handler';
@@ -56,7 +57,11 @@ initDb().then(() => {
     // Seed discord config from env vars (if not already in DB)
     initDiscordConfigFromEnv(db);
 }).catch((err) => {
-    log.error('File-based migration failed', { error: err instanceof Error ? err.message : String(err) });
+    log.error('File-based migration failed — schema may be incomplete', {
+        error: err instanceof Error ? err.message : String(err),
+        currentVersion: getCurrentVersion(db),
+    });
+    log.error('Pending migrations will be retried on next restart');
 });
 
 // Bootstrap all application services (see server/bootstrap.ts)
