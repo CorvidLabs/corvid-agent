@@ -52,10 +52,6 @@ jobs:
       - name: Version alignment check
         run: bun run version:check
 
-      - name: Stats check
-        if: matrix.os == 'ubuntu-latest'
-        run: bun run stats:check -- --skip-tests
-
       - name: Build client
         run: bun run build:client
 

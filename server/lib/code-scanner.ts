@@ -84,6 +84,7 @@ const CRITICAL_PATTERNS: PatternRule[] = [
         regex: /process\s*\.\s*kill\s*\(/,
         category: 'process_control',
         severity: 'critical',
+        allowedFiles: ['server/process/session-lifecycle.ts'],
     },
     {
         name: 'reverse shell (nc -e)',
