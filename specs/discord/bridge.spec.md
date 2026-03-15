@@ -122,6 +122,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `archiveThread` | `(botToken, threadId)` | `Promise<void>` | Archive a single thread via the Discord API |
 | `createStandaloneThread` | `(botToken, channelId, name)` | `Promise<string \| null>` | Create a standalone Discord thread |
 | `resolveDefaultAgent` | `(db, config)` | `Agent \| null` | Resolve the default agent from config or first available |
+| `normalizeTimestamp` | `(ts: string)` | `string` | Append 'Z' to SQLite UTC timestamps lacking timezone indicator |
+| `formatDuration` | `(ms: number)` | `string` | Format milliseconds as human-readable "Xm Ys" or "Xs" string |
 
 ### Exported Functions (from message-formatter.ts)
 

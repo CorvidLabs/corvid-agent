@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleAnalyticsRoutes } from '../routes/analytics';
+import { insertSessionMetrics } from '../db/session-metrics';
 
 let db: Database;
 
@@ -103,5 +104,56 @@ describe('Analytics Routes', () => {
         const { req, url } = fakeReq('GET', '/api/other');
         const res = handleAnalyticsRoutes(req, url, db);
         expect(res).toBeNull();
+    });
+
+    // ── Session metrics routes ───────────────────────────────────────
+
+    it('GET /api/analytics/session-metrics returns aggregate + recent', async () => {
+        // Insert metrics for a session
+        const sid = db.query("SELECT id FROM sessions LIMIT 1").get() as { id: string };
+        insertSessionMetrics(db, {
+            sessionId: sid.id,
+            model: 'llama3.1:70b',
+            tier: 'standard',
+            totalIterations: 5,
+            toolCallCount: 10,
+            maxChainDepth: 3,
+            nudgeCount: 1,
+            midChainNudgeCount: 0,
+            explorationDriftCount: 0,
+            stallDetected: false,
+            stallType: null,
+            terminationReason: 'normal',
+            durationMs: 5000,
+            needsSummary: false,
+        });
+
+        const { req, url } = fakeReq('GET', '/api/analytics/session-metrics');
+        const res = handleAnalyticsRoutes(req, url, db);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.aggregate).toBeDefined();
+        expect(data.aggregate.totalSessions).toBe(1);
+        expect(data.aggregate.avgIterations).toBe(5);
+        expect(Array.isArray(data.recent)).toBe(true);
+        expect(data.recent).toHaveLength(1);
+    });
+
+    it('GET /api/analytics/session-metrics filters by model', async () => {
+        const { req, url } = fakeReq('GET', '/api/analytics/session-metrics?model=nonexistent');
+        const res = handleAnalyticsRoutes(req, url, db);
+        const data = await res!.json();
+        expect(data.aggregate.totalSessions).toBe(0);
+    });
+
+    it('GET /api/analytics/session-metrics/:id returns per-session metrics', async () => {
+        const sid = db.query("SELECT id FROM sessions LIMIT 1").get() as { id: string };
+        const { req, url } = fakeReq('GET', `/api/analytics/session-metrics/${sid.id}`);
+        const res = handleAnalyticsRoutes(req, url, db);
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(Array.isArray(data.metrics)).toBe(true);
     });
 });

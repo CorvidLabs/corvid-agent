@@ -25,6 +25,27 @@ import {
 
 const log = createLogger('DiscordThreadManager');
 
+/**
+ * Normalize a SQLite UTC timestamp by appending 'Z' if it doesn't already
+ * have a timezone indicator, so `new Date()` parses it as UTC rather than local.
+ * Exported for testing.
+ */
+export function normalizeTimestamp(ts: string): string {
+    return ts.endsWith('Z') ? ts : ts + 'Z';
+}
+
+/**
+ * Format a duration in milliseconds as a human-readable string.
+ * Returns "Xm Ys" for durations >= 1 minute, or "Xs" for shorter.
+ * Exported for testing.
+ */
+export function formatDuration(ms: number): string {
+    const durationMs = Math.max(0, ms);
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.floor((durationMs % 60000) / 1000);
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
 export interface ThreadSessionInfo {
     sessionId: string;
     agentName: string;
@@ -178,31 +199,23 @@ export function subscribeForResponseWithEmbed(
                 const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
                 try {
                     const row = db.query<{
-                        total_cost_usd: number;
                         total_turns: number;
                         work_dir: string | null;
                         created_at: string;
                     }, [string]>(
-                        'SELECT total_cost_usd, total_turns, work_dir, created_at FROM sessions WHERE id = ?',
+                        'SELECT total_turns, work_dir, created_at FROM sessions WHERE id = ?',
                     ).get(sessionId);
 
                     if (row) {
-                        // Duration
-                        const startMs = new Date(row.created_at).getTime();
+                        // Duration — normalizeTimestamp appends Z so JS parses SQLite UTC correctly
+                        const createdAt = normalizeTimestamp(row.created_at);
+                        const startMs = new Date(createdAt).getTime();
                         const durationMs = Date.now() - startMs;
-                        const durationMin = Math.floor(durationMs / 60000);
-                        const durationSec = Math.floor((durationMs % 60000) / 1000);
-                        const durationStr = durationMin > 0 ? `${durationMin}m ${durationSec}s` : `${durationSec}s`;
-                        fields.push({ name: 'Duration', value: durationStr, inline: true });
+                        fields.push({ name: 'Duration', value: formatDuration(durationMs), inline: true });
 
                         // Turns
                         if (row.total_turns > 0) {
                             fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
-                        }
-
-                        // Cost
-                        if (row.total_cost_usd > 0) {
-                            fields.push({ name: 'Cost', value: `$${row.total_cost_usd.toFixed(4)}`, inline: true });
                         }
 
                         // Worktree branch + git stats
@@ -217,14 +230,14 @@ export function subscribeForResponseWithEmbed(
                                     (async () => {
                                         const p = Bun.spawn(['git', 'diff', 'main...HEAD', '--name-only'], { cwd: row.work_dir!, stdout: 'pipe', stderr: 'pipe' });
                                         const out = await new Response(p.stdout).text();
-                                        await p.exited;
-                                        return out.trim();
+                                        const code = await p.exited;
+                                        return code === 0 ? out.trim() : '';
                                     })(),
                                     (async () => {
                                         const p = Bun.spawn(['git', 'rev-list', '--count', 'main...HEAD'], { cwd: row.work_dir!, stdout: 'pipe', stderr: 'pipe' });
                                         const out = await new Response(p.stdout).text();
-                                        await p.exited;
-                                        return out.trim();
+                                        const code = await p.exited;
+                                        return code === 0 ? out.trim() : '';
                                     })(),
                                 ]);
 

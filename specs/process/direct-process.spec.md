@@ -24,6 +24,7 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 |------|-------------|
 | `DirectProcessOptions` | Full configuration: session, project, agent, prompt, provider, callbacks, MCP context, persona/skill prompts, model override, external MCP configs, tool allow list |
 | `ToolDef` | Minimal tool definition shape: name, description, parameters |
+| `SessionMetricsState` | Input state captured from the main loop for building session metrics: model, tier, iteration, toolCallCount, maxChainDepth, nudge/drift counts, stallType, terminationReason, loopDurationMs, needsSummary |
 
 ### Exported Functions
 
@@ -31,6 +32,7 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 |----------|-----------|---------|-------------|
 | `startDirectProcess` | `(options: DirectProcessOptions)` | `SdkProcess` | Start a direct process, returns handle with pid/sendMessage/kill |
 | `prependRoutingContext` | `(message: string, source: string, tierConfig?: AgentTierConfig)` | `string` | Prepend channel-affinity routing hints (Discord/AlgoChat) to a user prompt, with optional input sanitization for non-high-tier agents |
+| `buildSessionMetrics` | `(state: SessionMetricsState)` | `DirectProcessMetrics` | Build a DirectProcessMetrics object from loop state variables. Pure function — derives `stallDetected` from `terminationReason` and maps field names |
 | `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
 
 ## Invariants

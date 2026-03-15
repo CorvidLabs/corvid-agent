@@ -64,6 +64,7 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `EventCallback` | Type alias `(sessionId: string, event: ClaudeStreamEvent) => void` for session and global event callbacks. |
 | `ClaudeProcessOptions` | Interface for `spawnClaudeProcess` options: `session`, `project`, `agent`, `resume`, `prompt`, `mcpEnabled`, `onEvent`, `onExit`. |
 | `ClaudeProcess` | Interface for the returned process handle: `proc`, `pid`, `sendMessage`, `kill`. |
+| `DirectProcessMetrics` | Interface for metrics collected during a direct-process run: `model`, `tier`, iteration counts, tool-call counts, nudge counts, stall info, `terminationReason`, `durationMs`, `needsSummary`. |
 | `ISessionEventBus` | Interface contract for the session event bus, defining subscribe/unsubscribe/emit/cleanup methods. |
 
 ### Exported Classes
