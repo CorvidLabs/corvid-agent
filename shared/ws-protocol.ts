@@ -148,7 +148,7 @@ export type ErrorSeverity = 'info' | 'warning' | 'error' | 'fatal';
 /** Structured error info for session failure recovery events. */
 export interface SessionErrorInfo {
     message: string;
-    errorType: 'spawn_error' | 'credits_exhausted' | 'timeout' | 'crash' | 'unknown';
+    errorType: 'spawn_error' | 'credits_exhausted' | 'context_exhausted' | 'timeout' | 'crash' | 'unknown';
     severity: ErrorSeverity;
     recoverable: boolean;
     sessionStatus?: string;

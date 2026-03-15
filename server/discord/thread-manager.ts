@@ -89,6 +89,7 @@ export function subscribeForResponseWithEmbed(
     const TYPING_REFRESH_MS = 8000;
     const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
     let receivedAnyActivity = false; // tracks any activity (content OR tool use)
+    let sentErrorMessage = false; // dedup: prevent repeated error messages for same session
 
     // Keep typing indicator alive continuously until response completes
     const typingInterval = setInterval(() => {
@@ -96,11 +97,17 @@ export function subscribeForResponseWithEmbed(
         if (!processManager.isRunning(sessionId)) {
             clearTyping();
             log.warn('Process died while typing indicator active', { sessionId, threadId });
-            if (!receivedAnyContent) {
-                sendEmbed(delivery, botToken, threadId, {
-                    description: 'The agent session ended unexpectedly. Send a message to start a new session.',
+            if (!receivedAnyContent && !sentErrorMessage) {
+                sentErrorMessage = true;
+                sendEmbedWithButtons(delivery, botToken, threadId, {
+                    description: 'The agent session ended unexpectedly. Send a message to resume.',
                     color: 0xff3355,
-                }).catch(() => {});
+                    footer: { text: `${agentName} · crashed` },
+                }, [
+                    buildActionRow(
+                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
+                    ),
+                ]).catch(() => {});
             }
             threadCallbacks.delete(threadId);
             return;
@@ -266,14 +273,14 @@ export function subscribeForResponseWithEmbed(
                 }
 
                 await sendEmbedWithButtons(delivery, botToken, threadId, {
-                    description: 'Session complete. Send a message to continue, or use the buttons below.',
+                    description: 'Session complete. Send a message to continue the conversation.',
                     color: 0x57f287,
                     ...(fields.length > 0 ? { fields } : {}),
                     footer: { text: `${agentName} · done` },
                 }, [
                     buildActionRow(
-                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                        { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
+                        { label: 'Continue', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '💬' },
+                        { label: 'Archive Thread', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' },
                     ),
                 ]);
             })().catch((err) => {
@@ -283,13 +290,49 @@ export function subscribeForResponseWithEmbed(
 
         if (event.type === 'session_error') {
             clearTyping();
-            const errEvent = event as { error?: { message?: string; errorType?: string } };
-            const errMsg = errEvent.error?.message || 'Unknown error';
+            if (sentErrorMessage) return; // dedup: only show one error per session lifecycle
+            sentErrorMessage = true;
+
+            const errEvent = event as { error?: { message?: string; errorType?: string; recoverable?: boolean } };
+            const errorType = errEvent.error?.errorType || 'unknown';
+
+            // Differentiated messages per error type
+            let description: string;
+            let title: string;
+            let color: number;
+            switch (errorType) {
+                case 'context_exhausted':
+                    title = 'Context Limit Reached';
+                    description = 'The conversation ran out of context space. The session will restart with fresh context — send a message to continue.';
+                    color = 0xf0b232; // yellow/warning
+                    break;
+                case 'credits_exhausted':
+                    title = 'Credits Exhausted';
+                    description = 'Session paused — credits have been used up. Add credits to resume.';
+                    color = 0xf0b232;
+                    break;
+                case 'crash':
+                    title = 'Session Crashed';
+                    description = 'The agent session crashed unexpectedly. Send a message or press Resume to restart.';
+                    color = 0xff3355;
+                    break;
+                case 'spawn_error':
+                    title = 'Failed to Start';
+                    description = 'The agent session could not be started. This may be a configuration issue.';
+                    color = 0xff3355;
+                    break;
+                default:
+                    title = 'Session Error';
+                    description = (errEvent.error?.message || 'An unexpected error occurred.').slice(0, 4096);
+                    color = 0xff3355;
+                    break;
+            }
+
             sendEmbedWithButtons(delivery, botToken, threadId, {
-                title: 'Session Error',
-                description: errMsg.slice(0, 4096),
-                color: 0xff3355,
-                footer: { text: `${agentName} · ${errEvent.error?.errorType || 'error'}` },
+                title,
+                description,
+                color,
+                footer: { text: `${agentName} · ${errorType}` },
             }, [
                 buildActionRow(
                     { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
@@ -543,7 +586,6 @@ export async function archiveStaleThreads(
             }, [
                 buildActionRow(
                     { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                    { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
                 ),
             ]);
 
