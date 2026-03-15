@@ -22,7 +22,7 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 |----------|-----------|---------|-------------|
 | `getWorktreeBaseDir` | `(projectWorkingDir: string)` | `string` | Resolves the base directory for worktrees. Uses `WORKTREE_BASE_DIR` env var or defaults to `.corvid-worktrees` sibling directory |
 | `createWorktree` | `(options: CreateWorktreeOptions)` | `Promise<CreateWorktreeResult>` | Creates an isolated git worktree with a new branch |
-| `removeWorktree` | `(projectWorkingDir: string, worktreeDir: string)` | `Promise<void>` | Removes a git worktree (keeps the branch). Idempotent |
+| `removeWorktree` | `(projectWorkingDir: string, worktreeDir: string, options?: RemoveWorktreeOptions)` | `Promise<void>` | Removes a git worktree. With `cleanBranch: true`, auto-deletes branches with zero commits ahead of main. Idempotent |
 | `generateChatBranchName` | `(agentName: string, sessionId: string)` | `string` | Generates a branch name for chat session worktrees: `chat/{agentSlug}/{sessionIdPrefix}` |
 
 ### Exported Types
@@ -31,13 +31,14 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 |------|-------------|
 | `CreateWorktreeOptions` | Options for worktree creation: `projectWorkingDir`, `branchName`, `worktreeId` |
 | `CreateWorktreeResult` | Result of worktree creation: `success`, `worktreeDir`, optional `error` |
+| `RemoveWorktreeOptions` | Options for worktree removal: `cleanBranch` (auto-delete empty branches) |
 
 ## Invariants
 
 1. **Deterministic base dir**: `getWorktreeBaseDir` always returns a path that is a sibling of the project directory (or the override from `WORKTREE_BASE_DIR`)
 2. **Worktree isolation**: Each worktree directory is at `{baseDir}/{worktreeId}`, ensuring unique paths per session/task
 3. **Branch naming**: Chat branches follow `chat/{agentSlug}/{sessionPrefix}` pattern; work task branches follow `agent/{agentSlug}/{taskSlug}-{timestamp}-{suffix}` (handled by WorkTaskService)
-4. **Non-destructive removal**: `removeWorktree` only removes the worktree directory, never the branch (branches are needed for PRs/review)
+4. **Smart branch cleanup**: `removeWorktree` with `cleanBranch: true` deletes branches with zero commits ahead of main; branches with actual commits are preserved for PRs/review. Without the option, branches are always kept
 5. **Idempotent removal**: Calling `removeWorktree` on an already-removed worktree logs a warning but does not throw
 6. **Graceful failure**: `createWorktree` returns `{ success: false, error }` on failure rather than throwing
 
@@ -57,12 +58,26 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 - **Then** `{ success: false, error: '...' }` is returned
 - **And** no exception is thrown
 
-### Scenario: Removing a worktree
+### Scenario: Removing a worktree (default — keep branch)
 
 - **Given** a worktree exists at `/tmp/.corvid-worktrees/chat-abc123`
 - **When** `removeWorktree('/app/corvid-agent', '/tmp/.corvid-worktrees/chat-abc123')` is called
 - **Then** the worktree directory is removed via `git worktree remove --force`
 - **And** the branch is preserved
+
+### Scenario: Removing a worktree with cleanBranch (no commits)
+
+- **Given** a worktree exists with branch `chat/corvid/abc123` that has zero commits ahead of main
+- **When** `removeWorktree(projectDir, worktreeDir, { cleanBranch: true })` is called
+- **Then** the worktree directory is removed
+- **And** the branch is deleted via `git branch -D`
+
+### Scenario: Removing a worktree with cleanBranch (has commits)
+
+- **Given** a worktree exists with branch `chat/corvid/abc123` that has 3 commits ahead of main
+- **When** `removeWorktree(projectDir, worktreeDir, { cleanBranch: true })` is called
+- **Then** the worktree directory is removed
+- **And** the branch is preserved (needed for PRs/review)
 
 ### Scenario: Branch name generation
 
@@ -93,7 +108,9 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 |--------|-------------|
 | `server/work/service.ts` | `getWorktreeBaseDir`, `createWorktree`, `removeWorktree` for work task isolation |
 | `server/discord/message-handler.ts` | `createWorktree`, `generateChatBranchName` for chat session isolation |
-| `server/process/manager.ts` | `removeWorktree` for chat worktree cleanup on session exit |
+| `server/discord/commands.ts` | `createWorktree`, `generateChatBranchName` for slash-command chat session isolation |
+| `server/algochat/message-router.ts` | `createWorktree`, `generateChatBranchName` for AlgoChat session isolation |
+| `server/process/manager.ts` | `removeWorktree` (with `cleanBranch: true`) for chat worktree cleanup on session exit |
 
 ## Configuration
 
@@ -105,4 +122,5 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-15 | corvid-agent | Added `RemoveWorktreeOptions` / `cleanBranch` for smart branch cleanup; AlgoChat consumer |
 | 2026-03-12 | corvid-agent | Initial spec — extracted from WorkTaskService |

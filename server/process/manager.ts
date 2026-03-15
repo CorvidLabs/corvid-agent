@@ -1009,7 +1009,7 @@ export class ProcessManager {
         const project = session.projectId ? getProject(this.db, session.projectId) : null;
         if (!project?.workingDir) return;
 
-        removeWorktree(project.workingDir, session.workDir).catch((err) => {
+        removeWorktree(project.workingDir, session.workDir, { cleanBranch: true }).catch((err) => {
             log.warn('Failed to clean up chat worktree', {
                 sessionId,
                 workDir: session.workDir,

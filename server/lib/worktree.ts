@@ -68,11 +68,31 @@ export async function createWorktree(options: CreateWorktreeOptions): Promise<Cr
     }
 }
 
+export interface RemoveWorktreeOptions {
+    /**
+     * If true, delete the branch after removing the worktree when it has
+     * zero commits ahead of main (i.e. the chat session produced no work).
+     * Branches with actual commits are kept for PRs/review.
+     */
+    cleanBranch?: boolean;
+}
+
 /**
- * Remove a git worktree. The branch is kept (needed for PRs and review).
+ * Remove a git worktree. By default the branch is kept (needed for PRs and review).
+ * Pass `{ cleanBranch: true }` to auto-delete branches with no commits ahead of main.
  * Idempotent — safe to call if the worktree was already removed.
  */
-export async function removeWorktree(projectWorkingDir: string, worktreeDir: string): Promise<void> {
+export async function removeWorktree(
+    projectWorkingDir: string,
+    worktreeDir: string,
+    options?: RemoveWorktreeOptions,
+): Promise<void> {
+    // Detect the branch name before removing the worktree (needed for cleanBranch)
+    let branchName: string | undefined;
+    if (options?.cleanBranch) {
+        branchName = await detectWorktreeBranch(projectWorkingDir, worktreeDir);
+    }
+
     try {
         const proc = Bun.spawn(
             ['git', 'worktree', 'remove', '--force', worktreeDir],
@@ -93,6 +113,74 @@ export async function removeWorktree(projectWorkingDir: string, worktreeDir: str
     } catch (err) {
         log.warn('Error removing worktree', {
             worktreeDir,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+
+    // Clean up empty branches after worktree removal
+    if (branchName) {
+        await cleanupEmptyBranch(projectWorkingDir, branchName);
+    }
+}
+
+/**
+ * Detect which branch a worktree is on by parsing `git worktree list --porcelain`.
+ */
+async function detectWorktreeBranch(projectWorkingDir: string, worktreeDir: string): Promise<string | undefined> {
+    try {
+        const proc = Bun.spawn(
+            ['git', 'worktree', 'list', '--porcelain'],
+            { cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe' },
+        );
+        const stdout = await new Response(proc.stdout).text();
+        await proc.exited;
+
+        // Porcelain output: blocks separated by blank lines.
+        // Each block: "worktree <path>\nHEAD <sha>\nbranch refs/heads/<name>\n"
+        const blocks = stdout.split('\n\n');
+        for (const block of blocks) {
+            if (block.includes(`worktree ${worktreeDir}`)) {
+                const branchLine = block.split('\n').find(l => l.startsWith('branch '));
+                if (branchLine) {
+                    return branchLine.replace('branch refs/heads/', '');
+                }
+            }
+        }
+    } catch {
+        // Non-fatal — we just won't clean the branch
+    }
+    return undefined;
+}
+
+/**
+ * Delete a branch if it has zero commits ahead of main.
+ * Branches with actual work are preserved for PRs/review.
+ */
+async function cleanupEmptyBranch(projectWorkingDir: string, branchName: string): Promise<void> {
+    try {
+        // Check if the branch has any commits not on main
+        const logProc = Bun.spawn(
+            ['git', 'log', 'main..' + branchName, '--oneline'],
+            { cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe' },
+        );
+        const logOutput = (await new Response(logProc.stdout).text()).trim();
+        await logProc.exited;
+
+        if (logOutput.length > 0) {
+            log.info('Keeping branch with commits', { branchName, commits: logOutput.split('\n').length });
+            return;
+        }
+
+        // No commits ahead — safe to delete
+        const delProc = Bun.spawn(
+            ['git', 'branch', '-D', branchName],
+            { cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe' },
+        );
+        await delProc.exited;
+        log.info('Deleted empty branch', { branchName });
+    } catch (err) {
+        log.warn('Failed to clean up branch', {
+            branchName,
             error: err instanceof Error ? err.message : String(err),
         });
     }
