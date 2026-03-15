@@ -1,5 +1,5 @@
 name: CI
-
+# paths-ignore: skip CI on docs-only changes
 on:
   push:
     branches: [main]
