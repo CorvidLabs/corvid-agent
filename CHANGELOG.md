@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.31.0] - 2026-03-15
+
+### Added
+- **Cross-platform contact identity mapping** — map agent identities across Discord, Telegram, Slack, and AlgoChat with unified contact resolution (#1113)
+- **User response feedback tied to reputation scoring** — users can rate agent responses, feeding into the reputation system for trust-aware routing (#1110)
+- **AlgoChat worktree isolation and smart branch cleanup** — AlgoChat sessions now use isolated git worktrees with automatic stale branch cleanup (#1115)
+- **Flock Directory automated testing framework** — structured test harness for validating Flock Directory agent discovery and heartbeat flows (#1108)
+- **Session metrics tracking and analytics endpoints** — track token usage, tool calls, and duration per session with new analytics API (#1107)
+- **CLI per-command `--help` output** — every CLI command now supports `--help` with usage, options, and examples (#1116)
+
+### Fixed
+- **Session metrics persistence on error** — metrics are now saved even when sessions terminate with errors or aborts (#1109)
+- **Migration retry on failure** — reset cached initDb promise when migrations fail, allowing retry without restart (#1106)
+
+### Changed
+- Missing export specs documented for infra and response-feedback modules (#1112)
+- Expanded test coverage for feedback routes, reputation scorer (#1114), and validation edge cases (#1117)
+- Fixed stale README badges and references (#1111)
+
 ## [0.30.0] - 2026-03-15
 
 ### Added
