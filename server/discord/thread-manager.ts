@@ -25,6 +25,27 @@ import {
 
 const log = createLogger('DiscordThreadManager');
 
+/**
+ * Normalize a SQLite UTC timestamp by appending 'Z' if it doesn't already
+ * have a timezone indicator, so `new Date()` parses it as UTC rather than local.
+ * Exported for testing.
+ */
+export function normalizeTimestamp(ts: string): string {
+    return ts.endsWith('Z') ? ts : ts + 'Z';
+}
+
+/**
+ * Format a duration in milliseconds as a human-readable string.
+ * Returns "Xm Ys" for durations >= 1 minute, or "Xs" for shorter.
+ * Exported for testing.
+ */
+export function formatDuration(ms: number): string {
+    const durationMs = Math.max(0, ms);
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.floor((durationMs % 60000) / 1000);
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
 export interface ThreadSessionInfo {
     sessionId: string;
     agentName: string;
@@ -186,14 +207,11 @@ export function subscribeForResponseWithEmbed(
                     ).get(sessionId);
 
                     if (row) {
-                        // Duration — append Z so JS parses SQLite UTC timestamp correctly
-                        const createdAt = row.created_at.endsWith('Z') ? row.created_at : row.created_at + 'Z';
+                        // Duration — normalizeTimestamp appends Z so JS parses SQLite UTC correctly
+                        const createdAt = normalizeTimestamp(row.created_at);
                         const startMs = new Date(createdAt).getTime();
-                        const durationMs = Math.max(0, Date.now() - startMs);
-                        const durationMin = Math.floor(durationMs / 60000);
-                        const durationSec = Math.floor((durationMs % 60000) / 1000);
-                        const durationStr = durationMin > 0 ? `${durationMin}m ${durationSec}s` : `${durationSec}s`;
-                        fields.push({ name: 'Duration', value: durationStr, inline: true });
+                        const durationMs = Date.now() - startMs;
+                        fields.push({ name: 'Duration', value: formatDuration(durationMs), inline: true });
 
                         // Turns
                         if (row.total_turns > 0) {

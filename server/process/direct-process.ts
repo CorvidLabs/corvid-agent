@@ -753,23 +753,20 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
         // Build session metrics
         const loopDurationMs = Date.now() - loopStartTime;
-        const stallDetected = terminationReason === 'stall_repeat'
-            || terminationReason === 'stall_same_tool';
-        const sessionMetrics: DirectProcessMetrics = {
+        const sessionMetrics = buildSessionMetrics({
             model,
             tier: tierConfig.tier,
-            totalIterations: iteration,
+            iteration,
             toolCallCount,
             maxChainDepth,
             nudgeCount,
             midChainNudgeCount,
-            explorationDriftCount: totalExplorationDrifts,
-            stallDetected,
+            totalExplorationDrifts,
             stallType,
             terminationReason,
-            durationMs: loopDurationMs,
+            loopDurationMs,
             needsSummary,
-        };
+        });
 
         // Emit result event with metrics
         onEvent({
@@ -1011,6 +1008,47 @@ export function prependRoutingContext(message: string, source: string, tierConfi
         return `[This message came from Discord. Reply directly in this conversation — do NOT use corvid_send_message or other cross-channel tools to respond. Your text reply will be posted back to the Discord thread automatically.]\n\n${sanitizedMessage}`;
     }
     return sanitizedMessage;
+}
+
+/** Input state captured from the direct-process main loop for metrics. */
+export interface SessionMetricsState {
+    model: string;
+    tier: string;
+    iteration: number;
+    toolCallCount: number;
+    maxChainDepth: number;
+    nudgeCount: number;
+    midChainNudgeCount: number;
+    totalExplorationDrifts: number;
+    stallType: string | null;
+    terminationReason: DirectProcessMetrics['terminationReason'];
+    loopDurationMs: number;
+    needsSummary: boolean;
+}
+
+/**
+ * Build a DirectProcessMetrics object from loop state variables.
+ * Exported for testing — this pure function is called at the end of the
+ * tool-use loop to construct the metrics payload.
+ */
+export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMetrics {
+    const stallDetected = state.terminationReason === 'stall_repeat'
+        || state.terminationReason === 'stall_same_tool';
+    return {
+        model: state.model,
+        tier: state.tier,
+        totalIterations: state.iteration,
+        toolCallCount: state.toolCallCount,
+        maxChainDepth: state.maxChainDepth,
+        nudgeCount: state.nudgeCount,
+        midChainNudgeCount: state.midChainNudgeCount,
+        explorationDriftCount: state.totalExplorationDrifts,
+        stallDetected,
+        stallType: state.stallType,
+        terminationReason: state.terminationReason,
+        durationMs: state.loopDurationMs,
+        needsSummary: state.needsSummary,
+    };
 }
 
 export interface ToolDef {
