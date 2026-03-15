@@ -139,7 +139,7 @@ See `.env.example` for the full list of 30+ configuration options.
 |--------|-------|
 | Unit tests | **6,982** across 293 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **145** with automated validation (100% file coverage) |
+| Module specs | **146** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
@@ -154,7 +154,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 |--------|-------|
 | MCP tools | **43** corvid_* tool handlers |
 | API endpoints | **~300** across 44 route modules |
-| DB migrations | **12** (squashed baseline + incremental, 90+ tables) |
+| DB migrations | **13** (squashed baseline + incremental, 90+ tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
