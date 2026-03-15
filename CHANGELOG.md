@@ -11,8 +11,11 @@ All notable changes to this project will be documented in this file.
 - **Flock Directory automated testing framework** — structured test harness for validating Flock Directory agent discovery and heartbeat flows (#1108)
 - **Session metrics tracking and analytics endpoints** — track token usage, tool calls, and duration per session with new analytics API (#1107)
 - **CLI per-command `--help` output** — every CLI command now supports `--help` with usage, options, and examples (#1116)
+- **Context exhausted error handling** — emit `context_exhausted` error type on context reset with differentiated Discord error messages (#1124)
+- **Discord archive thread button** — replace "New Session" with "Archive Thread" button; rename "Resume" to "Continue" (#1124)
 
 ### Fixed
+- **Discord duplicate error message dedup** — prevent duplicate error messages with `sentErrorMessage` flag (#1124)
 - **Session metrics persistence on error** — metrics are now saved even when sessions terminate with errors or aborts (#1109)
 - **Migration retry on failure** — reset cached initDb promise when migrations fail, allowing retry without restart (#1106)
 
