@@ -91,7 +91,7 @@ export class SessionLifecycleManager {
      * UI and can be resumed.
      *
      * Detection: for each session with status='running' and a non-null pid,
-     * check if the process is still alive via kill(pid, 0). If the PID is dead
+     * check if the process is still alive via `kill -0`. If the PID is dead
      * (or belongs to a different process — unlikely to collide on macOS),
      * mark the session stopped.
      */
@@ -109,14 +109,12 @@ export class SessionLifecycleManager {
             let alive = false;
 
             if (session.pid) {
+                // Use `kill -0` to check PID liveness without sending a signal.
+                // Exit code 0 = process exists, non-zero = dead.
                 try {
-                    // kill(pid, 0) doesn't send a signal — just checks if the
-                    // process exists and we have permission to signal it.
-                    process.kill(session.pid, 0);
-                    alive = true;
+                    const result = Bun.spawnSync(['kill', '-0', String(session.pid)]);
+                    alive = result.exitCode === 0;
                 } catch {
-                    // ESRCH = no such process, EPERM = exists but we can't signal it
-                    // In both cases, treat as dead for our purposes
                     alive = false;
                 }
             }
