@@ -107,7 +107,9 @@ export function subscribeForResponseWithEmbed(
                     buildActionRow(
                         { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
                     ),
-                ]).catch(() => {});
+                ]).catch((err) => {
+                    log.warn('Failed to send crash embed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                });
             }
             threadCallbacks.delete(threadId);
             return;
@@ -125,7 +127,9 @@ export function subscribeForResponseWithEmbed(
             sendEmbed(delivery, botToken, threadId, {
                 description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
                 color: 0xf0b232,
-            }).catch(() => {});
+            }).catch((err) => {
+                log.warn('Failed to send timeout embed', { threadId, error: err instanceof Error ? err.message : String(err) });
+            });
         }
     }, TYPING_TIMEOUT_MS);
 
@@ -387,7 +391,9 @@ export function subscribeForInlineResponse(
                 sendEmbed(delivery, botToken, channelId, {
                     description: 'The agent session ended unexpectedly. Send a message to start a new session.',
                     color: 0xff3355,
-                }).catch(() => {});
+                }).catch((err) => {
+                    log.warn('Failed to send crash embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
             }
             return;
         }
@@ -404,7 +410,9 @@ export function subscribeForInlineResponse(
             sendEmbed(delivery, botToken, channelId, {
                 description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
                 color: 0xf0b232,
-            }).catch(() => {});
+            }).catch((err) => {
+                log.warn('Failed to send timeout embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+            });
         }
     }, TYPING_TIMEOUT_MS);
 
