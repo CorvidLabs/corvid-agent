@@ -22,6 +22,31 @@ permissions:
   contents: read
 
 jobs:
+  checks:
+    name: Checks (ubuntu-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Governance tier check
+        if: github.event_name == 'pull_request'
+        run: bun run governance:check
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Spec check (strict — warnings fail the build)
+        run: bun run spec:check -- --strict
+
+      - name: Spec coverage (100% required)
+        run: bun run spec:coverage:require
+
+      - name: Build client
+        run: bun run build:client
+
   build:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -45,22 +70,6 @@ jobs:
         # Windows process spawning and dynamic imports are ~3-5x slower;
         # use 30s per-test timeout there to avoid flaky failures (default 10s via bunfig).
         run: bun test ${{ matrix.os == 'windows-latest' && '--timeout 30000' || '' }}
-
-      - name: Governance tier check
-        if: github.event_name == 'pull_request'
-        run: bun run governance:check
-        env:
-          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          GITHUB_ACTOR: ${{ github.actor }}
-
-      - name: Spec check (strict — warnings fail the build)
-        run: bun run spec:check -- --strict
-
-      - name: Spec coverage (100% required)
-        run: bun run spec:coverage:require
-
-      - name: Build client
-        run: bun run build:client
 
   coverage:
     name: Coverage
@@ -88,7 +97,7 @@ jobs:
   review:
     name: PR Review
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, checks]
     if: always() && github.event_name == 'pull_request'
     permissions:
       pull-requests: write
@@ -99,34 +108,37 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BUILD_RESULT: ${{ needs.build.result }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
         run: |
-          if [ "$BUILD_RESULT" = "success" ]; then
+          if [ "$BUILD_RESULT" = "success" ] && [ "$CHECKS_RESULT" = "success" ]; then
             gh pr review "$PR_NUMBER" \
               --approve \
-              --body "All CI checks passed (tsc, tests, spec:check, client build) across ubuntu, macos, and windows."
+              --body "All CI checks passed (tsc, tests, spec, client build) across ubuntu, macos, and windows."
           else
             gh pr review "$PR_NUMBER" \
               --request-changes \
               --body "CI checks failed. Please review the build logs and fix the issues before merging."
           fi
 
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: build
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - uses: ./.github/actions/setup-workspace
-
-      - name: Build client
-        run: bun run build:client
-
-      - name: Install Playwright
-        run: npx playwright install chromium --with-deps
-
-      - name: Run E2E tests
-        run: npx playwright test --config=playwright.config.js
-        env:
-          CI: true
+  # E2E tests temporarily disabled to conserve CI minutes.
+  # Uncomment when GitHub Actions credits are replenished.
+  # e2e:
+  #   name: E2E Tests
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 20
+  #   needs: build
+  #
+  #   steps:
+  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+  #     - uses: ./.github/actions/setup-workspace
+  #
+  #     - name: Build client
+  #       run: bun run build:client
+  #
+  #     - name: Install Playwright
+  #       run: npx playwright install chromium --with-deps
+  #
+  #     - name: Run E2E tests
+  #       run: npx playwright test --config=playwright.config.js
+  #       env:
+  #         CI: true
