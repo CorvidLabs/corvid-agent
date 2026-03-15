@@ -354,6 +354,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
                 defaultAgentId: process.env.DISCORD_DEFAULT_AGENT_ID ?? undefined,
                 appId: process.env.DISCORD_APP_ID ?? undefined,
                 guildId: process.env.DISCORD_GUILD_ID ?? undefined,
+                botRoleId: process.env.DISCORD_BOT_ROLE_ID ?? undefined,
                 publicMode: process.env.DISCORD_PUBLIC_MODE === 'true',
                 rolePermissions: process.env.DISCORD_ROLE_PERMISSIONS
                     ? JSON.parse(process.env.DISCORD_ROLE_PERMISSIONS)

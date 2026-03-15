@@ -78,6 +78,8 @@ export class DiscordBridge {
 
     /** Track last activity per thread for stale detection */
     private threadLastActivity: Map<string, number> = new Map();
+    /** Maps bot reply message IDs → session info for mention-reply context in channels. */
+    private mentionSessions: Map<string, import('./message-handler').MentionSessionInfo> = new Map();
     private staleCheckTimer: ReturnType<typeof setInterval> | null = null;
     /** Stale thread auto-archive after 2 hours of inactivity */
     private readonly STALE_THREAD_MS = 2 * 60 * 60 * 1000;
@@ -300,6 +302,7 @@ export class DiscordBridge {
             workTaskService: this.workTaskService,
             delivery: this.delivery,
             botUserId: this.botUserId,
+            botRoleId: this.config.botRoleId ?? null,
             mutedUsers: this.mutedUsers,
             interactedUsers: this.interactedUsers,
             userMessageTimestamps: this.userMessageTimestamps,
@@ -308,6 +311,7 @@ export class DiscordBridge {
             threadSessions: this.threadSessions,
             threadCallbacks: this.threadCallbacks,
             threadLastActivity: this.threadLastActivity,
+            mentionSessions: this.mentionSessions,
         };
         await handleMessageImpl(ctx, data);
     }
@@ -331,6 +335,7 @@ export class DiscordBridge {
             workTaskService: this.workTaskService,
             delivery: this.delivery,
             botUserId: this.botUserId,
+            botRoleId: this.config.botRoleId ?? null,
             mutedUsers: this.mutedUsers,
             interactedUsers: this.interactedUsers,
             userMessageTimestamps: this.userMessageTimestamps,
@@ -339,6 +344,7 @@ export class DiscordBridge {
             threadSessions: this.threadSessions,
             threadCallbacks: this.threadCallbacks,
             threadLastActivity: this.threadLastActivity,
+            mentionSessions: this.mentionSessions,
         };
         await sendTaskResultImpl(ctx, channelId, task, mentionUserId);
     }

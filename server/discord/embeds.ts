@@ -122,9 +122,9 @@ export async function sendEmbed(
     botToken: string,
     channelId: string,
     embed: DiscordEmbed,
-): Promise<void> {
+): Promise<string | null> {
     try {
-        await delivery.sendWithReceipt('discord', async () => {
+        const { result } = await delivery.sendWithReceipt('discord', async () => {
             const response = await fetch(
                 `https://discord.com/api/v10/channels/${channelId}/messages`,
                 {
@@ -142,9 +142,14 @@ export async function sendEmbed(
                 log.error('Failed to send Discord embed', { status: response.status, error: error.slice(0, 200) });
                 throw new Error(`Discord embed failed: ${response.status}`);
             }
+
+            const data = await response.json() as { id: string };
+            return data.id;
         });
+        return result;
     } catch {
         // Error already logged by DeliveryTracker
+        return null;
     }
 }
 
@@ -221,11 +226,11 @@ export async function sendReplyEmbed(
     channelId: string,
     replyToMessageId: string,
     embed: DiscordEmbed,
-): Promise<void> {
+): Promise<string | null> {
     assertSnowflake(channelId, 'channel ID');
     assertSnowflake(replyToMessageId, 'message ID');
     try {
-        await delivery.sendWithReceipt('discord', async () => {
+        const { result } = await delivery.sendWithReceipt('discord', async () => {
             const response = await fetch(
                 `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`,
                 {
@@ -246,9 +251,14 @@ export async function sendReplyEmbed(
                 log.error('Failed to send Discord reply embed', { status: response.status, error: error.slice(0, 200) });
                 throw new Error(`Discord reply embed failed: ${response.status}`);
             }
+
+            const data = await response.json() as { id: string };
+            return data.id;
         });
+        return result;
     } catch {
         // Error already logged by DeliveryTracker
+        return null;
     }
 }
 

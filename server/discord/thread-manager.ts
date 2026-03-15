@@ -368,6 +368,7 @@ export function subscribeForInlineResponse(
     replyToMessageId: string,
     agentName: string,
     agentModel: string,
+    onBotMessage?: (botMessageId: string) => void,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -423,18 +424,22 @@ export function subscribeForInlineResponse(
 
         const parts = splitEmbedDescription(text);
         for (let i = 0; i < parts.length; i++) {
+            let sentId: string | null = null;
             if (i === 0) {
-                await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
+                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
                     description: parts[i],
                     color,
                     footer: { text: `${agentName} · ${agentModel}` },
                 });
             } else {
-                await sendEmbed(delivery, botToken, channelId, {
+                sentId = await sendEmbed(delivery, botToken, channelId, {
                     description: parts[i],
                     color,
                     footer: { text: `${agentName} · ${agentModel}` },
                 });
+            }
+            if (sentId && onBotMessage) {
+                onBotMessage(sentId);
             }
         }
     };

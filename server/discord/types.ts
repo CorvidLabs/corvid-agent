@@ -11,6 +11,8 @@ export interface DiscordBridgeConfig {
     defaultAgentId?: string;
     appId?: string;
     guildId?: string;
+    /** The bot's managed role ID (used to detect @role mentions of the bot). */
+    botRoleId?: string;
     /**
      * When true, any user can interact with the bot (subject to role-based access).
      * When false (default), only allowedUserIds can interact.
@@ -144,6 +146,14 @@ export interface DiscordMessageData {
     mention_roles?: string[];
     /** Guild member info — includes roles when GUILD_MEMBERS intent is present */
     member?: { roles: string[] };
+    /** Present when this message is a reply to another message */
+    message_reference?: { message_id: string; channel_id?: string; guild_id?: string };
+    /** The message being replied to (populated by Discord when available) */
+    referenced_message?: {
+        id: string;
+        content: string;
+        author: DiscordAuthor;
+    } | null;
 }
 
 /** Permission levels for role-based access. */
