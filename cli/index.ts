@@ -16,6 +16,11 @@ import { c, printError } from './render';
 const args = process.argv.slice(2);
 const command = args[0];
 
+/** Check whether --help or -h appears anywhere in the argument list. */
+function hasHelpFlag(): boolean {
+    return args.includes('--help') || args.includes('-h');
+}
+
 function getFlag(name: string): string | undefined {
     const idx = args.indexOf(`--${name}`);
     if (idx === -1 || idx + 1 >= args.length) return undefined;
@@ -108,6 +113,192 @@ ${c.bold}Documentation:${c.reset}
 `);
 }
 
+// ─── Per-Command Help ────────────────────────────────────────────────────────
+
+function printInitHelp(): void {
+    console.log(`
+${c.bold}corvid-agent init${c.reset} — Interactive project setup
+
+${c.bold}Usage:${c.reset}
+  corvid-agent init [options]
+
+${c.bold}Options:${c.reset}
+  --mcp          MCP-only setup (add tools to Claude Code, Cursor, etc.)
+  --full         Full setup including dashboard build
+  --yes, -y      Non-interactive with sensible defaults
+  --help, -h     Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent init                  ${c.gray('# guided interactive setup')}
+  corvid-agent init --mcp            ${c.gray('# just add MCP tools to your editor')}
+  corvid-agent init --full --yes     ${c.gray('# full unattended setup')}
+`);
+}
+
+function printDemoHelp(): void {
+    console.log(`
+${c.bold}corvid-agent demo${c.reset} — Run a self-contained demo session
+
+${c.bold}Usage:${c.reset}
+  corvid-agent demo
+
+Starts a temporary server (or uses a running one), creates a demo agent,
+and streams a sample conversation. Everything is cleaned up on exit.
+
+${c.bold}Examples:${c.reset}
+  corvid-agent demo                  ${c.gray('# see corvid-agent in action')}
+`);
+}
+
+function printStatusHelp(): void {
+    console.log(`
+${c.bold}corvid-agent status${c.reset} — Check server health
+
+${c.bold}Usage:${c.reset}
+  corvid-agent status
+
+Shows server status, uptime, active sessions, AlgoChat, scheduler,
+and workflow state.
+
+${c.bold}Examples:${c.reset}
+  corvid-agent status                ${c.gray('# check if the server is running')}
+`);
+}
+
+function printChatHelp(): void {
+    console.log(`
+${c.bold}corvid-agent chat${c.reset} — Send a one-shot message to an agent
+
+${c.bold}Usage:${c.reset}
+  corvid-agent chat <prompt> [options]
+
+${c.bold}Options:${c.reset}
+  --agent <id>     Agent ID (or picks interactively / uses default)
+  --project <id>   Project ID (or auto-detects from cwd)
+  --model <model>  Model override for this message
+  --help, -h       Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent chat "What files are in this project?"
+  corvid-agent chat "Fix the bug in auth.ts" --agent abc123
+  corvid-agent chat "Summarize recent changes" --model claude-sonnet-4-20250514
+`);
+}
+
+function printSessionHelp(): void {
+    console.log(`
+${c.bold}corvid-agent session${c.reset} — Manage sessions
+
+${c.bold}Usage:${c.reset}
+  corvid-agent session <action> [id]
+
+${c.bold}Actions:${c.reset}
+  list             List all sessions
+  get <id>         Show session details
+  stop <id>        Stop a running session
+  resume <id>      Resume a stopped session
+
+${c.bold}Options:${c.reset}
+  --help, -h       Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent session list
+  corvid-agent session get abc12345
+  corvid-agent session stop abc12345
+`);
+}
+
+function printAgentHelp(): void {
+    console.log(`
+${c.bold}corvid-agent agent${c.reset} — Manage agents
+
+${c.bold}Usage:${c.reset}
+  corvid-agent agent <action> [id] [options]
+
+${c.bold}Actions:${c.reset}
+  list                  List all agents
+  get <id>              Show agent details
+  create                Create a new agent
+
+${c.bold}Create Options:${c.reset}
+  --name <name>         Agent name (required)
+  --description <text>  Agent description
+  --model <model>       Model to use (e.g. claude-sonnet-4-20250514)
+  --system-prompt <text> System prompt for the agent
+
+${c.bold}Options:${c.reset}
+  --help, -h            Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent agent list
+  corvid-agent agent get abc12345
+  corvid-agent agent create --name "Reviewer" --model claude-sonnet-4-20250514
+  corvid-agent agent create --name "Writer" --description "Writes docs"
+`);
+}
+
+function printLoginHelp(): void {
+    console.log(`
+${c.bold}corvid-agent login${c.reset} — Log in to CorvidAgent Cloud
+
+${c.bold}Usage:${c.reset}
+  corvid-agent login [options]
+
+Opens a browser for device authorization and saves the token.
+
+${c.bold}Options:${c.reset}
+  --server <url>   Server URL (default: from config or http://127.0.0.1:3000)
+  --help, -h       Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent login
+  corvid-agent login --server https://cloud.corvidlabs.com
+`);
+}
+
+function printLogoutHelp(): void {
+    console.log(`
+${c.bold}corvid-agent logout${c.reset} — Log out and remove saved token
+
+${c.bold}Usage:${c.reset}
+  corvid-agent logout
+
+Removes the saved authentication token from ~/.corvid/config.json.
+`);
+}
+
+function printConfigHelp(): void {
+    console.log(`
+${c.bold}corvid-agent config${c.reset} — Manage CLI configuration
+
+${c.bold}Usage:${c.reset}
+  corvid-agent config [action] [key] [value]
+
+${c.bold}Actions:${c.reset}
+  show             Show all config values (default)
+  get <key>        Get a specific config value
+  set <key> <val>  Set a config value (use "null" to clear)
+
+${c.bold}Valid Keys:${c.reset}
+  serverUrl        Server URL (default: http://127.0.0.1:3000)
+  authToken        Authentication token
+  defaultAgent     Default agent ID
+  defaultProject   Default project ID
+  defaultModel     Default model override
+
+${c.bold}Options:${c.reset}
+  --help, -h       Show this help
+
+${c.bold}Examples:${c.reset}
+  corvid-agent config                            ${c.gray('# show all')}
+  corvid-agent config show                       ${c.gray('# same as above')}
+  corvid-agent config get serverUrl
+  corvid-agent config set serverUrl http://localhost:3578
+  corvid-agent config set defaultAgent abc123
+  corvid-agent config set authToken null         ${c.gray('# clear the token')}
+`);
+}
+
 // ─── Dispatch ───────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -129,6 +320,10 @@ async function main(): Promise<void> {
 
     switch (command) {
         case 'init':
+            if (hasHelpFlag() && !args.includes('--mcp') && !args.includes('--full')) {
+                printInitHelp();
+                return;
+            }
             await initCommand({
                 mcp: args.includes('--mcp'),
                 full: args.includes('--full'),
@@ -137,14 +332,17 @@ async function main(): Promise<void> {
             break;
 
         case 'demo':
+            if (hasHelpFlag()) { printDemoHelp(); return; }
             await demoCommand();
             break;
 
         case 'status':
+            if (hasHelpFlag()) { printStatusHelp(); return; }
             await statusCommand();
             break;
 
         case 'chat': {
+            if (hasHelpFlag()) { printChatHelp(); return; }
             const prompt = getPositional(0);
             if (!prompt) {
                 printError('Prompt required: corvid-agent chat "your prompt here"');
@@ -159,6 +357,7 @@ async function main(): Promise<void> {
         }
 
         case 'session': {
+            if (hasHelpFlag()) { printSessionHelp(); return; }
             const action = getPositional(0) as 'list' | 'get' | 'stop' | 'resume' | undefined;
             if (!action) {
                 printError('Action required: corvid-agent session list|get|stop|resume');
@@ -170,6 +369,7 @@ async function main(): Promise<void> {
         }
 
         case 'agent': {
+            if (hasHelpFlag()) { printAgentHelp(); return; }
             const action = getPositional(0) as 'list' | 'get' | 'create' | undefined;
             if (!action) {
                 printError('Action required: corvid-agent agent list|get|create');
@@ -195,14 +395,17 @@ async function main(): Promise<void> {
         }
 
         case 'login':
+            if (hasHelpFlag()) { printLoginHelp(); return; }
             await loginCommand(getFlag('server'));
             break;
 
         case 'logout':
+            if (hasHelpFlag()) { printLogoutHelp(); return; }
             await logoutCommand();
             break;
 
         case 'config': {
+            if (hasHelpFlag()) { printConfigHelp(); return; }
             const action = (getPositional(0) ?? 'show') as 'show' | 'get' | 'set';
             configCommand(action, getPositional(1), getPositional(2));
             break;
