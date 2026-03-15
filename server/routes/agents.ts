@@ -29,7 +29,7 @@ export function handleAgentRoutes(
     const method = req.method;
 
     if (path === '/api/agents' && method === 'GET') {
-        return json(listAgents(db, context.tenantId));
+        return json(listAgents(db, context.tenantId, { includeDisabled: true }));
     }
 
     if (path === '/api/agents' && method === 'POST') {
