@@ -17,6 +17,8 @@ export class WebSocketService {
 
     readonly connected = signal(false);
     readonly connectionStatus = computed(() => this.connected() ? 'connected' : 'disconnected');
+    /** True when the server has announced a shutdown and we're waiting for it to come back. */
+    readonly serverRestarting = signal(false);
     /** Last server timestamp received via welcome/ping (ISO string). Enables clock drift compensation. */
     readonly lastServerTime = signal<string | null>(null);
 
@@ -30,6 +32,10 @@ export class WebSocketService {
 
         this.ws.onopen = () => {
             this.connected.set(true);
+            if (this.serverRestarting()) {
+                this.serverRestarting.set(false);
+                this.notifications.info('Server reconnected');
+            }
             this.wasConnected = true;
             // Re-subscribe to any sessions
             for (const sessionId of this.subscribedSessions) {
@@ -49,6 +55,11 @@ export class WebSocketService {
                 // Track server time from welcome message
                 if (msg.type === 'welcome') {
                     this.lastServerTime.set(msg.serverTime);
+                }
+                // Handle server shutdown announcement
+                if (msg.type === 'server_shutdown') {
+                    this.serverRestarting.set(true);
+                    this.notifications.info(msg.message ?? 'Server is restarting…');
                 }
                 // Surface server-side error messages as notifications
                 if (msg.type === 'error') {

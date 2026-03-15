@@ -464,6 +464,7 @@ process.on('uncaughtException', (err) => {
 function logShutdownDiagnostics(signal: string): void {
     const uptimeSeconds = Math.round((Date.now() - startTime) / 1000);
     const mem = process.memoryUsage();
+    const activeCount = processManager.getActiveSessionIds().length;
     let parentInfo = `ppid=${process.ppid}`;
     try {
         // Try to identify the parent process that may have sent the signal
@@ -475,10 +476,21 @@ function logShutdownDiagnostics(signal: string): void {
     log.info(`Shutting down (${signal})`, {
         uptime: `${uptimeSeconds}s`,
         parent: parentInfo,
-        activeSessions: processManager.getActiveSessionIds().length,
+        activeSessions: activeCount,
         rss: `${Math.round(mem.rss / 1024 / 1024)}MB`,
         heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
     });
+
+    // Notify connected WebSocket clients so the UI can show a restart banner
+    // instead of silently losing the connection.
+    try {
+        publishToTenant(server, 'system', JSON.stringify({
+            type: 'server_shutdown',
+            signal,
+            activeSessions: activeCount,
+            message: signal === 'SIGTERM' ? 'Server is restarting…' : 'Server is shutting down…',
+        }));
+    } catch { /* best-effort — server may already be closing */ }
 }
 
 // Coordinated graceful shutdown via ShutdownCoordinator.

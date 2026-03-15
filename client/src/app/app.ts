@@ -27,7 +27,11 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             <app-header
                 [sidebarOpen]="sidebarOpen()"
                 (hamburgerClick)="toggleSidebar()" />
-            @if (!wsService.connected()) {
+            @if (wsService.serverRestarting()) {
+                <div class="app-layout__banner app-layout__banner--restart" role="alert">
+                    Server is restarting — reconnecting automatically...
+                </div>
+            } @else if (!wsService.connected()) {
                 <div class="app-layout__banner" role="alert">
                     Connection lost — reconnecting...
                 </div>
@@ -79,6 +83,11 @@ import { KeyboardShortcutsService } from './core/services/keyboard-shortcuts.ser
             font-weight: 600;
             text-align: center;
             letter-spacing: 0.03em;
+        }
+        .app-layout__banner--restart {
+            background: var(--accent-yellow-dim, rgba(255, 204, 0, 0.1));
+            border-bottom-color: var(--accent-yellow, #fc0);
+            color: var(--accent-yellow, #fc0);
         }
     `,
 })
