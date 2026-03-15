@@ -169,22 +169,9 @@ export class SessionViewComponent implements OnInit, OnDestroy {
         this.sessionId = this.route.snapshot.paramMap.get('id');
         if (!this.sessionId) return;
 
-        const session = await this.sessionService.getSession(this.sessionId);
-        this.session.set(session);
-
-        const messages = await this.sessionService.getMessages(this.sessionId);
-        this.messages.set(messages);
-
-        if (session.agentId) {
-            this.agentService.getAgent(session.agentId).then((agent) => {
-                this.agentName.set(agent.name);
-            }).catch(() => {});
-        }
-
-        this.sessionService.subscribeToSession(this.sessionId);
-
-        // Listen for approval requests, questions, notifications, and status updates
+        // Subscribe to WebSocket FIRST so no events are missed during HTTP fetch
         const sid = this.sessionId;
+        this.sessionService.subscribeToSession(sid);
         this.approvalCleanup = this.wsService.onMessage((msg) => {
             if (msg.type === 'approval_request' && msg.request.sessionId === sid) {
                 this.pendingApproval.set(msg.request);
@@ -210,6 +197,20 @@ export class SessionViewComponent implements OnInit, OnDestroy {
                 }, msg.question.timeoutMs);
             }
         });
+
+        // Fetch session and messages in parallel
+        const [session, messages] = await Promise.all([
+            this.sessionService.getSession(sid),
+            this.sessionService.getMessages(sid),
+        ]);
+        this.session.set(session);
+        this.messages.set(messages);
+
+        if (session.agentId) {
+            this.agentService.getAgent(session.agentId).then((agent) => {
+                this.agentName.set(agent.name);
+            }).catch(() => {});
+        }
     }
 
     ngOnDestroy(): void {
