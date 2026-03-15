@@ -23,6 +23,7 @@ files:
   - server/mcp/tool-handlers/repo-blocklist.ts
   - server/mcp/tool-handlers/flock-directory.ts
   - server/mcp/tool-handlers/projects.ts
+  - server/mcp/tool-handlers/contacts.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -98,6 +99,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleLaunchCouncil` | `(ctx, { topic, agentIds?, chairmanAgentId?, discussionRounds?, governanceTier? })` | `Promise<CallToolResult>` | Launch a multi-agent council deliberation. Requires `processManager` in context |
 | `handleManageRepoBlocklist` | `(ctx, { action, repo?, reason?, source? })` | `Promise<CallToolResult>` | Manage the repo blocklist: list, add, remove, or check entries |
 | `handleFlockDirectory` | `(ctx, { action, agent_id?, address?, name?, description?, instance_url?, capabilities?, query?, capability?, min_reputation?, limit? })` | `Promise<CallToolResult>` | Flock Directory operations: register, deregister, heartbeat, lookup, search, list, stats, sync |
+| `handleLookupContact` | `(ctx, { name?, platform?, platform_id? })` | `Promise<CallToolResult>` | Look up a contact by display name or by platform + platform_id; returns all known platform links for the matched contact |
 
 ## Invariants
 
@@ -161,6 +163,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `server/a2a/client.ts` | `discoverAgent`, `invokeRemoteAgent` |
 | `server/improvement/health-store.ts` | `getRecentSnapshots`, `computeTrends`, `formatTrendsForPrompt` |
 | `server/db/repo-blocklist.ts` | `listRepoBlocklist`, `addToRepoBlocklist`, `removeFromRepoBlocklist`, `isRepoBlocked` |
+| `server/db/contacts.ts` | `findContactByName`, `findContactByPlatformId` |
 
 ### Consumed By
 

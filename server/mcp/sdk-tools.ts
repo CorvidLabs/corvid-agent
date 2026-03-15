@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
 import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
+import { handleLookupContact } from './tool-handlers/contacts';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { getAgent } from '../db/agents';
 
@@ -49,6 +50,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_repo_blocklist',
     'corvid_launch_council',
     'corvid_flock_directory',
+    'corvid_lookup_contact',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -555,6 +557,19 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 limit: z.number().optional().describe('Max results to return (default 20)'),
             },
             async (args) => handleFlockDirectory(ctx, args),
+        ),
+
+        // ─── Contact identity lookup ────────────────────────────────────
+        tool(
+            'corvid_lookup_contact',
+            'Look up a contact by name or platform identifier to resolve cross-platform identities. ' +
+            'Returns the contact with all linked platform identifiers (Discord, AlgoChat, GitHub).',
+            {
+                name: z.string().optional().describe('Display name to look up'),
+                platform: z.enum(['discord', 'algochat', 'github']).optional().describe('Platform to search by (requires platform_id)'),
+                platform_id: z.string().optional().describe('Platform-specific identifier (requires platform)'),
+            },
+            async (args) => handleLookupContact(ctx, args),
         ),
     ];
 

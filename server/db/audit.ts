@@ -60,7 +60,13 @@ export type AuditAction =
     | 'key_access_sign'
     | 'key_access'
     | 'key_access_denied'
-    | 'purge_test_data';
+    | 'purge_test_data'
+    | 'contact_create'
+    | 'contact_update'
+    | 'contact_delete'
+    | 'link_add'
+    | 'link_remove'
+    | 'link_verify';
 
 export interface AuditEntry {
     id: number;
