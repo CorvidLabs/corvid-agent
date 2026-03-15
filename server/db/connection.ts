@@ -5,6 +5,9 @@ import { migrateUp, getCurrentVersion, discoverMigrations } from './migrate';
 import { initCreditConfigFromEnv } from './credits';
 import { DbPool, writeTransaction } from './pool';
 import type { WriteTransactionOptions } from './pool';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('db:connection');
 
 let db: Database | null = null;
 let _initPromise: Promise<void> | null = null;
@@ -65,7 +68,7 @@ export async function initDb(): Promise<void> {
             if (pending.length > 0) {
                 const { applied, to } = await migrateUp(d);
                 if (applied > 0) {
-                    console.log(`[migrate] Applied ${applied} file-based migration(s), now at version ${to}`);
+                    log.info(`Applied ${applied} file-based migration(s), now at version ${to}`);
                 }
             }
         })();

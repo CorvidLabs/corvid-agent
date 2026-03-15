@@ -14,6 +14,9 @@
 import { Database } from 'bun:sqlite';
 import { readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('migrate');
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -181,6 +184,6 @@ export function migrationStatus(db: Database, dir?: string): MigrationStatus[] {
 export async function runPendingMigrations(db: Database): Promise<void> {
     const { applied } = await migrateUp(db);
     if (applied > 0) {
-        console.log(`[migrate] Applied ${applied} migration(s)`);
+        log.info(`Applied ${applied} migration(s)`);
     }
 }
