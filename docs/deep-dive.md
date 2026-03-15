@@ -46,7 +46,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Module specs | 139 .spec.md files |
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
-| Version | 0.29.0 |
+| Version | 0.30.0 |
 | Git commits | 558 |
 
 ### Tech Stack

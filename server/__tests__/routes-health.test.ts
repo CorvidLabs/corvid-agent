@@ -15,7 +15,7 @@ function createMockDeps(db: Database, overrides?: Partial<HealthCheckDeps>): Hea
     return {
         db,
         startTime: Date.now() - 60_000, // 1 minute ago
-        version: '0.29.0-test',
+        version: '0.30.0-test',
         getActiveSessions: mock(() => []),
         isAlgoChatConnected: mock(() => false),
         isShuttingDown: mock(() => false),
@@ -101,7 +101,7 @@ describe('routes/health', () => {
         const res = await handleHealthRoutes(req, url, deps, db);
         expect(res!.status).toBe(200);
         const data = await res!.json();
-        expect(data.version).toBe('0.29.0-test');
+        expect(data.version).toBe('0.30.0-test');
         expect(data.uptime).toBeGreaterThanOrEqual(0);
         expect(data.dependencies).toBeDefined();
         expect(data.dependencies.database.status).toBe('healthy');
@@ -113,7 +113,7 @@ describe('routes/health', () => {
         const res = await handleHealthRoutes(req, url, deps, db);
         expect(res!.status).toBe(200);
         const data = await res!.json();
-        expect(data.version).toBe('0.29.0-test');
+        expect(data.version).toBe('0.30.0-test');
     });
 
     it('returns 503 when shutting down', async () => {
