@@ -162,6 +162,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer) |
 | `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
 | `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?) |
+| `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel) |
 | `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
 | `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |
 
@@ -170,11 +171,11 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Type | Description |
 |------|-------------|
 | `DiscordBridgeMode` | `'chat' \| 'work_intake'` — operational mode for the bridge |
-| `DiscordBridgeConfig` | `{ botToken, channelId, additionalChannelIds?, allowedUserIds, mode?, defaultAgentId?, appId?, guildId?, publicMode?, rolePermissions?, defaultPermissionLevel?, rateLimitByLevel? }` |
+| `DiscordBridgeConfig` | `{ botToken, channelId, additionalChannelIds?, allowedUserIds, mode?, defaultAgentId?, appId?, guildId?, botRoleId?, publicMode?, rolePermissions?, defaultPermissionLevel?, rateLimitByLevel? }` |
 | `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
 | `DiscordHelloData` | `{ heartbeat_interval: number }` |
 | `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
-| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], member?: { roles: string[] } }` |
+| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], mention_roles?: string[], member?: { roles: string[] }, message_reference?, referenced_message? }` |
 | `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
 | `DiscordInteractionOption` | `{ name, type, value?, options?: DiscordInteractionOption[] }` — recursive option type for subcommands and subcommand groups |
 | `DiscordInteractionData` | Slash command interaction payload from gateway |
