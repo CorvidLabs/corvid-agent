@@ -173,62 +173,97 @@ export function subscribeForResponseWithEmbed(
             processManager.unsubscribe(sessionId, callback);
             threadCallbacks.delete(threadId);
 
-            // Fetch session stats for the completion embed
-            const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
-            try {
-                const row = db.query<{
-                    total_cost_usd: number;
-                    total_turns: number;
-                    work_dir: string | null;
-                    created_at: string;
-                }, [string]>(
-                    'SELECT total_cost_usd, total_turns, work_dir, created_at FROM sessions WHERE id = ?',
-                ).get(sessionId);
+            // Gather stats and send completion embed (async, fire-and-forget)
+            (async () => {
+                const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+                try {
+                    const row = db.query<{
+                        total_cost_usd: number;
+                        total_turns: number;
+                        work_dir: string | null;
+                        created_at: string;
+                    }, [string]>(
+                        'SELECT total_cost_usd, total_turns, work_dir, created_at FROM sessions WHERE id = ?',
+                    ).get(sessionId);
 
-                if (row) {
-                    // Duration
-                    const startMs = new Date(row.created_at).getTime();
-                    const durationMs = Date.now() - startMs;
-                    const durationMin = Math.floor(durationMs / 60000);
-                    const durationSec = Math.floor((durationMs % 60000) / 1000);
-                    const durationStr = durationMin > 0 ? `${durationMin}m ${durationSec}s` : `${durationSec}s`;
-                    fields.push({ name: 'Duration', value: durationStr, inline: true });
+                    if (row) {
+                        // Duration
+                        const startMs = new Date(row.created_at).getTime();
+                        const durationMs = Date.now() - startMs;
+                        const durationMin = Math.floor(durationMs / 60000);
+                        const durationSec = Math.floor((durationMs % 60000) / 1000);
+                        const durationStr = durationMin > 0 ? `${durationMin}m ${durationSec}s` : `${durationSec}s`;
+                        fields.push({ name: 'Duration', value: durationStr, inline: true });
 
-                    // Turns
-                    if (row.total_turns > 0) {
-                        fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
+                        // Turns
+                        if (row.total_turns > 0) {
+                            fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
+                        }
+
+                        // Cost
+                        if (row.total_cost_usd > 0) {
+                            fields.push({ name: 'Cost', value: `$${row.total_cost_usd.toFixed(4)}`, inline: true });
+                        }
+
+                        // Worktree branch + git stats
+                        if (row.work_dir) {
+                            const branchMatch = row.work_dir.match(/\/([^/]+)$/);
+                            const branch = branchMatch ? branchMatch[1] : row.work_dir;
+                            fields.push({ name: 'Branch', value: `\`${branch}\``, inline: true });
+
+                            // Gather git stats from worktree
+                            try {
+                                const [filesOutput, commitsOutput] = await Promise.all([
+                                    (async () => {
+                                        const p = Bun.spawn(['git', 'diff', 'main...HEAD', '--name-only'], { cwd: row.work_dir!, stdout: 'pipe', stderr: 'pipe' });
+                                        const out = await new Response(p.stdout).text();
+                                        await p.exited;
+                                        return out.trim();
+                                    })(),
+                                    (async () => {
+                                        const p = Bun.spawn(['git', 'rev-list', '--count', 'main...HEAD'], { cwd: row.work_dir!, stdout: 'pipe', stderr: 'pipe' });
+                                        const out = await new Response(p.stdout).text();
+                                        await p.exited;
+                                        return out.trim();
+                                    })(),
+                                ]);
+
+                                const fileCount = filesOutput ? filesOutput.split('\n').length : 0;
+                                if (fileCount > 0) {
+                                    fields.push({ name: 'Files Changed', value: String(fileCount), inline: true });
+                                }
+
+                                const commitCount = parseInt(commitsOutput, 10);
+                                if (commitCount > 0) {
+                                    fields.push({ name: 'Commits', value: String(commitCount), inline: true });
+                                }
+                            } catch (gitErr) {
+                                log.debug('Failed to gather git stats for completion embed', {
+                                    sessionId,
+                                    error: gitErr instanceof Error ? gitErr.message : String(gitErr),
+                                });
+                            }
+                        }
                     }
-
-                    // Cost
-                    if (row.total_cost_usd > 0) {
-                        fields.push({ name: 'Cost', value: `$${row.total_cost_usd.toFixed(4)}`, inline: true });
-                    }
-
-                    // Worktree branch
-                    if (row.work_dir) {
-                        const branchMatch = row.work_dir.match(/\/([^/]+)$/);
-                        const branch = branchMatch ? branchMatch[1] : row.work_dir;
-                        fields.push({ name: 'Branch', value: `\`${branch}\``, inline: true });
-                    }
+                } catch (err) {
+                    log.debug('Failed to fetch session stats for completion embed', {
+                        sessionId,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
                 }
-            } catch (err) {
-                log.debug('Failed to fetch session stats for completion embed', {
-                    sessionId,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
 
-            sendEmbedWithButtons(delivery, botToken, threadId, {
-                description: 'Session complete. Send a message to continue, or use the buttons below.',
-                color: 0x57f287,
-                ...(fields.length > 0 ? { fields } : {}),
-                footer: { text: `${agentName} · done` },
-            }, [
-                buildActionRow(
-                    { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
-                    { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
-                ),
-            ]).catch((err) => {
+                await sendEmbedWithButtons(delivery, botToken, threadId, {
+                    description: 'Session complete. Send a message to continue, or use the buttons below.',
+                    color: 0x57f287,
+                    ...(fields.length > 0 ? { fields } : {}),
+                    footer: { text: `${agentName} · done` },
+                }, [
+                    buildActionRow(
+                        { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
+                        { label: 'New Session', customId: 'new_session', style: ButtonStyle.SECONDARY, emoji: '➕' },
+                    ),
+                ]);
+            })().catch((err) => {
                 log.debug('Session complete embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
             });
         }
