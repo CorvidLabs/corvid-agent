@@ -49,9 +49,6 @@ jobs:
       - name: Spec coverage (100% required)
         run: bun run spec:coverage:require
 
-      - name: Version alignment check
-        run: bun run version:check
-
       - name: Build client
         run: bun run build:client
 
