@@ -3,10 +3,7 @@ module: response-feedback
 version: 1
 status: draft
 files:
-  - server/routes/reputation.ts
-  - server/reputation/scorer.ts
   - server/db/migrations/090_response_feedback.ts
-  - server/lib/validation.ts
 db_tables:
   - response_feedback
   - reputation_events
@@ -41,7 +38,14 @@ Indexes: `agent_id`, `created_at`.
 
 ## Public API
 
-### Exported Schemas
+### Migration Exports (090_response_feedback.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `response_feedback` table with indexes on `agent_id` and `created_at` |
+| `down` | `(db: Database)` | `void` | Drops `response_feedback` table |
+
+### Exported Schemas (in `server/lib/validation.ts`)
 
 - `SubmitFeedbackSchema` — Zod schema for validating feedback submission requests.
 
