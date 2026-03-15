@@ -68,11 +68,59 @@ describe('buildSessionMetrics', () => {
     test('stallDetected=false for abort', () => {
         const m = buildSessionMetrics(makeState({ terminationReason: 'abort' }));
         expect(m.stallDetected).toBe(false);
+        expect(m.terminationReason).toBe('abort');
     });
 
     test('stallDetected=false for error', () => {
         const m = buildSessionMetrics(makeState({ terminationReason: 'error' }));
         expect(m.stallDetected).toBe(false);
+        expect(m.terminationReason).toBe('error');
+    });
+
+    test('error termination preserves all metric fields', () => {
+        const m = buildSessionMetrics(makeState({
+            terminationReason: 'error',
+            iteration: 3,
+            toolCallCount: 7,
+            maxChainDepth: 2,
+            nudgeCount: 1,
+            midChainNudgeCount: 0,
+            totalExplorationDrifts: 1,
+            loopDurationMs: 5000,
+            needsSummary: false,
+        }));
+        expect(m.terminationReason).toBe('error');
+        expect(m.stallDetected).toBe(false);
+        expect(m.stallType).toBeNull();
+        expect(m.totalIterations).toBe(3);
+        expect(m.toolCallCount).toBe(7);
+        expect(m.maxChainDepth).toBe(2);
+        expect(m.nudgeCount).toBe(1);
+        expect(m.explorationDriftCount).toBe(1);
+        expect(m.durationMs).toBe(5000);
+        expect(m.needsSummary).toBe(false);
+    });
+
+    test('abort termination preserves all metric fields', () => {
+        const m = buildSessionMetrics(makeState({
+            terminationReason: 'abort',
+            iteration: 10,
+            toolCallCount: 20,
+            maxChainDepth: 6,
+            nudgeCount: 0,
+            midChainNudgeCount: 0,
+            totalExplorationDrifts: 2,
+            loopDurationMs: 30000,
+            needsSummary: false,
+        }));
+        expect(m.terminationReason).toBe('abort');
+        expect(m.stallDetected).toBe(false);
+        expect(m.stallType).toBeNull();
+        expect(m.totalIterations).toBe(10);
+        expect(m.toolCallCount).toBe(20);
+        expect(m.maxChainDepth).toBe(6);
+        expect(m.explorationDriftCount).toBe(2);
+        expect(m.durationMs).toBe(30000);
     });
 
     test('maps iteration to totalIterations', () => {
