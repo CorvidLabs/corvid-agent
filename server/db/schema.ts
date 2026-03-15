@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 89;
+const SCHEMA_VERSION = 90;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -1349,6 +1349,23 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_flock_test_results_agent ON flock_test_results(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_flock_test_results_completed ON flock_test_results(completed_at)`,
         `CREATE INDEX IF NOT EXISTS idx_flock_test_challenge_results_test ON flock_test_challenge_results(test_result_id)`,
+    ],
+
+    90: [
+        // Response feedback for reputation (issue #1094)
+        `CREATE TABLE IF NOT EXISTS response_feedback (
+            id              TEXT PRIMARY KEY,
+            agent_id        TEXT NOT NULL,
+            session_id      TEXT DEFAULT NULL,
+            source          TEXT NOT NULL DEFAULT 'api',
+            sentiment       TEXT NOT NULL,
+            category        TEXT DEFAULT NULL,
+            comment         TEXT DEFAULT NULL,
+            submitted_by    TEXT DEFAULT NULL,
+            created_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_response_feedback_agent ON response_feedback(agent_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_response_feedback_created ON response_feedback(created_at)`,
     ],
 };
 

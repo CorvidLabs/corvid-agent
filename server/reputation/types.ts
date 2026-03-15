@@ -43,7 +43,8 @@ export type ReputationEventType =
     | 'session_completed'
     | 'attestation_published'
     | 'improvement_loop_completed'
-    | 'improvement_loop_failed';
+    | 'improvement_loop_failed'
+    | 'feedback_received';
 
 export interface ReputationEvent {
     id: string;
