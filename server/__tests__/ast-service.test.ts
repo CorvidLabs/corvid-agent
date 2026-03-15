@@ -54,7 +54,7 @@ describe('AstParserService', () => {
     });
 
     afterAll(async () => {
-        await rm(tempDir, { recursive: true, force: true });
+        if (tempDir) await rm(tempDir, { recursive: true, force: true });
     });
 
     // ─── TypeScript parsing ─────────────────────────────────────────────
