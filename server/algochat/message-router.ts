@@ -45,6 +45,8 @@ import { DedupService } from '../lib/dedup';
 import { createEventContext, runWithEventContext } from '../observability/event-context';
 import { scanForInjection } from '../lib/prompt-injection';
 import { recordAudit } from '../db/audit';
+import { getProject } from '../db/projects';
+import { createWorktree, generateChatBranchName } from '../lib/worktree';
 
 const log = createLogger('MessageRouter');
 
@@ -363,15 +365,17 @@ export class MessageRouter {
             this.subscriptionManager.cleanupLocalSession(existingSessionId);
         }
 
-        // Create a new session
+        // Create a new session with worktree isolation
         const resolvedProjectId = projectId ?? agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId();
-        log.debug(`Creating new session`, { projectId: resolvedProjectId, agentId });
+        const workDir = await this.createSessionWorktree(resolvedProjectId);
+        log.debug(`Creating new session`, { projectId: resolvedProjectId, agentId, workDir });
         const session = createSession(this.db, {
             projectId: resolvedProjectId,
             agentId,
             name: `Chat: ${agent.name}`,
             initialPrompt: content,
             source: 'web',
+            workDir,
         });
 
         log.debug(`Session created: ${session.id}, starting process`);
@@ -588,12 +592,15 @@ export class MessageRouter {
             const agent = getAgent(this.db, agentId);
             if (!agent) return;
 
+            const projectId = agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId();
+            const workDir = await this.createSessionWorktree(projectId);
             const session = createSession(this.db, {
-                projectId: agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId(),
+                projectId,
                 agentId,
                 name: `AlgoChat: ${participant.slice(0, 8)}...`,
                 initialPrompt: agentContent,
                 source: 'algochat',
+                workDir,
             });
 
             conversation = createConversation(this.db, participant, agentId, session.id);
@@ -632,12 +639,15 @@ export class MessageRouter {
                     const agent = getAgent(this.db, agentId);
                     if (agent) {
                         const { updateConversationSession } = await import('../db/sessions');
+                        const projectId = agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId();
+                        const workDir = await this.createSessionWorktree(projectId);
                         const session = createSession(this.db, {
-                            projectId: agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId(),
+                            projectId,
                             agentId,
                             name: `AlgoChat: ${participant.slice(0, 8)}...`,
                             initialPrompt: agentContent,
                             source: 'algochat',
+                            workDir,
                         });
                         updateConversationSession(this.db, conversation.id, session.id);
                         conversation.sessionId = session.id;
@@ -697,6 +707,25 @@ export class MessageRouter {
                 this.pendingGroupChunks.delete(k);
             }
         }
+    }
+
+    /**
+     * Create a worktree for a chat session (same pattern as Discord's handleMentionReply).
+     * Non-fatal — returns undefined if worktree creation fails.
+     */
+    private async createSessionWorktree(projectId: string | null): Promise<string | undefined> {
+        if (!projectId) return undefined;
+        const project = getProject(this.db, projectId);
+        if (!project?.workingDir) return undefined;
+
+        const sessionId = crypto.randomUUID();
+        const branchName = generateChatBranchName('algochat', sessionId);
+        const result = await createWorktree({
+            projectWorkingDir: project.workingDir,
+            branchName,
+            worktreeId: `chat-${sessionId.slice(0, 12)}`,
+        });
+        return result.success ? result.worktreeDir : undefined;
     }
 }
 
