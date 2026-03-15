@@ -683,21 +683,33 @@ export class WorkTaskService {
         // Subscribe for completion (includes stall detection for chain continuation)
         this.subscribeForCompletion(task.id, session.id);
 
-        // Resolve model: apply tier override if present (from chain continuation escalation)
+        // Resolve model: apply tier override if present (from chain continuation escalation).
+        // We temporarily patch the agent's model in the DB so that ProcessManager's
+        // synchronous getAgent() call inside startProcess() picks up the override.
+        // This is safe in single-threaded JS: getAgent runs before any async work,
+        // and we restore the original model immediately after startProcess returns.
         const agentRecord = getAgent(this.db, agent.id);
         const agentModel = agentRecord?.model ?? '';
         const resolvedModel = this.resolveModelForTask(task.id, agentModel);
-        const modelOverride = resolvedModel !== agentModel ? resolvedModel : undefined;
+        const hasModelOverride = !!agentModel && resolvedModel !== agentModel;
+
+        if (hasModelOverride) {
+            this.db.query('UPDATE agents SET model = ? WHERE id = ?').run(resolvedModel, agent.id);
+        }
 
         // Start the process
-        this.processManager.startProcess(session, prompt, modelOverride ? { modelOverride } : undefined);
+        this.processManager.startProcess(session, prompt);
+
+        if (hasModelOverride) {
+            this.db.query('UPDATE agents SET model = ? WHERE id = ?').run(agentModel, agent.id);
+        }
 
         log.info('Work task running', {
             taskId: task.id,
             sessionId: session.id,
             branchName,
             worktreeDir,
-            ...(modelOverride ? { modelOverride } : {}),
+            ...(hasModelOverride ? { resolvedModel } : {}),
         });
 
         const updated = getWorkTask(this.db, task.id);

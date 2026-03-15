@@ -162,7 +162,7 @@ export class ProcessManager {
         }
     }
 
-    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType; modelOverride?: string }): void {
+    startProcess(session: Session, prompt?: string, options?: { depth?: number; schedulerMode?: boolean; schedulerActionType?: ScheduleActionType }): void {
         if (this.processes.has(session.id)) {
             this.stopProcess(session.id);
         }
@@ -177,13 +177,6 @@ export class ProcessManager {
         }
 
         let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
-
-        // Apply model tier override for chain-continuation escalation.
-        // The overridden agent is ephemeral — the DB record is not modified.
-        if (options?.modelOverride && effectiveAgent) {
-            effectiveAgent = { ...effectiveAgent, model: options.modelOverride };
-        }
-
         const resolvedPrompt = prompt ?? session.initialPrompt;
 
         // Route based on provider execution mode

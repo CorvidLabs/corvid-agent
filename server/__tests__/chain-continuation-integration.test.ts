@@ -22,6 +22,7 @@ import { WorkTaskService } from '../work/service';
 import type { ProcessManager } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
 import { ModelTier } from '../work/chain-continuation';
+import type { Session } from '../../shared/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,18 +33,25 @@ type EventCallback = (sessionId: string, event: ClaudeStreamEvent) => void;
 /**
  * Creates a ProcessManager stub that:
  *  - Captures subscribe() callbacks so tests can drive events
- *  - Tracks which model was last used via startProcess options
+ *  - Reads the agent's model directly from the DB at startProcess() call time,
+ *    capturing any temporary model override applied by WorkTaskService before
+ *    the call (the DB temp-patch pattern used to avoid touching Layer 0 paths).
  */
-function createMockProcessManager() {
+function createMockProcessManager(db: Database) {
     const subscribers = new Map<string, EventCallback[]>();
     const processStartCalls: Array<{
         sessionId: string;
-        modelOverride?: string;
+        resolvedAgentModel?: string;
     }> = [];
 
     const pm = {
-        startProcess: mock((session: { id: string }, _prompt?: string, options?: { modelOverride?: string }) => {
-            processStartCalls.push({ sessionId: session.id, modelOverride: options?.modelOverride });
+        startProcess: mock((session: Session, _prompt?: string) => {
+            // Capture the agent model at this exact moment — WorkTaskService temporarily
+            // patches the DB with the tier-overridden model before calling startProcess.
+            const row = session.agentId
+                ? (db.query('SELECT model FROM agents WHERE id = ?').get(session.agentId) as { model: string } | null)
+                : null;
+            processStartCalls.push({ sessionId: session.id, resolvedAgentModel: row?.model });
         }),
         stopProcess: mock((_sessionId: string) => {
             // Mark process as not running
@@ -81,7 +89,7 @@ function createMockProcessManager() {
 
     return pm as unknown as ProcessManager & {
         _emit: (sessionId: string, event: ClaudeStreamEvent) => void;
-        _processStartCalls: Array<{ sessionId: string; modelOverride?: string }>;
+        _processStartCalls: Array<{ sessionId: string; resolvedAgentModel?: string }>;
     };
 }
 
@@ -159,7 +167,7 @@ beforeEach(() => {
         workingDir: '/tmp/chain-test',
     });
 
-    pm = createMockProcessManager();
+    pm = createMockProcessManager(db);
     service = new WorkTaskService(db, pm as unknown as ProcessManager);
 });
 
@@ -268,7 +276,7 @@ describe('chain continuation: stall detection', () => {
 });
 
 describe('chain continuation: tier override', () => {
-    test('task with modelTier=sonnet passes modelOverride to startProcess', async () => {
+    test('task with modelTier=sonnet resolves agent model to sonnet at startProcess call time', async () => {
         const taskPromise = service.create({
             agentId: haikuAgent.id,
             projectId: project.id,
@@ -279,13 +287,15 @@ describe('chain continuation: tier override', () => {
         await new Promise((r) => setTimeout(r, 10));
         await taskPromise;
 
-        // The most recent startProcess call should have modelOverride = sonnet model
+        // The mock captures the agent model from the DB at the moment startProcess is called.
+        // WorkTaskService temporarily patches the DB to the tier-overridden model, so the
+        // resolved model should be claude-sonnet-4-6 even though the agent's default is haiku.
         const calls = pm._processStartCalls;
         const lastCall = calls[calls.length - 1];
-        expect(lastCall?.modelOverride).toBe('claude-sonnet-4-6');
+        expect(lastCall?.resolvedAgentModel).toBe('claude-sonnet-4-6');
     });
 
-    test('task with modelTier=opus passes opus model override', async () => {
+    test('task with modelTier=opus resolves agent model to opus at startProcess call time', async () => {
         const taskPromise = service.create({
             agentId: haikuAgent.id,
             projectId: project.id,
@@ -298,10 +308,10 @@ describe('chain continuation: tier override', () => {
 
         const calls = pm._processStartCalls;
         const lastCall = calls[calls.length - 1];
-        expect(lastCall?.modelOverride).toBe('claude-opus-4-6');
+        expect(lastCall?.resolvedAgentModel).toBe('claude-opus-4-6');
     });
 
-    test('task with no modelTier uses agent default (no override)', async () => {
+    test('task with no modelTier uses agent default model (no override)', async () => {
         const taskPromise = service.create({
             agentId: haikuAgent.id,
             projectId: project.id,
@@ -313,8 +323,8 @@ describe('chain continuation: tier override', () => {
 
         const calls = pm._processStartCalls;
         const lastCall = calls[calls.length - 1];
-        // Agent model is already haiku, so no override should be set
-        expect(lastCall?.modelOverride).toBeUndefined();
+        // No tier override — agent model should remain haiku
+        expect(lastCall?.resolvedAgentModel).toBe('claude-haiku-4-5-20251001');
     });
 
     test('invalid modelTier string is silently ignored', async () => {
@@ -330,7 +340,8 @@ describe('chain continuation: tier override', () => {
 
         const calls = pm._processStartCalls;
         const lastCall = calls[calls.length - 1];
-        expect(lastCall?.modelOverride).toBeUndefined();
+        // Invalid tier is silently ignored — agent model should remain haiku
+        expect(lastCall?.resolvedAgentModel).toBe('claude-haiku-4-5-20251001');
     });
 });
 
