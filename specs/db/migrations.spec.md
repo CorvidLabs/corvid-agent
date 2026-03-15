@@ -17,6 +17,7 @@ files:
   - server/db/migrations/086_agent_display_customization.ts
   - server/db/migrations/087_session_metrics.ts
   - server/db/migrations/088_agent_display_columns_fixup.ts
+  - server/db/migrations/089_flock_test_results.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -264,10 +265,44 @@ Adds display customization fields to the `agents` table: `display_color`, `displ
 | `up` | `(db: Database)` | `void` | Adds 4 columns: `display_color` (TEXT, nullable), `display_icon` (TEXT, nullable), `avatar_url` (TEXT, nullable), `disabled` (INTEGER, default 0) |
 | `down` | `(db: Database)` | `void` | Recreates the `agents` table without the new columns via backup-and-restore |
 
+### 087_session_metrics.ts
+
+Adds session metrics tracking columns and tables for analytics.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates session metrics tables and indexes |
+| `down` | `(db: Database)` | `void` | Drops session metrics tables and indexes |
+
+### 088_agent_display_columns_fixup.ts
+
+Fixup migration for agent display customization columns added in 086.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Ensures agent display columns are correctly configured |
+| `down` | `(db: Database)` | `void` | Reverts fixup changes |
+
+### 089_flock_test_results.ts
+
+Creates `flock_test_results` and `flock_test_challenge_results` tables for storing Flock Directory automated agent test outcomes.
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `flock_test_results` and `flock_test_challenge_results` tables with indexes for agent ID and test result lookups |
+| `down` | `(db: Database)` | `void` | Drops both tables and their indexes |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-14 | corvid-agent | Add migrations 087-089 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migration 086 to spec coverage |
 | 2026-03-13 | corvid-agent | Add 8 migration files (078-085) to spec coverage |
 | 2026-03-04 | corvid-agent | Initial spec |
