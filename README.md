@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.30.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.31.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
@@ -131,15 +131,15 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## 6,900+ Tests. 1.14× Test-to-Code Ratio. Open Source.
+## 7,100+ Tests. 1.14× Test-to-Code Ratio. Open Source.
 
 > More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **6,982** across 293 files |
+| Unit tests | **7,148** across 303 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **147** with automated validation (100% file coverage) |
+| Module specs | **145** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
 
 Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
@@ -150,9 +150,9 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 
 | Metric | Count |
 |--------|-------|
-| MCP tools | **44** corvid_* tool handlers |
-| API endpoints | **~300** across 44 route modules |
-| DB migrations | **14** (squashed baseline + incremental, 90+ tables) |
+| MCP tools | **43** corvid_* tool handlers |
+| API endpoints | **279** across 44 route modules |
+| DB migrations | **13** (squashed baseline + incremental, 90+ tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
 Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
@@ -348,7 +348,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  14 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  13 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -363,7 +363,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (14 migrations) and query modules
+  db/            SQLite schema (13 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -374,7 +374,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 41 corvid_* tool handlers
+  mcp/           MCP tool server and 43 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -412,7 +412,7 @@ e2e/             Playwright end-to-end tests (31 spec files, 360 E2E tests)
 
 ---
 
-## MCP Tools (41)
+## MCP Tools (43)
 
 Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
 
@@ -500,17 +500,17 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 6982 server tests (~110s)
+bun test              # 7148 server tests (~110s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**6,982 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**7,148 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**139 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (369/369 files) enforced in CI via `--require-coverage 100`.
+**145 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (379/379 files) enforced in CI via `--require-coverage 100`.
 
 ---
 
@@ -642,7 +642,7 @@ No contribution is too small. Fixing a typo, improving an error message, or addi
 
 ### What makes this project different
 
-You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 6,900+ tests, 11 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
+You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 7,100+ tests, 13 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
 
 See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 
