@@ -63,8 +63,30 @@ function computeTaskCompletion(db: Database, agentId: string): number {
 }
 
 /**
- * Compute peer rating from marketplace reviews.
- * Normalized to 0-100 scale (reviews are 1-5).
+ * Compute feedback score from response_feedback table.
+ * Returns null if fewer than 3 feedbacks (not enough data).
+ */
+function computeFeedbackScore(db: Database, agentId: string): number | null {
+    const row = db.query(`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive
+        FROM response_feedback
+        WHERE agent_id = ?
+          AND created_at > datetime('now', '-90 days')
+    `).get(agentId) as { total: number; positive: number } | null;
+
+    if (!row || row.total < 3) return null;
+    const positiveRatio = (row.positive ?? 0) / row.total;
+    return Math.round(positiveRatio * 100);
+}
+
+/**
+ * Compute peer rating from marketplace reviews, blended with response feedback.
+ * - Both present: 60% marketplace, 40% feedback
+ * - Only marketplace: marketplace score
+ * - Only feedback: feedback score
+ * - Neither: 50 (default)
  */
 function computePeerRating(db: Database, agentId: string): number {
     const row = db.query(`
@@ -74,9 +96,17 @@ function computePeerRating(db: Database, agentId: string): number {
         WHERE l.agent_id = ?
     `).get(agentId) as { avg_rating: number | null; count: number } | null;
 
-    if (!row || row.count === 0 || row.avg_rating === null) return 50;
-    // Convert 1-5 scale to 0-100
-    return Math.round(((row.avg_rating - 1) / 4) * 100);
+    const hasMarketplace = row && row.count > 0 && row.avg_rating !== null;
+    const marketplaceScore = hasMarketplace ? Math.round(((row!.avg_rating! - 1) / 4) * 100) : null;
+
+    const feedbackScore = computeFeedbackScore(db, agentId);
+
+    if (marketplaceScore !== null && feedbackScore !== null) {
+        return Math.round(marketplaceScore * 0.6 + feedbackScore * 0.4);
+    }
+    if (marketplaceScore !== null) return marketplaceScore;
+    if (feedbackScore !== null) return feedbackScore;
+    return 50;
 }
 
 /**

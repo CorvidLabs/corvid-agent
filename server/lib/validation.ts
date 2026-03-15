@@ -684,7 +684,7 @@ const ReputationEventTypeSchema = z.enum([
     'task_completed', 'task_failed', 'review_received',
     'credit_spent', 'credit_earned', 'security_violation',
     'session_completed', 'attestation_published', 'improvement_loop_completed',
-    'improvement_loop_failed',
+    'improvement_loop_failed', 'feedback_received',
 ]);
 
 export const RecordReputationEventSchema = z.object({
@@ -692,6 +692,16 @@ export const RecordReputationEventSchema = z.object({
     eventType: ReputationEventTypeSchema,
     scoreImpact: z.number({ message: 'scoreImpact must be a number' }),
     metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const SubmitFeedbackSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    sessionId: z.string().optional(),
+    source: z.enum(['api', 'discord', 'algochat']).default('api'),
+    sentiment: z.enum(['positive', 'negative']),
+    category: z.enum(['helpful', 'accurate', 'truthful', 'harmful', 'inaccurate', 'untruthful']).optional(),
+    comment: z.string().max(500).optional(),
+    submittedBy: z.string().optional(),
 });
 
 // ─── Billing ─────────────────────────────────────────────────────────────────

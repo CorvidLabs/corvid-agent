@@ -8,7 +8,10 @@ import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
 import { IdentityVerification, type VerificationTier } from '../reputation/identity-verification';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
-import { parseBodyOrThrow, ValidationError, RecordReputationEventSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError, RecordReputationEventSchema, SubmitFeedbackSchema } from '../lib/validation';
+import { createLogger } from '../lib/logger';
+
+const feedbackLog = createLogger('FeedbackRoutes');
 
 const VALID_TIERS: Set<string> = new Set(['UNVERIFIED', 'GITHUB_VERIFIED', 'OWNER_VOUCHED', 'ESTABLISHED']);
 
@@ -107,6 +110,21 @@ export function handleReputationRoutes(
         }
     }
 
+    // ─── Feedback ──────────────────────────────────────────────────────────
+
+    if (path === '/api/reputation/feedback' && method === 'POST') {
+        return handleSubmitFeedback(req, _db, scorer);
+    }
+
+    const feedbackMatch = path.match(/^\/api\/reputation\/feedback\/([^/]+)$/);
+    if (feedbackMatch && method === 'GET') {
+        const agentId = feedbackMatch[1];
+        const limit = safeNumParam(url.searchParams.get('limit'), 50);
+        return handleGetFeedback(agentId, limit, _db);
+    }
+
+    // ─── Attestation ─────────────────────────────────────────────────────
+
     const attestMatch = path.match(/^\/api\/reputation\/attestation\/([^/]+)$/);
     if (attestMatch) {
         const agentId = attestMatch[1];
@@ -174,4 +192,91 @@ async function handleSetIdentityTier(
     } catch (err) {
         return handleRouteError(err);
     }
+}
+
+// ─── Feedback Handlers ──────────────────────────────────────────────────────
+
+async function handleSubmitFeedback(
+    req: Request,
+    db: Database,
+    scorer: ReputationScorer,
+): Promise<Response> {
+    try {
+        const body = await parseBodyOrThrow(req, SubmitFeedbackSchema);
+
+        // Rate limiting: max 10 feedbacks per submitter per agent per day
+        if (body.submittedBy) {
+            const row = db.query(`
+                SELECT COUNT(*) as count FROM response_feedback
+                WHERE submitted_by = ? AND agent_id = ?
+                  AND created_at > datetime('now', '-1 day')
+            `).get(body.submittedBy, body.agentId) as { count: number };
+
+            if (row.count >= 10) {
+                return json({ error: 'Rate limit exceeded: max 10 feedbacks per agent per day' }, 429);
+            }
+        }
+
+        const id = crypto.randomUUID();
+
+        db.query(`
+            INSERT INTO response_feedback (id, agent_id, session_id, source, sentiment, category, comment, submitted_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            id,
+            body.agentId,
+            body.sessionId ?? null,
+            body.source,
+            body.sentiment,
+            body.category ?? null,
+            body.comment ?? null,
+            body.submittedBy ?? null,
+        );
+
+        // Record reputation event
+        const scoreImpact = body.sentiment === 'positive' ? 2 : -2;
+        scorer.recordEvent({
+            agentId: body.agentId,
+            eventType: 'feedback_received',
+            scoreImpact,
+            metadata: { feedbackId: id, sentiment: body.sentiment, source: body.source },
+        });
+
+        feedbackLog.info('Feedback submitted', { id, agentId: body.agentId, sentiment: body.sentiment });
+        return json({ ok: true, id }, 201);
+    } catch (err) {
+        if (err instanceof ValidationError) return badRequest(err.detail);
+        return handleRouteError(err);
+    }
+}
+
+function handleGetFeedback(
+    agentId: string,
+    limit: number,
+    db: Database,
+): Response {
+    const feedback = db.query(`
+        SELECT * FROM response_feedback
+        WHERE agent_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+    `).all(agentId, limit);
+
+    const aggregate = db.query(`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive,
+            SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as negative
+        FROM response_feedback
+        WHERE agent_id = ?
+    `).get(agentId) as { total: number; positive: number; negative: number };
+
+    return json({
+        feedback,
+        aggregate: {
+            positive: aggregate.positive ?? 0,
+            negative: aggregate.negative ?? 0,
+            total: aggregate.total ?? 0,
+        },
+    });
 }

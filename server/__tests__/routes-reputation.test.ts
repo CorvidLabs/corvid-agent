@@ -155,6 +155,94 @@ describe('Reputation Routes', () => {
         expect(typeof data.overallScore).toBe('number');
     });
 
+    // ─── Feedback ──────────────────────────────────────────────────────────
+
+    it('POST /api/reputation/feedback submits positive feedback', async () => {
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            agentId,
+            sentiment: 'positive',
+            source: 'api',
+        });
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(201);
+        const data = await res!.json();
+        expect(data.ok).toBe(true);
+        expect(data.id).toBeDefined();
+    });
+
+    it('POST /api/reputation/feedback submits negative feedback with comment', async () => {
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            agentId,
+            sentiment: 'negative',
+            source: 'discord',
+            category: 'inaccurate',
+            comment: 'Wrong answer',
+        });
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(201);
+        const data = await res!.json();
+        expect(data.ok).toBe(true);
+    });
+
+    it('POST /api/reputation/feedback rejects invalid sentiment', async () => {
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            agentId,
+            sentiment: 'neutral',
+            source: 'api',
+        });
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(400);
+    });
+
+    it('POST /api/reputation/feedback enforces rate limit', async () => {
+        const submitter = 'rate-limit-wallet';
+        // Insert 10 feedbacks directly
+        for (let i = 0; i < 10; i++) {
+            db.query(`
+                INSERT INTO response_feedback (id, agent_id, source, sentiment, submitted_by)
+                VALUES (?, ?, 'api', 'positive', ?)
+            `).run(crypto.randomUUID(), agentId, submitter);
+        }
+
+        const { req, url } = fakeReq('POST', '/api/reputation/feedback', {
+            agentId,
+            sentiment: 'positive',
+            source: 'api',
+            submittedBy: submitter,
+        });
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(429);
+        const data = await res!.json();
+        expect(data.error).toContain('Rate limit');
+    });
+
+    it('GET /api/reputation/feedback/:agentId returns feedback list and aggregate', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/feedback/${agentId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.feedback).toBeDefined();
+        expect(Array.isArray(data.feedback)).toBe(true);
+        expect(data.aggregate).toBeDefined();
+        expect(typeof data.aggregate.total).toBe('number');
+        expect(typeof data.aggregate.positive).toBe('number');
+        expect(typeof data.aggregate.negative).toBe('number');
+    });
+
+    it('GET /api/reputation/feedback/:agentId respects limit param', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/feedback/${agentId}?limit=1`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.feedback.length).toBeLessThanOrEqual(1);
+    });
+
     // ─── Unmatched path ──────────────────────────────────────────────────────
 
     it('returns null for unmatched paths', () => {
