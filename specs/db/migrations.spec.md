@@ -15,6 +15,8 @@ files:
   - server/db/migrations/084_model_exams.ts
   - server/db/migrations/085_project_dir_strategy.ts
   - server/db/migrations/086_agent_display_customization.ts
+  - server/db/migrations/087_session_metrics.ts
+  - server/db/migrations/088_agent_display_columns_fixup.ts
 db_tables:
   - schema_version
 depends_on: []

@@ -395,13 +395,13 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         ctx.processManager.resumeProcess(session, text);
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
-            ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
+            ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
         );
         return;
     }
 
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
-        ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
+        ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
     );
 }

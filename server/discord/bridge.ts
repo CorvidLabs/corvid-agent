@@ -315,7 +315,7 @@ export class DiscordBridge {
     private subscribeForResponseWithEmbed(sessionId: string, threadId: string, agentName: string, agentModel: string): void {
         subscribeImpl(
             this.processManager, this.delivery, this.config.botToken,
-            this.threadCallbacks, sessionId, threadId, agentName, agentModel,
+            this.db, this.threadCallbacks, sessionId, threadId, agentName, agentModel,
         );
     }
 

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 86;
+const SCHEMA_VERSION = 88;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -859,6 +859,25 @@ const MIGRATIONS: Record<number, string[]> = {
             updated_at        TEXT DEFAULT (datetime('now'))
         )`,
 
+        `CREATE TABLE IF NOT EXISTS session_metrics (
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id              TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            model                   TEXT NOT NULL DEFAULT '',
+            tier                    TEXT NOT NULL DEFAULT '',
+            total_iterations        INTEGER NOT NULL DEFAULT 0,
+            tool_call_count         INTEGER NOT NULL DEFAULT 0,
+            max_chain_depth         INTEGER NOT NULL DEFAULT 0,
+            nudge_count             INTEGER NOT NULL DEFAULT 0,
+            mid_chain_nudge_count   INTEGER NOT NULL DEFAULT 0,
+            exploration_drift_count INTEGER NOT NULL DEFAULT 0,
+            stall_detected          INTEGER NOT NULL DEFAULT 0,
+            stall_type              TEXT DEFAULT NULL,
+            termination_reason      TEXT NOT NULL DEFAULT 'normal',
+            duration_ms             INTEGER NOT NULL DEFAULT 0,
+            needs_summary           INTEGER NOT NULL DEFAULT 0,
+            created_at              TEXT DEFAULT (datetime('now'))
+        )`,
+
         `CREATE TABLE IF NOT EXISTS skill_bundles (
             id               TEXT PRIMARY KEY,
             name             TEXT NOT NULL UNIQUE,
@@ -1174,6 +1193,9 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)`,
         `CREATE INDEX IF NOT EXISTS idx_session_messages_session_timestamp ON session_messages(session_id, timestamp ASC)`,
         `CREATE INDEX IF NOT EXISTS idx_session_messages_tenant ON session_messages(tenant_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_session_metrics_session ON session_metrics(session_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_session_metrics_model ON session_metrics(model)`,
+        `CREATE INDEX IF NOT EXISTS idx_session_metrics_created ON session_metrics(created_at)`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id)`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_council_launch ON sessions(council_launch_id)`,
         `CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)`,
