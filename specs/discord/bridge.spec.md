@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 11
+version: 12
 status: active
 files:
   - server/discord/bridge.ts
@@ -18,6 +18,7 @@ files:
   - server/discord/types.ts
   - server/discord/message-formatter.ts
   - server/discord/gateway.ts
+  - server/discord/reaction-handler.ts
 db_tables:
   - sessions
   - session_messages
@@ -65,6 +66,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `removeReaction` | `(channelId, messageId, emoji: string)` | `Promise<void>` | Remove a bot reaction from a message. Best-effort |
 | `muteUser` | `(userId: string)` | `void` | Mute a user from bot interactions (admin action) |
 | `unmuteUser` | `(userId: string)` | `void` | Unmute a previously muted user (admin action) |
+| `setReputationScorer` | `(scorer: ReputationScorer)` | `void` | Wire up the reputation scorer for reaction-based feedback |
 
 ### Exported Functions (from commands.ts)
 
@@ -180,7 +182,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 
 | Export | Kind | Description |
 |--------|------|-------------|
-| `GatewayDispatchHandlers` | Interface | Callbacks for gateway dispatch events: `onMessage`, `onInteraction`, `onReady` |
+| `GatewayDispatchHandlers` | Interface | Callbacks for gateway dispatch events: `onMessage`, `onInteraction`, `onReady`, `onReactionAdd?` |
 | `DiscordGateway` | Class | Manages the Discord Gateway WebSocket connection, heartbeat, identify/resume lifecycle, and reconnection. Dispatch events are forwarded to the bridge via `GatewayDispatchHandlers` |
 
 #### DiscordGateway Constructor
@@ -198,6 +200,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `stop` | `()` | `void` | Close the WebSocket and clear heartbeat timer |
 | `updatePresence` | `(statusText?: string, activityType?: number)` | `void` | Update bot presence on the live gateway connection |
 
+### Exported Functions (from reaction-handler.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleReaction` | `(ctx: ReactionHandlerContext, data: DiscordReactionData)` | `void` | Handle a MESSAGE_REACTION_ADD event — maps emoji reactions to reputation feedback |
+
 ### Exported Types (from extracted modules)
 
 | Type | Source | Description |
@@ -208,6 +216,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?) |
 | `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel) |
 | `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
+| `ReactionHandlerContext` | `reaction-handler.ts` | Context object for reaction handler (db, botUserId, scorer, mentionSessions, threadSessions) |
 | `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |
 
 ### Exported Types (from types.ts)
@@ -224,7 +233,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `DiscordInteractionOption` | `{ name, type, value?, options?: DiscordInteractionOption[] }` — recursive option type for subcommands and subcommand groups |
 | `DiscordInteractionData` | Slash command interaction payload from gateway |
 | `GatewayOp` | Constants for gateway opcodes (DISPATCH=0, HEARTBEAT=1, IDENTIFY=2, PRESENCE_UPDATE=3, RESUME=6, RECONNECT=7, INVALID_SESSION=9, HELLO=10, HEARTBEAT_ACK=11) |
-| `GatewayIntent` | Bit flags: `GUILDS` (1<<0), `GUILD_MEMBERS` (1<<1), `GUILD_MESSAGES` (1<<9), `MESSAGE_CONTENT` (1<<15) |
+| `GatewayIntent` | Bit flags: `GUILDS` (1<<0), `GUILD_MEMBERS` (1<<1), `GUILD_MESSAGES` (1<<9), `GUILD_MESSAGE_REACTIONS` (1<<10), `MESSAGE_CONTENT` (1<<15) |
+| `DiscordReactionData` | `{ user_id, channel_id, message_id, guild_id?, emoji: { id, name } }` — payload from MESSAGE_REACTION_ADD |
 | `PermissionLevel` | Constants: `BLOCKED=0, BASIC=1, STANDARD=2, ADMIN=3` |
 | `ComponentType` | Constants for Discord component types: `ACTION_ROW=1, BUTTON=2` |
 | `ButtonStyle` | Constants for Discord button styles: `PRIMARY=1, SECONDARY=2, SUCCESS=3, DANGER=4` |
@@ -245,7 +255,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 6. **Session resume**: On reconnection, if a `sessionId` exists, a RESUME is sent instead of IDENTIFY. On INVALID_SESSION with `resumable=false`, the session ID is cleared and IDENTIFY is used
 7. **INVALID_SESSION delay**: After receiving INVALID_SESSION, the bridge waits 1-5 seconds (random) before re-identifying, per Discord documentation
 8. **Reconnection backoff**: Exponential backoff with `delay = min(1000 * 2^attempt, 60000)`. Maximum 10 reconnect attempts before giving up and setting `running = false`
-9. **Gateway intents**: Requests `GUILD_MESSAGES` and `MESSAGE_CONTENT` intents during IDENTIFY. When `publicMode` is enabled, also requests `GUILDS` and `GUILD_MEMBERS` for role data
+9. **Gateway intents**: Requests `GUILD_MESSAGES`, `GUILD_MESSAGE_REACTIONS`, and `MESSAGE_CONTENT` intents during IDENTIFY. When `publicMode` is enabled, also requests `GUILDS` and `GUILD_MEMBERS` for role data
 10. **Bot presence**: Set via the `presence` field in IDENTIFY payload. Configurable via `DISCORD_STATUS` and `DISCORD_ACTIVITY_TYPE` env vars. Can be updated at runtime via `updatePresence()`
 
 ### Channel Message Handling (Passive Mode)
@@ -282,6 +292,12 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 29. **Typing indicators**: A typing indicator is sent when a message is received and periodically refreshed (every 8s) while the agent is responding, since Discord typing indicators expire after ~10 seconds
 30. **Message reactions**: Thread titles are updated with a ✓ prefix when the session completes
 31. **Stale thread auto-archive**: Threads inactive for 2 hours are automatically archived with a closing message. The stale check runs every 10 minutes. Thread sessions and subscriptions are cleaned up on archive
+
+### Reaction Feedback
+
+32. **Reaction-based reputation feedback**: When a user reacts with a feedback emoji (👍 or 👎) on a bot message, the reaction is mapped to a `response_feedback` record with source `discord`. The session is resolved from `mentionSessions` (for channel replies) or `threadSessions` (for thread messages). Bot self-reactions are ignored. Non-feedback emojis are silently ignored
+33. **Reaction rate limiting**: Each user is limited to 5 feedback reactions per 60-second sliding window. Rate limits are per-user, independent of each other. Rate-limited reactions are silently dropped
+34. **Reputation event recording**: Each feedback reaction also records a reputation event via `ReputationScorer.recordEvent()` with `eventType: 'feedback_received'` and `scoreImpact: +2` (positive) or `-2` (negative)
 
 ### Commands
 
@@ -444,6 +460,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `server/lib/logger.ts` | `createLogger` |
 | `server/lib/prompt-injection.ts` | `scanForInjection` |
 | `server/work/service.ts` | `WorkTaskService` (optional, for work_intake mode) |
+| `server/reputation/scorer.ts` | `ReputationScorer` (optional, for reaction feedback) |
 
 ### Consumed By
 
@@ -485,3 +502,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-10 | corvid-agent | v9: `/admin` slash command with subcommand groups for managing channels (add/remove/list), users (add/remove/list), roles (set/remove/list), bridge mode, and public mode — all from within Discord using native mentions. `DiscordInteractionOption` recursive type for nested subcommands. Audit logging on every config mutation. `/help` updated with Admin Configuration section. 20 new tests |
 | 2026-03-11 | corvid-agent | v10: Decomposed bridge.ts (2688→367 lines) into 6 extracted modules: `commands.ts` (slash command registration & handling), `admin-commands.ts` (/admin subcommands), `embeds.ts` (Discord API helpers & embed builders), `message-handler.ts` (message routing & dispatch), `permissions.ts` (RBAC & rate limiting), `thread-manager.ts` (thread lifecycle & streaming). Bridge.ts retained as thin orchestration layer. No behavioral changes — pure refactoring. Closes #932 |
 | 2026-03-14 | corvid-agent | v11: Added `/tasks`, `/schedule`, `/config` slash commands. `/tasks` shows active work tasks with status emojis and queue counts. `/schedule` shows active schedules with Discord relative timestamps for next/last runs. `/config` is admin-only ephemeral embed showing mode, channels, and permission settings. Updated `/help` embed. 6 new tests. Closes #894 |
+| 2026-03-16 | corvid-agent | v12: Discord reaction listener for reputation feedback. Added `GUILD_MESSAGE_REACTIONS` intent, `MESSAGE_REACTION_ADD` dispatch handler, `reaction-handler.ts` module with emoji-to-sentiment mapping, per-user rate limiting (5/min), session resolution from mentionSessions and threadSessions, `response_feedback` insertion, and reputation event recording. `setReputationScorer()` setter on DiscordBridge. 11 new tests. Closes #1161 |

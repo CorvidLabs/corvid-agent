@@ -368,6 +368,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
             },
             workTaskService,
         );
+        discordBridge.setReputationScorer(reputationScorer);
         discordBridge.start();
         shutdownCoordinator.registerService('DiscordBridge', discordBridge, 20);
         log.info('Discord bridge initialized');

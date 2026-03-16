@@ -24,8 +24,9 @@
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
 import type { WorkTaskService } from '../work/service';
-import type { DiscordBridgeConfig, DiscordInteractionData, DiscordMessageData } from './types';
+import type { DiscordBridgeConfig, DiscordInteractionData, DiscordMessageData, DiscordReactionData } from './types';
 import type { EventCallback } from '../process/interfaces';
+import type { ReputationScorer } from '../reputation/scorer';
 import { DiscordGateway } from './gateway';
 import { getAgent } from '../db/agents';
 import { getSession } from '../db/sessions';
@@ -45,6 +46,7 @@ import {
     removeReaction as removeReactionImpl,
 } from './embeds';
 import { muteUser as muteUserImpl, unmuteUser as unmuteUserImpl } from './permissions';
+import { handleReaction as handleReactionImpl, type ReactionHandlerContext } from './reaction-handler';
 import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
 import {
     subscribeForResponseWithEmbed as subscribeImpl,
@@ -90,6 +92,9 @@ export class DiscordBridge {
     /** Users who have interacted at least once — used for first-interaction welcome tips. */
     private interactedUsers: Set<string> = new Set();
 
+    /** Reputation scorer for reaction feedback. Set via setReputationScorer(). */
+    private reputationScorer: ReputationScorer | null = null;
+
     /** Debounce timer for updateSlashCommands — coalesces rapid agent changes. */
     private slashCommandDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     private static readonly SLASH_COMMAND_DEBOUNCE_MS = 2_000;
@@ -121,6 +126,9 @@ export class DiscordBridge {
                 this.handleInteraction(data).catch(err => {
                     log.error('Error handling Discord interaction', { error: err instanceof Error ? err.message : String(err) });
                 });
+            },
+            onReactionAdd: (data) => {
+                this.handleReaction(data);
             },
             onReady: (sessionId, botUserId) => {
                 if (botUserId) {
@@ -269,7 +277,23 @@ export class DiscordBridge {
         }, DiscordBridge.SLASH_COMMAND_DEBOUNCE_MS);
     }
 
+    /** Wire up the reputation scorer for reaction-based feedback. */
+    setReputationScorer(scorer: ReputationScorer): void {
+        this.reputationScorer = scorer;
+    }
+
     // ── Delegation methods ──────────────────────────────────────────────
+
+    private handleReaction(data: DiscordReactionData): void {
+        const ctx: ReactionHandlerContext = {
+            db: this.db,
+            botUserId: this.botUserId,
+            scorer: this.reputationScorer,
+            mentionSessions: this.mentionSessions,
+            threadSessions: this.threadSessions,
+        };
+        handleReactionImpl(ctx, data);
+    }
 
     private async handleInteraction(interaction: DiscordInteractionData): Promise<void> {
         const ctx: InteractionContext = {

@@ -5,6 +5,7 @@ import type {
     DiscordReadyData,
     DiscordMessageData,
     DiscordInteractionData,
+    DiscordReactionData,
 } from './types';
 import { GatewayOp, GatewayIntent } from './types';
 import { createLogger } from '../lib/logger';
@@ -21,6 +22,7 @@ export interface GatewayDispatchHandlers {
     onMessage(data: DiscordMessageData): void;
     onInteraction(data: DiscordInteractionData): void;
     onReady(sessionId: string, botUserId: string | null): void;
+    onReactionAdd?(data: DiscordReactionData): void;
 }
 
 /**
@@ -224,6 +226,12 @@ export class DiscordGateway {
                 this.handlers.onInteraction(data);
                 break;
             }
+
+            case 'MESSAGE_REACTION_ADD': {
+                const data = payload.d as DiscordReactionData;
+                this.handlers.onReactionAdd?.(data);
+                break;
+            }
         }
     }
 
@@ -232,7 +240,7 @@ export class DiscordGateway {
     private identify(): void {
         // GUILDS is always needed for the bot to receive guild dispatch events.
         // GUILD_MEMBERS is added when public mode is enabled (for role data).
-        let intents = GatewayIntent.GUILDS | GatewayIntent.GUILD_MESSAGES | GatewayIntent.MESSAGE_CONTENT;
+        let intents = GatewayIntent.GUILDS | GatewayIntent.GUILD_MESSAGES | GatewayIntent.GUILD_MESSAGE_REACTIONS | GatewayIntent.MESSAGE_CONTENT;
         if (this.config.publicMode) {
             intents |= GatewayIntent.GUILD_MEMBERS;
         }
