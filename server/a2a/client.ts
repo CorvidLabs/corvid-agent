@@ -258,8 +258,8 @@ export async function invokeRemoteAgent(
                     error: pollResult.state === 'failed' ? (responseText ?? 'Task failed') : null,
                 };
             }
-        } catch {
-            // Poll failed — retry
+        } catch (err) {
+            log.debug('A2A poll attempt failed, retrying', { error: err instanceof Error ? err.message : String(err) });
         }
 
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));

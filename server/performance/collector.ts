@@ -105,8 +105,8 @@ export class PerformanceCollector {
             this.db.query(
                 `INSERT INTO performance_metrics (metric, labels, value, unit) VALUES (?, ?, ?, ?)`,
             ).run('db_slow_query', operation, durationMs, 'ms');
-        } catch {
-            // Non-critical — don't let metrics recording break the caller
+        } catch (err) {
+            log.debug('Failed to record slow query metric', { error: err instanceof Error ? err.message : String(err) });
         }
     }
 
@@ -295,8 +295,8 @@ export class PerformanceCollector {
             if (result.changes > 0) {
                 log.info('Pruned old metrics', { deleted: result.changes });
             }
-        } catch {
-            // Non-critical
+        } catch (err) {
+            log.warn('Failed to prune old metrics', { error: err instanceof Error ? err.message : String(err) });
         }
     }
 }
