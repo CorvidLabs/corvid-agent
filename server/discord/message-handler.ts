@@ -39,6 +39,19 @@ import {
 
 const log = createLogger('DiscordMessageHandler');
 
+/** Maximum number of bot message→session mappings to keep for mention-reply context. */
+const MAX_MENTION_SESSIONS = 500;
+
+/** Evict oldest entries from mentionSessions when it exceeds the cap. */
+function trackMentionSession(map: Map<string, MentionSessionInfo>, botMessageId: string, info: MentionSessionInfo): void {
+    if (map.size >= MAX_MENTION_SESSIONS) {
+        // Delete the oldest entry (first key in insertion order)
+        const firstKey = map.keys().next().value;
+        if (firstKey) map.delete(firstKey);
+    }
+    map.set(botMessageId, info);
+}
+
 /** Replace Discord mention IDs with @username before stripping unresolved mentions.
  *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
 function resolveMentions(text: string, mentions?: Array<{ id: string; username: string }>, botUserId?: string | null): string {
@@ -51,6 +64,13 @@ function resolveMentions(text: string, mentions?: Array<{ id: string; username: 
     return resolved.replace(/<@!?\d+>/g, '').trim();
 }
 
+/** Info for tracking mention-reply sessions in channels (not threads). */
+export interface MentionSessionInfo {
+    sessionId: string;
+    agentName: string;
+    agentModel: string;
+}
+
 /** Context needed by the message handler to access bridge state. */
 export interface MessageHandlerContext {
     db: Database;
@@ -59,6 +79,7 @@ export interface MessageHandlerContext {
     workTaskService: WorkTaskService | null;
     delivery: DeliveryTracker;
     botUserId: string | null;
+    botRoleId: string | null;
     mutedUsers: Set<string>;
     interactedUsers: Set<string>;
     userMessageTimestamps: Map<string, number[]>;
@@ -67,6 +88,8 @@ export interface MessageHandlerContext {
     threadSessions: Map<string, ThreadSessionInfo>;
     threadCallbacks: Map<string, ThreadCallbackInfo>;
     threadLastActivity: Map<string, number>;
+    /** Maps bot reply message IDs → session info for mention-reply context. */
+    mentionSessions: Map<string, MentionSessionInfo>;
 }
 
 /** Cooldown for permission-denial replies: only notify a user once per window. */
@@ -98,12 +121,19 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     const isBotUserMentioned = ctx.botUserId
         ? data.mentions?.some(m => m.id === ctx.botUserId) ?? false
         : false;
-    const hasRoleMention = (data.mention_roles?.length ?? 0) > 0;
-    const isBotMentioned = isBotUserMentioned || hasRoleMention;
+    const isBotRoleMentioned = ctx.botRoleId
+        ? data.mention_roles?.includes(ctx.botRoleId) ?? false
+        : false;
+    const isBotMentioned = isBotUserMentioned || isBotRoleMentioned;
 
-    if (isMonitored && !isOurThread && !isBotMentioned) {
+    // Check if this is a reply to a bot message (for mention-reply context)
+    const isReplyToBot = isMonitored && !isOurThread
+        && data.referenced_message?.author?.id === ctx.botUserId
+        && data.message_reference?.message_id != null;
+
+    if (isMonitored && !isOurThread && !isBotMentioned && !isReplyToBot) {
         log.debug('Message in monitored channel without bot mention', {
-            channelId, userId, isBotUserMentioned, hasRoleMention,
+            channelId, userId, isBotUserMentioned, isBotRoleMentioned,
             textPreview: text.slice(0, 50),
         });
         return;
@@ -166,6 +196,16 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
 
     sendFirstInteractionTip(ctx, userId, channelId);
     sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
+
+    // If replying to a bot message, try to resume the existing session
+    if (isReplyToBot && data.message_reference?.message_id) {
+        const existingSession = ctx.mentionSessions.get(data.message_reference.message_id);
+        if (existingSession) {
+            await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions);
+            return;
+        }
+        // If we can't find the session (e.g. after restart), fall through to create new
+    }
 
     const mode = ctx.config.mode ?? 'chat';
     if (mode === 'work_intake') {
@@ -358,9 +398,50 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
 
     ctx.processManager.startProcess(session, cleanText);
 
+    const agentName = agent.name;
+    const agentModel = agent.model || 'unknown';
     subscribeForInlineResponse(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
-        session.id, channelId, messageId, agent.name, agent.model || 'unknown',
+        session.id, channelId, messageId, agentName, agentModel,
+        (botMessageId) => {
+            trackMentionSession(ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel });
+        },
+    );
+}
+
+async function handleMentionReplyResume(
+    ctx: MessageHandlerContext,
+    channelId: string,
+    _userId: string,
+    messageId: string,
+    text: string,
+    sessionInfo: MentionSessionInfo,
+    mentions?: Array<{ id: string; username: string }>,
+): Promise<void> {
+    const cleanText = resolveMentions(text, mentions, ctx.botUserId);
+    if (!cleanText) return;
+
+    const { sessionId, agentName, agentModel } = sessionInfo;
+    const session = getSession(ctx.db, sessionId);
+
+    if (!session) {
+        log.info('Mention-reply session not found, creating new session', { sessionId });
+        await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions);
+        return;
+    }
+
+    // Try to send message to existing process, or resume if it's stopped
+    const sent = ctx.processManager.sendMessage(sessionId, cleanText);
+    if (!sent) {
+        ctx.processManager.resumeProcess(session, cleanText);
+    }
+
+    subscribeForInlineResponse(
+        ctx.processManager, ctx.delivery, ctx.config.botToken,
+        sessionId, channelId, messageId, agentName, agentModel,
+        (botMessageId) => {
+            trackMentionSession(ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel });
+        },
     );
 }
 
