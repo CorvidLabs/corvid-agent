@@ -19,7 +19,6 @@ import {
     CreateWebhookRegistrationSchema, UpdateWebhookRegistrationSchema,
     CreateMentionPollingSchema, UpdateMentionPollingSchema,
     CreateWorkflowSchema, UpdateWorkflowSchema, TriggerWorkflowSchema, WorkflowRunActionSchema,
-    CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema,
     RecordReputationEventSchema,
     CreateSubscriptionSchema,
     UpsertPersonaSchema,
@@ -28,6 +27,9 @@ import {
     EscalationResolveSchema, OperationalModeSchema, SelfTestSchema, SwitchNetworkSchema,
     OllamaPullModelSchema, OllamaDeleteModelSchema,
 } from '../lib/validation';
+import {
+    CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema,
+} from '../lib/schemas/marketplace';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
