@@ -34,6 +34,8 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | `prependRoutingContext` | `(message: string, source: string, tierConfig?: AgentTierConfig)` | `string` | Prepend channel-affinity routing hints (Discord/AlgoChat) to a user prompt, with optional input sanitization for non-high-tier agents |
 | `buildSessionMetrics` | `(state: SessionMetricsState)` | `DirectProcessMetrics` | Build a DirectProcessMetrics object from loop state variables. Pure function — derives `stallDetected` from `terminationReason` and maps field names |
 | `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
+| `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Compute context usage metrics for the current message state. |
+| `determineWarningLevel` | `usagePercent: number` | `{level, message} \| null` | Determine warning level and message for a given usage percent. Returns null below 50%. |
 
 ## Invariants
 
