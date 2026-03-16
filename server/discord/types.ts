@@ -189,5 +189,15 @@ export const GatewayIntent = {
     GUILDS: 1 << 0,
     GUILD_MEMBERS: 1 << 1,
     GUILD_MESSAGES: 1 << 9,
+    GUILD_MESSAGE_REACTIONS: 1 << 10,
     MESSAGE_CONTENT: 1 << 15,
 } as const;
+
+/** Payload received from Discord MESSAGE_REACTION_ADD dispatch event. */
+export interface DiscordReactionData {
+    user_id: string;
+    channel_id: string;
+    message_id: string;
+    guild_id?: string;
+    emoji: { id: string | null; name: string };
+}
