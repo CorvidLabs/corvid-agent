@@ -79,6 +79,45 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleAdminCommand` | `(db, config, mutedUsers, threadSessionCount, interaction, options)` | `Promise<void>` | Dispatch `/admin` subcommands |
 
+### Exported Functions (from command-handlers/session-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleSessionCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/session` slash command — creates a threaded conversation with a selected agent |
+| `handleWorkCommand` | `(ctx, interaction, permLevel, getOption, userId)` | `Promise<void>` | Handle the `/work` slash command — creates an autonomous work task |
+
+### Exported Functions (from command-handlers/info-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleAgentsCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/agents` command — lists available agents with their models |
+| `handleStatusCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/status` command — shows bot status and active sessions |
+| `handleTasksCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/tasks` command — shows active work tasks and queue status |
+| `handleScheduleCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/schedule` command — shows active schedules with next/last run times |
+| `handleConfigCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle the `/config` command — shows bot configuration (admin-only) |
+| `handleQuickstartCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/quickstart` command — shows Discord onboarding flow |
+| `handleHelpCommand` | `(interaction)` | `Promise<void>` | Handle the `/help` command — shows available commands and usage |
+
+### Exported Functions (from command-handlers/moderation-commands.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleCouncilCommand` | `(ctx, interaction, permLevel, getOption)` | `Promise<void>` | Handle the `/council` command — launches a council discussion on a topic |
+| `handleMuteCommand` | `(ctx, interaction, permLevel, getOption)` | `Promise<void>` | Handle the `/mute` command — mutes a user from bot interactions |
+| `handleUnmuteCommand` | `(ctx, interaction, permLevel, getOption)` | `Promise<void>` | Handle the `/unmute` command — unmutes a previously muted user |
+
+### Exported Functions (from command-handlers/component-handlers.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleComponentInteraction` | `(ctx, interaction)` | `Promise<void>` | Handle button/component interactions (resume_thread, new_session, archive_thread, stop_session) |
+
+### Exported Functions (from command-handlers/autocomplete-handler.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `handleAutocomplete` | `(ctx, interaction)` | `Promise<void>` | Handle autocomplete interactions — provides live results for agent and project name fields |
+
 ### Exported Functions (from embeds.ts)
 
 | Function | Parameters | Returns | Description |
