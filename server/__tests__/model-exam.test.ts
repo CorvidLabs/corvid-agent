@@ -209,6 +209,20 @@ describe('Tool Use', () => {
             expect(grade.score).toBe(0.5);
         });
 
+        test('passes when SDK Glob tool is called', () => {
+            const grade = listFiles.grade(makeResponse({
+                toolCalls: [{ name: 'Glob', arguments: { pattern: '*' } }],
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('passes when SDK Bash tool is called', () => {
+            const grade = listFiles.grade(makeResponse({
+                toolCalls: [{ name: 'Bash', arguments: { command: 'ls' } }],
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
         test('fails when no tools called', () => {
             const grade = listFiles.grade(makeResponse({
                 content: 'Here are the files: ...',
@@ -234,6 +248,13 @@ describe('Tool Use', () => {
             expect(grade.score).toBe(0.5);
         });
 
+        test('passes when SDK Read tool called with package.json', () => {
+            const grade = readFile.grade(makeResponse({
+                toolCalls: [{ name: 'Read', arguments: { file_path: '/project/package.json' } }],
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
         test('fails when no tools called', () => {
             const grade = readFile.grade(makeResponse({ content: '{}' }));
             expect(grade.passed).toBe(false);
@@ -255,6 +276,13 @@ describe('Tool Use', () => {
             }));
             expect(grade.passed).toBe(false);
             expect(grade.score).toBe(0.5);
+        });
+
+        test('passes when SDK Bash tool called with echo hello', () => {
+            const grade = runCmd.grade(makeResponse({
+                toolCalls: [{ name: 'Bash', arguments: { command: 'echo hello' } }],
+            }));
+            expect(grade.passed).toBe(true);
         });
 
         test('fails when no tools called', () => {

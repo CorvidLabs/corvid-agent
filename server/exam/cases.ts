@@ -10,12 +10,18 @@ function fail(reason: string, score = 0): ExamGrade {
     return { passed: false, reason, score };
 }
 
-function hasToolCall(result: ExamResponse, toolName: string): boolean {
-    return result.toolCalls.some(tc => tc.name === toolName);
+/**
+ * Check if any tool call matches one of the given names.
+ * SDK sessions may use built-in tool names (Read, Bash, Glob) instead of
+ * MCP tool names (read_file, run_command, list_files), so callers should
+ * provide all acceptable aliases.
+ */
+function hasToolCall(result: ExamResponse, ...toolNames: string[]): boolean {
+    return result.toolCalls.some(tc => toolNames.includes(tc.name));
 }
 
-function toolCallArg(result: ExamResponse, toolName: string, argName: string): unknown {
-    const tc = result.toolCalls.find(t => t.name === toolName);
+function toolCallArg(result: ExamResponse, argName: string, ...toolNames: string[]): unknown {
+    const tc = result.toolCalls.find(t => toolNames.includes(t.name));
     return tc?.arguments?.[argName];
 }
 
@@ -237,14 +243,15 @@ const tools01: ExamCase = {
     category: 'tools',
     name: 'Single Tool Call',
     tools: ['list_files'],
-    prompt: 'List the files in the current directory.',
+    prompt: 'List the files in the current directory using a tool.',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
-        if (hasToolCall(result, 'list_files')) {
-            return pass('Correctly called list_files tool');
+        // Accept MCP list_files, SDK Glob, or Bash with ls
+        if (hasToolCall(result, 'list_files', 'Glob', 'Bash')) {
+            return pass(`Correctly used file listing tool: ${result.toolCalls.map(t => t.name).join(', ')}`);
         }
         if (result.toolCalls.length > 0) {
-            return fail(`Called ${result.toolCalls.map(t => t.name).join(', ')} instead of list_files`, 0.5);
+            return fail(`Called ${result.toolCalls.map(t => t.name).join(', ')} — not a file listing tool`, 0.5);
         }
         return fail('No tool calls made');
     },
@@ -255,18 +262,21 @@ const tools02: ExamCase = {
     category: 'tools',
     name: 'Read File',
     tools: ['read_file'],
-    prompt: 'Read the contents of package.json',
+    prompt: 'Read the contents of package.json using a tool.',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
-        if (hasToolCall(result, 'read_file')) {
-            const path = toolCallArg(result, 'read_file', 'path') as string | undefined;
+        // Accept MCP read_file or SDK Read tool
+        if (hasToolCall(result, 'read_file', 'Read')) {
+            // Check path argument — SDK Read uses 'file_path', MCP uses 'path'
+            const path = (toolCallArg(result, 'path', 'read_file', 'Read')
+                ?? toolCallArg(result, 'file_path', 'read_file', 'Read')) as string | undefined;
             if (path && path.includes('package.json')) {
-                return pass('Correctly called read_file with package.json path');
+                return pass('Correctly read package.json');
             }
-            return fail('Called read_file but with wrong path', 0.5);
+            return fail('Called read tool but with wrong path', 0.5);
         }
         if (result.toolCalls.length > 0) {
-            return fail(`Called ${result.toolCalls.map(t => t.name).join(', ')} instead of read_file`, 0.25);
+            return fail(`Called ${result.toolCalls.map(t => t.name).join(', ')} instead of a read tool`, 0.25);
         }
         return fail('No tool calls made');
     },
@@ -277,18 +287,19 @@ const tools03: ExamCase = {
     category: 'tools',
     name: 'Run Command',
     tools: ['run_command'],
-    prompt: 'Run the command `echo hello`',
+    prompt: 'Run the command `echo hello` using a tool.',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
-        if (hasToolCall(result, 'run_command')) {
-            const cmd = toolCallArg(result, 'run_command', 'command') as string | undefined;
+        // Accept MCP run_command or SDK Bash tool
+        if (hasToolCall(result, 'run_command', 'Bash')) {
+            const cmd = (toolCallArg(result, 'command', 'run_command', 'Bash')) as string | undefined;
             if (cmd && cmd.includes('echo hello')) {
-                return pass('Correctly called run_command with echo hello');
+                return pass('Correctly ran echo hello');
             }
-            return fail('Called run_command but with wrong command', 0.5);
+            return fail('Called command tool but with wrong command', 0.5);
         }
         if (result.toolCalls.length > 0) {
-            return fail(`Called ${result.toolCalls.map(t => t.name).join(', ')} instead of run_command`, 0.25);
+            return fail(`Called ${result.toolCalls.map(t => t.name).join(', ')} instead of a command tool`, 0.25);
         }
         return fail('No tool calls made');
     },
@@ -353,8 +364,8 @@ const algochat01: ExamCase = {
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
         if (hasToolCall(result, 'corvid_send_message')) {
-            const toAgent = toolCallArg(result, 'corvid_send_message', 'to_agent') as string | undefined;
-            const message = toolCallArg(result, 'corvid_send_message', 'message') as string | undefined;
+            const toAgent = toolCallArg(result, 'to_agent', 'corvid_send_message') as string | undefined;
+            const message = toolCallArg(result, 'message', 'corvid_send_message') as string | undefined;
             if (toAgent && message) {
                 return pass(`Correctly called corvid_send_message to ${toAgent}`);
             }
@@ -826,8 +837,8 @@ const collaboration02: ExamCase = {
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
         if (hasToolCall(result, 'corvid_send_message')) {
-            const toAgent = toolCallArg(result, 'corvid_send_message', 'to_agent') as string | undefined;
-            const message = toolCallArg(result, 'corvid_send_message', 'message') as string | undefined;
+            const toAgent = toolCallArg(result, 'to_agent', 'corvid_send_message') as string | undefined;
+            const message = toolCallArg(result, 'message', 'corvid_send_message') as string | undefined;
             if (toAgent && toAgent.toLowerCase().includes('security')) {
                 if (message && (message.toLowerCase().includes('auth') || message.toLowerCase().includes('vulnerab') || message.toLowerCase().includes('review') || message.toLowerCase().includes('security'))) {
                     return pass(`Correctly delegated security review to ${toAgent}`);

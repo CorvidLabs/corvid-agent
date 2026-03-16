@@ -232,6 +232,62 @@ export class ExamRunner {
         projectId: string,
         agentId: string,
     ): Promise<ExamResponse> {
+        // Multi-turn cases need separate sessions per turn (SDK sessions are single-shot)
+        if (examCase.followUps && examCase.followUps.length > 0) {
+            return this.executeMultiTurnCase(examCase, projectId, agentId);
+        }
+
+        return this.executeSingleTurnCase(examCase, projectId, agentId, examCase.prompt);
+    }
+
+    /**
+     * Execute a multi-turn case by running separate sessions for each turn.
+     * SDK sessions end when the model finishes responding, so follow-ups
+     * must be sent as new sessions with conversation history in the prompt.
+     */
+    private async executeMultiTurnCase(
+        examCase: ExamCase,
+        projectId: string,
+        agentId: string,
+    ): Promise<ExamResponse> {
+        const allTurns = [examCase.prompt, ...examCase.followUps!];
+        const conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+        let lastResponse: ExamResponse = { content: '', toolCalls: [], turns: 0 };
+
+        for (let i = 0; i < allTurns.length; i++) {
+            const userMessage = allTurns[i];
+
+            // Build prompt with conversation history for follow-up turns
+            let effectivePrompt: string;
+            if (i === 0) {
+                effectivePrompt = userMessage;
+            } else {
+                const historyText = conversationHistory
+                    .map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
+                    .join('\n\n');
+                effectivePrompt = `[Previous conversation]\n${historyText}\n\n[Current message — respond to this]\n${userMessage}`;
+            }
+
+            lastResponse = await this.executeSingleTurnCase(examCase, projectId, agentId, effectivePrompt);
+
+            // Record the exchange in history
+            conversationHistory.push({ role: 'user', content: userMessage });
+            conversationHistory.push({ role: 'assistant', content: lastResponse.content });
+
+            // If there was an error, stop early
+            if (lastResponse.error) break;
+        }
+
+        return lastResponse;
+    }
+
+    private async executeSingleTurnCase(
+        examCase: ExamCase,
+        projectId: string,
+        agentId: string,
+        prompt: string,
+    ): Promise<ExamResponse> {
         // For cases with custom system prompts, temporarily update the agent
         if (examCase.systemPrompt) {
             updateAgent(this.db, agentId, { systemPrompt: examCase.systemPrompt });
@@ -252,12 +308,12 @@ export class ExamRunner {
             projectId,
             agentId,
             name: `Exam: ${examCase.id}`,
-            initialPrompt: examCase.prompt,
+            initialPrompt: prompt,
             source: 'web',
         });
 
-        let contentParts: string[] = [];
-        let toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
+        const contentParts: string[] = [];
+        const toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
         let turns = 0;
         let error: string | undefined;
         let resolved = false;
@@ -315,14 +371,6 @@ export class ExamRunner {
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeout);
-
-                            // For multi-turn (follow-up) cases, send follow-ups before resolving
-                            if (examCase.followUps && examCase.followUps.length > 0 && event.type !== 'result') {
-                                // The session just started and delivered initial response —
-                                // we need to send follow-ups, but the session has already exited.
-                                // Content already captured is from initial prompt.
-                            }
-
                             cleanup();
                             const rawContent = contentParts.join('\n');
                             const content = stripThinkBlocks(rawContent);
@@ -352,99 +400,8 @@ export class ExamRunner {
             };
 
             this.processManager.subscribe(session.id, callback);
-
-            // For multi-turn cases, we need to handle follow-ups
-            if (examCase.followUps && examCase.followUps.length > 0) {
-                this.runMultiTurnCase(session.id, examCase, callback, contentParts, toolCalls, timeout, resolve, () => {
-                    resolved = true;
-                    cleanup();
-                });
-            }
-
-            this.processManager.startProcess(session, examCase.prompt);
+            this.processManager.startProcess(session, prompt);
         });
-    }
-
-    private runMultiTurnCase(
-        sessionId: string,
-        examCase: ExamCase,
-        _originalCallback: (sid: string, event: ClaudeStreamEvent) => void,
-        contentParts: string[],
-        toolCalls: Array<{ name: string; arguments: Record<string, unknown> }>,
-        timeout: ReturnType<typeof setTimeout>,
-        resolve: (response: ExamResponse) => void,
-        markResolved: () => void,
-    ): void {
-        if (!examCase.followUps || examCase.followUps.length === 0) return;
-
-        let followUpIndex = 0;
-        let waitingForResponse = false;
-        let initialResponseReceived = false;
-
-        // Override the callback to handle follow-ups
-        const multiTurnCallback = (sid: string, event: ClaudeStreamEvent) => {
-            if (sid !== sessionId) return;
-
-            if (event.type === 'assistant' && event.message?.content) {
-                const text = extractContentText(event.message.content);
-                if (text) {
-                    if (!initialResponseReceived) {
-                        // This is the response to the initial prompt — clear it for follow-ups
-                        initialResponseReceived = true;
-                        contentParts.length = 0; // We only care about the last response for grading
-                    }
-                    if (waitingForResponse) {
-                        contentParts.push(text);
-                    }
-                }
-            }
-
-            // After initial response, send follow-ups
-            if ((event.type === 'result' || event.type === 'session_exited') && !initialResponseReceived) {
-                initialResponseReceived = true;
-                // Session ended after initial prompt — send follow-up via new message
-                if (followUpIndex < examCase.followUps!.length) {
-                    contentParts.length = 0;
-                    waitingForResponse = true;
-                    const sent = this.processManager.sendMessage(sessionId, examCase.followUps![followUpIndex]);
-                    if (!sent) {
-                        // Session already ended, can't send follow-up
-                        clearTimeout(timeout);
-                        markResolved();
-                        resolve({
-                            content: contentParts.join('\n'),
-                            toolCalls,
-                            turns: followUpIndex + 1,
-                            error: 'Session ended before follow-ups could be sent',
-                        });
-                    }
-                    followUpIndex++;
-                }
-            }
-
-            // When we get a response to a follow-up, check if there are more
-            if (event.type === 'assistant' && waitingForResponse && initialResponseReceived) {
-                waitingForResponse = false;
-                if (followUpIndex < examCase.followUps!.length) {
-                    waitingForResponse = true;
-                    this.processManager.sendMessage(sessionId, examCase.followUps![followUpIndex]);
-                    followUpIndex++;
-                    contentParts.length = 0; // Only keep last response
-                } else {
-                    // All follow-ups answered
-                    clearTimeout(timeout);
-                    markResolved();
-                    this.processManager.unsubscribe(sessionId, multiTurnCallback);
-                    resolve({
-                        content: contentParts.join('\n'),
-                        toolCalls,
-                        turns: followUpIndex + 1,
-                    });
-                }
-            }
-        };
-
-        this.processManager.subscribe(sessionId, multiTurnCallback);
     }
 
     private buildScorecard(model: string, results: ExamResult[], durationMs: number): ExamScorecard {
