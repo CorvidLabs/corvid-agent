@@ -207,7 +207,8 @@ export function transitionProposal(
 
     const allowed = VALID_TRANSITIONS[existing.status];
     if (!allowed.includes(newStatus)) {
-        throw new Error(`Invalid transition: ${existing.status} → ${newStatus}`);
+        const valid = allowed.length > 0 ? allowed.join(', ') : 'none (terminal state)';
+        throw new Error(`Invalid transition: ${existing.status} → ${newStatus}. Valid transitions from "${existing.status}": ${valid}`);
     }
 
     const fields: string[] = ['status = ?'];

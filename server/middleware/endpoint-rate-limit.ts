@@ -184,7 +184,7 @@ interface ParsedPattern {
 function parsePattern(pattern: string): ParsedPattern {
     const spaceIdx = pattern.indexOf(' ');
     if (spaceIdx === -1) {
-        throw new Error(`Invalid endpoint pattern: "${pattern}" (expected "METHOD /path")`);
+        throw new Error(`Invalid endpoint pattern: "${pattern}" (expected "METHOD /path", e.g. "GET /api/health" or "POST /api/sessions")`);
     }
     const method = pattern.slice(0, spaceIdx).toUpperCase();
     let path = pattern.slice(spaceIdx + 1);

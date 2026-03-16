@@ -23,13 +23,13 @@ const DISCORD_TOKEN_RE = /^[\w.\-]{20,500}$/;
 
 export function assertSnowflake(value: string, label: string): void {
     if (!DISCORD_SNOWFLAKE_RE.test(value)) {
-        throw new Error(`Invalid Discord ${label}: expected snowflake ID`);
+        throw new Error(`Invalid Discord ${label}: expected snowflake ID (17-20 digit numeric string)`);
     }
 }
 
 export function assertInteractionToken(value: string): void {
     if (!DISCORD_TOKEN_RE.test(value)) {
-        throw new Error('Invalid Discord interaction token');
+        throw new Error('Invalid Discord interaction token (expected 20-500 alphanumeric characters with dashes, dots, or underscores)');
     }
 }
 

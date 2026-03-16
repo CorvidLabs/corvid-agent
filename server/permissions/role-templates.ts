@@ -136,7 +136,8 @@ export async function applyRoleTemplate(
 ): Promise<{ template: RoleTemplate; grants: PermissionGrant[]; skipped: number }> {
     const template = getRoleTemplate(templateName);
     if (!template) {
-        throw new Error(`Unknown role template: "${templateName}"`);
+        const available = ROLE_TEMPLATES.map((t) => t.name).join(', ');
+        throw new Error(`Unknown role template: "${templateName}". Available: ${available}`);
     }
 
     const broker = new PermissionBroker(db);
@@ -191,7 +192,8 @@ export function revokeRoleTemplate(
 ): { template: RoleTemplate; revoked: number } {
     const template = getRoleTemplate(templateName);
     if (!template) {
-        throw new Error(`Unknown role template: "${templateName}"`);
+        const available = ROLE_TEMPLATES.map((t) => t.name).join(', ');
+        throw new Error(`Unknown role template: "${templateName}". Available: ${available}`);
     }
 
     const broker = new PermissionBroker(db);
