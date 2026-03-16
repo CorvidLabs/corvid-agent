@@ -157,7 +157,7 @@ describe('thread-manager catch handlers', () => {
 
             expect(mockSendEmbedWithButtons).toHaveBeenCalledTimes(1);
             // Verify the embed was called with crash-related params
-            const embedCall = mockSendEmbedWithButtons.mock.calls[0];
+            const embedCall = (mockSendEmbedWithButtons.mock.calls as any[][])[0];
             expect(embedCall[0]).toBe(delivery);
             expect(embedCall[2]).toBe('thread-1');
             expect(embedCall[3].description).toContain('ended unexpectedly');
@@ -191,7 +191,7 @@ describe('thread-manager catch handlers', () => {
             await new Promise(r => origSetTimeout(r, 10));
 
             expect(mockSendEmbed).toHaveBeenCalledTimes(1);
-            const embedCall = mockSendEmbed.mock.calls[0];
+            const embedCall = (mockSendEmbed.mock.calls as any[][])[0];
             expect(embedCall[0]).toBe(delivery);
             expect(embedCall[2]).toBe('thread-2');
             expect(embedCall[3].description).toContain('taking too long');
@@ -225,7 +225,7 @@ describe('thread-manager catch handlers', () => {
             await new Promise(r => origSetTimeout(r, 10));
 
             expect(mockSendEmbed).toHaveBeenCalledTimes(1);
-            const embedCall = mockSendEmbed.mock.calls[0];
+            const embedCall = (mockSendEmbed.mock.calls as any[][])[0];
             expect(embedCall[0]).toBe(delivery);
             expect(embedCall[2]).toBe('channel-1');
             expect(embedCall[3].description).toContain('ended unexpectedly');
@@ -255,7 +255,7 @@ describe('thread-manager catch handlers', () => {
             await new Promise(r => origSetTimeout(r, 10));
 
             expect(mockSendEmbed).toHaveBeenCalledTimes(1);
-            const embedCall = mockSendEmbed.mock.calls[0];
+            const embedCall = (mockSendEmbed.mock.calls as any[][])[0];
             expect(embedCall[0]).toBe(delivery);
             expect(embedCall[2]).toBe('channel-2');
             expect(embedCall[3].description).toContain('taking too long');
