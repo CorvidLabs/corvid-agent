@@ -49,6 +49,8 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 10. **Council sessions get no tools**: Deliberation sessions (member, discusser, reviewer) disable all tools and get reasoning-only system prompts
 11. **Token estimation**: Uses content-aware estimation: ~0.33 tokens/char for code-heavy content, ~0.25 tokens/char for prose
 12. **Smart trimming with summaries**: When trimming messages, discarded tool results are replaced with one-line summaries instead of being dropped entirely
+13. **Context usage events emitted per turn**: After each `trimMessages()` call, a `context_usage` event is emitted with estimated tokens, context window size, usage percent, message count, and whether trimming occurred
+14. **Context warning events at thresholds**: `context_warning` events are emitted when usage crosses 50% (info), 70% (warning), or 85% (critical). Each level is emitted only once (no re-emission until a higher level is crossed)
 
 ## Behavioral Examples
 
@@ -79,6 +81,15 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 - **When** `startDirectProcess` is called
 - **Then** `directTools` is empty
 - **And** the system prompt uses reasoning-only instructions
+
+### Scenario: Context usage events emitted each turn
+
+- **Given** a running direct-process session
+- **When** `trimMessages` is called before each inference turn
+- **Then** a `context_usage` event is emitted with `estimatedTokens`, `contextWindow`, `usagePercent`, `messagesCount`, and `trimmed`
+- **And** if `usagePercent` crosses 50%, a `context_warning` event with level `info` is emitted
+- **And** if `usagePercent` crosses 70%, a `context_warning` event with level `warning` is emitted
+- **And** if `usagePercent` crosses 85%, a `context_warning` event with level `critical` is emitted
 
 ### Scenario: Abort during slot wait
 

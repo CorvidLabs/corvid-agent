@@ -198,6 +198,19 @@ export function subscribeForResponseWithEmbed(
             }
         }
 
+        if (event.type === 'context_warning') {
+            const warning = event as { level?: string; message?: string; usagePercent?: number };
+            if (warning.level === 'critical') {
+                sendEmbed(delivery, botToken, threadId, {
+                    description: `⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
+                    color: 0xf0b232, // yellow/warning
+                    footer: { text: `${agentName} · context warning` },
+                }).catch((err) => {
+                    log.debug('Context warning embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+        }
+
         if (event.type === 'result') {
             clearTyping();
             if (debounceTimer) clearTimeout(debounceTimer);

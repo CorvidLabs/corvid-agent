@@ -402,6 +402,55 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let stallType: string | null = null;
         const loopStartTime = Date.now();
 
+        // ── Context usage tracking ──────────────────────────────────
+        let lastWarningLevel: string | null = null;
+        let hasTrimmed = false;
+
+        function emitContextUsage(
+            msgs: Array<{ role: string; content: string }>,
+            sysPrompt: string,
+        ): void {
+            const contextWindow = getContextBudget();
+            const estimatedToks = estimateTokens(sysPrompt) +
+                msgs.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+            const usagePercent = Math.round((estimatedToks / contextWindow) * 100);
+
+            onEvent({
+                type: 'context_usage',
+                session_id: session.id,
+                estimatedTokens: estimatedToks,
+                contextWindow,
+                usagePercent,
+                messagesCount: msgs.length,
+                trimmed: hasTrimmed,
+            } as ClaudeStreamEvent);
+
+            // Emit warnings at thresholds (only when crossing a new level)
+            let level: 'info' | 'warning' | 'critical' | null = null;
+            let message = '';
+            if (usagePercent >= 85) {
+                level = 'critical';
+                message = `Context usage at ${usagePercent}% — session at risk of exhaustion. Consider starting a new session.`;
+            } else if (usagePercent >= 70) {
+                level = 'warning';
+                message = `Context usage at ${usagePercent}% — message trimming will start soon.`;
+            } else if (usagePercent >= 50) {
+                level = 'info';
+                message = `Context usage at ${usagePercent}%.`;
+            }
+
+            if (level && level !== lastWarningLevel) {
+                lastWarningLevel = level;
+                onEvent({
+                    type: 'context_warning',
+                    session_id: session.id,
+                    level,
+                    usagePercent,
+                    message,
+                } as ClaudeStreamEvent);
+            }
+        }
+
         try {
 
         while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
@@ -421,7 +470,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
             let result;
             try {
+                const countBefore = messages.length;
                 trimMessages(messages, systemPrompt);
+                if (messages.length < countBefore) hasTrimmed = true;
+                emitContextUsage(messages, systemPrompt);
                 result = await provider.complete({
                     model,
                     systemPrompt,
@@ -442,7 +494,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     log.warn(`Model ${model} does not support tools — disabling for this session`);
                     toolsDisabled = true;
                     // Retry without tools
+                    const countBefore2 = messages.length;
                     trimMessages(messages, systemPrompt);
+                    if (messages.length < countBefore2) hasTrimmed = true;
+                    emitContextUsage(messages, systemPrompt);
                     result = await provider.complete({
                         model,
                         systemPrompt,
@@ -711,7 +766,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 content: 'Summarize what you accomplished. Be concise — state the key actions taken and their results.',
             });
             try {
+                const countBeforeSummary = messages.length;
                 trimMessages(messages, systemPrompt);
+                if (messages.length < countBeforeSummary) hasTrimmed = true;
+                emitContextUsage(messages, systemPrompt);
                 const summaryResult = await provider.complete({
                     model,
                     systemPrompt,

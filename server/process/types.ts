@@ -161,6 +161,24 @@ export interface PerformanceEvent extends BaseStreamEvent {
     evalDurationMs: number;
 }
 
+/** Context usage metrics emitted after each turn */
+export interface ContextUsageEvent extends BaseStreamEvent {
+    type: 'context_usage';
+    estimatedTokens: number;
+    contextWindow: number;
+    usagePercent: number;
+    messagesCount: number;
+    trimmed: boolean;
+}
+
+/** Context warning when usage exceeds thresholds */
+export interface ContextWarningEvent extends BaseStreamEvent {
+    type: 'context_warning';
+    level: 'info' | 'warning' | 'critical';
+    usagePercent: number;
+    message: string;
+}
+
 /** Raw SDK event passthrough */
 export interface RawStreamEvent extends BaseStreamEvent {
     type: 'raw';
@@ -203,7 +221,9 @@ export type ClaudeStreamEvent =
     | SessionErrorRecoveryEvent
     | QueueStatusEvent
     | PerformanceEvent
-    | RawStreamEvent;
+    | RawStreamEvent
+    | ContextUsageEvent
+    | ContextWarningEvent;
 
 /**
  * Known event type string literals — useful for type assertions and
@@ -255,4 +275,12 @@ export function isSessionEndEvent(e: ClaudeStreamEvent): e is SessionExitedEvent
 
 export function isSessionErrorRecoveryEvent(e: ClaudeStreamEvent): e is SessionErrorRecoveryEvent {
     return e.type === 'session_error';
+}
+
+export function isContextUsageEvent(e: ClaudeStreamEvent): e is ContextUsageEvent {
+    return e.type === 'context_usage';
+}
+
+export function isContextWarningEvent(e: ClaudeStreamEvent): e is ContextWarningEvent {
+    return e.type === 'context_warning';
 }
