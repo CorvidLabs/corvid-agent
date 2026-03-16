@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Added unit tests for `server/lib/dedup.ts` (#1128, #1032)
 - Optimized CI workflow minutes — split platform-independent checks, disable e2e (#1131)
 - Split CI workflows into separate files for maintainability (#1132)
+- Added `paths-ignore` to skip CI workflows on docs-only changes (#1125)
 
 ## [0.31.0] - 2026-03-15
 
