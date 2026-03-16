@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.32.0] - 2026-03-16
+
+### Added
+- **Resume Discord sessions by reply** — users can reply to any bot message in a session thread to resume the conversation (#1130)
+
+### Fixed
+- **Discord embed delivery logging** — log embed delivery failures instead of silently swallowing errors (#1129)
+
+### Changed
+- Improved error messages with available options context for better debugging (#1133)
+- Replaced `console.log` with structured logger in `server/db/` (#1127)
+- Added unit tests for `server/lib/dedup.ts` (#1128, #1032)
+- Optimized CI workflow minutes — split platform-independent checks, disable e2e (#1131)
+- Split CI workflows into separate files for maintainability (#1132)
+
 ## [0.31.0] - 2026-03-15
 
 ### Added
