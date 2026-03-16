@@ -41,12 +41,17 @@ Provides a model competency examination framework that runs standardized test ca
 |----------|-----------|---------|-------------|
 | `parseModelSizeB` | `input: string` | `number \| null` | Parses parameter count in billions from a model name (e.g., ":8b" returns 8, "14.8B" returns 14.8) |
 | `isCloudModel` | `model: string` | `boolean` | Returns true if the model name contains "-cloud" |
+| `stripThinkBlocks` | `text: string` | `string` | Strips `<think>...</think>` blocks from text and trims whitespace |
+| `isApiError` | `text: string` | `string \| undefined` | Detects API error messages in assistant content; returns formatted error or undefined |
+| `extractSdkToolCalls` | `content: unknown[]` | `Array<{ name, arguments }>` | Extracts tool_use blocks from SDK assistant message content arrays |
+| `detectProvider` | `model: string` | `string` | Detects model provider from model name (anthropic, ollama) based on naming patterns |
+| `buildConversationPrompt` | `userMessage: string, conversationHistory: Array<{ role, content }>` | `string` | Builds an effective prompt for follow-up turns incorporating conversation history |
 
 #### cases.ts (constant)
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `examCases` | `ExamCase[]` | The complete array of 30 exam cases across 6 categories (5 per category) |
+| `examCases` | `ExamCase[]` | The complete array of 40 exam cases across 8 categories |
 
 ### Exported Types
 
@@ -55,8 +60,8 @@ Provides a model competency examination framework that runs standardized test ca
 | Type | Description |
 |------|-------------|
 | `ExamCase` | Interface: id, category (ExamCategory), name, prompt, systemPrompt?, tools?, followUps?, grade (function) |
-| `ExamCategory` | Union type: `'coding' \| 'context' \| 'tools' \| 'algochat' \| 'council' \| 'instruction'` |
-| `EXAM_CATEGORIES` | Constant array of all 6 ExamCategory values |
+| `ExamCategory` | Union type: `'coding' \| 'context' \| 'tools' \| 'algochat' \| 'council' \| 'instruction' \| 'collaboration' \| 'reasoning'` |
+| `EXAM_CATEGORIES` | Constant array of all 8 ExamCategory values |
 | `ExamResponse` | Interface: content (string), toolCalls (Array<{ name, arguments }>), turns (number), error? |
 | `ExamGrade` | Interface: passed (boolean), reason (string), score (number 0-1) |
 | `ExamResult` | Interface: caseId, category, name, grade (ExamGrade), durationMs |
@@ -76,7 +81,7 @@ Provides a model competency examination framework that runs standardized test ca
 | `runExam` | `model: string, categories?: ExamCategory[]` | `Promise<ExamScorecard>` | Runs all (or filtered) exam cases against the given model and returns a scorecard |
 
 ## Invariants
-1. There are exactly 30 exam cases across 6 categories (5 per category): coding, context, tools, AlgoChat, council, instruction.
+1. There are exactly 40 exam cases across 8 categories: coding (6), context (6), tools (5), AlgoChat (5), council (6), instruction (6), collaboration (3), reasoning (3).
 2. Each case has a deterministic `grade` function that evaluates an `ExamResponse` and returns an `ExamGrade` with score 0-1.
 3. Models with fewer than 8B parameters are rejected with an error (cloud models are exempt from this check).
 4. Model size is first parsed from the model name string; if unparseable, the Ollama `/api/show` endpoint is queried.
@@ -97,7 +102,7 @@ Provides a model competency examination framework that runs standardized test ca
 ### Scenario: Running a full exam
 - **Given** an ExamRunner initialized with a database and process manager
 - **When** `runExam('qwen3:14b')` is called
-- **Then** it creates/updates the exam project and agent, runs all 30 cases, and returns an ExamScorecard with overall and per-category scores
+- **Then** it creates/updates the exam project and agent, runs all 40 cases, and returns an ExamScorecard with overall and per-category scores
 
 ### Scenario: Model size rejection
 - **Given** a model name "phi3:3b"

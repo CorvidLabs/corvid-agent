@@ -16,13 +16,19 @@ function makeResponse(overrides: Partial<ExamResponse> = {}): ExamResponse {
 // ── Structure tests ─────────────────────────────────────────────────────────
 
 describe('examCases structure', () => {
-    test('has exactly 30 cases', () => {
-        expect(examCases.length).toBe(30);
+    test('has exactly 40 cases', () => {
+        expect(examCases.length).toBe(40);
     });
 
-    test('has 5 cases per category', () => {
-        for (const cat of ['coding', 'context', 'tools', 'algochat', 'council', 'instruction']) {
+    test('has expected cases per category', () => {
+        for (const cat of ['coding', 'context', 'council', 'instruction']) {
+            expect(getCasesByCategory(cat).length).toBe(6);
+        }
+        for (const cat of ['tools', 'algochat']) {
             expect(getCasesByCategory(cat).length).toBe(5);
+        }
+        for (const cat of ['collaboration', 'reasoning']) {
+            expect(getCasesByCategory(cat).length).toBe(3);
         }
     });
 

@@ -37,14 +37,74 @@ export function isCloudModel(model: string): boolean {
 }
 
 /** Strip <think>...</think> blocks that some models emit for chain-of-thought reasoning. */
-function stripThinkBlocks(text: string): string {
+export function stripThinkBlocks(text: string): string {
     return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
 /** Detect API error messages that get stored as assistant content. */
-function isApiError(text: string): string | undefined {
+export function isApiError(text: string): string | undefined {
     const match = text.match(/^API Error:\s*(\d+)\s*(.*)/s);
     return match ? `API ${match[1]}: ${match[2].slice(0, 100)}` : undefined;
+}
+
+/**
+ * Extract tool_use blocks from SDK assistant message content.
+ * SDK responses include tool calls as content blocks with type: 'tool_use'.
+ */
+export function extractSdkToolCalls(
+    content: unknown[],
+): Array<{ name: string; arguments: Record<string, unknown> }> {
+    const toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
+    for (const block of content) {
+        if ((block as any).type === 'tool_use' && (block as any).name) {
+            const toolBlock = block as { type: string; name: string; input?: Record<string, unknown> };
+            toolCalls.push({ name: toolBlock.name, arguments: toolBlock.input ?? {} });
+        }
+    }
+    return toolCalls;
+}
+
+/**
+ * Detect model provider from model name.
+ * Exported for testability.
+ */
+export function detectProvider(model: string): string {
+    // Claude models always go through Anthropic
+    if (model.startsWith('claude-')) {
+        return 'anthropic';
+    }
+    // Cloud models go through Ollama (proxied to their cloud)
+    if (isCloudModel(model)) {
+        return 'ollama';
+    }
+    // Ollama models typically have format "name:tag" (e.g. qwen3:8b, llama3.1:8b)
+    // or are known open-source model families
+    const ollamaPatterns = [
+        /:/, // contains colon (qwen3:8b, llama3:70b, etc.)
+        /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder|minimax|glm|kimi|gpt-oss)/i,
+    ];
+    if (ollamaPatterns.some(p => p.test(model))) {
+        return 'ollama';
+    }
+    // Default to ollama for exam (most likely local model testing)
+    return 'ollama';
+}
+
+/**
+ * Build an effective prompt for a follow-up turn, incorporating conversation history.
+ * Exported for testability.
+ */
+export function buildConversationPrompt(
+    userMessage: string,
+    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+): string {
+    if (conversationHistory.length === 0) {
+        return userMessage;
+    }
+    const historyText = conversationHistory
+        .map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
+        .join('\n\n');
+    return `[Previous conversation]\n${historyText}\n\n[Current message — respond to this]\n${userMessage}`;
 }
 
 export class ExamRunner {
@@ -92,25 +152,7 @@ export class ExamRunner {
     }
 
     private detectProvider(model: string): string {
-        // Claude models always go through Anthropic
-        if (model.startsWith('claude-')) {
-            return 'anthropic';
-        }
-        // Cloud models go through Ollama (proxied to their cloud)
-        if (isCloudModel(model)) {
-            return 'ollama';
-        }
-        // Ollama models typically have format "name:tag" (e.g. qwen3:8b, llama3.1:8b)
-        // or are known open-source model families
-        const ollamaPatterns = [
-            /:/, // contains colon (qwen3:8b, llama3:70b, etc.)
-            /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder|minimax|glm|kimi|gpt-oss)/i,
-        ];
-        if (ollamaPatterns.some(p => p.test(model))) {
-            return 'ollama';
-        }
-        // Default to ollama for exam (most likely local model testing)
-        return 'ollama';
+        return detectProvider(model);
     }
 
     /** Query Ollama's /api/show endpoint for model parameter size. */
@@ -232,21 +274,80 @@ export class ExamRunner {
         projectId: string,
         agentId: string,
     ): Promise<ExamResponse> {
+        // Multi-turn cases need separate sessions per turn (SDK sessions are single-shot)
+        if (examCase.followUps && examCase.followUps.length > 0) {
+            return this.executeMultiTurnCase(examCase, projectId, agentId);
+        }
+
+        return this.executeSingleTurnCase(examCase, projectId, agentId, examCase.prompt);
+    }
+
+    /**
+     * Execute a multi-turn case by running separate sessions for each turn.
+     * SDK sessions end when the model finishes responding, so follow-ups
+     * must be sent as new sessions with conversation history in the prompt.
+     */
+    private async executeMultiTurnCase(
+        examCase: ExamCase,
+        projectId: string,
+        agentId: string,
+    ): Promise<ExamResponse> {
+        const allTurns = [examCase.prompt, ...examCase.followUps!];
+        const conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+        let lastResponse: ExamResponse = { content: '', toolCalls: [], turns: 0 };
+
+        for (let i = 0; i < allTurns.length; i++) {
+            const userMessage = allTurns[i];
+
+            // Build prompt with conversation history for follow-up turns
+            const effectivePrompt = buildConversationPrompt(userMessage, conversationHistory);
+
+            lastResponse = await this.executeSingleTurnCase(examCase, projectId, agentId, effectivePrompt);
+
+            // Record the exchange in history
+            conversationHistory.push({ role: 'user', content: userMessage });
+            conversationHistory.push({ role: 'assistant', content: lastResponse.content });
+
+            // If there was an error, stop early
+            if (lastResponse.error) break;
+        }
+
+        return lastResponse;
+    }
+
+    private async executeSingleTurnCase(
+        examCase: ExamCase,
+        projectId: string,
+        agentId: string,
+        prompt: string,
+    ): Promise<ExamResponse> {
         // For cases with custom system prompts, temporarily update the agent
         if (examCase.systemPrompt) {
             updateAgent(this.db, agentId, { systemPrompt: examCase.systemPrompt });
+        }
+
+        // Enable algochat for algochat category cases
+        const needsAlgochat = examCase.category === 'algochat';
+        if (needsAlgochat) {
+            updateAgent(this.db, agentId, { algochatEnabled: true });
+        }
+
+        // Set tool permissions for cases that specify required tools
+        if (examCase.tools && examCase.tools.length > 0) {
+            updateAgent(this.db, agentId, { mcpToolPermissions: examCase.tools });
         }
 
         const session = createSession(this.db, {
             projectId,
             agentId,
             name: `Exam: ${examCase.id}`,
-            initialPrompt: examCase.prompt,
+            initialPrompt: prompt,
             source: 'web',
         });
 
-        let contentParts: string[] = [];
-        let toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
+        const contentParts: string[] = [];
+        const toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
         let turns = 0;
         let error: string | undefined;
         let resolved = false;
@@ -268,6 +369,10 @@ export class ExamRunner {
                         if (event.message?.content) {
                             const text = extractContentText(event.message.content);
                             if (text) contentParts.push(text);
+                            // Extract tool calls from SDK tool_use content blocks
+                            if (Array.isArray(event.message.content)) {
+                                toolCalls.push(...extractSdkToolCalls(event.message.content));
+                            }
                         }
                         turns++;
                         break;
@@ -295,14 +400,6 @@ export class ExamRunner {
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeout);
-
-                            // For multi-turn (follow-up) cases, send follow-ups before resolving
-                            if (examCase.followUps && examCase.followUps.length > 0 && event.type !== 'result') {
-                                // The session just started and delivered initial response —
-                                // we need to send follow-ups, but the session has already exited.
-                                // Content already captured is from initial prompt.
-                            }
-
                             cleanup();
                             const rawContent = contentParts.join('\n');
                             const content = stripThinkBlocks(rawContent);
@@ -321,102 +418,19 @@ export class ExamRunner {
                 if (examCase.systemPrompt) {
                     updateAgent(this.db, agentId, { systemPrompt: 'You are being tested. Follow instructions precisely.' });
                 }
+                // Restore algochat if we enabled it
+                if (needsAlgochat) {
+                    updateAgent(this.db, agentId, { algochatEnabled: false });
+                }
+                // Restore tool permissions if we set them
+                if (examCase.tools) {
+                    updateAgent(this.db, agentId, { mcpToolPermissions: null });
+                }
             };
 
             this.processManager.subscribe(session.id, callback);
-
-            // For multi-turn cases, we need to handle follow-ups
-            if (examCase.followUps && examCase.followUps.length > 0) {
-                this.runMultiTurnCase(session.id, examCase, callback, contentParts, toolCalls, timeout, resolve, () => {
-                    resolved = true;
-                    cleanup();
-                });
-            }
-
-            this.processManager.startProcess(session, examCase.prompt);
+            this.processManager.startProcess(session, prompt);
         });
-    }
-
-    private runMultiTurnCase(
-        sessionId: string,
-        examCase: ExamCase,
-        _originalCallback: (sid: string, event: ClaudeStreamEvent) => void,
-        contentParts: string[],
-        toolCalls: Array<{ name: string; arguments: Record<string, unknown> }>,
-        timeout: ReturnType<typeof setTimeout>,
-        resolve: (response: ExamResponse) => void,
-        markResolved: () => void,
-    ): void {
-        if (!examCase.followUps || examCase.followUps.length === 0) return;
-
-        let followUpIndex = 0;
-        let waitingForResponse = false;
-        let initialResponseReceived = false;
-
-        // Override the callback to handle follow-ups
-        const multiTurnCallback = (sid: string, event: ClaudeStreamEvent) => {
-            if (sid !== sessionId) return;
-
-            if (event.type === 'assistant' && event.message?.content) {
-                const text = extractContentText(event.message.content);
-                if (text) {
-                    if (!initialResponseReceived) {
-                        // This is the response to the initial prompt — clear it for follow-ups
-                        initialResponseReceived = true;
-                        contentParts.length = 0; // We only care about the last response for grading
-                    }
-                    if (waitingForResponse) {
-                        contentParts.push(text);
-                    }
-                }
-            }
-
-            // After initial response, send follow-ups
-            if ((event.type === 'result' || event.type === 'session_exited') && !initialResponseReceived) {
-                initialResponseReceived = true;
-                // Session ended after initial prompt — send follow-up via new message
-                if (followUpIndex < examCase.followUps!.length) {
-                    contentParts.length = 0;
-                    waitingForResponse = true;
-                    const sent = this.processManager.sendMessage(sessionId, examCase.followUps![followUpIndex]);
-                    if (!sent) {
-                        // Session already ended, can't send follow-up
-                        clearTimeout(timeout);
-                        markResolved();
-                        resolve({
-                            content: contentParts.join('\n'),
-                            toolCalls,
-                            turns: followUpIndex + 1,
-                            error: 'Session ended before follow-ups could be sent',
-                        });
-                    }
-                    followUpIndex++;
-                }
-            }
-
-            // When we get a response to a follow-up, check if there are more
-            if (event.type === 'assistant' && waitingForResponse && initialResponseReceived) {
-                waitingForResponse = false;
-                if (followUpIndex < examCase.followUps!.length) {
-                    waitingForResponse = true;
-                    this.processManager.sendMessage(sessionId, examCase.followUps![followUpIndex]);
-                    followUpIndex++;
-                    contentParts.length = 0; // Only keep last response
-                } else {
-                    // All follow-ups answered
-                    clearTimeout(timeout);
-                    markResolved();
-                    this.processManager.unsubscribe(sessionId, multiTurnCallback);
-                    resolve({
-                        content: contentParts.join('\n'),
-                        toolCalls,
-                        turns: followUpIndex + 1,
-                    });
-                }
-            }
-        };
-
-        this.processManager.subscribe(sessionId, multiTurnCallback);
     }
 
     private buildScorecard(model: string, results: ExamResult[], durationMs: number): ExamScorecard {

@@ -10,9 +10,9 @@ export interface ExamCase {
     grade: (result: ExamResponse) => ExamGrade;
 }
 
-export type ExamCategory = 'coding' | 'context' | 'tools' | 'algochat' | 'council' | 'instruction';
+export type ExamCategory = 'coding' | 'context' | 'tools' | 'algochat' | 'council' | 'instruction' | 'collaboration' | 'reasoning';
 
-export const EXAM_CATEGORIES: ExamCategory[] = ['coding', 'context', 'tools', 'algochat', 'council', 'instruction'];
+export const EXAM_CATEGORIES: ExamCategory[] = ['coding', 'context', 'tools', 'algochat', 'council', 'instruction', 'collaboration', 'reasoning'];
 
 export interface ExamResponse {
     content: string;
