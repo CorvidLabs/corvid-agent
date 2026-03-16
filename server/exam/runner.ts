@@ -237,6 +237,17 @@ export class ExamRunner {
             updateAgent(this.db, agentId, { systemPrompt: examCase.systemPrompt });
         }
 
+        // Enable algochat for algochat category cases
+        const needsAlgochat = examCase.category === 'algochat';
+        if (needsAlgochat) {
+            updateAgent(this.db, agentId, { algochatEnabled: true });
+        }
+
+        // Set tool permissions for cases that specify required tools
+        if (examCase.tools && examCase.tools.length > 0) {
+            updateAgent(this.db, agentId, { mcpToolPermissions: examCase.tools });
+        }
+
         const session = createSession(this.db, {
             projectId,
             agentId,
@@ -268,6 +279,15 @@ export class ExamRunner {
                         if (event.message?.content) {
                             const text = extractContentText(event.message.content);
                             if (text) contentParts.push(text);
+                            // Extract tool calls from SDK tool_use content blocks
+                            if (Array.isArray(event.message.content)) {
+                                for (const block of event.message.content) {
+                                    if ((block as any).type === 'tool_use' && (block as any).name) {
+                                        const toolBlock = block as { type: string; name: string; input?: Record<string, unknown> };
+                                        toolCalls.push({ name: toolBlock.name, arguments: toolBlock.input ?? {} });
+                                    }
+                                }
+                            }
                         }
                         turns++;
                         break;
@@ -320,6 +340,14 @@ export class ExamRunner {
                 // Restore default system prompt if we changed it
                 if (examCase.systemPrompt) {
                     updateAgent(this.db, agentId, { systemPrompt: 'You are being tested. Follow instructions precisely.' });
+                }
+                // Restore algochat if we enabled it
+                if (needsAlgochat) {
+                    updateAgent(this.db, agentId, { algochatEnabled: false });
+                }
+                // Restore tool permissions if we set them
+                if (examCase.tools) {
+                    updateAgent(this.db, agentId, { mcpToolPermissions: null });
                 }
             };
 

@@ -44,6 +44,8 @@ function makeScorecard(overrides: Partial<ExamScorecard> = {}): ExamScorecard {
             algochat: { score: 70, passed: 3, total: 5 },
             council: { score: 80, passed: 4, total: 5 },
             instruction: { score: 70, passed: 3, total: 5 },
+            collaboration: { score: 75, passed: 3, total: 4 },
+            reasoning: { score: 85, passed: 4, total: 5 },
         },
         results: [
             {

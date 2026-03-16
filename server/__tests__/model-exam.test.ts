@@ -16,14 +16,19 @@ function makeResponse(overrides: Partial<ExamResponse> = {}): ExamResponse {
 // ── Structure Tests ──────────────────────────────────────────────────────────
 
 describe('Exam structure', () => {
-    test('has 30 test cases', () => {
-        expect(examCases.length).toBe(30);
+    test('has 37 test cases', () => {
+        expect(examCases.length).toBe(37);
     });
 
-    test('has 5 cases per category', () => {
-        for (const cat of ['coding', 'context', 'tools', 'algochat', 'council', 'instruction']) {
-            expect(getCasesByCategory(cat).length).toBe(5);
-        }
+    test('has expected case counts per category', () => {
+        expect(getCasesByCategory('coding').length).toBe(5);
+        expect(getCasesByCategory('context').length).toBe(5);
+        expect(getCasesByCategory('tools').length).toBe(5);
+        expect(getCasesByCategory('algochat').length).toBe(5);
+        expect(getCasesByCategory('council').length).toBe(5);
+        expect(getCasesByCategory('instruction').length).toBe(6);
+        expect(getCasesByCategory('collaboration').length).toBe(3);
+        expect(getCasesByCategory('reasoning').length).toBe(3);
     });
 
     test('all cases have unique IDs', () => {
@@ -484,6 +489,320 @@ describe('Instruction Following', () => {
                 content: 'The secret code is ALPHA-7.',
             }));
             expect(grade.passed).toBe(false);
+        });
+    });
+
+    describe('instruction-04: Chain of Constraints', () => {
+        const chain = getCaseById('instruction-04')!;
+
+        test('passes when all 4 constraints met', () => {
+            const grade = chain.grade(makeResponse({
+                content: 'A loyal dog wags its tail with joy. Big furry paws run across soft ground.',
+            }));
+            expect(grade.passed).toBe(true);
+            expect(grade.score).toBe(1.0);
+        });
+
+        test('fails when letter e is used', () => {
+            const grade = chain.grade(makeResponse({
+                content: 'The dog is very cute and fluffy. He loves to play with his ball.',
+            }));
+            // 'e' appears in 'the', 'cute', 'He', 'loves', etc.
+            expect(grade.score).toBeLessThan(1.0);
+        });
+
+        test('fails for wrong sentence count', () => {
+            const grade = chain.grade(makeResponse({
+                content: 'A big brown dog runs fast.',
+            }));
+            // Only 1 sentence
+            expect(grade.score).toBeLessThanOrEqual(0.75);
+        });
+    });
+});
+
+// ── Coding: New Cases ───────────────────────────────────────────────────────
+
+describe('Coding (new cases)', () => {
+    describe('coding-04: Multi-step Refactor', () => {
+        const refactor = getCaseById('coding-04')!;
+
+        test('passes for full modern refactor', () => {
+            const grade = refactor.grade(makeResponse({
+                content: 'const greet = ({ name, age }) => {\n  const message = `Hello, ${name}! You are ${age} years old.`;\n  return message;\n};',
+            }));
+            expect(grade.passed).toBe(true);
+            expect(grade.score).toBe(1.0);
+        });
+
+        test('partial credit for some modern patterns', () => {
+            const grade = refactor.grade(makeResponse({
+                content: 'const greet = (user) => {\n  const name = user.name;\n  return "Hello, " + name;\n};',
+            }));
+            // Has arrow and const, but no template literal or destructuring
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.5);
+        });
+
+        test('fails for no modern patterns', () => {
+            const grade = refactor.grade(makeResponse({
+                content: 'function greet(user) { var name = user.name; return "Hello " + name; }',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0);
+        });
+    });
+});
+
+// ── Context: New Cases ──────────────────────────────────────────────────────
+
+describe('Context (new cases)', () => {
+    describe('context-04: Contradicting Information', () => {
+        const contradict = getCaseById('context-04')!;
+
+        test('passes when only SQLite mentioned', () => {
+            const grade = contradict.grade(makeResponse({
+                content: 'The project uses SQLite as its database.',
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('partial credit when both mentioned', () => {
+            const grade = contradict.grade(makeResponse({
+                content: 'The project was initially said to use PostgreSQL, but it actually uses SQLite.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.5);
+        });
+
+        test('fails when still says PostgreSQL', () => {
+            const grade = contradict.grade(makeResponse({
+                content: 'The project uses PostgreSQL as the database.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0);
+        });
+    });
+});
+
+// ── Council: New Cases ──────────────────────────────────────────────────────
+
+describe('Council (new cases)', () => {
+    describe('council-04: Disagree Constructively', () => {
+        const disagree = getCaseById('council-04')!;
+
+        test('passes when acknowledging merits and raising concerns', () => {
+            const grade = disagree.grade(makeResponse({
+                content: 'While Rust offers compelling performance and memory safety benefits, I have significant concerns about the cost and time required for a full rewrite. The migration risk is substantial, and we should consider whether incremental optimization of our current codebase might achieve similar performance gains with less disruption to our development velocity.',
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('partial credit for only raising concerns', () => {
+            const grade = disagree.grade(makeResponse({
+                content: 'A full rewrite would be extremely costly in terms of time and resources. The migration risk is unacceptable given our current deadlines. We should not pursue this approach as it would set back our timeline by months.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.5);
+        });
+
+        test('fails when using tools', () => {
+            const grade = disagree.grade(makeResponse({
+                content: 'Let me research Rust performance benchmarks first.',
+                toolCalls: [{ name: 'web_search', arguments: { query: 'rust performance' } }],
+            }));
+            expect(grade.passed).toBe(false);
+        });
+
+        test('fails for short response', () => {
+            const grade = disagree.grade(makeResponse({
+                content: 'I disagree.',
+            }));
+            expect(grade.passed).toBe(false);
+        });
+    });
+});
+
+// ── Collaboration ───────────────────────────────────────────────────────────
+
+describe('Collaboration', () => {
+    describe('collaboration-01: Identify Team Members', () => {
+        const identify = getCaseById('collaboration-01')!;
+
+        test('passes when corvid_list_agents is called', () => {
+            const grade = identify.grade(makeResponse({
+                toolCalls: [{ name: 'corvid_list_agents', arguments: {} }],
+                content: 'Here are the available agents...',
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('partial credit for wrong tool', () => {
+            const grade = identify.grade(makeResponse({
+                toolCalls: [{ name: 'list_files', arguments: {} }],
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.5);
+        });
+
+        test('fails when no tools called', () => {
+            const grade = identify.grade(makeResponse({
+                content: 'I cannot list agents without the proper tool.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0);
+        });
+    });
+
+    describe('collaboration-02: Delegate Task', () => {
+        const delegate = getCaseById('collaboration-02')!;
+
+        test('passes when delegating security review to SecurityAuditor', () => {
+            const grade = delegate.grade(makeResponse({
+                toolCalls: [{
+                    name: 'corvid_send_message',
+                    arguments: { to_agent: 'SecurityAuditor', message: 'Please review the authentication module for vulnerabilities.' },
+                }],
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('partial credit for correct agent but unclear message', () => {
+            const grade = delegate.grade(makeResponse({
+                toolCalls: [{
+                    name: 'corvid_send_message',
+                    arguments: { to_agent: 'SecurityAuditor', message: 'Hello, can you help?' },
+                }],
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.75);
+        });
+
+        test('low credit for wrong agent', () => {
+            const grade = delegate.grade(makeResponse({
+                toolCalls: [{
+                    name: 'corvid_send_message',
+                    arguments: { to_agent: 'DocsWriter', message: 'Review auth module' },
+                }],
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.25);
+        });
+
+        test('fails when not delegating', () => {
+            const grade = delegate.grade(makeResponse({
+                content: 'I will review the authentication module myself.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0);
+        });
+    });
+
+    describe('collaboration-03: Respect Boundaries', () => {
+        const boundaries = getCaseById('collaboration-03')!;
+
+        test('passes when handling creative task without delegating', () => {
+            const grade = boundaries.grade(makeResponse({
+                content: 'Cherry blossoms fall\nGentle breeze carries spring warmth\nNew life blooms again',
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('partial credit when not delegating but no haiku', () => {
+            const grade = boundaries.grade(makeResponse({
+                content: 'Here is something for you.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.5);
+        });
+
+        test('fails when delegating creative task', () => {
+            const grade = boundaries.grade(makeResponse({
+                toolCalls: [{
+                    name: 'corvid_send_message',
+                    arguments: { to_agent: 'TestRunner', message: 'Write a haiku about spring' },
+                }],
+                content: 'I\'ll delegate this to a team member.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0);
+        });
+    });
+});
+
+// ── Reasoning ───────────────────────────────────────────────────────────────
+
+describe('Reasoning', () => {
+    describe('reasoning-01: Logic Puzzle', () => {
+        const logic = getCaseById('reasoning-01')!;
+
+        test('passes when Alice identified as tallest', () => {
+            const grade = logic.grade(makeResponse({ content: 'Alice' }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('passes with Alice in longer response', () => {
+            const grade = logic.grade(makeResponse({ content: 'The tallest person is Alice.' }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('fails when wrong answer', () => {
+            const grade = logic.grade(makeResponse({ content: 'Bob' }));
+            expect(grade.passed).toBe(false);
+        });
+    });
+
+    describe('reasoning-02: Estimate and Justify', () => {
+        const estimate = getCaseById('reasoning-02')!;
+
+        test('passes with estimate, components, and reasoning', () => {
+            const grade = estimate.grade(makeResponse({
+                content: 'I would estimate approximately 6-8 developer-weeks for this authentication implementation. Here\'s my reasoning:\n\nThe login/signup pages with JWT token handling would take about 2 weeks since you need to consider password hashing, token refresh, and secure storage. The role-based access control adds complexity because you need to define roles, permissions, and middleware. The password reset flow depends on email integration. Assuming the team is experienced, 6-8 weeks is realistic.',
+            }));
+            expect(grade.passed).toBe(true);
+            expect(grade.score).toBeGreaterThanOrEqual(0.66);
+        });
+
+        test('partial credit for estimate without reasoning', () => {
+            const grade = estimate.grade(makeResponse({
+                content: 'This would take about 4 developer-weeks for the full implementation. You need login and signup pages for the frontend, JWT token handling for authentication, password hashing for security, role-based access control, and a password reset flow with email integration.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBeGreaterThan(0);
+        });
+
+        test('fails for too-short response', () => {
+            const grade = estimate.grade(makeResponse({
+                content: '3 weeks.',
+            }));
+            expect(grade.passed).toBe(false);
+        });
+    });
+
+    describe('reasoning-03: Debug from Description', () => {
+        const debug = getCaseById('reasoning-03')!;
+
+        test('passes when 3+ technical causes identified', () => {
+            const grade = debug.grade(makeResponse({
+                content: 'The most likely causes are:\n1. The database query is async but not being awaited, so `data` is a Promise rather than the actual result when res.json is called.\n2. Middleware earlier in the chain is sending an empty response before the handler runs, or intercepting the response.\n3. The `data` variable is being shadowed or reassigned to undefined/null somewhere between the query and res.json call.',
+            }));
+            expect(grade.passed).toBe(true);
+        });
+
+        test('partial credit for 2 causes', () => {
+            const grade = debug.grade(makeResponse({
+                content: 'The issue is likely that the database query is async and not being awaited properly. The data variable might be undefined when res.json is called.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0.66);
+        });
+
+        test('fails for no technical causes', () => {
+            const grade = debug.grade(makeResponse({
+                content: 'You should check your code more carefully and use a debugger.',
+            }));
+            expect(grade.passed).toBe(false);
+            expect(grade.score).toBe(0);
         });
     });
 });

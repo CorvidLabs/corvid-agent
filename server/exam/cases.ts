@@ -236,6 +236,7 @@ const tools01: ExamCase = {
     id: 'tools-01',
     category: 'tools',
     name: 'Single Tool Call',
+    tools: ['list_files'],
     prompt: 'List the files in the current directory.',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
@@ -253,6 +254,7 @@ const tools02: ExamCase = {
     id: 'tools-02',
     category: 'tools',
     name: 'Read File',
+    tools: ['read_file'],
     prompt: 'Read the contents of package.json',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
@@ -274,6 +276,7 @@ const tools03: ExamCase = {
     id: 'tools-03',
     category: 'tools',
     name: 'Run Command',
+    tools: ['run_command'],
     prompt: 'Run the command `echo hello`',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
@@ -345,6 +348,7 @@ const algochat01: ExamCase = {
     id: 'algochat-01',
     category: 'algochat',
     name: 'Send Message',
+    tools: ['corvid_send_message', 'corvid_list_agents'],
     prompt: 'Send a message to Agent-Alpha saying "Hello from the exam"',
     grade(result: ExamResponse): ExamGrade {
         if (result.error) return fail(`Error: ${result.error}`);
@@ -364,6 +368,7 @@ const algochat02: ExamCase = {
     id: 'algochat-02',
     category: 'algochat',
     name: 'Don\'t Self-Message',
+    tools: ['corvid_send_message'],
     systemPrompt: 'You are Agent-Beta. You communicate with other agents via the corvid_send_message tool. Never send messages to yourself.',
     prompt: 'Send yourself a test message.',
     grade(result: ExamResponse): ExamGrade {
@@ -384,6 +389,7 @@ const algochat03: ExamCase = {
     id: 'algochat-03',
     category: 'algochat',
     name: 'Reply Without Tool',
+    tools: ['corvid_send_message'],
     systemPrompt: 'You are a helpful agent. [This message was sent via AlgoChat from another agent]',
     prompt: 'What is 2+2?',
     grade(result: ExamResponse): ExamGrade {
@@ -659,6 +665,280 @@ const instruction07: ExamCase = {
         return fail(`Response is ${wordCount} words (exceeds 50-word limit)`);
     },
 };
+// ── New Coding Cases ─────────────────────────────────────────────────────────
+
+const coding04: ExamCase = {
+    id: 'coding-04',
+    category: 'coding',
+    name: 'Multi-step Refactor',
+    prompt: `Refactor this code to use modern JavaScript (arrow functions, const/let, template literals, destructuring where appropriate):
+\`\`\`javascript
+function greet(user) {
+    var name = user.name;
+    var age = user.age;
+    var message = "Hello, " + name + "! You are " + age + " years old.";
+    return message;
+}
+\`\`\`
+Only output the refactored function.`,
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        const c = result.content;
+        const hasArrow = c.includes('=>');
+        const hasConst = c.includes('const') || c.includes('let');
+        const hasTemplate = c.includes('`') && c.includes('${');
+        const hasDestructuring = /\{\s*name\s*,\s*age\s*\}/.test(c) || /\{\s*age\s*,\s*name\s*\}/.test(c);
+
+        let score = 0;
+        if (hasArrow) score += 0.25;
+        if (hasConst) score += 0.25;
+        if (hasTemplate) score += 0.25;
+        if (hasDestructuring) score += 0.25;
+
+        if (score >= 0.75) return pass(`Modern JS refactor: arrow=${hasArrow}, const/let=${hasConst}, template=${hasTemplate}, destructuring=${hasDestructuring}`, score);
+        if (score > 0) return fail(`Partial refactor (${score * 100}%): arrow=${hasArrow}, const/let=${hasConst}, template=${hasTemplate}, destructuring=${hasDestructuring}`, score);
+        return fail('No modern JS patterns detected');
+    },
+};
+
+// ── New Context Cases ────────────────────────────────────────────────────────
+
+const context04: ExamCase = {
+    id: 'context-04',
+    category: 'context',
+    name: 'Contradicting Information',
+    prompt: 'The project uses PostgreSQL as the database. Remember that.',
+    followUps: ['Actually, I was wrong. The project uses SQLite, not PostgreSQL. Please update your understanding.', 'What database does the project use?'],
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        const c = result.content.toLowerCase();
+        if (c.includes('sqlite') && !c.includes('postgresql')) {
+            return pass('Correctly updated to SQLite after correction');
+        }
+        if (c.includes('sqlite') && c.includes('postgresql')) {
+            return fail('Mentioned both databases — should only mention SQLite', 0.5);
+        }
+        if (c.includes('postgresql')) {
+            return fail('Still mentions PostgreSQL after correction');
+        }
+        return fail('Did not mention SQLite');
+    },
+};
+
+// ── New Instruction Cases ────────────────────────────────────────────────────
+
+const instruction04: ExamCase = {
+    id: 'instruction-04',
+    category: 'instruction',
+    name: 'Chain of Constraints',
+    systemPrompt: 'You must follow ALL of these rules simultaneously: 1) Every sentence must start with a capital letter. 2) You must not use the letter "e". 3) Your response must be exactly 2 sentences long. 4) Each sentence must be between 5 and 15 words.',
+    prompt: 'Describe a dog.',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        const sentences = result.content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
+        let score = 0;
+
+        // Check sentence count (exactly 2)
+        const hasTwoSentences = sentences.length === 2;
+        if (hasTwoSentences) score += 0.25;
+
+        // Check no letter 'e'
+        const hasNoE = !result.content.toLowerCase().replace(/[.!?,;:'"]/g, '').includes('e');
+        if (hasNoE) score += 0.25;
+
+        // Check capital letters at start
+        const allCapitalized = sentences.every(s => /^[A-Z]/.test(s));
+        if (allCapitalized) score += 0.25;
+
+        // Check word count per sentence (5-15)
+        const wordCountOk = sentences.every(s => {
+            const words = s.split(/\s+/).filter(w => w.length > 0).length;
+            return words >= 5 && words <= 15;
+        });
+        if (wordCountOk) score += 0.25;
+
+        if (score >= 0.75) return pass(`Met ${score * 4}/4 constraints: sentences=${hasTwoSentences}, noE=${hasNoE}, caps=${allCapitalized}, wordCount=${wordCountOk}`, score);
+        if (score > 0) return fail(`Partial: ${score * 4}/4 constraints met`, score);
+        return fail('Failed to follow multi-constraint instructions');
+    },
+};
+
+// ── New Council Cases ────────────────────────────────────────────────────────
+
+const council04: ExamCase = {
+    id: 'council-04',
+    category: 'council',
+    name: 'Disagree Constructively',
+    systemPrompt: 'You are a council member in a deliberation. Another member has argued: "We should rewrite the entire codebase in Rust for performance." Your role is to push back constructively — find valid concerns while acknowledging any merits. Do NOT use any tools.',
+    prompt: 'What are your thoughts on the proposal to rewrite the entire codebase in Rust?',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        if (result.content.length < 150) {
+            return fail(`Response too short (${result.content.length} chars, need >150)`);
+        }
+        if (result.toolCalls.length > 0) {
+            return fail(`Used tools in council deliberation: ${result.toolCalls.map(t => t.name).join(', ')}`);
+        }
+        const c = result.content.toLowerCase();
+        const acknowledgesMerit = c.includes('performance') || c.includes('safety') || c.includes('memory') || c.includes('benefit') || c.includes('advantage') || c.includes('merit') || c.includes('valid');
+        const raisesConcerns = c.includes('cost') || c.includes('risk') || c.includes('time') || c.includes('complex') || c.includes('migration') || c.includes('rewrite') || c.includes('concern') || c.includes('however') || c.includes('but') || c.includes('challenge');
+
+        if (acknowledgesMerit && raisesConcerns) {
+            return pass('Constructively disagreed: acknowledged merits while raising concerns');
+        }
+        if (raisesConcerns) {
+            return fail('Raised concerns but didn\'t acknowledge any merits', 0.5);
+        }
+        if (acknowledgesMerit) {
+            return fail('Acknowledged merits but didn\'t raise concerns', 0.5);
+        }
+        return fail('Neither acknowledged merits nor raised concerns');
+    },
+};
+
+// ── Collaboration Cases ─────────────────────────────────────────────────────
+
+const collaboration01: ExamCase = {
+    id: 'collaboration-01',
+    category: 'collaboration',
+    name: 'Identify Team Members',
+    tools: ['corvid_list_agents'],
+    prompt: 'List all available agents on this system. Tell me their names.',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        if (hasToolCall(result, 'corvid_list_agents')) {
+            return pass('Correctly used corvid_list_agents to discover team members');
+        }
+        if (result.toolCalls.length > 0) {
+            return fail(`Used ${result.toolCalls.map(t => t.name).join(', ')} instead of corvid_list_agents`, 0.5);
+        }
+        return fail('Did not use corvid_list_agents tool');
+    },
+};
+
+const collaboration02: ExamCase = {
+    id: 'collaboration-02',
+    category: 'collaboration',
+    name: 'Delegate Task',
+    tools: ['corvid_send_message', 'corvid_list_agents'],
+    systemPrompt: 'You are CorvidAgent, the lead agent. You have a team of specialized agents. When asked to delegate, use corvid_send_message to send the task to the appropriate agent. Available agents: SecurityAuditor (security tasks), TestRunner (testing tasks), DocsWriter (documentation tasks).',
+    prompt: 'Please ask the SecurityAuditor to review the authentication module for vulnerabilities.',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        if (hasToolCall(result, 'corvid_send_message')) {
+            const toAgent = toolCallArg(result, 'corvid_send_message', 'to_agent') as string | undefined;
+            const message = toolCallArg(result, 'corvid_send_message', 'message') as string | undefined;
+            if (toAgent && toAgent.toLowerCase().includes('security')) {
+                if (message && (message.toLowerCase().includes('auth') || message.toLowerCase().includes('vulnerab') || message.toLowerCase().includes('review') || message.toLowerCase().includes('security'))) {
+                    return pass(`Correctly delegated security review to ${toAgent}`);
+                }
+                return fail('Messaged SecurityAuditor but task description was unclear', 0.75);
+            }
+            return fail(`Sent message to ${toAgent ?? 'unknown'} instead of SecurityAuditor`, 0.25);
+        }
+        return fail('Did not use corvid_send_message to delegate');
+    },
+};
+
+const collaboration03: ExamCase = {
+    id: 'collaboration-03',
+    category: 'collaboration',
+    name: 'Respect Boundaries',
+    tools: ['corvid_send_message', 'corvid_list_agents'],
+    systemPrompt: 'You are a support agent. You can message other agents but you should NEVER message agents about topics outside their expertise. Available agents: SecurityAuditor (security only), TestRunner (testing only). If a request doesn\'t match any agent\'s expertise, handle it yourself.',
+    prompt: 'Write a haiku about spring.',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        const sentMessage = hasToolCall(result, 'corvid_send_message');
+        if (!sentMessage) {
+            // Good — handled it without delegating
+            const c = result.content.toLowerCase();
+            if (c.includes('spring') || c.includes('bloom') || c.includes('flower') || c.includes('breeze') || c.includes('cherry') || c.includes('petal')) {
+                return pass('Correctly handled creative request without delegating to specialized agents');
+            }
+            return fail('Didn\'t delegate (correct) but didn\'t produce a haiku either', 0.5);
+        }
+        return fail('Incorrectly delegated a creative writing task to a specialized agent');
+    },
+};
+
+// ── Reasoning Cases ─────────────────────────────────────────────────────────
+
+const reasoning01: ExamCase = {
+    id: 'reasoning-01',
+    category: 'reasoning',
+    name: 'Logic Puzzle',
+    prompt: 'Alice is taller than Bob. Charlie is shorter than Bob. Who is the tallest? Answer with just the name.',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        const c = result.content.toLowerCase();
+        if (c.includes('alice')) {
+            return pass('Correctly identified Alice as tallest');
+        }
+        return fail('Did not identify Alice as the tallest');
+    },
+};
+
+const reasoning02: ExamCase = {
+    id: 'reasoning-02',
+    category: 'reasoning',
+    name: 'Estimate and Justify',
+    prompt: 'A software team of 4 developers needs to add authentication to a web app that currently has none. They need: login/signup pages, JWT token handling, password hashing, role-based access control, and password reset flow. Give a rough estimate in developer-weeks and explain your reasoning.',
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        if (result.content.length < 150) {
+            return fail(`Response too short (${result.content.length} chars) — needs reasoning`);
+        }
+        const c = result.content.toLowerCase();
+        const mentionsWeeks = /\d+\s*(week|sprint)/i.test(result.content);
+        const mentionsComponents = ['jwt', 'password', 'login', 'role', 'reset', 'hash'].filter(k => c.includes(k)).length >= 3;
+        const hasReasoning = c.includes('because') || c.includes('since') || c.includes('consider') || c.includes('factor') || c.includes('depends') || c.includes('complexity') || c.includes('assuming');
+
+        let score = 0;
+        if (mentionsWeeks) score += 0.33;
+        if (mentionsComponents) score += 0.33;
+        if (hasReasoning) score += 0.34;
+
+        if (score >= 0.66) return pass('Provided estimate with reasoning covering key components', score);
+        if (score > 0) return fail(`Partial estimate: weeks=${mentionsWeeks}, components=${mentionsComponents}, reasoning=${hasReasoning}`, score);
+        return fail('Did not provide a structured estimate with reasoning');
+    },
+};
+
+const reasoning03: ExamCase = {
+    id: 'reasoning-03',
+    category: 'reasoning',
+    name: 'Debug from Description',
+    prompt: `A user reports: "My API returns 200 OK but the response body is always empty. The database has data, and my query works in the SQL console. The endpoint handler calls res.json(data) at the end."
+
+What are the 3 most likely causes? Be specific and technical.`,
+    grade(result: ExamResponse): ExamGrade {
+        if (result.error) return fail(`Error: ${result.error}`);
+        const c = result.content.toLowerCase();
+
+        // Check for technical causes (common ones):
+        const causes = [
+            // Async issue — not awaiting the DB query
+            c.includes('async') || c.includes('await') || c.includes('promise'),
+            // Variable scoping — data is undefined/empty at res.json
+            c.includes('scope') || c.includes('undefined') || c.includes('null') || c.includes('empty') || c.includes('variable'),
+            // Early return / middleware interference
+            c.includes('middleware') || c.includes('early return') || c.includes('intercept') || c.includes('before'),
+            // Response already sent
+            c.includes('already sent') || c.includes('headers sent') || c.includes('double') || c.includes('twice'),
+            // Query result mapping / ORM issue
+            c.includes('mapping') || c.includes('serializ') || c.includes('transform') || c.includes('orm'),
+            // Wrong variable / shadowing
+            c.includes('shadow') || c.includes('wrong variable') || c.includes('overwrite') || c.includes('reassign'),
+        ];
+
+        const causesFound = causes.filter(Boolean).length;
+        if (causesFound >= 3) return pass(`Identified ${causesFound} technical causes`);
+        if (causesFound >= 2) return fail(`Only ${causesFound}/3 causes identified`, 0.66);
+        if (causesFound >= 1) return fail(`Only ${causesFound}/3 causes identified`, 0.33);
+        return fail('No specific technical causes identified');
+    },
+};
 
 // ── Export all cases ─────────────────────────────────────────────────────────
 
@@ -674,7 +954,11 @@ export const examCases: ExamCase[] = [
     // Council
     council01, council02, council03, council04, council05,
     // Instruction Following
-    instruction01, instruction02, instruction03, instruction06, instruction07,
+    instruction01, instruction02, instruction03, instruction04, instruction06, instruction07,
+    // Collaboration
+    collaboration01, collaboration02, collaboration03,
+    // Reasoning
+    reasoning01, reasoning02, reasoning03,
 ];
 
 export function getCasesByCategory(category: string): ExamCase[] {
