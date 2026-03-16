@@ -1,11 +1,16 @@
 ---
 module: discord-bridge
-version: 10
+version: 11
 status: active
 files:
   - server/discord/bridge.ts
   - server/discord/commands.ts
   - server/discord/admin-commands.ts
+  - server/discord/command-handlers/session-commands.ts
+  - server/discord/command-handlers/info-commands.ts
+  - server/discord/command-handlers/moderation-commands.ts
+  - server/discord/command-handlers/component-handlers.ts
+  - server/discord/command-handlers/autocomplete-handler.ts
   - server/discord/embeds.ts
   - server/discord/message-handler.ts
   - server/discord/permissions.ts
