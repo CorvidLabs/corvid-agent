@@ -90,4 +90,49 @@ describe('Audit Routes', () => {
         const res = handleAuditRoutes(req, url, db);
         expect(res).toBeNull();
     });
+
+    it('rejects negative offset', async () => {
+        const { req, url } = fakeReq('GET', '/api/audit-log?offset=-1');
+        const res = handleAuditRoutes(req, url, db);
+        expect(res!.status).toBe(400);
+        const data = await res!.json();
+        expect(data.error).toContain('Validation failed');
+    });
+
+    it('rejects non-numeric limit', async () => {
+        const { req, url } = fakeReq('GET', '/api/audit-log?limit=abc');
+        const res = handleAuditRoutes(req, url, db);
+        expect(res!.status).toBe(400);
+        const data = await res!.json();
+        expect(data.error).toContain('Validation failed');
+    });
+
+    it('rejects invalid date format', async () => {
+        const { req, url } = fakeReq('GET', '/api/audit-log?start_date=not-a-date');
+        const res = handleAuditRoutes(req, url, db);
+        expect(res!.status).toBe(400);
+        const data = await res!.json();
+        expect(data.error).toContain('ISO 8601');
+    });
+
+    it('rejects oversized action filter', async () => {
+        const longAction = 'a'.repeat(100);
+        const { req, url } = fakeReq('GET', `/api/audit-log?action=${longAction}`);
+        const res = handleAuditRoutes(req, url, db);
+        expect(res!.status).toBe(400);
+    });
+
+    it('caps limit at 500', async () => {
+        const { req, url } = fakeReq('GET', '/api/audit-log?limit=999');
+        const res = handleAuditRoutes(req, url, db);
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.limit).toBe(500);
+    });
+
+    it('accepts valid ISO date with time', async () => {
+        const { req, url } = fakeReq('GET', '/api/audit-log?start_date=2026-01-01T00:00:00Z');
+        const res = handleAuditRoutes(req, url, db);
+        expect(res!.status).toBe(200);
+    });
 });

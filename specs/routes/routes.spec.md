@@ -110,6 +110,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleExamRoutes` | exam.ts | Live model exams |
 | `handleOllamaRoutes` | ollama.ts | Ollama model management |
 | `handleAuditRoutes` | audit.ts | Immutable audit log queries |
+| `AuditQuerySchema` | audit.ts | Zod schema for audit log query validation |
 | `handleGitHubAllowlistRoutes` | github-allowlist.ts | GitHub username allowlist |
 | `handlePerformanceRoutes` | performance.ts | Performance metrics and reports |
 | `handleSlackRoutes` | slack.ts | Slack events API handler |
