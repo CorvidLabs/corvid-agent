@@ -340,7 +340,7 @@ const tools05: ExamCase = {
             return pass('Correctly chose list_files for directory listing');
         }
         if (hasToolCall(result, 'run_command')) {
-            const cmd = toolCallArg(result, 'run_command', 'command') as string | undefined;
+            const cmd = toolCallArg(result, 'command', 'run_command') as string | undefined;
             if (cmd && (cmd.includes('ls') || cmd.includes('dir'))) {
                 return fail('Used run_command with ls instead of list_files', 0.5);
             }
@@ -678,8 +678,8 @@ const instruction07: ExamCase = {
 };
 // ── New Coding Cases ─────────────────────────────────────────────────────────
 
-const coding04: ExamCase = {
-    id: 'coding-04',
+const coding06: ExamCase = {
+    id: 'coding-06',
     category: 'coding',
     name: 'Multi-step Refactor',
     prompt: `Refactor this code to use modern JavaScript (arrow functions, const/let, template literals, destructuring where appropriate):
@@ -714,8 +714,8 @@ Only output the refactored function.`,
 
 // ── New Context Cases ────────────────────────────────────────────────────────
 
-const context04: ExamCase = {
-    id: 'context-04',
+const context06: ExamCase = {
+    id: 'context-06',
     category: 'context',
     name: 'Contradicting Information',
     prompt: 'The project uses PostgreSQL as the database. Remember that.',
@@ -776,8 +776,8 @@ const instruction04: ExamCase = {
 
 // ── New Council Cases ────────────────────────────────────────────────────────
 
-const council04: ExamCase = {
-    id: 'council-04',
+const council06: ExamCase = {
+    id: 'council-06',
     category: 'council',
     name: 'Disagree Constructively',
     systemPrompt: 'You are a council member in a deliberation. Another member has argued: "We should rewrite the entire codebase in Rust for performance." Your role is to push back constructively — find valid concerns while acknowledging any merits. Do NOT use any tools.',
@@ -955,15 +955,15 @@ What are the 3 most likely causes? Be specific and technical.`,
 
 export const examCases: ExamCase[] = [
     // Coding
-    coding01, coding02, coding03, coding04, coding05,
+    coding01, coding02, coding03, coding04, coding05, coding06,
     // Context
-    context01, context02, context03, context04, context05,
+    context01, context02, context03, context04, context05, context06,
     // Tool Use
     tools01, tools02, tools03, tools04, tools05,
     // AlgoChat
     algochat01, algochat02, algochat03, algochat04, algochat05,
     // Council
-    council01, council02, council03, council04, council05,
+    council01, council02, council03, council04, council05, council06,
     // Instruction Following
     instruction01, instruction02, instruction03, instruction04, instruction06, instruction07,
     // Collaboration

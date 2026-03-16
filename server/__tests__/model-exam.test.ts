@@ -16,16 +16,16 @@ function makeResponse(overrides: Partial<ExamResponse> = {}): ExamResponse {
 // ── Structure Tests ──────────────────────────────────────────────────────────
 
 describe('Exam structure', () => {
-    test('has 37 test cases', () => {
-        expect(examCases.length).toBe(37);
+    test('has 40 test cases', () => {
+        expect(examCases.length).toBe(40);
     });
 
     test('has expected case counts per category', () => {
-        expect(getCasesByCategory('coding').length).toBe(5);
-        expect(getCasesByCategory('context').length).toBe(5);
+        expect(getCasesByCategory('coding').length).toBe(6);
+        expect(getCasesByCategory('context').length).toBe(6);
         expect(getCasesByCategory('tools').length).toBe(5);
         expect(getCasesByCategory('algochat').length).toBe(5);
-        expect(getCasesByCategory('council').length).toBe(5);
+        expect(getCasesByCategory('council').length).toBe(6);
         expect(getCasesByCategory('instruction').length).toBe(6);
         expect(getCasesByCategory('collaboration').length).toBe(3);
         expect(getCasesByCategory('reasoning').length).toBe(3);
@@ -552,8 +552,8 @@ describe('Instruction Following', () => {
 // ── Coding: New Cases ───────────────────────────────────────────────────────
 
 describe('Coding (new cases)', () => {
-    describe('coding-04: Multi-step Refactor', () => {
-        const refactor = getCaseById('coding-04')!;
+    describe('coding-06: Multi-step Refactor', () => {
+        const refactor = getCaseById('coding-06')!;
 
         test('passes for full modern refactor', () => {
             const grade = refactor.grade(makeResponse({
@@ -585,8 +585,8 @@ describe('Coding (new cases)', () => {
 // ── Context: New Cases ──────────────────────────────────────────────────────
 
 describe('Context (new cases)', () => {
-    describe('context-04: Contradicting Information', () => {
-        const contradict = getCaseById('context-04')!;
+    describe('context-06: Contradicting Information', () => {
+        const contradict = getCaseById('context-06')!;
 
         test('passes when only SQLite mentioned', () => {
             const grade = contradict.grade(makeResponse({
@@ -616,8 +616,8 @@ describe('Context (new cases)', () => {
 // ── Council: New Cases ──────────────────────────────────────────────────────
 
 describe('Council (new cases)', () => {
-    describe('council-04: Disagree Constructively', () => {
-        const disagree = getCaseById('council-04')!;
+    describe('council-06: Disagree Constructively', () => {
+        const disagree = getCaseById('council-06')!;
 
         test('passes when acknowledging merits and raising concerns', () => {
             const grade = disagree.grade(makeResponse({
