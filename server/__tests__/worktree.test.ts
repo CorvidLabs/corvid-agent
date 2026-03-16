@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 
+const IS_WINDOWS = process.platform === 'win32';
+
 describe('worktree utilities', () => {
     // -----------------------------------------------------------------------
     // getWorktreeBaseDir
@@ -95,7 +97,7 @@ describe('worktree utilities', () => {
             rmSync(tempDir, { recursive: true, force: true });
         });
 
-        test('creates worktree successfully', async () => {
+        test.skipIf(IS_WINDOWS)('creates worktree successfully', async () => {
             const result = await createWorktree({
                 projectWorkingDir: tempDir,
                 branchName: 'test/branch',
