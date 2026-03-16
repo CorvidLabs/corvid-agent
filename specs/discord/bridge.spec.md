@@ -205,6 +205,17 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `handleReaction` | `(ctx: ReactionHandlerContext, data: DiscordReactionData)` | `void` | Handle a MESSAGE_REACTION_ADD event — maps emoji reactions to reputation feedback |
+| `checkReactionRateLimit` | `(userId: string)` | `boolean` | Check per-user reaction rate limit (5 per 60s window). Returns true if allowed |
+| `resolveSession` | `(ctx: ReactionHandlerContext, data: DiscordReactionData)` | `{ sessionId, agentId } \| null` | Resolve the session and agent ID for a reacted-to message from mentionSessions or threadSessions |
+
+### Exported Constants (from reaction-handler.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `FEEDBACK_EMOJIS` | `Record<string, 'positive' \| 'negative'>` | Maps emoji characters to sentiment values (👍→positive, 👎→negative) |
+| `reactionRateLimit` | `Map<string, number[]>` | Per-user reaction rate limit state — maps userId to timestamps of recent reactions |
+| `RATE_LIMIT_MAX` | `number` | Maximum feedback reactions per rate limit window (5) |
+| `RATE_LIMIT_WINDOW_MS` | `number` | Rate limit sliding window duration in milliseconds (60000) |
 
 ### Exported Types (from extracted modules)
 
