@@ -207,6 +207,11 @@ describe('DiscordBridge', () => {
 
             // Should start a process for one-off reply
             expect(pm.startProcess).toHaveBeenCalled();
+            // Prompt should include author context prefix
+            const startArgs = (pm.startProcess as ReturnType<typeof mock>).mock.calls[0];
+            const prompt = startArgs[1] as string;
+            expect(prompt).toContain('[From Discord user: TestUser]');
+            expect(prompt).toContain('what time is it?');
             // Should subscribe for response
             expect(pm.subscribe).toHaveBeenCalled();
         } finally {

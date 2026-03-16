@@ -52,6 +52,12 @@ function trackMentionSession(map: Map<string, MentionSessionInfo>, botMessageId:
     map.set(botMessageId, info);
 }
 
+/** Prefix a message with Discord author context so the agent knows who is speaking. */
+function withAuthorContext(text: string, authorUsername?: string): string {
+    if (!authorUsername) return text;
+    return `[From Discord user: ${authorUsername}]\n${text}`;
+}
+
 /** Replace Discord mention IDs with @username before stripping unresolved mentions.
  *  Mentions matching botUserId are stripped entirely (they're just trigger mentions). */
 function resolveMentions(text: string, mentions?: Array<{ id: string; username: string }>, botUserId?: string | null): string {
@@ -190,7 +196,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (isOurThread) {
         sendFirstInteractionTip(ctx, userId, channelId);
         sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
-        await routeToThread(ctx, channelId, userId, text);
+        await routeToThread(ctx, channelId, userId, text, data.author.username);
         return;
     }
 
@@ -201,7 +207,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (isReplyToBot && data.message_reference?.message_id) {
         const existingSession = ctx.mentionSessions.get(data.message_reference.message_id);
         if (existingSession) {
-            await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions);
+            await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions, data.author.username);
             return;
         }
         // If we can't find the session (e.g. after restart), fall through to create new
@@ -211,7 +217,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (mode === 'work_intake') {
         await handleWorkIntake(ctx, channelId, data.id, userId, text, data.mentions);
     } else {
-        await handleMentionReply(ctx, channelId, userId, data.id, text, data.mentions);
+        await handleMentionReply(ctx, channelId, userId, data.id, text, data.mentions, data.author.username);
     }
 }
 
@@ -349,7 +355,7 @@ export async function sendTaskResult(
     }
 }
 
-async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string, mentions?: Array<{ id: string; username: string }>): Promise<void> {
+async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string, mentions?: Array<{ id: string; username: string }>, authorUsername?: string): Promise<void> {
     const agent = resolveDefaultAgent(ctx.db, ctx.config);
     if (!agent) {
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No agents configured. Create an agent first.');
@@ -396,7 +402,7 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         workDir,
     });
 
-    ctx.processManager.startProcess(session, cleanText);
+    ctx.processManager.startProcess(session, withAuthorContext(cleanText, authorUsername));
 
     const agentName = agent.name;
     const agentModel = agent.model || 'unknown';
@@ -417,6 +423,7 @@ async function handleMentionReplyResume(
     text: string,
     sessionInfo: MentionSessionInfo,
     mentions?: Array<{ id: string; username: string }>,
+    authorUsername?: string,
 ): Promise<void> {
     const cleanText = resolveMentions(text, mentions, ctx.botUserId);
     if (!cleanText) return;
@@ -426,14 +433,15 @@ async function handleMentionReplyResume(
 
     if (!session) {
         log.info('Mention-reply session not found, creating new session', { sessionId });
-        await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions);
+        await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorUsername);
         return;
     }
 
     // Try to send message to existing process, or resume if it's stopped
-    const sent = ctx.processManager.sendMessage(sessionId, cleanText);
+    const contextualText = withAuthorContext(cleanText, authorUsername);
+    const sent = ctx.processManager.sendMessage(sessionId, contextualText);
     if (!sent) {
-        ctx.processManager.resumeProcess(session, cleanText);
+        ctx.processManager.resumeProcess(session, contextualText);
     }
 
     subscribeForInlineResponse(
@@ -445,7 +453,7 @@ async function handleMentionReplyResume(
     );
 }
 
-async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string): Promise<void> {
+async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorUsername?: string): Promise<void> {
     ctx.threadLastActivity.set(threadId, Date.now());
 
     let threadInfo = ctx.threadSessions.get(threadId);
@@ -471,9 +479,10 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         return;
     }
 
-    const sent = ctx.processManager.sendMessage(sessionId, text);
+    const contextualText = withAuthorContext(text, authorUsername);
+    const sent = ctx.processManager.sendMessage(sessionId, contextualText);
     if (!sent) {
-        ctx.processManager.resumeProcess(session, text);
+        ctx.processManager.resumeProcess(session, contextualText);
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
             ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
