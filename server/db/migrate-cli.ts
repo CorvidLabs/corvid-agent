@@ -13,6 +13,9 @@
 import { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
 import { migrateUp, migrateDown, migrationStatus, getCurrentVersion } from './migrate';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('migrate-cli');
 
 const DB_PATH = process.env.DB_PATH ?? 'corvid-agent.db';
 
@@ -59,13 +62,13 @@ async function main(): Promise<void> {
                 const to = getFlag('to');
                 const target = to ? parseInt(to, 10) : undefined;
                 const before = getCurrentVersion(db);
-                console.log(`Current schema version: ${before}`);
+                log.info(`Current schema version: ${before}`);
 
                 const { applied, to: newVersion } = await migrateUp(db, target);
                 if (applied === 0) {
-                    console.log('Already up to date.');
+                    log.info('Already up to date.');
                 } else {
-                    console.log(`Applied ${applied} migration(s). Schema version: ${before} -> ${newVersion}`);
+                    log.info(`Applied ${applied} migration(s). Schema version: ${before} -> ${newVersion}`);
                 }
                 break;
             }
@@ -74,18 +77,18 @@ async function main(): Promise<void> {
                 const to = getFlag('to');
                 const target = to ? parseInt(to, 10) : undefined;
                 const before = getCurrentVersion(db);
-                console.log(`Current schema version: ${before}`);
+                log.info(`Current schema version: ${before}`);
 
                 if (before === 0) {
-                    console.log('No migrations to revert.');
+                    log.info('No migrations to revert.');
                     break;
                 }
 
                 const { reverted, to: newVersion } = await migrateDown(db, target);
                 if (reverted === 0) {
-                    console.log('Nothing to revert.');
+                    log.info('Nothing to revert.');
                 } else {
-                    console.log(`Reverted ${reverted} migration(s). Schema version: ${before} -> ${newVersion}`);
+                    log.info(`Reverted ${reverted} migration(s). Schema version: ${before} -> ${newVersion}`);
                 }
                 break;
             }
@@ -94,41 +97,40 @@ async function main(): Promise<void> {
                 const current = getCurrentVersion(db);
                 const statuses = migrationStatus(db);
 
-                console.log(`Schema version: ${current}`);
+                log.info(`Schema version: ${current}`);
                 if (isNew) {
-                    console.log('(new database — no migrations applied yet)\n');
+                    log.info('(new database — no migrations applied yet)');
                 }
-                console.log('');
 
                 if (statuses.length === 0) {
-                    console.log('No migration files found.');
+                    log.info('No migration files found.');
                     break;
                 }
 
                 const maxNameLen = Math.max(...statuses.map((s) => s.name.length));
-                console.log(
+                log.info(
                     `${'Ver'.padStart(4)}  ${'Name'.padEnd(maxNameLen)}  Status`,
                 );
-                console.log(`${'─'.repeat(4)}  ${'─'.repeat(maxNameLen)}  ${'─'.repeat(10)}`);
+                log.info(`${'─'.repeat(4)}  ${'─'.repeat(maxNameLen)}  ${'─'.repeat(10)}`);
 
                 for (const s of statuses) {
                     const marker = s.applied ? '  applied' : '  pending';
-                    console.log(
+                    log.info(
                         `${String(s.version).padStart(4)}  ${s.name.padEnd(maxNameLen)}${marker}`,
                     );
                 }
 
                 const pending = statuses.filter((s) => !s.applied);
                 if (pending.length > 0) {
-                    console.log(`\n${pending.length} pending migration(s).`);
+                    log.info(`${pending.length} pending migration(s).`);
                 } else {
-                    console.log('\nAll migrations applied.');
+                    log.info('All migrations applied.');
                 }
                 break;
             }
 
             default:
-                console.error(`Unknown command: ${command}`);
+                log.error(`Unknown command: ${command}`);
                 printUsage();
                 process.exit(1);
         }
@@ -138,6 +140,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-    console.error('Migration error:', err instanceof Error ? err.message : String(err));
+    log.error(`Migration error: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
 });

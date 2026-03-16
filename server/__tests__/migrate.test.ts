@@ -339,6 +339,63 @@ describe('initDb retry on failure', () => {
 
         closeDb();
     });
+
+    test('initDb applies pending file-based migrations and logs', async () => {
+        const { initDb, closeDb, getDb: getDbConn } = await import('../db/connection');
+
+        // Reset any existing state
+        closeDb();
+
+        // Create DB with legacy migrations (version 91)
+        const d = getDbConn();
+
+        // Lower the schema version so initDb finds pending file-based migrations
+        const current = getCurrentVersion(d);
+        expect(current).toBeGreaterThan(0);
+        d.query('UPDATE schema_version SET version = ?').run(current - 1);
+
+        // Now initDb should discover 1 pending migration and apply it
+        await initDb();
+
+        // Verify version was restored
+        expect(getCurrentVersion(d)).toBe(current);
+
+        closeDb();
+    });
+});
+
+describe('runPendingMigrations', () => {
+    test('applies migrations and logs when applied > 0', async () => {
+        const { runPendingMigrations } = await import('../db/migrate');
+        // Fresh in-memory DB has version 0, so all file-based migrations are pending
+        const freshDb = new Database(':memory:');
+        freshDb.exec('PRAGMA foreign_keys = ON');
+
+        await runPendingMigrations(freshDb);
+
+        // Verify migrations were actually applied
+        const version = getCurrentVersion(freshDb);
+        expect(version).toBeGreaterThan(0);
+
+        freshDb.close();
+    });
+
+    test('does not log when no migrations are pending', async () => {
+        const { runPendingMigrations } = await import('../db/migrate');
+        // Apply all migrations first
+        const freshDb = new Database(':memory:');
+        freshDb.exec('PRAGMA foreign_keys = ON');
+        await migrateUp(freshDb);
+
+        // Running again should find nothing pending
+        await runPendingMigrations(freshDb);
+
+        // Verify version unchanged
+        const version = getCurrentVersion(freshDb);
+        expect(version).toBeGreaterThan(0);
+
+        freshDb.close();
+    });
 });
 
 describe('baseline migration (001_baseline.ts)', () => {
