@@ -8,6 +8,7 @@ files:
   - server/lib/errors.ts
   - server/lib/response.ts
   - server/lib/validation.ts
+  - server/lib/schemas/marketplace.ts
 db_tables: []
 depends_on: []
 ---
@@ -170,10 +171,27 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `StartTrialSchema` | Marketplace | Validates trial start: `tenantId` (required). |
 | `SubmitFeedbackSchema` | Reputation Feedback | Validates feedback submission: `agentId` (required), `sentiment` (positive/negative required), optional `sessionId`, `source`, `category`, `comment`, `submittedBy`. |
 
+### Exported Zod Schemas (schemas/marketplace.ts)
+
+| Schema | Domain | Description |
+|--------|--------|-------------|
+| `CreateListingSchema` | Marketplace | Validates marketplace listing creation: `agentId`, `name`, `description`, `category` (required). |
+| `UpdateListingSchema` | Marketplace | Validates marketplace listing update. All fields optional. |
+| `CreateReviewSchema` | Marketplace | Validates review creation: `rating` (1..5), `comment` (required). |
+| `RegisterFederationInstanceSchema` | Marketplace | Validates federation instance: `url`, `name` (required). |
+| `SubscribeSchema` | Marketplace | Validates marketplace subscription: `subscriberTenantId` (required), `billingCycle` (daily/weekly/monthly). |
+| `CancelSubscriptionSchema` | Marketplace | Validates subscription cancellation: `subscriberTenantId` (required). |
+| `CreateTierSchema` | Marketplace | Validates pricing tier creation: `name`, `priceCredits` (required), optional `description`, `billingCycle`, `rateLimit`, `features`, `sortOrder`. |
+| `UpdateTierSchema` | Marketplace | Validates pricing tier update. All fields optional. |
+| `TierUseSchema` | Marketplace | Validates tier use: `tierId` (required). |
+| `TierSubscribeSchema` | Marketplace | Validates tier subscription: `tierId`, `subscriberTenantId` (required). |
+| `StartTrialSchema` | Marketplace | Validates trial start: `tenantId` (required). |
+
 ### Re-exports (validation.ts)
 | Export | Source | Description |
 |--------|--------|-------------|
 | `ValidationError` | `./errors` | Re-exported so existing `import { ValidationError } from '../lib/validation'` paths continue to work. |
+| Marketplace schemas | `./schemas/marketplace` | All 11 marketplace/pricing/trial schemas re-exported for backward compatibility (#1134). |
 
 ## Invariants
 

@@ -16,7 +16,8 @@ import type {
     VerificationBadge,
 } from '../marketplace/types';
 import { json, badRequest, notFound, handleRouteError, safeNumParam } from '../lib/response';
-import { parseBodyOrThrow, ValidationError, CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema, CreateTierSchema, UpdateTierSchema, TierUseSchema, TierSubscribeSchema, StartTrialSchema } from '../lib/validation';
+import { parseBodyOrThrow, ValidationError } from '../lib/validation';
+import { CreateListingSchema, UpdateListingSchema, CreateReviewSchema, RegisterFederationInstanceSchema, SubscribeSchema, CancelSubscriptionSchema, CreateTierSchema, UpdateTierSchema, TierUseSchema, TierSubscribeSchema, StartTrialSchema } from '../lib/schemas/marketplace';
 
 export function handleMarketplaceRoutes(
     req: Request,
