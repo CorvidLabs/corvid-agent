@@ -182,6 +182,13 @@ export async function createVerificationTasks(
 
     const { repo, prNumber } = parsed;
 
+    // Get parent task to inherit agent/project (check early to avoid unnecessary network calls)
+    const parentTask = getWorkTask(db, parentTaskId);
+    if (!parentTask) {
+        log.warn('Parent task not found for verification', { parentTaskId });
+        return [];
+    }
+
     // Fetch the PR body to parse test plan items
     const body = await fetchPrBody(repo, prNumber);
     if (!body) {
@@ -192,13 +199,6 @@ export async function createVerificationTasks(
     const items = parseTestPlanItems(body);
     if (items.length === 0) {
         log.info('No test plan items found in PR body', { prUrl });
-        return [];
-    }
-
-    // Get parent task to inherit agent/project
-    const parentTask = getWorkTask(db, parentTaskId);
-    if (!parentTask) {
-        log.warn('Parent task not found for verification', { parentTaskId });
         return [];
     }
 

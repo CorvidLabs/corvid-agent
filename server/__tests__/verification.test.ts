@@ -112,9 +112,8 @@ describe('createVerificationTasks', () => {
     });
 
     test('returns empty array when parent task not found', async () => {
-        // Use a valid-looking URL but nonexistent parent task
+        // Parent task check runs before fetchPrBody, so no gh call needed
         const result = await createVerificationTasks(db, 'nonexistent', 'https://github.com/CorvidLabs/corvid-agent/pull/999');
-        // This will fail at fetchPrBody (no gh in test), but parent task check comes after
         expect(result).toEqual([]);
     });
 });
