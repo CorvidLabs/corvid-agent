@@ -9,17 +9,17 @@ describe('EndpointRateLimiter parsePattern', () => {
                 {
                     pattern: 'GET/api/health', // missing space
                     tiers: {
-                        public: { windowMs: 60_000, maxRequests: 10 },
-                        user: { windowMs: 60_000, maxRequests: 100 },
-                        admin: { windowMs: 60_000, maxRequests: 1000 },
+                        public: { windowMs: 60_000, max: 10 },
+                        user: { windowMs: 60_000, max: 100 },
+                        admin: { windowMs: 60_000, max: 1000 },
                     },
                 },
             ],
             exemptPaths: [],
-            defaultTiers: {
-                public: { windowMs: 60_000, maxRequests: 60 },
-                user: { windowMs: 60_000, maxRequests: 300 },
-                admin: { windowMs: 60_000, maxRequests: 1000 },
+            defaults: {
+                public: { windowMs: 60_000, max: 60 },
+                user: { windowMs: 60_000, max: 300 },
+                admin: { windowMs: 60_000, max: 1000 },
             },
         };
 
