@@ -103,6 +103,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleBillingRoutes` | billing.ts | Billing subscriptions and usage |
 | `handleAuthFlowRoutes` | auth-flow.ts | Device authorization flow |
 | `handleA2ARoutes` | a2a.ts | Agent-to-agent task protocol |
+| `resetInboundRateLimiter` | a2a.ts | Reset the inbound A2A rate limiter (for testing) |
 | `handlePluginRoutes` | plugins.ts | Plugin load/unload/capabilities |
 | `handlePersonaRoutes` | personas.ts | Agent persona CRUD |
 | `handleSkillBundleRoutes` | skill-bundles.ts | Skill bundle CRUD and assignment |

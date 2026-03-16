@@ -7,6 +7,7 @@ files:
   - server/a2a/client.ts
   - server/a2a/task-handler.ts
   - server/a2a/agent-card.ts
+  - server/a2a/invocation-guard.ts
 db_tables: []
 depends_on: []
 ---
@@ -29,6 +30,9 @@ Agent-to-Agent (A2A) protocol implementation for inter-agent communication. Hand
 | `A2ATaskSendRequest` | Inbound request shape for `tasks/send` method |
 | `A2ATaskDeps` | Dependency injection for task handler (db, processManager, optional overrides) |
 | `RemoteInvocationResult` | Result of remote agent invocation: success, taskId, responseText, error |
+| `InvocationGuardConfig` | Configuration for session budgets and inbound rate limits |
+| `BudgetRejectionReason` | Union: `'INVOCATION_LIMIT' \| 'UNIQUE_AGENT_LIMIT' \| 'COOLDOWN'` |
+| `BudgetCheckResult` | Result of a budget check: allowed flag with optional reason/detail |
 
 ### Exported Functions
 
@@ -43,6 +47,21 @@ Agent-to-Agent (A2A) protocol implementation for inter-agent communication. Hand
 | `clearTaskStore` | `()` | `void` | Clear all tasks from in-memory store |
 | `buildAgentCard` | `(baseUrl?: string)` | `A2AAgentCard` | Build the primary instance-level A2A Agent Card |
 | `buildAgentCardForAgent` | `(agent, baseUrl?, db?)` | `A2AAgentCard` | Build an agent-specific A2A Agent Card |
+| `loadInvocationGuardConfig` | `()` | `InvocationGuardConfig` | Load invocation guard config from env vars with defaults |
+
+### Exported Classes
+
+| Class | Description |
+|-------|-------------|
+| `DepthExceededError` | Error thrown when A2A invocation depth exceeds `MAX_A2A_DEPTH` |
+| `SessionInvocationBudget` | Per-session budget tracker for remote invocations, unique agents, and cooldown |
+| `InboundA2ARateLimiter` | Sliding-window rate limiter for inbound A2A tasks per source agent |
+
+### Exported Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_A2A_DEPTH` | `3` | Maximum allowed A2A invocation chain depth |
 
 ## Invariants
 

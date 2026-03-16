@@ -15,6 +15,7 @@ import type { AstParserService } from '../../ast/service';
 import type { PermissionBroker } from '../../permissions/broker';
 import type { ProcessManager } from '../../process/manager';
 import type { FlockDirectoryService } from '../../flock-directory/service';
+import type { SessionInvocationBudget } from '../../a2a/invocation-guard';
 import type { ScheduleActionType } from '../../../shared/types/schedules';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
@@ -74,6 +75,8 @@ export interface McpToolContext {
     processManager?: ProcessManager;
     /** Flock Directory service for agent registry operations. */
     flockDirectoryService?: FlockDirectoryService;
+    /** Per-session invocation budget for remote agent calls. */
+    invocationBudget?: SessionInvocationBudget;
 }
 
 export function textResult(text: string): CallToolResult {

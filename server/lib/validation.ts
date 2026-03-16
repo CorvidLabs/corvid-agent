@@ -700,10 +700,13 @@ export const SendA2ATaskSchema = z.object({
         message: z.string().min(1, 'message is required'),
         skill: z.string().optional(),
         timeoutMs: z.number().int().min(1000).max(600000).optional(),
+        depth: z.number().int().min(1).max(10).optional(),
     }).optional(),
     message: z.string().min(1).optional(),
     skill: z.string().optional(),
     timeoutMs: z.number().int().min(1000).max(600000).optional(),
+    depth: z.number().int().min(1).max(10).optional(),
+    sourceAgent: z.string().optional(),
 }).refine(
     (d) => (d.params?.message?.trim()) || (d.message?.trim()),
     { message: 'message is required (either at top-level or inside params)' },

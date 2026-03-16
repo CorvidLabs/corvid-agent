@@ -13,6 +13,7 @@ import { listAgents as defaultListAgents } from '../db/agents';
 import { createSession as defaultCreateSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import { NotFoundError } from '../lib/errors';
+import { MAX_A2A_DEPTH } from './invocation-guard';
 
 const log = createLogger('A2ATaskHandler');
 
@@ -48,10 +49,23 @@ export interface A2ATaskDeps {
  * Handle an inbound tasks/send request.
  * Resolves target agent, creates a session, starts a process.
  */
+export class DepthExceededError extends Error {
+    constructor(depth: number) {
+        super(`Invocation depth ${depth} exceeds maximum of ${MAX_A2A_DEPTH}`);
+        this.name = 'DepthExceededError';
+    }
+}
+
 export function handleTaskSend(
     deps: A2ATaskDeps,
-    body: { message: string; skill?: string; timeoutMs?: number },
+    body: { message: string; skill?: string; timeoutMs?: number; depth?: number },
 ): A2ATask {
+    // Enforce depth limit on inbound A2A tasks
+    const depth = body.depth ?? 1;
+    if (depth > MAX_A2A_DEPTH) {
+        throw new DepthExceededError(depth);
+    }
+
     pruneOldTasks();
 
     const { db, processManager } = deps;
@@ -82,13 +96,19 @@ export function handleTaskSend(
 
     tasks.set(taskId, task);
 
-    // Create session
+    // Create session (propagate depth from sender)
     const session = createSessionFn(db, {
         projectId,
         agentId: agent.id,
         name: `A2A Task: ${body.message.slice(0, 50)}`,
         initialPrompt: body.message,
         source: 'agent',
+    });
+
+    log.info('A2A task session created with depth', {
+        taskId,
+        sessionId: session.id,
+        depth,
     });
 
     task.sessionId = session.id;

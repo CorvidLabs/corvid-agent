@@ -7,13 +7,22 @@
 
 import type { Database } from 'bun:sqlite';
 import type { ProcessManager } from '../process/manager';
-import { handleTaskSend, handleTaskGet, type A2ATaskDeps } from '../a2a/task-handler';
+import { handleTaskSend, handleTaskGet, DepthExceededError, type A2ATaskDeps } from '../a2a/task-handler';
 import { json, notFound, handleRouteError } from '../lib/response';
 import { parseBodyOrThrow, ValidationError, SendA2ATaskSchema } from '../lib/validation';
 import { checkInjection } from '../lib/injection-guard';
+import { InboundA2ARateLimiter } from '../a2a/invocation-guard';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('A2ARoutes');
+
+// Singleton inbound rate limiter for A2A tasks
+const inboundRateLimiter = new InboundA2ARateLimiter();
+
+/** Exposed for testing — resets the inbound rate limiter. */
+export function resetInboundRateLimiter(): void {
+    inboundRateLimiter.reset();
+}
 
 export async function handleA2ARoutes(
     req: Request,
@@ -31,16 +40,42 @@ export async function handleA2ARoutes(
             const blocked = checkInjection(db, params.message ?? '', 'a2a', req);
             if (blocked) return blocked;
 
+            // Inbound rate limiting by source agent
+            const sourceAgent = data.sourceAgent ?? req.headers.get('x-source-agent') ?? 'unknown';
+            const rateCheck = inboundRateLimiter.check(sourceAgent);
+            if (!rateCheck.allowed) {
+                log.warn('Inbound A2A task rate-limited', {
+                    sourceAgent,
+                    retryAfterMs: rateCheck.retryAfterMs,
+                });
+                return json(
+                    { error: 'Rate limit exceeded. Try again later.' },
+                    429,
+                );
+            }
+            inboundRateLimiter.record(sourceAgent);
+
             const deps: A2ATaskDeps = { db, processManager };
             const task = handleTaskSend(deps, {
                 message: params.message!,
                 skill: params.skill,
                 timeoutMs: params.timeoutMs,
+                depth: params.depth ?? data.depth,
+            });
+
+            log.info('A2A inbound task accepted', {
+                taskId: task.id,
+                sourceAgent,
+                depth: params.depth ?? data.depth ?? 1,
             });
 
             return json(task);
         } catch (err) {
             if (err instanceof ValidationError) return json({ error: err.detail }, 400);
+            if (err instanceof DepthExceededError) {
+                log.warn('A2A task rejected: depth exceeded', { error: err.message });
+                return json({ error: 'Invocation depth limit exceeded.' }, 400);
+            }
             log.error('A2A tasks/send failed', { error: err instanceof Error ? err.message : String(err) });
             return handleRouteError(err);
         }
