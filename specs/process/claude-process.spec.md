@@ -31,13 +31,15 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `isApprovalEvent` | `e: ClaudeStreamEvent` | `e is ApprovalRequestEvent` | Type guard: returns `true` if the event is an `approval_request` event. |
 | `isSessionEndEvent` | `e: ClaudeStreamEvent` | `e is SessionExitedEvent \| SessionStoppedEvent` | Type guard: returns `true` if the event is `session_exited` or `session_stopped`. |
 | `isSessionErrorRecoveryEvent` | `e: ClaudeStreamEvent` | `e is SessionErrorRecoveryEvent` | Type guard: returns `true` if the event is a `session_error` event. |
+| `isContextUsageEvent` | `e: ClaudeStreamEvent` | `e is ContextUsageEvent` | Type guard: returns `true` if the event is a `context_usage` event. |
+| `isContextWarningEvent` | `e: ClaudeStreamEvent` | `e is ContextWarningEvent` | Type guard: returns `true` if the event is a `context_warning` event. |
 
 ### Exported Types
 
 | Type | Description |
 |------|-------------|
 | `ContentBlock` | Interface with `type: string` and optional `text: string`. Represents a content block in assistant messages. |
-| `ClaudeStreamEvent` | Discriminated union of all 18 stream event types, discriminated on the `type` field. The canonical event type for the process subsystem. |
+| `ClaudeStreamEvent` | Discriminated union of all 20 stream event types, discriminated on the `type` field. The canonical event type for the process subsystem. |
 | `ClaudeStreamEventType` | String literal union of all event type discriminants (`'message_start' \| 'message_delta' \| ...`). |
 | `MessageStartEvent` | Event emitted when a message begins. Contains optional `message` with `role` and `content`. |
 | `MessageDeltaEvent` | Event emitted for incremental message content. Contains optional `delta` with `type` and `text`. |
@@ -59,6 +61,8 @@ Provides the CLI-based Claude process spawning mechanism (deprecated in favor of
 | `SessionErrorRecoveryEvent` | Event emitted for session errors with structured recovery info. Contains `error` with `message`, `errorType`, `severity`, and `recoverable` fields. |
 | `PerformanceEvent` | Event carrying inference metrics: `model`, `tokensPerSecond`, `outputTokens`, `evalDurationMs`. |
 | `RawStreamEvent` | Raw SDK event passthrough. Contains optional `message` with `content`. |
+| `ContextUsageEvent` | Context usage metrics emitted after each turn. Contains `estimatedTokens`, `contextWindow`, `usagePercent`, `messagesCount`, and `trimmed` flag. |
+| `ContextWarningEvent` | Context warning when usage exceeds thresholds. Contains `level` (`'info' \| 'warning' \| 'critical'`), `usagePercent`, and `message`. |
 | `ClaudeInputMessage` | Interface for messages sent to Claude via stdin: `{ type: 'user', message: { role: 'user', content: string } }`. |
 | `ProcessInfo` | Interface tracking a running process: `sessionId`, `pid`, `proc`, `subscribers` set. |
 | `EventCallback` | Type alias `(sessionId: string, event: ClaudeStreamEvent) => void` for session and global event callbacks. |

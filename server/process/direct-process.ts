@@ -183,6 +183,33 @@ function trimMessages(
     log.info(`Trimmed conversation to ${messages.length} messages (${summaries.length} tool results summarized) — ${reason}`);
 }
 
+/** Compute context usage metrics for the current message state. */
+export function computeContextUsage(
+    msgs: Array<{ role: string; content: string }>,
+    sysPrompt: string,
+    trimmed: boolean,
+): { estimatedTokens: number; contextWindow: number; usagePercent: number; messagesCount: number; trimmed: boolean } {
+    const contextWindow = getContextBudget();
+    const estimatedTokens = estimateTokens(sysPrompt) +
+        msgs.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+    const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
+    return { estimatedTokens, contextWindow, usagePercent, messagesCount: msgs.length, trimmed };
+}
+
+/** Determine warning level and message for a given usage percent. */
+export function determineWarningLevel(
+    usagePercent: number,
+): { level: 'info' | 'warning' | 'critical'; message: string } | null {
+    if (usagePercent >= 85) {
+        return { level: 'critical', message: `Context usage at ${usagePercent}% — session at risk of exhaustion. Consider starting a new session.` };
+    } else if (usagePercent >= 70) {
+        return { level: 'warning', message: `Context usage at ${usagePercent}% — message trimming will start soon.` };
+    } else if (usagePercent >= 50) {
+        return { level: 'info', message: `Context usage at ${usagePercent}%.` };
+    }
+    return null;
+}
+
 export interface DirectProcessOptions {
     session: Session;
     project: Project;
@@ -402,6 +429,37 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let stallType: string | null = null;
         const loopStartTime = Date.now();
 
+        // ── Context usage tracking ──────────────────────────────────
+        let lastWarningLevel: string | null = null;
+        let hasTrimmed = false;
+
+        function emitContextUsage(
+            msgs: Array<{ role: string; content: string }>,
+            sysPrompt: string,
+        ): void {
+            const usage = computeContextUsage(msgs, sysPrompt, hasTrimmed);
+
+            onEvent({
+                type: 'context_usage',
+                session_id: session.id,
+                ...usage,
+            } as ClaudeStreamEvent);
+
+            // Emit warnings at thresholds (only when crossing a new level)
+            const warning = determineWarningLevel(usage.usagePercent);
+
+            if (warning && warning.level !== lastWarningLevel) {
+                lastWarningLevel = warning.level;
+                onEvent({
+                    type: 'context_warning',
+                    session_id: session.id,
+                    level: warning.level,
+                    usagePercent: usage.usagePercent,
+                    message: warning.message,
+                } as ClaudeStreamEvent);
+            }
+        }
+
         try {
 
         while (!aborted && iteration < MAX_TOOL_ITERATIONS) {
@@ -421,7 +479,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
 
             let result;
             try {
+                const countBefore = messages.length;
                 trimMessages(messages, systemPrompt);
+                if (messages.length < countBefore) hasTrimmed = true;
+                emitContextUsage(messages, systemPrompt);
                 result = await provider.complete({
                     model,
                     systemPrompt,
@@ -442,7 +503,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     log.warn(`Model ${model} does not support tools — disabling for this session`);
                     toolsDisabled = true;
                     // Retry without tools
+                    const countBefore2 = messages.length;
                     trimMessages(messages, systemPrompt);
+                    if (messages.length < countBefore2) hasTrimmed = true;
+                    emitContextUsage(messages, systemPrompt);
                     result = await provider.complete({
                         model,
                         systemPrompt,
@@ -711,7 +775,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 content: 'Summarize what you accomplished. Be concise — state the key actions taken and their results.',
             });
             try {
+                const countBeforeSummary = messages.length;
                 trimMessages(messages, systemPrompt);
+                if (messages.length < countBeforeSummary) hasTrimmed = true;
+                emitContextUsage(messages, systemPrompt);
                 const summaryResult = await provider.complete({
                     model,
                     systemPrompt,

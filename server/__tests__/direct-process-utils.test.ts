@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { buildSystemPrompt, type ToolDef } from '../process/direct-process';
+import { buildSystemPrompt, computeContextUsage, determineWarningLevel, type ToolDef } from '../process/direct-process';
 
 /**
  * Tests for utility functions from direct-process.ts.
@@ -288,5 +288,87 @@ describe('buildSystemPrompt', () => {
         const withoutReadFile = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', [makeTool('other_tool')], true);
         expect(withReadFile).toContain('protected');
         expect(withoutReadFile).not.toContain('File operations');
+    });
+});
+
+describe('computeContextUsage', () => {
+    it('calculates usage metrics for empty messages', () => {
+        const result = computeContextUsage([], '', false);
+        expect(result.estimatedTokens).toBe(0);
+        expect(result.contextWindow).toBe(8192);
+        expect(result.usagePercent).toBe(0);
+        expect(result.messagesCount).toBe(0);
+        expect(result.trimmed).toBe(false);
+    });
+
+    it('calculates usage percent correctly', () => {
+        // 4096 chars of prose ≈ 1024 tokens, context window 8192 → ~12.5%
+        const msgs = [{ role: 'user', content: 'a'.repeat(4096) }];
+        const result = computeContextUsage(msgs, '', false);
+        expect(result.usagePercent).toBe(Math.round((result.estimatedTokens / 8192) * 100));
+        expect(result.messagesCount).toBe(1);
+    });
+
+    it('includes system prompt in token count', () => {
+        const withSystem = computeContextUsage([], 'x'.repeat(4000), false);
+        const withoutSystem = computeContextUsage([], '', false);
+        expect(withSystem.estimatedTokens).toBeGreaterThan(withoutSystem.estimatedTokens);
+    });
+
+    it('sums tokens across multiple messages', () => {
+        const one = computeContextUsage([{ role: 'user', content: 'a'.repeat(1000) }], '', false);
+        const two = computeContextUsage([
+            { role: 'user', content: 'a'.repeat(1000) },
+            { role: 'assistant', content: 'a'.repeat(1000) },
+        ], '', false);
+        expect(two.estimatedTokens).toBeGreaterThan(one.estimatedTokens);
+        expect(two.messagesCount).toBe(2);
+    });
+
+    it('passes through trimmed flag', () => {
+        expect(computeContextUsage([], '', true).trimmed).toBe(true);
+        expect(computeContextUsage([], '', false).trimmed).toBe(false);
+    });
+});
+
+describe('determineWarningLevel', () => {
+    it('returns null below 50%', () => {
+        expect(determineWarningLevel(0)).toBeNull();
+        expect(determineWarningLevel(25)).toBeNull();
+        expect(determineWarningLevel(49)).toBeNull();
+    });
+
+    it('returns info at 50%', () => {
+        const result = determineWarningLevel(50);
+        expect(result).not.toBeNull();
+        expect(result!.level).toBe('info');
+        expect(result!.message).toContain('50%');
+    });
+
+    it('returns info between 50-69%', () => {
+        expect(determineWarningLevel(60)!.level).toBe('info');
+        expect(determineWarningLevel(69)!.level).toBe('info');
+    });
+
+    it('returns warning at 70%', () => {
+        const result = determineWarningLevel(70);
+        expect(result!.level).toBe('warning');
+        expect(result!.message).toContain('trimming');
+    });
+
+    it('returns warning between 70-84%', () => {
+        expect(determineWarningLevel(75)!.level).toBe('warning');
+        expect(determineWarningLevel(84)!.level).toBe('warning');
+    });
+
+    it('returns critical at 85%', () => {
+        const result = determineWarningLevel(85);
+        expect(result!.level).toBe('critical');
+        expect(result!.message).toContain('exhaustion');
+    });
+
+    it('returns critical above 85%', () => {
+        expect(determineWarningLevel(90)!.level).toBe('critical');
+        expect(determineWarningLevel(100)!.level).toBe('critical');
     });
 });
