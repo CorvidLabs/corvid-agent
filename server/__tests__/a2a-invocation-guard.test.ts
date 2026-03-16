@@ -3,12 +3,14 @@
  * - Session invocation budget (total limit, unique agent limit, cooldown)
  * - Inbound rate limiting
  * - Depth propagation and enforcement
+ * - loadInvocationGuardConfig defaults and env overrides
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import {
     SessionInvocationBudget,
     InboundA2ARateLimiter,
     MAX_A2A_DEPTH,
+    loadInvocationGuardConfig,
 } from '../a2a/invocation-guard';
 import { handleTaskSend, clearTaskStore, DepthExceededError } from '../a2a/task-handler';
 import type { A2ATaskDeps } from '../a2a/task-handler';
@@ -290,5 +292,125 @@ describe('A2A Depth Enforcement', () => {
 
     it('MAX_A2A_DEPTH is 3', () => {
         expect(MAX_A2A_DEPTH).toBe(3);
+    });
+});
+
+// ── loadInvocationGuardConfig ────────────────────────────────────────────────
+
+describe('loadInvocationGuardConfig', () => {
+    const envKeys = [
+        'MAX_REMOTE_INVOCATIONS_PER_SESSION',
+        'MAX_UNIQUE_AGENTS_PER_SESSION',
+        'A2A_INVOCATION_COOLDOWN_MS',
+        'A2A_INBOUND_RATE_LIMIT_PER_MIN',
+    ];
+
+    // Save and restore env vars around each test
+    let savedEnv: Record<string, string | undefined>;
+
+    beforeEach(() => {
+        savedEnv = {};
+        for (const key of envKeys) {
+            savedEnv[key] = process.env[key];
+            delete process.env[key];
+        }
+    });
+
+    afterEach(() => {
+        for (const key of envKeys) {
+            if (savedEnv[key] !== undefined) {
+                process.env[key] = savedEnv[key];
+            } else {
+                delete process.env[key];
+            }
+        }
+    });
+
+    it('returns correct defaults when no env vars are set', () => {
+        const config = loadInvocationGuardConfig();
+        expect(config.maxInvocationsPerSession).toBe(10);
+        expect(config.maxUniqueAgentsPerSession).toBe(3);
+        expect(config.cooldownMs).toBe(5000);
+        expect(config.inboundRateLimitPerMin).toBe(5);
+        expect(config.inboundRateLimitWindowMs).toBe(60_000);
+    });
+
+    it('reads values from environment variables', () => {
+        process.env.MAX_REMOTE_INVOCATIONS_PER_SESSION = '20';
+        process.env.MAX_UNIQUE_AGENTS_PER_SESSION = '8';
+        process.env.A2A_INVOCATION_COOLDOWN_MS = '2000';
+        process.env.A2A_INBOUND_RATE_LIMIT_PER_MIN = '15';
+
+        const config = loadInvocationGuardConfig();
+        expect(config.maxInvocationsPerSession).toBe(20);
+        expect(config.maxUniqueAgentsPerSession).toBe(8);
+        expect(config.cooldownMs).toBe(2000);
+        expect(config.inboundRateLimitPerMin).toBe(15);
+    });
+
+    it('falls back to defaults for invalid (non-numeric) env values', () => {
+        process.env.MAX_REMOTE_INVOCATIONS_PER_SESSION = 'abc';
+        process.env.MAX_UNIQUE_AGENTS_PER_SESSION = '';
+        process.env.A2A_INVOCATION_COOLDOWN_MS = 'NaN';
+        process.env.A2A_INBOUND_RATE_LIMIT_PER_MIN = '-5';
+
+        const config = loadInvocationGuardConfig();
+        expect(config.maxInvocationsPerSession).toBe(10);
+        expect(config.maxUniqueAgentsPerSession).toBe(3);
+        expect(config.cooldownMs).toBe(5000);
+        expect(config.inboundRateLimitPerMin).toBe(5);
+    });
+
+    it('falls back to defaults for zero or negative values', () => {
+        process.env.MAX_REMOTE_INVOCATIONS_PER_SESSION = '0';
+        process.env.MAX_UNIQUE_AGENTS_PER_SESSION = '0';
+        process.env.A2A_INBOUND_RATE_LIMIT_PER_MIN = '0';
+
+        const config = loadInvocationGuardConfig();
+        expect(config.maxInvocationsPerSession).toBe(10);
+        expect(config.maxUniqueAgentsPerSession).toBe(3);
+        expect(config.inboundRateLimitPerMin).toBe(5);
+    });
+
+    it('allows cooldownMs of 0', () => {
+        process.env.A2A_INVOCATION_COOLDOWN_MS = '0';
+        const config = loadInvocationGuardConfig();
+        expect(config.cooldownMs).toBe(0);
+    });
+});
+
+// ── Inbound Rate Limiter — sweep & pruning ──────────────────────────────────
+
+describe('InboundA2ARateLimiter — sweep and pruning', () => {
+    it('prunes expired timestamps on check', () => {
+        // Use a very short window so old timestamps expire fast
+        const limiter = new InboundA2ARateLimiter({
+            inboundRateLimitPerMin: 100,
+            inboundRateLimitWindowMs: 1, // 1ms window
+        });
+
+        limiter.record('agent-x');
+        limiter.record('agent-x');
+
+        // Wait for window to expire
+        const start = Date.now();
+        while (Date.now() - start < 5) { /* spin */ }
+
+        // After expiry, check should pass (timestamps pruned)
+        const result = limiter.check('agent-x');
+        expect(result.allowed).toBe(true);
+
+        limiter.stop();
+    });
+
+    it('stop is idempotent', () => {
+        const limiter = new InboundA2ARateLimiter({
+            inboundRateLimitPerMin: 5,
+            inboundRateLimitWindowMs: 60_000,
+        });
+
+        limiter.stop();
+        limiter.stop(); // second call should not throw
+        expect(true).toBe(true);
     });
 });
