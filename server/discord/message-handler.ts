@@ -36,6 +36,7 @@ import {
     subscribeForInlineResponse,
     resolveDefaultAgent,
 } from './thread-manager';
+import { resolveDiscordContact } from './contact-linker';
 
 const log = createLogger('DiscordMessageHandler');
 
@@ -105,6 +106,16 @@ const permDenyCooldowns = new Map<string, number>();
 export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMessageData): Promise<void> {
     // Ignore bot messages
     if (data.author.bot) return;
+
+    // Auto-link Discord user to contact identity (best-effort, non-blocking)
+    try {
+        resolveDiscordContact(ctx.db, data.author.id, data.author.username);
+    } catch (err) {
+        log.warn('Failed to resolve Discord contact', {
+            authorId: data.author.id,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
 
     const text = data.content;
     if (!text) return;
