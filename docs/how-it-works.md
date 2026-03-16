@@ -68,7 +68,7 @@ The agent runs until it finishes or you stop it. Sessions can be paused and resu
 
 ## Tool System (MCP)
 
-Agents interact with the world through **38 MCP tools**. Each tool is a function the LLM can call:
+Agents interact with the world through **44 MCP tools**. Each tool is a function the LLM can call:
 
 | Category | Examples |
 |----------|----------|
