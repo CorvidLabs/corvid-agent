@@ -7,11 +7,43 @@ describe('DedupService', () => {
     let service: DedupService;
 
     beforeEach(() => {
+        DedupService.resetGlobal();
         service = new DedupService();
     });
 
     afterEach(() => {
         service.stop();
+        DedupService.resetGlobal();
+    });
+
+    // -----------------------------------------------------------------------
+    // Singleton management
+    // -----------------------------------------------------------------------
+
+    describe('singleton management', () => {
+        test('init() creates the global singleton', () => {
+            const s = DedupService.init();
+            expect(s).toBeInstanceOf(DedupService);
+            expect(DedupService.global()).toBe(s);
+        });
+
+        test('init() returns the same instance on repeated calls', () => {
+            const a = DedupService.init();
+            const b = DedupService.init();
+            expect(a).toBe(b);
+        });
+
+        test('global() creates a fallback instance if init() was not called', () => {
+            const g = DedupService.global();
+            expect(g).toBeInstanceOf(DedupService);
+        });
+
+        test('resetGlobal() clears the singleton so a new one is created', () => {
+            const a = DedupService.init();
+            DedupService.resetGlobal();
+            const b = DedupService.global();
+            expect(b).not.toBe(a);
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -91,6 +123,11 @@ describe('DedupService', () => {
             service.clear('test');
             expect(service.has('test', 'a')).toBe(false);
             expect(service.has('test', 'b')).toBe(false);
+        });
+
+        test('is a no-op for unregistered namespace', () => {
+            // Should not throw
+            service.clear('nonexistent');
         });
     });
 
@@ -206,6 +243,13 @@ describe('DedupService', () => {
             expect(m.evictions).toBe(1);
         });
 
+        test('tracks size accurately', () => {
+            service.register('test', { maxSize: 100, ttlMs: 60_000 });
+            service.markSeen('test', 'a');
+            service.markSeen('test', 'b');
+            expect(service.metrics('test')!.size).toBe(2);
+        });
+
         test('returns null for unregistered namespace', () => {
             expect(service.metrics('unknown')).toBeNull();
         });
@@ -221,6 +265,10 @@ describe('DedupService', () => {
             expect(Object.keys(all)).toContain('ns2');
             expect(all['ns1'].size).toBe(1);
             expect(all['ns2'].size).toBe(1);
+        });
+
+        test('allMetrics returns empty object when no namespaces registered', () => {
+            expect(service.allMetrics()).toEqual({});
         });
     });
 
@@ -238,6 +286,79 @@ describe('DedupService', () => {
         test('isDuplicate auto-registers namespace', () => {
             expect(service.isDuplicate('auto', 'key1')).toBe(false);
             expect(service.isDuplicate('auto', 'key1')).toBe(true);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // start() / stop()
+    // -----------------------------------------------------------------------
+
+    describe('start / stop', () => {
+        test('start is idempotent — repeated calls do not throw', () => {
+            service.start();
+            service.start();
+            service.stop();
+        });
+
+        test('stop is safe to call multiple times', () => {
+            service.start();
+            service.stop();
+            service.stop();
+        });
+
+        test('stop without start does not throw', () => {
+            service.stop();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // register() idempotency
+    // -----------------------------------------------------------------------
+
+    describe('register idempotency', () => {
+        test('second register with different config is a no-op (first config wins)', () => {
+            service.register('ns', { maxSize: 3 });
+            service.register('ns', { maxSize: 999 });
+            // If maxSize=3 stuck, inserting 4 items leaves 3
+            for (let i = 0; i < 4; i++) service.markSeen('ns', `k${i}`);
+            expect(service.metrics('ns')!.size).toBe(3);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Edge cases
+    // -----------------------------------------------------------------------
+
+    describe('edge cases', () => {
+        test('handles empty string keys', () => {
+            expect(service.isDuplicate('ns', '')).toBe(false);
+            expect(service.isDuplicate('ns', '')).toBe(true);
+        });
+
+        test('handles empty string namespace', () => {
+            expect(service.isDuplicate('', 'k')).toBe(false);
+            expect(service.isDuplicate('', 'k')).toBe(true);
+        });
+
+        test('handles keys with special characters', () => {
+            const special = 'key-with:special/chars?and=query&params#hash';
+            expect(service.isDuplicate('ns', special)).toBe(false);
+            expect(service.isDuplicate('ns', special)).toBe(true);
+        });
+
+        test('handles very long keys', () => {
+            const longKey = 'k'.repeat(10_000);
+            expect(service.isDuplicate('ns', longKey)).toBe(false);
+            expect(service.isDuplicate('ns', longKey)).toBe(true);
+        });
+
+        test('maxSize of 1 evicts immediately on second insert', () => {
+            service.register('tiny', { maxSize: 1, ttlMs: 60_000 });
+            service.markSeen('tiny', 'first');
+            service.markSeen('tiny', 'second');
+            expect(service.metrics('tiny')!.size).toBe(1);
+            expect(service.has('tiny', 'first')).toBe(false);
+            expect(service.has('tiny', 'second')).toBe(true);
         });
     });
 
