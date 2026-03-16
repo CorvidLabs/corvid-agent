@@ -26,6 +26,7 @@ import type { ProcessManager } from './manager';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import type { OwnerQuestionManager } from './owner-question-manager';
 import type { ScheduleActionType } from '../../shared/types/schedules';
+import { SessionInvocationBudget } from '../a2a/invocation-guard';
 import { createLogger } from '../lib/logger';
 
 const log = createLogger('McpServiceContainer');
@@ -115,6 +116,7 @@ export class McpServiceContainer {
             permissionBroker: this.services.permissionBroker,
             processManager: this.services.processManager,
             flockDirectoryService: this.services.flockDirectoryService,
+            invocationBudget: new SessionInvocationBudget(),
         };
     }
 }

@@ -4,9 +4,12 @@ import { textResult, errorResult } from './types';
 import { invokeRemoteAgent, discoverAgent } from '../../a2a/client';
 import { MarketplaceService, InsufficientCreditsError } from '../../marketplace/service';
 import { getBalance } from '../../db/credits';
+import type { TrustLevel } from '../../reputation/types';
 import { createLogger } from '../../lib/logger';
 
 const log = createLogger('McpToolHandlers');
+
+const TRUST_ORDER: TrustLevel[] = ['untrusted', 'low', 'medium', 'high', 'verified'];
 
 export async function handleDiscoverAgent(
     ctx: McpToolContext,
@@ -81,6 +84,50 @@ export async function handleInvokeRemoteAgent(
         return errorResult('agent_url and message are required.');
     }
 
+    // ── Session invocation budget check ──────────────────────────────────
+    if (ctx.invocationBudget) {
+        const budgetCheck = ctx.invocationBudget.check(args.agent_url);
+        if (!budgetCheck.allowed) {
+            log.warn('Remote invocation blocked by session budget', {
+                sessionId: ctx.sessionId,
+                agentId: ctx.agentId,
+                targetUrl: args.agent_url,
+                reason: budgetCheck.reason,
+            });
+            return errorResult('Remote agent invocation is temporarily unavailable. Try again later.');
+        }
+    }
+
+    // ── Min trust verification ───────────────────────────────────────────
+    const minTrust = (args.min_trust as TrustLevel) ?? 'low';
+    if (ctx.reputationScorer && TRUST_ORDER.includes(minTrust)) {
+        try {
+            // Look up by agent URL as a best-effort identifier
+            const score = ctx.reputationScorer.computeScore(args.agent_url);
+            const targetTrustIdx = TRUST_ORDER.indexOf(score.trustLevel);
+            const requiredTrustIdx = TRUST_ORDER.indexOf(minTrust);
+
+            if (targetTrustIdx < requiredTrustIdx) {
+                log.warn('Remote invocation blocked by trust check', {
+                    sessionId: ctx.sessionId,
+                    agentId: ctx.agentId,
+                    targetUrl: args.agent_url,
+                    targetTrust: score.trustLevel,
+                    requiredTrust: minTrust,
+                });
+                return errorResult(
+                    `Target agent does not meet the required trust level.`,
+                );
+            }
+        } catch (err) {
+            // If reputation lookup fails, log but allow (trust system is advisory)
+            log.warn('Trust check failed, proceeding with invocation', {
+                targetUrl: args.agent_url,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
     try {
         // Pre-invocation credit check for marketplace listings
         if (args.listing_id) {
@@ -112,6 +159,11 @@ export async function handleInvokeRemoteAgent(
             }
         }
 
+        // Record invocation in budget tracker
+        if (ctx.invocationBudget) {
+            ctx.invocationBudget.record(args.agent_url);
+        }
+
         ctx.emitStatus?.(`Invoking remote agent at ${args.agent_url}...`);
 
         const timeoutMs = (args.timeout_minutes ?? 5) * 60 * 1000;
@@ -119,6 +171,15 @@ export async function handleInvokeRemoteAgent(
         const result = await invokeRemoteAgent(args.agent_url, args.message, {
             skill: args.skill,
             timeoutMs,
+        });
+
+        log.info('Remote agent invocation completed', {
+            sessionId: ctx.sessionId,
+            agentId: ctx.agentId,
+            targetUrl: args.agent_url,
+            depth: ctx.depth ?? 1,
+            success: result.success,
+            taskId: result.taskId,
         });
 
         if (!result.success) {
@@ -131,7 +192,12 @@ export async function handleInvokeRemoteAgent(
         );
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        log.error('MCP invoke_remote_agent failed', { error: message });
+        log.error('MCP invoke_remote_agent failed', {
+            error: message,
+            sessionId: ctx.sessionId,
+            agentId: ctx.agentId,
+            targetUrl: args.agent_url,
+        });
         return errorResult(`Failed to invoke remote agent: ${message}`);
     }
 }
