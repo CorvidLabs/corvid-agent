@@ -234,7 +234,7 @@ async function readStream(
                 }
             }
         }
-    } catch {
-        // Stream closed
+    } catch (err) {
+        log.debug('Claude process stream ended', { error: err instanceof Error ? err.message : String(err) });
     }
 }
