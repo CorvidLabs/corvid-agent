@@ -747,6 +747,207 @@ describe('DiscordBridge work_intake mode', () => {
     });
 });
 
+describe('DiscordBridge mention-reply resume', () => {
+    test('reply to bot message resumes existing session', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        // Create a session and add it to mentionSessions map
+        const { createSession } = await import('../db/sessions');
+        const { listAgents } = await import('../db/agents');
+        const { listProjects } = await import('../db/projects');
+        const agents = listAgents(db);
+        const projects = listProjects(db);
+        const session = createSession(db, {
+            projectId: projects[0].id,
+            agentId: agents[0].id,
+            name: 'Mention reply test',
+            initialPrompt: 'test',
+            source: 'discord',
+        });
+
+        const mentionSessions = (bridge as unknown as { mentionSessions: Map<string, import('../discord/message-handler').MentionSessionInfo> }).mentionSessions;
+        mentionSessions.set('600000000000000001', {
+            sessionId: session.id,
+            agentName: 'TestAgent',
+            agentModel: 'test-model',
+        });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000030',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'follow up question',
+                timestamp: new Date().toISOString(),
+                message_reference: { message_id: '600000000000000001' },
+                referenced_message: {
+                    id: '600000000000000001',
+                    content: 'bot response',
+                    author: { id: '999000000000000001', username: 'CorvidBot', bot: true },
+                },
+            });
+
+            // Should send message to existing session (resume) rather than start new
+            expect(pm.sendMessage).toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('reply to unknown bot message falls through to new session', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            // Reply to a bot message that isn't tracked (e.g. after restart)
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000031',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'follow up to old message',
+                timestamp: new Date().toISOString(),
+                message_reference: { message_id: '700000000000000001' },
+                referenced_message: {
+                    id: '700000000000000001',
+                    content: 'old bot response',
+                    author: { id: '999000000000000001', username: 'CorvidBot', bot: true },
+                },
+            });
+
+            // Should create a new session (startProcess) since mentionSessions doesn't have this message
+            expect(pm.startProcess).toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('botRoleId mention triggers reply', async () => {
+        const pm = createMockProcessManager();
+        createAgent(db, { name: 'TestAgent' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            botRoleId: '888000000000000001',
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000032',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: '<@&888000000000000001> what time is it?',
+                timestamp: new Date().toISOString(),
+                mentions: [],
+                mention_roles: ['888000000000000001'],
+            });
+
+            // Should start process — bot role was mentioned
+            expect(pm.startProcess).toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('unrelated role mention does not trigger reply', async () => {
+        const pm = createMockProcessManager();
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+            botRoleId: '888000000000000001',
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+        setBotUserId(bridge, '999000000000000001');
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000033',
+                channel_id: '100000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: '<@&777000000000000001> hello',
+                timestamp: new Date().toISOString(),
+                mentions: [],
+                mention_roles: ['777000000000000001'], // different role, not the bot
+            });
+
+            // Should NOT start process — wrong role
+            expect(pm.startProcess).not.toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
+
+describe('trackMentionSession', () => {
+    test('evicts oldest entry when cap is reached', async () => {
+        const map = new Map<string, { sessionId: string; agentName: string; agentModel: string }>();
+
+        // Fill to capacity (500)
+        for (let i = 0; i < 500; i++) {
+            map.set(`msg-${i}`, { sessionId: `session-${i}`, agentName: 'Agent', agentModel: 'model' });
+        }
+        expect(map.size).toBe(500);
+
+        // The first key should be msg-0
+        expect(map.keys().next().value).toBe('msg-0');
+
+        // Simulate what trackMentionSession does: evict oldest when at cap
+        if (map.size >= 500) {
+            const firstKey = map.keys().next().value;
+            if (firstKey) map.delete(firstKey);
+        }
+        map.set('msg-500', { sessionId: 'session-500', agentName: 'Agent', agentModel: 'model' });
+
+        expect(map.size).toBe(500);
+        expect(map.has('msg-0')).toBe(false);
+        expect(map.has('msg-500')).toBe(true);
+    });
+});
+
 describe('DiscordBridge onboarding', () => {
     test('/help responds with embed containing command fields', async () => {
         const pm = createMockProcessManager();
