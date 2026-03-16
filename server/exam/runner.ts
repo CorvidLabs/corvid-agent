@@ -37,14 +37,74 @@ export function isCloudModel(model: string): boolean {
 }
 
 /** Strip <think>...</think> blocks that some models emit for chain-of-thought reasoning. */
-function stripThinkBlocks(text: string): string {
+export function stripThinkBlocks(text: string): string {
     return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
 /** Detect API error messages that get stored as assistant content. */
-function isApiError(text: string): string | undefined {
+export function isApiError(text: string): string | undefined {
     const match = text.match(/^API Error:\s*(\d+)\s*(.*)/s);
     return match ? `API ${match[1]}: ${match[2].slice(0, 100)}` : undefined;
+}
+
+/**
+ * Extract tool_use blocks from SDK assistant message content.
+ * SDK responses include tool calls as content blocks with type: 'tool_use'.
+ */
+export function extractSdkToolCalls(
+    content: unknown[],
+): Array<{ name: string; arguments: Record<string, unknown> }> {
+    const toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
+    for (const block of content) {
+        if ((block as any).type === 'tool_use' && (block as any).name) {
+            const toolBlock = block as { type: string; name: string; input?: Record<string, unknown> };
+            toolCalls.push({ name: toolBlock.name, arguments: toolBlock.input ?? {} });
+        }
+    }
+    return toolCalls;
+}
+
+/**
+ * Detect model provider from model name.
+ * Exported for testability.
+ */
+export function detectProvider(model: string): string {
+    // Claude models always go through Anthropic
+    if (model.startsWith('claude-')) {
+        return 'anthropic';
+    }
+    // Cloud models go through Ollama (proxied to their cloud)
+    if (isCloudModel(model)) {
+        return 'ollama';
+    }
+    // Ollama models typically have format "name:tag" (e.g. qwen3:8b, llama3.1:8b)
+    // or are known open-source model families
+    const ollamaPatterns = [
+        /:/, // contains colon (qwen3:8b, llama3:70b, etc.)
+        /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder|minimax|glm|kimi|gpt-oss)/i,
+    ];
+    if (ollamaPatterns.some(p => p.test(model))) {
+        return 'ollama';
+    }
+    // Default to ollama for exam (most likely local model testing)
+    return 'ollama';
+}
+
+/**
+ * Build an effective prompt for a follow-up turn, incorporating conversation history.
+ * Exported for testability.
+ */
+export function buildConversationPrompt(
+    userMessage: string,
+    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+): string {
+    if (conversationHistory.length === 0) {
+        return userMessage;
+    }
+    const historyText = conversationHistory
+        .map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
+        .join('\n\n');
+    return `[Previous conversation]\n${historyText}\n\n[Current message — respond to this]\n${userMessage}`;
 }
 
 export class ExamRunner {
@@ -92,25 +152,7 @@ export class ExamRunner {
     }
 
     private detectProvider(model: string): string {
-        // Claude models always go through Anthropic
-        if (model.startsWith('claude-')) {
-            return 'anthropic';
-        }
-        // Cloud models go through Ollama (proxied to their cloud)
-        if (isCloudModel(model)) {
-            return 'ollama';
-        }
-        // Ollama models typically have format "name:tag" (e.g. qwen3:8b, llama3.1:8b)
-        // or are known open-source model families
-        const ollamaPatterns = [
-            /:/, // contains colon (qwen3:8b, llama3:70b, etc.)
-            /^(qwen|llama|mistral|gemma|phi|deepseek|codellama|vicuna|orca|neural|solar|yi|command-r|starcoder|minimax|glm|kimi|gpt-oss)/i,
-        ];
-        if (ollamaPatterns.some(p => p.test(model))) {
-            return 'ollama';
-        }
-        // Default to ollama for exam (most likely local model testing)
-        return 'ollama';
+        return detectProvider(model);
     }
 
     /** Query Ollama's /api/show endpoint for model parameter size. */
@@ -259,15 +301,7 @@ export class ExamRunner {
             const userMessage = allTurns[i];
 
             // Build prompt with conversation history for follow-up turns
-            let effectivePrompt: string;
-            if (i === 0) {
-                effectivePrompt = userMessage;
-            } else {
-                const historyText = conversationHistory
-                    .map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
-                    .join('\n\n');
-                effectivePrompt = `[Previous conversation]\n${historyText}\n\n[Current message — respond to this]\n${userMessage}`;
-            }
+            const effectivePrompt = buildConversationPrompt(userMessage, conversationHistory);
 
             lastResponse = await this.executeSingleTurnCase(examCase, projectId, agentId, effectivePrompt);
 
@@ -337,12 +371,7 @@ export class ExamRunner {
                             if (text) contentParts.push(text);
                             // Extract tool calls from SDK tool_use content blocks
                             if (Array.isArray(event.message.content)) {
-                                for (const block of event.message.content) {
-                                    if ((block as any).type === 'tool_use' && (block as any).name) {
-                                        const toolBlock = block as { type: string; name: string; input?: Record<string, unknown> };
-                                        toolCalls.push({ name: toolBlock.name, arguments: toolBlock.input ?? {} });
-                                    }
-                                }
+                                toolCalls.push(...extractSdkToolCalls(event.message.content));
                             }
                         }
                         turns++;
