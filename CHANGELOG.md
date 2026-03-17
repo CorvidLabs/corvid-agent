@@ -2,6 +2,96 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.0] - 2026-03-17
+
+### Added
+- **Adaptive inline response** — skip progress embed for quick replies (#1198)
+- **On-chain memory reader and sync tools** — read and sync agent memories from localnet (#1196)
+- **Multi-agent dashboard UX** — onboarding, flock browser, profiles, analytics (#1197)
+
+### Fixed
+- **External MCP configs persist on session resume** — fix merge of process.env into SDK MCP server environment (#1193)
+
+### Docs
+- Add troubleshooting, configuration, and CLI reference (#1195)
+
+## [0.35.1] - 2026-03-17
+
+### Fixed
+- Merge process.env into SDK MCP server environment (#1193)
+
+## [0.35.0] - 2026-03-17
+
+### Added
+- **Two-tier memory architecture** — session auto-save with localnet long-term and SQLite short-term (#1186, #1188)
+- **External MCP servers** — add external MCP servers to SDK path, expand gallery to 15 servers (#1191)
+- **Proactive context compression** — compress context before crash (#1189)
+
+### Changed
+- Decompose route-registry.ts (1452 LOC) into domain-colocated modules (#1190)
+
+### Docs
+- Add JSDoc to exported functions in server/lib/ (#1187)
+- Sync README and deep-dive stats with v0.34.0 (#1179)
+
+## [0.34.0] - 2026-03-16
+
+### Added
+- **Reputation score explanation** — per-component reasoning for reputation scores (#1172)
+- **Layer 0 governance** — tiered permission architecture (#1171)
+- **Activity breakdown stats** — added to reputation detail panel (#1169)
+
+### Fixed
+- Persist Discord mention-reply sessions to survive restarts (#1170)
+- Hide misleading reputation scores for agents with no activity (#1177)
+
+### Changed
+- Decompose schema.ts into domain-colocated schema files (#1178)
+- Update spec_files count to 152 (#1175)
+
+### Deps
+- Bump web-tree-sitter from 0.25.10 to 0.26.7 (#1152)
+
+### Docs
+- Add Scripts Reference table to CONTRIBUTING.md (#1166)
+
+## [0.33.0] - 2026-03-16
+
+### Added
+- **Exam system overhaul** — fix SDK tool detection, expand to 28 cases (#1159)
+- **Discord reactions to reputation feedback** (#1161, #1164)
+- **Auto-link Discord users to cross-platform contacts** (#1160, #1163)
+- **Context usage metrics** — expose to clients (#1158)
+- **Discord author username** — pass to agent prompt context (#1157)
+- **Expand exam framework** — from 18 to 30 test cases (#1146)
+- **Agent invocation guardrails** — security hardening (#1147)
+
+### Fixed
+- Add logging to silent catch blocks for better observability (#1162)
+- Resolve stale TODO(#1067) in messaging.ts (#1143)
+
+### Changed
+- Decompose discord commands.ts into command-handlers/ (#1144)
+- Extract marketplace schemas into domain-colocated file (#1139)
+
+### Security
+- Add Zod input validation to audit log query endpoint (#1138)
+
+### Tests
+- Add coverage for memory decay, provider fallback, and permission broker (#1153)
+
+### CI
+- Bump oven-sh/setup-bun from 2.1.3 to 2.2.0 (#1150)
+- Bump actions/upload-artifact from 4.6.2 to 7.0.0 (#1149)
+- Bump docker/metadata-action from 5.10.0 to 6.0.0 (#1148)
+- Reduce workflow minutes by trimming non-essential triggers (#1140, #1142, #1145)
+
+### Deps
+- Bump jsdom from 28.1.0 to 29.0.0 in /client (#1151)
+
+### Docs
+- Sync stale stats — version, test counts, MCP tool counts (#1141)
+
 ## [0.32.0] - 2026-03-16
 
 ### Added
