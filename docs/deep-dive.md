@@ -38,7 +38,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Server modules | 47 |
 | API routes | 44 modules (~205 endpoints) |
 | Database tables | 93 |
-| Database migrations | 15 (squashed baseline) |
+| Database migrations | 16 (squashed baseline) |
 | MCP tools | 44 corvid_* handlers |
 | Unit tests | 7,718 across 320 files |
 | E2E tests | 360 across 31 Playwright specs |
@@ -241,7 +241,6 @@ Localnet serves double duty: inter-agent communication _and_ the agent's long-te
 - Dashboard UI overhaul — cyberpunk theme, WCAG AAA (#604)
 - Work task priority queue with preemption (#487)
 - Stats collection automation in CI (#537)
-- Nevermore NFT bridge (#539)
 
 **Future:**
 - Smart contract agreements between agents
