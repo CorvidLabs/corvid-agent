@@ -5,7 +5,7 @@ import { ReputationService } from '../../core/services/reputation.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { ReputationScore, ReputationEvent } from '../../core/models/reputation.model';
+import type { ReputationScore, ReputationEvent, AgentReputationStats } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
@@ -109,6 +109,78 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
                                     </div>
                                 }
                             </div>
+
+                            @if (stats()) {
+                                <h4>Activity Breakdown</h4>
+                                <div class="stats-grid">
+                                    @if (stats()!.feedbackTotal.total > 0) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon" data-type="positive">&#128077;</div>
+                                            <div class="stat-card__value">{{ stats()!.feedbackTotal.positive }}</div>
+                                            <div class="stat-card__label">Likes</div>
+                                        </div>
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon" data-type="negative">&#128078;</div>
+                                            <div class="stat-card__value">{{ stats()!.feedbackTotal.negative }}</div>
+                                            <div class="stat-card__label">Dislikes</div>
+                                        </div>
+                                    }
+                                    @if (stats()!.events['task_completed']; as tc) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon" data-type="positive">&#10003;</div>
+                                            <div class="stat-card__value">{{ tc.count }}</div>
+                                            <div class="stat-card__label">Tasks Done</div>
+                                        </div>
+                                    }
+                                    @if (stats()!.events['task_failed']; as tf) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon" data-type="negative">&#10007;</div>
+                                            <div class="stat-card__value">{{ tf.count }}</div>
+                                            <div class="stat-card__label">Tasks Failed</div>
+                                        </div>
+                                    }
+                                    @if (stats()!.events['session_completed']; as sc) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon">&#9881;</div>
+                                            <div class="stat-card__value">{{ sc.count }}</div>
+                                            <div class="stat-card__label">Sessions</div>
+                                        </div>
+                                    }
+                                    @if (stats()!.events['attestation_published']; as ap) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon">&#128279;</div>
+                                            <div class="stat-card__value">{{ ap.count }}</div>
+                                            <div class="stat-card__label">Attestations</div>
+                                        </div>
+                                    }
+                                    @if (stats()!.events['improvement_loop_completed']; as ilc) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon" data-type="positive">&#8634;</div>
+                                            <div class="stat-card__value">{{ ilc.count }}</div>
+                                            <div class="stat-card__label">Improvements</div>
+                                        </div>
+                                    }
+                                    @if (stats()!.events['security_violation']; as sv) {
+                                        <div class="stat-card">
+                                            <div class="stat-card__icon" data-type="negative">&#9888;</div>
+                                            <div class="stat-card__value">{{ sv.count }}</div>
+                                            <div class="stat-card__label">Violations</div>
+                                        </div>
+                                    }
+                                </div>
+                                @if (hasFeedbackSources()) {
+                                    <h4>Feedback by Source</h4>
+                                    <div class="feedback-sources">
+                                        @for (src of feedbackSources(); track src.source) {
+                                            <div class="source-row">
+                                                <span class="source-row__name">{{ src.source }}</span>
+                                                <span class="source-row__positive">+{{ src.positive }}</span>
+                                                <span class="source-row__negative">-{{ src.negative }}</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
 
                             @if (s.attestationHash) {
                                 <p class="attestation">Attestation: <code>{{ s.attestationHash }}</code></p>
@@ -226,6 +298,30 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
         .attestation { font-size: 0.8rem; color: var(--text-secondary); margin: 1rem 0; }
         .attestation code { color: var(--accent-green); font-size: 0.75rem; }
 
+        /* Stats grid */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem;
+        }
+        .stat-card {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem; text-align: center;
+        }
+        .stat-card__icon { font-size: 1.2rem; margin-bottom: 0.25rem; }
+        .stat-card__icon[data-type="positive"] { color: var(--accent-green); }
+        .stat-card__icon[data-type="negative"] { color: var(--accent-red); }
+        .stat-card__value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+        .stat-card__label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+
+        /* Feedback sources */
+        .feedback-sources { display: flex; flex-direction: column; gap: 0.25rem; }
+        .source-row {
+            display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0;
+            font-size: 0.8rem; border-bottom: 1px solid var(--border);
+        }
+        .source-row__name { font-weight: 600; color: var(--text-primary); flex: 1; text-transform: capitalize; }
+        .source-row__positive { color: var(--accent-green); font-weight: 600; }
+        .source-row__negative { color: var(--accent-red); font-weight: 600; }
+
         /* Events */
         .events-list { display: flex; flex-direction: column; gap: 0.25rem; }
         .event-row {
@@ -272,6 +368,7 @@ export class ReputationComponent implements OnInit {
 
     protected readonly selectedAgentId = signal<string | null>(null);
     protected readonly selectedScore = signal<ReputationScore | null>(null);
+    protected readonly stats = signal<AgentReputationStats | null>(null);
     protected readonly computing = signal(false);
     protected readonly loadError = signal(false);
 
@@ -324,12 +421,31 @@ export class ReputationComponent implements OnInit {
         return this.eventLabels[eventType] ?? eventType;
     }
 
+    protected hasFeedbackSources(): boolean {
+        const s = this.stats();
+        return !!s && Object.keys(s.feedback).length > 0;
+    }
+
+    protected feedbackSources(): { source: string; positive: number; negative: number }[] {
+        const s = this.stats();
+        if (!s) return [];
+        return Object.entries(s.feedback).map(([source, counts]) => ({
+            source,
+            positive: counts.positive,
+            negative: counts.negative,
+        }));
+    }
+
     async selectAgent(agentId: string): Promise<void> {
         this.selectedAgentId.set(agentId);
+        this.stats.set(null);
         try {
             const score = await this.reputationService.getScore(agentId);
             this.selectedScore.set(score);
-            await this.reputationService.getEvents(agentId);
+            await Promise.all([
+                this.reputationService.getEvents(agentId),
+                this.reputationService.getStats(agentId).then(s => this.stats.set(s)).catch(() => {}),
+            ]);
         } catch {
             this.selectedScore.set(null);
         }
