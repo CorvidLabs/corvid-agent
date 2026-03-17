@@ -46,6 +46,7 @@ function makeReputation(overrides: Partial<ReputationScore> = {}): ReputationSco
         },
         attestationHash: null,
         computedAt: '2026-02-16T03:00:00.000Z',
+        hasActivity: true,
         ...overrides,
     };
 }
