@@ -9,10 +9,4 @@ export default defineConfig({
   splitting: false,
   treeshake: true,
   outDir: 'dist',
-  banner: ({ format }) => {
-    if (format === 'esm') {
-      return { js: '#!/usr/bin/env node' };
-    }
-    return {};
-  },
 });
