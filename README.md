@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.33.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.34.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-7659%20unit%20%7C%20360%20E2E-brightgreen" alt="7659 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-7718%20unit%20%7C%20360%20E2E-brightgreen" alt="7718 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -137,7 +137,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **7,659** across 318 files |
+| Unit tests | **7,718** across 320 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **152** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
@@ -151,7 +151,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 | Metric | Count |
 |--------|-------|
 | MCP tools | **44** corvid_* tool handlers |
-| API endpoints | **279** across 44 route modules |
+| API endpoints | **279** across 46 route modules |
 | DB migrations | **15** (squashed baseline + incremental, 90+ tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
@@ -388,7 +388,7 @@ server/          Bun HTTP + WebSocket server
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (44 route modules)
+  routes/        REST API routes (46 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -438,7 +438,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~300 REST endpoints and a WebSocket interface across 44 route modules.
+~300 REST endpoints and a WebSocket interface across 46 route modules.
 
 **[API Reference](docs/api-reference.md)** — detailed docs with request/response examples for workflows, councils, marketplace, reputation, and billing.
 
@@ -500,17 +500,17 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 7659 server tests (~110s)
+bun test              # 7718 server tests (~110s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**7,659 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**7,718 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**149 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (379/379 files) enforced in CI via `--require-coverage 100`.
+**151 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (416/416 files) enforced in CI via `--require-coverage 100`.
 
 ---
 
