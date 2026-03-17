@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
-import type { ReputationScore, ReputationEvent } from '../models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation } from '../models/reputation.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -9,6 +9,7 @@ export class ReputationService {
 
     readonly scores = signal<ReputationScore[]>([]);
     readonly events = signal<ReputationEvent[]>([]);
+    readonly explanation = signal<ScoreExplanation | null>(null);
     readonly loading = signal(false);
 
     async loadScores(): Promise<void> {
@@ -63,6 +64,14 @@ export class ReputationService {
         );
         this.events.set(events);
         return events;
+    }
+
+    async getExplanation(agentId: string): Promise<ScoreExplanation> {
+        const explanation = await firstValueFrom(
+            this.api.get<ScoreExplanation>(`/reputation/explain/${agentId}`),
+        );
+        this.explanation.set(explanation);
+        return explanation;
     }
 
     async getAttestation(agentId: string): Promise<{ hash: string | null }> {

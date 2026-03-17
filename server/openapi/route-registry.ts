@@ -1053,6 +1053,12 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
     {
+        method: 'GET', path: '/api/reputation/explain/{agentId}',
+        summary: 'Get detailed score explanation with per-component reasoning',
+        tags: ['Reputation'],
+        auth: 'required',
+    },
+    {
         method: 'POST', path: '/api/reputation/events',
         summary: 'Record reputation event',
         tags: ['Reputation'],

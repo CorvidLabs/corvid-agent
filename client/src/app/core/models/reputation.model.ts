@@ -37,3 +37,33 @@ export interface ReputationEvent {
     metadata: Record<string, unknown>;
     createdAt: string;
 }
+
+export interface ComponentExplanation {
+    component: keyof ReputationComponents;
+    score: number;
+    weight: number;
+    weightedContribution: number;
+    isDefault: boolean;
+    reason: string;
+    evidence: Record<string, unknown>;
+    recentEvents: ReputationEventRecord[];
+}
+
+export interface ReputationEventRecord {
+    id: string;
+    agent_id: string;
+    event_type: string;
+    score_impact: number;
+    metadata: string;
+    created_at: string;
+}
+
+export interface ScoreExplanation {
+    agentId: string;
+    overallScore: number;
+    trustLevel: TrustLevel;
+    decayFactor: number;
+    rawScore: number;
+    components: ComponentExplanation[];
+    computedAt: string;
+}

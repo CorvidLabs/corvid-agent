@@ -5,7 +5,7 @@ import { ReputationService } from '../../core/services/reputation.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
-import type { ReputationScore, ReputationEvent } from '../../core/models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExplanation } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-reputation',
@@ -91,24 +91,67 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
                                 <h3>{{ getAgentName(s.agentId) }}</h3>
                                 <span class="trust-badge trust-badge--lg" [attr.data-level]="s.trustLevel">{{ s.trustLevel }}</span>
                             </div>
-                            <div class="detail-components">
-                                @for (meta of componentMeta; track meta.key) {
-                                    <div class="detail-bar">
-                                        <div class="detail-bar__label">
-                                            <span>{{ meta.label }}</span>
-                                            <span class="detail-bar__weight">{{ meta.weight }}</span>
-                                        </div>
-                                        <div class="detail-bar__track">
-                                            <div
-                                                class="detail-bar__fill"
-                                                [attr.data-color]="meta.color"
-                                                [style.width.%]="s.components[meta.key]">
-                                            </div>
-                                        </div>
-                                        <span class="detail-bar__value">{{ s.components[meta.key] | number:'1.0-0' }}</span>
+
+                            @if (explanation(); as ex) {
+                                @if (ex.decayFactor < 1) {
+                                    <div class="decay-notice">
+                                        Decay applied: {{ ex.decayFactor | number:'1.3-3' }}x multiplier (raw score: {{ ex.rawScore }})
                                     </div>
                                 }
-                            </div>
+                                <div class="explain-components">
+                                    @for (comp of ex.components; track comp.component) {
+                                        <div class="explain-card" [class.explain-card--default]="comp.isDefault">
+                                            <div class="explain-card__header">
+                                                <span class="explain-card__name">{{ getComponentLabel(comp.component) }}</span>
+                                                <span class="explain-card__weight">{{ comp.weight * 100 | number:'1.0-0' }}%</span>
+                                                <span class="explain-card__score" [attr.data-color]="getComponentColor(comp.component)">
+                                                    {{ comp.score | number:'1.0-0' }}
+                                                </span>
+                                                @if (comp.isDefault) {
+                                                    <span class="default-badge">DEFAULT</span>
+                                                }
+                                            </div>
+                                            <div class="explain-card__reason">{{ comp.reason }}</div>
+                                            <div class="explain-card__contribution">
+                                                Contributes {{ comp.weightedContribution | number:'1.1-1' }} to overall score
+                                            </div>
+                                            @if (comp.recentEvents.length > 0) {
+                                                <div class="explain-card__events">
+                                                    <span class="explain-card__events-label">Evidence ({{ comp.recentEvents.length }} events):</span>
+                                                    @for (ev of comp.recentEvents; track ev.id) {
+                                                        <div class="explain-event">
+                                                            <span class="explain-event__type" [attr.data-type]="ev.event_type">{{ getEventLabel(ev.event_type) }}</span>
+                                                            <span class="explain-event__impact" [attr.data-impact]="ev.score_impact >= 0 ? 'positive' : 'negative'">
+                                                                {{ ev.score_impact >= 0 ? '+' : '' }}{{ ev.score_impact }}
+                                                            </span>
+                                                            <span class="explain-event__time">{{ ev.created_at | relativeTime }}</span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            } @else {
+                                <div class="detail-components">
+                                    @for (meta of componentMeta; track meta.key) {
+                                        <div class="detail-bar">
+                                            <div class="detail-bar__label">
+                                                <span>{{ meta.label }}</span>
+                                                <span class="detail-bar__weight">{{ meta.weight }}</span>
+                                            </div>
+                                            <div class="detail-bar__track">
+                                                <div
+                                                    class="detail-bar__fill"
+                                                    [attr.data-color]="meta.color"
+                                                    [style.width.%]="s.components[meta.key]">
+                                                </div>
+                                            </div>
+                                            <span class="detail-bar__value">{{ s.components[meta.key] | number:'1.0-0' }}</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
 
                             @if (s.attestationHash) {
                                 <p class="attestation">Attestation: <code>{{ s.attestationHash }}</code></p>
@@ -117,7 +160,7 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
                             }
                         }
 
-                        <h4>Recent Events</h4>
+                        <h4>All Recent Events</h4>
                         @if (reputationService.events().length === 0) {
                             <p class="empty">No events recorded.</p>
                         } @else {
@@ -226,6 +269,53 @@ import type { ReputationScore, ReputationEvent } from '../../core/models/reputat
         .attestation { font-size: 0.8rem; color: var(--text-secondary); margin: 1rem 0; }
         .attestation code { color: var(--accent-green); font-size: 0.75rem; }
 
+        /* Decay notice */
+        .decay-notice {
+            background: var(--accent-yellow-dim, rgba(255, 193, 7, 0.1)); border: 1px solid var(--accent-yellow, #ffc107);
+            border-radius: var(--radius); padding: 0.5rem 0.75rem; margin-bottom: 1rem;
+            font-size: 0.8rem; color: var(--accent-yellow, #ffc107);
+        }
+
+        /* Explanation cards */
+        .explain-components { display: flex; flex-direction: column; gap: 0.75rem; }
+        .explain-card {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+        }
+        .explain-card--default { border-left: 3px solid var(--accent-yellow, #ffc107); }
+        .explain-card__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+        .explain-card__name { font-weight: 600; font-size: 0.85rem; color: var(--text-primary); }
+        .explain-card__weight { font-size: 0.7rem; color: var(--text-secondary); }
+        .explain-card__score { font-size: 0.85rem; font-weight: 700; margin-left: auto; }
+        .explain-card__score[data-color="green"] { color: var(--accent-green); }
+        .explain-card__score[data-color="yellow"] { color: var(--accent-yellow, #ffc107); }
+        .explain-card__score[data-color="cyan"] { color: var(--accent-cyan); }
+        .explain-card__score[data-color="purple"] { color: var(--accent-purple, #b388ff); }
+        .explain-card__score[data-color="orange"] { color: var(--accent-orange, #ff9100); }
+        .default-badge {
+            font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; font-weight: 700;
+            background: var(--accent-yellow-dim, rgba(255, 193, 7, 0.1));
+            color: var(--accent-yellow, #ffc107); border: 1px solid var(--accent-yellow, #ffc107);
+        }
+        .explain-card__reason { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.3rem; }
+        .explain-card__contribution { font-size: 0.7rem; color: var(--text-secondary); opacity: 0.7; }
+        .explain-card__events { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+        .explain-card__events-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; display: block; margin-bottom: 0.3rem; }
+        .explain-event { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; font-size: 0.75rem; }
+        .explain-event__type { font-weight: 600; color: var(--text-primary); }
+        .explain-event__type[data-type="task_completed"],
+        .explain-event__type[data-type="credit_earned"],
+        .explain-event__type[data-type="session_completed"] { color: var(--accent-green); }
+        .explain-event__type[data-type="task_failed"],
+        .explain-event__type[data-type="security_violation"] { color: var(--accent-red); }
+        .explain-event__type[data-type="feedback_received"],
+        .explain-event__type[data-type="review_received"] { color: var(--accent-yellow, #ffc107); }
+        .explain-event__type[data-type="credit_spent"] { color: var(--accent-cyan); }
+        .explain-event__impact { font-weight: 600; min-width: 2.5em; }
+        .explain-event__impact[data-impact="positive"] { color: var(--accent-green); }
+        .explain-event__impact[data-impact="negative"] { color: var(--accent-red); }
+        .explain-event__time { color: var(--text-secondary); margin-left: auto; }
+
         /* Events */
         .events-list { display: flex; flex-direction: column; gap: 0.25rem; }
         .event-row {
@@ -272,6 +362,7 @@ export class ReputationComponent implements OnInit {
 
     protected readonly selectedAgentId = signal<string | null>(null);
     protected readonly selectedScore = signal<ReputationScore | null>(null);
+    protected readonly explanation = signal<ScoreExplanation | null>(null);
     protected readonly computing = signal(false);
     protected readonly loadError = signal(false);
 
@@ -324,12 +415,40 @@ export class ReputationComponent implements OnInit {
         return this.eventLabels[eventType] ?? eventType;
     }
 
+    private readonly componentLabels: Record<string, string> = {
+        taskCompletion: 'Task Completion',
+        peerRating: 'Peer Rating',
+        creditPattern: 'Credit Pattern',
+        securityCompliance: 'Security',
+        activityLevel: 'Activity',
+    };
+
+    private readonly componentColors: Record<string, string> = {
+        taskCompletion: 'green',
+        peerRating: 'yellow',
+        creditPattern: 'cyan',
+        securityCompliance: 'purple',
+        activityLevel: 'orange',
+    };
+
+    protected getComponentLabel(key: string): string {
+        return this.componentLabels[key] ?? key;
+    }
+
+    protected getComponentColor(key: string): string {
+        return this.componentColors[key] ?? 'cyan';
+    }
+
     async selectAgent(agentId: string): Promise<void> {
         this.selectedAgentId.set(agentId);
+        this.explanation.set(null);
         try {
             const score = await this.reputationService.getScore(agentId);
             this.selectedScore.set(score);
-            await this.reputationService.getEvents(agentId);
+            await Promise.all([
+                this.reputationService.getEvents(agentId),
+                this.reputationService.getExplanation(agentId).then(ex => this.explanation.set(ex)),
+            ]);
         } catch {
             this.selectedScore.set(null);
         }
