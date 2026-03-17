@@ -193,6 +193,41 @@ bun run spec:check
 bun run lint:sql
 ```
 
+### Scripts Reference
+
+Every `bun run <script>` command defined in `package.json`:
+
+| Script | Description |
+|--------|-------------|
+| `try` | Start a zero-config sandbox with in-memory DB, demo agent, and auto-open dashboard |
+| `dev` | Start the server in watch mode (auto-restarts on file changes) |
+| `start` | Start the server in production mode |
+| `test` | Run all unit tests via Bun's test runner |
+| `test:e2e` | Run Playwright end-to-end tests |
+| `test:e2e:ui` | Run Playwright end-to-end tests in interactive UI mode |
+| `build:client` | Build the Angular client for production |
+| `dev:client` | Start the Angular client dev server |
+| `migrate` | Database migration CLI (run with `up`, `down`, or `status` subcommand) |
+| `migrate:up` | Apply all pending database migrations |
+| `migrate:down` | Revert the most recent database migration |
+| `migrate:status` | Show current database migration status |
+| `migrate:create` | Scaffold a new timestamped migration file in `server/db/migrations/` |
+| `spec:check` | Validate module specification files in `specs/` (structure, API surface, dependencies) |
+| `spec:coverage` | Show file and module coverage report for specs |
+| `spec:coverage:require` | Fail if spec coverage is below 100% |
+| `spec:generate` | Scaffold spec files for modules that lack one |
+| `openapi:validate` | Generate and validate the OpenAPI spec from route definitions |
+| `openapi:export` | Generate the OpenAPI spec and export it to a file |
+| `lint:sql` | Scan for potential SQL injection via string interpolation in queries |
+| `rc:check` | Run automated v1.0.0-rc gating criteria checks |
+| `security:scan` | Run unified security scanner (code patterns, fetch calls, SQL injection) |
+| `stats:check` | Verify codebase statistics match values documented in README and docs |
+| `stats:update` | Collect live codebase statistics and update docs in-place |
+| `version:check` | Ensure version strings in package.json and Helm Chart.yaml stay aligned |
+| `migrate:keys` | Rotate wallet encryption keys (interactive key migration tool) |
+| `purge:test-data` | Preview and purge test/sample data from the database (dry run by default) |
+| `governance:check` | Block automated PRs from modifying governance-protected paths |
+
 ### Development Workflow
 
 1. **Start the server**: `bun run dev` — starts on `http://localhost:3000` with file watching
