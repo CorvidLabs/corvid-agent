@@ -426,5 +426,39 @@ export function agentColor(name: string): number {
          | Math.round((b + m) * 255);
 }
 
+export async function editEmbed(
+    delivery: DeliveryTracker,
+    botToken: string,
+    channelId: string,
+    messageId: string,
+    embed: DiscordEmbed,
+): Promise<void> {
+    assertSnowflake(channelId, 'channel ID');
+    assertSnowflake(messageId, 'message ID');
+    try {
+        await delivery.sendWithReceipt('discord', async () => {
+            const response = await fetch(
+                `https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bot ${botToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ embeds: [embed] }),
+                },
+            );
+
+            if (!response.ok) {
+                const error = await response.text();
+                log.error('Failed to edit Discord embed', { status: response.status, error: error.slice(0, 200) });
+                throw new Error(`Discord embed edit failed: ${response.status}`);
+            }
+        });
+    } catch {
+        // Error already logged by DeliveryTracker
+    }
+}
+
 /** Re-export splitEmbedDescription for use by other modules. */
 export { splitEmbedDescription } from './message-formatter';

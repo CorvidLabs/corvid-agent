@@ -33,7 +33,7 @@ import type { ThreadSessionInfo, ThreadCallbackInfo } from './thread-manager';
 import {
     tryRecoverThread,
     subscribeForResponseWithEmbed,
-    subscribeForInlineResponse,
+    subscribeForAdaptiveInlineResponse,
     resolveDefaultAgent,
 } from './thread-manager';
 import { resolveDiscordContact } from './contact-linker';
@@ -438,7 +438,7 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
     const agentName = agent.name;
     const agentModel = agent.model || 'unknown';
     const projectNameForFooter = project.name;
-    subscribeForInlineResponse(
+    subscribeForAdaptiveInlineResponse(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         session.id, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
@@ -477,7 +477,7 @@ async function handleMentionReplyResume(
         ctx.processManager.resumeProcess(session, contextualText);
     }
 
-    subscribeForInlineResponse(
+    subscribeForAdaptiveInlineResponse(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {

@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 12
+version: 13
 status: active
 files:
   - server/discord/bridge.ts
@@ -137,6 +137,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `sendTypingIndicator` | `(botToken, channelId)` | `Promise<void>` | Send a typing indicator (best-effort) |
 | `addReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Add a reaction to a message (best-effort) |
 | `removeReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Remove a reaction from a message (best-effort) |
+| `editEmbed` | `(delivery, botToken, channelId, messageId, embed)` | `Promise<void>` | Edit an existing embed message in-place via PATCH |
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
 | `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a standardized footer with session ID, project, agent, and status |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
@@ -164,6 +165,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `subscribeForResponseWithEmbed` | `(pm, delivery, botToken, threadCallbacks, sessionId, threadId, agentName, agentModel)` | `void` | Subscribe to agent events and stream responses as embeds |
 | `subscribeForInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel)` | `void` | Subscribe for inline reply responses (one-off @mention) |
+| `subscribeForAdaptiveInlineResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?)` | `void` | Adaptive UX subscriber: starts lightweight (typing only), upgrades to progress embed on tool use |
+| `subscribeForInlineProgressResponse` | `(pm, delivery, botToken, sessionId, channelId, replyToId, agentName, agentModel, onBotMessage?, projectName?)` | `void` | Edit-in-place progress subscriber: posts progress embed immediately, edits with tool status |
 | `tryRecoverThread` | `(db, threadSessions, threadId)` | `ThreadSessionInfo \| null` | Try to recover a thread-session mapping from the DB |
 | `recoverActiveThreadSubscriptions` | `(db, pm, delivery, botToken, threadSessions, threadCallbacks)` | `void` | Re-subscribe to all active Discord sessions on startup |
 | `archiveStaleThreads` | `(pm, delivery, botToken, lastActivity, sessions, callbacks, thresholdMs)` | `Promise<void>` | Archive threads idle beyond threshold |
@@ -530,3 +533,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-11 | corvid-agent | v10: Decomposed bridge.ts (2688→367 lines) into 6 extracted modules: `commands.ts` (slash command registration & handling), `admin-commands.ts` (/admin subcommands), `embeds.ts` (Discord API helpers & embed builders), `message-handler.ts` (message routing & dispatch), `permissions.ts` (RBAC & rate limiting), `thread-manager.ts` (thread lifecycle & streaming). Bridge.ts retained as thin orchestration layer. No behavioral changes — pure refactoring. Closes #932 |
 | 2026-03-14 | corvid-agent | v11: Added `/tasks`, `/schedule`, `/config` slash commands. `/tasks` shows active work tasks with status emojis and queue counts. `/schedule` shows active schedules with Discord relative timestamps for next/last runs. `/config` is admin-only ephemeral embed showing mode, channels, and permission settings. Updated `/help` embed. 6 new tests. Closes #894 |
 | 2026-03-16 | corvid-agent | v12: Discord reaction listener for reputation feedback. Added `GUILD_MESSAGE_REACTIONS` intent, `MESSAGE_REACTION_ADD` dispatch handler, `reaction-handler.ts` module with emoji-to-sentiment mapping, per-user rate limiting (5/min), session resolution from mentionSessions and threadSessions, `response_feedback` insertion, and reputation event recording. `setReputationScorer()` setter on DiscordBridge. 11 new tests. Closes #1161 |
+| 2026-03-17 | corvid-agent | v13: Adaptive inline response UX. Added `subscribeForAdaptiveInlineResponse` (starts lightweight, upgrades to progress embed on tool use), `subscribeForInlineProgressResponse` (always-on progress embed), and `editEmbed` helper for PATCH-ing embeds in-place. @mention replies now use adaptive subscriber for cleaner conversational UX |
