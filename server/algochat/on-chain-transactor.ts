@@ -26,6 +26,14 @@ interface CachedPublicKey {
     cachedAt: number;
 }
 
+export interface OnChainMemory {
+    key: string;
+    content: string;
+    txid: string;
+    timestamp: string;
+    confirmedRound: number;
+}
+
 export interface SendMessageOptions {
     fromAgentId: string;
     toAgentId: string;
@@ -177,6 +185,83 @@ export class OnChainTransactor {
             log.info('On-chain self-send (memory, condensed fallback)', { agentId, txid: result.txid });
             return result.txid;
         }
+    }
+
+    /**
+     * Read on-chain memories for an agent by querying self-to-self transactions.
+     * Decrypts both the AlgoChat layer and the memory content layer.
+     *
+     * @param agentId - The agent whose memories to read
+     * @param serverMnemonic - Server mnemonic for memory content decryption
+     * @param network - Network name for decryption passphrase resolution
+     * @param options - Optional filters: limit, afterRound, search query
+     * @returns Array of decrypted on-chain memories
+     */
+    async readOnChainMemories(
+        agentId: string,
+        serverMnemonic: string | null | undefined,
+        network: string | undefined,
+        options: { limit?: number; afterRound?: number; search?: string } = {},
+    ): Promise<OnChainMemory[]> {
+        if (!this.service) return [];
+
+        const account = await this.agentWalletService.getAgentChatAccount(agentId);
+        if (!account) {
+            log.debug(`No wallet for agent ${agentId}, cannot read on-chain memories`);
+            return [];
+        }
+
+        const limit = options.limit ?? 100;
+
+        // Fetch self-to-self messages using AlgoChat's built-in decryption
+        const messages = await this.service.algorandService.fetchMessages(
+            account.account,
+            account.address, // participant = self
+            options.afterRound,
+            limit,
+        );
+
+        const { decryptMemoryContent } = await import('../lib/crypto');
+        const memories: OnChainMemory[] = [];
+        const memoryPattern = /^\[MEMORY:([^\]]+)\]\s+(.+)$/s;
+
+        for (const msg of messages) {
+            // Only self-sent messages (direction = 'sent' to self)
+            if (msg.sender !== account.address) continue;
+
+            const match = msg.content.match(memoryPattern);
+            if (!match) continue;
+
+            const [, key, encrypted] = match;
+
+            try {
+                const content = await decryptMemoryContent(encrypted.trim(), serverMnemonic, network);
+
+                // Apply search filter if provided
+                if (options.search) {
+                    const searchLower = options.search.toLowerCase();
+                    if (!key.toLowerCase().includes(searchLower) && !content.toLowerCase().includes(searchLower)) {
+                        continue;
+                    }
+                }
+
+                memories.push({
+                    key,
+                    content,
+                    txid: msg.id,
+                    timestamp: msg.timestamp.toISOString(),
+                    confirmedRound: msg.confirmedRound,
+                });
+            } catch (err) {
+                log.debug('Failed to decrypt on-chain memory', {
+                    txid: msg.id,
+                    key,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+
+        return memories;
     }
 
     /**

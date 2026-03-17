@@ -11,6 +11,8 @@ import {
     handleSendMessage,
     handleSaveMemory,
     handleRecallMemory,
+    handleReadOnChainMemories,
+    handleSyncOnChainMemories,
     handleListAgents,
     handleExtendTimeout,
     handleCheckCredits,
@@ -59,6 +61,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_save_memory',
     'corvid_recall_memory',
+    'corvid_read_on_chain_memories',
+    'corvid_sync_on_chain_memories',
     'corvid_list_agents',
     'corvid_extend_timeout',
     'corvid_check_credits',
@@ -180,6 +184,29 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 },
             },
             handler: async (args) => unwrapResult(await handleRecallMemory(ctx, args as { key?: string; query?: string })),
+        },
+        {
+            name: 'corvid_read_on_chain_memories',
+            description: 'Read memories directly from on-chain storage (Algorand blockchain). Browse permanent long-term memories. Useful when local cache may be stale or empty.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    search: { type: 'string', description: 'Optional search term to filter by key or content' },
+                    limit: { type: 'number', description: 'Max memories to return (default: 50)' },
+                },
+            },
+            handler: async (args) => unwrapResult(await handleReadOnChainMemories(ctx, args as { search?: string; limit?: number })),
+        },
+        {
+            name: 'corvid_sync_on_chain_memories',
+            description: 'Sync memories from on-chain storage back to local SQLite cache. Recovers memories after database reset.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    limit: { type: 'number', description: 'Max on-chain memories to scan (default: 200)' },
+                },
+            },
+            handler: async (args) => unwrapResult(await handleSyncOnChainMemories(ctx, args as { limit?: number })),
         },
         {
             name: 'corvid_list_agents',

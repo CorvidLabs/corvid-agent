@@ -4,6 +4,7 @@ import { textResult, errorResult } from './types';
 import { saveMemory, recallMemory, searchMemories, listMemories, updateMemoryTxid, updateMemoryStatus } from '../../db/agent-memories';
 import { encryptMemoryContent } from '../../lib/crypto';
 import { createLogger } from '../../lib/logger';
+import type { OnChainMemory } from '../../algochat/on-chain-transactor';
 
 const log = createLogger('McpToolHandlers');
 
@@ -111,5 +112,90 @@ export async function handleRecallMemory(
         const message = err instanceof Error ? err.message : String(err);
         log.error('MCP recall_memory failed', { error: message });
         return errorResult(`Failed to recall memory: ${message}`);
+    }
+}
+
+export async function handleReadOnChainMemories(
+    ctx: McpToolContext,
+    args: { search?: string; limit?: number },
+): Promise<CallToolResult> {
+    try {
+        const memories = await ctx.agentMessenger.readOnChainMemories(
+            ctx.agentId,
+            ctx.serverMnemonic,
+            ctx.network,
+            { limit: args.limit ?? 50, search: args.search },
+        );
+
+        if (memories.length === 0) {
+            const msg = args.search
+                ? `No on-chain memories found matching "${args.search}".`
+                : 'No on-chain memories found.';
+            return textResult(msg);
+        }
+
+        const lines = memories.map((m: OnChainMemory) =>
+            `[${m.key}] ${m.content}\n  (txid: ${m.txid.slice(0, 12)}... | ${m.timestamp})`,
+        );
+
+        return textResult(
+            `Found ${memories.length} on-chain memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n\n')}`,
+        );
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('MCP read_on_chain_memories failed', { error: message });
+        return errorResult(`Failed to read on-chain memories: ${message}`);
+    }
+}
+
+export async function handleSyncOnChainMemories(
+    ctx: McpToolContext,
+    args: { limit?: number },
+): Promise<CallToolResult> {
+    try {
+        const memories = await ctx.agentMessenger.readOnChainMemories(
+            ctx.agentId,
+            ctx.serverMnemonic,
+            ctx.network,
+            { limit: args.limit ?? 200 },
+        );
+
+        if (memories.length === 0) {
+            return textResult('No on-chain memories found to sync.');
+        }
+
+        let synced = 0;
+        let skipped = 0;
+
+        for (const m of memories) {
+            const existing = recallMemory(ctx.db, ctx.agentId, m.key);
+            if (existing) {
+                // Update txid if local copy exists but isn't confirmed
+                if (existing.status !== 'confirmed' && m.txid) {
+                    updateMemoryTxid(ctx.db, existing.id, m.txid);
+                    synced++;
+                } else {
+                    skipped++;
+                }
+            } else {
+                // Restore memory from on-chain to local SQLite
+                const saved = saveMemory(ctx.db, {
+                    agentId: ctx.agentId,
+                    key: m.key,
+                    content: m.content,
+                });
+                updateMemoryTxid(ctx.db, saved.id, m.txid);
+                synced++;
+            }
+        }
+
+        return textResult(
+            `Sync complete: ${synced} memor${synced === 1 ? 'y' : 'ies'} restored/updated, ${skipped} already up-to-date.` +
+            `\nTotal on-chain: ${memories.length}`,
+        );
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('MCP sync_on_chain_memories failed', { error: message });
+        return errorResult(`Failed to sync on-chain memories: ${message}`);
     }
 }

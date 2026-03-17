@@ -106,6 +106,45 @@ server.tool(
 );
 
 server.tool(
+    'corvid_read_on_chain_memories',
+    'Read memories directly from on-chain storage (Algorand blockchain). ' +
+    'Browse permanent long-term memories. Useful when local cache may be stale or empty.',
+    {
+        search: z.string().optional().describe('Optional search term to filter by key or content'),
+        limit: z.number().optional().describe('Max memories to return (default: 50)'),
+    },
+    async (args) => {
+        const data = await callApi('/api/mcp/read-on-chain-memories', {
+            agentId,
+            search: args.search,
+            limit: args.limit,
+        });
+        return {
+            content: [{ type: 'text' as const, text: data.response }],
+            isError: data.isError,
+        };
+    },
+);
+
+server.tool(
+    'corvid_sync_on_chain_memories',
+    'Sync memories from on-chain storage back to local SQLite cache. Recovers memories after database reset.',
+    {
+        limit: z.number().optional().describe('Max on-chain memories to scan (default: 200)'),
+    },
+    async (args) => {
+        const data = await callApi('/api/mcp/sync-on-chain-memories', {
+            agentId,
+            limit: args.limit,
+        });
+        return {
+            content: [{ type: 'text' as const, text: data.response }],
+            isError: data.isError,
+        };
+    },
+);
+
+server.tool(
     'corvid_list_agents',
     'List all available agents you can communicate with. ' +
     'Shows agent names, IDs, and wallet addresses.',

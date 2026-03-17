@@ -510,6 +510,19 @@ export class AgentMessenger {
     }
 
     /**
+     * Read on-chain memories for an agent. Delegates to OnChainTransactor.
+     */
+    async readOnChainMemories(
+        agentId: string,
+        serverMnemonic: string | null | undefined,
+        network: string | undefined,
+        options?: { limit?: number; afterRound?: number; search?: string },
+    ): Promise<import('./on-chain-transactor').OnChainMemory[]> {
+        if (!this.transactor) return [];
+        return this.transactor.readOnChainMemories(agentId, serverMnemonic, network, options);
+    }
+
+    /**
      * Send a notification to an arbitrary Algorand address from an agent.
      * Best-effort — returns txid or null, never throws.
      */
