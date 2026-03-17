@@ -99,6 +99,41 @@ export interface ReputationEventRecord {
     created_at: string;
 }
 
+// ─── Score Explanation ──────────────────────────────────────────────────────
+
+export interface ComponentExplanation {
+    /** Component name */
+    component: keyof ReputationComponents;
+    /** Computed score (0-100) */
+    score: number;
+    /** Weight in overall calculation */
+    weight: number;
+    /** Weighted contribution to overall score */
+    weightedContribution: number;
+    /** Whether this is a default value due to insufficient data */
+    isDefault: boolean;
+    /** Human-readable reason for the score */
+    reason: string;
+    /** Raw evidence behind the score */
+    evidence: Record<string, unknown>;
+    /** Recent events that influenced this component */
+    recentEvents: ReputationEventRecord[];
+}
+
+export interface ScoreExplanation {
+    agentId: string;
+    overallScore: number;
+    trustLevel: TrustLevel;
+    /** Decay factor applied (1.0 = no decay) */
+    decayFactor: number;
+    /** Raw score before decay */
+    rawScore: number;
+    /** Per-component explanations */
+    components: ComponentExplanation[];
+    /** When computed */
+    computedAt: string;
+}
+
 // ─── Input Types ────────────────────────────────────────────────────────────
 
 export interface RecordEventInput {

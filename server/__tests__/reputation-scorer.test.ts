@@ -341,6 +341,110 @@ describe('computeAllIfStale', () => {
     });
 });
 
+// ─── computeExplanation ─────────────────────────────────────────────────────
+
+describe('computeExplanation', () => {
+    test('returns explanation with default flags for agent with no activity', () => {
+        const ex = scorer.computeExplanation('agent-1');
+
+        expect(ex.agentId).toBe('agent-1');
+        expect(ex.overallScore).toBeGreaterThanOrEqual(1);
+        expect(ex.components).toHaveLength(5);
+        expect(ex.computedAt).toBeTruthy();
+        expect(typeof ex.decayFactor).toBe('number');
+        expect(typeof ex.rawScore).toBe('number');
+
+        // Task completion should be default
+        const tc = ex.components.find(c => c.component === 'taskCompletion')!;
+        expect(tc.isDefault).toBe(true);
+        expect(tc.score).toBe(50);
+        expect(tc.reason).toContain('No tasks');
+
+        // Peer rating should be default
+        const pr = ex.components.find(c => c.component === 'peerRating')!;
+        expect(pr.isDefault).toBe(true);
+        expect(pr.score).toBe(50);
+
+        // Credit pattern should be default
+        const cp = ex.components.find(c => c.component === 'creditPattern')!;
+        expect(cp.isDefault).toBe(true);
+        expect(cp.score).toBe(50);
+
+        // Activity should be 0 (not default, just no sessions)
+        const al = ex.components.find(c => c.component === 'activityLevel')!;
+        expect(al.isDefault).toBe(false);
+        expect(al.score).toBe(0);
+        expect(al.reason).toContain('No sessions');
+    });
+
+    test('shows real data when tasks exist', () => {
+        for (let i = 0; i < 5; i++) seedWorkTask('agent-1', 'completed');
+        seedWorkTask('agent-1', 'failed');
+
+        const ex = scorer.computeExplanation('agent-1');
+        const tc = ex.components.find(c => c.component === 'taskCompletion')!;
+
+        expect(tc.isDefault).toBe(false);
+        expect(tc.score).toBe(83); // 5/6 = 83%
+        expect(tc.reason).toContain('5/6');
+        expect(tc.reason).toContain('1 failed');
+        expect(tc.evidence).toEqual(expect.objectContaining({ total: 6, completed: 5, failed: 1 }));
+    });
+
+    test('groups events by component', () => {
+        scorer.recordEvent({ agentId: 'agent-1', eventType: 'task_completed', scoreImpact: 5 });
+        scorer.recordEvent({ agentId: 'agent-1', eventType: 'security_violation', scoreImpact: -20 });
+        scorer.recordEvent({ agentId: 'agent-1', eventType: 'credit_earned', scoreImpact: 10 });
+
+        const ex = scorer.computeExplanation('agent-1');
+
+        const tc = ex.components.find(c => c.component === 'taskCompletion')!;
+        expect(tc.recentEvents.length).toBeGreaterThanOrEqual(1);
+        expect(tc.recentEvents[0].event_type).toBe('task_completed');
+
+        const sc = ex.components.find(c => c.component === 'securityCompliance')!;
+        expect(sc.recentEvents.length).toBeGreaterThanOrEqual(1);
+        expect(sc.recentEvents[0].event_type).toBe('security_violation');
+
+        const cp = ex.components.find(c => c.component === 'creditPattern')!;
+        expect(cp.recentEvents.length).toBeGreaterThanOrEqual(1);
+        expect(cp.recentEvents[0].event_type).toBe('credit_earned');
+    });
+
+    test('includes weighted contribution per component', () => {
+        const ex = scorer.computeExplanation('agent-1');
+
+        for (const comp of ex.components) {
+            expect(comp.weight).toBeGreaterThan(0);
+            expect(comp.weightedContribution).toBeCloseTo(comp.score * comp.weight, 1);
+        }
+    });
+
+    test('security compliance explains violations', () => {
+        seedReputationEvent('agent-1', 'security_violation', -20, 5);
+        seedReputationEvent('agent-1', 'security_violation', -20, 10);
+
+        const ex = scorer.computeExplanation('agent-1');
+        const sc = ex.components.find(c => c.component === 'securityCompliance')!;
+
+        expect(sc.score).toBe(60);
+        expect(sc.reason).toContain('2 security violations');
+        expect(sc.reason).toContain('-40');
+        expect(sc.evidence).toEqual(expect.objectContaining({ violations: 2 }));
+    });
+
+    test('activity explains session count', () => {
+        for (let i = 0; i < 7; i++) seedSession('agent-1', i);
+
+        const ex = scorer.computeExplanation('agent-1');
+        const al = ex.components.find(c => c.component === 'activityLevel')!;
+
+        expect(al.score).toBe(70);
+        expect(al.reason).toContain('7 sessions');
+        expect(al.evidence).toEqual(expect.objectContaining({ sessions: 7 }));
+    });
+});
+
 // ─── edge cases ─────────────────────────────────────────────────────────────
 
 describe('edge cases', () => {

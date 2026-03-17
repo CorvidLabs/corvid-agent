@@ -17,6 +17,8 @@ import type {
     ReputationRecord,
     ReputationEventRecord,
     RecordEventInput,
+    ComponentExplanation,
+    ScoreExplanation,
 } from './types';
 import { DEFAULT_WEIGHTS } from './types';
 import { createLogger } from '../lib/logger';
@@ -169,6 +171,213 @@ function computeActivityLevel(db: Database, agentId: string): number {
     if (sessions === 0) return 0;
     // 10+ sessions in 30 days = full score
     return Math.min(100, sessions * 10);
+}
+
+// ─── Component Explanation Helpers ───────────────────────────────────────────
+
+interface ComponentDetail {
+    score: number;
+    isDefault: boolean;
+    reason: string;
+    evidence: Record<string, unknown>;
+}
+
+function explainTaskCompletion(db: Database, agentId: string): ComponentDetail {
+    const row = db.query(`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+        FROM work_tasks
+        WHERE agent_id = ?
+          AND created_at > datetime('now', '-90 days')
+    `).get(agentId) as { total: number; completed: number; failed: number } | null;
+
+    const total = row?.total ?? 0;
+    const completed = row?.completed ?? 0;
+    const failed = row?.failed ?? 0;
+
+    if (total < 3) {
+        return {
+            score: 50,
+            isDefault: true,
+            reason: total === 0
+                ? 'No tasks in last 90 days. Default score of 50 applied.'
+                : `Only ${total} task${total === 1 ? '' : 's'} in last 90 days (minimum 3 needed). Default score of 50 applied.`,
+            evidence: { total, completed, failed, window: '90 days', minimumRequired: 3 },
+        };
+    }
+
+    const score = Math.round((completed / total) * 100);
+    return {
+        score,
+        isDefault: false,
+        reason: `${completed}/${total} tasks completed (${score}%). ${failed > 0 ? `${failed} failed.` : 'No failures.'}`,
+        evidence: { total, completed, failed, window: '90 days' },
+    };
+}
+
+function explainPeerRating(db: Database, agentId: string): ComponentDetail {
+    const marketRow = db.query(`
+        SELECT AVG(r.rating) as avg_rating, COUNT(*) as count
+        FROM marketplace_reviews r
+        JOIN marketplace_listings l ON l.id = r.listing_id
+        WHERE l.agent_id = ?
+    `).get(agentId) as { avg_rating: number | null; count: number } | null;
+
+    const feedbackRow = db.query(`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive,
+            SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as negative
+        FROM response_feedback
+        WHERE agent_id = ?
+          AND created_at > datetime('now', '-90 days')
+    `).get(agentId) as { total: number; positive: number; negative: number } | null;
+
+    const hasMarketplace = marketRow && marketRow.count > 0 && marketRow.avg_rating !== null;
+    const marketplaceScore = hasMarketplace ? Math.round(((marketRow!.avg_rating! - 1) / 4) * 100) : null;
+    const marketCount = marketRow?.count ?? 0;
+
+    const feedbackTotal = feedbackRow?.total ?? 0;
+    const feedbackPositive = feedbackRow?.positive ?? 0;
+    const feedbackNegative = feedbackRow?.negative ?? 0;
+    const hasFeedback = feedbackTotal >= 3;
+    const feedbackScore = hasFeedback ? Math.round((feedbackPositive / feedbackTotal) * 100) : null;
+
+    const evidence: Record<string, unknown> = {
+        marketplaceReviews: marketCount,
+        marketplaceAvgRating: marketRow?.avg_rating ?? null,
+        feedbackTotal,
+        feedbackPositive,
+        feedbackNegative,
+        feedbackMinimum: 3,
+    };
+
+    if (marketplaceScore !== null && feedbackScore !== null) {
+        const score = Math.round(marketplaceScore * 0.6 + feedbackScore * 0.4);
+        return {
+            score,
+            isDefault: false,
+            reason: `Blended: ${marketCount} marketplace reviews (avg ${marketRow!.avg_rating!.toFixed(1)}/5) + ${feedbackTotal} feedbacks (${feedbackPositive} positive, ${feedbackNegative} negative).`,
+            evidence,
+        };
+    }
+    if (marketplaceScore !== null) {
+        return {
+            score: marketplaceScore,
+            isDefault: false,
+            reason: `${marketCount} marketplace reviews, avg ${marketRow!.avg_rating!.toFixed(1)}/5. No sufficient feedback data (${feedbackTotal}/${3} minimum).`,
+            evidence,
+        };
+    }
+    if (feedbackScore !== null) {
+        return {
+            score: feedbackScore,
+            isDefault: false,
+            reason: `${feedbackTotal} feedbacks: ${feedbackPositive} positive, ${feedbackNegative} negative (${feedbackScore}% positive). No marketplace reviews.`,
+            evidence,
+        };
+    }
+
+    const parts: string[] = [];
+    if (marketCount === 0) parts.push('No marketplace reviews');
+    if (feedbackTotal === 0) {
+        parts.push('no response feedback');
+    } else {
+        parts.push(`only ${feedbackTotal} feedback${feedbackTotal === 1 ? '' : 's'} (need 3+)`);
+    }
+    return {
+        score: 50,
+        isDefault: true,
+        reason: `${parts.join(', ')}. Default score of 50 applied.`,
+        evidence,
+    };
+}
+
+function explainCreditPattern(db: Database, agentId: string): ComponentDetail {
+    const events = db.query(`
+        SELECT event_type, SUM(ABS(score_impact)) as total
+        FROM reputation_events
+        WHERE agent_id = ?
+          AND event_type IN ('credit_spent', 'credit_earned')
+          AND created_at > datetime('now', '-90 days')
+        GROUP BY event_type
+    `).all(agentId) as { event_type: string; total: number }[];
+
+    let earned = 0;
+    let spent = 0;
+    for (const row of events) {
+        if (row.event_type === 'credit_earned') earned = row.total;
+        if (row.event_type === 'credit_spent') spent = row.total;
+    }
+
+    if (earned === 0 && spent === 0) {
+        return {
+            score: 50,
+            isDefault: true,
+            reason: 'No credit activity in last 90 days. Default score of 50 applied.',
+            evidence: { earned: 0, spent: 0, window: '90 days' },
+        };
+    }
+
+    const ratio = spent > 0 ? earned / spent : earned > 0 ? 2.0 : 1.0;
+    const score = Math.min(100, Math.round(ratio * 50));
+    return {
+        score,
+        isDefault: false,
+        reason: `Earned ${earned}, spent ${spent} (ratio: ${ratio.toFixed(2)}). ${ratio >= 1 ? 'Earning more than spending.' : 'Spending exceeds earning.'}`,
+        evidence: { earned, spent, ratio: Math.round(ratio * 100) / 100, window: '90 days' },
+    };
+}
+
+function explainSecurityCompliance(db: Database, agentId: string): ComponentDetail {
+    const row = db.query(`
+        SELECT COUNT(*) as violations
+        FROM reputation_events
+        WHERE agent_id = ?
+          AND event_type = 'security_violation'
+          AND created_at > datetime('now', '-90 days')
+    `).get(agentId) as { violations: number } | null;
+
+    const violations = row?.violations ?? 0;
+    const score = Math.max(0, 100 - violations * 20);
+
+    return {
+        score,
+        isDefault: false,
+        reason: violations === 0
+            ? 'No security violations in last 90 days. Perfect compliance.'
+            : `${violations} security violation${violations === 1 ? '' : 's'} in last 90 days (-${violations * 20} points).`,
+        evidence: { violations, penaltyPerViolation: 20, window: '90 days' },
+    };
+}
+
+function explainActivityLevel(db: Database, agentId: string): ComponentDetail {
+    const row = db.query(`
+        SELECT COUNT(*) as sessions
+        FROM sessions
+        WHERE agent_id = ?
+          AND created_at > datetime('now', '-30 days')
+    `).get(agentId) as { sessions: number } | null;
+
+    const sessions = row?.sessions ?? 0;
+    if (sessions === 0) {
+        return {
+            score: 0,
+            isDefault: false,
+            reason: 'No sessions in last 30 days. Score: 0.',
+            evidence: { sessions: 0, window: '30 days', maxSessions: 10 },
+        };
+    }
+
+    const score = Math.min(100, sessions * 10);
+    return {
+        score,
+        isDefault: false,
+        reason: `${sessions} session${sessions === 1 ? '' : 's'} in last 30 days (${score}/100, max at 10+ sessions).`,
+        evidence: { sessions, window: '30 days', maxSessions: 10 },
+    };
 }
 
 // ─── Reputation Decay ────────────────────────────────────────────────────────
@@ -401,6 +610,70 @@ export class ReputationScorer {
         this.db.query(
             'UPDATE agent_reputation SET attestation_hash = ? WHERE agent_id = ?',
         ).run(hash, agentId);
+    }
+
+    /**
+     * Compute a full explanation of how an agent's reputation score was derived.
+     * Returns per-component reasoning, evidence, and relevant events.
+     */
+    computeExplanation(agentId: string): ScoreExplanation {
+        const explanations: { key: keyof ReputationComponents; detail: ComponentDetail }[] = [
+            { key: 'taskCompletion', detail: explainTaskCompletion(this.db, agentId) },
+            { key: 'peerRating', detail: explainPeerRating(this.db, agentId) },
+            { key: 'creditPattern', detail: explainCreditPattern(this.db, agentId) },
+            { key: 'securityCompliance', detail: explainSecurityCompliance(this.db, agentId) },
+            { key: 'activityLevel', detail: explainActivityLevel(this.db, agentId) },
+        ];
+
+        // Map event types to components for grouping
+        const eventTypeToComponent: Record<string, keyof ReputationComponents> = {
+            task_completed: 'taskCompletion',
+            task_failed: 'taskCompletion',
+            review_received: 'peerRating',
+            feedback_received: 'peerRating',
+            credit_spent: 'creditPattern',
+            credit_earned: 'creditPattern',
+            security_violation: 'securityCompliance',
+            session_completed: 'activityLevel',
+        };
+
+        // Fetch recent events for grouping
+        const allEvents = this.getEvents(agentId, 100);
+        const eventsByComponent = new Map<keyof ReputationComponents, ReputationEventRecord[]>();
+        for (const event of allEvents) {
+            const comp = eventTypeToComponent[event.event_type];
+            if (comp) {
+                if (!eventsByComponent.has(comp)) eventsByComponent.set(comp, []);
+                eventsByComponent.get(comp)!.push(event);
+            }
+        }
+
+        const components: ComponentExplanation[] = explanations.map(({ key, detail }) => ({
+            component: key,
+            score: detail.score,
+            weight: this.weights[key],
+            weightedContribution: Math.round(detail.score * this.weights[key] * 100) / 100,
+            isDefault: detail.isDefault,
+            reason: detail.reason,
+            evidence: detail.evidence,
+            recentEvents: (eventsByComponent.get(key) ?? []).slice(0, 10),
+        }));
+
+        const rawScore = Math.round(
+            components.reduce((sum, c) => sum + c.score * c.weight, 0),
+        );
+        const decayFactor = computeDecayFactor(this.db, agentId);
+        const overallScore = Math.max(1, Math.round(rawScore * decayFactor));
+
+        return {
+            agentId,
+            overallScore,
+            trustLevel: computeTrustLevel(overallScore),
+            decayFactor: Math.round(decayFactor * 1000) / 1000,
+            rawScore,
+            components,
+            computedAt: new Date().toISOString(),
+        };
     }
 
     // ─── Private ─────────────────────────────────────────────────────────────

@@ -63,6 +63,14 @@ export function handleReputationRoutes(
         }
     }
 
+    // ─── Explanation ──────────────────────────────────────────────────────────
+
+    const explainMatch = path.match(/^\/api\/reputation\/explain\/([^/]+)$/);
+    if (explainMatch && method === 'GET') {
+        const agentId = explainMatch[1];
+        return json(scorer.computeExplanation(agentId));
+    }
+
     // ─── Events ──────────────────────────────────────────────────────────────
 
     // Record event

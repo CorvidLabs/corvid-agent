@@ -6,14 +6,15 @@ files:
   - server/db/discord-mention-sessions.ts
 db_tables:
   - discord_mention_sessions
-depends_on: []
+depends_on:
+  - specs/db/migrations.spec.md
 ---
 
 # Discord Mention Sessions
 
 ## Purpose
 
-Provides database persistence for Discord mention-reply session mappings. When a user mentions the bot and the bot responds, the association between the bot's message ID and the session info is stored so that it survives server restarts. This enables conversation continuity when users reply to bot messages after a restart.
+Persists Discord mention-reply session mappings so they survive server restarts. When a bot replies to a mention, the mapping between the bot's message ID and the ongoing session info (session ID, agent name, model) is stored in the `discord_mention_sessions` table. On server restart, the bot can look up this mapping when a user replies to one of its messages, enabling conversation continuity.
 
 ## Public API
 
@@ -23,25 +24,25 @@ Provides database persistence for Discord mention-reply session mappings. When a
 |----------|-----------|---------|-------------|
 | `saveMentionSession` | `db: Database, botMessageId: string, info: MentionSessionInfo` | `void` | Persists a mention-reply session mapping using INSERT OR REPLACE |
 | `getMentionSession` | `db: Database, botMessageId: string` | `MentionSessionInfo \| null` | Looks up a session by bot message ID; returns null if not found |
-| `deleteMentionSessionsBySessionId` | `db: Database, sessionId: string` | `void` | Deletes all mention session mappings for a given session ID |
-| `pruneOldMentionSessions` | `db: Database, maxAgeDays?: number` | `number` | Removes entries older than the specified age (default 7 days); returns count of deleted rows |
+| `deleteMentionSessionsBySessionId` | `db: Database, sessionId: string` | `void` | Removes all mention session entries for a given session ID |
+| `pruneOldMentionSessions` | `db: Database, maxAgeDays?: number` | `number` | Deletes rows older than the specified age (default 7 days); returns the number of deleted rows |
 
 ## Invariants
 
-1. `saveMentionSession` uses `INSERT OR REPLACE` so calling it with an existing `botMessageId` updates the row rather than failing.
-2. `getMentionSession` maps database column names (`session_id`, `agent_name`, `agent_model`) to camelCase `MentionSessionInfo` fields.
-3. `pruneOldMentionSessions` defaults to 7 days when `maxAgeDays` is not provided.
-4. `pruneOldMentionSessions` uses SQLite's `datetime('now', ...)` for age calculation and returns `result.changes`.
-5. `deleteMentionSessionsBySessionId` deletes by `session_id`, not by `bot_message_id`.
+1. `saveMentionSession` uses `INSERT OR REPLACE` so updating the same `bot_message_id` is idempotent.
+2. `getMentionSession` returns `null` when no matching row exists.
+3. `deleteMentionSessionsBySessionId` deletes all rows for the session; a session may have multiple bot message IDs.
+4. `pruneOldMentionSessions` defaults to a 7-day retention window if `maxAgeDays` is not provided.
+5. `pruneOldMentionSessions` returns the actual number of rows deleted (may be 0).
+6. An index on `session_id` exists to make `deleteMentionSessionsBySessionId` efficient.
 
 ## Behavioral Examples
 
-### Scenario: Round-trip save and get
+### Scenario: Save and retrieve a session
 
-- **Given** an empty `discord_mention_sessions` table
-- **When** `saveMentionSession(db, "msg-1", { sessionId: "sess-1", agentName: "agent-a", agentModel: "opus" })` is called
-- **And** `getMentionSession(db, "msg-1")` is called
-- **Then** returns `{ sessionId: "sess-1", agentName: "agent-a", agentModel: "opus" }`
+- **Given** a bot message ID `"msg-abc"` and session info `{ sessionId: "s1", agentName: "Corvid", agentModel: "claude-3" }`
+- **When** `saveMentionSession(db, "msg-abc", info)` is called
+- **Then** `getMentionSession(db, "msg-abc")` returns `{ sessionId: "s1", agentName: "Corvid", agentModel: "claude-3" }`
 
 ### Scenario: Overwrite existing session
 
@@ -49,25 +50,31 @@ Provides database persistence for Discord mention-reply session mappings. When a
 - **When** `saveMentionSession(db, "msg-1", { sessionId: "sess-2", agentName: "agent-b", agentModel: "sonnet" })` is called
 - **Then** the existing row is replaced and `getMentionSession(db, "msg-1")` returns the new session info
 
-### Scenario: Delete by session ID
+### Scenario: Lookup for unknown message returns null
 
-- **Given** two bot messages map to `sessionId = "sess-1"`
-- **When** `deleteMentionSessionsBySessionId(db, "sess-1")` is called
-- **Then** both rows are deleted
+- **Given** no rows in `discord_mention_sessions`
+- **When** `getMentionSession(db, "unknown-id")` is called
+- **Then** returns `null`
+
+### Scenario: Delete by session ID removes all related mappings
+
+- **Given** two bot messages `"msg-1"` and `"msg-2"` both mapped to session `"s1"`
+- **When** `deleteMentionSessionsBySessionId(db, "s1")` is called
+- **Then** both rows are removed; `getMentionSession` for either message returns `null`
 
 ### Scenario: Prune old sessions
 
-- **Given** sessions exist with `created_at` timestamps spanning the last 14 days
+- **Given** two rows: one created 10 days ago, one created 3 days ago
 - **When** `pruneOldMentionSessions(db, 7)` is called
-- **Then** sessions older than 7 days are deleted and the count of deleted rows is returned
+- **Then** the 10-day-old row is deleted, the 3-day-old row is kept; return value is `1`
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
 | `getMentionSession` with non-existent bot message ID | Returns `null` |
-| `deleteMentionSessionsBySessionId` with non-existent session ID | No-op (no rows affected) |
-| `pruneOldMentionSessions` with no old sessions | Returns `0` |
+| `deleteMentionSessionsBySessionId` with no matching rows | Runs without error; no rows deleted |
+| `pruneOldMentionSessions` with no rows meeting threshold | Returns `0` |
 
 ## Dependencies
 
@@ -82,7 +89,7 @@ Provides database persistence for Discord mention-reply session mappings. When a
 
 | Module | What is used |
 |--------|-------------|
-| `server/discord/message-handler.ts` | `saveMentionSession`, `getMentionSession` for mention-reply session tracking |
+| `server/discord/message-handler.ts` | `saveMentionSession` on mention reply, `getMentionSession` on incoming reply, `deleteMentionSessionsBySessionId` on session end |
 
 ## Database Tables
 
@@ -90,11 +97,11 @@ Provides database persistence for Discord mention-reply session mappings. When a
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `bot_message_id` | TEXT | PRIMARY KEY | The bot's Discord message ID |
-| `session_id` | TEXT | NOT NULL | The session ID associated with this mention thread |
-| `agent_name` | TEXT | NOT NULL | Name of the agent that handled the mention |
-| `agent_model` | TEXT | NOT NULL | Model used by the agent |
-| `created_at` | TEXT | DEFAULT datetime('now') | Timestamp of when the mapping was created |
+| `bot_message_id` | TEXT | PRIMARY KEY | Discord message ID of the bot's reply |
+| `session_id` | TEXT | NOT NULL | Active session ID associated with this mention reply |
+| `agent_name` | TEXT | NOT NULL | Display name of the agent that handled the mention |
+| `agent_model` | TEXT | NOT NULL | Model identifier used for the session |
+| `created_at` | TEXT | DEFAULT `datetime('now')` | When the mapping was created |
 
 ### Indexes
 
@@ -104,4 +111,4 @@ Provides database persistence for Discord mention-reply session mappings. When a
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-03-16 | corvid-agent | Initial spec |
+| 2026-03-16 | corvid-agent | Initial spec (mention-reply persistence, migration 092) |

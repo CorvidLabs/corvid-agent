@@ -288,6 +288,53 @@ describe('Reputation Routes', () => {
         expect(data.aggregate.total).toBe(0);
     });
 
+    // ─── Explain ─────────────────────────────────────────────────────────────
+
+    it('GET /api/reputation/explain/:agentId returns detailed explanation', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/explain/${agentId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.agentId).toBe(agentId);
+        expect(typeof data.overallScore).toBe('number');
+        expect(typeof data.decayFactor).toBe('number');
+        expect(typeof data.rawScore).toBe('number');
+        expect(Array.isArray(data.components)).toBe(true);
+        expect(data.components).toHaveLength(5);
+
+        const comp = data.components[0];
+        expect(typeof comp.component).toBe('string');
+        expect(typeof comp.score).toBe('number');
+        expect(typeof comp.weight).toBe('number');
+        expect(typeof comp.weightedContribution).toBe('number');
+        expect(typeof comp.isDefault).toBe('boolean');
+        expect(typeof comp.reason).toBe('string');
+        expect(comp.evidence).toBeDefined();
+        expect(Array.isArray(comp.recentEvents)).toBe(true);
+    });
+
+    it('GET /api/reputation/explain/:agentId marks defaults correctly', async () => {
+        // Create a fresh agent with no activity
+        const freshId = crypto.randomUUID();
+        db.query("INSERT INTO agents (id, name) VALUES (?, 'Fresh Agent')").run(freshId);
+
+        const { req, url } = fakeReq('GET', `/api/reputation/explain/${freshId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        const data = await res!.json();
+
+        const tc = data.components.find((c: { component: string }) => c.component === 'taskCompletion');
+        expect(tc.isDefault).toBe(true);
+        expect(tc.reason).toContain('No tasks');
+
+        const pr = data.components.find((c: { component: string }) => c.component === 'peerRating');
+        expect(pr.isDefault).toBe(true);
+
+        const al = data.components.find((c: { component: string }) => c.component === 'activityLevel');
+        expect(al.isDefault).toBe(false);
+        expect(al.score).toBe(0);
+    });
+
     // ─── Stats ─────────────────────────────────────────────────────────────
 
     it('GET /api/reputation/stats/:agentId returns aggregated stats', async () => {
