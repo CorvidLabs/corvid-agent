@@ -283,6 +283,11 @@ export class ProcessManager {
             })()
             : undefined;
 
+        // Fetch external MCP server configs (Figma, Slack, etc.) for SDK sessions
+        const externalMcpConfigs = session.agentId
+            ? getActiveServersForAgent(this.db, session.agentId)
+            : [];
+
         let sp: SdkProcess;
         try {
             sp = startSdkProcess({
@@ -296,6 +301,7 @@ export class ProcessManager {
                 onApprovalRequest: (request) => this.handleApprovalRequest(session.id, request),
                 onApiOutage: () => this.handleApiOutage(session.id),
                 mcpServers,
+                externalMcpConfigs,
                 personaPrompt: config.personaPrompt,
                 skillPrompt: config.skillPrompt,
             });
