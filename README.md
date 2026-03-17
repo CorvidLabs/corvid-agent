@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.34.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.35.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-7718%20unit%20%7C%20360%20E2E-brightgreen" alt="7718 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-7751%20unit%20%7C%20360%20E2E-brightgreen" alt="7718 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -131,13 +131,13 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## 7,600+ Tests. 1.14× Test-to-Code Ratio. Open Source.
+## 7,700+ Tests. 1.14× Test-to-Code Ratio. Open Source.
 
 > More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **7,718** across 320 files |
+| Unit tests | **7,751** across 321 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **152** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
@@ -348,7 +348,7 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  15 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  16 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -363,7 +363,7 @@ server/          Bun HTTP + WebSocket server
   billing/       Usage metering and billing
   channels/      Channel adapter interfaces for messaging bridges
   councils/      Council discussion and synthesis engines
-  db/            SQLite schema (15 migrations) and query modules
+  db/            SQLite schema (16 migrations) and query modules
   discord/       Bidirectional Discord bridge (raw WebSocket gateway)
   docs/          OpenAPI generator, MCP tool docs, route registry
   events/        Event bus and WebSocket broadcasting
@@ -500,17 +500,17 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 7718 server tests (~110s)
+bun test              # 7751 server tests (~110s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
 ```
 
-**7,718 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
+**7,751 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
 
 **360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
 
-**151 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (416/416 files) enforced in CI via `--require-coverage 100`.
+**152 module specs** in `specs/` with automated validation via `bun run spec:check` — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (416/416 files) enforced in CI via `--require-coverage 100`.
 
 ---
 
@@ -520,7 +520,7 @@ bun run spec:check    # Validate all module specs in specs/
 |-------|-----------|
 | Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
 | Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 15 migrations |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 16 migrations |
 | Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
 | Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
 | Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
@@ -642,7 +642,7 @@ No contribution is too small. Fixing a typo, improving an error message, or addi
 
 ### What makes this project different
 
-You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 7,600+ tests, 14 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
+You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 7,700+ tests, 16 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
 
 See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 
