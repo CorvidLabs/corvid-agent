@@ -4,6 +4,27 @@ version: 1
 status: active
 files:
   - server/db/schema/index.ts
+  - server/db/schema/agents.ts
+  - server/db/schema/algochat.ts
+  - server/db/schema/auth.ts
+  - server/db/schema/contacts.ts
+  - server/db/schema/councils.ts
+  - server/db/schema/credits.ts
+  - server/db/schema/discord.ts
+  - server/db/schema/flock.ts
+  - server/db/schema/infra.ts
+  - server/db/schema/marketplace.ts
+  - server/db/schema/memory.ts
+  - server/db/schema/messaging.ts
+  - server/db/schema/permissions.ts
+  - server/db/schema/plugins.ts
+  - server/db/schema/projects.ts
+  - server/db/schema/reputation.ts
+  - server/db/schema/schedules.ts
+  - server/db/schema/sessions.ts
+  - server/db/schema/webhooks.ts
+  - server/db/schema/work.ts
+  - server/db/schema/workflows.ts
 db_tables:
   - schema_version
   - projects

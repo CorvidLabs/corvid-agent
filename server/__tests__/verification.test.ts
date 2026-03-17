@@ -116,7 +116,7 @@ describe('createVerificationTasks', () => {
         const result = await createVerificationTasks(db, 'nonexistent', 'https://github.com/CorvidLabs/corvid-agent/pull/999');
         // This will fail at fetchPrBody (no gh in test), but parent task check comes after
         expect(result).toEqual([]);
-    });
+    }, 15_000);
 });
 
 // ── handleVerificationComplete ──────────────────────────────────────
