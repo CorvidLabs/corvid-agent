@@ -716,7 +716,7 @@ export class ProcessManager {
         };
     }
 
-    sendMessage(sessionId: string, content: string): boolean {
+    sendMessage(sessionId: string, content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]): boolean {
         const cp = this.processes.get(sessionId);
         if (!cp) return false;
 
@@ -726,7 +726,11 @@ export class ProcessManager {
             return false;
         }
 
-        addSessionMessage(this.db, sessionId, 'user', content);
+        // Persist as text for session history (extract text from multimodal content)
+        const textContent = typeof content === 'string'
+            ? content
+            : content.filter((b): b is { type: 'text'; text: string } => b.type === 'text').map(b => b.text).join('\n');
+        addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
 
         const meta = this.sessionMeta.get(sessionId);
         if (meta) meta.turnCount++;

@@ -1132,10 +1132,14 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         });
     }
 
-    function sendMessage(content: string): boolean {
+    function sendMessage(content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]): boolean {
+        // Direct process (Ollama) doesn't support multimodal — extract text only
+        const textContent = typeof content === 'string'
+            ? content
+            : content.filter((b): b is { type: 'text'; text: string } => b.type === 'text').map(b => b.text).join('\n') || '[image attachment(s)]';
         if (aborted) return false;
         if (processing) {
-            pendingMessages.push(content);
+            pendingMessages.push(textContent);
         } else if (idleResolver) {
             // Waiting for next message — resolve the idle promise
             if (idleTimer) {
@@ -1144,9 +1148,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             }
             const resolve = idleResolver;
             idleResolver = null;
-            resolve(content);
+            resolve(textContent);
         } else {
-            runLoop(content).catch((err) => {
+            runLoop(textContent).catch((err) => {
                 if (aborted) return;
                 const errorMsg = err instanceof Error ? err.message : String(err);
                 log.error(`Direct process error for session ${session.id}`, { error: errorMsg });
