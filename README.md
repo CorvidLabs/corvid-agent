@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.35.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.36.0-blue" alt="Version">
   <a href="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml"><img src="https://github.com/CorvidLabs/corvid-agent/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-7751%20unit%20%7C%20360%20E2E-brightgreen" alt="7718 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-7787%20unit%20%7C%20360%20E2E-brightgreen" alt="7718 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -137,7 +137,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **7,751** across 321 files |
+| Unit tests | **7,787** across 324 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **152** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
@@ -500,7 +500,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # 7751 server tests (~110s)
+bun test              # 7787 server tests (~110s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
