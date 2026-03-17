@@ -16,6 +16,8 @@ export interface ReputationScore {
     attestationHash: string | null;
     /** When the score was last computed */
     computedAt: string;
+    /** Whether the agent has any real activity backing the scores */
+    hasActivity: boolean;
 }
 
 export interface ReputationComponents {

@@ -58,9 +58,10 @@ export class ReputationService {
         return score;
     }
 
-    async getEvents(agentId: string): Promise<ReputationEvent[]> {
+    async getEvents(agentId: string, limit?: number): Promise<ReputationEvent[]> {
+        const params = limit !== undefined ? `?limit=${limit}` : '';
         const events = await firstValueFrom(
-            this.api.get<ReputationEvent[]>(`/reputation/events/${agentId}`),
+            this.api.get<ReputationEvent[]>(`/reputation/events/${agentId}${params}`),
         );
         this.events.set(events);
         return events;

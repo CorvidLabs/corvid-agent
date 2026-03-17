@@ -15,6 +15,7 @@ export interface ReputationScore {
     components: ReputationComponents;
     attestationHash: string | null;
     computedAt: string;
+    hasActivity: boolean;
 }
 
 export type ReputationEventType =

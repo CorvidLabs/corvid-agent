@@ -42,41 +42,45 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                                 <span class="agent-card__name">{{ getAgentName(score.agentId) }}</span>
                                 <span class="trust-badge" [attr.data-level]="score.trustLevel">{{ score.trustLevel }}</span>
                             </div>
-                            <div class="agent-card__body">
-                                <div class="score-ring">
-                                    <svg viewBox="0 0 120 120" class="score-ring__svg">
-                                        <circle cx="60" cy="60" r="52" class="score-ring__bg" />
-                                        <circle
-                                            cx="60" cy="60" r="52"
-                                            class="score-ring__fill"
-                                            [attr.data-level]="score.trustLevel"
-                                            [attr.stroke-dasharray]="ringCircumference"
-                                            [attr.stroke-dashoffset]="getRingOffset(score.overallScore)"
-                                            transform="rotate(-90 60 60)" />
-                                        <text x="60" y="60" class="score-ring__text" dominant-baseline="central" text-anchor="middle">
-                                            {{ score.overallScore | number:'1.0-0' }}
-                                        </text>
-                                    </svg>
-                                </div>
-                                <div class="component-bars">
-                                    @for (meta of componentMeta; track meta.key) {
-                                        <div class="comp-bar">
-                                            <div class="comp-bar__label">
-                                                <span>{{ meta.label }}</span>
-                                                <span class="comp-bar__weight">{{ meta.weight }}</span>
-                                            </div>
-                                            <div class="comp-bar__track">
-                                                <div
-                                                    class="comp-bar__fill"
-                                                    [attr.data-color]="meta.color"
-                                                    [style.width.%]="score.components[meta.key]">
+                            @if (score.hasActivity) {
+                                <div class="agent-card__body">
+                                    <div class="score-ring">
+                                        <svg viewBox="0 0 120 120" class="score-ring__svg">
+                                            <circle cx="60" cy="60" r="52" class="score-ring__bg" />
+                                            <circle
+                                                cx="60" cy="60" r="52"
+                                                class="score-ring__fill"
+                                                [attr.data-level]="score.trustLevel"
+                                                [attr.stroke-dasharray]="ringCircumference"
+                                                [attr.stroke-dashoffset]="getRingOffset(score.overallScore)"
+                                                transform="rotate(-90 60 60)" />
+                                            <text x="60" y="60" class="score-ring__text" dominant-baseline="central" text-anchor="middle">
+                                                {{ score.overallScore | number:'1.0-0' }}
+                                            </text>
+                                        </svg>
+                                    </div>
+                                    <div class="component-bars">
+                                        @for (meta of componentMeta; track meta.key) {
+                                            <div class="comp-bar">
+                                                <div class="comp-bar__label">
+                                                    <span>{{ meta.label }}</span>
+                                                    <span class="comp-bar__weight">{{ meta.weight }}</span>
                                                 </div>
+                                                <div class="comp-bar__track">
+                                                    <div
+                                                        class="comp-bar__fill"
+                                                        [attr.data-color]="meta.color"
+                                                        [style.width.%]="score.components[meta.key]">
+                                                    </div>
+                                                </div>
+                                                <span class="comp-bar__value">{{ score.components[meta.key] | number:'1.0-0' }}</span>
                                             </div>
-                                            <span class="comp-bar__value">{{ score.components[meta.key] | number:'1.0-0' }}</span>
-                                        </div>
-                                    }
+                                        }
+                                    </div>
                                 </div>
-                            </div>
+                            } @else {
+                                <div class="no-activity">No activity data</div>
+                            }
                             <div class="agent-card__footer">
                                 <span class="computed-at">{{ score.computedAt | relativeTime }}</span>
                             </div>
@@ -91,6 +95,12 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                                 <h3>{{ getAgentName(s.agentId) }}</h3>
                                 <span class="trust-badge trust-badge--lg" [attr.data-level]="s.trustLevel">{{ s.trustLevel }}</span>
                             </div>
+
+                            @if (!s.hasActivity) {
+                                <div class="no-activity-notice">
+                                    This agent has no recorded activity. Scores shown are system defaults.
+                                </div>
+                            }
 
                             @if (explanation(); as ex) {
                                 @if (ex.decayFactor < 1) {
@@ -232,7 +242,7 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
                             }
                         }
 
-                        <h4>All Recent Events</h4>
+                        <h4>All Events</h4>
                         @if (reputationService.events().length === 0) {
                             <p class="empty">No events recorded.</p>
                         } @else {
@@ -340,6 +350,16 @@ import type { ReputationScore, ReputationEvent, ScoreExplanation, ComponentExpla
         .detail-bar__value { font-size: 0.85rem; color: var(--text-primary); text-align: right; font-weight: 600; }
         .attestation { font-size: 0.8rem; color: var(--text-secondary); margin: 1rem 0; }
         .attestation code { color: var(--accent-green); font-size: 0.75rem; }
+
+        /* No activity */
+        .no-activity {
+            color: var(--text-secondary); font-size: 0.8rem; padding: 1rem;
+            text-align: center; font-style: italic; width: 100%;
+        }
+        .no-activity-notice {
+            background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);
+        }
 
         /* Decay notice */
         .decay-notice {
@@ -559,7 +579,7 @@ export class ReputationComponent implements OnInit {
             const score = await this.reputationService.getScore(agentId);
             this.selectedScore.set(score);
             await Promise.all([
-                this.reputationService.getEvents(agentId),
+                this.reputationService.getEvents(agentId, 0),
                 this.reputationService.getExplanation(agentId).then(ex => this.explanation.set(ex)),
                 this.reputationService.getStats(agentId).then(s => this.stats.set(s)).catch(() => {}),
             ]);

@@ -86,7 +86,8 @@ export function handleReputationRoutes(
     const eventsMatch = path.match(/^\/api\/reputation\/events\/([^/]+)$/);
     if (eventsMatch && method === 'GET') {
         const agentId = eventsMatch[1];
-        const limit = safeNumParam(url.searchParams.get('limit'), 50);
+        const limitParam = safeNumParam(url.searchParams.get('limit'), 50);
+        const limit = limitParam === 0 ? 10000 : limitParam;
         return json(scorer.getEvents(agentId, limit));
     }
 

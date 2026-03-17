@@ -434,6 +434,44 @@ export class ReputationScorer {
     }
 
     /**
+     * Check whether an agent has any real activity backing scores.
+     * Returns true if the agent has reputation events, work tasks, sessions,
+     * or response feedback within the relevant time windows.
+     */
+    checkHasActivity(agentId: string): boolean {
+        const row = this.db.query(`
+            SELECT EXISTS(
+                SELECT 1 FROM reputation_events WHERE agent_id = ? AND created_at > datetime('now', '-90 days')
+                UNION ALL
+                SELECT 1 FROM work_tasks WHERE agent_id = ? AND created_at > datetime('now', '-90 days')
+                UNION ALL
+                SELECT 1 FROM sessions WHERE agent_id = ? AND created_at > datetime('now', '-30 days')
+                UNION ALL
+                SELECT 1 FROM response_feedback WHERE agent_id = ? AND created_at > datetime('now', '-90 days')
+            ) as has_activity
+        `).get(agentId, agentId, agentId, agentId) as { has_activity: number };
+        return row.has_activity === 1;
+    }
+
+    /**
+     * Batch query: returns the set of all agent IDs that have any activity.
+     */
+    getActiveAgentIds(): Set<string> {
+        const rows = this.db.query(`
+            SELECT DISTINCT agent_id FROM (
+                SELECT agent_id FROM reputation_events WHERE created_at > datetime('now', '-90 days')
+                UNION
+                SELECT agent_id FROM work_tasks WHERE created_at > datetime('now', '-90 days')
+                UNION
+                SELECT agent_id FROM sessions WHERE created_at > datetime('now', '-30 days')
+                UNION
+                SELECT agent_id FROM response_feedback WHERE created_at > datetime('now', '-90 days')
+            )
+        `).all() as { agent_id: string }[];
+        return new Set(rows.map(r => r.agent_id));
+    }
+
+    /**
      * Compute the full reputation score for an agent.
      */
     computeScore(agentId: string): ReputationScore {
@@ -453,6 +491,8 @@ export class ReputationScorer {
             'SELECT attestation_hash FROM agent_reputation WHERE agent_id = ?',
         ).get(agentId) as { attestation_hash: string | null } | null;
 
+        const hasActivity = this.checkHasActivity(agentId);
+
         const score: ReputationScore = {
             agentId,
             overallScore,
@@ -460,6 +500,7 @@ export class ReputationScorer {
             components,
             attestationHash: existing?.attestation_hash ?? null,
             computedAt: new Date().toISOString(),
+            hasActivity,
         };
 
         // Persist
@@ -491,6 +532,7 @@ export class ReputationScorer {
             },
             attestationHash: row.attestation_hash,
             computedAt: row.computed_at,
+            hasActivity: this.checkHasActivity(row.agent_id),
         };
     }
 
@@ -518,12 +560,13 @@ export class ReputationScorer {
      * Get reputation events for an agent.
      */
     getEvents(agentId: string, limit: number = 50): ReputationEventRecord[] {
+        const effectiveLimit = limit === 0 ? 10000 : limit;
         return this.db.query(`
             SELECT * FROM reputation_events
             WHERE agent_id = ?
             ORDER BY created_at DESC
             LIMIT ?
-        `).all(agentId, limit) as ReputationEventRecord[];
+        `).all(agentId, effectiveLimit) as ReputationEventRecord[];
     }
 
     /**
@@ -587,6 +630,8 @@ export class ReputationScorer {
             'SELECT * FROM agent_reputation ORDER BY overall_score DESC',
         ).all() as ReputationRecord[];
 
+        const activeIds = this.getActiveAgentIds();
+
         return rows.map((row) => ({
             agentId: row.agent_id,
             overallScore: row.overall_score,
@@ -600,6 +645,7 @@ export class ReputationScorer {
             },
             attestationHash: row.attestation_hash,
             computedAt: row.computed_at,
+            hasActivity: activeIds.has(row.agent_id),
         }));
     }
 
