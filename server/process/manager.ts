@@ -526,6 +526,11 @@ export class ProcessManager {
 
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
+        // Load external MCP configs for resumed sessions (Figma, GitHub, etc.)
+        const resumeExternalMcpConfigs = session.agentId
+            ? getActiveServersForAgent(this.db, session.agentId)
+            : [];
+
         let sp: SdkProcess;
         try {
             if (providerInstance && providerInstance.executionMode === 'direct') {
@@ -551,6 +556,7 @@ export class ProcessManager {
                     personaPrompt: resumeConfig.personaPrompt,
                     skillPrompt: resumeConfig.skillPrompt,
                     modelOverride: modelOverrideResume,
+                    externalMcpConfigs: resumeExternalMcpConfigs,
                 });
             } else {
                 const mcpServers = session.agentId
@@ -572,6 +578,7 @@ export class ProcessManager {
                     mcpServers,
                     personaPrompt: resumeConfig.personaPrompt,
                     skillPrompt: resumeConfig.skillPrompt,
+                    externalMcpConfigs: resumeExternalMcpConfigs,
                 });
             }
         } catch (err) {
