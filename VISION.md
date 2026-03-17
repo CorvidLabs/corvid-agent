@@ -30,7 +30,7 @@ corvid-agent is not trying to be OpenClaw, Devin, or Copilot Workspace.
 - Purpose-built for **development workflows** (code, review, test, deploy)
 - The only agent platform with **native on-chain identity and communication**
 - Designed for agents that **talk to each other** across trust boundaries
-- Part of the broader **Corvid Labs ecosystem** on Algorand
+- Built on the **AlgoChat ecosystem** on Algorand
 
 The key differentiator is not that agents can write code — everyone does that now. It's that agents have **verifiable identities**, can **communicate through cryptographic channels**, and can **form decentralized networks** where trust is established through blockchain, not through sharing API keys or being on the same server.
 
@@ -148,16 +148,12 @@ Agents are autonomous but not unsupervised:
 
 ---
 
-## The Corvid Labs Ecosystem
+## The Ecosystem
 
-corvid-agent is one piece of a larger ecosystem:
+corvid-agent is built on a broader open-source ecosystem:
 
 ```
-Corvid Labs Ecosystem
-|-- Nevermore NFT Collection --- 1,000 lifetime membership tokens on Algorand
-|-- CORVID ASA ---------------- Community token with tiered Discord roles
-|-- Mono ---------------------- iOS productivity app (pro features for NFT holders)
-|-- Corvid Companion ---------- Discord bot (NFT/ASA verification + role management)
+Ecosystem
 |-- AlgoChat ------------------ Encrypted on-chain messaging protocol (6 languages)
 |-- corvid-agent -------------- Decentralized development agents (this project)
 |-- Swift SDK for Algorand ---- swift-algorand, swift-algokit, swift-mint, swift-arc, etc.
@@ -166,23 +162,13 @@ Corvid Labs Ecosystem
 
 ### AlgoChat is the Connective Tissue
 
-AlgoChat was built as a standalone encrypted messaging protocol on Algorand with implementations in Swift, TypeScript, Python, Kotlin, Rust, and a web app. In corvid-agent, AlgoChat becomes the **native communication layer for AI agents**.
+AlgoChat is a standalone encrypted messaging protocol on Algorand with implementations in Swift, TypeScript, Python, Kotlin, Rust, and a web app. In corvid-agent, AlgoChat becomes the **native communication layer for AI agents**.
 
 This means:
 
 - Agents running corvid-agent can message any AlgoChat-compatible endpoint
-- Future Corvid Labs apps (Mono, Discord bot) can receive agent messages natively
 - Third-party developers can build AlgoChat-compatible agents in any of the 6 supported languages
 - The protocol is open and on-chain — no vendor lock-in, no central broker
-
-### NFT Holder Benefits (Future)
-
-As the platform matures, Nevermore NFT holders gain:
-
-- Priority access to hosted agent instances
-- Exclusive agent skills and capabilities
-- Governance voting on platform development priorities
-- Access to the agent marketplace as both consumers and publishers
 
 ---
 
@@ -285,7 +271,6 @@ Today, corvid-agent runs as a single instance managing local agents. Tomorrow, m
 - **Multi-instance agent networks:** Decentralized mesh of corvid-agent nodes
 - **Smart contract task agreements:** On-chain contracts defining work scope, validation criteria, and completion verification between agents
 - **Agent reputation system:** On-chain track record of reliability, code quality, and task completion rates
-- **NFT-gated agent access:** Nevermore holders get priority access to hosted agent services
 - **Billing activation:** Usage-based pricing for hosted agent instances
 - **Full A2A maturity:** Complete Google Agent-to-Agent protocol support for interop with non-Corvid agents
 

@@ -205,11 +205,11 @@ export function buildAgentCard(baseUrl?: string): A2AAgentCard {
             'AI development agent with on-chain identity, inter-agent messaging, and autonomous coding capabilities',
         url,
         provider: {
-            organization: 'CorvidLabs',
-            url: 'https://github.com/CorvidLabs',
+            organization: process.env.A2A_PROVIDER_ORG || 'corvid-agent',
+            url: process.env.A2A_PROVIDER_URL || 'https://github.com/corvid-agent/corvid-agent',
         },
         version: PKG_VERSION,
-        documentationUrl: 'https://github.com/CorvidLabs/corvid-agent',
+        documentationUrl: process.env.A2A_DOCS_URL || 'https://github.com/corvid-agent/corvid-agent',
         capabilities: {
             streaming: true, // WebSocket support exists
             pushNotifications: false,
@@ -264,11 +264,11 @@ export function buildAgentCardForAgent(
         description: enrichedDescription,
         url: `${url}/api/agents/${agent.id}`,
         provider: {
-            organization: 'CorvidLabs',
-            url: 'https://github.com/CorvidLabs',
+            organization: process.env.A2A_PROVIDER_ORG || 'corvid-agent',
+            url: process.env.A2A_PROVIDER_URL || 'https://github.com/corvid-agent/corvid-agent',
         },
         version: PKG_VERSION,
-        documentationUrl: 'https://github.com/CorvidLabs/corvid-agent',
+        documentationUrl: process.env.A2A_DOCS_URL || 'https://github.com/corvid-agent/corvid-agent',
         capabilities: {
             streaming: true,
             pushNotifications: false,
