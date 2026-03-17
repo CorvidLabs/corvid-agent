@@ -16,7 +16,9 @@ import { NotificationService } from '../../core/services/notification.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { ServerWsMessage } from '@shared/ws-protocol';
+import type { FlockAgent } from '@shared/types/flock-directory';
 import type { Agent } from '../../core/models/agent.model';
+import type { AgentMessage } from '../../core/models/agent-message.model';
 import type { Session } from '../../core/models/session.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -40,10 +42,12 @@ interface AgentSummary {
     balance: number;
     runningSessions: number;
     lastActive: string | null;
+    reputationScore: number | null;
+    capabilities: string[];
 }
 
 interface ActivityEvent {
-    type: 'session_started' | 'session_completed' | 'session_error' | 'work_task' | 'council';
+    type: 'session_started' | 'session_completed' | 'session_error' | 'work_task' | 'council' | 'agent_message';
     label: string;
     detail: string;
     timestamp: string;
@@ -127,6 +131,24 @@ interface ActivityEvent {
                                             [attr.data-provider]="summary.agent.provider || 'anthropic'">
                                             {{ summary.agent.provider || 'anthropic' }}{{ summary.agent.model ? ' / ' + summary.agent.model : '' }}
                                         </span>
+                                        @if (summary.reputationScore !== null) {
+                                            <div class="agent-card__reputation">
+                                                <span class="agent-card__rep-score" [attr.data-level]="summary.reputationScore >= 70 ? 'high' : summary.reputationScore >= 30 ? 'mid' : 'low'">
+                                                    {{ summary.reputationScore }}
+                                                </span>
+                                                <span class="agent-card__rep-label">Rep</span>
+                                            </div>
+                                        }
+                                        @if (summary.capabilities.length > 0) {
+                                            <div class="agent-card__capabilities">
+                                                @for (cap of summary.capabilities.slice(0, 3); track cap) {
+                                                    <span class="agent-card__cap-pill">{{ cap }}</span>
+                                                }
+                                                @if (summary.capabilities.length > 3) {
+                                                    <span class="agent-card__cap-more">+{{ summary.capabilities.length - 3 }}</span>
+                                                }
+                                            </div>
+                                        }
                                     </div>
                                     <span
                                         class="agent-card__status"
@@ -158,6 +180,82 @@ interface ActivityEvent {
                 </div>
             }
 
+            <!-- Flock Directory Browser -->
+            @if (flockAgents().length > 0) {
+                <div class="section">
+                    <div class="section__header">
+                        <h3>Flock Directory</h3>
+                        @if (flockStats(); as stats) {
+                            <span class="flock-stats">{{ stats.active }} active agents</span>
+                        }
+                    </div>
+                    <div class="flock-grid">
+                        @for (agent of flockAgents(); track agent.id) {
+                            <div class="flock-card">
+                                <div class="flock-card__top">
+                                    <span class="flock-card__name">{{ agent.name }}</span>
+                                    <span class="flock-card__score" [attr.data-level]="agent.reputationScore >= 70 ? 'high' : agent.reputationScore >= 30 ? 'mid' : 'low'">
+                                        {{ agent.reputationScore }}
+                                    </span>
+                                </div>
+                                @if (agent.description) {
+                                    <p class="flock-card__desc">{{ agent.description.length > 60 ? agent.description.slice(0, 60) + '...' : agent.description }}</p>
+                                }
+                                <div class="flock-card__caps">
+                                    @for (cap of agent.capabilities.slice(0, 2); track cap) {
+                                        <span class="flock-card__cap">{{ cap }}</span>
+                                    }
+                                </div>
+                                <div class="flock-card__footer">
+                                    <span class="flock-card__status" [attr.data-status]="agent.status">{{ agent.status }}</span>
+                                    <button class="flock-card__connect-btn" (click)="navigateTo('/agents')">Connect</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (agentSummaries().length >= 2) {
+                <div class="section">
+                    <div class="section__header">
+                        <h3>Agent Comparison</h3>
+                    </div>
+                    <div class="comparison-table">
+                        <div class="comparison-table__header">
+                            <span>Agent</span>
+                            <span>Reputation</span>
+                            <span>Sessions</span>
+                            <span>Balance</span>
+                            <span>Status</span>
+                        </div>
+                        @for (summary of agentSummaries(); track summary.agent.id) {
+                            <a class="comparison-table__row" [routerLink]="['/agents', summary.agent.id]">
+                                <span class="comparison-table__name">{{ summary.agent.name }}</span>
+                                <span class="comparison-table__rep">
+                                    @if (summary.reputationScore !== null) {
+                                        <span class="comparison-table__rep-bar">
+                                            <span class="comparison-table__rep-fill" [style.width.%]="summary.reputationScore" [attr.data-level]="summary.reputationScore >= 70 ? 'high' : summary.reputationScore >= 30 ? 'mid' : 'low'"></span>
+                                        </span>
+                                        <span class="comparison-table__rep-val">{{ summary.reputationScore }}</span>
+                                    } @else {
+                                        <span class="comparison-table__na">—</span>
+                                    }
+                                </span>
+                                <span class="comparison-table__sessions">
+                                    <span class="comparison-table__sessions-val">{{ summary.runningSessions }}</span>
+                                    <span class="comparison-table__sessions-label">active</span>
+                                </span>
+                                <span class="comparison-table__balance">{{ (summary.balance / 1000000) | number:'1.2-4' }}</span>
+                                <span class="comparison-table__status" [attr.data-status]="summary.runningSessions > 0 ? 'busy' : 'idle'">
+                                    {{ summary.runningSessions > 0 ? 'Busy' : 'Idle' }}
+                                </span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+
             <div class="two-col">
                 <!-- Recent Activity Feed -->
                 <div class="section section--feed">
@@ -180,6 +278,7 @@ interface ActivityEvent {
                                             @case ('session_error') { ! }
                                             @case ('work_task') { &gt;&gt; }
                                             @case ('council') { &amp; }
+                                            @case ('agent_message') { @ }
                                         }
                                     </span>
                                     <div class="activity-item__body">
@@ -456,6 +555,116 @@ interface ActivityEvent {
         .stage-badge[data-stage="synthesizing"] { color: var(--accent-gold); border-color: var(--accent-gold); }
         .stage-badge[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
 
+        /* Agent Card Reputation */
+        .agent-card__reputation {
+            display: flex; align-items: center; gap: 0.25rem; margin-top: 0.15rem;
+        }
+        .agent-card__rep-score {
+            font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono, monospace);
+            padding: 1px 5px; border-radius: var(--radius-sm); border: 1px solid;
+        }
+        .agent-card__rep-score[data-level="high"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .agent-card__rep-score[data-level="mid"] { color: var(--accent-amber, #ffc107); border-color: var(--accent-amber, #ffc107); }
+        .agent-card__rep-score[data-level="low"] { color: var(--accent-red); border-color: var(--accent-red); }
+        .agent-card__rep-label { font-size: 0.55rem; color: var(--text-tertiary); text-transform: uppercase; }
+
+        /* Agent Card Capabilities */
+        .agent-card__capabilities { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.35rem; }
+        .agent-card__cap-pill {
+            font-size: 0.55rem; padding: 1px 6px; border-radius: 9999px;
+            background: rgba(0, 229, 255, 0.08); border: 1px solid rgba(0, 229, 255, 0.2);
+            color: var(--accent-cyan); text-transform: lowercase; font-weight: 500;
+        }
+        .agent-card__cap-more {
+            font-size: 0.55rem; padding: 1px 6px; color: var(--text-tertiary); font-weight: 500;
+        }
+
+        /* Flock Directory Grid */
+        .flock-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+        .flock-card {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.75rem;
+            transition: border-color 0.15s;
+        }
+        .flock-card:hover { border-color: var(--accent-magenta); }
+        .flock-card__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
+        .flock-card__name { font-weight: 700; font-size: 0.8rem; color: var(--text-primary); }
+        .flock-card__score {
+            font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono, monospace);
+            padding: 1px 5px; border-radius: var(--radius-sm); border: 1px solid;
+        }
+        .flock-card__score[data-level="high"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .flock-card__score[data-level="mid"] { color: var(--accent-amber, #ffc107); border-color: var(--accent-amber, #ffc107); }
+        .flock-card__score[data-level="low"] { color: var(--accent-red); border-color: var(--accent-red); }
+        .flock-card__desc { font-size: 0.7rem; color: var(--text-tertiary); margin: 0 0 0.4rem; line-height: 1.4; }
+        .flock-card__caps { display: flex; gap: 0.25rem; margin-bottom: 0.5rem; }
+        .flock-card__cap {
+            font-size: 0.55rem; padding: 1px 6px; border-radius: 9999px;
+            background: rgba(255, 0, 128, 0.08); border: 1px solid rgba(255, 0, 128, 0.2);
+            color: var(--accent-magenta); text-transform: lowercase; font-weight: 500;
+        }
+        .flock-card__footer { display: flex; justify-content: space-between; align-items: center; }
+        .flock-card__status {
+            font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .flock-card__status[data-status="active"] { color: var(--accent-green); }
+        .flock-card__status[data-status="inactive"] { color: var(--text-tertiary); }
+        .flock-card__connect-btn {
+            padding: 0.2rem 0.5rem; font-size: 0.6rem; font-weight: 600; font-family: inherit;
+            text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+            background: transparent; border: 1px solid var(--accent-magenta); border-radius: var(--radius-sm);
+            color: var(--accent-magenta); transition: all 0.15s;
+        }
+        .flock-card__connect-btn:hover { background: rgba(255, 0, 128, 0.1); }
+        .flock-stats { font-size: 0.7rem; color: var(--text-tertiary); }
+
+        /* Agent Message Activity Icon */
+        .activity-item__icon[data-type="agent_message"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
+
+        /* Comparison Table */
+        .comparison-table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .comparison-table__header {
+            display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 0.75fr;
+            padding: 0.5rem 1rem; background: var(--bg-raised); font-size: 0.7rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);
+        }
+        .comparison-table__row {
+            display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 0.75fr;
+            padding: 0.5rem 1rem; border-top: 1px solid var(--border);
+            font-size: 0.8rem; color: var(--text-primary); text-decoration: none;
+            transition: background 0.1s; align-items: center;
+        }
+        .comparison-table__row:hover { background: var(--bg-hover); }
+        .comparison-table__name { font-weight: 600; color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .comparison-table__rep { display: flex; align-items: center; gap: 0.5rem; }
+        .comparison-table__rep-bar {
+            flex: 1; height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; max-width: 80px;
+        }
+        .comparison-table__rep-fill {
+            height: 100%; border-radius: 3px; min-width: 1px; transition: width 0.3s;
+        }
+        .comparison-table__rep-fill[data-level="high"] { background: var(--accent-cyan); }
+        .comparison-table__rep-fill[data-level="mid"] { background: var(--accent-amber, #ffc107); }
+        .comparison-table__rep-fill[data-level="low"] { background: var(--accent-red); }
+        .comparison-table__rep-val { font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono, monospace); color: var(--text-primary); }
+        .comparison-table__na { color: var(--text-tertiary); font-size: 0.75rem; }
+        .comparison-table__sessions { display: flex; align-items: center; gap: 0.25rem; }
+        .comparison-table__sessions-val { font-weight: 700; color: var(--accent-cyan); }
+        .comparison-table__sessions-label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; }
+        .comparison-table__balance { color: var(--accent-green); font-family: var(--font-mono, monospace); font-size: 0.8rem; }
+        .comparison-table__status {
+            font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-sm);
+            text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid; text-align: center;
+        }
+        .comparison-table__status[data-status="busy"] { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .comparison-table__status[data-status="idle"] { color: var(--text-tertiary); border-color: var(--border); background: var(--bg-surface); }
+
         @media (max-width: 768px) {
             .dashboard { padding: 1rem; }
             .metrics-row { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
@@ -500,6 +709,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     protected readonly selfTestRunning = signal(false);
     protected readonly loading = signal(true);
     protected readonly serverVersion = signal<string | null>(null);
+    protected readonly flockAgents = signal<FlockAgent[]>([]);
+    protected readonly flockStats = signal<{ total: number; active: number } | null>(null);
+    protected readonly agentMessages = signal<AgentMessage[]>([]);
 
     protected readonly activeWorkTaskCount = computed(() => {
         const tasks = this.overview()?.workTasks;
@@ -564,6 +776,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
             });
         }
 
+        // Agent message events
+        for (const msg of this.agentMessages().slice(0, 10)) {
+            const fromName = agentMap.get(msg.fromAgentId) ?? msg.fromAgentId.slice(0, 8);
+            const toName = agentMap.get(msg.toAgentId) ?? msg.toAgentId.slice(0, 8);
+            events.push({
+                type: 'agent_message',
+                label: `Message: ${msg.status}`,
+                detail: `${fromName} → ${toName}`,
+                timestamp: msg.completedAt || msg.createdAt,
+                link: `/agents/${msg.toAgentId}`,
+                status: msg.status,
+            });
+        }
+
         // Sort by timestamp descending and take top 15
         return events
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -584,6 +810,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.loadActiveCouncilLaunches(),
             this.loadOverview(),
             this.loadServerVersion(),
+            this.loadFlockDirectory(),
+            this.agentService.loadAgents().then(() => this.loadAgentMessages()),
         ];
         Promise.allSettled(loads).then(() => this.loading.set(false));
 
@@ -594,6 +822,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
                         s.agent.id === msg.agentId ? { ...s, balance: msg.balance } : s,
                     ),
                 );
+            }
+            if (msg.type === 'agent_message_update') {
+                this.loadAgentMessages();
             }
             if (msg.type === 'session_status') {
                 // Update session status in-place; only full-refresh on lifecycle changes
@@ -665,6 +896,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
         const sessions = this.sessionService.sessions();
 
+        // Fetch flock directory agents to enrich summaries
+        let flockAgentMap = new Map<string, FlockAgent>();
+        try {
+            const flockResult = await firstValueFrom(
+                this.apiService.get<{ agents: FlockAgent[] }>('/flock-directory/agents'),
+            );
+            for (const fa of flockResult.agents) {
+                flockAgentMap.set(fa.name.toLowerCase(), fa);
+            }
+        } catch {
+            // Flock directory may not be available
+        }
+
         const summaries: AgentSummary[] = await Promise.all(
             agents.map(async (agent) => {
                 let balance = 0;
@@ -681,11 +925,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
                     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
                 )[0];
 
+                const flockAgent = flockAgentMap.get(agent.name.toLowerCase());
+
                 return {
                     agent,
                     balance,
                     runningSessions,
                     lastActive: lastSession?.updatedAt ?? null,
+                    reputationScore: flockAgent?.reputationScore ?? null,
+                    capabilities: flockAgent?.capabilities ?? [],
                 };
             }),
         );
@@ -710,6 +958,35 @@ export class DashboardComponent implements OnInit, OnDestroy {
             this.activeCouncilLaunches.set(
                 launches.filter((l) => l.stage !== 'complete'),
             );
+        } catch {
+            // Non-critical
+        }
+    }
+
+    private async loadFlockDirectory(): Promise<void> {
+        try {
+            const [agentsResult, stats] = await Promise.all([
+                firstValueFrom(this.apiService.get<{ agents: FlockAgent[]; total: number }>('/flock-directory/search?sortBy=reputation&sortOrder=desc&limit=6&status=active')),
+                firstValueFrom(this.apiService.get<{ total: number; active: number }>('/flock-directory/stats')),
+            ]);
+            this.flockAgents.set(agentsResult.agents);
+            this.flockStats.set(stats);
+        } catch {
+            // Flock directory may not be available
+        }
+    }
+
+    private async loadAgentMessages(): Promise<void> {
+        try {
+            const agents = this.agentService.agents();
+            const allMessages: AgentMessage[] = [];
+            for (const agent of agents.slice(0, 5)) {
+                const messages = await this.agentService.getMessages(agent.id);
+                allMessages.push(...messages);
+            }
+            // Deduplicate by id
+            const unique = [...new Map(allMessages.map(m => [m.id, m])).values()];
+            this.agentMessages.set(unique.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20));
         } catch {
             // Non-critical
         }
