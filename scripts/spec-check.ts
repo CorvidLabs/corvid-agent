@@ -19,7 +19,7 @@ import { join, resolve, relative } from 'node:path';
 
 const ROOT = resolve(import.meta.dir, '..');
 const SPECS_DIR = join(ROOT, 'specs');
-const SCHEMA_FILE = join(ROOT, 'server/db/schema.ts');
+const SCHEMA_DIR = join(ROOT, 'server/db/schema');
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -109,13 +109,16 @@ function parseFrontmatter(content: string): { frontmatter: Frontmatter; body: st
 
 function getSchemaTableNames(): Set<string> {
     const tables = new Set<string>();
-    if (!existsSync(SCHEMA_FILE)) return tables;
+    if (!existsSync(SCHEMA_DIR)) return tables;
 
-    const content = readFileSync(SCHEMA_FILE, 'utf-8');
-    const regex = /CREATE (?:VIRTUAL )?TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)/g;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(content)) !== null) {
-        tables.add(match[1]);
+    const files = readdirSync(SCHEMA_DIR).filter((f) => f.endsWith('.ts'));
+    for (const file of files) {
+        const content = readFileSync(join(SCHEMA_DIR, file), 'utf-8');
+        const regex = /CREATE (?:VIRTUAL )?TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)/g;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(content)) !== null) {
+            tables.add(match[1]);
+        }
     }
     return tables;
 }
@@ -313,7 +316,7 @@ function validateSpec(specPath: string, schemaTables: Set<string>): ValidationRe
     if (fm.db_tables && Array.isArray(fm.db_tables)) {
         for (const table of fm.db_tables) {
             if (!schemaTables.has(table)) {
-                result.errors.push(`DB table not found in schema.ts: ${table}`);
+                result.errors.push(`DB table not found in schema/: ${table}`);
             }
         }
     }

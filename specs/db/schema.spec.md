@@ -3,7 +3,7 @@ module: db-schema
 version: 1
 status: active
 files:
-  - server/db/schema.ts
+  - server/db/schema/index.ts
 db_tables:
   - schema_version
   - projects

@@ -59,8 +59,14 @@ function countApiEndpoints(): number {
 }
 
 function countDbTables(): number {
-    const schema = readFileSync(join(ROOT, 'server/db/schema.ts'), 'utf-8');
-    return (schema.match(/CREATE TABLE/g) || []).length;
+    const schemaDir = join(ROOT, 'server/db/schema');
+    const files = readdirSync(schemaDir).filter(f => f.endsWith('.ts'));
+    let count = 0;
+    for (const file of files) {
+        const content = readFileSync(join(schemaDir, file), 'utf-8');
+        count += (content.match(/CREATE TABLE/g) || []).length;
+    }
+    return count;
 }
 
 function countE2eSpecFiles(): number {
