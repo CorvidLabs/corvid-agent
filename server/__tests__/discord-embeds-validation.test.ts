@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { assertSnowflake, assertInteractionToken } from '../discord/embeds';
+import { assertSnowflake, assertInteractionToken, buildFooterText } from '../discord/embeds';
 
 describe('assertSnowflake', () => {
     test('accepts valid snowflake IDs', () => {
@@ -36,5 +36,59 @@ describe('assertInteractionToken', () => {
         expect(() => assertInteractionToken('invalid token with spaces!!')).toThrow(
             'Invalid Discord interaction token',
         );
+    });
+});
+
+describe('buildFooterText', () => {
+    test('returns agent name and model when only required fields provided', () => {
+        const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' });
+        expect(result).toBe('Corvid · opus');
+    });
+
+    test('includes all fields when fully populated', () => {
+        const result = buildFooterText({
+            agentName: 'Corvid',
+            agentModel: 'opus',
+            projectName: 'my-project',
+            sessionId: 'abcdef1234567890',
+            status: 'running',
+        });
+        expect(result).toBe('Corvid · opus · my-project · sid:abcdef12 · running');
+    });
+
+    test('includes projectName only', () => {
+        const result = buildFooterText({
+            agentName: 'Corvid',
+            agentModel: 'opus',
+            projectName: 'my-project',
+        });
+        expect(result).toBe('Corvid · opus · my-project');
+    });
+
+    test('includes sessionId only and truncates to 8 chars', () => {
+        const result = buildFooterText({
+            agentName: 'Corvid',
+            agentModel: 'opus',
+            sessionId: 'abcdef1234567890',
+        });
+        expect(result).toBe('Corvid · opus · sid:abcdef12');
+    });
+
+    test('includes status only', () => {
+        const result = buildFooterText({
+            agentName: 'Corvid',
+            agentModel: 'opus',
+            status: 'completed',
+        });
+        expect(result).toBe('Corvid · opus · completed');
+    });
+
+    test('handles short sessionId without error', () => {
+        const result = buildFooterText({
+            agentName: 'Corvid',
+            agentModel: 'opus',
+            sessionId: 'abc',
+        });
+        expect(result).toBe('Corvid · opus · sid:abc');
     });
 });

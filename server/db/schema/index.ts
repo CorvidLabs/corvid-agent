@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 92;
+const SCHEMA_VERSION = 93;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -92,6 +92,10 @@ const MIGRATIONS: Record<number, string[]> = {
     92: [
         ...discord.tables.filter((s) => s.includes('discord_mention')),
         ...discord.indexes.filter((s) => s.includes('discord_mention')),
+    ],
+    93: [
+        // Add project_name to mention sessions for Discord footer metadata
+        `ALTER TABLE discord_mention_sessions ADD COLUMN project_name TEXT`,
     ],
 };
 

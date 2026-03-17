@@ -20,7 +20,14 @@ depends_on: []
 
 ## Purpose
 
-Structured memory subsystem for agents. Provides persistent, per-agent memory storage with automatic categorization, TF-IDF embedding generation, LRU caching, dual-mode semantic search (fast FTS5 + TF-IDF hybrid and deep LLM re-ranking), temporal decay, summarization of old memories, and cross-reference tracking between related memories. All new capabilities are additive and backward compatible with the core `agent_memories` CRUD.
+Structured memory subsystem for agents implementing a **two-tier memory architecture**:
+
+- **Long-term storage (localnet AlgoChat):** All memories are persisted as encrypted self-messages on the localnet blockchain via `sendOnChainToSelf()`. This is the durable source of truth — always available, timestamped, immutable.
+- **Short-term cache (SQLite `agent_memories` table):** Fast local access for in-session recall. Ephemeral — may be cleared or lost at any time.
+
+Both tiers are written on every save. SQLite is checked first for speed; localnet is the authoritative record.
+
+Provides automatic categorization, TF-IDF embedding generation, LRU caching, dual-mode semantic search (fast FTS5 + TF-IDF hybrid and deep LLM re-ranking), temporal decay, summarization of old memories, and cross-reference tracking between related memories. All new capabilities are additive and backward compatible with the core `agent_memories` CRUD.
 
 ## Public API
 
@@ -122,6 +129,9 @@ Structured memory subsystem for agents. Provides persistent, per-agent memory st
 16. **Cosine similarity for zero vectors**: Both `cosineSimilaritySparse` and `cosineSimilarityDense` return 0 when either input is a zero vector (no division by zero).
 17. **Fast search scoring blend**: When TF-IDF produces non-zero query vectors, scores blend 40% FTS5 positional rank + 60% TF-IDF cosine. When TF-IDF zeroes out, 100% FTS5 rank is used.
 18. **Category fallback in search**: If category filtering eliminates all FTS5 candidates, the filter is dropped and unfiltered results are returned.
+19. **Two-tier persistence**: Every memory save writes to both SQLite (short-term cache) and localnet AlgoChat (long-term storage). SQLite may be cleared without data loss because localnet is the authoritative record.
+20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which writes to both tiers. Channel of origin does not affect storage behavior.
+21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `pending`. The `MemorySyncService` picks it up and syncs to localnet AlgoChat. Sessions with no user messages are skipped.
 
 ## Behavioral Examples
 
@@ -160,6 +170,18 @@ Structured memory subsystem for agents. Provides persistent, per-agent memory st
 - **Given** one old memory in category `config`
 - **When** `summarizeOldMemories` is called
 - **Then** the memory is not archived and no summary is created
+
+### Scenario: Session exit saves summary to memory
+
+- **Given** a session with user and assistant messages exits cleanly (code 0)
+- **When** `handleExit` is called
+- **Then** a memory with key `session:{sessionId}:{date}` is saved with status `pending`, containing the session source, message counts, and a context summary
+
+### Scenario: Empty session skips summary save
+
+- **Given** a session with only system messages (no user messages)
+- **When** the session exits cleanly
+- **Then** no memory is saved (the auto-save is skipped)
 
 ### Scenario: Agent-scoped search isolation
 
@@ -205,6 +227,7 @@ Structured memory subsystem for agents. Provides persistent, per-agent memory st
 | `server/improvement/prompt-builder.ts` | `ScoredMemory` |
 | `server/scheduler/service.ts` | `summarizeOldMemories` |
 | `server/mcp/tool-handlers/index.ts` | `handleSaveMemory`, `handleRecallMemory` (via memory tool handler, uses core CRUD) |
+| `server/process/manager.ts` | `saveMemory` (session exit auto-save) |
 
 ## Database Tables
 
@@ -259,4 +282,6 @@ Structured memory subsystem for agents. Provides persistent, per-agent memory st
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-17 | corvid-agent | Add session exit auto-save (invariant 21), behavioral scenarios (#1186) |
+| 2026-03-17 | corvid-agent | Add two-tier memory architecture (invariants 19-20), update purpose section (#1186) |
 | 2026-02-27 | corvid-agent | Initial spec |

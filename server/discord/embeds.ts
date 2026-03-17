@@ -39,6 +39,35 @@ export interface DiscordEmbed {
     color?: number;
     fields?: Array<{ name: string; value: string; inline?: boolean }>;
     footer?: { text: string };
+    timestamp?: string;
+}
+
+/** Metadata for building rich embed footers with session context. */
+export interface FooterContext {
+    agentName: string;
+    agentModel: string;
+    sessionId?: string;
+    projectName?: string;
+    status?: string;
+}
+
+/**
+ * Build a standardized footer string with session metadata.
+ * Format: `agentName · model | project | sid:abc12345 · status`
+ * Shorter segments are omitted when not available.
+ */
+export function buildFooterText(ctx: FooterContext): string {
+    const parts: string[] = [`${ctx.agentName} · ${ctx.agentModel}`];
+    if (ctx.projectName) {
+        parts.push(ctx.projectName);
+    }
+    if (ctx.sessionId) {
+        parts.push(`sid:${ctx.sessionId.slice(0, 8)}`);
+    }
+    if (ctx.status) {
+        parts.push(ctx.status);
+    }
+    return parts.join(' · ');
 }
 
 export async function respondToInteraction(interaction: DiscordInteractionData, content: string): Promise<void> {

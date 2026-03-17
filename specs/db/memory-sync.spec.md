@@ -13,7 +13,7 @@ depends_on: []
 
 ## Purpose
 
-Background service that periodically syncs pending agent memories to the Algorand blockchain via encrypted on-chain transactions. Memories are encrypted, sent as self-addressed AlgoChat messages, and their transaction IDs are recorded back in the database.
+Background service that periodically syncs pending agent memories to **long-term storage** on the Algorand blockchain via encrypted on-chain transactions. In the two-tier memory architecture, this service is responsible for ensuring all memories reach the durable localnet layer (the authoritative record). Memories are encrypted, sent as self-addressed AlgoChat messages, and their transaction IDs are recorded back in the SQLite short-term cache.
 
 ## Public API
 
@@ -140,4 +140,5 @@ Background service that periodically syncs pending agent memories to the Algoran
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-17 | corvid-agent | Update purpose to reflect two-tier architecture role (#1186) |
 | 2026-03-04 | corvid-agent | Initial spec |

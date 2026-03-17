@@ -396,7 +396,7 @@ describe('handleComponentInteraction', () => {
         const interaction = makeComponentInteraction('resume_thread');
         await handleComponentInteraction(ctx, interaction);
 
-        expect(ctx.subscribeForResponseWithEmbed).toHaveBeenCalledWith('sess-1', '100000000000000001', 'TestAgent', 'test-model');
+        expect(ctx.subscribeForResponseWithEmbed).toHaveBeenCalledWith('sess-1', '100000000000000001', 'TestAgent', 'test-model', undefined);
     });
 
     test('resume_thread — skips subscribe if callback exists', async () => {

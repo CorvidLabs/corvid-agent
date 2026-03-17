@@ -38,7 +38,7 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 | Server modules | 47 |
 | API routes | 44 modules (~205 endpoints) |
 | Database tables | 93 |
-| Database migrations | 15 (squashed baseline) |
+| Database migrations | 16 (squashed baseline) |
 | MCP tools | 44 corvid_* handlers |
 | Unit tests | 7,718 across 320 files |
 | E2E tests | 360 across 31 Playwright specs |
@@ -94,7 +94,7 @@ marketplace/     —          Agent service listings, escrow, federation
 | Category | Tools |
 |----------|-------|
 | Messaging | corvid_send_message, corvid_list_agents |
-| Memory | corvid_save_memory (on-chain encrypted), corvid_recall_memory (FTS5) |
+| Memory | corvid_save_memory (long-term on-chain + short-term SQLite), corvid_recall_memory (FTS5 + on-chain status) |
 | GitHub | 12 tools — star, fork, PRs, issues, reviews, comments, repo info |
 | Automation | corvid_create_work_task, corvid_manage_schedule, corvid_manage_workflow, corvid_launch_council |
 | Discovery | corvid_discover_agent, corvid_invoke_remote_agent (A2A) |
@@ -154,12 +154,24 @@ On-chain, cryptographically verifiable track records:
 - Cross-instance verification of reputation claims
 - Governance voting weights tied to reputation
 
-### 5. Memory (On-Chain Encrypted)
+### 5. Two-Tier Memory Architecture
 
+Agents use a two-tier memory model:
+
+- **Long-term storage (localnet AlgoChat):** All memories are persisted as encrypted self-messages on the localnet Algorand blockchain via `sendOnChainToSelf()`. This is the durable source of truth — always available, timestamped, immutable. Like disk storage.
+- **Short-term cache (SQLite):** The `agent_memories` table provides fast local access for in-session recall. This is ephemeral — it may be cleared, reset, or lost at any time. Like L1 cache.
+
+Both tiers are written on every `save_memory` call. When recalling, SQLite is checked first for speed, but localnet is the authoritative record.
+
+**Capabilities:**
 - Vector embeddings for semantic search
 - FTS5 full-text retrieval
-- Time-decay relevance scoring
-- On-chain encrypted persistence — agents remember across sessions and instances
+- Time-decay relevance scoring (0.4 floor — old memories deprioritized but never zeroed)
+- Auto-categorization (10-category taxonomy)
+- Cross-reference tracking between related memories
+- LRU caching with configurable TTL
+
+**Key rule:** Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, etc.) must always save to long-term storage (localnet). Short-term cache is a convenience layer, not the source of truth.
 
 ### 6. Agent Wallets & Credits
 
@@ -171,8 +183,10 @@ On-chain, cryptographically verifiable track records:
 ### 7. Dual-Network Architecture
 
 - **Testnet/Mainnet** — external-facing (PSK contacts, user messaging)
-- **Localnet** — inter-agent comms (wallets, memories, internal messaging)
+- **Localnet** — inter-agent comms (wallets, memories, internal messaging, long-term memory storage)
 - Same mnemonic, different network endpoints, full isolation
+
+Localnet serves double duty: inter-agent communication _and_ the agent's long-term memory store. Self-messages on localnet are free, instant, and always available regardless of external network connectivity.
 
 ### 8. Channel Integrations
 
@@ -227,7 +241,6 @@ On-chain, cryptographically verifiable track records:
 - Dashboard UI overhaul — cyberpunk theme, WCAG AAA (#604)
 - Work task priority queue with preemption (#487)
 - Stats collection automation in CI (#537)
-- Nevermore NFT bridge (#539)
 
 **Future:**
 - Smart contract agreements between agents

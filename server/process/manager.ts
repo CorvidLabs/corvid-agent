@@ -14,6 +14,7 @@ import type { LlmProviderType } from '../providers/types';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { hasClaudeAccess } from '../providers/router';
 import { getSession, getSessionMessages, updateSessionPid, updateSessionStatus, updateSessionCost, addSessionMessage, getParticipantForSession } from '../db/sessions';
+import { saveMemory } from '../db/agent-memories';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { resolveSessionConfig } from './session-config-resolver';
 import { createCorvidMcpServer } from '../mcp/sdk-tools';
@@ -982,6 +983,12 @@ export class ProcessManager {
             addSessionMessage(this.db, sessionId, 'system', 'Session completed.');
         }
 
+        // Two-tier memory: auto-save session summary on clean exit
+        // Saves to SQLite (pending) — MemorySyncService will sync to localnet chain
+        if (code === 0) {
+            this.saveSessionSummaryToMemory(sessionId);
+        }
+
         if (code !== 0) {
             const isAutoRestartable = meta?.source === 'algochat' && (meta?.restartCount ?? 0) < MAX_RESTARTS;
             this.eventBus.emit(sessionId, {
@@ -1023,6 +1030,53 @@ export class ProcessManager {
             }
         } else {
             this.cleanupSessionState(sessionId);
+        }
+    }
+
+    /**
+     * Save a session summary to long-term memory on clean exit.
+     * Two-tier memory architecture: saves to SQLite with status='pending',
+     * then MemorySyncService picks it up and syncs to localnet AlgoChat.
+     * Fire-and-forget — errors are logged but do not block session cleanup.
+     */
+    private saveSessionSummaryToMemory(sessionId: string): void {
+        try {
+            const session = getSession(this.db, sessionId);
+            if (!session?.agentId) return;
+
+            const messages = getSessionMessages(this.db, sessionId);
+            if (messages.length === 0) return;
+
+            // Build a summary from the conversation
+            const userMsgs = messages.filter(m => m.role === 'user');
+            const assistantMsgs = messages.filter(m => m.role === 'assistant');
+            if (userMsgs.length === 0) return;
+
+            const summary = summarizeConversation(
+                messages
+                    .filter(m => m.role === 'user' || m.role === 'assistant')
+                    .map(m => ({ role: m.role, content: m.content })),
+            );
+
+            const key = `session:${sessionId}:${new Date().toISOString().slice(0, 10)}`;
+            const content = [
+                `Session ${sessionId} (${session.source ?? 'unknown'} source)`,
+                `Duration: ${userMsgs.length} user messages, ${assistantMsgs.length} assistant responses`,
+                summary,
+            ].join('\n');
+
+            saveMemory(this.db, {
+                agentId: session.agentId,
+                key,
+                content,
+            });
+
+            log.info('Session summary saved to memory', { sessionId, key });
+        } catch (err) {
+            log.warn('Failed to save session summary to memory', {
+                sessionId,
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
     }
 

@@ -154,7 +154,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
         {
             name: 'corvid_save_memory',
-            description: 'Save an encrypted memory by sending a message to yourself on Algorand. Cached locally for fast recall.',
+            description: 'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache for fast recall.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -171,7 +171,7 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
         },
         {
             name: 'corvid_recall_memory',
-            description: 'Recall on-chain memories. Includes blockchain status. Key for exact lookup, query for search, or neither to list recent.',
+            description: 'Recall memories from short-term cache (SQLite) with long-term storage status. Key for exact lookup, query for search, or neither to list recent.',
             parameters: {
                 type: 'object',
                 properties: {

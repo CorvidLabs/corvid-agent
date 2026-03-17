@@ -58,7 +58,7 @@ export async function handleComponentInteraction(
 
             // Resubscribe for responses
             if (!ctx.threadCallbacks.has(threadId)) {
-                ctx.subscribeForResponseWithEmbed(info.sessionId, threadId, info.agentName, info.agentModel);
+                ctx.subscribeForResponseWithEmbed(info.sessionId, threadId, info.agentName, info.agentModel, info.projectName);
             }
             ctx.threadLastActivity.set(threadId, Date.now());
 

@@ -85,6 +85,7 @@ export interface MentionSessionInfo {
     sessionId: string;
     agentName: string;
     agentModel: string;
+    projectName?: string;
 }
 
 /** Context needed by the message handler to access bridge state. */
@@ -436,12 +437,14 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
 
     const agentName = agent.name;
     const agentModel = agent.model || 'unknown';
+    const projectNameForFooter = project.name;
     subscribeForInlineResponse(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         session.id, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter });
         },
+        projectNameForFooter,
     );
 }
 
@@ -458,7 +461,7 @@ async function handleMentionReplyResume(
     const cleanText = resolveMentions(text, mentions, ctx.botUserId);
     if (!cleanText) return;
 
-    const { sessionId, agentName, agentModel } = sessionInfo;
+    const { sessionId, agentName, agentModel, projectName } = sessionInfo;
     const session = getSession(ctx.db, sessionId);
 
     if (!session) {
@@ -478,8 +481,9 @@ async function handleMentionReplyResume(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName });
         },
+        projectName,
     );
 }
 
@@ -493,7 +497,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         if (!threadInfo) return;
     }
 
-    const { sessionId, agentName, agentModel } = threadInfo;
+    const { sessionId, agentName, agentModel, projectName } = threadInfo;
 
     const session = getSession(ctx.db, sessionId);
     if (!session) {
@@ -516,6 +520,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
             ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
+            projectName,
         );
         return;
     }
@@ -523,5 +528,6 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
+        projectName,
     );
 }
