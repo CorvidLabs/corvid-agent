@@ -20,6 +20,7 @@ import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { ReputationScorer } from '../reputation/scorer';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
+import { PermissionTier, requirePermissionTier } from '../permissions/governance-tier';
 import { parseBodyOrThrow, ValidationError, CreateCouncilSchema, UpdateCouncilSchema, LaunchCouncilSchema, CouncilChatSchema, CastVoteSchema, HumanApprovalSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 import { NotFoundError } from '../lib/errors';
@@ -63,19 +64,29 @@ export function handleCouncilRoutes(
 
     // Council CRUD
     if (path === '/api/councils' && method === 'GET') {
+        if (context) {
+            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+            if (denied) return denied;
+        }
         return json(listCouncils(db, tenantId));
     }
 
     if (path === '/api/councils' && method === 'POST') {
         if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
             if (denied) return denied;
+            const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (roleDenied) return roleDenied;
         }
         return handleCreateCouncil(req, db, tenantId);
     }
 
     // Council launches list (optional councilId filter)
     if (path === '/api/council-launches' && method === 'GET') {
+        if (context) {
+            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+            if (denied) return denied;
+        }
         const councilId = url.searchParams.get('councilId') ?? undefined;
         return json(listCouncilLaunches(db, councilId, tenantId));
     }
@@ -87,17 +98,29 @@ export function handleCouncilRoutes(
         const action = launchMatch[3];
 
         if (!action && method === 'GET') {
+            if (context) {
+                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+                if (denied) return denied;
+            }
             const launch = getCouncilLaunch(db, launchId, tenantId);
             return launch ? json(launch) : json({ error: 'Not found' }, 404);
         }
 
         if (action === 'logs' && method === 'GET') {
+            if (context) {
+                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+                if (denied) return denied;
+            }
             const launch = getCouncilLaunch(db, launchId, tenantId);
             if (!launch) return json({ error: 'Not found' }, 404);
             return json(getCouncilLaunchLogs(db, launchId));
         }
 
         if (action === 'discussion-messages' && method === 'GET') {
+            if (context) {
+                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+                if (denied) return denied;
+            }
             const launch = getCouncilLaunch(db, launchId, tenantId);
             if (!launch) return json({ error: 'Not found' }, 404);
             return json(getDiscussionMessages(db, launchId));
@@ -105,53 +128,69 @@ export function handleCouncilRoutes(
 
         if (action === 'abort' && method === 'POST') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleAbort(db, processManager, launchId);
         }
 
         if (action === 'review' && method === 'POST') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleReview(db, processManager, launchId);
         }
 
         if (action === 'synthesize' && method === 'POST') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleSynthesize(db, processManager, launchId);
         }
 
         if (action === 'chat' && method === 'POST') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleCouncilChat(req, db, processManager, launchId);
         }
 
         // Governance vote endpoints
         if (action === 'vote' && method === 'GET') {
+            if (context) {
+                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+                if (denied) return denied;
+            }
             return handleGetVoteStatus(db, launchId, reputationScorer);
         }
 
         if (action === 'vote' && method === 'POST') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleCastVote(req, db, launchId, reputationScorer);
         }
 
         if (action === 'vote/approve' && method === 'POST') {
             if (context) {
-                const denied = tenantRoleGuard('owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Owner, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleHumanApproval(req, db, launchId, reputationScorer);
         }
@@ -166,20 +205,28 @@ export function handleCouncilRoutes(
 
     if (!action) {
         if (method === 'GET') {
+            if (context) {
+                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+                if (denied) return denied;
+            }
             const council = getCouncil(db, id, tenantId);
             return council ? json(council) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleUpdateCouncil(req, db, id, tenantId);
         }
         if (method === 'DELETE') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             const deleted = deleteCouncil(db, id, tenantId);
             return deleted ? json({ ok: true }) : json({ error: 'Not found' }, 404);
@@ -188,13 +235,19 @@ export function handleCouncilRoutes(
 
     if (action === 'launch' && method === 'POST') {
         if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
             if (denied) return denied;
+            const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (roleDenied) return roleDenied;
         }
         return handleLaunch(req, db, processManager, id, agentMessenger ?? null);
     }
 
     if (action === 'launches' && method === 'GET') {
+        if (context) {
+            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+            if (denied) return denied;
+        }
         return json(listCouncilLaunches(db, id, tenantId));
     }
 

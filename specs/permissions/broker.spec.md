@@ -1,10 +1,11 @@
 ---
 module: permission-broker
-version: 1
+version: 2
 status: active
 files:
   - server/permissions/broker.ts
   - server/permissions/types.ts
+  - server/permissions/governance-tier.ts
   - server/permissions/index.ts
 db_tables:
   - permission_grants
@@ -30,6 +31,8 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | `applyRoleTemplate` | `(db, agentId, templateName, grantedBy, opts?)` | `Promise<{...}>` | Apply a role template to an agent (re-exported from `role-templates`) |
 | `revokeRoleTemplate` | `(db, agentId, templateName, revokedBy, opts?)` | `{...}` | Revoke all grants matching a role template (re-exported from `role-templates`) |
 | `_resetHmacSecretForTesting` | `()` | `void` | Reset the cached HMAC secret (test-only helper to simulate server restarts) |
+| `resolveCallerTier` | `(context: RequestContext, db?: Database)` | `PermissionTier` | Resolve governance PermissionTier for a caller based on API role, tenant role, DB grants, or auth status (re-exported from `governance-tier`) |
+| `requirePermissionTier` | `(minTier: PermissionTier, db?: Database)` | `Guard` | Middleware guard factory that enforces a minimum PermissionTier for governance routes (re-exported from `governance-tier`) |
 
 ### Exported Types
 
@@ -43,12 +46,20 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | `RevokeOptions` | Options for revoking: grantId?, agentId?, action?, revokedBy, reason?, tenantId? |
 | `RoleTemplate` | A role template with `name`, `description`, and `actions` (re-exported from `role-templates`) |
 
+### Exported Enums
+
+| Enum | Description |
+|------|-------------|
+| `PermissionTier` | Governance tier hierarchy: Guest (0), Agent (1), Operator (2), Owner (3). Callers must meet or exceed the minimum tier for an action (re-exported from `governance-tier`) |
+
 ### Exported Constants
 
 | Constant | Type | Description |
 |----------|------|-------------|
 | `TOOL_ACTION_MAP` | `Record<string, PermissionAction>` | Maps MCP tool names (e.g. `corvid_github_create_pr`) to their required permission action (e.g. `git:create_pr`). Currently maps 30+ tools across 11 namespaces |
 | `ROLE_TEMPLATES` | `readonly RoleTemplate[]` | Built-in role templates: owner, operator, viewer, developer, communicator (re-exported from `role-templates`) |
+| `PERMISSION_TIER_NAMES` | `Readonly<Record<PermissionTier, string>>` | Human-readable names for each tier (server-side logging only) (re-exported from `governance-tier`) |
+| `GOVERNANCE_ROUTE_TIERS` | `Readonly<Record<string, PermissionTier>>` | Documents the minimum PermissionTier required for each governance route (re-exported from `governance-tier`) |
 
 ### Exported Classes
 
@@ -185,3 +196,4 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-05 | corvid-agent | Initial spec (#591) |
+| 2026-03-17 | corvid-agent | Add Layer 0 governance tier exports: PermissionTier, PERMISSION_TIER_NAMES, GOVERNANCE_ROUTE_TIERS, resolveCallerTier, requirePermissionTier (#1038) |

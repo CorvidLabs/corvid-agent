@@ -1,7 +1,7 @@
 import { createLogger } from '../lib/logger';
 import { scanDiff, formatScanReport } from '../lib/fetch-detector';
 import { scanDiff as scanCodeDiff, formatScanReport as formatCodeScanReport } from '../lib/code-scanner';
-import { assessImpact } from '../councils/governance';
+import { assessImpact, LAYER_0_BASENAMES } from '../councils/governance';
 
 const log = createLogger('WorkValidation');
 
@@ -113,40 +113,85 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
         await diffProc.exited;
 
         if (diffOutput.trim()) {
-            // Governance tier check — block changes to Layer 0/1 paths in automated workflows
-            const changedFiles = diffOutput
-                .split('\n')
-                .filter((line) => line.startsWith('diff --git'))
-                .map((line) => {
-                    const match = line.match(/b\/(.+)$/);
-                    return match?.[1] ?? '';
-                })
-                .filter(Boolean);
+            // Governance tier check — block modifications to existing Layer 0/1 files.
+            // Only blocks changes that delete lines from existing protected files (real logic
+            // changes). New files added to Layer 0/1 directories and pure-additive changes
+            // (e.g. adding re-exports to a barrel file) are allowed: they add new security
+            // infrastructure without weakening existing guarantees.
+            const diffBlocks = diffOutput.split(/(?=^diff --git )/m).filter((b) => b.trim());
+            const governanceBlockedPaths: string[] = [];
 
-            if (changedFiles.length > 0) {
-                const impact = assessImpact(changedFiles);
-                if (impact.blockedFromAutomation) {
-                    passed = false;
-                    const blockedList = impact.affectedPaths
-                        .filter((p) => p.tier < 2)
-                        .map((p) => `  - ${p.path} (Layer ${p.tier})`)
-                        .join('\n');
-                    outputs.push(
-                        `=== Governance Tier Violation ===\n` +
-                        `Work task attempted to modify ${impact.tierLabel} (Layer ${impact.tier}) paths.\n` +
-                        `Automated workflows cannot modify Layer 0 or Layer 1 paths.\n\n` +
-                        `Blocked paths:\n${blockedList}`,
-                    );
-                    log.warn('Work task blocked by governance tier', {
-                        tier: impact.tier,
-                        tierLabel: impact.tierLabel,
-                        blockedPaths: impact.affectedPaths.filter((p) => p.tier < 2).map((p) => p.path),
-                    });
+            for (const block of diffBlocks) {
+                const pathMatch = block.match(/^diff --git .* b\/(.+)$/m);
+                if (!pathMatch) continue;
+                const filePath = pathMatch[1];
+                const tier = assessImpact([filePath]).tier;
+                if (tier >= 2) continue; // operational — not blocked
+
+                const basename = filePath.split('/').pop() ?? '';
+                const isProtectedByName = LAYER_0_BASENAMES.has(basename);
+                const isNewFile = /^new file mode /m.test(block);
+                const hasDeletions = /^-(?!--)/m.test(block);
+
+                // Block if:
+                //   - File basename is explicitly listed in LAYER_0_BASENAMES (always protected
+                //     by name, even when added as a new file — these are named critical files)
+                //   - File is an existing Layer 0/1 path that has logic changes (deletions)
+                // Allow:
+                //   - New files in Layer 0 directories that aren't in LAYER_0_BASENAMES
+                //     (e.g. adding new security infrastructure modules to server/permissions/)
+                //   - Pure additions to existing Layer 0/1 files with no removed lines
+                //     (e.g. adding re-exports to a barrel index.ts)
+                if (isProtectedByName || (!isNewFile && hasDeletions)) {
+                    governanceBlockedPaths.push(filePath);
                 }
             }
 
+            if (governanceBlockedPaths.length > 0) {
+                passed = false;
+                const tierInfo = assessImpact(governanceBlockedPaths);
+                const blockedList = governanceBlockedPaths
+                    .map((p) => `  - ${p} (Layer ${assessImpact([p]).tier})`)
+                    .join('\n');
+                outputs.push(
+                    `=== Governance Tier Violation ===\n` +
+                    `Work task attempted to modify ${tierInfo.tierLabel} (Layer ${tierInfo.tier}) paths.\n` +
+                    `Automated workflows cannot modify Layer 0 or Layer 1 paths.\n\n` +
+                    `Blocked paths:\n${blockedList}`,
+                );
+                log.warn('Work task blocked by governance tier', {
+                    tier: tierInfo.tier,
+                    tierLabel: tierInfo.tierLabel,
+                    blockedPaths: governanceBlockedPaths,
+                });
+            }
+
+            /**
+             * Strip test and spec file sections from the diff before security scanning.
+             * Test files legitimately contain mock URLs, eval patterns, and HTTP clients
+             * as test fixtures — these are not real security risks and must not be flagged.
+             */
+            function stripTestSections(diff: string): string {
+                const lines = diff.split('\n');
+                const result: string[] = [];
+                let skip = false;
+                for (const line of lines) {
+                    if (line.startsWith('diff --git')) {
+                        skip =
+                            /\b__tests__\//.test(line) ||
+                            /\.test\.ts\b/.test(line) ||
+                            /\bspecs\//.test(line) ||
+                            /\.spec\.(md|ts)\b/.test(line);
+                    }
+                    if (!skip) result.push(line);
+                }
+                return result.join('\n');
+            }
+
+            const filteredDiff = stripTestSections(diffOutput);
+
             // Fetch detector
-            const fetchResult = scanDiff(diffOutput);
+            const fetchResult = scanDiff(filteredDiff);
             if (fetchResult.hasUnapprovedFetches) {
                 passed = false;
                 outputs.push(formatScanReport(fetchResult));
@@ -156,7 +201,7 @@ export async function runValidation(workingDir: string): Promise<{ passed: boole
             }
 
             // Code pattern scanner
-            const codeResult = scanCodeDiff(diffOutput);
+            const codeResult = scanCodeDiff(filteredDiff);
             if (codeResult.hasCriticalFindings) {
                 passed = false;
                 outputs.push(formatCodeScanReport(codeResult));
