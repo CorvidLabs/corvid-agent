@@ -5,6 +5,7 @@ import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
 import { isProtectedPath, extractFilePathsFromInput, BASH_WRITE_OPERATORS } from './protected-paths';
 import { query, type Query, type SDKMessage, type PermissionResult, type CanUseTool, type McpSdkServerConfigWithInstance, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
+import type { McpServerConfig as DbMcpServerConfig } from '../../shared/types';
 import { getMessagingSafetyPrompt, getResponseRoutingPrompt } from '../providers/ollama/tool-prompt-templates';
 import { prependRoutingContext } from './direct-process';
 import { createLogger } from '../lib/logger';
@@ -98,6 +99,8 @@ export interface SdkProcessOptions {
     onApprovalRequest: (request: ApprovalRequestWire) => void;
     onApiOutage?: () => void;
     mcpServers?: McpSdkServerConfigWithInstance[];
+    /** External MCP server configs from the database (stdio servers like Figma, Slack, etc.) */
+    externalMcpConfigs?: DbMcpServerConfig[];
     /** Persona system prompt section (from agent_personas table) */
     personaPrompt?: string;
     /** Skill bundle prompt additions (from assigned skill_bundles) */
@@ -124,6 +127,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         onApprovalRequest,
         onApiOutage,
         mcpServers,
+        externalMcpConfigs,
         personaPrompt,
         skillPrompt,
     } = options;
@@ -298,11 +302,25 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         sdkOptions.settingSources = ['user', 'project'];
     }
 
+    // Build MCP servers record — corvid tools + any external servers (Figma, Slack, etc.)
+    const mcpRecord: Record<string, McpServerConfig> = {};
     if (mcpServers && mcpServers.length > 0) {
-        const mcpRecord: Record<string, McpServerConfig> = {};
         for (const server of mcpServers) {
             mcpRecord[server.name] = server;
         }
+    }
+    if (externalMcpConfigs && externalMcpConfigs.length > 0) {
+        for (const ext of externalMcpConfigs) {
+            mcpRecord[ext.name] = {
+                type: 'stdio',
+                command: ext.command,
+                args: ext.args,
+                env: ext.envVars,
+            };
+            log.info(`Adding external MCP server "${ext.name}" to SDK session`, { sessionId: session.id, command: ext.command });
+        }
+    }
+    if (Object.keys(mcpRecord).length > 0) {
         sdkOptions.mcpServers = mcpRecord;
     }
 
