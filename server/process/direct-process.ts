@@ -119,33 +119,120 @@ function truncateCouncilContext(
 }
 
 /**
- * Trim conversation history to bound memory usage.
- * Two triggers:
- * 1. Message count exceeds MAX_MESSAGES (40)
- * 2. Estimated tokens exceed 70% of context window (token-budget trim)
- *
- * Keeps the first user message (original prompt context) and the most recent
- * messages so the model retains enough context to continue.
+ * Progressive compression tiers based on context usage percentage.
+ * Each tier applies increasingly aggressive compression to keep the
+ * conversation within the context window.
  */
-function trimMessages(
-    messages: Array<{ role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string }>,
-    systemPrompt?: string,
+const COMPRESSION_TIERS = [
+    { name: 'tier1', threshold: 0.60, description: 'light tool result summarization' },
+    { name: 'tier2', threshold: 0.75, description: 'reduce recent window + summarize discarded' },
+    { name: 'tier3', threshold: 0.85, description: 'aggressive compression to 4 exchanges' },
+    { name: 'tier4', threshold: 0.90, description: 'full context summary + last 2 exchanges' },
+] as const;
+
+type ConversationMessage = { role: 'user' | 'assistant' | 'tool'; content: string; toolCallId?: string };
+
+/**
+ * Compress tool result messages in-place by truncating content older than
+ * `maxAge` positions from the end of the array to at most `maxChars`.
+ */
+export function compressToolResults(
+    messages: ConversationMessage[],
+    maxAge: number,
+    maxChars: number,
+): number {
+    let compressed = 0;
+    const cutoff = messages.length - maxAge;
+    for (let i = 0; i < cutoff; i++) {
+        const msg = messages[i];
+        if (msg.role === 'tool' && msg.content.length > maxChars) {
+            const original = msg.content.length;
+            msg.content = msg.content.slice(0, maxChars).replace(/\n/g, ' ').trim()
+                + `... [compressed, was ${original} chars]`;
+            compressed++;
+        }
+    }
+    return compressed;
+}
+
+/**
+ * Generate a brief plain-text summary of the key points in a conversation.
+ * Used for Tier 4 compression and context reset in ProcessManager.
+ */
+export function summarizeConversation(
+    messages: Array<{ role: string; content: string }>,
+): string {
+    const points: string[] = [];
+
+    // Extract key user requests
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length > 0) {
+        const firstRequest = userMessages[0].content.slice(0, 300).replace(/\n/g, ' ').trim();
+        points.push(`Original request: ${firstRequest}${userMessages[0].content.length > 300 ? '...' : ''}`);
+    }
+
+    // Extract tool usage summary
+    const toolMessages = messages.filter(m => m.role === 'tool');
+    if (toolMessages.length > 0) {
+        points.push(`Tools used: ${toolMessages.length} tool calls executed.`);
+    }
+
+    // Extract key assistant conclusions (last few assistant messages)
+    const assistantMessages = messages.filter(m => m.role === 'assistant');
+    if (assistantMessages.length > 0) {
+        const last = assistantMessages[assistantMessages.length - 1];
+        const conclusion = last.content.slice(0, 300).replace(/\n/g, ' ').trim();
+        points.push(`Last assistant response: ${conclusion}${last.content.length > 300 ? '...' : ''}`);
+    }
+
+    // Summarize intermediate user follow-ups
+    if (userMessages.length > 1) {
+        const followUps = userMessages.slice(1).map(m => {
+            const text = m.content.slice(0, 100).replace(/\n/g, ' ').trim();
+            return text + (m.content.length > 100 ? '...' : '');
+        });
+        if (followUps.length <= 5) {
+            points.push(`Follow-up messages: ${followUps.join('; ')}`);
+        } else {
+            points.push(`Follow-up messages (${followUps.length} total): ${followUps.slice(0, 3).join('; ')}; ... and ${followUps.length - 3} more`);
+        }
+    }
+
+    return `[Context Summary]\n${points.join('\n')}`;
+}
+
+/**
+ * Truncate tool result messages older than `ageThreshold` positions from the
+ * end to at most `maxChars`, appending a truncation notice.
+ * This is a post-trim pass for additional size reduction.
+ */
+export function truncateOldToolResults(
+    messages: ConversationMessage[],
+    ageThreshold: number,
+    maxChars: number,
+): number {
+    let truncated = 0;
+    const cutoff = messages.length - ageThreshold;
+    for (let i = 0; i < cutoff; i++) {
+        const msg = messages[i];
+        if (msg.role === 'tool' && msg.content.length > maxChars) {
+            const original = msg.content.length;
+            msg.content = msg.content.slice(0, maxChars) + `... [truncated, was ${original} chars]`;
+            truncated++;
+        }
+    }
+    return truncated;
+}
+
+/**
+ * Internal: Original trim logic (Tier 2 behavior).
+ * Reduces the message window and summarizes discarded tool results.
+ */
+function trimMessagesTier2(
+    messages: ConversationMessage[],
+    _systemPrompt?: string,
 ): void {
-    const ctxSize = getContextBudget();
-    const threshold = Math.floor(ctxSize * 0.7);
-    const systemTokens = systemPrompt ? estimateTokens(systemPrompt) : 0;
-    const messageTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-    const totalTokens = systemTokens + messageTokens;
-
-    const overCount = messages.length > MAX_MESSAGES;
-    const overBudget = totalTokens > threshold;
-
-    if (!overCount && !overBudget) return;
-
-    // When over budget, keep fewer messages to leave room for generation
-    const keepCount = overBudget
-        ? Math.max(6, Math.min(KEEP_RECENT, Math.floor(messages.length * 0.4)))
-        : KEEP_RECENT;
+    const keepCount = Math.max(6, Math.min(KEEP_RECENT, Math.floor(messages.length * 0.4)));
 
     const first = messages[0];
     const discarded = messages.slice(1, -keepCount);
@@ -155,14 +242,12 @@ function trimMessages(
     const summaries: string[] = [];
     for (const msg of discarded) {
         if (msg.role === 'tool' && msg.content.length > 0) {
-            // Extract a brief summary from the tool result
-            const preview = msg.content.slice(0, 80).replace(/\n/g, ' ').trim();
+            const preview = msg.content.slice(0, 200).replace(/\n/g, ' ').trim();
             const lineCount = (msg.content.match(/\n/g) || []).length + 1;
-            summaries.push(`[Previous tool result: ${preview}${msg.content.length > 80 ? '...' : ''} (${lineCount} lines)]`);
+            summaries.push(`[Previous tool result: ${preview}${msg.content.length > 200 ? '...' : ''} (${lineCount} lines)]`);
         }
     }
 
-    // Avoid duplicating the first message if it's already in the recent window
     if (recent[0] === first) {
         messages.length = 0;
         if (summaries.length > 0) {
@@ -177,10 +262,104 @@ function trimMessages(
         }
         messages.push(...recent);
     }
+}
 
-    const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
-    const reason = overBudget ? `token budget (${totalTokens}→${newTokens} of ${threshold})` : `message count (>${MAX_MESSAGES})`;
-    log.info(`Trimmed conversation to ${messages.length} messages (${summaries.length} tool results summarized) — ${reason}`);
+/**
+ * Trim conversation history using progressive compression tiers.
+ *
+ * Tier 1 (60%): Summarize tool results older than 5 messages (200 char max).
+ * Tier 2 (75%): Reduce recent window dynamically, summarize discarded results.
+ * Tier 3 (85%): Keep only last 4 exchanges (8 messages), one-line tool summaries.
+ * Tier 4 (90%): Replace all with context summary + last 2 exchanges (4 messages).
+ *
+ * Also triggers on message count exceeding MAX_MESSAGES.
+ */
+function trimMessages(
+    messages: ConversationMessage[],
+    systemPrompt?: string,
+): void {
+    const ctxSize = getContextBudget();
+    const systemTokens = systemPrompt ? estimateTokens(systemPrompt) : 0;
+    const messageTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+    const totalTokens = systemTokens + messageTokens;
+    const usageRatio = totalTokens / ctxSize;
+
+    const overCount = messages.length > MAX_MESSAGES;
+
+    // Determine which tier applies
+    if (usageRatio >= COMPRESSION_TIERS[3].threshold) {
+        // Tier 4: Full context summary + last 2 exchanges
+        const summary = summarizeConversation(messages);
+        const keepLast = Math.min(4, messages.length);
+        const recent = messages.slice(-keepLast);
+        messages.length = 0;
+        messages.push({ role: 'user', content: summary });
+        messages.push(...recent);
+        const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+        log.info(`Trimmed conversation (tier4: full summary) to ${messages.length} messages — token budget (${totalTokens}→${newTokens} of ${ctxSize})`);
+        return;
+    }
+
+    if (usageRatio >= COMPRESSION_TIERS[2].threshold) {
+        // Tier 3: Aggressive — keep last 4 exchanges (8 messages)
+        const keepLast = Math.min(8, messages.length);
+        const first = messages[0];
+        const recent = messages.slice(-keepLast);
+        // One-line summaries for all tool results older than 2 turns (4 messages)
+        const discarded = messages.slice(0, -keepLast);
+        const summaries: string[] = [];
+        for (const msg of discarded) {
+            if (msg.role === 'tool' && msg.content.length > 0) {
+                const preview = msg.content.slice(0, 80).replace(/\n/g, ' ').trim();
+                summaries.push(`[Tool: ${preview}${msg.content.length > 80 ? '...' : ''}]`);
+            }
+        }
+
+        if (recent[0] === first || !discarded.includes(first)) {
+            messages.length = 0;
+            if (summaries.length > 0) {
+                messages.push({ role: 'user', content: summaries.join('\n') });
+            }
+            messages.push(...recent);
+        } else {
+            messages.length = 0;
+            messages.push(first);
+            if (summaries.length > 0) {
+                messages.push({ role: 'user', content: summaries.join('\n') });
+            }
+            messages.push(...recent);
+        }
+
+        // Additionally compress any remaining old tool results
+        compressToolResults(messages, 4, 80);
+
+        const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+        log.info(`Trimmed conversation (tier3: aggressive) to ${messages.length} messages — token budget (${totalTokens}→${newTokens} of ${ctxSize})`);
+        return;
+    }
+
+    if (usageRatio >= COMPRESSION_TIERS[1].threshold || overCount) {
+        // Tier 2: Original behavior with dynamic keep count
+        trimMessagesTier2(messages, systemPrompt);
+        const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+        const reason = overCount && usageRatio < COMPRESSION_TIERS[1].threshold
+            ? `message count (>${MAX_MESSAGES})`
+            : `token budget (${totalTokens}→${newTokens} of ${ctxSize})`;
+        log.info(`Trimmed conversation (tier2: reduce window) to ${messages.length} messages — ${reason}`);
+        return;
+    }
+
+    if (usageRatio >= COMPRESSION_TIERS[0].threshold) {
+        // Tier 1: Light touch — just compress old tool results
+        const compressed = compressToolResults(messages, 5, 200);
+        if (compressed > 0) {
+            const newTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0) + systemTokens;
+            log.info(`Compressed ${compressed} old tool results (tier1: light) — token budget (${totalTokens}→${newTokens} of ${ctxSize})`);
+        }
+        return;
+    }
+
+    // Below all thresholds — no action needed
 }
 
 /** Compute context usage metrics for the current message state. */
@@ -482,6 +661,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 const countBefore = messages.length;
                 trimMessages(messages, systemPrompt);
                 if (messages.length < countBefore) hasTrimmed = true;
+                // Post-trim pass: truncate old tool results for additional savings
+                truncateOldToolResults(messages, 3, 500);
                 emitContextUsage(messages, systemPrompt);
                 result = await provider.complete({
                     model,
@@ -506,6 +687,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     const countBefore2 = messages.length;
                     trimMessages(messages, systemPrompt);
                     if (messages.length < countBefore2) hasTrimmed = true;
+                    // Post-trim pass: truncate old tool results
+                    truncateOldToolResults(messages, 3, 500);
                     emitContextUsage(messages, systemPrompt);
                     result = await provider.complete({
                         model,

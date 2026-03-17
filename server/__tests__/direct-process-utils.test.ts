@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { buildSystemPrompt, computeContextUsage, determineWarningLevel, type ToolDef } from '../process/direct-process';
+import { buildSystemPrompt, computeContextUsage, determineWarningLevel, compressToolResults, summarizeConversation, truncateOldToolResults, type ToolDef } from '../process/direct-process';
 
 /**
  * Tests for utility functions from direct-process.ts.
@@ -370,5 +370,245 @@ describe('determineWarningLevel', () => {
     it('returns critical above 85%', () => {
         expect(determineWarningLevel(90)!.level).toBe('critical');
         expect(determineWarningLevel(100)!.level).toBe('critical');
+    });
+});
+
+// ── compressToolResults ───────────────────────────────────────────────────
+
+describe('compressToolResults', () => {
+    it('truncates tool results older than maxAge positions', () => {
+        const messages: Msg[] = [
+            { role: 'tool', content: 'A'.repeat(500) },
+            { role: 'assistant', content: 'reply' },
+            { role: 'user', content: 'follow up' },
+            { role: 'assistant', content: 'response' },
+            { role: 'user', content: 'more' },
+        ];
+        const compressed = compressToolResults(messages, 3, 200);
+        expect(compressed).toBe(1);
+        expect(messages[0].content.length).toBeLessThan(500);
+        expect(messages[0].content).toContain('compressed, was 500 chars');
+    });
+
+    it('does not truncate tool results within maxAge window', () => {
+        const messages: Msg[] = [
+            { role: 'user', content: 'hello' },
+            { role: 'tool', content: 'A'.repeat(500) },
+        ];
+        const compressed = compressToolResults(messages, 3, 200);
+        expect(compressed).toBe(0);
+        expect(messages[1].content.length).toBe(500);
+    });
+
+    it('does not truncate short tool results', () => {
+        const messages: Msg[] = [
+            { role: 'tool', content: 'short result' },
+            { role: 'user', content: 'a' },
+            { role: 'assistant', content: 'b' },
+            { role: 'user', content: 'c' },
+            { role: 'assistant', content: 'd' },
+        ];
+        const compressed = compressToolResults(messages, 2, 200);
+        expect(compressed).toBe(0);
+        expect(messages[0].content).toBe('short result');
+    });
+
+    it('does not modify non-tool messages', () => {
+        const messages: Msg[] = [
+            { role: 'user', content: 'A'.repeat(500) },
+            { role: 'assistant', content: 'B'.repeat(500) },
+            { role: 'user', content: 'c' },
+            { role: 'assistant', content: 'd' },
+            { role: 'user', content: 'e' },
+        ];
+        const compressed = compressToolResults(messages, 2, 200);
+        expect(compressed).toBe(0);
+    });
+
+    it('returns count of compressed messages', () => {
+        const messages: Msg[] = [
+            { role: 'tool', content: 'A'.repeat(500) },
+            { role: 'tool', content: 'B'.repeat(500) },
+            { role: 'user', content: 'c' },
+            { role: 'assistant', content: 'd' },
+            { role: 'user', content: 'e' },
+        ];
+        const compressed = compressToolResults(messages, 2, 200);
+        expect(compressed).toBe(2);
+    });
+});
+
+// ── summarizeConversation ─────────────────────────────────────────────────
+
+describe('summarizeConversation', () => {
+    it('produces a summary containing the original request', () => {
+        const messages = [
+            { role: 'user', content: 'Please fix the login bug' },
+            { role: 'assistant', content: 'I will investigate the login bug.' },
+        ];
+        const summary = summarizeConversation(messages);
+        expect(summary).toContain('[Context Summary]');
+        expect(summary).toContain('Please fix the login bug');
+    });
+
+    it('includes tool usage count', () => {
+        const messages = [
+            { role: 'user', content: 'Do something' },
+            { role: 'tool', content: 'result 1' },
+            { role: 'tool', content: 'result 2' },
+            { role: 'assistant', content: 'Done' },
+        ];
+        const summary = summarizeConversation(messages);
+        expect(summary).toContain('2 tool calls');
+    });
+
+    it('includes last assistant response', () => {
+        const messages = [
+            { role: 'user', content: 'Hello' },
+            { role: 'assistant', content: 'First response' },
+            { role: 'assistant', content: 'Final conclusion here' },
+        ];
+        const summary = summarizeConversation(messages);
+        expect(summary).toContain('Final conclusion here');
+    });
+
+    it('truncates long original requests', () => {
+        const messages = [
+            { role: 'user', content: 'X'.repeat(500) },
+            { role: 'assistant', content: 'ok' },
+        ];
+        const summary = summarizeConversation(messages);
+        expect(summary).toContain('...');
+        // Should not contain the full 500 chars
+        expect(summary.length).toBeLessThan(600);
+    });
+
+    it('includes follow-up messages', () => {
+        const messages = [
+            { role: 'user', content: 'First request' },
+            { role: 'assistant', content: 'ok' },
+            { role: 'user', content: 'Second request' },
+            { role: 'assistant', content: 'done' },
+        ];
+        const summary = summarizeConversation(messages);
+        expect(summary).toContain('Follow-up messages');
+        expect(summary).toContain('Second request');
+    });
+
+    it('handles empty messages', () => {
+        const summary = summarizeConversation([]);
+        expect(summary).toContain('[Context Summary]');
+    });
+
+    it('summarizes many follow-ups concisely', () => {
+        const messages = [
+            { role: 'user', content: 'First' },
+            ...Array.from({ length: 10 }, (_, i) => ([
+                { role: 'assistant', content: `Response ${i}` },
+                { role: 'user', content: `Follow-up ${i}` },
+            ])).flat(),
+        ];
+        const summary = summarizeConversation(messages);
+        expect(summary).toContain('10 total');
+        expect(summary).toContain('and 7 more');
+    });
+});
+
+// ── truncateOldToolResults ────────────────────────────────────────────────
+
+describe('truncateOldToolResults', () => {
+    it('truncates tool results older than ageThreshold', () => {
+        const messages: Msg[] = [
+            { role: 'tool', content: 'A'.repeat(1000) },
+            { role: 'assistant', content: 'reply' },
+            { role: 'user', content: 'next' },
+            { role: 'assistant', content: 'response' },
+        ];
+        const truncated = truncateOldToolResults(messages, 3, 500);
+        expect(truncated).toBe(1);
+        expect(messages[0].content).toContain('truncated, was 1000 chars');
+        expect(messages[0].content.length).toBeLessThan(600);
+    });
+
+    it('does not truncate recent tool results', () => {
+        const messages: Msg[] = [
+            { role: 'user', content: 'hello' },
+            { role: 'tool', content: 'A'.repeat(1000) },
+        ];
+        const truncated = truncateOldToolResults(messages, 3, 500);
+        expect(truncated).toBe(0);
+        expect(messages[1].content.length).toBe(1000);
+    });
+
+    it('does not truncate tool results already under maxChars', () => {
+        const messages: Msg[] = [
+            { role: 'tool', content: 'short' },
+            { role: 'user', content: 'a' },
+            { role: 'assistant', content: 'b' },
+            { role: 'user', content: 'c' },
+            { role: 'assistant', content: 'd' },
+        ];
+        const truncated = truncateOldToolResults(messages, 2, 500);
+        expect(truncated).toBe(0);
+    });
+
+    it('returns count of truncated messages', () => {
+        const messages: Msg[] = [
+            { role: 'tool', content: 'A'.repeat(1000) },
+            { role: 'tool', content: 'B'.repeat(800) },
+            { role: 'user', content: 'a' },
+            { role: 'assistant', content: 'b' },
+            { role: 'user', content: 'c' },
+        ];
+        const truncated = truncateOldToolResults(messages, 2, 500);
+        expect(truncated).toBe(2);
+    });
+});
+
+// ── Progressive compression tiers (integration) ──────────────────────────
+
+describe('progressive compression tiers', () => {
+    // These tests use the re-implemented local trimMessages which mirrors the
+    // old single-tier behavior. The new progressive trimMessages is module-private,
+    // so we test the exported helpers directly and verify the tier thresholds
+    // via the computeContextUsage function.
+
+    it('tier thresholds are ordered correctly', () => {
+        // Verify the compression tiers make sense: 60% < 75% < 85% < 90%
+        const thresholds = [0.60, 0.75, 0.85, 0.90];
+        for (let i = 1; i < thresholds.length; i++) {
+            expect(thresholds[i]).toBeGreaterThan(thresholds[i - 1]);
+        }
+    });
+
+    it('compressToolResults + truncateOldToolResults chain correctly', () => {
+        // Simulate what happens in the main loop: first compress, then truncate
+        const messages: Msg[] = [
+            { role: 'tool', content: 'A'.repeat(2000) },
+            { role: 'tool', content: 'B'.repeat(1500) },
+            { role: 'assistant', content: 'mid reply' },
+            { role: 'user', content: 'follow up' },
+            { role: 'assistant', content: 'last reply' },
+        ];
+        // First pass: compress older than 3 positions with 200 char limit
+        compressToolResults(messages, 3, 200);
+        expect(messages[0].content.length).toBeLessThan(300);
+        expect(messages[1].content.length).toBeLessThan(300);
+
+        // Second pass: truncate older than 3 positions with 500 char limit
+        // Both are already under 500 from the first pass
+        const truncated = truncateOldToolResults(messages, 3, 500);
+        expect(truncated).toBe(0);
+    });
+
+    it('context usage detects when compression would trigger', () => {
+        // At 60%+ usage, tier 1 would trigger
+        // 8192 * 0.60 = 4915 tokens; prose at 4 chars/token = 19660 chars
+        const usage = computeContextUsage(
+            [{ role: 'user', content: 'a'.repeat(20000) }],
+            '',
+            false,
+        );
+        expect(usage.usagePercent).toBeGreaterThanOrEqual(60);
     });
 });

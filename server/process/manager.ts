@@ -3,7 +3,7 @@ import type { Session } from '../../shared/types';
 import type { ClaudeStreamEvent } from './types';
 import { extractContentText } from './types';
 import { startSdkProcess, type SdkProcess } from './sdk-process';
-import { startDirectProcess } from './direct-process';
+import { startDirectProcess, summarizeConversation } from './direct-process';
 import { ApprovalManager } from './approval-manager';
 import { OwnerQuestionManager } from './owner-question-manager';
 import type { ApprovalRequestWire } from './approval-types';
@@ -53,6 +53,8 @@ interface SessionMeta {
     turnCount: number;
     /** Timestamp of last activity (event received). Used for inactivity-based timeout. */
     lastActivityAt: number;
+    /** Context summary from previous session lifetime, used on context reset. */
+    contextSummary?: string;
 }
 
 export class ProcessManager {
@@ -441,6 +443,19 @@ export class ProcessManager {
             const meta = this.sessionMeta.get(session.id);
             if (meta && meta.turnCount >= MAX_TURNS_BEFORE_CONTEXT_RESET) {
                 log.info(`Context reset: killing session ${session.id} after ${meta.turnCount} turns`);
+
+                // Generate a context summary from existing messages before killing
+                try {
+                    const existingMessages = getSessionMessages(this.db, session.id);
+                    if (existingMessages.length > 0) {
+                        const summary = summarizeConversation(existingMessages);
+                        meta.contextSummary = summary;
+                        log.info(`Generated context summary for session ${session.id} (${summary.length} chars)`);
+                    }
+                } catch (err) {
+                    log.warn(`Failed to generate context summary for session ${session.id}`, { error: err });
+                }
+
                 this.eventBus.emit(session.id, {
                     type: 'session_error',
                     session_id: session.id,
@@ -586,6 +601,7 @@ export class ProcessManager {
 
     private buildResumePrompt(session: Session, newPrompt?: string): string {
         const messages = getSessionMessages(this.db, session.id);
+        const meta = this.sessionMeta.get(session.id);
 
         if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
 
@@ -602,13 +618,25 @@ export class ProcessManager {
             ? 'The following is the conversation history from this session. Use it for context when responding to the new message.'
             : 'The following is the conversation history from this session. The session was interrupted -- continue the conversation based on the history above.';
 
-        const parts = [
+        const parts: string[] = [];
+
+        // Prepend context summary from previous session lifetime if available
+        if (meta?.contextSummary) {
+            parts.push(
+                '<previous_context_summary>',
+                meta.contextSummary,
+                '</previous_context_summary>',
+                '',
+            );
+        }
+
+        parts.push(
             '<conversation_history>',
             instruction,
             '',
             ...historyLines,
             '</conversation_history>',
-        ];
+        );
 
         if (newPrompt) {
             parts.push('', newPrompt);
