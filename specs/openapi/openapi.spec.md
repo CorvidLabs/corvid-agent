@@ -7,6 +7,30 @@ files:
   - server/openapi/handler.ts
   - server/openapi/index.ts
   - server/openapi/route-registry.ts
+  - server/openapi/routes/agents.ts
+  - server/openapi/routes/algochat.ts
+  - server/openapi/routes/allowlist.ts
+  - server/openapi/routes/analytics.ts
+  - server/openapi/routes/auth.ts
+  - server/openapi/routes/billing.ts
+  - server/openapi/routes/councils.ts
+  - server/openapi/routes/escalation.ts
+  - server/openapi/routes/integrations.ts
+  - server/openapi/routes/marketplace.ts
+  - server/openapi/routes/mcp.ts
+  - server/openapi/routes/mention-polling.ts
+  - server/openapi/routes/plugins.ts
+  - server/openapi/routes/projects.ts
+  - server/openapi/routes/providers.ts
+  - server/openapi/routes/reputation.ts
+  - server/openapi/routes/sandbox.ts
+  - server/openapi/routes/schedules.ts
+  - server/openapi/routes/sessions.ts
+  - server/openapi/routes/system.ts
+  - server/openapi/routes/types.ts
+  - server/openapi/routes/webhooks.ts
+  - server/openapi/routes/work-tasks.ts
+  - server/openapi/routes/workflows.ts
 db_tables: []
 depends_on:
   - specs/lib/infra.spec.md
@@ -40,6 +64,29 @@ Generates and serves an OpenAPI 3.0.3 specification document from a declarative 
 | Constant | Type | Description |
 |----------|------|-------------|
 | `routes` | `RouteEntry[]` | The complete declarative route metadata registry containing all API route definitions with their methods, paths, tags, summaries, request schemas, auth requirements, and response descriptions. |
+| `agentRoutes` | `RouteEntry[]` | Route metadata for agent CRUD, invocation, personas, skill bundles, and funding endpoints. |
+| `algochatRoutes` | `RouteEntry[]` | Route metadata for AlgoChat feed history, network switching, and messaging endpoints. |
+| `allowlistRoutes` | `RouteEntry[]` | Route metadata for IP/address allowlist management endpoints. |
+| `analyticsRoutes` | `RouteEntry[]` | Route metadata for analytics and usage statistics endpoints. |
+| `authRoutes` | `RouteEntry[]` | Route metadata for authentication and token management endpoints. |
+| `billingRoutes` | `RouteEntry[]` | Route metadata for billing, credits, and spending endpoints. |
+| `councilRoutes` | `RouteEntry[]` | Route metadata for council proposals, voting, and governance endpoints. |
+| `escalationRoutes` | `RouteEntry[]` | Route metadata for escalation queue management endpoints. |
+| `integrationRoutes` | `RouteEntry[]` | Route metadata for third-party integration configuration endpoints. |
+| `marketplaceRoutes` | `RouteEntry[]` | Route metadata for marketplace listing, subscription, and federation endpoints. |
+| `mcpRoutes` | `RouteEntry[]` | Route metadata for MCP server management endpoints. |
+| `mentionPollingRoutes` | `RouteEntry[]` | Route metadata for Discord mention polling and session endpoints. |
+| `pluginRoutes` | `RouteEntry[]` | Route metadata for plugin installation and management endpoints. |
+| `projectRoutes` | `RouteEntry[]` | Route metadata for project CRUD and configuration endpoints. |
+| `providerRoutes` | `RouteEntry[]` | Route metadata for AI provider listing and configuration endpoints. |
+| `reputationRoutes` | `RouteEntry[]` | Route metadata for reputation score and history endpoints. |
+| `sandboxRoutes` | `RouteEntry[]` | Route metadata for sandbox environment management endpoints. |
+| `scheduleRoutes` | `RouteEntry[]` | Route metadata for scheduled task CRUD and execution endpoints. |
+| `sessionRoutes` | `RouteEntry[]` | Route metadata for session lifecycle, messages, and metrics endpoints. |
+| `systemRoutes` | `RouteEntry[]` | Route metadata for health, operational mode, database, self-test, logs, and settings endpoints. |
+| `webhookRoutes` | `RouteEntry[]` | Route metadata for webhook registration and delivery endpoints. |
+| `workTaskRoutes` | `RouteEntry[]` | Route metadata for work task queue and execution endpoints. |
+| `workflowRoutes` | `RouteEntry[]` | Route metadata for workflow definition and execution endpoints. |
 
 ## Invariants
 
