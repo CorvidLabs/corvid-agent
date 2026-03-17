@@ -75,9 +75,9 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         ),
         tool(
             'corvid_save_memory',
-            'Save an encrypted memory by sending a message to yourself on Algorand. ' +
-            'Memories persist across sessions on the blockchain, with a local cache for fast recall. ' +
-            'Use a descriptive key for easy recall later.',
+            'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache for fast recall. ' +
+            'Long-term storage is durable and always available; short-term cache is ephemeral. ' +
+            'Use this for ANY "remember this" request regardless of channel. Use a descriptive key for easy recall later.',
             {
                 key: z.string().describe('A short descriptive key for this memory (e.g. "user-preferences", "project-status")'),
                 content: z.string().describe('The content to remember'),
@@ -86,7 +86,8 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         ),
         tool(
             'corvid_recall_memory',
-            'Recall previously saved on-chain memories. Results include blockchain confirmation status. ' +
+            'Recall memories from short-term cache (SQLite) with long-term storage status. ' +
+            'Results show whether the memory is confirmed on-chain (long-term) or still pending sync. ' +
             'Provide a key for exact lookup, a query for search, or neither to list recent memories.',
             {
                 key: z.string().optional().describe('Exact key to look up'),

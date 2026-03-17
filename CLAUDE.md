@@ -140,6 +140,20 @@ Both are initialized in `server/index.ts` when their env vars are set. Both use 
 - `server/voice/stt.ts` — `transcribe()` calls OpenAI Whisper API
 - Both gated behind `OPENAI_API_KEY`
 
+## Two-Tier Memory Architecture
+
+Agents use a two-tier memory model. **Always save to long-term storage** — short-term is a cache that can vanish at any time.
+
+- **Long-term (localnet AlgoChat):** Durable, permanent, always recoverable. Use `corvid_save_memory` which writes to both tiers automatically. This is the source of truth.
+- **Short-term (SQLite `agent_memories`, `.claude/memory/` files):** Fast access cache. Ephemeral — may be gone in a day. Never rely on it being there.
+
+**Rules:**
+1. Any "remember this" request from any channel (Discord, AlgoChat, scheduled task) → always call `corvid_save_memory` (writes to localnet long-term + SQLite short-term)
+2. When recalling, check long-term storage too (via `corvid_recall_memory`), not just local cache
+3. `.claude/memory/` files are a session-level convenience cache — useful for fast access but not authoritative storage
+4. Scheduled tasks should save results/summaries to memory automatically
+5. Before session ends, save any important context to long-term memory
+
 ## Delegation & MCP Tool Usage
 
 ### Model-Aware Delegation

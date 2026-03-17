@@ -63,9 +63,9 @@ server.tool(
 
 server.tool(
     'corvid_save_memory',
-    'Save a private encrypted note to your memory. ' +
-    'Memories persist across sessions and are stored on-chain for audit. ' +
-    'Use a descriptive key for easy recall later.',
+    'Save a memory to long-term storage (encrypted on localnet AlgoChat) with a short-term SQLite cache. ' +
+    'Long-term storage is durable and always available; short-term cache is ephemeral. ' +
+    'Use this for ANY "remember this" request regardless of channel. Use a descriptive key for easy recall later.',
     {
         key: z.string().describe('A short descriptive key for this memory'),
         content: z.string().describe('The content to remember'),
@@ -85,7 +85,8 @@ server.tool(
 
 server.tool(
     'corvid_recall_memory',
-    'Recall previously saved memories. ' +
+    'Recall memories from short-term cache (SQLite) with long-term storage status. ' +
+    'Results show whether the memory is confirmed on-chain (long-term) or still pending sync. ' +
     'Provide a key for exact lookup, a query for search, or neither to list recent memories.',
     {
         key: z.string().optional().describe('Exact key to look up'),
