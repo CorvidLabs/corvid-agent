@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 
-const SCHEMA_VERSION = 91;
+const SCHEMA_VERSION = 92;
 
 /**
  * Collapsed MIGRATIONS dict — single v78 entry containing all idempotent
@@ -1390,6 +1390,17 @@ const MIGRATIONS: Record<number, string[]> = {
         `CREATE INDEX IF NOT EXISTS idx_contacts_tenant_name ON contacts(tenant_id, display_name)`,
         `CREATE UNIQUE INDEX IF NOT EXISTS idx_contact_platform_links_unique ON contact_platform_links(tenant_id, platform, platform_id)`,
         `CREATE INDEX IF NOT EXISTS idx_contact_platform_links_contact ON contact_platform_links(contact_id)`,
+    ],
+    92: [
+        // Persist Discord mention-reply session mappings across restarts
+        `CREATE TABLE IF NOT EXISTS discord_mention_sessions (
+            bot_message_id  TEXT PRIMARY KEY,
+            session_id      TEXT NOT NULL,
+            agent_name      TEXT NOT NULL,
+            agent_model     TEXT NOT NULL,
+            created_at      TEXT DEFAULT (datetime('now'))
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_discord_mention_sessions_session ON discord_mention_sessions(session_id)`,
     ],
 };
 
