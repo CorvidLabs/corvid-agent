@@ -45,7 +45,7 @@ bun run dev                 # → http://localhost:3000
   <img src="https://img.shields.io/badge/OpenCode-works-00e5ff" alt="OpenCode">
   <img src="https://img.shields.io/badge/Codex_CLI-works-00e5ff" alt="Codex CLI">
   <img src="https://img.shields.io/badge/Ollama-works-00e5ff" alt="Ollama">
-  <img src="https://img.shields.io/badge/MCP-44_tools-ff66c4" alt="MCP">
+  <img src="https://img.shields.io/badge/MCP-46_tools-ff66c4" alt="MCP">
   <img src="https://img.shields.io/badge/A2A_Protocol-compatible-00ff88" alt="A2A">
 </p>
 
@@ -150,7 +150,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 
 | Metric | Count |
 |--------|-------|
-| MCP tools | **44** corvid_* tool handlers |
+| MCP tools | **46** corvid_* tool handlers |
 | API endpoints | **279** across 46 route modules |
 | DB migrations | **16** (squashed baseline + incremental, 90+ tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
@@ -374,7 +374,7 @@ server/          Bun HTTP + WebSocket server
   improvement/   Self-improvement pipeline and health metrics
   lib/           Shared utilities (logger, crypto, validation, web search, dedup)
   marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 44 corvid_* tool handlers
+  mcp/           MCP tool server and 46 corvid_* tool handlers
   memory/        Structured memory with vector embeddings
   middleware/    Auth, CORS, rate limiting, startup validation
   notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
@@ -412,7 +412,7 @@ e2e/             Playwright end-to-end tests (31 spec files, 360 E2E tests)
 
 ---
 
-## MCP Tools (44)
+## MCP Tools (46)
 
 Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
 
