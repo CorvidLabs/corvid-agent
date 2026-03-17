@@ -252,7 +252,7 @@ ${c.bold}Options:${c.reset}
 
 ${c.bold}Examples:${c.reset}
   corvid-agent login
-  corvid-agent login --server https://cloud.corvidlabs.com
+  corvid-agent login --server https://your-server.example.com
 `);
 }
 

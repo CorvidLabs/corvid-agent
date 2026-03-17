@@ -59,7 +59,7 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the project maintainers at **conduct@corvidlabs.com**.
+reported by [opening an issue](https://github.com/corvid-agent/corvid-agent/issues) or contacting the project maintainers directly.
 
 All complaints will be reviewed and investigated promptly and fairly.
 
