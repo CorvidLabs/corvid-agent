@@ -15,6 +15,8 @@ import { extractContentText } from '../process/types';
 import { createLogger } from '../lib/logger';
 import {
     sendEmbed,
+    sendReplyEmbed,
+    editEmbed,
     sendEmbedWithButtons,
     buildActionRow,
     sendTypingIndicator,
@@ -500,6 +502,340 @@ export function subscribeForInlineResponse(
     };
 
     processManager.subscribe(sessionId, inlineCallback);
+}
+
+/**
+ * Subscribe for agent response with adaptive UX:
+ * - Starts lightweight (typing indicator only, like subscribeForInlineResponse)
+ * - If a tool_status event fires (meaning actual work is happening), upgrades
+ *   to a progress embed that edits in-place with tool status updates
+ * - Quick conversational replies never see a progress embed
+ */
+export function subscribeForAdaptiveInlineResponse(
+    processManager: ProcessManager,
+    delivery: DeliveryTracker,
+    botToken: string,
+    sessionId: string,
+    channelId: string,
+    replyToMessageId: string,
+    agentName: string,
+    agentModel: string,
+    onBotMessage?: (botMessageId: string) => void,
+    projectName?: string,
+): void {
+    let buffer = '';
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let receivedAnyContent = false;
+    let lastStatusTime = 0;
+    const STATUS_DEBOUNCE_MS = 3000;
+    const TYPING_REFRESH_MS = 8000;
+    const TYPING_TIMEOUT_MS = 4 * 60 * 1000;
+    let receivedAnyActivity = false;
+    const color = agentColor(agentName);
+
+    // Progress embed state — only created when tool use is detected
+    let progressMessageId: string | null = null;
+    let progressMode = false;
+
+    // Keep typing indicator alive continuously until response completes
+    const typingInterval = setInterval(() => {
+        if (!processManager.isRunning(sessionId)) {
+            clearTyping();
+            log.warn('Process died while typing indicator active (adaptive)', { sessionId, channelId });
+            if (!receivedAnyContent) {
+                sendEmbed(delivery, botToken, channelId, {
+                    description: 'The agent session ended unexpectedly. Send a message to start a new session.',
+                    color: 0xff3355,
+                }).catch((err) => {
+                    log.warn('Failed to send crash embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+            return;
+        }
+        sendTypingIndicator(botToken, channelId).catch((err) => {
+            log.debug('Typing indicator failed (adaptive)', { channelId, error: err instanceof Error ? err.message : String(err) });
+        });
+    }, TYPING_REFRESH_MS);
+
+    const typingSafetyTimeout = setTimeout(() => {
+        clearInterval(typingInterval);
+        log.warn('Typing indicator safety timeout reached (adaptive)', { sessionId, channelId });
+        if (!receivedAnyActivity) {
+            sendEmbed(delivery, botToken, channelId, {
+                description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
+                color: 0xf0b232,
+            }).catch((err) => {
+                log.warn('Failed to send timeout embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+    }, TYPING_TIMEOUT_MS);
+
+    const clearTyping = () => {
+        clearInterval(typingInterval);
+        clearTimeout(typingSafetyTimeout);
+    };
+
+    const flush = async () => {
+        if (!buffer) return;
+        const text = buffer;
+        buffer = '';
+
+        const parts = splitEmbedDescription(text);
+        for (let i = 0; i < parts.length; i++) {
+            let sentId: string | null = null;
+            if (i === 0) {
+                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
+                    description: parts[i],
+                    color,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+                });
+            } else {
+                sentId = await sendEmbed(delivery, botToken, channelId, {
+                    description: parts[i],
+                    color,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+                });
+            }
+            if (sentId && onBotMessage) {
+                onBotMessage(sentId);
+            }
+        }
+    };
+
+    /** Upgrade to progress mode — post the progress embed on first tool use. */
+    const upgradeToProgressMode = () => {
+        if (progressMode) return;
+        progressMode = true;
+        sendEmbed(delivery, botToken, channelId, {
+            description: 'Working on your request...',
+            color: 0x5865f2,
+            footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'starting...' }) },
+        }).then((msgId) => {
+            progressMessageId = msgId;
+        }).catch((err) => {
+            log.debug('Failed to send progress embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+        });
+    };
+
+    const adaptiveCallback: EventCallback = (_sid, event) => {
+        if (event.type === 'assistant' && event.message) {
+            const msg = event.message as { content?: unknown };
+            const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+            if (content) {
+                receivedAnyContent = true;
+                receivedAnyActivity = true;
+                buffer += content;
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => flush(), 1500);
+            }
+        }
+
+        if (event.type === 'tool_status' && event.statusMessage) {
+            receivedAnyActivity = true;
+            // Upgrade to progress mode on first tool use
+            upgradeToProgressMode();
+            const now = Date.now();
+            if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
+                lastStatusTime = now;
+                editEmbed(delivery, botToken, channelId, progressMessageId, {
+                    description: `\u23f3 ${event.statusMessage}`,
+                    color: 0x5865f2,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+                }).catch((err) => {
+                    log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+        }
+
+        if (event.type === 'result') {
+            clearTyping();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            flush().then(() => {
+                // Only mark progress embed as done if we upgraded to progress mode
+                if (progressMode && progressMessageId) {
+                    editEmbed(delivery, botToken, channelId, progressMessageId, {
+                        description: '\u2705 Done',
+                        color: 0x57f287,
+                        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+                    }).catch((err) => {
+                        log.debug('Final progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                    });
+                }
+            }).catch((err) => {
+                log.debug('Final flush failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+            });
+            processManager.unsubscribe(sessionId, adaptiveCallback);
+        }
+
+        if (event.type === 'session_error' || event.type === 'session_exited') {
+            clearTyping();
+            processManager.unsubscribe(sessionId, adaptiveCallback);
+        }
+    };
+
+    processManager.subscribe(sessionId, adaptiveCallback);
+}
+
+/**
+ * Subscribe for agent response with an edit-in-place progress message.
+ * Posts one progress embed, edits it with tool status updates, then posts
+ * the final response as a new reply — reducing message spam for @mentions.
+ */
+export function subscribeForInlineProgressResponse(
+    processManager: ProcessManager,
+    delivery: DeliveryTracker,
+    botToken: string,
+    sessionId: string,
+    channelId: string,
+    replyToMessageId: string,
+    agentName: string,
+    agentModel: string,
+    onBotMessage?: (botMessageId: string) => void,
+    projectName?: string,
+): void {
+    let buffer = '';
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let receivedAnyContent = false;
+    let lastStatusTime = 0;
+    const STATUS_DEBOUNCE_MS = 3000;
+    const TYPING_REFRESH_MS = 8000;
+    const TYPING_TIMEOUT_MS = 4 * 60 * 1000; // 4 minute safety timeout
+    let receivedAnyActivity = false;
+    const color = agentColor(agentName);
+    let progressMessageId: string | null = null;
+
+    // Post the initial progress embed immediately
+    sendEmbed(delivery, botToken, channelId, {
+        description: 'Working on your request...',
+        color: 0x5865f2, // blurple
+        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'starting...' }) },
+    }).then((msgId) => {
+        progressMessageId = msgId;
+    }).catch((err) => {
+        log.debug('Failed to send initial progress embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+    });
+
+    // Keep typing indicator alive continuously until response completes
+    const typingInterval = setInterval(() => {
+        if (!processManager.isRunning(sessionId)) {
+            clearTyping();
+            log.warn('Process died while typing indicator active (inline-progress)', { sessionId, channelId });
+            if (!receivedAnyContent) {
+                sendEmbed(delivery, botToken, channelId, {
+                    description: 'The agent session ended unexpectedly. Send a message to start a new session.',
+                    color: 0xff3355,
+                }).catch((err) => {
+                    log.warn('Failed to send crash embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+            return;
+        }
+        sendTypingIndicator(botToken, channelId).catch((err) => {
+            log.debug('Typing indicator failed (inline-progress)', { channelId, error: err instanceof Error ? err.message : String(err) });
+        });
+    }, TYPING_REFRESH_MS);
+
+    // Safety timeout: clear typing if no terminal event arrives
+    const typingSafetyTimeout = setTimeout(() => {
+        clearInterval(typingInterval);
+        log.warn('Typing indicator safety timeout reached (inline-progress)', { sessionId, channelId });
+        if (!receivedAnyActivity) {
+            sendEmbed(delivery, botToken, channelId, {
+                description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
+                color: 0xf0b232,
+            }).catch((err) => {
+                log.warn('Failed to send timeout embed', { channelId, error: err instanceof Error ? err.message : String(err) });
+            });
+        }
+    }, TYPING_TIMEOUT_MS);
+
+    const clearTyping = () => {
+        clearInterval(typingInterval);
+        clearTimeout(typingSafetyTimeout);
+    };
+
+    const flush = async () => {
+        if (!buffer) return;
+        const text = buffer;
+        buffer = '';
+
+        const parts = splitEmbedDescription(text);
+        for (let i = 0; i < parts.length; i++) {
+            let sentId: string | null = null;
+            if (i === 0) {
+                sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
+                    description: parts[i],
+                    color,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+                });
+            } else {
+                sentId = await sendEmbed(delivery, botToken, channelId, {
+                    description: parts[i],
+                    color,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+                });
+            }
+            if (sentId && onBotMessage) {
+                onBotMessage(sentId);
+            }
+        }
+    };
+
+    const progressCallback: EventCallback = (_sid, event) => {
+        if (event.type === 'assistant' && event.message) {
+            const msg = event.message as { content?: unknown };
+            const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+            if (content) {
+                receivedAnyContent = true;
+                receivedAnyActivity = true;
+                buffer += content;
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => flush(), 1500);
+            }
+        }
+
+        if (event.type === 'tool_status' && event.statusMessage) {
+            receivedAnyActivity = true;
+            const now = Date.now();
+            if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
+                lastStatusTime = now;
+                editEmbed(delivery, botToken, channelId, progressMessageId, {
+                    description: `\u23f3 ${event.statusMessage}`,
+                    color: 0x5865f2,
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
+                }).catch((err) => {
+                    log.debug('Progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                });
+            }
+        }
+
+        if (event.type === 'result') {
+            clearTyping();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            flush().then(() => {
+                // Mark progress embed as done
+                if (progressMessageId) {
+                    editEmbed(delivery, botToken, channelId, progressMessageId, {
+                        description: '\u2705 Done',
+                        color: 0x57f287, // green
+                        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
+                    }).catch((err) => {
+                        log.debug('Final progress embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+                    });
+                }
+            }).catch((err) => {
+                log.debug('Final flush failed', { channelId, error: err instanceof Error ? err.message : String(err) });
+            });
+            processManager.unsubscribe(sessionId, progressCallback);
+        }
+
+        if (event.type === 'session_error' || event.type === 'session_exited') {
+            clearTyping();
+            processManager.unsubscribe(sessionId, progressCallback);
+        }
+    };
+
+    processManager.subscribe(sessionId, progressCallback);
 }
 
 /**
