@@ -65,6 +65,32 @@ describe('saveMentionSession + getMentionSession', () => {
         expect(result).toBeNull();
     });
 
+    test('round-trip: save and retrieve with projectName', () => {
+        saveMentionSession(db, 'bot-msg-proj', {
+            sessionId: 'sess-proj',
+            agentName: 'TestAgent',
+            agentModel: 'claude-opus-4-20250514',
+            projectName: 'my-cool-project',
+        });
+
+        const result = getMentionSession(db, 'bot-msg-proj');
+        expect(result).not.toBeNull();
+        expect(result!.sessionId).toBe('sess-proj');
+        expect(result!.projectName).toBe('my-cool-project');
+    });
+
+    test('projectName is undefined when not provided', () => {
+        saveMentionSession(db, 'bot-msg-no-proj', {
+            sessionId: 'sess-no-proj',
+            agentName: 'TestAgent',
+            agentModel: 'claude-opus-4-20250514',
+        });
+
+        const result = getMentionSession(db, 'bot-msg-no-proj');
+        expect(result).not.toBeNull();
+        expect(result!.projectName).toBeUndefined();
+    });
+
     test('INSERT OR REPLACE overwrites existing entry', () => {
         saveMentionSession(db, 'bot-msg-1', {
             sessionId: 'sess-1',
