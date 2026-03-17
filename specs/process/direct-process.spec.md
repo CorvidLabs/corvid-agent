@@ -36,6 +36,9 @@ Direct execution engine for non-SDK providers (e.g., Ollama). Implements the sam
 | `buildSystemPrompt` | `(agent, project, model, toolDefs, hasTools, isDeliberation?, personaPrompt?, skillPrompt?, agentTierConfig?)` | `string` | Assemble the full system prompt from agent config, project context, tool definitions, and optional persona/skill overlays. Council deliberation sessions get reasoning-only instructions |
 | `computeContextUsage` | `msgs: Array<{role, content}>, sysPrompt: string, trimmed: boolean` | `{estimatedTokens, contextWindow, usagePercent, messagesCount, trimmed}` | Compute context usage metrics for the current message state. |
 | `determineWarningLevel` | `usagePercent: number` | `{level, message} \| null` | Determine warning level and message for a given usage percent. Returns null below 50%. |
+| `compressToolResults` | `(messages: ConversationMessage[], maxAge: number, maxChars: number)` | `number` | Compress tool result messages in-place by truncating content older than `maxAge` positions to at most `maxChars`. Returns count of compressed messages |
+| `summarizeConversation` | `(messages: Array<{role, content}>)` | `string` | Generate a brief plain-text summary of the key points in a conversation. Used for Tier 4 compression and context reset |
+| `truncateOldToolResults` | `(messages: ConversationMessage[], ageThreshold: number, maxChars: number)` | `number` | Post-trim pass that truncates tool results older than `ageThreshold` positions to at most `maxChars`. Returns count of truncated messages |
 
 ## Invariants
 
