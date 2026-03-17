@@ -131,6 +131,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 18. **Category fallback in search**: If category filtering eliminates all FTS5 candidates, the filter is dropped and unfiltered results are returned.
 19. **Two-tier persistence**: Every memory save writes to both SQLite (short-term cache) and localnet AlgoChat (long-term storage). SQLite may be cleared without data loss because localnet is the authoritative record.
 20. **Cross-channel remember routing**: Any "remember this" request from any channel (Discord, AlgoChat, scheduled task, CLI) must flow through `save_memory`, which writes to both tiers. Channel of origin does not affect storage behavior.
+21. **Session exit auto-save**: On clean session exit (code 0), a conversation summary is automatically saved to `agent_memories` with status `pending`. The `MemorySyncService` picks it up and syncs to localnet AlgoChat. Sessions with no user messages are skipped.
 
 ## Behavioral Examples
 
@@ -169,6 +170,18 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 - **Given** one old memory in category `config`
 - **When** `summarizeOldMemories` is called
 - **Then** the memory is not archived and no summary is created
+
+### Scenario: Session exit saves summary to memory
+
+- **Given** a session with user and assistant messages exits cleanly (code 0)
+- **When** `handleExit` is called
+- **Then** a memory with key `session:{sessionId}:{date}` is saved with status `pending`, containing the session source, message counts, and a context summary
+
+### Scenario: Empty session skips summary save
+
+- **Given** a session with only system messages (no user messages)
+- **When** the session exits cleanly
+- **Then** no memory is saved (the auto-save is skipped)
 
 ### Scenario: Agent-scoped search isolation
 
@@ -214,6 +227,7 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 | `server/improvement/prompt-builder.ts` | `ScoredMemory` |
 | `server/scheduler/service.ts` | `summarizeOldMemories` |
 | `server/mcp/tool-handlers/index.ts` | `handleSaveMemory`, `handleRecallMemory` (via memory tool handler, uses core CRUD) |
+| `server/process/manager.ts` | `saveMemory` (session exit auto-save) |
 
 ## Database Tables
 
@@ -268,5 +282,6 @@ Provides automatic categorization, TF-IDF embedding generation, LRU caching, dua
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-17 | corvid-agent | Add session exit auto-save (invariant 21), behavioral scenarios (#1186) |
 | 2026-03-17 | corvid-agent | Add two-tier memory architecture (invariants 19-20), update purpose section (#1186) |
 | 2026-02-27 | corvid-agent | Initial spec |
