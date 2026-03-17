@@ -7,6 +7,30 @@ files:
   - server/openapi/handler.ts
   - server/openapi/index.ts
   - server/openapi/route-registry.ts
+  - server/openapi/routes/agents.ts
+  - server/openapi/routes/algochat.ts
+  - server/openapi/routes/allowlist.ts
+  - server/openapi/routes/analytics.ts
+  - server/openapi/routes/auth.ts
+  - server/openapi/routes/billing.ts
+  - server/openapi/routes/councils.ts
+  - server/openapi/routes/escalation.ts
+  - server/openapi/routes/integrations.ts
+  - server/openapi/routes/marketplace.ts
+  - server/openapi/routes/mcp.ts
+  - server/openapi/routes/mention-polling.ts
+  - server/openapi/routes/plugins.ts
+  - server/openapi/routes/projects.ts
+  - server/openapi/routes/providers.ts
+  - server/openapi/routes/reputation.ts
+  - server/openapi/routes/sandbox.ts
+  - server/openapi/routes/schedules.ts
+  - server/openapi/routes/sessions.ts
+  - server/openapi/routes/system.ts
+  - server/openapi/routes/types.ts
+  - server/openapi/routes/webhooks.ts
+  - server/openapi/routes/work-tasks.ts
+  - server/openapi/routes/workflows.ts
 db_tables: []
 depends_on:
   - specs/lib/infra.spec.md
