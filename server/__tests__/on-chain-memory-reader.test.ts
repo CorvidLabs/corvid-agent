@@ -1,7 +1,7 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { handleReadOnChainMemories, handleSyncOnChainMemories } from '../mcp/tool-handlers/memory';
-import { recallMemory, listMemories } from '../db/agent-memories';
+import { recallMemory } from '../db/agent-memories';
 import { runMigrations } from '../db/schema';
 import type { McpToolContext } from '../mcp/tool-handlers/types';
 
