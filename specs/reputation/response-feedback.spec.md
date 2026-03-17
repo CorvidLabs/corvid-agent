@@ -144,7 +144,7 @@ Feedback score requires a minimum of 3 feedbacks within 90 days to be included.
 | `server/lib/validation.ts` | `SubmitFeedbackSchema`, `parseBodyOrThrow`, `ValidationError` |
 | `server/lib/response.ts` | `json`, `badRequest`, `handleRouteError` |
 | `server/routes/reputation.ts` | Route handler that wires feedback endpoints into the HTTP server |
-| `server/db/schema.ts` | Schema definition for `response_feedback` table |
+| `server/db/schema/reputation.ts` | Schema definition for `response_feedback` table |
 
 ## Change Log
 
