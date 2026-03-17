@@ -138,6 +138,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `addReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Add a reaction to a message (best-effort) |
 | `removeReaction` | `(botToken, channelId, messageId, emoji)` | `Promise<void>` | Remove a reaction from a message (best-effort) |
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
+| `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a standardized footer with session ID, project, agent, and status |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
 
 ### Exported Functions (from message-handler.ts)
@@ -236,10 +237,11 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Type | Source | Description |
 |------|--------|-------------|
 | `InteractionContext` | `commands.ts` | Context object for interaction handler delegation |
-| `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer) |
+| `DiscordEmbed` | `embeds.ts` | Embed object shape (title, description, color, fields, footer, timestamp) |
+| `FooterContext` | `embeds.ts` | Metadata for building rich embed footers (agentName, agentModel, sessionId?, projectName?, status?) |
 | `MessageHandlerContext` | `message-handler.ts` | Context object for message handler delegation |
-| `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?) |
-| `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel) |
+| `ThreadSessionInfo` | `thread-manager.ts` | Thread-to-session mapping info (sessionId, agentName, agentModel, ownerUserId, topic?, projectName?) |
+| `MentionSessionInfo` | `message-handler.ts` | Session info for mention-reply context in channels (sessionId, agentName, agentModel, projectName?) |
 | `ThreadCallbackInfo` | `thread-manager.ts` | Active subscription info per thread (sessionId, callback) |
 | `ReactionHandlerContext` | `reaction-handler.ts` | Context object for reaction handler (db, botUserId, scorer, mentionSessions, threadSessions) |
 | `assertInteractionToken` | `embeds.ts` | Validate a Discord interaction token |

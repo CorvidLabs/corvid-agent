@@ -101,6 +101,7 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | `session_id` | TEXT | NOT NULL | Active session ID associated with this mention reply |
 | `agent_name` | TEXT | NOT NULL | Display name of the agent that handled the mention |
 | `agent_model` | TEXT | NOT NULL | Model identifier used for the session |
+| `project_name` | TEXT | | Project name for embed footer context (migration 093) |
 | `created_at` | TEXT | DEFAULT `datetime('now')` | When the mapping was created |
 
 ### Indexes

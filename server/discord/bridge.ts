@@ -192,8 +192,16 @@ export class DiscordBridge {
             const agent = session.agentId ? getAgent(this.db, session.agentId) : null;
             const agentName = agent?.name || 'Agent';
             const agentModel = agent?.model || 'unknown';
-            this.threadSessions.set(threadId, { sessionId, agentName, agentModel, ownerUserId: '' });
-            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel);
+            // Look up project name for footer metadata
+            let projectName: string | undefined;
+            if (session.projectId) {
+                const projectRow = this.db.query<{ name: string }, [string]>(
+                    'SELECT name FROM projects WHERE id = ?',
+                ).get(session.projectId);
+                projectName = projectRow?.name;
+            }
+            this.threadSessions.set(threadId, { sessionId, agentName, agentModel, ownerUserId: '', projectName });
+            this.subscribeForResponseWithEmbed(sessionId, threadId, agentName, agentModel, projectName);
             log.info('Auto-subscribed Discord thread for resumed session', { threadId, sessionId });
         };
         this.processManager.subscribeAll(this.globalEventCallback);
@@ -308,8 +316,8 @@ export class DiscordBridge {
             threadLastActivity: this.threadLastActivity,
             createStandaloneThread: (channelId, name) =>
                 createStandaloneThreadImpl(this.config.botToken, channelId, name),
-            subscribeForResponseWithEmbed: (sid, tid, an, am) =>
-                this.subscribeForResponseWithEmbed(sid, tid, an, am),
+            subscribeForResponseWithEmbed: (sid, tid, an, am, pn) =>
+                this.subscribeForResponseWithEmbed(sid, tid, an, am, pn),
             sendTaskResult: (cid, task, uid) =>
                 this.sendTaskResult(cid, task, uid),
             muteUser: (uid) => this.muteUser(uid),
@@ -340,10 +348,11 @@ export class DiscordBridge {
         await handleMessageImpl(ctx, data);
     }
 
-    private subscribeForResponseWithEmbed(sessionId: string, threadId: string, agentName: string, agentModel: string): void {
+    private subscribeForResponseWithEmbed(sessionId: string, threadId: string, agentName: string, agentModel: string, projectName?: string): void {
         subscribeImpl(
             this.processManager, this.delivery, this.config.botToken,
             this.db, this.threadCallbacks, sessionId, threadId, agentName, agentModel,
+            projectName,
         );
     }
 

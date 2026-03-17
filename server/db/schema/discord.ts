@@ -12,6 +12,7 @@ export const tables: string[] = [
         session_id      TEXT NOT NULL,
         agent_name      TEXT NOT NULL,
         agent_model     TEXT NOT NULL,
+        project_name    TEXT,
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 ];

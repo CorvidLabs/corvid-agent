@@ -31,6 +31,7 @@ describe('migration creates table', () => {
         expect(colNames).toContain('session_id');
         expect(colNames).toContain('agent_name');
         expect(colNames).toContain('agent_model');
+        expect(colNames).toContain('project_name');
         expect(colNames).toContain('created_at');
     });
 

@@ -19,6 +19,7 @@ import {
     sendEmbedWithButtons,
     buildActionRow,
     agentColor,
+    buildFooterText,
 } from '../embeds';
 
 const log = createLogger('DiscordCommands');
@@ -118,17 +119,18 @@ export async function handleSessionCommand(
         agentModel: agent.model || 'unknown',
         ownerUserId: userId,
         topic,
+        projectName: project.name,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
     ctx.processManager.startProcess(session, topic);
-    ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown');
+    ctx.subscribeForResponseWithEmbed(session.id, threadId, agent.name, agent.model || 'unknown', project.name);
 
     // Post a welcome embed with Stop button in the thread
     sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
         description: `**${agent.name}** is working on: ${topic}`,
         color: agentColor(agent.name),
-        footer: { text: `${agent.name} · ${agent.model || 'unknown'}` },
+        footer: { text: buildFooterText({ agentName: agent.name, agentModel: agent.model || 'unknown', sessionId: session.id, projectName: project.name }) },
     }, [
         buildActionRow(
             { label: 'Stop', customId: 'stop_session', style: ButtonStyle.DANGER, emoji: '⏹' },

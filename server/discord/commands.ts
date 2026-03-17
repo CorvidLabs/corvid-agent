@@ -289,7 +289,7 @@ export interface InteractionContext {
     threadCallbacks: Map<string, ThreadCallbackInfo>;
     threadLastActivity: Map<string, number>;
     createStandaloneThread: (channelId: string, name: string) => Promise<string | null>;
-    subscribeForResponseWithEmbed: (sessionId: string, threadId: string, agentName: string, agentModel: string) => void;
+    subscribeForResponseWithEmbed: (sessionId: string, threadId: string, agentName: string, agentModel: string, projectName?: string) => void;
     sendTaskResult: (channelId: string, task: import('../../shared/types/work-tasks').WorkTask, mentionUserId?: string) => Promise<void>;
     muteUser: (userId: string) => void;
     unmuteUser: (userId: string) => void;

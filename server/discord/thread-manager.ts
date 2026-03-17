@@ -21,6 +21,7 @@ import {
     agentColor,
     assertSnowflake,
     splitEmbedDescription,
+    buildFooterText,
 } from './embeds';
 
 const log = createLogger('DiscordThreadManager');
@@ -52,6 +53,7 @@ export interface ThreadSessionInfo {
     agentModel: string;
     ownerUserId: string;
     topic?: string;
+    projectName?: string;
 }
 
 export interface ThreadCallbackInfo {
@@ -73,6 +75,7 @@ export function subscribeForResponseWithEmbed(
     threadId: string,
     agentName: string,
     agentModel: string,
+    projectName?: string,
 ): void {
     // Unsubscribe the previous callback for this thread to prevent duplicates
     const prev = threadCallbacks.get(threadId);
@@ -102,7 +105,7 @@ export function subscribeForResponseWithEmbed(
                 sendEmbedWithButtons(delivery, botToken, threadId, {
                     description: 'The agent session ended unexpectedly. Send a message to resume.',
                     color: 0xff3355,
-                    footer: { text: `${agentName} · crashed` },
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'crashed' }) },
                 }, [
                     buildActionRow(
                         { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
@@ -150,7 +153,7 @@ export function subscribeForResponseWithEmbed(
             await sendEmbed(delivery, botToken, threadId, {
                 description: part,
                 color,
-                footer: { text: `${agentName} · ${agentModel}` },
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
             });
         }
     };
@@ -185,7 +188,7 @@ export function subscribeForResponseWithEmbed(
                 sendEmbed(delivery, botToken, threadId, {
                     description: `⏳ ${event.statusMessage}`,
                     color: 0x95a5a6,
-                    footer: { text: `${agentName} · working...` },
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'working...' }) },
                 }).catch((err) => {
                     log.debug('Tool status embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
                 });
@@ -204,7 +207,7 @@ export function subscribeForResponseWithEmbed(
                 sendEmbed(delivery, botToken, threadId, {
                     description: `⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
                     color: 0xf0b232, // yellow/warning
-                    footer: { text: `${agentName} · context warning` },
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'context warning' }) },
                 }).catch((err) => {
                     log.debug('Context warning embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
                 });
@@ -293,7 +296,7 @@ export function subscribeForResponseWithEmbed(
                     description: 'Session complete. Send a message to continue the conversation.',
                     color: 0x57f287,
                     ...(fields.length > 0 ? { fields } : {}),
-                    footer: { text: `${agentName} · done` },
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: 'done' }) },
                 }, [
                     buildActionRow(
                         { label: 'Continue', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '💬' },
@@ -349,7 +352,7 @@ export function subscribeForResponseWithEmbed(
                 title,
                 description,
                 color,
-                footer: { text: `${agentName} · ${errorType}` },
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status: errorType }) },
             }, [
                 buildActionRow(
                     { label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' },
@@ -386,6 +389,7 @@ export function subscribeForInlineResponse(
     agentName: string,
     agentModel: string,
     onBotMessage?: (botMessageId: string) => void,
+    projectName?: string,
 ): void {
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -450,13 +454,13 @@ export function subscribeForInlineResponse(
                 sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, {
                     description: parts[i],
                     color,
-                    footer: { text: `${agentName} · ${agentModel}` },
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
                 });
             } else {
                 sentId = await sendEmbed(delivery, botToken, channelId, {
                     description: parts[i],
                     color,
-                    footer: { text: `${agentName} · ${agentModel}` },
+                    footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
                 });
             }
             if (sentId && onBotMessage) {
@@ -509,12 +513,13 @@ export function tryRecoverThread(
 ): ThreadSessionInfo | null {
     try {
         const row = db.query(
-            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model
+            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
+             LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.name = ? AND s.source = 'discord'
              ORDER BY s.created_at DESC LIMIT 1`,
-        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string } | null;
+        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; project_name: string | null } | null;
 
         if (!row) return null;
 
@@ -524,6 +529,7 @@ export function tryRecoverThread(
             agentModel: row.agent_model || 'unknown',
             ownerUserId: '',
             topic: row.initial_prompt || undefined,
+            projectName: row.project_name || undefined,
         };
         threadSessions.set(threadId, info);
         log.info('Recovered thread session from DB', { threadId, sessionId: row.id });
@@ -547,12 +553,13 @@ export function recoverActiveThreadSubscriptions(
 ): void {
     try {
         const rows = db.query(
-            `SELECT s.id, s.name, a.name as agent_name, a.model as agent_model
+            `SELECT s.id, s.name, a.name as agent_name, a.model as agent_model, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
+             LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.source = 'discord' AND s.status = 'running'
                AND s.name LIKE 'Discord thread:%'`,
-        ).all() as { id: string; name: string; agent_name: string; agent_model: string }[];
+        ).all() as { id: string; name: string; agent_name: string; agent_model: string; project_name: string | null }[];
 
         let recovered = 0;
         for (const row of rows) {
@@ -565,12 +572,14 @@ export function recoverActiveThreadSubscriptions(
                     agentName: row.agent_name || 'Agent',
                     agentModel: row.agent_model || 'unknown',
                     ownerUserId: '',
+                    projectName: row.project_name || undefined,
                 });
             }
 
             subscribeForResponseWithEmbed(
                 processManager, delivery, botToken, db, threadCallbacks,
                 row.id, threadId, row.agent_name || 'Agent', row.agent_model || 'unknown',
+                row.project_name || undefined,
             );
             recovered++;
         }
