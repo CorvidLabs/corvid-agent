@@ -19,6 +19,7 @@ files:
   - server/db/migrations/088_agent_display_columns_fixup.ts
   - server/db/migrations/089_flock_test_results.ts
   - server/db/migrations/091_contact_identities.ts
+  - server/db/migrations/092_discord_mention_sessions.ts
 db_tables:
   - schema_version
 depends_on: []

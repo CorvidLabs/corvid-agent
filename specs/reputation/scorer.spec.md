@@ -60,6 +60,8 @@ Supports auto-computation with a 5-minute staleness threshold so that GET reques
 | `ReputationRecord` | Snake-case DB row shape for `agent_reputation` |
 | `ReputationEventRecord` | Snake-case DB row shape for `reputation_events` |
 | `RecordEventInput` | Input for `recordEvent()` |
+| `ComponentExplanation` | Per-component breakdown: score, weight, weighted contribution, isDefault flag, reason string, evidence map, recentEvents |
+| `ScoreExplanation` | Full explanation: agentId, overallScore, trustLevel, decayFactor, rawScore, per-component explanations, computedAt |
 
 ## Invariants
 
