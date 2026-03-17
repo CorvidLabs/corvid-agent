@@ -315,7 +315,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
                 type: 'stdio',
                 command: ext.command,
                 args: ext.args,
-                env: ext.envVars,
+                env: { ...process.env as Record<string, string>, ...ext.envVars },
             };
             log.info(`Adding external MCP server "${ext.name}" to SDK session`, { sessionId: session.id, command: ext.command });
         }
