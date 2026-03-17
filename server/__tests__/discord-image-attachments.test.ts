@@ -128,6 +128,29 @@ describe('extractImageBlocks', () => {
         expect(result.blocks).toHaveLength(5);
         expect(result.skipped).toBe(2);
     });
+
+    test('extracts images with extension-only detection (no content_type)', () => {
+        const attachments = [
+            makeAttachment({ id: '1', content_type: undefined, filename: 'photo.jpg' }),
+            makeAttachment({ id: '2', content_type: undefined, filename: 'screenshot.jpeg' }),
+            makeAttachment({ id: '3', content_type: undefined, filename: 'icon.gif' }),
+            makeAttachment({ id: '4', content_type: undefined, filename: 'banner.webp' }),
+            makeAttachment({ id: '5', content_type: undefined, filename: 'noext' }),
+        ];
+        const result = extractImageBlocks(attachments);
+        // jpg, jpeg, gif, webp are valid; 'noext' has no recognized extension
+        expect(result.blocks).toHaveLength(4);
+        expect(result.skipped).toBe(0);
+    });
+
+    test('extracts image with unknown extension falls back gracefully', () => {
+        // An image identified only by extension with an unusual but valid type
+        const result = extractImageBlocks([
+            makeAttachment({ id: '1', content_type: undefined, filename: 'image.png', size: 500 }),
+        ]);
+        expect(result.blocks).toHaveLength(1);
+        expect(result.skipped).toBe(0);
+    });
 });
 
 describe('buildMultimodalContent', () => {
@@ -193,5 +216,34 @@ describe('buildMultimodalContent', () => {
         const result = buildMultimodalContent('text', oversizedAttachments);
         expect(typeof result).toBe('string');
         expect(result as string).toContain('skipped');
+    });
+
+    test('includes skip notice with valid images and over-limit images', () => {
+        // 5 valid images + 2 over limit = 5 extracted + 2 skipped
+        const attachments = Array.from({ length: 7 }, (_, i) =>
+            makeAttachment({ id: String(i), filename: `img${i}.png`, size: 1024 }),
+        );
+        const result = buildMultimodalContent('look at these', attachments);
+        expect(Array.isArray(result)).toBe(true);
+        const blocks = result as Array<{ type: string; text?: string }>;
+        // text + 5 images + skip notice
+        expect(blocks).toHaveLength(7);
+        expect(blocks[0]).toEqual({ type: 'text', text: 'look at these' });
+        expect(blocks[6].type).toBe('text');
+        expect(blocks[6].text).toContain('skipped');
+    });
+
+    test('handles images with extension-only detection in multimodal content', () => {
+        const attachments = [
+            makeAttachment({ content_type: undefined, filename: 'shot.jpg' }),
+            makeAttachment({ id: '2', content_type: undefined, filename: 'cap.webp' }),
+        ];
+        const result = buildMultimodalContent('check these', attachments);
+        expect(Array.isArray(result)).toBe(true);
+        const blocks = result as Array<{ type: string }>;
+        expect(blocks).toHaveLength(3); // text + 2 images
+        expect(blocks[0].type).toBe('text');
+        expect(blocks[1].type).toBe('image');
+        expect(blocks[2].type).toBe('image');
     });
 });
