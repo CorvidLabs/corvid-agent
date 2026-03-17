@@ -37,20 +37,29 @@ import {
     resolveDefaultAgent,
 } from './thread-manager';
 import { resolveDiscordContact } from './contact-linker';
+import { saveMentionSession, getMentionSession } from '../db/discord-mention-sessions';
 
 const log = createLogger('DiscordMessageHandler');
 
 /** Maximum number of bot message→session mappings to keep for mention-reply context. */
 const MAX_MENTION_SESSIONS = 500;
 
-/** Evict oldest entries from mentionSessions when it exceeds the cap. */
-function trackMentionSession(map: Map<string, MentionSessionInfo>, botMessageId: string, info: MentionSessionInfo): void {
+/** Evict oldest entries from mentionSessions when it exceeds the cap, and persist to DB. */
+function trackMentionSession(db: Database, map: Map<string, MentionSessionInfo>, botMessageId: string, info: MentionSessionInfo): void {
     if (map.size >= MAX_MENTION_SESSIONS) {
         // Delete the oldest entry (first key in insertion order)
         const firstKey = map.keys().next().value;
         if (firstKey) map.delete(firstKey);
     }
     map.set(botMessageId, info);
+    try {
+        saveMentionSession(db, botMessageId, info);
+    } catch (err) {
+        log.warn('Failed to persist mention session', {
+            botMessageId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
 }
 
 /** Prefix a message with Discord author context so the agent knows who is speaking. */
@@ -216,12 +225,22 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
 
     // If replying to a bot message, try to resume the existing session
     if (isReplyToBot && data.message_reference?.message_id) {
-        const existingSession = ctx.mentionSessions.get(data.message_reference.message_id);
+        const refId = data.message_reference.message_id;
+        let existingSession = ctx.mentionSessions.get(refId);
+        // Fall back to DB lookup (e.g. after server restart)
+        if (!existingSession) {
+            const dbSession = getMentionSession(ctx.db, refId);
+            if (dbSession) {
+                existingSession = dbSession;
+                // Re-populate in-memory map for future lookups
+                ctx.mentionSessions.set(refId, dbSession);
+            }
+        }
         if (existingSession) {
             await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions, data.author.username);
             return;
         }
-        // If we can't find the session (e.g. after restart), fall through to create new
+        // If we can't find the session in memory or DB, fall through to create new
     }
 
     const mode = ctx.config.mode ?? 'chat';
@@ -421,7 +440,7 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         session.id, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel });
         },
     );
 }
@@ -459,7 +478,7 @@ async function handleMentionReplyResume(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel });
         },
     );
 }

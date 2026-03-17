@@ -19,6 +19,7 @@ files:
   - server/db/migrations/088_agent_display_columns_fixup.ts
   - server/db/migrations/089_flock_test_results.ts
   - server/db/migrations/091_contact_identities.ts
+  - server/db/migrations/092_discord_mention_sessions.ts
 db_tables:
   - schema_version
 depends_on: []
@@ -310,10 +311,22 @@ Creates `contacts` and `contact_platform_links` tables for cross-platform identi
 | `up` | `(db: Database)` | `void` | Creates `contacts` and `contact_platform_links` tables with indexes for tenant+name lookup and unique platform identity constraint |
 | `down` | `(db: Database)` | `void` | Drops `contact_platform_links` and `contacts` tables |
 
+### 092_discord_mention_sessions.ts
+
+Creates the `discord_mention_sessions` table for persisting mention-reply session mappings across server restarts. Maps bot message IDs to session info (session ID, agent name, agent model).
+
+**Exported Functions:**
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Creates `discord_mention_sessions` table with `bot_message_id` as primary key, plus index on `session_id` |
+| `down` | `(db: Database)` | `void` | Drops the `discord_mention_sessions` table |
+
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-16 | corvid-agent | Add migration 092 to spec coverage |
 | 2026-03-15 | corvid-agent | Add migration 091 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migrations 087-089 to spec coverage |
 | 2026-03-14 | corvid-agent | Add migration 086 to spec coverage |
