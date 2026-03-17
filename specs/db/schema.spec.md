@@ -3,7 +3,27 @@ module: db-schema
 version: 1
 status: active
 files:
-  - server/db/schema.ts
+  - server/db/schema/index.ts
+  - server/db/schema/agents.ts
+  - server/db/schema/algochat.ts
+  - server/db/schema/auth.ts
+  - server/db/schema/contacts.ts
+  - server/db/schema/councils.ts
+  - server/db/schema/credits.ts
+  - server/db/schema/discord.ts
+  - server/db/schema/flock.ts
+  - server/db/schema/marketplace.ts
+  - server/db/schema/memory.ts
+  - server/db/schema/model-exams.ts
+  - server/db/schema/monitoring.ts
+  - server/db/schema/notifications.ts
+  - server/db/schema/projects.ts
+  - server/db/schema/reputation.ts
+  - server/db/schema/schedules.ts
+  - server/db/schema/sessions.ts
+  - server/db/schema/webhooks.ts
+  - server/db/schema/work.ts
+  - server/db/schema/workflows.ts
 db_tables:
   - schema_version
   - projects
@@ -81,6 +101,16 @@ Defines and manages the SQLite database schema through a sequential migration sy
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `runMigrations` | `(db: Database)` | `void` | Apply all pending migrations up to SCHEMA_VERSION in a single transaction |
+
+### Exported Constants (per domain file)
+
+| Export | Type | Required | Description |
+|--------|------|----------|-------------|
+| `tables` | `string[]` | yes | SQL CREATE TABLE IF NOT EXISTS statements for the domain's tables |
+| `indexes` | `string[]` | yes | SQL CREATE INDEX IF NOT EXISTS statements for the domain's indexes |
+| `virtualTables` | `string[]` | no | SQL CREATE VIRTUAL TABLE statements (e.g. FTS5) |
+| `triggers` | `string[]` | no | SQL CREATE TRIGGER statements (e.g. FTS sync) |
+| `seedData` | `string[]` | no | SQL INSERT OR IGNORE statements for preset data |
 
 ## Invariants
 
