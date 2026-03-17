@@ -394,6 +394,17 @@ export const McpRecallMemorySchema = z.object({
     query: z.string().optional(),
 });
 
+export const McpReadOnChainMemoriesSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    search: z.string().optional(),
+    limit: z.number().optional(),
+});
+
+export const McpSyncOnChainMemoriesSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    limit: z.number().optional(),
+});
+
 // ─── Misc routes (index.ts) ───────────────────────────────────────────────────
 
 export const EscalationResolveSchema = z.object({

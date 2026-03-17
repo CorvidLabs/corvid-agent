@@ -4,8 +4,8 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents } from '../mcp/tool-handlers';
-import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema } from '../lib/validation';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents } from '../mcp/tool-handlers';
+import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 
 function extractResultText(result: CallToolResult): string {
@@ -55,6 +55,14 @@ export function handleMcpApiRoutes(
         return handleRecallMemoryRoute(req, deps);
     }
 
+    if (url.pathname === '/api/mcp/read-on-chain-memories' && req.method === 'POST') {
+        return handleReadOnChainMemoriesRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/sync-on-chain-memories' && req.method === 'POST') {
+        return handleSyncOnChainMemoriesRoute(req, deps);
+    }
+
     if (url.pathname === '/api/mcp/list-agents' && req.method === 'GET') {
         return handleListAgentsRoute(url, deps);
     }
@@ -92,6 +100,30 @@ async function handleRecallMemoryRoute(req: Request, deps: McpApiDeps): Promise<
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleRecallMemory(ctx, { key: data.key, query: data.query });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleReadOnChainMemoriesRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpReadOnChainMemoriesSchema);
+
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleReadOnChainMemories(ctx, { search: data.search, limit: data.limit });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleSyncOnChainMemoriesRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpSyncOnChainMemoriesSchema);
+
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleSyncOnChainMemories(ctx, { limit: data.limit });
         return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);

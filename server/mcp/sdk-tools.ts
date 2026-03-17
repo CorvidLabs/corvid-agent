@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
@@ -12,6 +12,8 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_save_memory',
     'corvid_recall_memory',
+    'corvid_read_on_chain_memories',
+    'corvid_sync_on_chain_memories',
     'corvid_list_agents',
     'corvid_extend_timeout',
     'corvid_check_credits',
@@ -94,6 +96,28 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
                 query: z.string().optional().describe('Search term to find across keys and content'),
             },
             async (args) => handleRecallMemory(ctx, args),
+        ),
+        tool(
+            'corvid_read_on_chain_memories',
+            'Read memories directly from on-chain storage (Algorand blockchain). ' +
+            'Use this to browse your permanent long-term memories stored on-chain. ' +
+            'Unlike corvid_recall_memory (which reads from local SQLite cache), this reads the blockchain directly. ' +
+            'Useful for verifying on-chain state or when local cache may be stale/empty.',
+            {
+                search: z.string().optional().describe('Optional search term to filter memories by key or content'),
+                limit: z.number().optional().describe('Maximum number of memories to return (default: 50)'),
+            },
+            async (args) => handleReadOnChainMemories(ctx, args),
+        ),
+        tool(
+            'corvid_sync_on_chain_memories',
+            'Sync memories from on-chain storage back to local SQLite cache. ' +
+            'Use this to recover memories after a database reset or to ensure local cache matches on-chain state. ' +
+            'Reads all on-chain memories and restores any missing from the local database.',
+            {
+                limit: z.number().optional().describe('Maximum number of on-chain memories to scan (default: 200)'),
+            },
+            async (args) => handleSyncOnChainMemories(ctx, args),
         ),
         tool(
             'corvid_list_agents',

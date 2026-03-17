@@ -43,6 +43,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 
 | Type | Description |
 |------|-------------|
+| `OnChainMemory` | Interface for on-chain memory entries: `key: string`, `content: string`, `txid: string`, `timestamp: string`, `confirmedRound: number` |
 | `SendMessageOptions` | Interface for agent-to-agent sends: `fromAgentId`, `toAgentId`, `content`, `paymentMicro`, optional `messageId`, optional `sessionId` |
 | `SendMessageResult` | Interface with `txid: string \| null`, optional `blockedByLimit: boolean`, optional `limitError: string` |
 | `SendToAddressOptions` | Interface for direct-address sends: `senderAccount: ChatAccount`, `recipientAddress`, `recipientPublicKey: Uint8Array`, `content`, optional `paymentMicro`, optional `sessionId` |
@@ -64,6 +65,7 @@ _No standalone exported functions. All functionality is exposed via exported cla
 | `constructor` | `db: Database, service: AlgoChatService \| null, agentWalletService: AgentWalletService, agentDirectory: AgentDirectory` | `OnChainTransactor` | Creates transactor with all required dependencies; service may be null (disables all sends) |
 | `sendMessage` | `opts: SendMessageOptions` | `Promise<SendMessageResult>` | Sends encrypted on-chain message between two agents; checks spending limits, resolves wallets and public keys, prepends trace ID, uses group txn with condense fallback |
 | `sendToSelf` | `agentId: string, content: string` | `Promise<string \| null>` | Sends on-chain message from agent to itself for memory/audit storage; bypasses recipient resolution |
+| `readOnChainMemories` | `agentId: string, serverMnemonic: string \| null \| undefined, network: string \| undefined, options?: { limit?, afterRound?, search? }` | `Promise<OnChainMemory[]>` | Reads on-chain memories by querying self-to-self transactions via indexer, decrypting AlgoChat and memory layers |
 | `sendNotificationToAddress` | `fromAgentId: string, toAddress: string, content: string` | `Promise<string \| null>` | Best-effort notification to an arbitrary address; always condenses content to 800 bytes; never throws |
 | `sendBestEffort` | `fromAgentId: string, toAgentId: string, content: string, messageId?: string` | `Promise<string \| null>` | Best-effort message send with zero payment; never throws, returns txid or null |
 | `sendToAddress` | `senderAccount: ChatAccount, recipientAddress: string, content: string, sessionId?: string` | `Promise<{ txid: string; fee: number } \| null>` | Sends message to an Algorand address using a specific sender account; group txn first, single-txn fallback; records spending and session ALGO spent |
