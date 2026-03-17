@@ -288,6 +288,52 @@ describe('Reputation Routes', () => {
         expect(data.aggregate.total).toBe(0);
     });
 
+    // ─── Stats ─────────────────────────────────────────────────────────────
+
+    it('GET /api/reputation/stats/:agentId returns aggregated stats', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/stats/${agentId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.agentId).toBe(agentId);
+        expect(data.events).toBeDefined();
+        expect(data.feedback).toBeDefined();
+        expect(data.feedbackTotal).toBeDefined();
+        expect(typeof data.feedbackTotal.positive).toBe('number');
+        expect(typeof data.feedbackTotal.negative).toBe('number');
+        expect(typeof data.feedbackTotal.total).toBe('number');
+    });
+
+    it('GET /api/reputation/stats/:agentId includes event type counts', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/stats/${agentId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        const data = await res!.json();
+        // We recorded task_completed events earlier in the test
+        expect(data.events.task_completed).toBeDefined();
+        expect(data.events.task_completed.count).toBeGreaterThanOrEqual(1);
+        expect(typeof data.events.task_completed.totalImpact).toBe('number');
+    });
+
+    it('GET /api/reputation/stats/:agentId includes feedback by source', async () => {
+        const { req, url } = fakeReq('GET', `/api/reputation/stats/${agentId}`);
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        const data = await res!.json();
+        // We submitted feedback from 'api' and 'discord' sources earlier
+        expect(data.feedbackTotal.total).toBeGreaterThanOrEqual(2);
+    });
+
+    it('GET /api/reputation/stats/:agentId returns empty for unknown agent', async () => {
+        const { req, url } = fakeReq('GET', '/api/reputation/stats/nonexistent-agent');
+        const res = await handleReputationRoutes(req, url, db, scorer, attestation)!;
+        expect(res).not.toBeNull();
+        expect(res!.status).toBe(200);
+        const data = await res!.json();
+        expect(data.agentId).toBe('nonexistent-agent');
+        expect(Object.keys(data.events)).toHaveLength(0);
+        expect(data.feedbackTotal.total).toBe(0);
+    });
+
     // ─── Unmatched path ──────────────────────────────────────────────────────
 
     it('returns null for unmatched paths', () => {

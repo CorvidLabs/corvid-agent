@@ -37,3 +37,10 @@ export interface ReputationEvent {
     metadata: Record<string, unknown>;
     createdAt: string;
 }
+
+export interface AgentReputationStats {
+    agentId: string;
+    events: Record<string, { count: number; totalImpact: number }>;
+    feedback: Record<string, { positive: number; negative: number }>;
+    feedbackTotal: { positive: number; negative: number; total: number };
+}
