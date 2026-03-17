@@ -61,6 +61,11 @@ async function deriveKey(passphrase: string, salt: Uint8Array, iterations: numbe
 /**
  * Resolve the encryption passphrase from environment / config.
  * Exported for testing only — not part of the public API.
+ *
+ * @param network - The network name (e.g. 'localnet', 'testnet', 'mainnet'). Determines key requirements.
+ * @param serverMnemonic - Optional server mnemonic used as fallback passphrase on localnet.
+ * @returns The resolved encryption passphrase string.
+ * @throws {Error} If no WALLET_ENCRYPTION_KEY is set on non-localnet networks.
  */
 export function getEncryptionPassphrase(network?: string, serverMnemonic?: string | null): string {
     const envKey = process.env.WALLET_ENCRYPTION_KEY;
@@ -94,6 +99,15 @@ export function getEncryptionPassphrase(network?: string, serverMnemonic?: strin
     return DEFAULT_LOCALNET_KEY;
 }
 
+/**
+ * Encrypt a mnemonic using AES-256-GCM with a passphrase derived from the environment.
+ * Produces v2 format output: base64-encoded salt + IV + ciphertext.
+ *
+ * @param plaintext - The mnemonic plaintext to encrypt.
+ * @param serverMnemonic - Optional server mnemonic used as fallback passphrase on localnet.
+ * @param network - The network name, used to resolve the encryption passphrase.
+ * @returns A base64-encoded string containing the encrypted mnemonic.
+ */
 export async function encryptMnemonic(
     plaintext: string,
     serverMnemonic?: string | null,
@@ -128,6 +142,15 @@ export async function encryptMnemonic(
     }
 }
 
+/**
+ * Decrypt a mnemonic that was encrypted with {@link encryptMnemonic}.
+ * Supports both v2 (per-message salt) and legacy v1 (static salt) formats.
+ *
+ * @param encrypted - The base64-encoded encrypted mnemonic string.
+ * @param serverMnemonic - Optional server mnemonic used as fallback passphrase on localnet.
+ * @param network - The network name, used to resolve the encryption passphrase.
+ * @returns The decrypted mnemonic plaintext.
+ */
 export async function decryptMnemonic(
     encrypted: string,
     serverMnemonic?: string | null,
@@ -185,6 +208,11 @@ export async function decryptMnemonic(
 /**
  * Encrypt arbitrary content for on-chain storage (e.g. agent memories).
  * Uses the same AES-256-GCM scheme with the agent's encryption passphrase.
+ *
+ * @param plaintext - The content to encrypt.
+ * @param serverMnemonic - Optional server mnemonic used as fallback passphrase on localnet.
+ * @param network - The network name, used to resolve the encryption passphrase.
+ * @returns A base64-encoded string containing the encrypted content.
  */
 export async function encryptMemoryContent(
     plaintext: string,
@@ -196,7 +224,12 @@ export async function encryptMemoryContent(
 }
 
 /**
- * Decrypt content that was encrypted with encryptMemoryContent.
+ * Decrypt content that was encrypted with {@link encryptMemoryContent}.
+ *
+ * @param encrypted - The base64-encoded encrypted content string.
+ * @param serverMnemonic - Optional server mnemonic used as fallback passphrase on localnet.
+ * @param network - The network name, used to resolve the encryption passphrase.
+ * @returns The decrypted content string.
  */
 export async function decryptMemoryContent(
     encrypted: string,
@@ -209,6 +242,10 @@ export async function decryptMemoryContent(
 /**
  * Encrypt a mnemonic with an explicit passphrase (bypasses env-based resolution).
  * Used by KeyProvider-aware callers that resolve the passphrase externally.
+ *
+ * @param plaintext - The mnemonic plaintext to encrypt.
+ * @param passphrase - The encryption passphrase to use directly.
+ * @returns A base64-encoded string containing the encrypted mnemonic (v2 format).
  */
 export async function encryptMnemonicWithPassphrase(
     plaintext: string,
@@ -246,6 +283,10 @@ export async function encryptMnemonicWithPassphrase(
  *
  * Only supports v2 format (salt + iv + ciphertext). Legacy v1 format is not
  * supported since all new encryptions use v2.
+ *
+ * @param encrypted - The base64-encoded encrypted mnemonic string (v2 format).
+ * @param passphrase - The decryption passphrase to use directly.
+ * @returns The decrypted mnemonic plaintext.
  */
 export async function decryptMnemonicWithPassphrase(
     encrypted: string,

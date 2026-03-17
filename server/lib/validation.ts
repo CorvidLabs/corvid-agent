@@ -17,6 +17,11 @@ export { ValidationError };
  * Parse and validate a JSON request body against a Zod schema.
  * Returns the validated data, or throws a ValidationError with a descriptive message.
  * Route handlers should wrap in try/catch or use the safe variant.
+ *
+ * @param req - The incoming HTTP request whose JSON body will be parsed.
+ * @param schema - The Zod schema to validate the parsed body against.
+ * @returns The validated and typed request body data.
+ * @throws {ValidationError} If the body is not valid JSON or fails schema validation.
  */
 export async function parseBodyOrThrow<T extends z.ZodType>(
     req: Request,
@@ -41,6 +46,10 @@ export async function parseBodyOrThrow<T extends z.ZodType>(
 /**
  * Parse and validate — returns `{ data, error }`.
  * When `error` is truthy, return a 400; otherwise `data!` is safe to use.
+ *
+ * @param req - The incoming HTTP request whose JSON body will be parsed.
+ * @param schema - The Zod schema to validate the parsed body against.
+ * @returns An object with `data` (validated body or null) and `error` (error message or null).
  */
 export async function parseBody<T extends z.ZodType>(
     req: Request,
@@ -67,12 +76,23 @@ async function loadAlgosdk() {
     return _algosdk;
 }
 
-/** Synchronous format check: 58 uppercase A-Z2-7 characters. */
+/**
+ * Synchronous format check: 58 uppercase A-Z2-7 characters.
+ *
+ * @param address - The address string to validate.
+ * @returns `true` if the string matches the Algorand base32 address format.
+ */
 export function isAlgorandAddressFormat(address: string): boolean {
     return /^[A-Z2-7]{58}$/.test(address);
 }
 
-/** Full async validation with checksum via algosdk. */
+/**
+ * Full async validation with checksum via algosdk.
+ * Falls back to {@link isAlgorandAddressFormat} if algosdk is unavailable.
+ *
+ * @param address - The Algorand address string to validate.
+ * @returns `true` if the address is valid (format and checksum).
+ */
 export async function isValidAlgorandAddress(address: string): Promise<boolean> {
     try {
         const sdk = await loadAlgosdk();
@@ -83,7 +103,13 @@ export async function isValidAlgorandAddress(address: string): Promise<boolean> 
     }
 }
 
-/** Validate query/search params (plain object) against a schema. */
+/**
+ * Validate query/search params (plain object) against a schema.
+ *
+ * @param params - A record of query parameter key-value pairs to validate.
+ * @param schema - The Zod schema to validate the params against.
+ * @returns An object with `data` (validated params) and `error: null` on success, or `data: null` and `error` message on failure.
+ */
 export function parseQuery<T extends z.ZodType>(
     params: Record<string, string | null>,
     schema: T,
