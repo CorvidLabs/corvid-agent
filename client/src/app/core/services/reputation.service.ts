@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApiService } from './api.service';
-import type { ReputationScore, ReputationEvent, ScoreExplanation } from '../models/reputation.model';
+import type { ReputationScore, ReputationEvent, ScoreExplanation, AgentReputationStats } from '../models/reputation.model';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -72,6 +72,12 @@ export class ReputationService {
         );
         this.explanation.set(explanation);
         return explanation;
+    }
+
+    async getStats(agentId: string): Promise<AgentReputationStats> {
+        return firstValueFrom(
+            this.api.get<AgentReputationStats>(`/reputation/stats/${agentId}`),
+        );
     }
 
     async getAttestation(agentId: string): Promise<{ hash: string | null }> {

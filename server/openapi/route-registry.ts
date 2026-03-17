@@ -1084,6 +1084,13 @@ export const routes: RouteEntry[] = [
         auth: 'required',
     },
 
+    {
+        method: 'GET', path: '/api/reputation/stats/{agentId}',
+        summary: 'Get aggregated reputation stats for agent',
+        tags: ['Reputation'],
+        auth: 'none',
+    },
+
     // ── Billing ─────────────────────────────────────────────────────────────
     {
         method: 'GET', path: '/api/billing/subscription/{tenantId}',

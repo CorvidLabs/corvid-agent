@@ -16,6 +16,7 @@ import type { ProposalStatus } from '../../shared/types';
 import type { RequestContext } from '../middleware/guards';
 import type { ReputationScorer } from '../reputation/scorer';
 import { tenantRoleGuard } from '../middleware/guards';
+import { PermissionTier, requirePermissionTier } from '../permissions/governance-tier';
 import {
     parseBodyOrThrow,
     ValidationError,
@@ -54,6 +55,10 @@ export function handleProposalRoutes(
 
     // Collection endpoints
     if (path === '/api/proposals' && method === 'GET') {
+        if (context) {
+            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+            if (denied) return denied;
+        }
         const councilId = url.searchParams.get('councilId') ?? undefined;
         const status = (url.searchParams.get('status') as ProposalStatus) ?? undefined;
         return json(listProposals(db, { councilId, status }, tenantId));
@@ -61,8 +66,10 @@ export function handleProposalRoutes(
 
     if (path === '/api/proposals' && method === 'POST') {
         if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
             if (denied) return denied;
+            const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (roleDenied) return roleDenied;
         }
         return handleCreate(req, db, tenantId);
     }
@@ -76,20 +83,28 @@ export function handleProposalRoutes(
 
     if (!action) {
         if (method === 'GET') {
+            if (context) {
+                const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+                if (denied) return denied;
+            }
             const proposal = getProposal(db, id, tenantId);
             return proposal ? json(proposal) : json({ error: 'Not found' }, 404);
         }
         if (method === 'PUT') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleUpdate(req, db, id, tenantId);
         }
         if (method === 'DELETE') {
             if (context) {
-                const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
                 if (denied) return denied;
+                const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+                if (roleDenied) return roleDenied;
             }
             return handleDelete(db, id, tenantId);
         }
@@ -97,13 +112,19 @@ export function handleProposalRoutes(
 
     if (action === 'transition' && method === 'POST') {
         if (context) {
-            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            const denied = requirePermissionTier(PermissionTier.Operator, db)(req, url, context);
             if (denied) return denied;
+            const roleDenied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (roleDenied) return roleDenied;
         }
         return handleTransition(req, db, id, tenantId);
     }
 
     if (action === 'evaluate' && method === 'GET') {
+        if (context) {
+            const denied = requirePermissionTier(PermissionTier.Agent, db)(req, url, context);
+            if (denied) return denied;
+        }
         return handleEvaluate(db, id, tenantId, reputationScorer);
     }
 

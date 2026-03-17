@@ -19,6 +19,7 @@ files:
   - server/discord/message-formatter.ts
   - server/discord/gateway.ts
   - server/discord/reaction-handler.ts
+  - server/discord/contact-linker.ts
 db_tables:
   - sessions
   - session_messages
@@ -216,6 +217,19 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `reactionRateLimit` | `Map<string, number[]>` | Per-user reaction rate limit state — maps userId to timestamps of recent reactions |
 | `RATE_LIMIT_MAX` | `number` | Maximum feedback reactions per rate limit window (5) |
 | `RATE_LIMIT_WINDOW_MS` | `number` | Rate limit sliding window duration in milliseconds (60000) |
+
+### Exported Functions (from contact-linker.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `resolveDiscordContact` | `(db: Database, authorId: string, username: string)` | `string \| null` | Resolve or create a contact for a Discord user. Checks cache first, then DB lookup by platform ID, then creates a new contact with Discord link. Returns contact ID or null on error |
+
+### Exported Constants (from contact-linker.ts)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `CONTACT_CACHE_TTL` | `number` | Cache TTL in milliseconds (5 minutes) for in-memory contact resolution cache |
+| `contactCache` | `Map<string, CachedContact>` | In-memory cache mapping Discord author IDs to resolved contact IDs, avoiding DB lookups on every message |
 
 ### Exported Types (from extracted modules)
 

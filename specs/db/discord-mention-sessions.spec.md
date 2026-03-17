@@ -44,6 +44,12 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 - **When** `saveMentionSession(db, "msg-abc", info)` is called
 - **Then** `getMentionSession(db, "msg-abc")` returns `{ sessionId: "s1", agentName: "Corvid", agentModel: "claude-3" }`
 
+### Scenario: Overwrite existing session
+
+- **Given** a session mapping exists for `botMessageId = "msg-1"`
+- **When** `saveMentionSession(db, "msg-1", { sessionId: "sess-2", agentName: "agent-b", agentModel: "sonnet" })` is called
+- **Then** the existing row is replaced and `getMentionSession(db, "msg-1")` returns the new session info
+
 ### Scenario: Lookup for unknown message returns null
 
 - **Given** no rows in `discord_mention_sessions`
@@ -97,7 +103,9 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | `agent_model` | TEXT | NOT NULL | Model identifier used for the session |
 | `created_at` | TEXT | DEFAULT `datetime('now')` | When the mapping was created |
 
-An index `idx_discord_mention_sessions_session` on `session_id` supports efficient deletion by session.
+### Indexes
+
+- `idx_discord_mention_sessions_session` on `session_id`
 
 ## Change Log
 

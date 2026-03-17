@@ -90,6 +90,14 @@ export function handleReputationRoutes(
         return json(scorer.getEvents(agentId, limit));
     }
 
+    // ─── Stats ─────────────────────────────────────────────────────────────
+
+    const statsMatch = path.match(/^\/api\/reputation\/stats\/([^/]+)$/);
+    if (statsMatch && method === 'GET') {
+        const agentId = statsMatch[1];
+        return handleGetStats(agentId, _db);
+    }
+
     // ─── Attestation ─────────────────────────────────────────────────────────
 
     // ─── Identity Verification ─────────────────────────────────────────────
@@ -256,6 +264,57 @@ async function handleSubmitFeedback(
         if (err instanceof ValidationError) return badRequest(err.detail);
         return handleRouteError(err);
     }
+}
+
+function handleGetStats(agentId: string, db: Database): Response {
+    // Event counts by type
+    const eventCounts = db.query(`
+        SELECT event_type, COUNT(*) as count, SUM(score_impact) as total_impact
+        FROM reputation_events
+        WHERE agent_id = ?
+        GROUP BY event_type
+    `).all(agentId) as { event_type: string; count: number; total_impact: number }[];
+
+    // Feedback breakdown by source
+    const feedbackBySource = db.query(`
+        SELECT source, sentiment, COUNT(*) as count
+        FROM response_feedback
+        WHERE agent_id = ?
+        GROUP BY source, sentiment
+    `).all(agentId) as { source: string; sentiment: string; count: number }[];
+
+    // Total feedback aggregate
+    const feedbackTotal = db.query(`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN sentiment = 'positive' THEN 1 ELSE 0 END) as positive,
+            SUM(CASE WHEN sentiment = 'negative' THEN 1 ELSE 0 END) as negative
+        FROM response_feedback
+        WHERE agent_id = ?
+    `).get(agentId) as { total: number; positive: number; negative: number };
+
+    // Build structured response
+    const events: Record<string, { count: number; totalImpact: number }> = {};
+    for (const row of eventCounts) {
+        events[row.event_type] = { count: row.count, totalImpact: row.total_impact };
+    }
+
+    const feedback: Record<string, { positive: number; negative: number }> = {};
+    for (const row of feedbackBySource) {
+        if (!feedback[row.source]) feedback[row.source] = { positive: 0, negative: 0 };
+        feedback[row.source][row.sentiment as 'positive' | 'negative'] = row.count;
+    }
+
+    return json({
+        agentId,
+        events,
+        feedback,
+        feedbackTotal: {
+            positive: feedbackTotal.positive ?? 0,
+            negative: feedbackTotal.negative ?? 0,
+            total: feedbackTotal.total ?? 0,
+        },
+    });
 }
 
 function handleGetFeedback(
