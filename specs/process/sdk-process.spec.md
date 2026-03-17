@@ -43,6 +43,7 @@ This is the execution boundary between the corvid-agent system and the Claude Ag
 |----------|-----------|---------|-------------|
 | `startSdkProcess` | `(options: SdkProcessOptions)` | `SdkProcess` | Start a Claude Agent SDK query with full configuration, returns process handle |
 | `buildSafeEnv` | `(projectEnvVars?: Record<string, string>)` | `Record<string, string>` | Build sandboxed environment from allowlist + project env vars |
+| `buildMcpServerEnv` | `(envVars?: Record<string, string>)` | `Record<string, string>` | Build environment for external MCP server: full process.env merged with server-specific env vars |
 | `isApiError` | `(error: string)` | `boolean` | Check if an error string matches known API error patterns |
 | `mapSdkMessageToEvent` | `(message: SDKMessage, sessionId: string)` | `ClaudeStreamEvent \| null` | Convert an SDK message to a stream event for the event bus |
 

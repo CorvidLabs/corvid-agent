@@ -15,6 +15,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import {
     buildSafeEnv,
+    buildMcpServerEnv,
     isApiError,
     mapSdkMessageToEvent,
     ENV_ALLOWLIST,
@@ -581,6 +582,37 @@ describe('buildSafeEnv edge cases', () => {
         const env = buildSafeEnv();
 
         expect(env.BUN_INSTALL).toBe('/home/test/.bun');
+    });
+});
+
+// ── buildMcpServerEnv ────────────────────────────────────────────────────────
+
+describe('buildMcpServerEnv', () => {
+    test('includes process.env variables like PATH and HOME', () => {
+        const env = buildMcpServerEnv();
+        expect(env.PATH).toBe(process.env.PATH!);
+        expect(env.HOME).toBe(process.env.HOME!);
+    });
+
+    test('merges server-specific envVars on top of process.env', () => {
+        const env = buildMcpServerEnv({ FIGMA_API_KEY: 'test-key-123' });
+        expect(env.PATH).toBe(process.env.PATH!);
+        expect(env.FIGMA_API_KEY).toBe('test-key-123');
+    });
+
+    test('server envVars override process.env when keys collide', () => {
+        const env = buildMcpServerEnv({ PATH: '/custom/bin' });
+        expect(env.PATH).toBe('/custom/bin');
+    });
+
+    test('returns only process.env when envVars is undefined', () => {
+        const env = buildMcpServerEnv(undefined);
+        expect(env.PATH).toBe(process.env.PATH!);
+    });
+
+    test('returns only process.env when envVars is empty', () => {
+        const env = buildMcpServerEnv({});
+        expect(env.PATH).toBe(process.env.PATH!);
     });
 });
 

@@ -65,6 +65,15 @@ export function buildSafeEnv(projectEnvVars?: Record<string, string>): Record<st
     return safe;
 }
 
+/**
+ * Build environment for an external MCP server process.
+ * Merges the full host process.env (so PATH, HOME, etc. are available)
+ * with any server-specific envVars, letting the server overrides win.
+ */
+export function buildMcpServerEnv(envVars?: Record<string, string>): Record<string, string> {
+    return { ...process.env as Record<string, string>, ...envVars };
+}
+
 export const API_FAILURE_THRESHOLD = 3;
 
 export const API_ERROR_PATTERNS = [
@@ -315,7 +324,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
                 type: 'stdio',
                 command: ext.command,
                 args: ext.args,
-                env: { ...process.env as Record<string, string>, ...ext.envVars },
+                env: buildMcpServerEnv(ext.envVars),
             };
             log.info(`Adding external MCP server "${ext.name}" to SDK session`, { sessionId: session.id, command: ext.command });
         }
