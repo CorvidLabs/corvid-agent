@@ -1,10 +1,11 @@
 ---
 module: permission-broker
-version: 1
+version: 2
 status: active
 files:
   - server/permissions/broker.ts
   - server/permissions/types.ts
+  - server/permissions/governance-tier.ts
   - server/permissions/index.ts
 db_tables:
   - permission_grants
@@ -195,3 +196,4 @@ Provides capability-based security for agent actions via HMAC-signed grants. The
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-05 | corvid-agent | Initial spec (#591) |
+| 2026-03-17 | corvid-agent | Add Layer 0 governance tier exports: PermissionTier, PERMISSION_TIER_NAMES, GOVERNANCE_ROUTE_TIERS, resolveCallerTier, requirePermissionTier (#1038) |
