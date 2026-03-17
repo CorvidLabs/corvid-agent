@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 13
+version: 14
 status: active
 files:
   - server/discord/bridge.ts
@@ -20,6 +20,7 @@ files:
   - server/discord/gateway.ts
   - server/discord/reaction-handler.ts
   - server/discord/contact-linker.ts
+  - server/discord/image-attachments.ts
 db_tables:
   - sessions
   - session_messages
@@ -235,6 +236,20 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `CONTACT_CACHE_TTL` | `number` | Cache TTL in milliseconds (5 minutes) for in-memory contact resolution cache |
 | `contactCache` | `Map<string, CachedContact>` | In-memory cache mapping Discord author IDs to resolved contact IDs, avoiding DB lookups on every message |
 
+### Exported Functions (from image-attachments.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `isImageAttachment` | `(attachment: DiscordAttachment)` | `boolean` | Check whether an attachment is a supported image (PNG, JPEG, GIF, WebP) by content_type or file extension |
+| `extractImageBlocks` | `(attachments: DiscordAttachment[] \| undefined)` | `ExtractedImages` | Extract image attachments and convert to Claude API content blocks. Enforces 20 MB size limit and 5-image-per-message cap |
+| `buildMultimodalContent` | `(text: string, attachments: DiscordAttachment[] \| undefined)` | `string \| ContentBlockParam[]` | Build multimodal content from text and image attachments. Returns plain string when no images (backward compatible), or content block array when images are present |
+
+### Exported Types (from image-attachments.ts)
+
+| Type | Description |
+|------|-------------|
+| `ExtractedImages` | `{ blocks: ContentBlockParam[]; skipped: number }` — result of image extraction with skip count |
+
 ### Exported Types (from extracted modules)
 
 | Type | Source | Description |
@@ -258,7 +273,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `DiscordGatewayPayload` | `{ op: number; d: unknown; s: number \| null; t: string \| null }` |
 | `DiscordHelloData` | `{ heartbeat_interval: number }` |
 | `DiscordReadyData` | `{ session_id: string; resume_gateway_url: string }` |
-| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], mention_roles?: string[], member?: { roles: string[] }, message_reference?, referenced_message? }` |
+| `DiscordMessageData` | `{ id, channel_id, author, content, timestamp, mentions?: DiscordAuthor[], mention_roles?: string[], member?: { roles: string[] }, message_reference?, referenced_message?, attachments?: DiscordAttachment[] }` |
+| `DiscordAttachment` | `{ id, filename, content_type?, size, url, proxy_url, width?, height? }` — file attached to a Discord message |
 | `DiscordAuthor` | `{ id: string; username: string; bot?: boolean }` |
 | `DiscordInteractionOption` | `{ name, type, value?, options?: DiscordInteractionOption[] }` — recursive option type for subcommands and subcommand groups |
 | `DiscordInteractionData` | Slash command interaction payload from gateway |

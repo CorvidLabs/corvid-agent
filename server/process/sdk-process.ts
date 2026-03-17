@@ -109,7 +109,7 @@ export interface SdkProcessOptions {
 
 export interface SdkProcess {
     pid: number;
-    sendMessage: (content: string) => boolean;
+    sendMessage: (content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]) => boolean;
     kill: () => void;
 }
 
@@ -395,7 +395,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         }
     })();
 
-    function sendMessage(content: string): boolean {
+    function sendMessage(content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]): boolean {
         if (inputDone || abortController.signal.aborted) return false;
 
         // Stream input to the running query

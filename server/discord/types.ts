@@ -132,6 +132,24 @@ export interface DiscordReadyData {
     user?: { id: string; username: string };
 }
 
+/** A file attached to a Discord message. */
+export interface DiscordAttachment {
+    id: string;
+    filename: string;
+    /** MIME type (e.g. "image/png") — may be absent for unknown types. */
+    content_type?: string;
+    /** File size in bytes. */
+    size: number;
+    /** CDN URL for the attachment. */
+    url: string;
+    /** Proxied CDN URL (preferred — does not expire as quickly). */
+    proxy_url: string;
+    /** Image width in pixels (only present for image attachments). */
+    width?: number;
+    /** Image height in pixels (only present for image attachments). */
+    height?: number;
+}
+
 export interface DiscordMessageData {
     id: string;
     channel_id: string;
@@ -154,6 +172,8 @@ export interface DiscordMessageData {
         content: string;
         author: DiscordAuthor;
     } | null;
+    /** File attachments on the message. */
+    attachments?: DiscordAttachment[];
 }
 
 /** Permission levels for role-based access. */

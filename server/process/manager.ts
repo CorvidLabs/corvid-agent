@@ -526,6 +526,11 @@ export class ProcessManager {
 
         const resumeConfig = resolveSessionConfig(this.db, effectiveAgent, session.agentId, session.projectId);
 
+        // Load external MCP configs for resumed sessions (Figma, GitHub, etc.)
+        const resumeExternalMcpConfigs = session.agentId
+            ? getActiveServersForAgent(this.db, session.agentId)
+            : [];
+
         let sp: SdkProcess;
         try {
             if (providerInstance && providerInstance.executionMode === 'direct') {
@@ -551,6 +556,7 @@ export class ProcessManager {
                     personaPrompt: resumeConfig.personaPrompt,
                     skillPrompt: resumeConfig.skillPrompt,
                     modelOverride: modelOverrideResume,
+                    externalMcpConfigs: resumeExternalMcpConfigs,
                 });
             } else {
                 const mcpServers = session.agentId
@@ -572,6 +578,7 @@ export class ProcessManager {
                     mcpServers,
                     personaPrompt: resumeConfig.personaPrompt,
                     skillPrompt: resumeConfig.skillPrompt,
+                    externalMcpConfigs: resumeExternalMcpConfigs,
                 });
             }
         } catch (err) {
@@ -709,7 +716,7 @@ export class ProcessManager {
         };
     }
 
-    sendMessage(sessionId: string, content: string): boolean {
+    sendMessage(sessionId: string, content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[]): boolean {
         const cp = this.processes.get(sessionId);
         if (!cp) return false;
 
@@ -719,7 +726,11 @@ export class ProcessManager {
             return false;
         }
 
-        addSessionMessage(this.db, sessionId, 'user', content);
+        // Persist as text for session history (extract text from multimodal content)
+        const textContent = typeof content === 'string'
+            ? content
+            : content.filter((b): b is { type: 'text'; text: string } => b.type === 'text').map(b => b.text).join('\n');
+        addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
 
         const meta = this.sessionMeta.get(sessionId);
         if (meta) meta.turnCount++;
