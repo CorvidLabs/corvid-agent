@@ -102,6 +102,16 @@ Defines and manages the SQLite database schema through a sequential migration sy
 |----------|-----------|---------|-------------|
 | `runMigrations` | `(db: Database)` | `void` | Apply all pending migrations up to SCHEMA_VERSION in a single transaction |
 
+### Exported Constants (per domain file)
+
+| Export | Type | Required | Description |
+|--------|------|----------|-------------|
+| `tables` | `string[]` | yes | SQL CREATE TABLE IF NOT EXISTS statements for the domain's tables |
+| `indexes` | `string[]` | yes | SQL CREATE INDEX IF NOT EXISTS statements for the domain's indexes |
+| `virtualTables` | `string[]` | no | SQL CREATE VIRTUAL TABLE statements (e.g. FTS5) |
+| `triggers` | `string[]` | no | SQL CREATE TRIGGER statements (e.g. FTS sync) |
+| `seedData` | `string[]` | no | SQL INSERT OR IGNORE statements for preset data |
+
 ## Invariants
 
 1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 70) is the target. Versions must never be renumbered (version 11 was intentionally skipped)
