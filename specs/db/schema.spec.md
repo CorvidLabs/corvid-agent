@@ -103,6 +103,42 @@ Defines and manages the SQLite database schema through a sequential migration sy
 |----------|-----------|---------|-------------|
 | `runMigrations` | `(db: Database)` | `void` | Apply all pending migrations up to SCHEMA_VERSION in a single transaction |
 
+### Exported Constants (Domain Schema Files)
+
+Each domain file under `server/db/schema/` exports arrays of SQL statements used by the aggregator in `index.ts` to build the migration dictionary.
+
+#### Baseline Schema Arrays (all domain files)
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `tables` | `string[]` | `CREATE TABLE IF NOT EXISTS` statements for the domain's tables (v78 baseline) |
+| `indexes` | `string[]` | `CREATE INDEX IF NOT EXISTS` statements for the domain's indexes (v78 baseline) |
+
+#### Seed Data
+
+| Constant | Source File | Type | Description |
+|----------|------------|------|-------------|
+| `seeds` | `credits.ts`, `plugins.ts` | `string[]` | `INSERT OR IGNORE` statements for default credit config values and preset skill bundles |
+
+#### FTS (Full-Text Search) Statements
+
+| Constant | Source File | Type | Description |
+|----------|------------|------|-------------|
+| `ftsStatements` | `memory.ts` | `string[]` | `CREATE VIRTUAL TABLE IF NOT EXISTS` for the `agent_memories_fts` FTS5 table |
+| `ftsTriggers` | `memory.ts` | `string[]` | `CREATE TRIGGER IF NOT EXISTS` statements keeping `agent_memories_fts` in sync with `agent_memories` (insert, delete, update) |
+
+#### Post-Baseline Migration Arrays
+
+| Constant | Source File | Type | Description |
+|----------|------------|------|-------------|
+| `migrationV79` | `flock.ts` | `string[]` | Flock Directory schema additions (v79) |
+| `migrationV80` | `discord.ts` | `string[]` | Discord integration schema additions (v80) |
+| `migrationV84` | `flock.ts` | `string[]` | Flock Directory schema updates (v84) |
+| `migrationV89` | `flock.ts` | `string[]` | Flock Directory schema updates (v89) |
+| `migrationV90` | `reputation.ts` | `string[]` | Reputation schema additions (v90) |
+| `migrationV91` | `contacts.ts` | `string[]` | Cross-platform contact identity mapping (v91) |
+| `migrationV92` | `discord.ts` | `string[]` | Discord schema updates (v92) |
+
 ## Invariants
 
 1. **Sequential versioning**: Migrations are keyed by integer version numbers. `SCHEMA_VERSION` (currently 70) is the target. Versions must never be renumbered (version 11 was intentionally skipped)
@@ -132,7 +168,7 @@ Defines and manages the SQLite database schema through a sequential migration sy
 
 ### Scenario: Already at current version
 
-- **Given** a database at version 70
+- **Given** a database at version 92
 - **When** `runMigrations(db)` is called
 - **Then** returns immediately (no-op)
 
@@ -178,7 +214,7 @@ Note: This module defines all other database tables in the system. Individual ta
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `SCHEMA_VERSION` | `70` | Target schema version |
+| `SCHEMA_VERSION` | `92` | Target schema version |
 
 ## Migration Summary
 
