@@ -227,11 +227,82 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
                     </div>
                 }
 
+                @case ('flock') {
+                    <div class="wizard__step">
+                        <h2 class="step__title">Join the Flock</h2>
+                        <p class="step__desc">Register your agent on the Algorand network to discover and collaborate with other agents.</p>
+
+                        <div class="network-grid">
+                            <button class="network-card"
+                                    [attr.data-selected]="selectedNetwork() === 'localnet'"
+                                    (click)="selectedNetwork.set('localnet')">
+                                <span class="network-card__icon">[]</span>
+                                <span class="network-card__name">Localnet</span>
+                                <span class="network-card__desc">Development mode. Run a local Algorand network for testing.</span>
+                            </button>
+                            <button class="network-card"
+                                    [attr.data-selected]="selectedNetwork() === 'testnet'"
+                                    (click)="selectedNetwork.set('testnet')">
+                                <span class="network-card__icon">&lt;&gt;</span>
+                                <span class="network-card__name">Testnet</span>
+                                <span class="network-card__desc">Connect to Algorand TestNet. Interact with real agents in a sandbox.</span>
+                            </button>
+                        </div>
+
+                        @if (flockError()) {
+                            <div class="wizard__warning">
+                                <p>Registration failed, but you can continue setup.</p>
+                            </div>
+                        }
+
+                        <div class="wizard__actions">
+                            <button type="button" class="wizard__btn" (click)="step.set('create')">Back</button>
+                            <button type="button" class="wizard__btn" (click)="step.set('done')">Skip for now</button>
+                            <button class="wizard__btn wizard__btn--primary"
+                                    [disabled]="!selectedNetwork() || flockRegistering()"
+                                    (click)="registerFlock()">
+                                {{ flockRegistering() ? 'Registering...' : 'Register' }}
+                            </button>
+                        </div>
+                    </div>
+                }
+
                 @case ('done') {
                     <div class="wizard__step wizard__step--done">
                         <div class="done__icon">&check;</div>
                         <h2 class="step__title">Agent Created</h2>
                         <p class="step__desc">{{ createdAgentName() }} is ready to go.</p>
+
+                        <div class="setup-summary">
+                            <h3 class="setup-summary__title">Setup Summary</h3>
+                            <div class="setup-summary__list">
+                                <div class="setup-summary__item" data-status="ok">
+                                    <span class="setup-summary__icon">&check;</span>
+                                    <span class="setup-summary__label">Agent</span>
+                                    <span class="setup-summary__value setup-summary__value--ok">Created &mdash; {{ createdAgentName() }}</span>
+                                </div>
+                                <div class="setup-summary__item" [attr.data-status]="health()?.llm ? 'ok' : 'warn'">
+                                    <span class="setup-summary__icon">{{ health()?.llm ? '&check;' : '!' }}</span>
+                                    <span class="setup-summary__label">LLM Provider</span>
+                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="health()?.llm" [class.setup-summary__value--warn]="!health()?.llm">{{ health()?.llm ? 'Connected' : 'Not configured' }}</span>
+                                </div>
+                                <div class="setup-summary__item" [attr.data-status]="health()?.github ? 'ok' : 'optional'">
+                                    <span class="setup-summary__icon">{{ health()?.github ? '&check;' : '~' }}</span>
+                                    <span class="setup-summary__label">GitHub</span>
+                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="health()?.github" [class.setup-summary__value--optional]="!health()?.github">{{ health()?.github ? 'Connected' : 'Optional' }}</span>
+                                </div>
+                                <div class="setup-summary__item" [attr.data-status]="health()?.algorand ? 'ok' : 'optional'">
+                                    <span class="setup-summary__icon">{{ health()?.algorand ? '&check;' : '~' }}</span>
+                                    <span class="setup-summary__label">AlgoChat</span>
+                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="health()?.algorand" [class.setup-summary__value--optional]="!health()?.algorand">{{ health()?.algorand ? 'Connected' : 'Optional' }}</span>
+                                </div>
+                                <div class="setup-summary__item" [attr.data-status]="flockRegistered() ? 'ok' : 'optional'">
+                                    <span class="setup-summary__icon">{{ flockRegistered() ? '&check;' : '~' }}</span>
+                                    <span class="setup-summary__label">Flock Directory</span>
+                                    <span class="setup-summary__value" [class.setup-summary__value--ok]="flockRegistered()" [class.setup-summary__value--optional]="!flockRegistered()">{{ flockRegistered() ? 'Registered' : 'Skipped' }}</span>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="done__actions">
                             <button class="wizard__btn wizard__btn--primary" (click)="startSession()">
@@ -525,6 +596,117 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
             margin-top: 1.25rem;
         }
 
+        /* Network Grid (Flock Step) */
+        .network-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.65rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .network-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.75rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text-primary);
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .network-card:hover {
+            border-color: var(--border-bright);
+            background: var(--bg-hover);
+        }
+        .network-card[data-selected="true"] {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 229, 255, 0.06);
+            box-shadow: var(--glow-cyan);
+        }
+        .network-card__icon {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            font-family: monospace;
+        }
+        .network-card__name {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .network-card__desc {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            line-height: 1.35;
+        }
+
+        /* Setup Summary (Done Step) */
+        .setup-summary {
+            text-align: left;
+            margin-bottom: 1.25rem;
+        }
+        .setup-summary__title {
+            margin: 0 0 0.65rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .setup-summary__list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .setup-summary__item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .setup-summary__icon {
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 1px solid;
+        }
+        .setup-summary__item[data-status="ok"] .setup-summary__icon {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+        .setup-summary__item[data-status="warn"] .setup-summary__icon {
+            color: var(--accent-amber, #ffc107);
+            border-color: var(--accent-amber, #ffc107);
+        }
+        .setup-summary__item[data-status="optional"] .setup-summary__icon {
+            color: var(--text-tertiary);
+            border-color: var(--text-tertiary);
+        }
+        .setup-summary__label {
+            flex: 1;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .setup-summary__value {
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .setup-summary__value--ok { color: var(--accent-green); }
+        .setup-summary__value--warn { color: var(--accent-amber, #ffc107); }
+        .setup-summary__value--optional { color: var(--text-tertiary); }
+
         /* Footer */
         .wizard__footer {
             margin-top: 2rem;
@@ -542,6 +724,7 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
             .wizard__logo { font-size: 0.25rem; }
             .wizard__step { padding: 1rem; }
             .template-grid { grid-template-columns: 1fr; }
+            .network-grid { grid-template-columns: 1fr; }
         }
     `,
 })
@@ -555,13 +738,17 @@ export class WelcomeWizardComponent implements OnInit {
 
     readonly agentCreated = output<void>();
 
-    protected readonly step = signal<'status' | 'templates' | 'create' | 'done'>('status');
+    protected readonly step = signal<'status' | 'templates' | 'create' | 'flock' | 'done'>('status');
     protected readonly health = signal<HealthStatus | null>(null);
     protected readonly providers = signal<ProviderInfo[]>([]);
     protected readonly availableModels = signal<string[]>([]);
     protected readonly creating = signal(false);
     protected readonly createdAgentName = signal('');
     protected readonly selectedTemplate = signal<AgentTemplate | null>(null);
+    protected readonly selectedNetwork = signal<'localnet' | 'testnet' | null>(null);
+    protected readonly flockRegistering = signal(false);
+    protected readonly flockRegistered = signal(false);
+    protected readonly flockError = signal(false);
     protected readonly templates = AGENT_TEMPLATES;
     private createdAgentId = '';
 
@@ -660,7 +847,7 @@ export class WelcomeWizardComponent implements OnInit {
             }
 
             this.agentCreated.emit();
-            this.step.set('done');
+            this.step.set('flock');
         } finally {
             this.creating.set(false);
         }
@@ -685,6 +872,27 @@ export class WelcomeWizardComponent implements OnInit {
         return id.replace('preset-', '').split('-').map(
             (w) => w.charAt(0).toUpperCase() + w.slice(1),
         ).join(' ');
+    }
+
+    protected async registerFlock(): Promise<void> {
+        if (!this.selectedNetwork() || this.flockRegistering()) return;
+        this.flockRegistering.set(true);
+        this.flockError.set(false);
+
+        try {
+            await firstValueFrom(
+                this.apiService.post('/flock-directory/agents', {
+                    name: this.createdAgentName(),
+                    capabilities: ['code', 'review', 'test'],
+                }),
+            );
+            this.flockRegistered.set(true);
+            this.step.set('done');
+        } catch {
+            this.flockError.set(true);
+        } finally {
+            this.flockRegistering.set(false);
+        }
     }
 
     protected startSession(): void {

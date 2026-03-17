@@ -10,6 +10,7 @@ import { WorkTaskService } from '../../core/services/work-task.service';
 import { PersonaService } from '../../core/services/persona.service';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { ApiService } from '../../core/services/api.service';
 import { StatusBadgeComponent } from '../../shared/components/status-badge.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
@@ -20,8 +21,10 @@ import type { WorkTask } from '../../core/models/work-task.model';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { AgentPersona } from '../../core/models/persona.model';
 import type { AgentSkillAssignment } from '../../core/models/skill-bundle.model';
+import type { FlockAgent } from '@shared/types/flock-directory';
+import { firstValueFrom } from 'rxjs';
 
-type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'skills';
+type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'flock' | 'persona' | 'skills';
 
 @Component({
     selector: 'app-agent-detail',
@@ -260,6 +263,52 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
                     }
                 }
 
+                <!-- Flock Tab -->
+                @if (activeTab() === 'flock') {
+                    @if (flockAgent(); as fa) {
+                        <div class="flock-profile">
+                            <div class="flock-profile__header">
+                                <h3>Flock Profile</h3>
+                                <span class="flock-profile__score" [attr.data-level]="fa.reputationScore >= 70 ? 'high' : fa.reputationScore >= 30 ? 'mid' : 'low'">{{ fa.reputationScore }}</span>
+                            </div>
+                            <div class="flock-profile__metrics">
+                                <div class="flock-metric">
+                                    <span class="flock-metric__value">{{ fa.uptimePct | number:'1.1-1' }}%</span>
+                                    <span class="flock-metric__label">Uptime</span>
+                                    <div class="flock-metric__bar"><div class="flock-metric__fill" [style.width.%]="fa.uptimePct"></div></div>
+                                </div>
+                                <div class="flock-metric">
+                                    <span class="flock-metric__value">{{ fa.attestationCount }}</span>
+                                    <span class="flock-metric__label">Attestations</span>
+                                </div>
+                                <div class="flock-metric">
+                                    <span class="flock-metric__value">{{ fa.councilParticipations }}</span>
+                                    <span class="flock-metric__label">Councils</span>
+                                </div>
+                            </div>
+                            <div class="flock-profile__info">
+                                <dl>
+                                    <dt>Address</dt><dd><code>{{ fa.address.slice(0, 12) }}...{{ fa.address.slice(-6) }}</code></dd>
+                                    <dt>Status</dt><dd>{{ fa.status }}</dd>
+                                    <dt>Capabilities</dt><dd>{{ fa.capabilities.join(', ') || 'None' }}</dd>
+                                    <dt>Registered</dt><dd>{{ fa.registeredAt | relativeTime }}</dd>
+                                    @if (fa.lastHeartbeat) {
+                                        <dt>Last Heartbeat</dt><dd>{{ fa.lastHeartbeat | relativeTime }}</dd>
+                                    }
+                                </dl>
+                            </div>
+                        </div>
+                    } @else {
+                        <div class="flock-register">
+                            <p class="flock-register__text">This agent is not registered in the Flock Directory.</p>
+                            <p class="flock-register__hint">Register to enable discovery, reputation tracking, and cross-agent collaboration.</p>
+                            <button class="btn btn--primary" [disabled]="registeringFlock()" (click)="registerInFlock()">
+                                {{ registeringFlock() ? 'Registering...' : 'Register in Flock' }}
+                            </button>
+                        </div>
+                    }
+                }
+
                 <!-- Persona Tab -->
                 @if (activeTab() === 'persona') {
                     @if (persona(); as p) {
@@ -437,6 +486,33 @@ type Tab = 'overview' | 'sessions' | 'messages' | 'work-tasks' | 'persona' | 'sk
         .skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .skill-tag { font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-sm); background: var(--accent-cyan-dim); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
 
+        /* Flock Profile */
+        .flock-profile { display: flex; flex-direction: column; gap: 1.25rem; }
+        .flock-profile__header { display: flex; justify-content: space-between; align-items: center; }
+        .flock-profile__header h3 { margin: 0; color: var(--text-primary); }
+        .flock-profile__score {
+            font-size: 1.5rem; font-weight: 700; font-family: var(--font-mono, monospace);
+            padding: 2px 10px; border-radius: var(--radius-sm); border: 1px solid;
+        }
+        .flock-profile__score[data-level="high"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .flock-profile__score[data-level="mid"] { color: var(--accent-amber, #ffc107); border-color: var(--accent-amber, #ffc107); }
+        .flock-profile__score[data-level="low"] { color: var(--accent-red); border-color: var(--accent-red); }
+        .flock-profile__metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
+        .flock-metric {
+            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+            padding: 0.75rem; display: flex; flex-direction: column; gap: 0.2rem;
+        }
+        .flock-metric__value { font-size: 1.3rem; font-weight: 700; color: var(--accent-cyan); }
+        .flock-metric__label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
+        .flock-metric__bar { height: 4px; background: var(--bg-raised); border-radius: 2px; overflow: hidden; margin-top: 0.25rem; }
+        .flock-metric__fill { height: 100%; background: linear-gradient(90deg, var(--accent-cyan-dim), var(--accent-cyan)); border-radius: 2px; min-width: 1px; transition: width 0.3s; }
+        .flock-profile__info dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
+        .flock-profile__info dt { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .flock-profile__info dd { margin: 0; color: var(--text-primary); }
+        .flock-register { text-align: center; padding: 2rem 1rem; }
+        .flock-register__text { color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; margin: 0 0 0.35rem; }
+        .flock-register__hint { color: var(--text-tertiary); font-size: 0.75rem; margin: 0 0 1rem; line-height: 1.5; }
+
         code { background: var(--bg-raised); color: var(--accent-magenta); padding: 2px 6px; border-radius: var(--radius-sm); font-size: 0.8rem; border: 1px solid var(--border); }
 
         @media (max-width: 768px) {
@@ -459,6 +535,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     private readonly personaService = inject(PersonaService);
     private readonly skillBundleService = inject(SkillBundleService);
     private readonly notify = inject(NotificationService);
+    private readonly apiService = inject(ApiService);
 
     protected readonly agent = signal<Agent | null>(null);
     protected readonly persona = signal<AgentPersona | null>(null);
@@ -470,6 +547,8 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     protected readonly invoking = signal(false);
     protected readonly workTasks = signal<WorkTask[]>([]);
     protected readonly creatingWork = signal(false);
+    protected readonly flockAgent = signal<FlockAgent | null>(null);
+    protected readonly registeringFlock = signal(false);
     protected readonly activeTab = signal<Tab>('overview');
 
     protected invokeTargetId = '';
@@ -521,6 +600,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
             { key: 'sessions', label: 'Sessions', count: this.agentSessions().length },
             { key: 'messages', label: 'Messages', count: this.messages().length },
             { key: 'work-tasks', label: 'Work Tasks', count: this.workTasks().length },
+            { key: 'flock', label: 'Flock' },
             { key: 'persona', label: 'Persona' },
             { key: 'skills', label: 'Skills', count: this.agentBundles().length },
         ];
@@ -548,6 +628,7 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
                 .catch(() => {});
         }
 
+        this.loadFlockProfile(agent.name);
         this.personaService.loadPersona(id).then((p) => this.persona.set(p)).catch(() => this.persona.set(null));
         this.skillBundleService.getAgentBundles(id).then((ab) => this.agentBundles.set(ab)).catch(() => this.agentBundles.set([]));
         this.skillBundleService.loadBundles().catch(() => {});
@@ -589,6 +670,40 @@ export class AgentDetailComponent implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         this.unsubscribeWs?.();
         this.workTaskService.stopListening();
+    }
+
+    private async loadFlockProfile(agentName: string): Promise<void> {
+        try {
+            const result = await firstValueFrom(
+                this.apiService.get<{ agents: FlockAgent[] }>(`/flock-directory/search?name=${encodeURIComponent(agentName)}&limit=1`),
+            );
+            const match = result.agents.find((fa) => fa.name.toLowerCase() === agentName.toLowerCase());
+            this.flockAgent.set(match ?? null);
+        } catch {
+            this.flockAgent.set(null);
+        }
+    }
+
+    async registerInFlock(): Promise<void> {
+        const a = this.agent();
+        if (!a) return;
+        this.registeringFlock.set(true);
+        try {
+            const fa = await firstValueFrom(
+                this.apiService.post<FlockAgent>('/flock-directory/agents', {
+                    name: a.name,
+                    description: a.description,
+                    address: a.walletAddress ?? '',
+                    capabilities: [],
+                }),
+            );
+            this.flockAgent.set(fa);
+            this.notify.info('Agent registered in Flock Directory');
+        } catch {
+            this.notify.error('Failed to register in Flock Directory');
+        } finally {
+            this.registeringFlock.set(false);
+        }
     }
 
     async onDelete(): Promise<void> {
