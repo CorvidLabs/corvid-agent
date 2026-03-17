@@ -16,3 +16,10 @@ export {
     revokeRoleTemplate,
 } from './role-templates';
 export type { RoleTemplate } from './role-templates';
+export {
+    PermissionTier,
+    PERMISSION_TIER_NAMES,
+    GOVERNANCE_ROUTE_TIERS,
+    resolveCallerTier,
+    requirePermissionTier,
+} from './governance-tier';
