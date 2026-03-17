@@ -137,6 +137,10 @@ function formatLine(level: LogLevel, module: string, msg: string, ctx?: Record<s
     return `${ts} ${LEVEL_LABELS[level]} [${module}]${tracePrefix} ${safeMsg}${formatContext(ctx)}`;
 }
 
+/**
+ * Structured logger interface with level-based methods and child logger support.
+ * All log methods automatically sanitize messages to redact sensitive material.
+ */
 export interface Logger {
     debug(msg: string, ctx?: Record<string, unknown>): void;
     info(msg: string, ctx?: Record<string, unknown>): void;
@@ -145,6 +149,14 @@ export interface Logger {
     child(module: string): Logger;
 }
 
+/**
+ * Create a structured logger scoped to the given module name.
+ * Respects the LOG_LEVEL env var and outputs in JSON or text format
+ * based on LOG_FORMAT / NODE_ENV.
+ *
+ * @param module - The module name used as a prefix in log output (e.g. 'Crypto', 'Server').
+ * @returns A {@link Logger} instance with debug, info, warn, error, and child methods.
+ */
 export function createLogger(module: string): Logger {
     const minLevel = getMinLevel();
 
