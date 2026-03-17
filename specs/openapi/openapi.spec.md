@@ -63,7 +63,30 @@ Generates and serves an OpenAPI 3.0.3 specification document from a declarative 
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `routes` | `RouteEntry[]` | The complete declarative route metadata registry containing all API route definitions with their methods, paths, tags, summaries, request schemas, auth requirements, and response descriptions. |
+| `routes` | `RouteEntry[]` | The complete declarative route metadata registry containing all API route definitions, assembled from the domain-specific route arrays below. |
+| `agentRoutes` | `RouteEntry[]` | Route metadata for agent CRUD and lifecycle endpoints. |
+| `algochatRoutes` | `RouteEntry[]` | Route metadata for AlgoChat messaging and bridge endpoints. |
+| `allowlistRoutes` | `RouteEntry[]` | Route metadata for tenant allowlist management endpoints. |
+| `analyticsRoutes` | `RouteEntry[]` | Route metadata for analytics and metrics endpoints. |
+| `authRoutes` | `RouteEntry[]` | Route metadata for authentication and token endpoints. |
+| `billingRoutes` | `RouteEntry[]` | Route metadata for billing and subscription endpoints. |
+| `councilRoutes` | `RouteEntry[]` | Route metadata for governance council endpoints. |
+| `escalationRoutes` | `RouteEntry[]` | Route metadata for escalation workflow endpoints. |
+| `integrationRoutes` | `RouteEntry[]` | Route metadata for third-party integration endpoints. |
+| `marketplaceRoutes` | `RouteEntry[]` | Route metadata for marketplace listing endpoints. |
+| `mcpRoutes` | `RouteEntry[]` | Route metadata for MCP tool endpoints. |
+| `mentionPollingRoutes` | `RouteEntry[]` | Route metadata for mention polling endpoints. |
+| `pluginRoutes` | `RouteEntry[]` | Route metadata for plugin management endpoints. |
+| `projectRoutes` | `RouteEntry[]` | Route metadata for project CRUD endpoints. |
+| `providerRoutes` | `RouteEntry[]` | Route metadata for AI provider endpoints. |
+| `reputationRoutes` | `RouteEntry[]` | Route metadata for reputation scoring endpoints. |
+| `sandboxRoutes` | `RouteEntry[]` | Route metadata for sandbox execution endpoints. |
+| `scheduleRoutes` | `RouteEntry[]` | Route metadata for scheduled task endpoints. |
+| `sessionRoutes` | `RouteEntry[]` | Route metadata for session management endpoints. |
+| `systemRoutes` | `RouteEntry[]` | Route metadata for system health and info endpoints. |
+| `webhookRoutes` | `RouteEntry[]` | Route metadata for webhook configuration endpoints. |
+| `workTaskRoutes` | `RouteEntry[]` | Route metadata for work task pipeline endpoints. |
+| `workflowRoutes` | `RouteEntry[]` | Route metadata for workflow orchestration endpoints. |
 
 ## Invariants
 
