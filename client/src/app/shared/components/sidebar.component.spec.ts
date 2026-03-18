@@ -64,7 +64,7 @@ describe('SidebarComponent', () => {
 
     it('should render all nav items in DOM', () => {
         const links = hostEl.querySelectorAll('.sidebar__link');
-        expect(links.length).toBe(26);
+        expect(links.length).toBe(27);
     });
 
     it('should toggle collapsed state on toggleCollapse', () => {

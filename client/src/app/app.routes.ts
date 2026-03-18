@@ -192,4 +192,9 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./features/spending/spending.component').then((m) => m.SpendingComponent),
     },
+    {
+        path: 'brain-viewer',
+        loadComponent: () =>
+            import('./features/brain-viewer/brain-viewer.component').then((m) => m.BrainViewerComponent),
+    },
 ];

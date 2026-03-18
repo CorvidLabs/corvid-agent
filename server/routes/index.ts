@@ -11,6 +11,7 @@ import { handleGitHubAllowlistRoutes } from './github-allowlist';
 import { handleRepoBlocklistRoutes } from './repo-blocklist';
 import { handleAnalyticsRoutes } from './analytics';
 import { handleDashboardRoutes } from './dashboard';
+import { handleBrainViewerRoutes } from './brain-viewer';
 import { handleSystemLogRoutes } from './system-logs';
 import { handleSettingsRoutes } from './settings';
 import { handleScheduleRoutes } from './schedules';
@@ -337,6 +338,9 @@ async function handleRoutes(
 
     const dashboardResponse = handleDashboardRoutes(req, url, db, context);
     if (dashboardResponse) return dashboardResponse;
+
+    const brainViewerResponse = handleBrainViewerRoutes(req, url, db, context);
+    if (brainViewerResponse) return brainViewerResponse;
 
     const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
     if (analyticsResponse) return analyticsResponse;
