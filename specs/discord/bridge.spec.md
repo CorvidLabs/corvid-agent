@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 14
+version: 15
 status: active
 files:
   - server/discord/bridge.ts
@@ -242,7 +242,8 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `isImageAttachment` | `(attachment: DiscordAttachment)` | `boolean` | Check whether an attachment is a supported image (PNG, JPEG, GIF, WebP) by content_type or file extension |
 | `extractImageBlocks` | `(attachments: DiscordAttachment[] \| undefined)` | `ExtractedImages` | Extract image attachments and convert to Claude API content blocks. Enforces 20 MB size limit and 5-image-per-message cap |
-| `buildMultimodalContent` | `(text: string, attachments: DiscordAttachment[] \| undefined)` | `string \| ContentBlockParam[]` | Build multimodal content from text and image attachments. Returns plain string when no images (backward compatible), or content block array when images are present |
+| `appendAttachmentUrls` | `(text: string, attachments: DiscordAttachment[] \| undefined)` | `string` | Append `[attachment: <url>]` lines for each attachment to the text. Uses `proxy_url` with `url` fallback. Returns text unchanged when no attachments. Ensures the agent always sees attachment links even if multimodal content blocks are not supported |
+| `buildMultimodalContent` | `(text: string, attachments: DiscordAttachment[] \| undefined)` | `string \| ContentBlockParam[]` | Build multimodal content from text and image attachments. Always includes attachment URLs in the text portion as a fallback. Returns plain string when no images (backward compatible), or content block array when images are present |
 
 ### Exported Types (from image-attachments.ts)
 

@@ -16,3 +16,5 @@ export * from './a2a';
 export * from './reputation';
 export * from './marketplace';
 export * from './flock-directory';
+export * from './agent-config';
+export * from './plugins';
