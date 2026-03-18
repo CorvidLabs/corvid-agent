@@ -64,8 +64,10 @@ function trackMentionSession(db: Database, map: Map<string, MentionSessionInfo>,
 }
 
 /** Prefix a message with Discord author context so the agent knows who is speaking. */
-function withAuthorContext(text: string, authorUsername?: string): string {
-    if (!authorUsername) return text;
+function withAuthorContext(text: string, authorId?: string, authorUsername?: string): string {
+    if (!authorId && !authorUsername) return text;
+    if (authorId && authorUsername) return `[From Discord user: ${authorUsername} (Discord ID: ${authorId})]\n${text}`;
+    if (authorId) return `[From Discord user ID: ${authorId}]\n${text}`;
     return `[From Discord user: ${authorUsername}]\n${text}`;
 }
 
@@ -218,7 +220,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (isOurThread) {
         sendFirstInteractionTip(ctx, userId, channelId);
         sendTypingIndicator(ctx.config.botToken, channelId).catch((err) => log.debug('Typing indicator failed', { error: err instanceof Error ? err.message : String(err) }));
-        await routeToThread(ctx, channelId, userId, text, data.author.username, data.attachments);
+        await routeToThread(ctx, channelId, userId, text, data.author.id, data.author.username, data.attachments);
         return;
     }
 
@@ -239,7 +241,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
             }
         }
         if (existingSession) {
-            await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions, data.author.username, data.attachments);
+            await handleMentionReplyResume(ctx, channelId, userId, data.id, text, existingSession, data.mentions, data.author.id, data.author.username, data.attachments);
             return;
         }
         // If we can't find the session in memory or DB, fall through to create new
@@ -249,7 +251,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
     if (mode === 'work_intake') {
         await handleWorkIntake(ctx, channelId, data.id, userId, text, data.mentions);
     } else {
-        await handleMentionReply(ctx, channelId, userId, data.id, text, data.mentions, data.author.username, data.attachments);
+        await handleMentionReply(ctx, channelId, userId, data.id, text, data.mentions, data.author.id, data.author.username, data.attachments);
     }
 }
 
@@ -387,7 +389,7 @@ export async function sendTaskResult(
     }
 }
 
-async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string, mentions?: Array<{ id: string; username: string }>, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
+async function handleMentionReply(ctx: MessageHandlerContext, channelId: string, _userId: string, messageId: string, text: string, mentions?: Array<{ id: string; username: string }>, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
     const agent = resolveDefaultAgent(ctx.db, ctx.config);
     if (!agent) {
         await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, 'No agents configured. Create an agent first.');
@@ -435,7 +437,7 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
     });
 
     // Start the process with the text prompt
-    ctx.processManager.startProcess(session, withAuthorContext(cleanText, authorUsername));
+    ctx.processManager.startProcess(session, withAuthorContext(cleanText, authorId, authorUsername));
 
     // If there are image attachments, send them as a follow-up multimodal message.
     // The SDK query is already created by startProcess, so streamInput is ready.
@@ -465,6 +467,7 @@ async function handleMentionReplyResume(
     text: string,
     sessionInfo: MentionSessionInfo,
     mentions?: Array<{ id: string; username: string }>,
+    authorId?: string,
     authorUsername?: string,
     attachments?: DiscordAttachment[],
 ): Promise<void> {
@@ -476,16 +479,16 @@ async function handleMentionReplyResume(
 
     if (!session) {
         log.info('Mention-reply session not found, creating new session', { sessionId });
-        await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorUsername, attachments);
+        await handleMentionReply(ctx, channelId, _userId, messageId, text, mentions, authorId, authorUsername, attachments);
         return;
     }
 
     // Build multimodal content if images are attached
-    const contextualContent = buildMultimodalContent(withAuthorContext(cleanText, authorUsername), attachments);
+    const contextualContent = buildMultimodalContent(withAuthorContext(cleanText, authorId, authorUsername), attachments);
     const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
     if (!sent) {
         // resumeProcess accepts string only — use text for resume prompt
-        const resumeText = typeof contextualContent === 'string' ? contextualContent : withAuthorContext(cleanText, authorUsername);
+        const resumeText = typeof contextualContent === 'string' ? contextualContent : withAuthorContext(cleanText, authorId, authorUsername);
         ctx.processManager.resumeProcess(session, resumeText);
     }
 
@@ -499,7 +502,7 @@ async function handleMentionReplyResume(
     );
 }
 
-async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
+async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
     ctx.threadLastActivity.set(threadId, Date.now());
 
     let threadInfo = ctx.threadSessions.get(threadId);
@@ -526,10 +529,10 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     }
 
     // Build multimodal content if images are attached
-    const contextualContent = buildMultimodalContent(withAuthorContext(text, authorUsername), attachments);
+    const contextualContent = buildMultimodalContent(withAuthorContext(text, authorId, authorUsername), attachments);
     const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
     if (!sent) {
-        const resumeText = typeof contextualContent === 'string' ? contextualContent : withAuthorContext(text, authorUsername);
+        const resumeText = typeof contextualContent === 'string' ? contextualContent : withAuthorContext(text, authorId, authorUsername);
         ctx.processManager.resumeProcess(session, resumeText);
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
