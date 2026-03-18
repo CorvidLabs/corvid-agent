@@ -80,8 +80,19 @@ export function getEncryptionPassphrase(network?: string, serverMnemonic?: strin
         return trimmed;
     }
 
-    // On non-localnet, require an explicit encryption key
+    // On non-localnet, try serverMnemonic fallback before throwing
     if (network && network !== 'localnet') {
+        if (serverMnemonic && serverMnemonic.trim().length > 0) {
+            if (network === 'mainnet') {
+                throw new Error(
+                    `WALLET_ENCRYPTION_KEY must be set for mainnet. ` +
+                    'This key encrypts wallet mnemonics at rest. Generate one with: openssl rand -hex 32',
+                );
+            }
+            // Testnet: allow serverMnemonic as fallback with a warning
+            log.warn('Using server mnemonic as encryption key on testnet — set WALLET_ENCRYPTION_KEY for production');
+            return serverMnemonic.trim();
+        }
         throw new Error(
             `WALLET_ENCRYPTION_KEY must be set for ${network}. ` +
             'This key encrypts wallet mnemonics at rest. Generate one with: openssl rand -hex 32',

@@ -45,7 +45,7 @@ import {
     type McpToolContext,
 } from '../mcp/tool-handlers';
 import { grantCredits } from '../db/credits';
-import { saveMemory } from '../db/agent-memories';
+import { saveMemory, updateMemoryTxid } from '../db/agent-memories';
 const OWNER_WALLET = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
 
 /** Set the agent's wallet address in the DB. */
@@ -73,6 +73,7 @@ function createMockContext(overrides?: Partial<McpToolContext>): McpToolContext 
             invokeAndWait: mock(() => Promise.resolve({ response: 'mock response', threadId: 'thread-1' })),
             sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
             sendNotificationToAddress: mock(() => Promise.resolve()),
+            readOnChainMemories: mock(() => Promise.resolve([])),
         } as unknown as McpToolContext['agentMessenger'],
         agentDirectory: {
             listAvailable: mock(() => Promise.resolve([
@@ -871,6 +872,69 @@ describe('handleRecallMemory', () => {
         const ctx = createMockContext();
         const result = await handleRecallMemory(ctx, {});
         expect((result.content[0] as { text: string }).text).toContain('No memories');
+    });
+
+    test('recall by key shows full txid when confirmed', async () => {
+        const mem = saveMemory(db, { agentId, key: 'full-txid-key', content: 'txid-content' });
+        updateMemoryTxid(db, mem.id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
+        const ctx = createMockContext();
+        const result = await handleRecallMemory(ctx, { key: 'full-txid-key' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234');
+    });
+
+    test('recall nonexistent key falls back to on-chain', async () => {
+        const ctx = createMockContext({
+            agentMessenger: {
+                invokeAndWait: mock(() => Promise.resolve({ response: 'mock', threadId: 't' })),
+                sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
+                sendNotificationToAddress: mock(() => Promise.resolve()),
+                readOnChainMemories: mock(() => Promise.resolve([{
+                    key: 'on-chain-only',
+                    content: 'found on chain',
+                    txid: 'ONCHAINTXID123',
+                    timestamp: '2026-03-18T00:00:00Z',
+                    confirmedRound: 100,
+                }])),
+            } as unknown as McpToolContext['agentMessenger'],
+        });
+        const result = await handleRecallMemory(ctx, { key: 'on-chain-only' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('found on chain');
+        expect(text).toContain('ONCHAINTXID123');
+        expect(text).toContain('on-chain but missing from local cache');
+    });
+
+    test('recall query falls back to on-chain when no local results', async () => {
+        const ctx = createMockContext({
+            agentMessenger: {
+                invokeAndWait: mock(() => Promise.resolve({ response: 'mock', threadId: 't' })),
+                sendOnChainToSelf: mock(() => Promise.resolve('mock-txid')),
+                sendNotificationToAddress: mock(() => Promise.resolve()),
+                readOnChainMemories: mock(() => Promise.resolve([{
+                    key: 'chain-search-result',
+                    content: 'blockchain data',
+                    txid: 'SEARCHTXID456',
+                    timestamp: '2026-03-18T01:00:00Z',
+                    confirmedRound: 200,
+                }])),
+            } as unknown as McpToolContext['agentMessenger'],
+        });
+        const result = await handleRecallMemory(ctx, { query: 'blockchain' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('No local results');
+        expect(text).toContain('on-chain');
+        expect(text).toContain('blockchain data');
+        expect(text).toContain('SEARCHTXID456');
+    });
+
+    test('search results include txid when confirmed', async () => {
+        const mem = saveMemory(db, { agentId, key: 'search-txid', content: 'searchable content' });
+        updateMemoryTxid(db, mem.id, 'FULLTXIDINSEARCH');
+        const ctx = createMockContext();
+        const result = await handleRecallMemory(ctx, { query: 'searchable' });
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain('FULLTXIDINSEARCH');
     });
 });
 
