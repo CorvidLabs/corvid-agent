@@ -80,9 +80,10 @@ export async function handleSessionCommand(
         return;
     }
 
-    // Create a standalone thread (not attached to a message)
+    // Create a standalone thread in the channel where the command was invoked
     const threadName = `${agent.name} — ${topic}`;
-    const threadId = await ctx.createStandaloneThread(ctx.config.channelId, threadName);
+    const targetChannelId = interaction.channel_id || ctx.config.channelId;
+    const threadId = await ctx.createStandaloneThread(targetChannelId, threadName);
     if (!threadId) {
         await respondToInteraction(interaction, 'Failed to create conversation thread.');
         return;
