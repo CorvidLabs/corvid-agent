@@ -25,7 +25,6 @@ import { deductTurnCredits, getCreditConfig } from '../db/credits';
 import { removeWorktree } from '../lib/worktree';
 import { resolveProjectDir, cleanupEphemeralDir, type ResolvedDir } from '../lib/project-dir';
 import { createLogger } from '../lib/logger';
-import { isCheerleadingResponse, CHEERLEADING_WARNING_THRESHOLD } from '../lib/session-analysis';
 import { SessionEventBus } from './event-bus';
 import { SessionTimerManager } from './session-timer-manager';
 import { SessionResilienceManager, MAX_RESTARTS } from './session-resilience-manager';
@@ -57,10 +56,6 @@ interface SessionMeta {
     lastActivityAt: number;
     /** Context summary from previous session lifetime, used on context reset. */
     contextSummary?: string;
-    /** Events accumulated for the current response turn (reset after each result). */
-    currentTurnEvents: ClaudeStreamEvent[];
-    /** Number of consecutive cheerleading turns detected in this session. */
-    consecutiveCheerleadingCount: number;
 }
 
 export class ProcessManager {
@@ -419,8 +414,6 @@ export class ProcessManager {
             lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
             turnCount: 0,
             lastActivityAt: now,
-            currentTurnEvents: [],
-            consecutiveCheerleadingCount: this.sessionMeta.get(session.id)?.consecutiveCheerleadingCount ?? 0,
         });
         updateSessionPid(this.db, session.id, process.pid);
         updateSessionStatus(this.db, session.id, 'running');
@@ -609,8 +602,6 @@ export class ProcessManager {
             lastKnownCostUsd: this.sessionMeta.get(session.id)?.lastKnownCostUsd ?? 0,
             turnCount: 0,
             lastActivityAt: now,
-            currentTurnEvents: [],
-            consecutiveCheerleadingCount: this.sessionMeta.get(session.id)?.consecutiveCheerleadingCount ?? 0,
         });
         const proc = this.processes.get(session.id);
         if (proc) {
@@ -812,14 +803,6 @@ export class ProcessManager {
         return this.resilienceManager.isPaused(sessionId);
     }
 
-    /**
-     * Returns the number of consecutive cheerleading turns detected for the
-     * given session (0 if none or session not found).
-     */
-    getConsecutiveCheerleadingCount(sessionId: string): number {
-        return this.sessionMeta.get(sessionId)?.consecutiveCheerleadingCount ?? 0;
-    }
-
     getPausedSessionIds(): string[] {
         return this.resilienceManager.getPausedSessionIds();
     }
@@ -829,8 +812,6 @@ export class ProcessManager {
         if (meta) {
             meta.lastActivityAt = Date.now();
             this.timerManager.startSessionTimeout(sessionId);
-            // Accumulate events for the current turn (used by cheerleading detection)
-            meta.currentTurnEvents.push(event);
         }
 
         // Broadcast granular activity status so the dashboard reflects what the agent is doing
@@ -934,28 +915,6 @@ export class ProcessManager {
                     error: err instanceof Error ? err.message : String(err),
                 });
             }
-        }
-
-        // Cheerleading detection: analyse each completed response turn
-        if (event.type === 'result' && meta) {
-            const turnEvents = meta.currentTurnEvents;
-            if (isCheerleadingResponse(turnEvents)) {
-                meta.consecutiveCheerleadingCount++;
-                log.warn(`Cheerleading response detected`, {
-                    sessionId,
-                    consecutiveCount: meta.consecutiveCheerleadingCount,
-                });
-                if (meta.consecutiveCheerleadingCount >= CHEERLEADING_WARNING_THRESHOLD) {
-                    this.eventBus.emit(sessionId, {
-                        type: 'system',
-                        statusMessage: `__quality:cheerleading:${meta.consecutiveCheerleadingCount}`,
-                    } as ClaudeStreamEvent);
-                }
-            } else {
-                meta.consecutiveCheerleadingCount = 0;
-            }
-            // Reset accumulator for next turn
-            meta.currentTurnEvents = [];
         }
 
         this.eventBus.emit(sessionId, event);
