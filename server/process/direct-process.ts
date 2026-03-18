@@ -6,7 +6,7 @@
  */
 
 import type { Session, Agent, Project, McpServerConfig } from '../../shared/types';
-import type { ClaudeStreamEvent, DirectProcessMetrics } from './types';
+import type { ClaudeStreamEvent, DirectProcessMetrics, EscalationInfo } from './types';
 import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequest, ApprovalRequestWire } from './approval-types';
 import { formatToolDescription } from './approval-types';
@@ -18,6 +18,7 @@ import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-too
 import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getMessagingSafetyPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { ExternalMcpClientManager } from '../mcp/external-client';
 import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
+import { escalateTier, inferModelTier } from '../work/chain-continuation';
 import { AgentSessionLimiter } from '../lib/agent-session-limits';
 import { sanitizeAgentInput } from '../lib/agent-input-sanitizer';
 import { createLogger } from '../lib/logger';
@@ -534,7 +535,9 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         onExit(1, errorMsg);
     });
 
+    let lastUserMessage = '';
     async function runLoop(userMessage: string): Promise<void> {
+        lastUserMessage = userMessage;
         processing = true;
         messages.push({ role: 'user', content: userMessage });
 
@@ -616,6 +619,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let stallType: string | null = null;
         const qualityTracker = new ResponseQualityTracker();
         const MAX_QUALITY_NUDGES = tierConfig.tier === 'high' ? 1 : 2;
+        const toolCallLog: string[] = []; // Brief log of tool calls for escalation
         const loopStartTime = Date.now();
 
         // ── Context usage tracking ──────────────────────────────────
@@ -859,10 +863,17 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                             toolCallId: toolCall.id,
                         });
                         emitToolStatus(toolCall.name, toolResult.isError ? `Error: ${toolResult.text.slice(0, 200)}` : `Done`, false);
+                        // Track for escalation metadata
+                        if (toolCallLog.length < 20) {
+                            toolCallLog.push(`${toolCall.name}: ${toolResult.isError ? 'error' : 'ok'}`);
+                        }
                     } catch (err) {
                         const errorText = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
                         messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
                         emitToolStatus(toolCall.name, errorText, true);
+                        if (toolCallLog.length < 20) {
+                            toolCallLog.push(`${toolCall.name}: exception`);
+                        }
                     }
                 }
 
@@ -1068,6 +1079,14 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 needsSummary,
                 qualityMetrics: qualityTracker.getMetrics(),
             });
+            const errorEscalation = buildEscalationInfo({
+                terminationReason,
+                model,
+                tier: tierConfig.tier,
+                originalPrompt: lastUserMessage,
+                toolCallLog,
+                qualityMetrics: qualityTracker.getMetrics(),
+            });
             onEvent({
                 type: 'result',
                 subtype: 'error',
@@ -1076,6 +1095,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 num_turns: iteration,
                 session_id: session.id,
                 metrics: sessionMetrics,
+                ...(errorEscalation && { escalation: errorEscalation }),
             } as ClaudeStreamEvent);
             throw err;
         } finally {
@@ -1133,6 +1153,16 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             qualityMetrics: qualityTracker.getMetrics(),
         });
 
+        // Build escalation metadata for abnormal terminations
+        const escalation = buildEscalationInfo({
+            terminationReason,
+            model,
+            tier: tierConfig.tier,
+            originalPrompt: lastUserMessage,
+            toolCallLog,
+            qualityMetrics: qualityTracker.getMetrics(),
+        });
+
         // Emit result event with metrics
         onEvent({
             type: 'result',
@@ -1142,6 +1172,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             num_turns: iteration,
             session_id: session.id,
             metrics: sessionMetrics,
+            ...(escalation && { escalation }),
         } as ClaudeStreamEvent);
 
         processing = false;
@@ -1422,6 +1453,66 @@ export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMe
         totalVacuousToolCalls: state.qualityMetrics?.totalVacuousToolCalls ?? 0,
         qualityNudgeCount: state.qualityMetrics?.qualityNudgeCount ?? 0,
     };
+}
+
+// ── Escalation metadata ───────────────────────────────────────────────
+
+export interface BuildEscalationInput {
+    terminationReason: DirectProcessMetrics['terminationReason'];
+    model: string;
+    tier: string;
+    originalPrompt: string;
+    toolCallLog: string[];
+    qualityMetrics?: ResponseQualityMetrics;
+}
+
+/**
+ * Build escalation metadata for sessions that terminated abnormally.
+ * Returns null if the session ended normally or was aborted.
+ */
+export function buildEscalationInfo(input: BuildEscalationInput): EscalationInfo | null {
+    const escalationReasons = new Set<EscalationInfo['reason']>([
+        'stall_repeat', 'stall_same_tool', 'max_iterations',
+    ]);
+
+    // Check for low-quality termination (session ended but with many low-quality responses)
+    const isLowQuality = input.qualityMetrics
+        && input.qualityMetrics.totalLowQualityResponses >= 3
+        && input.terminationReason === 'normal';
+
+    const reason: EscalationInfo['reason'] | null = isLowQuality
+        ? 'low_quality'
+        : escalationReasons.has(input.terminationReason as EscalationInfo['reason'])
+            ? input.terminationReason as EscalationInfo['reason']
+            : null;
+
+    if (!reason) return null;
+
+    const currentTier = inferModelTier(input.model);
+    const nextTier = escalateTier(currentTier);
+
+    return {
+        canEscalate: nextTier !== null,
+        reason,
+        originalPrompt: input.originalPrompt.slice(0, 2000),
+        completedSteps: input.toolCallLog.slice(0, 20),
+        remainingWork: buildRemainingWorkDescription(reason),
+        currentTier: input.tier,
+        suggestedTier: nextTier,
+    };
+}
+
+function buildRemainingWorkDescription(reason: EscalationInfo['reason']): string {
+    switch (reason) {
+        case 'stall_repeat':
+            return 'Model entered a repeat loop — same tool call made multiple times without progress.';
+        case 'stall_same_tool':
+            return 'Model called the same tool repeatedly with varying arguments without making progress.';
+        case 'max_iterations':
+            return 'Model reached the maximum iteration limit before completing the task.';
+        case 'low_quality':
+            return 'Model produced multiple low-quality responses without substantive output.';
+    }
 }
 
 export interface ToolDef {

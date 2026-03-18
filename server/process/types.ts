@@ -84,6 +84,24 @@ export interface DirectProcessMetrics {
     qualityNudgeCount: number;
 }
 
+/** Escalation metadata — present when a session terminated abnormally and can be retried at a higher tier. */
+export interface EscalationInfo {
+    /** Whether this session is eligible for escalation. */
+    canEscalate: boolean;
+    /** Why escalation was suggested. */
+    reason: 'stall_repeat' | 'stall_same_tool' | 'max_iterations' | 'low_quality';
+    /** The original prompt that started this session. */
+    originalPrompt: string;
+    /** Summary of tools called and their results (redacted of secrets). */
+    completedSteps: string[];
+    /** Description of what work remains undone. */
+    remainingWork: string;
+    /** Current model tier. */
+    currentTier: string;
+    /** Suggested next tier for retry. */
+    suggestedTier: string | null;
+}
+
 /** Session completed successfully */
 export interface ResultEvent extends BaseStreamEvent {
     type: 'result';
@@ -91,6 +109,8 @@ export interface ResultEvent extends BaseStreamEvent {
     total_cost_usd: number;
     /** Structured session metrics from direct-process (when available). */
     metrics?: DirectProcessMetrics;
+    /** Escalation metadata when session terminated abnormally. */
+    escalation?: EscalationInfo;
 }
 
 /** Error occurred */
