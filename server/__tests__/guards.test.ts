@@ -80,14 +80,36 @@ describe('authGuard', () => {
         expect(context.role).toBe('admin');
     });
 
-    it('extracts wallet address from query param', () => {
+    it('extracts valid Algorand wallet address from query param', () => {
+        const validAddr = 'A'.repeat(58); // valid format: 58 uppercase A-Z2-7 chars
         const guard = authGuard(AUTH_DISABLED);
-        const req = makeRequest('/api/sessions?wallet=ABCD1234');
-        const url = makeUrl('/api/sessions', { wallet: 'ABCD1234' });
+        const req = makeRequest(`/api/sessions?wallet=${validAddr}`);
+        const url = makeUrl('/api/sessions', { wallet: validAddr });
         const context = createRequestContext();
 
         guard(req, url, context);
-        expect(context.walletAddress).toBe('ABCD1234');
+        expect(context.walletAddress).toBe(validAddr);
+    });
+
+    it('ignores wallet query param with invalid format', () => {
+        const guard = authGuard(AUTH_DISABLED);
+        const req = makeRequest('/api/sessions?wallet=INVALID');
+        const url = makeUrl('/api/sessions', { wallet: 'INVALID' });
+        const context = createRequestContext();
+
+        guard(req, url, context);
+        expect(context.walletAddress).toBeUndefined();
+    });
+
+    it('ignores wallet query param with injection attempt', () => {
+        const guard = authGuard(AUTH_DISABLED);
+        const malicious = "'; DROP TABLE sessions; --";
+        const req = makeRequest(`/api/sessions?wallet=${encodeURIComponent(malicious)}`);
+        const url = makeUrl('/api/sessions', { wallet: malicious });
+        const context = createRequestContext();
+
+        guard(req, url, context);
+        expect(context.walletAddress).toBeUndefined();
     });
 });
 
