@@ -4,6 +4,21 @@ import { textResult, errorResult } from './types';
 import * as github from '../../github/operations';
 import { assertRepoAllowed } from '../../github/off-limits';
 import { isRepoAllowedForScheduler, checkSchedulerRateLimit, SCHEDULER_ESCALATION_LABEL } from '../scheduler-tool-gating';
+import { createLogger } from '../../lib/logger';
+
+const logger = createLogger('GitHubTools');
+
+/** Warn when repo owner looks like the bot username instead of the org. */
+export function warnOwnerMismatch(repo: string): void {
+    const owner = repo.split('/')[0];
+    if (owner === 'corvid-agent') {
+        logger.warn(
+            `GitHub tool called with owner "corvid-agent" for repo "${repo}". ` +
+            `Did you mean "CorvidLabs/${repo.split('/')[1]}"? ` +
+            `The bot username is not an org — use "CorvidLabs" as owner.`
+        );
+    }
+}
 
 /** Enforce scheduler org restriction + rate limit for a gated tool. Returns error result or null. */
 function enforceSchedulerGuards(ctx: McpToolContext, toolName: string, repo: string): CallToolResult | null {
@@ -65,6 +80,7 @@ export async function handleGitHubListPrs(
     _ctx: McpToolContext,
     args: { repo: string; limit?: number },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         const result = await github.listOpenPrs(args.repo, args.limit ?? 10);
         if (!result.ok) return errorResult(result.error ?? 'Failed to list PRs');
@@ -84,6 +100,7 @@ export async function handleGitHubCreatePr(
     ctx: McpToolContext,
     args: { repo: string; title: string; body: string; head: string; base?: string },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         assertRepoAllowed(args.repo);
         const guard = enforceSchedulerGuards(ctx, 'corvid_github_create_pr', args.repo);
@@ -101,6 +118,7 @@ export async function handleGitHubReviewPr(
     _ctx: McpToolContext,
     args: { repo: string; pr_number: number; event: string; body: string },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         assertRepoAllowed(args.repo);
         const event = args.event.toUpperCase() as 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
@@ -120,6 +138,7 @@ export async function handleGitHubCreateIssue(
     ctx: McpToolContext,
     args: { repo: string; title: string; body: string; labels?: string[] },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         assertRepoAllowed(args.repo);
         const guard = enforceSchedulerGuards(ctx, 'corvid_github_create_issue', args.repo);
@@ -145,6 +164,7 @@ export async function handleGitHubListIssues(
     _ctx: McpToolContext,
     args: { repo: string; state?: string; limit?: number },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         const state = (args.state ?? 'open') as 'open' | 'closed' | 'all';
         const result = await github.listIssues(args.repo, state, args.limit ?? 30);
@@ -166,6 +186,7 @@ export async function handleGitHubRepoInfo(
     _ctx: McpToolContext,
     args: { repo: string },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         const result = await github.getRepoInfo(args.repo);
         if (!result.ok) return errorResult(result.error ?? 'Failed to get repo info');
@@ -180,6 +201,7 @@ export async function handleGitHubGetPrDiff(
     _ctx: McpToolContext,
     args: { repo: string; pr_number: number },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         const result = await github.getPrDiff(args.repo, args.pr_number);
         if (!result.ok) return errorResult(result.error ?? 'Failed to get PR diff');
@@ -195,6 +217,7 @@ export async function handleGitHubCommentOnPr(
     ctx: McpToolContext,
     args: { repo: string; pr_number: number; body: string },
 ): Promise<CallToolResult> {
+    warnOwnerMismatch(args.repo);
     try {
         assertRepoAllowed(args.repo);
         const guard = enforceSchedulerGuards(ctx, 'corvid_github_comment_on_pr', args.repo);
