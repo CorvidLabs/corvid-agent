@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, afterAll, mock } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { handleSessionRoutes } from '../routes/sessions';
+import { insertSessionMetrics } from '../db/session-metrics';
 import type { ProcessManager } from '../process/manager';
+import type { WorkTaskService } from '../work/service';
 
 let db: Database;
 
@@ -214,5 +216,179 @@ describe('Session Routes', () => {
         const { req, url } = fakeReq('GET', '/api/other');
         const res = await handleSessionRoutes(req, url, db, pm);
         expect(res).toBeNull();
+    });
+
+    describe('POST /api/sessions/:id/escalate', () => {
+        function createMockWorkTaskService(overrides?: Partial<WorkTaskService>): WorkTaskService {
+            return {
+                create: mock(async () => ({ id: 'task-123', status: 'pending' })),
+                ...overrides,
+            } as unknown as WorkTaskService;
+        }
+
+        let agentId: string;
+
+        async function createSessionWithAgent(pm: ProcessManager): Promise<string> {
+            // Create an agent
+            if (!agentId) {
+                agentId = crypto.randomUUID();
+                db.query("INSERT INTO agents (id, name, system_prompt) VALUES (?, 'TestAgent', 'test')").run(agentId);
+            }
+            const { req, url } = fakeReq('POST', '/api/sessions', {
+                projectId,
+                name: 'Escalation Test',
+                agentId,
+                initialPrompt: 'Fix the bug',
+            });
+            const res = await handleSessionRoutes(req, url, db, pm);
+            const data = await res!.json();
+            return data.id;
+        }
+
+        it('returns 503 when workTaskService is null', async () => {
+            const pm = createMockPM();
+            const sessionId = await createSessionWithAgent(pm);
+            const { req, url } = fakeReq('POST', `/api/sessions/${sessionId}/escalate`);
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, null);
+            expect(res!.status).toBe(503);
+        });
+
+        it('returns 404 for unknown session', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService();
+            const { req, url } = fakeReq('POST', '/api/sessions/nonexistent/escalate');
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(404);
+        });
+
+        it('returns 400 when no metrics exist', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService();
+            const sessionId = await createSessionWithAgent(pm);
+            const { req, url } = fakeReq('POST', `/api/sessions/${sessionId}/escalate`);
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(400);
+            const data = await res!.json();
+            expect(data.error).toContain('No metrics');
+        });
+
+        it('returns 400 when session did not stall', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService();
+            const sessionId = await createSessionWithAgent(pm);
+            insertSessionMetrics(db, {
+                sessionId,
+                model: 'llama3.1:70b',
+                tier: 'standard',
+                totalIterations: 5,
+                toolCallCount: 3,
+                maxChainDepth: 1,
+                nudgeCount: 0,
+                midChainNudgeCount: 0,
+                explorationDriftCount: 0,
+                stallDetected: false,
+                stallType: null,
+                terminationReason: 'normal',
+                durationMs: 5000,
+                needsSummary: false,
+            });
+            const { req, url } = fakeReq('POST', `/api/sessions/${sessionId}/escalate`);
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(400);
+            const data = await res!.json();
+            expect(data.error).toContain('did not stall');
+        });
+
+        it('creates work task for stalled session', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService();
+            const sessionId = await createSessionWithAgent(pm);
+            insertSessionMetrics(db, {
+                sessionId,
+                model: 'llama3.1:70b',
+                tier: 'standard',
+                totalIterations: 25,
+                toolCallCount: 20,
+                maxChainDepth: 3,
+                nudgeCount: 2,
+                midChainNudgeCount: 0,
+                explorationDriftCount: 0,
+                stallDetected: true,
+                stallType: 'stall_repeat',
+                terminationReason: 'stall_repeat',
+                durationMs: 30000,
+                needsSummary: true,
+            });
+            const { req, url } = fakeReq('POST', `/api/sessions/${sessionId}/escalate`, { modelTier: 'opus' });
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(201);
+            const data = await res!.json();
+            expect(data.ok).toBe(true);
+            expect(data.taskId).toBe('task-123');
+            expect(data.modelTier).toBe('opus');
+            expect(wts.create).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns 400 when session has no agent', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService();
+            // Create session without agent
+            const { req: cReq, url: cUrl } = fakeReq('POST', '/api/sessions', {
+                projectId,
+                name: 'No Agent Session',
+            });
+            const cRes = await handleSessionRoutes(cReq, cUrl, db, pm);
+            const session = await cRes!.json();
+            insertSessionMetrics(db, {
+                sessionId: session.id,
+                model: 'llama3.1:70b',
+                tier: 'standard',
+                totalIterations: 25,
+                toolCallCount: 20,
+                maxChainDepth: 3,
+                nudgeCount: 2,
+                midChainNudgeCount: 0,
+                explorationDriftCount: 0,
+                stallDetected: true,
+                stallType: 'stall_repeat',
+                terminationReason: 'stall_repeat',
+                durationMs: 30000,
+                needsSummary: true,
+            });
+            const { req, url } = fakeReq('POST', `/api/sessions/${session.id}/escalate`);
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(400);
+            const data = await res!.json();
+            expect(data.error).toContain('no agent');
+        });
+
+        it('returns 500 when work task creation fails', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService({
+                create: mock(async () => { throw new Error('DB error'); }),
+            } as unknown as Partial<WorkTaskService>);
+            const sessionId = await createSessionWithAgent(pm);
+            insertSessionMetrics(db, {
+                sessionId,
+                model: 'llama3.1:70b',
+                tier: 'standard',
+                totalIterations: 25,
+                toolCallCount: 20,
+                maxChainDepth: 3,
+                nudgeCount: 2,
+                midChainNudgeCount: 0,
+                explorationDriftCount: 0,
+                stallDetected: true,
+                stallType: 'stall_repeat',
+                terminationReason: 'stall_repeat',
+                durationMs: 30000,
+                needsSummary: true,
+            });
+            const { req, url } = fakeReq('POST', `/api/sessions/${sessionId}/escalate`);
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(500);
+            const data = await res!.json();
+            expect(data.error).toContain('Escalation failed');
+        });
     });
 });
