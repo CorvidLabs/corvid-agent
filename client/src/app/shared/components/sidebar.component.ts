@@ -27,7 +27,7 @@ const SECTIONS: SidebarSection[] = [
     { key: 'sessions', label: 'Sessions', collapsible: true, defaultCollapsed: false, routes: ['/sessions', '/work-tasks', '/councils'] },
     { key: 'automation', label: 'Automation', collapsible: true, defaultCollapsed: true, routes: ['/schedules', '/workflows', '/webhooks', '/mention-polling'] },
     { key: 'integrations', label: 'Integrations', collapsible: true, defaultCollapsed: true, routes: ['/mcp-servers'] },
-    { key: 'monitoring', label: 'Monitoring', collapsible: true, defaultCollapsed: false, routes: ['/feed', '/analytics', '/logs'] },
+    { key: 'monitoring', label: 'Monitoring', collapsible: true, defaultCollapsed: false, routes: ['/feed', '/analytics', '/logs', '/brain-viewer'] },
     { key: 'community', label: 'Community', collapsible: true, defaultCollapsed: true, routes: ['/reputation', '/marketplace'] },
     { key: 'config', label: 'Config', collapsible: true, defaultCollapsed: true, routes: ['/allowlist', '/github-allowlist', '/repo-blocklist', '/wallets', '/spending', '/settings', '/security'] },
 ];
@@ -250,6 +250,12 @@ const STORAGE_KEY = 'sidebar_sections_collapsed';
                             <a class="sidebar__link" routerLink="/logs" routerLinkActive="sidebar__link--active" title="Logs">
                                 <span class="sidebar__label">Logs</span>
                                 <span class="sidebar__abbr">L</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="sidebar__link" routerLink="/brain-viewer" routerLinkActive="sidebar__link--active" title="Brain Viewer">
+                                <span class="sidebar__label">Brain Viewer</span>
+                                <span class="sidebar__abbr">Br</span>
                             </a>
                         </li>
                     </ul>
