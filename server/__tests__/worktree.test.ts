@@ -1,7 +1,48 @@
-import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
+import { resolve, dirname, join } from 'node:path';
+
+// Restore the REAL worktree module — other test files (discord-bridge,
+// algochat-message-router, discord-commands-additional) use mock.module()
+// for ../lib/worktree, and in Bun 1.x that mock leaks across files in
+// the same test run. Re-providing the real implementations here ensures
+// this file tests the actual code.
+mock.module('../lib/worktree', () => ({
+    getWorktreeBaseDir: (projectWorkingDir: string) =>
+        process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees'),
+    generateChatBranchName: (agentName: string, sessionId: string) => {
+        const agentSlug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const sessionPrefix = sessionId.slice(0, 12);
+        return `chat/${agentSlug}/${sessionPrefix}`;
+    },
+    createWorktree: async (options: { projectWorkingDir: string; branchName: string; worktreeId: string }) => {
+        const { projectWorkingDir, branchName, worktreeId } = options;
+        const worktreeBase = process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
+        const worktreeDir = resolve(worktreeBase, worktreeId);
+        try {
+            const proc = Bun.spawn(['git', 'worktree', 'add', '-b', branchName, worktreeDir], {
+                cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe',
+            });
+            const stderr = await new Response(proc.stderr).text();
+            const exitCode = await proc.exited;
+            if (exitCode !== 0) return { success: false, worktreeDir, error: `Failed to create worktree: ${stderr.trim()}` };
+            return { success: true, worktreeDir };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return { success: false, worktreeDir, error: `Failed to create worktree: ${message}` };
+        }
+    },
+    removeWorktree: async (projectWorkingDir: string, worktreeDir: string) => {
+        try {
+            const proc = Bun.spawn(['git', 'worktree', 'remove', '--force', worktreeDir], {
+                cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe',
+            });
+            await proc.exited;
+        } catch { /* non-fatal */ }
+    },
+}));
+
 import { getWorktreeBaseDir, generateChatBranchName, createWorktree, removeWorktree } from '../lib/worktree';
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const IS_WINDOWS = process.platform === 'win32';
