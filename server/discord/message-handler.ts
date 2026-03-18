@@ -502,6 +502,91 @@ async function handleMentionReplyResume(
     );
 }
 
+/**
+ * Create a new session in a thread whose previous session expired or was deleted.
+ * Reuses the original agent when possible, falls back to the default agent.
+ * Returns true if the session was successfully created and the message dispatched.
+ */
+async function resumeExpiredThreadSession(
+    ctx: MessageHandlerContext,
+    threadId: string,
+    previousInfo: { agentName: string; agentModel: string; ownerUserId: string; topic?: string; projectName?: string },
+    text: string,
+    authorId?: string,
+    authorUsername?: string,
+    attachments?: DiscordAttachment[],
+): Promise<boolean> {
+    const agents = listAgents(ctx.db);
+    const agent = agents.find(a => a.name === previousInfo.agentName)
+        ?? resolveDefaultAgent(ctx.db, ctx.config);
+    if (!agent) return false;
+
+    const projects = listProjects(ctx.db);
+    const project = agent.defaultProjectId
+        ? projects.find(p => p.id === agent.defaultProjectId) ?? projects[0]
+        : projects[0];
+    if (!project) return false;
+
+    // Create an isolated worktree for the new session
+    let workDir: string | undefined;
+    if (project.workingDir) {
+        const tempId = crypto.randomUUID();
+        const branchName = generateChatBranchName(agent.name, tempId);
+        const result = await createWorktree({
+            projectWorkingDir: project.workingDir,
+            branchName,
+            worktreeId: `chat-${tempId.slice(0, 12)}`,
+        });
+        if (result.success) {
+            workDir = result.worktreeDir;
+        }
+    }
+
+    const newSession = createSession(ctx.db, {
+        projectId: project.id,
+        agentId: agent.id,
+        name: `Discord thread:${threadId}`,
+        initialPrompt: text,
+        source: 'discord' as SessionSource,
+        workDir,
+    });
+
+    ctx.threadSessions.set(threadId, {
+        sessionId: newSession.id,
+        agentName: agent.name,
+        agentModel: agent.model || 'unknown',
+        ownerUserId: previousInfo.ownerUserId,
+        topic: previousInfo.topic,
+        projectName: project.name,
+    });
+    ctx.threadLastActivity.set(threadId, Date.now());
+
+    // Start the process with the user's message
+    const contextualContent = buildMultimodalContent(withAuthorContext(text, authorId, authorUsername), attachments);
+    ctx.processManager.startProcess(newSession, typeof contextualContent === 'string' ? contextualContent : withAuthorContext(text, authorId, authorUsername));
+
+    // Send image attachments as a follow-up if multimodal
+    if (typeof contextualContent !== 'string') {
+        ctx.processManager.sendMessage(newSession.id, contextualContent);
+    }
+
+    subscribeForResponseWithEmbed(
+        ctx.processManager, ctx.delivery, ctx.config.botToken,
+        ctx.db, ctx.threadCallbacks, newSession.id, threadId, agent.name, agent.model || 'unknown',
+        project.name,
+    );
+
+    // Brief non-blocking notification
+    sendEmbed(ctx.delivery, ctx.config.botToken, threadId, {
+        description: `Session resumed with **${agent.name}**.`,
+        color: 0x57f287,
+    }).catch((err) => log.debug('Failed to send resume embed', { error: err instanceof Error ? err.message : String(err) }));
+
+    log.info('Resumed expired thread session', { threadId, newSessionId: newSession.id, agentName: agent.name });
+
+    return true;
+}
+
 async function routeToThread(ctx: MessageHandlerContext, threadId: string, _userId: string, text: string, authorId?: string, authorUsername?: string, attachments?: DiscordAttachment[]): Promise<void> {
     ctx.threadLastActivity.set(threadId, Date.now());
 
@@ -517,14 +602,18 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     const session = getSession(ctx.db, sessionId);
     if (!session) {
         ctx.threadSessions.delete(threadId);
-        await sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
-            description: 'This conversation has ended.',
-            color: 0x95a5a6,
-        }, [
-            buildActionRow(
-                { label: 'Archive Thread', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' },
-            ),
-        ]);
+        // Automatically resume: create a new session in the same thread
+        const resumed = await resumeExpiredThreadSession(ctx, threadId, threadInfo, text, authorId, authorUsername, attachments);
+        if (!resumed) {
+            await sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
+                description: 'This conversation has ended.',
+                color: 0x95a5a6,
+            }, [
+                buildActionRow(
+                    { label: 'Archive Thread', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' },
+                ),
+            ]);
+        }
         return;
     }
 
