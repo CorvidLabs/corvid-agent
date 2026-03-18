@@ -362,6 +362,35 @@ describe('Session Routes', () => {
             expect(data.error).toContain('no agent');
         });
 
+        it('creates work task with default modelTier when body is empty', async () => {
+            const pm = createMockPM();
+            const wts = createMockWorkTaskService();
+            const sessionId = await createSessionWithAgent(pm);
+            insertSessionMetrics(db, {
+                sessionId,
+                model: 'llama3.1:70b',
+                tier: 'standard',
+                totalIterations: 25,
+                toolCallCount: 20,
+                maxChainDepth: 3,
+                nudgeCount: 2,
+                midChainNudgeCount: 0,
+                explorationDriftCount: 0,
+                stallDetected: true,
+                stallType: 'stall_repeat',
+                terminationReason: 'stall_repeat',
+                durationMs: 30000,
+                needsSummary: true,
+            });
+            // POST without body — exercises the catch block for empty body parsing
+            const { req, url } = fakeReq('POST', `/api/sessions/${sessionId}/escalate`);
+            const res = await handleSessionRoutes(req, url, db, pm, undefined, wts);
+            expect(res!.status).toBe(201);
+            const data = await res!.json();
+            expect(data.ok).toBe(true);
+            expect(data.modelTier).toBe('sonnet'); // default tier
+        });
+
         it('returns 500 when work task creation fails', async () => {
             const pm = createMockPM();
             const wts = createMockWorkTaskService({
