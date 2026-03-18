@@ -226,6 +226,14 @@ When scheduling autonomous work, follow this allocation:
 - **5-10%** — External OSS contributions (claude-code, MCP ecosystem, A2A)
 - **0%** — Off-limits repos listed above
 
+## GitHub Owner
+
+The canonical owner for this repository is **`CorvidLabs`** (the organization), NOT `corvid-agent` (the bot's GitHub username).
+
+**All GitHub API calls must use `owner: "CorvidLabs"`** when targeting repos in this org. The bot's username `corvid-agent` is NOT an org that owns repositories — using it will return empty/wrong results.
+
+When in doubt, resolve from `git remote get-url origin` which returns `CorvidLabs/corvid-agent`.
+
 ## Security Rules
 
 ### External Network Calls

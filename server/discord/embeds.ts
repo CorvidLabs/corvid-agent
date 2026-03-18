@@ -15,6 +15,23 @@ const log = createLogger('DiscordEmbeds');
 
 const MAX_MESSAGE_LENGTH = 2000;
 
+/** Discord mention pattern: <@123456789> or <@!123456789> */
+const MENTION_RE = /<@!?\d{17,20}>/g;
+
+/**
+ * Extract Discord mentions from embed text so they can be placed in the
+ * top-level `content` field where Discord will actually send notifications.
+ * Mentions inside embed descriptions render as blue text but do NOT ping.
+ */
+export function extractMentionsFromEmbed(embed: DiscordEmbed): string | undefined {
+    const desc = embed.description;
+    if (!desc) return undefined;
+    const matches = desc.match(MENTION_RE);
+    if (!matches || matches.length === 0) return undefined;
+    // Deduplicate mentions
+    return Array.from(new Set(matches)).join(' ');
+}
+
 /** Discord snowflake IDs are purely numeric strings. */
 const DISCORD_SNOWFLAKE_RE = /^\d{17,20}$/;
 
@@ -162,7 +179,10 @@ export async function sendEmbed(
                         'Authorization': `Bot ${botToken}`,
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ embeds: [embed] }),
+                    body: JSON.stringify({
+                        embeds: [embed],
+                        ...(extractMentionsFromEmbed(embed) ? { content: extractMentionsFromEmbed(embed) } : {}),
+                    }),
                 },
             );
 
@@ -271,6 +291,7 @@ export async function sendReplyEmbed(
                     body: JSON.stringify({
                         embeds: [embed],
                         message_reference: { message_id: replyToMessageId },
+                        ...(extractMentionsFromEmbed(embed) ? { content: extractMentionsFromEmbed(embed) } : {}),
                     }),
                 },
             );
@@ -445,7 +466,10 @@ export async function editEmbed(
                         'Authorization': `Bot ${botToken}`,
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ embeds: [embed] }),
+                    body: JSON.stringify({
+                        embeds: [embed],
+                        ...(extractMentionsFromEmbed(embed) ? { content: extractMentionsFromEmbed(embed) } : {}),
+                    }),
                 },
             );
 

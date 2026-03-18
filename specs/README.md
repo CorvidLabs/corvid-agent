@@ -6,6 +6,8 @@ Structured markdown specs are the **source of truth** for what each module in co
 2. **Agents** can validate their changes against a formal contract
 3. **Correctness** can be checked automatically via `bun run spec:check`
 
+Validation is powered by [SpecSync](https://github.com/marketplace/actions/specsync), a Rust-based spec-to-code validator available on the GitHub Marketplace.
+
 ## Reading a Spec
 
 Each `.spec.md` file has two parts:

@@ -14,7 +14,6 @@ import type { ScheduleActionType } from '../../shared/types/schedules';
 
 /** Tools that are never appropriate for automated scheduler sessions. */
 export const SCHEDULER_ALWAYS_BLOCKED = new Set([
-    'corvid_send_message',
     'corvid_grant_credits',
     'corvid_credit_config',
     'corvid_github_fork_repo',
@@ -29,6 +28,7 @@ export const SCHEDULER_GATED_TOOLS: ReadonlyMap<string, ReadonlySet<ScheduleActi
     ['corvid_github_create_issue', new Set<ScheduleActionType>(['daily_review', 'improvement_loop', 'custom'])],
     ['corvid_github_create_pr', new Set<ScheduleActionType>(['work_task', 'improvement_loop', 'codebase_review'])],
     ['corvid_github_comment_on_pr', new Set<ScheduleActionType>(['review_prs', 'daily_review'])],
+    ['corvid_send_message', new Set<ScheduleActionType>(['send_message', 'status_checkin', 'daily_review', 'custom'])],
 ]);
 
 /** Max issues a single scheduler session may create (rate limiting). */
@@ -39,6 +39,9 @@ export const SCHEDULER_MAX_PRS_PER_SESSION = 3;
 
 /** Max PR comments a single scheduler session may create (rate limiting). */
 export const SCHEDULER_MAX_PR_COMMENTS_PER_SESSION = 5;
+
+/** Max messages a single scheduler session may send (rate limiting). */
+export const SCHEDULER_MAX_MESSAGES_PER_SESSION = 3;
 
 /** Orgs that scheduled sessions are allowed to create issues/PRs in. */
 export const SCHEDULER_ALLOWED_ORGS = new Set(['CorvidLabs', 'corvid-agent']);
@@ -83,6 +86,7 @@ const SCHEDULER_RATE_LIMITS: Record<string, number> = {
     corvid_github_create_issue: SCHEDULER_MAX_ISSUES_PER_SESSION,
     corvid_github_create_pr: SCHEDULER_MAX_PRS_PER_SESSION,
     corvid_github_comment_on_pr: SCHEDULER_MAX_PR_COMMENTS_PER_SESSION,
+    corvid_send_message: SCHEDULER_MAX_MESSAGES_PER_SESSION,
 };
 
 /**

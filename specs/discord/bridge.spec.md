@@ -142,6 +142,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
 | `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a standardized footer with session ID, project, agent, and status |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
+| `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field notifications |
 
 ### Exported Functions (from message-handler.ts)
 
@@ -552,3 +553,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-16 | corvid-agent | v12: Discord reaction listener for reputation feedback. Added `GUILD_MESSAGE_REACTIONS` intent, `MESSAGE_REACTION_ADD` dispatch handler, `reaction-handler.ts` module with emoji-to-sentiment mapping, per-user rate limiting (5/min), session resolution from mentionSessions and threadSessions, `response_feedback` insertion, and reputation event recording. `setReputationScorer()` setter on DiscordBridge. 11 new tests. Closes #1161 |
 | 2026-03-17 | corvid-agent | v13: Adaptive inline response UX. Added `subscribeForAdaptiveInlineResponse` (starts lightweight, upgrades to progress embed on tool use), `subscribeForInlineProgressResponse` (always-on progress embed), and `editEmbed` helper for PATCH-ing embeds in-place. @mention replies now use adaptive subscriber for cleaner conversational UX |
 | 2026-03-18 | corvid-agent | v14: Improved expired-session UX — thread message for deleted sessions now says "This session has expired and can no longer be resumed" with actionable guidance instead of vague "This conversation has ended". Fixes #1222 |
+| 2026-03-18 | corvid-agent | v15: Added `extractMentionsFromEmbed` — extracts Discord mentions from embed descriptions into top-level `content` field so mentions trigger notifications. Applied to `sendEmbed`, `sendReplyEmbed`, and `editEmbed` |
