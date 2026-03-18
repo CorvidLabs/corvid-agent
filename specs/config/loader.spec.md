@@ -9,7 +9,7 @@ depends_on:
   - specs/lib/infra.spec.md
 ---
 
-# Configuration Loader
+# Config Loader
 
 ## Purpose
 
@@ -21,7 +21,7 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `CONFIG_DEFAULTS` | `object` | Default values for optional server, database, work, scheduler, and process configuration fields |
+| `CONFIG_DEFAULTS` | `object` | Default values for optional server (port, bindHost, logLevel, logFormat, shutdownGraceMs), database (path, backupMaxKeep), work (maxIterations, maxPerDay, drainTimeoutMs, queue), scheduler (pollIntervalMs, maxConcurrentExecutions, minScheduleIntervalMs), and process (maxTurnsBeforeContextReset, inactivityTimeoutMs) configuration fields |
 
 ### Exported Functions
 
@@ -52,11 +52,23 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 
 ## Behavioral Examples
 
-### Scenario: Load from environment variables (no config file)
+### Scenario: Load from explicit config path
 
-- **Given** no explicit config path and no config file in the working directory
+- **Given** `configPath` is `/app/config.json`
+- **When** `loadAgentConfig('/app/config.json')` is called
+- **Then** loads and parses the JSON file, applies defaults, validates, and returns config
+
+### Scenario: Auto-discover config file
+
+- **Given** no `configPath`, `corvid-agent.config.ts` exists in cwd
 - **When** `loadAgentConfig()` is called
-- **Then** configuration is built from `process.env` via `configFromEnv()`
+- **Then** discovers and loads the `.ts` file
+
+### Scenario: Fall back to environment variables
+
+- **Given** no `configPath`, no config file in cwd
+- **When** `loadAgentConfig()` is called
+- **Then** builds config from `process.env` via `configFromEnv()`
 - **And** defaults are applied for any missing optional fields
 
 ### Scenario: Auto-discovering a config file
@@ -67,10 +79,9 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 
 ### Scenario: Validation warns but does not throw
 
-- **Given** a config with validation issues (e.g. missing provider API key)
-- **When** `loadAgentConfig()` is called
-- **Then** warnings are logged
-- **And** the config is still returned (no exception thrown)
+- **Given** config has `enabledProviders: ['anthropic']` but no `anthropic.apiKey`
+- **When** `validateConfig(config)` is called
+- **Then** returns error at path `providers.anthropic.apiKey`
 
 ### Scenario: Config file must have correct export
 
