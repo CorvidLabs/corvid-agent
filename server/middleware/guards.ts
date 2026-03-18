@@ -14,6 +14,7 @@ import type { TenantContext, TenantRole } from '../tenant/types';
 import { DEFAULT_TENANT_ID } from '../tenant/types';
 import { extractTenantId } from '../tenant/middleware';
 import { createLogger } from '../lib/logger';
+import { isAlgorandAddressFormat } from '../lib/validation';
 
 const log = createLogger('Guards');
 
@@ -47,7 +48,7 @@ export function authGuard(config: AuthConfig): Guard {
             context.role = 'admin';
         }
         const wallet = url.searchParams.get('wallet');
-        if (wallet) {
+        if (wallet && isAlgorandAddressFormat(wallet)) {
             context.walletAddress = wallet;
         }
         return null;
