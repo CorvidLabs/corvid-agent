@@ -91,4 +91,4 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-03-18 | corvid-agent | Initial spec — restore 100% spec coverage |
+| 2026-03-18 | corvid-agent | Initial spec to restore 100% spec coverage |
