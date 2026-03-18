@@ -9,12 +9,33 @@ import {
     SCHEDULER_MAX_ISSUES_PER_SESSION,
     SCHEDULER_MAX_PRS_PER_SESSION,
     SCHEDULER_MAX_PR_COMMENTS_PER_SESSION,
+    SCHEDULER_MAX_MESSAGES_PER_SESSION,
 } from '../mcp/scheduler-tool-gating';
 
 describe('isToolBlockedForScheduler', () => {
-    test('always blocks corvid_send_message regardless of action type', () => {
-        expect(isToolBlockedForScheduler('corvid_send_message', 'custom')).toBe(true);
-        expect(isToolBlockedForScheduler('corvid_send_message', 'daily_review')).toBe(true);
+    test('allows corvid_send_message for send_message action', () => {
+        expect(isToolBlockedForScheduler('corvid_send_message', 'send_message')).toBe(false);
+    });
+
+    test('allows corvid_send_message for status_checkin action', () => {
+        expect(isToolBlockedForScheduler('corvid_send_message', 'status_checkin')).toBe(false);
+    });
+
+    test('allows corvid_send_message for daily_review action', () => {
+        expect(isToolBlockedForScheduler('corvid_send_message', 'daily_review')).toBe(false);
+    });
+
+    test('allows corvid_send_message for custom action', () => {
+        expect(isToolBlockedForScheduler('corvid_send_message', 'custom')).toBe(false);
+    });
+
+    test('blocks corvid_send_message for non-allowed action types', () => {
+        expect(isToolBlockedForScheduler('corvid_send_message', 'work_task')).toBe(true);
+        expect(isToolBlockedForScheduler('corvid_send_message', 'review_prs')).toBe(true);
+        expect(isToolBlockedForScheduler('corvid_send_message', 'improvement_loop')).toBe(true);
+    });
+
+    test('blocks corvid_send_message when no action type provided', () => {
         expect(isToolBlockedForScheduler('corvid_send_message')).toBe(true);
     });
 
@@ -151,6 +172,21 @@ describe('checkSchedulerRateLimit', () => {
         expect(result).not.toBeNull();
     });
 
+    test('allows up to max messages per session', () => {
+        const usage = new Map<string, number>();
+        for (let i = 0; i < SCHEDULER_MAX_MESSAGES_PER_SESSION; i++) {
+            expect(checkSchedulerRateLimit('corvid_send_message', usage)).toBeNull();
+        }
+        expect(usage.get('corvid_send_message')).toBe(SCHEDULER_MAX_MESSAGES_PER_SESSION);
+    });
+
+    test('blocks after exceeding message limit', () => {
+        const usage = new Map<string, number>([['corvid_send_message', SCHEDULER_MAX_MESSAGES_PER_SESSION]]);
+        const result = checkSchedulerRateLimit('corvid_send_message', usage);
+        expect(result).not.toBeNull();
+        expect(result).toContain('rate limit');
+    });
+
     test('returns null for tools without rate limits', () => {
         const usage = new Map<string, number>();
         expect(checkSchedulerRateLimit('corvid_save_memory', usage)).toBeNull();
@@ -168,15 +204,19 @@ describe('checkSchedulerRateLimit', () => {
 
 describe('constants', () => {
     test('SCHEDULER_ALWAYS_BLOCKED contains expected tools', () => {
-        expect(SCHEDULER_ALWAYS_BLOCKED.has('corvid_send_message')).toBe(true);
         expect(SCHEDULER_ALWAYS_BLOCKED.has('corvid_grant_credits')).toBe(true);
         expect(SCHEDULER_ALWAYS_BLOCKED.has('corvid_credit_config')).toBe(true);
         expect(SCHEDULER_ALWAYS_BLOCKED.has('corvid_github_fork_repo')).toBe(true);
         expect(SCHEDULER_ALWAYS_BLOCKED.has('corvid_ask_owner')).toBe(true);
     });
 
-    test('SCHEDULER_GATED_TOOLS contains 3 tools', () => {
-        expect(SCHEDULER_GATED_TOOLS.size).toBe(3);
+    test('corvid_send_message is gated, not always blocked', () => {
+        expect(SCHEDULER_ALWAYS_BLOCKED.has('corvid_send_message')).toBe(false);
+        expect(SCHEDULER_GATED_TOOLS.has('corvid_send_message')).toBe(true);
+    });
+
+    test('SCHEDULER_GATED_TOOLS contains 4 tools', () => {
+        expect(SCHEDULER_GATED_TOOLS.size).toBe(4);
     });
 
     test('SCHEDULER_ESCALATION_LABEL is agent-escalation', () => {
