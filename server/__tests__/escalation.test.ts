@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test';
-import { buildEscalationInfo, type BuildEscalationInput } from '../process/direct-process';
+import { buildEscalationInfo, trackToolCall, buildResultEvent, type BuildEscalationInput } from '../process/direct-process';
+import type { DirectProcessMetrics } from '../process/types';
 
 function makeInput(overrides: Partial<BuildEscalationInput> = {}): BuildEscalationInput {
     return {
@@ -117,5 +118,95 @@ describe('buildEscalationInfo', () => {
         // claude-3-opus is inferred as OPUS tier, no higher tier available
         expect(result!.canEscalate).toBe(false);
         expect(result!.suggestedTier).toBeNull();
+    });
+});
+
+describe('trackToolCall', () => {
+    test('appends tool call to log', () => {
+        const log: string[] = [];
+        trackToolCall(log, 'read_file', 'ok');
+        expect(log).toEqual(['read_file: ok']);
+    });
+
+    test('tracks error outcomes', () => {
+        const log: string[] = [];
+        trackToolCall(log, 'write_file', 'error');
+        expect(log).toEqual(['write_file: error']);
+    });
+
+    test('tracks exception outcomes', () => {
+        const log: string[] = [];
+        trackToolCall(log, 'search_files', 'exception');
+        expect(log).toEqual(['search_files: exception']);
+    });
+
+    test('caps log at 20 entries', () => {
+        const log = Array.from({ length: 20 }, (_, i) => `tool_${i}: ok`);
+        trackToolCall(log, 'extra_tool', 'ok');
+        expect(log).toHaveLength(20);
+        expect(log[19]).toBe('tool_19: ok');
+    });
+
+    test('allows up to 20 entries', () => {
+        const log: string[] = [];
+        for (let i = 0; i < 25; i++) {
+            trackToolCall(log, `tool_${i}`, 'ok');
+        }
+        expect(log).toHaveLength(20);
+        expect(log[19]).toBe('tool_19: ok');
+    });
+});
+
+describe('buildResultEvent', () => {
+    const baseMetrics: DirectProcessMetrics = {
+        model: 'llama3.1:70b',
+        tier: 'standard',
+        totalIterations: 10,
+        toolCallCount: 5,
+        maxChainDepth: 2,
+        nudgeCount: 0,
+        midChainNudgeCount: 0,
+        explorationDriftCount: 0,
+        stallDetected: false,
+        stallType: null,
+        terminationReason: 'normal',
+        durationMs: 5000,
+        needsSummary: false,
+        totalLowQualityResponses: 0,
+        totalVacuousToolCalls: 0,
+        qualityNudgeCount: 0,
+    };
+
+    test('builds success event without escalation for normal termination', () => {
+        const event = buildResultEvent(
+            { subtype: 'success', durationMs: 5000, numTurns: 10, sessionId: 'sess-1', metrics: baseMetrics },
+            makeInput({ terminationReason: 'normal' }),
+        );
+        expect(event.type).toBe('result');
+        expect(event.subtype).toBe('success');
+        expect((event as unknown as Record<string, unknown>).escalation).toBeUndefined();
+    });
+
+    test('builds error event with escalation for stall termination', () => {
+        const event = buildResultEvent(
+            { subtype: 'error', durationMs: 30000, numTurns: 25, sessionId: 'sess-2', metrics: { ...baseMetrics, stallDetected: true, terminationReason: 'stall_repeat' } },
+            makeInput({ terminationReason: 'stall_repeat' }),
+        );
+        expect(event.type).toBe('result');
+        expect(event.subtype).toBe('error');
+        expect((event as unknown as Record<string, unknown>).escalation).toBeDefined();
+        const esc = (event as unknown as Record<string, unknown>).escalation as Record<string, unknown>;
+        expect(esc.reason).toBe('stall_repeat');
+    });
+
+    test('includes correct metadata in result event', () => {
+        const event = buildResultEvent(
+            { subtype: 'success', durationMs: 8000, numTurns: 15, sessionId: 'sess-3', metrics: baseMetrics },
+            makeInput({ terminationReason: 'normal' }),
+        );
+        expect((event as unknown as Record<string, unknown>).duration_ms).toBe(8000);
+        expect((event as unknown as Record<string, unknown>).num_turns).toBe(15);
+        expect((event as unknown as Record<string, unknown>).session_id).toBe('sess-3');
+        expect((event as unknown as Record<string, unknown>).total_cost_usd).toBe(0);
     });
 });

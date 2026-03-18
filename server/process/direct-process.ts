@@ -865,19 +865,12 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                             toolCallId: toolCall.id,
                         });
                         emitToolStatus(toolCall.name, toolResult.isError ? `Error: ${toolResult.text.slice(0, 200)}` : `Done`, false);
-                        /* c8 ignore next 4 -- integration-level process loop */
-                        // Track for escalation metadata
-                        if (toolCallLog.length < 20) {
-                            toolCallLog.push(`${toolCall.name}: ${toolResult.isError ? 'error' : 'ok'}`);
-                        }
+                        trackToolCall(toolCallLog, toolCall.name, toolResult.isError ? 'error' : 'ok');
                     } catch (err) {
                         const errorText = `Tool execution error: ${err instanceof Error ? err.message : String(err)}`;
                         messages.push({ role: 'tool', content: errorText, toolCallId: toolCall.id });
                         emitToolStatus(toolCall.name, errorText, true);
-                        /* c8 ignore next 3 -- integration-level process loop */
-                        if (toolCallLog.length < 20) {
-                            toolCallLog.push(`${toolCall.name}: exception`);
-                        }
+                        trackToolCall(toolCallLog, toolCall.name, 'exception');
                     }
                 }
 
@@ -1083,26 +1076,10 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 needsSummary,
                 qualityMetrics: qualityTracker.getMetrics(),
             });
-            /* c8 ignore start -- error path inside integration-level process loop */
-            const errorEscalation = buildEscalationInfo({
-                terminationReason,
-                model,
-                tier: tierConfig.tier,
-                originalPrompt: lastUserMessage,
-                toolCallLog,
-                qualityMetrics: qualityTracker.getMetrics(),
-            });
-            onEvent({
-                type: 'result',
-                subtype: 'error',
-                total_cost_usd: 0,
-                duration_ms: loopDurationMs,
-                num_turns: iteration,
-                session_id: session.id,
-                metrics: sessionMetrics,
-                ...(errorEscalation && { escalation: errorEscalation }),
-            } as ClaudeStreamEvent);
-            /* c8 ignore stop */
+            onEvent(buildResultEvent(
+                { subtype: 'error', durationMs: loopDurationMs, numTurns: iteration, sessionId: session.id, metrics: sessionMetrics },
+                { terminationReason, model, tier: tierConfig.tier, originalPrompt: lastUserMessage, toolCallLog, qualityMetrics: qualityTracker.getMetrics() },
+            ));
             throw err;
         } finally {
             // Release the slot so the next agent can run
@@ -1159,29 +1136,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             qualityMetrics: qualityTracker.getMetrics(),
         });
 
-        /* c8 ignore start -- integration-level process loop wiring */
-        // Build escalation metadata for abnormal terminations
-        const escalation = buildEscalationInfo({
-            terminationReason,
-            model,
-            tier: tierConfig.tier,
-            originalPrompt: lastUserMessage,
-            toolCallLog,
-            qualityMetrics: qualityTracker.getMetrics(),
-        });
-
-        // Emit result event with metrics
-        onEvent({
-            type: 'result',
-            subtype: 'success',
-            total_cost_usd: 0, // Local models are free
-            duration_ms: loopDurationMs,
-            num_turns: iteration,
-            session_id: session.id,
-            metrics: sessionMetrics,
-            ...(escalation && { escalation }),
-        } as ClaudeStreamEvent);
-        /* c8 ignore stop */
+        // Emit result event with metrics (and escalation metadata for abnormal terminations)
+        onEvent(buildResultEvent(
+            { subtype: 'success', durationMs: loopDurationMs, numTurns: iteration, sessionId: session.id, metrics: sessionMetrics },
+            { terminationReason, model, tier: tierConfig.tier, originalPrompt: lastUserMessage, toolCallLog, qualityMetrics: qualityTracker.getMetrics() },
+        ));
 
         processing = false;
 
@@ -1465,6 +1424,15 @@ export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMe
 
 // ── Escalation metadata ───────────────────────────────────────────────
 
+const MAX_TOOL_CALL_LOG = 20;
+
+/** Append a tool-call entry to the log (capped at MAX_TOOL_CALL_LOG). */
+export function trackToolCall(log: string[], toolName: string, outcome: 'ok' | 'error' | 'exception'): void {
+    if (log.length < MAX_TOOL_CALL_LOG) {
+        log.push(`${toolName}: ${outcome}`);
+    }
+}
+
 export interface BuildEscalationInput {
     terminationReason: DirectProcessMetrics['terminationReason'];
     model: string;
@@ -1521,6 +1489,24 @@ function buildRemainingWorkDescription(reason: EscalationInfo['reason']): string
         case 'low_quality':
             return 'Model produced multiple low-quality responses without substantive output.';
     }
+}
+
+/** Build a result event, attaching escalation metadata when applicable. */
+export function buildResultEvent(
+    base: { subtype: 'success' | 'error'; durationMs: number; numTurns: number; sessionId: string; metrics: DirectProcessMetrics },
+    escalationInput: BuildEscalationInput,
+): ClaudeStreamEvent {
+    const escalation = buildEscalationInfo(escalationInput);
+    return {
+        type: 'result',
+        subtype: base.subtype,
+        total_cost_usd: 0,
+        duration_ms: base.durationMs,
+        num_turns: base.numTurns,
+        session_id: base.sessionId,
+        metrics: base.metrics,
+        ...(escalation && { escalation }),
+    } as ClaudeStreamEvent;
 }
 
 export interface ToolDef {
