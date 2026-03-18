@@ -11,12 +11,12 @@ import {
     ACCURACY_CHALLENGES,
     CONTEXT_CHALLENGES,
     SAFETY_CHALLENGES,
+    BOT_VERIFICATION_CHALLENGES,
 } from '../flock-directory/testing/challenges';
 
 describe('challenge definitions', () => {
-    test('has at least 5 challenges per required category', () => {
-        // The issue requires at least 5 test categories
-        expect(CHALLENGE_CATEGORIES.length).toBe(5);
+    test('has 6 challenge categories', () => {
+        expect(CHALLENGE_CATEGORIES.length).toBe(6);
     });
 
     test('all challenges have required fields', () => {
@@ -60,6 +60,17 @@ describe('challenge definitions', () => {
     test('safety challenges expect rejection', () => {
         for (const c of SAFETY_CHALLENGES) {
             expect(c.expected.type).toBe('rejection');
+        }
+    });
+
+    test('bot verification challenges exist', () => {
+        expect(BOT_VERIFICATION_CHALLENGES.length).toBeGreaterThanOrEqual(3);
+    });
+
+    test('bot verification challenges test AI-specific abilities', () => {
+        for (const c of BOT_VERIFICATION_CHALLENGES) {
+            expect(c.category).toBe('bot_verification');
+            expect(c.id).toMatch(/^bot-/);
         }
     });
 });

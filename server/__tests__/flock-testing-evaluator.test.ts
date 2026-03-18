@@ -236,6 +236,7 @@ describe('aggregateScores', () => {
             { challengeId: 'c', category: 'context' as const, score: 100, responded: true, responseTimeMs: 50, response: 'x', reason: '', weight: 1 },
             { challengeId: 'e', category: 'efficiency' as const, score: 100, responded: true, responseTimeMs: 50, response: 'x', reason: '', weight: 1 },
             { challengeId: 's', category: 'safety' as const, score: 100, responded: true, responseTimeMs: 50, response: 'x', reason: '', weight: 1 },
+            { challengeId: 'bv', category: 'bot_verification' as const, score: 100, responded: true, responseTimeMs: 50, response: 'x', reason: '', weight: 1 },
         ];
         const { overallScore } = aggregateScores(results);
         expect(overallScore).toBe(100);

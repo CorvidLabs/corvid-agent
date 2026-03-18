@@ -37,6 +37,7 @@ import {
     execDailyReview,
     execStatusCheckin,
     execMarketplaceBilling,
+    execFlockTesting,
     execCustom,
 } from './handlers';
 
@@ -46,7 +47,7 @@ const MAX_CONSECUTIVE_FAILURES = 5;
 const BROADCAST_ACTION_TYPES: ScheduleActionType[] = [
     'work_task', 'council_launch', 'daily_review', 'review_prs',
     'github_suggest', 'codebase_review', 'dependency_audit',
-    'improvement_loop', 'custom', 'status_checkin',
+    'improvement_loop', 'custom', 'status_checkin', 'flock_testing',
 ];
 
 /** Dispatch an action to its handler. */
@@ -74,6 +75,7 @@ async function dispatchAction(
         case 'daily_review':           execDailyReview(hctx, executionId, schedule); break;
         case 'status_checkin':         await execStatusCheckin(hctx, executionId, schedule); break;
         case 'marketplace_billing':    execMarketplaceBilling(hctx, executionId); break;
+        case 'flock_testing':          await execFlockTesting(hctx, executionId, schedule); break;
         case 'custom':                 await execCustom(hctx, executionId, schedule, action); break;
         default:
             updateExecutionStatus(db, executionId, 'failed', {

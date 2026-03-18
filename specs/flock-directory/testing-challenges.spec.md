@@ -1,6 +1,6 @@
 ---
 module: flock-testing-challenges
-version: 1
+version: 2
 status: active
 files:
   - server/flock-directory/testing/challenges.ts
@@ -11,7 +11,7 @@ depends_on: []
 
 ## Purpose
 
-Defines test challenge definitions for automated agent evaluation in the Flock Directory. Each challenge belongs to a category (responsiveness, accuracy, context, efficiency, safety) and specifies messages, expected outcomes, timeouts, and weights.
+Defines test challenge definitions for automated agent evaluation in the Flock Directory. Each challenge belongs to a category (responsiveness, accuracy, context, efficiency, safety, bot_verification) and specifies messages, expected outcomes, timeouts, and weights.
 
 ## Public API
 
@@ -26,7 +26,7 @@ Defines test challenge definitions for automated agent evaluation in the Flock D
 
 | Type | Description |
 |------|-------------|
-| `ChallengeCategory` | Union: 'responsiveness' \| 'accuracy' \| 'context' \| 'efficiency' \| 'safety' |
+| `ChallengeCategory` | Union: 'responsiveness' \| 'accuracy' \| 'context' \| 'efficiency' \| 'safety' \| 'bot_verification' |
 | `Challenge` | Challenge definition with id, category, messages, expected outcome, timeout, weight |
 | `ChallengeExpectation` | Discriminated union for expected outcomes (contains, regex, numeric, rejection, context_recall, any_response) |
 
@@ -39,12 +39,13 @@ Defines test challenge definitions for automated agent evaluation in the Flock D
 | `CONTEXT_CHALLENGES` | Built-in context handling challenges (3) |
 | `EFFICIENCY_CHALLENGES` | Built-in efficiency challenges (2) |
 | `SAFETY_CHALLENGES` | Built-in safety challenges (3) |
-| `ALL_CHALLENGES` | All 15 built-in challenges combined |
-| `CHALLENGE_CATEGORIES` | Array of all 5 category names |
+| `BOT_VERIFICATION_CHALLENGES` | Built-in bot verification challenges (4) |
+| `ALL_CHALLENGES` | All 19 built-in challenges combined |
+| `CHALLENGE_CATEGORIES` | Array of all 6 category names |
 
 ## Key Behaviors
 
-- Each challenge has a unique `id` prefixed by category abbreviation
+- Each challenge has a unique `id` prefixed by category abbreviation (e.g., `bot-` for bot_verification)
 - Multi-turn challenges (context category) use message arrays with 2+ entries
 - Safety challenges always expect `rejection` type responses
 - Challenge weights allow certain challenges to count more in scoring
@@ -76,3 +77,4 @@ _No runtime dependencies._
 | Version | Date | Changes |
 |---------|------|---------|
 | 1 | 2026-03-15 | Initial version — 15 challenges across 5 categories |
+| 2 | 2026-03-17 | Added bot_verification category (4 challenges, 19 total across 6 categories) |
