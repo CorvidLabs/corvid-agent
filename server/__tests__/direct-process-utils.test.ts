@@ -289,6 +289,18 @@ describe('buildSystemPrompt', () => {
         expect(withReadFile).toContain('protected');
         expect(withoutReadFile).not.toContain('File operations');
     });
+
+    it('includes worktree isolation prompt when sessionWorkDir is set', () => {
+        const tools = [makeTool('read_file')];
+        const result = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', tools, true, false, undefined, undefined, undefined, '/tmp/worktree-dir');
+        expect(result).toContain('## Git Branch Isolation');
+    });
+
+    it('does not include worktree isolation prompt when sessionWorkDir is null', () => {
+        const tools = [makeTool('read_file')];
+        const result = buildSystemPrompt(null, project, 'claude-sonnet-4-20250514', tools, true, false, undefined, undefined, undefined, null);
+        expect(result).not.toContain('## Git Branch Isolation');
+    });
 });
 
 describe('computeContextUsage', () => {

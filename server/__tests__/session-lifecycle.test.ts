@@ -278,4 +278,30 @@ describe('enforceSessionLimits (via runCleanup)', () => {
         const remaining = db.query('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>;
         expect(remaining.map(r => r.id)).toEqual(['young-1', 'young-2']);
     });
+
+    it('deletes escalation queue entries for excess sessions', async () => {
+        manager = new SessionLifecycleManager(db, {
+            maxSessionsPerProject: 1,
+            sessionTtlMs: 999999999,
+            cleanupIntervalMs: 999999,
+        });
+
+        const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+        insertSession('old-sess', 'proj-1', 'idle', new Date(twoDaysAgo).toISOString().replace('T', ' ').replace('Z', ''));
+        insertSession('new-sess', 'proj-1', 'idle', new Date(twoDaysAgo + 1000).toISOString().replace('T', ' ').replace('Z', ''));
+
+        // Add escalation queue entry for the session that will be deleted
+        db.query(
+            "INSERT INTO escalation_queue (session_id, tool_name, tool_input, status) VALUES ('old-sess', 'Bash', '{\"cmd\":\"ls\"}', 'pending')",
+        ).run();
+
+        const queueBefore = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
+        expect(queueBefore).toBe(1);
+
+        await manager.runCleanup();
+
+        expect(countSessions()).toBe(1);
+        const queueAfter = (db.query('SELECT COUNT(*) as c FROM escalation_queue').get() as { c: number }).c;
+        expect(queueAfter).toBe(0);
+    });
 });

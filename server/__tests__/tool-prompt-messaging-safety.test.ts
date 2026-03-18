@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { getMessagingSafetyPrompt } from '../providers/ollama/tool-prompt-templates';
+import { getMessagingSafetyPrompt, getWorktreeIsolationPrompt } from '../providers/ollama/tool-prompt-templates';
 
 describe('getMessagingSafetyPrompt', () => {
     test('returns a non-empty string', () => {
@@ -52,6 +52,36 @@ describe('getMessagingSafetyPrompt', () => {
     test('returns identical result on repeated calls (pure function)', () => {
         const first = getMessagingSafetyPrompt();
         const second = getMessagingSafetyPrompt();
+        expect(first).toBe(second);
+    });
+});
+
+describe('getWorktreeIsolationPrompt', () => {
+    test('returns a non-empty string', () => {
+        const result = getWorktreeIsolationPrompt();
+        expect(typeof result).toBe('string');
+        expect(result.length).toBeGreaterThan(0);
+    });
+
+    test('includes branch isolation header', () => {
+        const result = getWorktreeIsolationPrompt();
+        expect(result).toContain('## Git Branch Isolation');
+    });
+
+    test('warns against interacting with other sessions branches', () => {
+        const result = getWorktreeIsolationPrompt();
+        expect(result).toContain('chat/*');
+        expect(result).toContain('Do NOT checkout');
+    });
+
+    test('instructs to use main as base branch', () => {
+        const result = getWorktreeIsolationPrompt();
+        expect(result).toContain('main');
+    });
+
+    test('returns identical result on repeated calls (pure function)', () => {
+        const first = getWorktreeIsolationPrompt();
+        const second = getWorktreeIsolationPrompt();
         expect(first).toBe(second);
     });
 });
