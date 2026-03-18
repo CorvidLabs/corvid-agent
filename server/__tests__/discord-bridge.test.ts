@@ -1202,7 +1202,7 @@ describe('DiscordBridge expired thread session resume', () => {
             // Should have sent the dead-end embed
             const deadEnd = fetchBodies.find((b: unknown) => {
                 const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
-                return embeds?.some(e => e.description === 'This conversation has ended.');
+                return embeds?.some(e => e.description === 'This session has expired and can no longer be resumed. Start a new `/session` to continue working.');
             });
             expect(deadEnd).toBeDefined();
 
