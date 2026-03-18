@@ -75,7 +75,7 @@ Detects "cheerleading" responses — model outputs that sound productive but con
 ## Error Cases
 
 1. **Null/undefined text** — treated as empty string; scores 0.0 without tool calls or 1.0 with.
-2. **On-chain fallback failure** — `searchOnChainFallback` catches errors and returns `null`; never throws.
+2. **Malformed tool arguments** — non-object arguments are safely coerced via `String()` without throwing.
 3. **Nudge cap exceeded** — after `MAX_QUALITY_NUDGES` nudges, no more are injected regardless of quality scores.
 
 ## Dependencies
