@@ -3,7 +3,6 @@ module: memory-brain-viewer
 version: 1
 status: draft
 files:
-  - server/routes/brain-viewer.ts
   - server/routes/dashboard.ts
 db_tables:
   - agent_memories
@@ -23,7 +22,6 @@ Dashboard panel that gives humans full visibility into an agent's "brain" — al
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `handleBrainViewerRoutes` | `(req: Request, url: URL, db: Database, context?: RequestContext)` | `Response \| null` | Route handler for `/api/dashboard/memories` brain viewer endpoints |
 | `handleDashboardRoutes` | `(req: Request, url: URL, db: Database, context?: RequestContext)` | `Response \| null` | Route handler for `/api/dashboard/summary` aggregated endpoint |
 
 ### API Endpoints
