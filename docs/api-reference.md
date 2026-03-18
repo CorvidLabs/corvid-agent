@@ -46,6 +46,9 @@ Role-based access levels:
 - [Backup](#backup)
 - [Self-Test](#self-test)
 - [Dashboard](#dashboard)
+- [Contacts](#contacts)
+- [Brain Viewer](#brain-viewer)
+- [Flock Testing](#flock-testing)
 
 ---
 
@@ -2583,6 +2586,56 @@ curl "http://localhost:3000/api/dashboard/summary?activityLimit=10" \
 
 ---
 
+## Contacts
+
+Manage cross-platform contact identities with linked platform accounts (Discord, AlgoChat, GitHub).
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/contacts` | List contacts (search, pagination) | any |
+| POST | `/api/contacts` | Create contact | any |
+| GET | `/api/contacts/lookup` | Lookup by name or platform+platform_id | any |
+| GET | `/api/contacts/{id}` | Get contact by ID | any |
+| PUT | `/api/contacts/{id}` | Update contact | any |
+| DELETE | `/api/contacts/{id}` | Delete contact | any |
+| POST | `/api/contacts/{id}/links` | Add platform link (discord, algochat, github) | any |
+| DELETE | `/api/contacts/{id}/links/{linkId}` | Remove platform link | any |
+| PUT | `/api/contacts/{id}/links/{linkId}/verify` | Mark platform link as verified | any |
+
+---
+
+## Brain Viewer
+
+Read-only dashboard endpoints for inspecting agent memory state across both tiers (longterm on-chain, shortterm SQLite-only).
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/dashboard/memories` | List memories (filter by agent, tier, status, category, search) | dashboard |
+| GET | `/api/dashboard/memories/stats` | Memory statistics (counts by status, category, agent) | dashboard |
+| GET | `/api/dashboard/memories/sync-status` | Sync status (pending/failed counts, recent failures) | dashboard |
+| GET | `/api/dashboard/memories/{id}` | Get memory detail with categories and decay score | dashboard |
+
+---
+
+## Flock Testing
+
+Test result tracking for Flock Directory agents with score decay.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/flock-directory/testing/stats` | Aggregate test statistics | any |
+| GET | `/api/flock-directory/testing/agents/{agentId}/results` | Agent test results (with limit) | any |
+| GET | `/api/flock-directory/testing/agents/{agentId}/latest` | Latest test result for agent | any |
+| GET | `/api/flock-directory/testing/agents/{agentId}/score` | Effective score with decay multiplier | any |
+
+---
+
 ## Additional Modules
 
 The following modules are fully documented in the interactive API explorer at `/api/docs`. Each module has OpenAPI metadata including summaries, auth requirements, and request body schemas.
@@ -2608,6 +2661,7 @@ The following modules are fully documented in the interactive API explorer at `/
 | Operational Mode | `/api/operational-mode` | Get/set operational mode |
 | Memories | `POST /api/memories/backfill` | Memory embedding backfill |
 | Slack | `POST /slack/events` | Slack Events API webhook |
+| Personas | `/api/agents/{id}/persona` | Agent persona CRUD (archetype, traits, voice) |
 
 ---
 

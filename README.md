@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-7787%20unit%20%7C%20360%20E2E-brightgreen" alt="7718 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-7868%20unit%20%7C%20360%20E2E-brightgreen" alt="7868 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -137,7 +137,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | **7,787** across 324 files |
+| Unit tests | **7,868** across 328 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **153** with automated validation (100% file coverage) |
 | Test:code ratio | **1.14×** |
