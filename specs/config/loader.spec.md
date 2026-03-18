@@ -1,76 +1,107 @@
 ---
-module: config/loader
+module: config-loader
 version: 1
 status: active
 files:
   - server/config/loader.ts
-depends_on: []
+db_tables: []
+depends_on:
+  - specs/lib/infra.spec.md
 ---
 
 # Config Loader
 
 ## Purpose
 
-Loads, validates, and applies defaults to agent deployment configuration. Supports three loading strategies in priority order: explicit config file path, auto-discovered config file in the working directory, and environment variables (backward-compatible with `.env`).
+Loads, validates, and applies defaults to agent deployment configuration. Supports three loading strategies in priority order: explicit config file path, auto-discovered config file in the working directory (`corvid-agent.config.{ts,js,json}`), or environment variables. Provides backward compatibility with `.env`-based deployments while enabling structured config files.
 
 ## Public API
+
+### Exported Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `CONFIG_DEFAULTS` | `object` | Default values for optional server (port, bindHost, logLevel, logFormat, shutdownGraceMs), database (path, backupMaxKeep), work (maxIterations, maxPerDay, drainTimeoutMs, queue), scheduler (pollIntervalMs, maxConcurrentExecutions, minScheduleIntervalMs), and process (maxTurnsBeforeContextReset, inactivityTimeoutMs) configuration fields |
 
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `configFromEnv` | `()` | `AgentDeploymentConfig` | Builds config entirely from environment variables |
-| `validateConfig` | `(config: AgentDeploymentConfig)` | `ConfigValidationError[]` | Validates a deployment config, returns errors found |
-| `loadAgentConfig` | `(configPath?: string)` | `Promise<AgentDeploymentConfig>` | Loads, validates, and returns the agent deployment configuration |
+| `configFromEnv` | `()` | `AgentDeploymentConfig` | Builds config from environment variables, with auto-detection of enabled providers |
+| `validateConfig` | `(config: AgentDeploymentConfig)` | `ConfigValidationError[]` | Validates a deployment config, returning any errors found (empty array means valid) |
+| `loadAgentConfig` | `(configPath?: string)` | `Promise<AgentDeploymentConfig>` | Main entry point: loads config from file or env, applies defaults, validates, and returns the result |
 
 ### Exported Types
 
 | Type | Description |
 |------|-------------|
-| `ConfigValidationError` | Validation error with dot-path and message |
-
-### Exported Constants
-
-| Constant | Description |
-|----------|-------------|
-| `CONFIG_DEFAULTS` | Default values for server, database, work, scheduler, and process config |
+| `ConfigValidationError` | Validation error with `path` (dot-path to field) and `message` (human-readable description) |
 
 ## Invariants
 
-1. `loadAgentConfig` always applies defaults before returning — optional fields have safe fallback values.
-2. Validation warnings are logged but do not throw — deployments may intentionally omit optional fields.
-3. Environment variable loading is fully backward-compatible with `.env.example` mappings.
-4. Config file discovery checks `corvid-agent.config.ts`, `.js`, `.json` in that order.
-5. Explicit `configPath` takes priority over auto-discovery, which takes priority over env vars.
+1. Loading priority is always: explicit path > auto-discovered file > environment variables.
+2. Config file discovery searches for `corvid-agent.config.ts`, `.js`, `.json` in that order.
+3. Defaults are applied after loading, before validation — optional fields always have values.
+4. Validation errors are logged as warnings but do not throw; the config is still returned.
+5. `configFromEnv` auto-detects the anthropic provider when `ANTHROPIC_API_KEY` is set and always includes ollama as a fallback.
+6. Port must be between 0 and 65535.
+7. An API key is required when binding to a non-localhost address.
+8. At least one provider must be enabled.
+9. If the anthropic provider is enabled, its API key must be present.
+10. Database path is required.
 
 ## Behavioral Examples
 
-### Scenario: No config file, env vars only
+### Scenario: Load from explicit config path
 
-- **Given** no config file exists in the working directory
-- **When** `loadAgentConfig()` is called without a path
-- **Then** config is built from environment variables via `configFromEnv()`
+- **Given** `configPath` is `/app/config.json`
+- **When** `loadAgentConfig('/app/config.json')` is called
+- **Then** loads and parses the JSON file, applies defaults, validates, and returns config
 
-### Scenario: Validation catches missing required fields
+### Scenario: Auto-discover config file
 
-- **Given** a config with an empty `agent.name`
-- **When** `validateConfig()` is called
-- **Then** the result contains an error with path `agent.name`
+- **Given** no `configPath`, `corvid-agent.config.ts` exists in cwd
+- **When** `loadAgentConfig()` is called
+- **Then** discovers and loads the `.ts` file
 
-### Scenario: Non-localhost binding requires API key
+### Scenario: Fall back to environment variables
 
-- **Given** a config with `server.bindHost` set to `0.0.0.0` and no `server.apiKey`
-- **When** `validateConfig()` is called
-- **Then** the result contains an error requiring an API key
+- **Given** no `configPath`, no config file in cwd
+- **When** `loadAgentConfig()` is called
+- **Then** builds config from `process.env` via `configFromEnv()`
+- **And** defaults are applied for any missing optional fields
+
+### Scenario: Auto-discovering a config file
+
+- **Given** a file named `corvid-agent.config.json` exists in the current directory
+- **When** `loadAgentConfig()` is called without a path argument
+- **Then** the JSON file is loaded and parsed as the deployment config
+
+### Scenario: Validation warns but does not throw
+
+- **Given** config has `enabledProviders: ['anthropic']` but no `anthropic.apiKey`
+- **When** `validateConfig(config)` is called
+- **Then** returns error at path `providers.anthropic.apiKey`
+
+### Scenario: Config file must have correct export
+
+- **Given** a `.ts` or `.js` config file that exports neither `default` nor `config`
+- **When** the file is loaded
+- **Then** an error is thrown explaining the required export shape
 
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
-| Config file missing default/named export | Throws with descriptive message |
-| Invalid port (< 0 or > 65535) | Returns validation error at `server.port` |
-| No enabled providers | Returns validation error at `providers.enabledProviders` |
-| Anthropic enabled without API key | Returns validation error at `providers.anthropic.apiKey` |
+| Config file does not export `default` or `config` | Throws error |
+| Invalid JSON in `.json` config file | Throws parse error |
+| Agent name is empty | `validateConfig` returns error at path `agent.name` |
+| Default model is empty | `validateConfig` returns error at path `agent.defaultModel` |
+| No enabled providers | `validateConfig` returns error at path `providers.enabledProviders` |
+| Anthropic enabled without API key | `validateConfig` returns error at path `providers.anthropic.apiKey` |
+| Non-localhost bind without API key | `validateConfig` returns error at path `server.apiKey` |
+| Port out of range | `validateConfig` returns error at path `server.port` |
+| Database path is empty | `validateConfig` returns error at path `database.path` |
 
 ## Dependencies
 
@@ -80,15 +111,31 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 |--------|-------------|
 | `shared/types/agent-config` | `AgentDeploymentConfig` type |
 | `server/lib/logger` | `createLogger()` |
+| `node:fs` | `existsSync` for config file discovery |
+| `node:path` | `resolve`, `join` for path resolution |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
-| `server/__tests__/config-loader.test.ts` | `configFromEnv`, `validateConfig`, `loadAgentConfig`, `CONFIG_DEFAULTS` |
+| `server/bootstrap` | `loadAgentConfig` to initialize server configuration |
+| `server/__tests__/config-loader.test.ts` | All exported functions and types |
+
+## Configuration
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `PORT` | `3000` | Server listen port |
+| `BIND_HOST` | `127.0.0.1` | Server bind address |
+| `LOG_LEVEL` | `info` | Logging level |
+| `LOG_FORMAT` | `text` | Log output format |
+| `DATABASE_PATH` | `./corvid-agent.db` | SQLite database file path |
+| `ANTHROPIC_API_KEY` | — | Anthropic provider API key |
+| `DEFAULT_MODEL` | `claude-sonnet-4-20250514` | Default LLM model |
+| `DEFAULT_PROVIDER` | auto-detected | Default LLM provider |
 
 ## Change Log
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-03-18 | corvid-agent | Initial spec to restore 100% spec coverage |
+| 2026-03-18 | corvid-agent | Initial spec |

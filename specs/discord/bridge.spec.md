@@ -150,6 +150,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `handleMessage` | `(ctx, data)` | `Promise<void>` | Dispatch an incoming Discord message to the appropriate handler |
 | `sendTaskResult` | `(ctx, channelId, task, mentionUserId?)` | `Promise<void>` | Send a task completion/failure embed |
+| `withAuthorContext` | `(text, authorId?, authorUsername?)` | `string` | Prefix message text with Discord author context for agent identification |
 
 ### Exported Functions (from permissions.ts)
 

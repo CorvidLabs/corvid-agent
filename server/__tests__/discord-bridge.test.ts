@@ -7,6 +7,7 @@ import type { DiscordBridgeConfig } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import type { WorkTask } from '../../shared/types/work-tasks';
+import { withAuthorContext } from '../discord/message-handler';
 
 function createMockProcessManager() {
     return {
@@ -210,7 +211,7 @@ describe('DiscordBridge', () => {
             // Prompt should include author context prefix
             const startArgs = (pm.startProcess as ReturnType<typeof mock>).mock.calls[0];
             const prompt = startArgs[1] as string;
-            expect(prompt).toContain('[From Discord user: TestUser]');
+            expect(prompt).toContain('[From Discord user: TestUser (Discord ID: user-1)]');
             expect(prompt).toContain('what time is it?');
             // Should subscribe for response
             expect(pm.subscribe).toHaveBeenCalled();
@@ -1083,6 +1084,189 @@ describe('DiscordBridge onboarding', () => {
                 return embeds?.some(e => e.footer?.text === 'This tip only appears once');
             });
             expect(secondWelcome).toBeUndefined();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
+
+describe('withAuthorContext', () => {
+    test('returns text unchanged when no author info provided', () => {
+        expect(withAuthorContext('hello')).toBe('hello');
+    });
+
+    test('includes both username and Discord ID when both provided', () => {
+        expect(withAuthorContext('hello', '12345', 'Alice')).toBe('[From Discord user: Alice (Discord ID: 12345)]\nhello');
+    });
+
+    test('includes only Discord ID when username is missing', () => {
+        expect(withAuthorContext('hello', '12345')).toBe('[From Discord user ID: 12345]\nhello');
+    });
+
+    test('includes only username when Discord ID is missing', () => {
+        expect(withAuthorContext('hello', undefined, 'Alice')).toBe('[From Discord user: Alice]\nhello');
+    });
+});
+
+describe('DiscordBridge expired thread session resume', () => {
+    test('resumes expired session when user messages in thread with deleted session', async () => {
+        const pm = createMockProcessManager();
+        // Make getSession return null by having isRunning return false
+        // and sendMessage return false so it tries to resume
+        (pm.sendMessage as ReturnType<typeof mock>).mockImplementation(() => true);
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        createAgent(db, { name: 'ResumeAgent', model: 'test-model' });
+        createProject(db, { name: 'ResumeProject', workingDir: '/tmp/test' });
+
+        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+
+        // Set up thread info pointing to a non-existent session ID
+        threadSessions.set('600000000000000001', {
+            sessionId: 'non-existent-session-id',
+            agentName: 'ResumeAgent',
+            agentModel: 'test-model',
+            ownerUserId: 'user-1',
+            topic: 'test topic',
+            projectName: 'ResumeProject',
+        });
+
+        const originalFetch = globalThis.fetch;
+        const fetchCalls: string[] = [];
+        globalThis.fetch = mock(async (url: string | URL | Request) => {
+            const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+            fetchCalls.push(urlStr);
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000050',
+                channel_id: '600000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'hello after expiry',
+                timestamp: new Date().toISOString(),
+            });
+
+            // Should have started a new process (resume behavior)
+            expect(pm.startProcess).toHaveBeenCalled();
+
+            // Thread session should be updated with a new session ID
+            const updatedInfo = threadSessions.get('600000000000000001') as { sessionId: string; agentName: string };
+            expect(updatedInfo).toBeDefined();
+            expect(updatedInfo.sessionId).not.toBe('non-existent-session-id');
+            expect(updatedInfo.agentName).toBe('ResumeAgent');
+
+            // Should have subscribed for responses
+            expect(pm.subscribe).toHaveBeenCalled();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('falls back to dead-end embed when no agents are configured', async () => {
+        const pm = createMockProcessManager();
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        // No agents or projects created — resume should fail
+        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        threadSessions.set('700000000000000001', {
+            sessionId: 'non-existent-session-id',
+            agentName: 'GhostAgent',
+            agentModel: 'test-model',
+            ownerUserId: 'user-1',
+        });
+
+        const originalFetch = globalThis.fetch;
+        const fetchBodies: unknown[] = [];
+        globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+            if (init?.body) {
+                try { fetchBodies.push(JSON.parse(init.body as string)); } catch { /* skip */ }
+            }
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000060',
+                channel_id: '700000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'hello',
+                timestamp: new Date().toISOString(),
+            });
+
+            // Should NOT have started a new process
+            expect(pm.startProcess).not.toHaveBeenCalled();
+
+            // Should have sent the dead-end embed
+            const deadEnd = fetchBodies.find((b: unknown) => {
+                const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
+                return embeds?.some(e => e.description === 'This conversation has ended.');
+            });
+            expect(deadEnd).toBeDefined();
+
+            // Thread session should be cleaned up
+            expect(threadSessions.has('700000000000000001')).toBe(false);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('falls back to default agent when original agent no longer exists', async () => {
+        const pm = createMockProcessManager();
+        (pm.sendMessage as ReturnType<typeof mock>).mockImplementation(() => true);
+
+        const config: DiscordBridgeConfig = {
+            botToken: 'test-token',
+            channelId: '100000000000000001',
+            allowedUserIds: [],
+        };
+        const bridge = new DiscordBridge(db, pm, config);
+
+        // Create a different agent than the one in the thread info
+        createAgent(db, { name: 'FallbackAgent', model: 'fallback-model' });
+        createProject(db, { name: 'TestProject', workingDir: '/tmp/test' });
+
+        const threadSessions = (bridge as unknown as { threadSessions: Map<string, unknown> }).threadSessions;
+        threadSessions.set('800000000000000001', {
+            sessionId: 'non-existent-session-id',
+            agentName: 'DeletedAgent', // This agent doesn't exist
+            agentModel: 'old-model',
+            ownerUserId: 'user-1',
+        });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(async () => {
+            return new Response(JSON.stringify({}), { status: 200 });
+        }) as unknown as typeof fetch;
+
+        try {
+            await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
+                id: '200000000000000070',
+                channel_id: '800000000000000001',
+                author: { id: 'user-1', username: 'TestUser' },
+                content: 'hello with fallback',
+                timestamp: new Date().toISOString(),
+            });
+
+            // Should have started a process with the fallback agent
+            expect(pm.startProcess).toHaveBeenCalled();
+
+            // Thread should be updated with FallbackAgent
+            const updatedInfo = threadSessions.get('800000000000000001') as { agentName: string };
+            expect(updatedInfo).toBeDefined();
+            expect(updatedInfo.agentName).toBe('FallbackAgent');
         } finally {
             globalThis.fetch = originalFetch;
         }
