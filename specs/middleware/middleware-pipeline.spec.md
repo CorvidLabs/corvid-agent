@@ -126,6 +126,7 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 22. **Global rate limit exempt paths**: `/api/health`, `/webhooks/github`, and `/ws` bypass global rate limiting.
 23. **Admin API key comparison uses timingSafeEqual()**: Never plain `===` — prevents timing oracle attacks on the admin key.
 24. **POST /api/algochat/network requires admin role**: The network switch endpoint is gated via `requiresAdminRole()` in the `ADMIN_PATHS` set.
+25. **Wallet query param validated**: `authGuard` only sets `context.walletAddress` from the `?wallet` query parameter if the value passes `isAlgorandAddressFormat()` (58 uppercase base32 chars). Invalid or malformed values are silently ignored.
 
 ## Behavioral Examples
 
@@ -189,6 +190,18 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 - **When** an authenticated request with `role=user` hits `/metrics`
 - **Then** roleGuard returns a 403 Response with `{ error: 'Forbidden: insufficient role', requiredRoles: ['admin'] }`
 
+### Scenario: authGuard ignores invalid wallet query param
+
+- **Given** a request with `?wallet=<script>alert(1)</script>`
+- **When** `authGuard` processes the request
+- **Then** `context.walletAddress` remains `undefined` (the invalid value is silently dropped)
+
+### Scenario: authGuard accepts valid wallet query param
+
+- **Given** a request with `?wallet=IEEMTOJCOCJ5V6Z4I4XGFUPPVSROSPBNOMMJIFWVBTJTMYPIEZYELJDFD4`
+- **When** `authGuard` processes the request
+- **Then** `context.walletAddress` is set to the provided address
+
 ### Scenario: Endpoint rate limit exempt path
 
 - **Given** `/api/health` is in the exempt paths list
@@ -225,6 +238,7 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 |--------|-------------|
 | `server/middleware/auth.ts` | `AuthConfig`, `buildCorsHeaders`, `checkHttpAuth` |
 | `server/middleware/rate-limit.ts` | `RateLimiter`, `getClientIp` |
+| `server/lib/validation.ts` | `isAlgorandAddressFormat` |
 | `server/lib/logger.ts` | `createLogger` |
 | `server/lib/errors.ts` | `isAppError`, `RateLimitError` |
 | `server/observability/metrics.ts` | `endpointRateLimitRejections` counter |
@@ -272,3 +286,4 @@ Request processing infrastructure for the HTTP server. Provides two complementar
 |------|--------|--------|
 | 2026-02-26 | corvid-agent | Initial spec |
 | 2026-03-06 | corvid-agent | Admin key comparison changed from === to timingSafeEqual(). Network switch endpoint added to requiresAdminRole(). |
+| 2026-03-17 | corvid-agent | Added invariant 25 (wallet query param validation), two behavioral examples, and validation.ts dependency for authGuard wallet format check. |
