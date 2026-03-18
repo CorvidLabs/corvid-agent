@@ -39,6 +39,7 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
 
       - name: Spec validation (strict + 100% coverage)
+        # https://github.com/marketplace/actions/specsync-check
         uses: CorvidLabs/spec-sync@v1
         with:
           strict: 'true'
