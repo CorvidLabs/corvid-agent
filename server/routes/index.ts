@@ -356,7 +356,7 @@ async function handleRoutes(
     const settingsResponse = await handleSettingsRoutes(req, url, db, context, getAuthConfig());
     if (settingsResponse) return settingsResponse;
 
-    const sessionResponse = await handleSessionRoutes(req, url, db, processManager, context);
+    const sessionResponse = await handleSessionRoutes(req, url, db, processManager, context, workTaskService);
     if (sessionResponse) return sessionResponse;
 
     const councilResponse = handleCouncilRoutes(req, url, db, processManager, agentMessenger, context, reputationScorer);

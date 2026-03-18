@@ -259,6 +259,7 @@ Every request passes through these stages in order:
 | GET | `/api/sessions/:id/messages` | sessions.ts | List session messages |
 | POST | `/api/sessions/:id/stop` | sessions.ts | Stop running session |
 | POST | `/api/sessions/:id/resume` | index.ts (inline) | Resume paused session |
+| POST | `/api/sessions/:id/escalate` | sessions.ts | Create work task from stalled session at higher model tier |
 
 ### Councils
 

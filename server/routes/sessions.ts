@@ -7,7 +7,9 @@ import {
     deleteSession,
     getSessionMessages,
 } from '../db/sessions';
+import { getSessionMetrics } from '../db/session-metrics';
 import type { ProcessManager } from '../process/manager';
+import type { WorkTaskService } from '../work/service';
 import { createLogger } from '../lib/logger';
 import { parseBodyOrThrow, ValidationError, CreateSessionSchema, UpdateSessionSchema, ResumeSessionSchema } from '../lib/validation';
 import { json } from '../lib/response';
@@ -24,6 +26,7 @@ export async function handleSessionRoutes(
     db: Database,
     processManager: ProcessManager,
     context?: RequestContext,
+    workTaskService?: WorkTaskService | null,
 ): Promise<Response | null> {
     const path = url.pathname;
     const method = req.method;
@@ -90,6 +93,14 @@ export async function handleSessionRoutes(
             if (denied) return denied;
         }
         return handleResume(req, db, processManager, id, tenantId);
+    }
+
+    if (action === 'escalate' && method === 'POST') {
+        if (context) {
+            const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
+            if (denied) return denied;
+        }
+        return handleEscalate(req, db, id, tenantId, workTaskService ?? null);
     }
 
     return null;
@@ -175,4 +186,90 @@ async function handleResume(
         log.error('Failed to resume process', { sessionId: session.id, error: err instanceof Error ? err.message : String(err) });
     }
     return json({ ok: true });
+}
+
+/**
+ * POST /api/sessions/:id/escalate
+ * Creates a work task from a stalled session, retrying the original prompt
+ * at a higher model tier.
+ */
+async function handleEscalate(
+    req: Request,
+    db: Database,
+    sessionId: string,
+    tenantId: string,
+    workTaskService: WorkTaskService | null,
+): Promise<Response> {
+    if (!workTaskService) {
+        return json({ error: 'Work task service not available' }, 503);
+    }
+
+    const session = getSession(db, sessionId, tenantId);
+    if (!session) return json({ error: 'Session not found' }, 404);
+
+    // Check session metrics for stall detection (use most recent metrics entry)
+    const allMetrics = getSessionMetrics(db, sessionId);
+    const metrics = allMetrics[allMetrics.length - 1];
+    if (!metrics) {
+        return json({ error: 'No metrics found for session — cannot determine escalation eligibility' }, 400);
+    }
+
+    const stallReasons = new Set(['stall_repeat', 'stall_same_tool', 'max_iterations']);
+    if (!stallReasons.has(metrics.terminationReason) && !metrics.stallDetected) {
+        return json({ error: 'Session did not stall — escalation not applicable' }, 400);
+    }
+
+    if (!session.agentId) {
+        return json({ error: 'Session has no agent — cannot create work task' }, 400);
+    }
+
+    // Parse optional body for model tier override
+    let modelTier: string | undefined;
+    try {
+        const body = await req.json() as { modelTier?: string };
+        modelTier = body?.modelTier;
+    } catch {
+        // Empty body is fine
+    }
+
+    const prompt = session.initialPrompt || 'Continue the previous task.';
+    const description = `[Escalated from session ${sessionId}] ${prompt.slice(0, 500)}`;
+
+    try {
+        const task = await workTaskService.create({
+            agentId: session.agentId,
+            description,
+            projectId: session.projectId ?? undefined,
+            source: 'web',
+            sourceId: sessionId,
+            modelTier: modelTier || 'sonnet',
+            requesterInfo: {
+                escalatedFrom: sessionId,
+                originalTier: metrics.tier,
+                stallType: metrics.stallType,
+                terminationReason: metrics.terminationReason,
+            },
+        });
+
+        const ip = getClientIp(req);
+        recordAudit(db, 'work_task_create', ip, 'session', sessionId, null, null, ip);
+
+        log.info('Session escalated to work task', {
+            sessionId,
+            taskId: task.id,
+            fromTier: metrics.tier,
+            toTier: modelTier || 'sonnet',
+        });
+
+        return json({
+            ok: true,
+            taskId: task.id,
+            escalatedFrom: sessionId,
+            modelTier: modelTier || 'sonnet',
+        }, 201);
+    } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        log.error('Failed to escalate session', { sessionId, error: errorMsg });
+        return json({ error: `Escalation failed: ${errorMsg}` }, 500);
+    }
 }
