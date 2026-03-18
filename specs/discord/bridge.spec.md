@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 14
+version: 15
 status: active
 files:
   - server/discord/bridge.ts
@@ -142,6 +142,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `agentColor` | `(name: string)` | `number` | Generate a consistent embed color for an agent name |
 | `buildFooterText` | `(ctx: FooterContext)` | `string` | Build a standardized footer with session ID, project, agent, and status |
 | `assertSnowflake` | `(value, label)` | `void` | Validate a Discord snowflake ID |
+| `extractMentionsFromEmbed` | `(embed)` | `string \| undefined` | Extract Discord mentions from embed description for top-level content field notifications |
 
 ### Exported Functions (from message-handler.ts)
 
@@ -550,3 +551,4 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-14 | corvid-agent | v11: Added `/tasks`, `/schedule`, `/config` slash commands. `/tasks` shows active work tasks with status emojis and queue counts. `/schedule` shows active schedules with Discord relative timestamps for next/last runs. `/config` is admin-only ephemeral embed showing mode, channels, and permission settings. Updated `/help` embed. 6 new tests. Closes #894 |
 | 2026-03-16 | corvid-agent | v12: Discord reaction listener for reputation feedback. Added `GUILD_MESSAGE_REACTIONS` intent, `MESSAGE_REACTION_ADD` dispatch handler, `reaction-handler.ts` module with emoji-to-sentiment mapping, per-user rate limiting (5/min), session resolution from mentionSessions and threadSessions, `response_feedback` insertion, and reputation event recording. `setReputationScorer()` setter on DiscordBridge. 11 new tests. Closes #1161 |
 | 2026-03-17 | corvid-agent | v13: Adaptive inline response UX. Added `subscribeForAdaptiveInlineResponse` (starts lightweight, upgrades to progress embed on tool use), `subscribeForInlineProgressResponse` (always-on progress embed), and `editEmbed` helper for PATCH-ing embeds in-place. @mention replies now use adaptive subscriber for cleaner conversational UX |
+| 2026-03-18 | corvid-agent | v14→v15: Added `extractMentionsFromEmbed` — extracts Discord mentions from embed descriptions into top-level `content` field so mentions trigger notifications. Applied to `sendEmbed`, `sendReplyEmbed`, and `editEmbed` |
