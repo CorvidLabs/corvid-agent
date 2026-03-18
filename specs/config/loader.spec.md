@@ -5,14 +5,15 @@ status: active
 files:
   - server/config/loader.ts
 db_tables: []
-depends_on: []
+depends_on:
+  - specs/lib/infra.spec.md
 ---
 
 # Configuration Loader
 
 ## Purpose
 
-Configuration loader for agent deployments. Supports three loading strategies in priority order: explicit config file path, auto-discovered config file in the working directory (`corvid-agent.config.{ts,js,json}`), or environment variables. After loading, the config is validated and defaults are applied for optional fields.
+Loads, validates, and applies defaults to agent deployment configuration. Supports three loading strategies in priority order: explicit config file path, auto-discovered config file in the working directory (`corvid-agent.config.{ts,js,json}`), or environment variables. Provides backward compatibility with `.env`-based deployments while enabling structured config files.
 
 ## Public API
 
@@ -26,9 +27,9 @@ Configuration loader for agent deployments. Supports three loading strategies in
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `configFromEnv` | `()` | `AgentDeploymentConfig` | Builds config from environment variables, providing backward compatibility with `.env` deployments |
+| `configFromEnv` | `()` | `AgentDeploymentConfig` | Builds config from environment variables, with auto-detection of enabled providers |
 | `validateConfig` | `(config: AgentDeploymentConfig)` | `ConfigValidationError[]` | Validates a deployment config, returning any errors found (empty array means valid) |
-| `loadAgentConfig` | `(configPath?: string)` | `Promise<AgentDeploymentConfig>` | Main entry point: loads, validates, and returns the agent deployment configuration |
+| `loadAgentConfig` | `(configPath?: string)` | `Promise<AgentDeploymentConfig>` | Main entry point: loads config from file or env, applies defaults, validates, and returns the result |
 
 ### Exported Types
 
@@ -38,11 +39,16 @@ Configuration loader for agent deployments. Supports three loading strategies in
 
 ## Invariants
 
-1. Loading priority is always: explicit path > auto-discovered file > environment variables
-2. Defaults are applied after loading, before returning — optional fields always have values
-3. Validation warnings are logged but never throw — deployments may intentionally omit optional fields
-4. Auto-discovery searches for `corvid-agent.config.ts`, `.js`, `.json` in that order
-5. When binding to a non-localhost address, an API key is required
+1. Loading priority is always: explicit path > auto-discovered file > environment variables.
+2. Config file discovery searches for `corvid-agent.config.ts`, `.js`, `.json` in that order.
+3. Defaults are applied after loading, before validation — optional fields always have values.
+4. Validation errors are logged as warnings but do not throw; the config is still returned.
+5. `configFromEnv` auto-detects the anthropic provider when `ANTHROPIC_API_KEY` is set and always includes ollama as a fallback.
+6. Port must be between 0 and 65535.
+7. An API key is required when binding to a non-localhost address.
+8. At least one provider must be enabled.
+9. If the anthropic provider is enabled, its API key must be present.
+10. Database path is required.
 
 ## Behavioral Examples
 
@@ -52,6 +58,12 @@ Configuration loader for agent deployments. Supports three loading strategies in
 - **When** `loadAgentConfig()` is called
 - **Then** configuration is built from `process.env` via `configFromEnv()`
 - **And** defaults are applied for any missing optional fields
+
+### Scenario: Auto-discovering a config file
+
+- **Given** a file named `corvid-agent.config.json` exists in the current directory
+- **When** `loadAgentConfig()` is called without a path argument
+- **Then** the JSON file is loaded and parsed as the deployment config
 
 ### Scenario: Validation warns but does not throw
 
@@ -70,9 +82,15 @@ Configuration loader for agent deployments. Supports three loading strategies in
 
 | Condition | Behavior |
 |-----------|----------|
-| Config file missing default/config export | Throws error |
+| Config file does not export `default` or `config` | Throws error |
 | Invalid JSON in `.json` config file | Throws parse error |
-| Validation failures | Logs warnings, returns config anyway |
+| Agent name is empty | `validateConfig` returns error at path `agent.name` |
+| Default model is empty | `validateConfig` returns error at path `agent.defaultModel` |
+| No enabled providers | `validateConfig` returns error at path `providers.enabledProviders` |
+| Anthropic enabled without API key | `validateConfig` returns error at path `providers.anthropic.apiKey` |
+| Non-localhost bind without API key | `validateConfig` returns error at path `server.apiKey` |
+| Port out of range | `validateConfig` returns error at path `server.port` |
+| Database path is empty | `validateConfig` returns error at path `database.path` |
 
 ## Dependencies
 
@@ -82,11 +100,14 @@ Configuration loader for agent deployments. Supports three loading strategies in
 |--------|-------------|
 | `shared/types/agent-config` | `AgentDeploymentConfig` type |
 | `server/lib/logger` | `createLogger()` |
+| `node:fs` | `existsSync` for config file discovery |
+| `node:path` | `resolve`, `join` for path resolution |
 
 ### Consumed By
 
 | Module | What is used |
 |--------|-------------|
+| `server/bootstrap` | `loadAgentConfig` to initialize server configuration |
 | `server/__tests__/config-loader.test.ts` | All exported functions and types |
 
 ## Configuration
