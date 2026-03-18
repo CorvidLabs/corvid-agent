@@ -16,17 +16,11 @@ Configuration loader for agent deployments. Supports three loading strategies in
 
 ## Public API
 
-### Exported Types
-
-| Type | Description |
-|------|-------------|
-| `ConfigValidationError` | Validation error with `path` (dot-path to field) and `message` (human-readable description) |
-
 ### Exported Constants
 
-| Constant | Description |
-|----------|-------------|
-| `CONFIG_DEFAULTS` | Default values for server (port, bindHost, logLevel, logFormat, shutdownGraceMs), database (path, backupMaxKeep), work (maxIterations, maxPerDay, drainTimeoutMs, queue), scheduler (pollIntervalMs, maxConcurrentExecutions, minScheduleIntervalMs), and process (maxTurnsBeforeContextReset, inactivityTimeoutMs) |
+| Constant | Type | Description |
+|----------|------|-------------|
+| `CONFIG_DEFAULTS` | `object` | Default values for optional server (port, bindHost, logLevel, logFormat, shutdownGraceMs), database (path, backupMaxKeep), work (maxIterations, maxPerDay, drainTimeoutMs, queue), scheduler (pollIntervalMs, maxConcurrentExecutions, minScheduleIntervalMs), and process (maxTurnsBeforeContextReset, inactivityTimeoutMs) configuration fields |
 
 ### Exported Functions
 
@@ -35,6 +29,12 @@ Configuration loader for agent deployments. Supports three loading strategies in
 | `configFromEnv` | `()` | `AgentDeploymentConfig` | Build config entirely from environment variables. Provides backward compatibility with `.env` deployments |
 | `validateConfig` | `(config: AgentDeploymentConfig)` | `ConfigValidationError[]` | Validate a deployment config, returning errors found. Empty array means valid |
 | `loadAgentConfig` | `(configPath?: string)` | `Promise<AgentDeploymentConfig>` | Load, validate, and return the agent deployment configuration using the three-strategy priority chain |
+
+### Exported Types
+
+| Type | Description |
+|------|-------------|
+| `ConfigValidationError` | Validation error with `path` (dot-path to field) and `message` (human-readable description) |
 
 ## Invariants
 
@@ -65,6 +65,7 @@ Configuration loader for agent deployments. Supports three loading strategies in
 - **Given** no `configPath`, no config file in cwd
 - **When** `loadAgentConfig()` is called
 - **Then** builds config from `process.env` via `configFromEnv()`
+- **And** defaults are applied for any missing optional fields
 
 ### Scenario: Validation warns on missing provider key
 
@@ -72,11 +73,18 @@ Configuration loader for agent deployments. Supports three loading strategies in
 - **When** `validateConfig(config)` is called
 - **Then** returns error at path `providers.anthropic.apiKey`
 
+### Scenario: Config file must have correct export
+
+- **Given** a `.ts` or `.js` config file that exports neither `default` nor `config`
+- **When** the file is loaded
+- **Then** an error is thrown explaining the required export shape
+
 ## Error Cases
 
 | Condition | Behavior |
 |-----------|----------|
 | Config file exports neither `default` nor `config` | Throws Error |
+| Invalid JSON in `.json` config file | Throws parse error |
 | Invalid port (negative or > 65535) | Validation error at `server.port` |
 | Non-localhost bind without API key | Validation error at `server.apiKey` |
 | No enabled providers | Validation error at `providers.enabledProviders` |
@@ -99,6 +107,20 @@ Configuration loader for agent deployments. Supports three loading strategies in
 | Module | What is used |
 |--------|-------------|
 | `server/index.ts` | `loadAgentConfig()` at startup |
+| `server/__tests__/config-loader.test.ts` | All exported functions and types |
+
+## Configuration
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `PORT` | `3000` | Server listen port |
+| `BIND_HOST` | `127.0.0.1` | Server bind address |
+| `LOG_LEVEL` | `info` | Logging level |
+| `LOG_FORMAT` | `text` | Log output format |
+| `DATABASE_PATH` | `./corvid-agent.db` | SQLite database file path |
+| `ANTHROPIC_API_KEY` | — | Anthropic provider API key |
+| `DEFAULT_MODEL` | `claude-sonnet-4-20250514` | Default LLM model |
+| `DEFAULT_PROVIDER` | auto-detected | Default LLM provider |
 
 ## Change Log
 

@@ -4,6 +4,18 @@ Get corvid-agent running and have an AI agent open a real PR on a test repo.
 
 ---
 
+## Choose your path
+
+| I want to... | Command | Time | API keys needed? |
+|--------------|---------|------|-----------------|
+| **Try it instantly** | `git clone && bun run try` | 30 sec | No |
+| **See a CLI demo** | `corvid-agent demo` | 1 min | No |
+| **Set up for real** | `corvid-agent init` | 5 min | Yes |
+
+**New here?** Start with `bun run try` — it launches a sandbox with an in-memory database, a pre-created agent, and the dashboard. No `.env` or API keys needed. When you're ready for the real thing, come back to step 1 below.
+
+---
+
 ## 1. Install and start (2 minutes)
 
 ```bash
