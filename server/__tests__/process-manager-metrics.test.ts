@@ -34,6 +34,9 @@ function makeMetrics(overrides: Partial<DirectProcessMetrics> = {}): DirectProce
         terminationReason: 'normal',
         durationMs: 15000,
         needsSummary: false,
+        totalLowQualityResponses: 0,
+        totalVacuousToolCalls: 0,
+        qualityNudgeCount: 0,
         ...overrides,
     };
 }

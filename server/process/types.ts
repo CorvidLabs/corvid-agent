@@ -78,6 +78,10 @@ export interface DirectProcessMetrics {
     terminationReason: 'normal' | 'stall_repeat' | 'stall_same_tool' | 'max_iterations' | 'abort' | 'error';
     durationMs: number;
     needsSummary: boolean;
+    /** Response quality metrics (cheerleading detection). */
+    totalLowQualityResponses: number;
+    totalVacuousToolCalls: number;
+    qualityNudgeCount: number;
 }
 
 /** Session completed successfully */
