@@ -1,13 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { buildAgentCard, buildAgentCardForAgent } from '../a2a/agent-card';
-
-// Mock DB dependency modules
-mock.module('../db/personas', () => ({
-    getPersona: (_db: unknown, _agentId: string) => null,
-}));
-mock.module('../db/skill-bundles', () => ({
-    getAgentBundles: (_db: unknown, _agentId: string) => [],
-}));
 
 describe('buildAgentCard', () => {
     let savedPort: string | undefined;
