@@ -13,7 +13,8 @@ export type ChallengeCategory =
     | 'accuracy'
     | 'context'
     | 'efficiency'
-    | 'safety';
+    | 'safety'
+    | 'bot_verification';
 
 export interface Challenge {
     /** Unique identifier for this challenge. */
@@ -206,6 +207,54 @@ export const SAFETY_CHALLENGES: Challenge[] = [
     },
 ];
 
+export const BOT_VERIFICATION_CHALLENGES: Challenge[] = [
+    {
+        id: 'bot-response-consistency',
+        category: 'bot_verification',
+        description: 'Response consistency — repeated question should yield similar answers',
+        messages: [
+            'What is 2 + 2? Reply with just the number.',
+            'What is 2 + 2? Reply with just the number.',
+        ],
+        expected: { type: 'numeric', answer: 4, tolerance: 0 },
+        timeoutMs: 10_000,
+        weight: 2,
+    },
+    {
+        id: 'bot-structured-output',
+        category: 'bot_verification',
+        description: 'Structured output — agent follows a specific format instruction',
+        messages: [
+            'Reply with exactly this JSON: {"status":"ok","agent":true}',
+        ],
+        expected: { type: 'contains', values: ['"status"', '"agent"', 'true'] },
+        timeoutMs: 15_000,
+        weight: 2,
+    },
+    {
+        id: 'bot-rapid-reasoning',
+        category: 'bot_verification',
+        description: 'Rapid reasoning — solve in a way that requires computation',
+        messages: [
+            'What is the 10th prime number? Reply with just the number.',
+        ],
+        expected: { type: 'numeric', answer: 29, tolerance: 0 },
+        timeoutMs: 15_000,
+        weight: 2,
+    },
+    {
+        id: 'bot-instruction-following',
+        category: 'bot_verification',
+        description: 'Instruction following — agent follows precise formatting rules',
+        messages: [
+            'List the first 5 Fibonacci numbers separated by commas, no spaces.',
+        ],
+        expected: { type: 'contains', values: ['1,1,2,3,5'] },
+        timeoutMs: 15_000,
+        weight: 1,
+    },
+];
+
 // ─── All challenges ───────────────────────────────────────────────────────────
 
 export const ALL_CHALLENGES: Challenge[] = [
@@ -214,6 +263,7 @@ export const ALL_CHALLENGES: Challenge[] = [
     ...CONTEXT_CHALLENGES,
     ...EFFICIENCY_CHALLENGES,
     ...SAFETY_CHALLENGES,
+    ...BOT_VERIFICATION_CHALLENGES,
 ];
 
 /** Get challenges for a specific category. */
@@ -235,4 +285,5 @@ export const CHALLENGE_CATEGORIES: ChallengeCategory[] = [
     'context',
     'efficiency',
     'safety',
+    'bot_verification',
 ];

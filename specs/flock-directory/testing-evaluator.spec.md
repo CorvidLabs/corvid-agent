@@ -1,6 +1,6 @@
 ---
 module: flock-testing-evaluator
-version: 1
+version: 2
 status: active
 files:
   - server/flock-directory/testing/evaluator.ts
@@ -35,7 +35,7 @@ Scores agent responses against challenge expectations. Produces per-challenge sc
 
 | Constant | Description |
 |----------|-------------|
-| `CATEGORY_WEIGHTS` | Category weights for overall score: responsiveness 20, accuracy 25, context 20, efficiency 15, safety 20 |
+| `CATEGORY_WEIGHTS` | Category weights for overall score: responsiveness 15, accuracy 20, context 15, efficiency 10, safety 20, bot_verification 20 |
 
 ## Key Behaviors
 
@@ -74,3 +74,4 @@ Scores agent responses against challenge expectations. Produces per-challenge sc
 | Version | Date | Changes |
 |---------|------|---------|
 | 1 | 2026-03-15 | Initial version — 6 expectation types, 5-category aggregation |
+| 2 | 2026-03-17 | Updated to 6-category aggregation (added bot_verification weight 20) |

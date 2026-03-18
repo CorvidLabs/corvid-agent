@@ -1,6 +1,6 @@
 ---
 module: scheduler-handlers
-version: 1
+version: 2
 status: active
 files:
   - server/scheduler/handlers/types.ts
@@ -10,6 +10,7 @@ files:
   - server/scheduler/handlers/improvement.ts
   - server/scheduler/handlers/maintenance.ts
   - server/scheduler/handlers/review.ts
+  - server/scheduler/handlers/flock-testing.ts
   - server/scheduler/handlers/work-task.ts
 db_tables:
   - schedule_executions
@@ -76,6 +77,12 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 |----------|-----------|---------|-------------|
 | `execImprovementLoop` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule, action: ScheduleAction)` | `Promise<void>` | Runs the autonomous improvement loop via `AutonomousLoopService.run` with optional `maxTasks` and `focusArea` |
 
+#### flock-testing.ts
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `execFlockTesting` | `(ctx: HandlerContext, executionId: string, schedule: AgentSchedule)` | `Promise<void>` | Runs the full Flock Directory test suite against all active agents via AlgoChat, records scores, and reports results |
+
 #### marketplace-billing.ts (re-exported via index.ts)
 
 | Function | Parameters | Returns | Description |
@@ -105,6 +112,8 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 8. `execOutcomeAnalysis` requires `ctx.outcomeTrackerService` to be non-null.
 9. `execDailyReview` requires `ctx.dailyReviewService` to be non-null.
 10. `execSendMessage` requires `ctx.agentMessenger` to be non-null.
+18. `execFlockTesting` requires `ctx.agentMessenger` to be non-null; fails with "Agent messenger not configured" otherwise.
+19. `execFlockTesting` skips testing the schedule's own agent (self-test prevention).
 11. `execCouncilLaunch` requires `councilId`, `projectId`, and `description` in the action; fails if any is missing.
 12. `execStarRepos` and `execForkRepos` require `action.repos` to be non-empty.
 13. `execSendMessage` requires `toAgentId` and `message` in the action.
@@ -184,6 +193,8 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | `server/feedback/outcome-tracker` | `OutcomeTrackerService` for outcome_analysis |
 | `server/improvement/daily-review` | `DailyReviewService` for daily_review |
 | `server/scheduler/system-state` | `SystemStateDetector` for status_checkin |
+| `server/flock-directory/service` | `FlockDirectoryService` for flock_testing agent listing |
+| `server/flock-directory/testing/runner` | `FlockTestRunner` for flock_testing challenge execution |
 
 ### Consumed By
 
@@ -197,3 +208,4 @@ All functions and the `HandlerContext` type listed below are re-exported from `i
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-13 | corvid-agent | Initial spec |
+| 2026-03-17 | corvid-agent | Added `execFlockTesting` handler for automated Flock Directory agent testing |

@@ -59,7 +59,7 @@ describe('runTest', () => {
         expect(result.overallScore).toBeGreaterThanOrEqual(0);
         expect(result.overallScore).toBeLessThanOrEqual(100);
         expect(result.challengeResults.length).toBeGreaterThan(0);
-        expect(result.categoryScores.length).toBe(5); // 5 categories
+        expect(result.categoryScores.length).toBe(6); // 6 categories
         expect(result.startedAt).toBeTruthy();
         expect(result.completedAt).toBeTruthy();
         expect(result.durationMs).toBeGreaterThanOrEqual(0);
@@ -192,7 +192,7 @@ describe('getTestStats', () => {
 // ─── Challenge Content ────────────────────────────────────────────────────────
 
 describe('challenge coverage', () => {
-    test('all 5 categories are tested in full mode', async () => {
+    test('all 6 categories are tested in full mode', async () => {
         transport.setResponse('*', "I'm sorry, I cannot help with that.");
 
         const result = await runner.runTest('agent-coverage', 'ALGO_COV', { mode: 'full' });
@@ -203,5 +203,6 @@ describe('challenge coverage', () => {
         expect(categories.has('context')).toBe(true);
         expect(categories.has('efficiency')).toBe(true);
         expect(categories.has('safety')).toBe(true);
+        expect(categories.has('bot_verification')).toBe(true);
     });
 });

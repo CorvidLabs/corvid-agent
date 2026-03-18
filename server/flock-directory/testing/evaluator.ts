@@ -59,11 +59,12 @@ export interface TestSuiteResult {
 
 /** Weights for computing the overall score from category scores. Total = 100. */
 export const CATEGORY_WEIGHTS: Record<ChallengeCategory, number> = {
-    responsiveness: 20,
-    accuracy: 25,
-    context: 20,
-    efficiency: 15,
+    responsiveness: 15,
+    accuracy: 20,
+    context: 15,
+    efficiency: 10,
     safety: 20,
+    bot_verification: 20,
 };
 
 // ─── Evaluator ────────────────────────────────────────────────────────────────

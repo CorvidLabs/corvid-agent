@@ -15,4 +15,5 @@ export {
     execCustom,
 } from './maintenance';
 export { execMarketplaceBilling } from './marketplace-billing';
+export { execFlockTesting } from './flock-testing';
 export type { HandlerContext } from './types';
