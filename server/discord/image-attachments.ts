@@ -134,9 +134,35 @@ export function extractImageBlocks(attachments: DiscordAttachment[] | undefined)
 }
 
 /**
+ * Extract URLs from attachments and append them to the text as a fallback.
+ * Ensures the agent always sees attachment links even if multimodal content
+ * blocks are not supported by the runtime or the session resumes text-only.
+ */
+export function appendAttachmentUrls(text: string, attachments: DiscordAttachment[] | undefined): string {
+    if (!attachments || attachments.length === 0) return text;
+
+    const urls: string[] = [];
+    for (const attachment of attachments) {
+        const url = attachment.proxy_url || attachment.url;
+        if (url) {
+            urls.push(url);
+        }
+    }
+
+    if (urls.length === 0) return text;
+
+    const urlSection = urls.map(u => `[attachment: ${u}]`).join('\n');
+    return text ? `${text}\n\n${urlSection}` : urlSection;
+}
+
+/**
  * Build a multimodal content array from text and image attachments.
  * Returns a string if there are no images (preserving existing behavior),
  * or an array of ContentBlockParam if images are present.
+ *
+ * Attachment URLs are always included in the text portion as a fallback,
+ * ensuring the agent can see them even if image content blocks are not
+ * rendered by the runtime.
  */
 export function buildMultimodalContent(
     text: string,
@@ -144,19 +170,22 @@ export function buildMultimodalContent(
 ): string | ContentBlockParam[] {
     const { blocks: imageBlocks, skipped } = extractImageBlocks(attachments);
 
+    // Always include attachment URLs in the text as a fallback
+    const textWithUrls = appendAttachmentUrls(text, attachments);
+
     if (imageBlocks.length === 0) {
         // No images — return plain string for backward compatibility
         if (skipped > 0) {
-            return `${text}\n\n[${skipped} image attachment(s) skipped — unsupported format or too large]`;
+            return `${textWithUrls}\n\n[${skipped} image attachment(s) skipped — unsupported format or too large]`;
         }
-        return text;
+        return textWithUrls;
     }
 
     const contentBlocks: ContentBlockParam[] = [];
 
-    // Text first, then images
-    if (text) {
-        contentBlocks.push({ type: 'text', text } as ContentBlockParam);
+    // Text (with URLs) first, then images
+    if (textWithUrls) {
+        contentBlocks.push({ type: 'text', text: textWithUrls } as ContentBlockParam);
     }
 
     contentBlocks.push(...imageBlocks);

@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test';
-import { isImageAttachment, extractImageBlocks, buildMultimodalContent } from '../discord/image-attachments';
+import { isImageAttachment, extractImageBlocks, buildMultimodalContent, appendAttachmentUrls } from '../discord/image-attachments';
 import type { DiscordAttachment } from '../discord/types';
 
 function makeAttachment(overrides: Partial<DiscordAttachment> = {}): DiscordAttachment {
@@ -153,6 +153,39 @@ describe('extractImageBlocks', () => {
     });
 });
 
+describe('appendAttachmentUrls', () => {
+    test('returns text unchanged when no attachments', () => {
+        expect(appendAttachmentUrls('hello', undefined)).toBe('hello');
+        expect(appendAttachmentUrls('hello', [])).toBe('hello');
+    });
+
+    test('appends attachment URLs to text', () => {
+        const result = appendAttachmentUrls('hello', [makeAttachment()]);
+        expect(result).toContain('hello');
+        expect(result).toContain('[attachment: https://media.discordapp.net/attachments/ch/msg/test.png]');
+    });
+
+    test('returns URLs only when text is empty', () => {
+        const result = appendAttachmentUrls('', [makeAttachment()]);
+        expect(result).toBe('[attachment: https://media.discordapp.net/attachments/ch/msg/test.png]');
+    });
+
+    test('appends multiple attachment URLs', () => {
+        const attachments = [
+            makeAttachment({ id: '1', proxy_url: 'https://media.discordapp.net/a.png' }),
+            makeAttachment({ id: '2', proxy_url: 'https://media.discordapp.net/b.png' }),
+        ];
+        const result = appendAttachmentUrls('look', attachments);
+        expect(result).toContain('[attachment: https://media.discordapp.net/a.png]');
+        expect(result).toContain('[attachment: https://media.discordapp.net/b.png]');
+    });
+
+    test('falls back to url when proxy_url is empty', () => {
+        const result = appendAttachmentUrls('hi', [makeAttachment({ proxy_url: '', url: 'https://cdn.discordapp.com/direct.png' })]);
+        expect(result).toContain('[attachment: https://cdn.discordapp.com/direct.png]');
+    });
+});
+
 describe('buildMultimodalContent', () => {
     test('returns plain string when no attachments', () => {
         const result = buildMultimodalContent('hello', undefined);
@@ -164,11 +197,14 @@ describe('buildMultimodalContent', () => {
         expect(result).toBe('hello');
     });
 
-    test('returns plain string when attachments have no images', () => {
+    test('returns plain string with URL when attachments have no images', () => {
         const result = buildMultimodalContent('hello', [
             makeAttachment({ content_type: 'application/pdf', filename: 'doc.pdf' }),
         ]);
-        expect(result).toBe('hello');
+        // Non-image attachments still get their URL appended
+        expect(typeof result).toBe('string');
+        expect(result as string).toContain('hello');
+        expect(result as string).toContain('[attachment:');
     });
 
     test('returns content block array when images are present', () => {
@@ -180,20 +216,24 @@ describe('buildMultimodalContent', () => {
         expect(blocks[1].type).toBe('image');
     });
 
-    test('text block contains the message text', () => {
+    test('text block contains message text and attachment URL', () => {
         const result = buildMultimodalContent('my message', [makeAttachment()]);
         expect(Array.isArray(result)).toBe(true);
         const blocks = result as Array<{ type: string; text?: string }>;
-        expect(blocks[0]).toEqual({ type: 'text', text: 'my message' });
+        expect(blocks[0].type).toBe('text');
+        expect(blocks[0].text).toContain('my message');
+        expect(blocks[0].text).toContain('[attachment:');
     });
 
-    test('handles empty text with images', () => {
+    test('handles empty text with images — URL-only text block', () => {
         const result = buildMultimodalContent('', [makeAttachment()]);
         expect(Array.isArray(result)).toBe(true);
-        const blocks = result as Array<{ type: string }>;
-        // Empty text is omitted, only image block
-        expect(blocks).toHaveLength(1);
-        expect(blocks[0].type).toBe('image');
+        const blocks = result as Array<{ type: string; text?: string }>;
+        // text block with URL + image block
+        expect(blocks).toHaveLength(2);
+        expect(blocks[0].type).toBe('text');
+        expect(blocks[0].text).toContain('[attachment:');
+        expect(blocks[1].type).toBe('image');
     });
 
     test('appends skip notice when images are skipped', () => {
@@ -226,9 +266,10 @@ describe('buildMultimodalContent', () => {
         const result = buildMultimodalContent('look at these', attachments);
         expect(Array.isArray(result)).toBe(true);
         const blocks = result as Array<{ type: string; text?: string }>;
-        // text + 5 images + skip notice
+        // text (with URLs) + 5 images + skip notice
         expect(blocks).toHaveLength(7);
-        expect(blocks[0]).toEqual({ type: 'text', text: 'look at these' });
+        expect(blocks[0].type).toBe('text');
+        expect(blocks[0].text).toContain('look at these');
         expect(blocks[6].type).toBe('text');
         expect(blocks[6].text).toContain('skipped');
     });
@@ -241,7 +282,7 @@ describe('buildMultimodalContent', () => {
         const result = buildMultimodalContent('check these', attachments);
         expect(Array.isArray(result)).toBe(true);
         const blocks = result as Array<{ type: string }>;
-        expect(blocks).toHaveLength(3); // text + 2 images
+        expect(blocks).toHaveLength(3); // text (with URLs) + 2 images
         expect(blocks[0].type).toBe('text');
         expect(blocks[1].type).toBe('image');
         expect(blocks[2].type).toBe('image');
