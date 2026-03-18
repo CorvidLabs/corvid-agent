@@ -13,6 +13,8 @@
  * Zero-fill a Uint8Array or Buffer in place.
  * Uses crypto.getRandomValues first (to defeat optimizer dead-store elimination),
  * then fills with zeros.
+ *
+ * @param buf - The buffer to wipe. No-op if null or undefined.
  */
 export function wipeBuffer(buf: Uint8Array | ArrayBuffer | null | undefined): void {
     if (!buf) return;
@@ -25,6 +27,8 @@ export function wipeBuffer(buf: Uint8Array | ArrayBuffer | null | undefined): vo
 
 /**
  * Wipe multiple buffers. Convenience for finally blocks.
+ *
+ * @param bufs - The buffers to wipe. Null/undefined entries are skipped.
  */
 export function wipeBuffers(...bufs: Array<Uint8Array | ArrayBuffer | null | undefined>): void {
     for (const buf of bufs) {
@@ -35,6 +39,10 @@ export function wipeBuffers(...bufs: Array<Uint8Array | ArrayBuffer | null | und
 /**
  * Execute an async operation with a buffer, ensuring the buffer is wiped
  * in the finally block regardless of success or failure.
+ *
+ * @param buf - The sensitive buffer to use during the operation.
+ * @param operation - The async function to execute with the buffer.
+ * @returns The result of `operation`.
  */
 export async function withSecureBuffer<T>(
     buf: Uint8Array,
