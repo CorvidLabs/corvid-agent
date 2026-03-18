@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.0] - 2026-03-18
+
+### Added
+- **Bot verification challenges** — challenge-response system for verifying bot identities in flock testing (#1211)
+- **Auto-escalate stalled sessions** — structured metadata for escalation when sessions stall (#1209)
+- **Cheerleading detection** — detect and score low-quality cheerleading responses (#1205, #1207)
+- **Forward Discord image attachments** — images sent in Discord are forwarded to agent context (#1199)
+- **On-chain memory fallback** — `recall_memory` falls back to on-chain reader with full txid display (#1206)
+
+### Fixed
+- **Session recovery logging** — no more silent error swallowing on Continue button (#1214)
+- **`/session` channel fix** — threads now created in the correct channel (#1214)
+- **Wallet address validation** — validate wallet address format from query params (#1210)
+- **MCP package build** — add missing memory tools to MCP package (#1203)
+
+### Docs
+- Sync API reference and README with codebase (#1212)
+- Document exports for memory-brain-viewer spec (#1213)
+- Add JSDoc @param/@returns to server/lib/ exported functions (#1204)
+- Update CHANGELOG with v0.33.0 through v0.36.0 entries (#1202)
+
+### Tests
+- Add runtime tests for resumeProcess external MCP loading (#1201)
+
 ## [0.36.0] - 2026-03-17
 
 ### Added
