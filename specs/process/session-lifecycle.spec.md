@@ -74,7 +74,7 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 
 1. Sessions in status `'running'` or `'paused'` are never cleaned up by automated expiration or limit enforcement.
 2. Session TTL expiration only applies to sessions in terminal states (`'idle'`, `'completed'`, `'error'`, `'stopped'`).
-3. Per-project session limit enforcement deletes the oldest non-running sessions first.
+3. Per-project session limit enforcement deletes the oldest non-running sessions first, but only those older than 24 hours. Sessions younger than 24 hours are protected from limit-based cleanup to prevent a burst of new sessions from evicting recently-created sessions that users still expect to be resumable.
 4. All session deletions cascade within a transaction: `algochat_conversations` FK nullified, `session_messages` deleted, `escalation_queue` entries deleted, then the session row itself.
 5. `PROTECTED_BASENAMES` uses exact basename matching (e.g. `'manager.ts'` matches `server/process/manager.ts` but not `task-manager.ts`).
 6. `PROTECTED_SUBSTRINGS` uses substring matching on the forward-slash-normalized path.
@@ -91,9 +91,14 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 - **Then** those sessions and their related data are deleted in a transaction
 
 ### Scenario: Per-project session limit enforcement
-- **Given** `maxSessionsPerProject` is 100 and project `"proj-1"` has 110 non-running sessions
+- **Given** `maxSessionsPerProject` is 100 and project `"proj-1"` has 110 non-running sessions all older than 24 hours
 - **When** `runCleanup` executes
 - **Then** the 10 oldest non-running sessions for `"proj-1"` are deleted
+
+### Scenario: Young sessions protected from limit enforcement
+- **Given** `maxSessionsPerProject` is 100 and project `"proj-1"` has 110 non-running sessions, but 15 of the oldest are younger than 24 hours
+- **When** `runCleanup` executes
+- **Then** only sessions older than 24 hours are deleted; younger sessions are preserved even though the project remains over the limit
 
 ### Scenario: Session creation gating
 - **Given** project `"proj-1"` has 100 sessions
@@ -156,3 +161,4 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
+| 2026-03-18 | corvid-agent | v2: Added 24-hour minimum age guard to `enforceSessionLimits` — sessions younger than 24h are protected from limit-based cleanup. Updated invariant #3 and added behavioral example. Fixes #1221 |

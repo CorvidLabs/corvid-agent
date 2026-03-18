@@ -31,6 +31,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 | `getResponseRoutingPrompt` | `()` | `string` | When to use corvid_send_message vs text |
 | `getCodingToolPrompt` | `()` | `string` | File operation guidelines |
 | `getMessagingSafetyPrompt` | `()` | `string` | Prevent script-based message sending |
+| `getWorktreeIsolationPrompt` | `()` | `string` | Git branch isolation rules for worktree sessions |
 
 ## Invariants
 
@@ -43,6 +44,7 @@ Model-family-specific prompt templates for tool usage and response routing. Diff
 7. **Messaging safety always appended**: `getMessagingSafetyPrompt()` is always appended when tools are available (in `direct-process.ts`) or unconditionally to append content (in `sdk-process.ts`), preventing agents from writing scripts to send messages outside of MCP tools. This is an always-on guard -- unlike response routing (conditional on `corvid_send_message`) or coding guidance (conditional on `read_file`), messaging safety is never gated on specific tool presence
 8. **All supported families get guidance**: Every recognized family (llama, qwen2, qwen3, mistral, command-r, hermes, nemotron, phi, gemma, deepseek, minimax, glm, kimi, devstral, gemini) receives family-specific prompt guidance. Only `unknown` returns null
 9. **Dynamic few-shot example**: Family-specific prompts for phi, gemma, and deepseek include a few-shot example using the first available tool name from the tool list
+10. **Worktree isolation always appended**: `getWorktreeIsolationPrompt()` is unconditionally appended to both SDK and direct process system prompts, instructing the agent to stay on its own branch and not interact with other sessions' branches
 
 ## Behavioral Examples
 
@@ -82,8 +84,8 @@ None (standalone module).
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getMessagingSafetyPrompt`, `detectModelFamily` |
-| `server/process/sdk-process.ts` | `getMessagingSafetyPrompt` |
+| `server/process/direct-process.ts` | `getToolInstructionPrompt`, `getResponseRoutingPrompt`, `getCodingToolPrompt`, `getMessagingSafetyPrompt`, `getWorktreeIsolationPrompt`, `detectModelFamily` |
+| `server/process/sdk-process.ts` | `getMessagingSafetyPrompt`, `getResponseRoutingPrompt`, `getWorktreeIsolationPrompt` |
 
 ## Change Log
 

@@ -484,7 +484,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | Slash command registration fails | Logs error, continues |
 | Interaction response fails | Logs error |
 | Thread creation fails | Responds to `/session` interaction: `"Failed to create conversation thread."` |
-| Thread session ended | Replies in thread: `"This conversation has ended. Use /session to start a new one."` |
+| Thread session ended (deleted) | Replies in thread: `"This session has expired and can no longer be resumed. Start a new /session to continue working."` with Archive Thread button |
 | `/work` without WorkTaskService | Responds "Work task service not available." |
 | `/work` without description | Responds "Please provide a task description." |
 | `/work` with unknown agent | Responds with available agent names |
@@ -553,4 +553,5 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | 2026-03-14 | corvid-agent | v11: Added `/tasks`, `/schedule`, `/config` slash commands. `/tasks` shows active work tasks with status emojis and queue counts. `/schedule` shows active schedules with Discord relative timestamps for next/last runs. `/config` is admin-only ephemeral embed showing mode, channels, and permission settings. Updated `/help` embed. 6 new tests. Closes #894 |
 | 2026-03-16 | corvid-agent | v12: Discord reaction listener for reputation feedback. Added `GUILD_MESSAGE_REACTIONS` intent, `MESSAGE_REACTION_ADD` dispatch handler, `reaction-handler.ts` module with emoji-to-sentiment mapping, per-user rate limiting (5/min), session resolution from mentionSessions and threadSessions, `response_feedback` insertion, and reputation event recording. `setReputationScorer()` setter on DiscordBridge. 11 new tests. Closes #1161 |
 | 2026-03-17 | corvid-agent | v13: Adaptive inline response UX. Added `subscribeForAdaptiveInlineResponse` (starts lightweight, upgrades to progress embed on tool use), `subscribeForInlineProgressResponse` (always-on progress embed), and `editEmbed` helper for PATCH-ing embeds in-place. @mention replies now use adaptive subscriber for cleaner conversational UX |
-| 2026-03-18 | corvid-agent | v14→v15: Added `extractMentionsFromEmbed` — extracts Discord mentions from embed descriptions into top-level `content` field so mentions trigger notifications. Applied to `sendEmbed`, `sendReplyEmbed`, and `editEmbed` |
+| 2026-03-18 | corvid-agent | v14: Improved expired-session UX — thread message for deleted sessions now says "This session has expired and can no longer be resumed" with actionable guidance instead of vague "This conversation has ended". Fixes #1222 |
+| 2026-03-18 | corvid-agent | v15: Added `extractMentionsFromEmbed` — extracts Discord mentions from embed descriptions into top-level `content` field so mentions trigger notifications. Applied to `sendEmbed`, `sendReplyEmbed`, and `editEmbed` |

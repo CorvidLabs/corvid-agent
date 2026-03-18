@@ -1,4 +1,44 @@
 import { test, expect, beforeEach, afterEach, beforeAll, afterAll, describe, mock, spyOn } from 'bun:test';
+
+// Restore the REAL worktree module — other test files use mock.module() for
+// ../lib/worktree and in Bun 1.x the mock leaks across files. The real module
+// calls Bun.spawn which this file already intercepts via spyOn(Bun, 'spawn').
+import { resolve, dirname } from 'node:path';
+mock.module('../lib/worktree', () => ({
+    getWorktreeBaseDir: (projectWorkingDir: string) =>
+        process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees'),
+    generateChatBranchName: (agentName: string, sessionId: string) => {
+        const agentSlug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        return `chat/${agentSlug}/${sessionId.slice(0, 12)}`;
+    },
+    createWorktree: async (options: { projectWorkingDir: string; branchName: string; worktreeId: string }) => {
+        const { projectWorkingDir, branchName, worktreeId } = options;
+        const base = process.env.WORKTREE_BASE_DIR ?? resolve(dirname(projectWorkingDir), '.corvid-worktrees');
+        const worktreeDir = resolve(base, worktreeId);
+        try {
+            const proc = Bun.spawn(['git', 'worktree', 'add', '-b', branchName, worktreeDir], {
+                cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe',
+            });
+            const stderr = await new Response(proc.stderr).text();
+            const exitCode = await proc.exited;
+            if (exitCode !== 0) return { success: false, worktreeDir, error: `Failed to create worktree: ${stderr.trim()}` };
+            return { success: true, worktreeDir };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            return { success: false, worktreeDir, error: `Failed to create worktree: ${message}` };
+        }
+    },
+    removeWorktree: async (projectWorkingDir: string, worktreeDir: string) => {
+        try {
+            const proc = Bun.spawn(['git', 'worktree', 'remove', '--force', worktreeDir], {
+                cwd: projectWorkingDir, stdout: 'pipe', stderr: 'pipe',
+            });
+            await new Response(proc.stderr).text();
+            await proc.exited;
+        } catch { /* non-fatal */ }
+    },
+}));
+
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { createProject } from '../db/projects';

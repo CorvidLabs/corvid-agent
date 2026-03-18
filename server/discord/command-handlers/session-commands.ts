@@ -102,6 +102,12 @@ export async function handleSessionCommand(
         });
         if (result.success) {
             workDir = result.worktreeDir;
+        } else {
+            // Worktree isolation is mandatory — running without it risks
+            // cross-session contamination of the shared working directory.
+            await respondToInteraction(interaction,
+                `Failed to create isolated worktree: ${result.error ?? 'unknown error'}. Please try again.`);
+            return;
         }
     }
 

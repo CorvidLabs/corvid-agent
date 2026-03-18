@@ -365,9 +365,18 @@ export class MessageRouter {
             this.subscriptionManager.cleanupLocalSession(existingSessionId);
         }
 
-        // Create a new session with worktree isolation
+        // Create a new session with worktree isolation (mandatory)
         const resolvedProjectId = projectId ?? agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId();
-        const workDir = await this.createSessionWorktree(resolvedProjectId);
+        let worktreeResult: { workDir: string; branch: string } | undefined;
+        try {
+            worktreeResult = await this.createSessionWorktree(resolvedProjectId);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            log.error('Worktree creation failed for local chat session', { agentId, error: msg });
+            sendFn('local', `Failed to create isolated session: ${msg}`, 'outbound');
+            return;
+        }
+        const workDir = worktreeResult?.workDir;
         log.debug(`Creating new session`, { projectId: resolvedProjectId, agentId, workDir });
         const session = createSession(this.db, {
             projectId: resolvedProjectId,
@@ -593,14 +602,14 @@ export class MessageRouter {
             if (!agent) return;
 
             const projectId = agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId();
-            const workDir = await this.createSessionWorktree(projectId);
+            const worktreeResult2 = await this.createSessionWorktree(projectId);
             const session = createSession(this.db, {
                 projectId,
                 agentId,
                 name: `AlgoChat: ${participant.slice(0, 8)}...`,
                 initialPrompt: agentContent,
                 source: 'algochat',
-                workDir,
+                workDir: worktreeResult2?.workDir,
             });
 
             conversation = createConversation(this.db, participant, agentId, session.id);
@@ -640,14 +649,14 @@ export class MessageRouter {
                     if (agent) {
                         const { updateConversationSession } = await import('../db/sessions');
                         const projectId = agent.defaultProjectId ?? this.discoveryService.getDefaultProjectId();
-                        const workDir = await this.createSessionWorktree(projectId);
+                        const worktreeResult3 = await this.createSessionWorktree(projectId);
                         const session = createSession(this.db, {
                             projectId,
                             agentId,
                             name: `AlgoChat: ${participant.slice(0, 8)}...`,
                             initialPrompt: agentContent,
                             source: 'algochat',
-                            workDir,
+                            workDir: worktreeResult3?.workDir,
                         });
                         updateConversationSession(this.db, conversation.id, session.id);
                         conversation.sessionId = session.id;
@@ -711,9 +720,10 @@ export class MessageRouter {
 
     /**
      * Create a worktree for a chat session (same pattern as Discord's handleMentionReply).
-     * Non-fatal — returns undefined if worktree creation fails.
+     * Returns workDir and branchName on success, or throws if isolation fails.
+     * Projects without a workingDir return undefined (no isolation needed).
      */
-    private async createSessionWorktree(projectId: string | null): Promise<string | undefined> {
+    private async createSessionWorktree(projectId: string | null): Promise<{ workDir: string; branch: string } | undefined> {
         if (!projectId) return undefined;
         const project = getProject(this.db, projectId);
         if (!project?.workingDir) return undefined;
@@ -725,7 +735,10 @@ export class MessageRouter {
             branchName,
             worktreeId: `chat-${sessionId.slice(0, 12)}`,
         });
-        return result.success ? result.worktreeDir : undefined;
+        if (!result.success) {
+            throw new Error(`Worktree isolation failed: ${result.error ?? 'unknown error'}`);
+        }
+        return { workDir: result.worktreeDir, branch: branchName };
     }
 }
 

@@ -118,7 +118,7 @@ Loads, validates, and applies defaults to agent deployment configuration. Suppor
 
 | Module | What is used |
 |--------|-------------|
-| `server/bootstrap` | `loadAgentConfig` to initialize server configuration |
+| `server/bootstrap` | `loadAgentConfig` to initialize server configuration at startup |
 | `server/__tests__/config-loader.test.ts` | All exported functions and types |
 
 ## Configuration

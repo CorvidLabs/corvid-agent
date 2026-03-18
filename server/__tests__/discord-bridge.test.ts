@@ -1,4 +1,13 @@
 import { test, expect, describe, mock, beforeEach, afterEach } from 'bun:test';
+
+// Mock worktree creation — git is not available in CI / test environments.
+mock.module('../lib/worktree', () => ({
+    createWorktree: async () => ({ success: true, worktreeDir: '/tmp/mock-worktree' }),
+    generateChatBranchName: (agent: string, id: string) => `chat/${agent}/${id.slice(0, 8)}`,
+    getWorktreeBaseDir: (dir: string) => `${dir}/.worktrees`,
+    removeWorktree: async () => ({ success: true }),
+}));
+
 import { Database } from 'bun:sqlite';
 import { runMigrations } from '../db/schema';
 import { DiscordBridge } from '../discord/bridge';
@@ -1212,7 +1221,7 @@ describe('DiscordBridge expired thread session resume', () => {
             // Should have sent the dead-end embed
             const deadEnd = fetchBodies.find((b: unknown) => {
                 const embeds = (b as { embeds?: Array<{ description?: string }> }).embeds;
-                return embeds?.some(e => e.description === 'This conversation has ended.');
+                return embeds?.some(e => e.description === 'This session has expired and can no longer be resumed. Start a new `/session` to continue working.');
             });
             expect(deadEnd).toBeDefined();
 

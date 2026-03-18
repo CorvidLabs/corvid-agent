@@ -422,9 +422,13 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         });
         if (result.success) {
             workDir = result.worktreeDir;
+        } else {
+            // Worktree isolation is mandatory — running without it risks
+            // cross-session contamination of the shared working directory.
+            await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId,
+                `Failed to create isolated worktree for this session: ${result.error ?? 'unknown error'}. Please try again.`);
+            return;
         }
-        // If worktree creation fails, fall through to using the main working dir.
-        // This is non-fatal — the session still works, just without isolation.
     }
 
     const session = createSession(ctx.db, {
@@ -606,7 +610,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         const resumed = await resumeExpiredThreadSession(ctx, threadId, threadInfo, text, authorId, authorUsername, attachments);
         if (!resumed) {
             await sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
-                description: 'This conversation has ended.',
+                description: 'This session has expired and can no longer be resumed. Start a new `/session` to continue working.',
                 color: 0x95a5a6,
             }, [
                 buildActionRow(
