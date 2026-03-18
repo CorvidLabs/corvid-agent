@@ -515,7 +515,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     if (!session) {
         ctx.threadSessions.delete(threadId);
         await sendEmbedWithButtons(ctx.delivery, ctx.config.botToken, threadId, {
-            description: 'This conversation has ended.',
+            description: 'This session has expired and can no longer be resumed. Start a new `/session` to continue working.',
             color: 0x95a5a6,
         }, [
             buildActionRow(

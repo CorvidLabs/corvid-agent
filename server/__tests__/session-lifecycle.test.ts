@@ -238,9 +238,10 @@ describe('enforceSessionLimits (via runCleanup)', () => {
             cleanupIntervalMs: 999999,
         });
 
-        // Insert 4 sessions for proj-1
+        // Insert 4 sessions for proj-1 — all older than 24h so they're eligible for limit cleanup
+        const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
         for (let i = 0; i < 4; i++) {
-            const updatedAt = new Date(Date.now() - (4 - i) * 1000).toISOString().replace('T', ' ').replace('Z', '');
+            const updatedAt = new Date(twoDaysAgo + i * 1000).toISOString().replace('T', ' ').replace('Z', '');
             insertSession(`sess-${i}`, 'proj-1', 'idle', updatedAt);
         }
 
@@ -250,5 +251,31 @@ describe('enforceSessionLimits (via runCleanup)', () => {
 
         // Should keep only 2 newest
         expect(countSessions()).toBe(2);
+    });
+
+    it('protects sessions younger than 24 hours from limit cleanup', async () => {
+        manager = new SessionLifecycleManager(db, {
+            maxSessionsPerProject: 2,
+            sessionTtlMs: 999999999,
+            cleanupIntervalMs: 999999,
+        });
+
+        // Insert 2 old sessions (eligible for cleanup) and 2 young sessions (protected)
+        const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+        insertSession('old-1', 'proj-1', 'idle', new Date(twoDaysAgo).toISOString().replace('T', ' ').replace('Z', ''));
+        insertSession('old-2', 'proj-1', 'idle', new Date(twoDaysAgo + 1000).toISOString().replace('T', ' ').replace('Z', ''));
+        // Young sessions — updated_at is recent
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString().replace('T', ' ').replace('Z', '');
+        insertSession('young-1', 'proj-1', 'idle', oneHourAgo);
+        insertSession('young-2', 'proj-1', 'idle', oneHourAgo);
+
+        expect(countSessions()).toBe(4);
+
+        await manager.runCleanup();
+
+        // Only the 2 old sessions should be deleted; young ones are protected
+        expect(countSessions()).toBe(2);
+        const remaining = db.query('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>;
+        expect(remaining.map(r => r.id)).toEqual(['young-1', 'young-2']);
     });
 });

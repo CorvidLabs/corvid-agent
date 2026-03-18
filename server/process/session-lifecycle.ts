@@ -293,16 +293,22 @@ export class SessionLifecycleManager {
             HAVING session_count > ?
         `).all(this.config.maxSessionsPerProject) as Array<{ project_id: string; session_count: number }>;
 
+        // Protect sessions younger than 24 hours from limit-based cleanup.
+        // Without this guard, a burst of new sessions can push out recently-created
+        // sessions that the user still expects to be resumable.
+        const MIN_AGE_SECONDS = 24 * 60 * 60; // 24 hours
+
         for (const { project_id, session_count } of overLimitProjects) {
             const excessCount = session_count - this.config.maxSessionsPerProject;
 
-            // Delete oldest sessions for this project
+            // Delete oldest sessions for this project, but only if older than MIN_AGE
             const oldestSessions = this.db.query(`
                 SELECT id FROM sessions
                 WHERE project_id = ? AND status != 'running'
+                AND updated_at < datetime('now', '-' || ? || ' seconds')
                 ORDER BY updated_at ASC
                 LIMIT ?
-            `).all(project_id, excessCount) as Array<{ id: string }>;
+            `).all(project_id, MIN_AGE_SECONDS, excessCount) as Array<{ id: string }>;
 
             if (oldestSessions.length > 0) {
                 const sessionIds = oldestSessions.map(s => s.id);
@@ -321,6 +327,12 @@ export class SessionLifecycleManager {
                         WHERE session_id IN (${placeholders})
                     `).run(...sessionIds);
 
+                    // Delete escalation queue entries
+                    this.db.query(`
+                        DELETE FROM escalation_queue
+                        WHERE session_id IN (${placeholders})
+                    `).run(...sessionIds);
+
                     // Delete sessions
                     this.db.query(`
                         DELETE FROM sessions
@@ -333,6 +345,7 @@ export class SessionLifecycleManager {
                 log.info(`Enforced session limit for project ${project_id}`, {
                     deletedSessions: sessionIds.length,
                     remainingSessions: this.config.maxSessionsPerProject,
+                    skippedYoungSessions: excessCount - sessionIds.length,
                 });
             }
         }
