@@ -9,7 +9,11 @@ import { AppError } from './errors';
 
 // ── CircuitOpenError ────────────────────────────────────────────────────
 
+/** Thrown when a call is rejected because the circuit breaker is in the OPEN state. */
 export class CircuitOpenError extends AppError {
+    /**
+     * @param message - Optional custom message (defaults to a standard circuit-open message).
+     */
     constructor(message = 'Circuit breaker is OPEN — call rejected') {
         super(message, { code: 'CIRCUIT_OPEN', statusCode: 503 });
     }
@@ -35,6 +39,11 @@ export interface RetryOptions {
 /**
  * Retry `fn` with exponential backoff.
  * Formula: `min(baseDelayMs * multiplier^attempt, maxDelayMs) + random_jitter`
+ *
+ * @param fn - The async function to attempt.
+ * @param options - Retry behavior configuration (see {@link RetryOptions}).
+ * @returns The result of `fn` on the first successful attempt.
+ * @throws The last error if all attempts are exhausted, or immediately if `retryIf` returns false.
  */
 export async function withRetry<T>(
     fn: () => Promise<T>,
@@ -87,6 +96,13 @@ export interface CircuitBreakerOptions {
     successThreshold?: number;
 }
 
+/**
+ * Circuit breaker pattern implementation.
+ *
+ * Tracks failures and opens the circuit after a threshold is reached,
+ * rejecting subsequent calls until a reset timeout elapses. After the
+ * timeout, allows a probe call (HALF_OPEN) and closes on success.
+ */
 export class CircuitBreaker {
     private state: CircuitState = 'CLOSED';
     private failureCount = 0;
@@ -97,12 +113,21 @@ export class CircuitBreaker {
     private readonly resetTimeoutMs: number;
     private readonly successThreshold: number;
 
+    /**
+     * @param options - Circuit breaker thresholds and timing (see {@link CircuitBreakerOptions}).
+     */
     constructor(options: CircuitBreakerOptions = {}) {
         this.failureThreshold = options.failureThreshold ?? 3;
         this.resetTimeoutMs = options.resetTimeoutMs ?? 60_000;
         this.successThreshold = options.successThreshold ?? 1;
     }
 
+    /**
+     * Get the current circuit state, lazily transitioning OPEN → HALF_OPEN
+     * when the reset timeout has elapsed.
+     *
+     * @returns The current {@link CircuitState}.
+     */
     getState(): CircuitState {
         // Lazily transition OPEN → HALF_OPEN when the timeout has elapsed
         if (this.state === 'OPEN' && Date.now() - this.lastFailureTime >= this.resetTimeoutMs) {
@@ -112,6 +137,7 @@ export class CircuitBreaker {
         return this.state;
     }
 
+    /** Reset the circuit to CLOSED with all counters zeroed. */
     reset(): void {
         this.state = 'CLOSED';
         this.failureCount = 0;
@@ -119,6 +145,14 @@ export class CircuitBreaker {
         this.lastFailureTime = 0;
     }
 
+    /**
+     * Execute `fn` through the circuit breaker.
+     *
+     * @param fn - The async function to execute.
+     * @returns The result of `fn`.
+     * @throws {CircuitOpenError} If the circuit is OPEN.
+     * @throws Re-throws any error from `fn` after recording the failure.
+     */
     async execute<T>(fn: () => Promise<T>): Promise<T> {
         const currentState = this.getState();
 
