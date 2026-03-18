@@ -321,6 +321,89 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
     },
   );
 
+  // ── Save Memory ──────────────────────────────────────────────
+
+  server.tool(
+    'corvid_save_memory',
+    'Save a memory with a key. Memories are stored locally and written on-chain for persistence.',
+    {
+      key: z.string().describe('Unique key for this memory'),
+      content: z.string().describe('The memory content to save'),
+    },
+    async ({ key, content }) => {
+      try {
+        const result = await client.post('/api/mcp/save-memory', { key, content });
+        return textResult(JSON.stringify(result, null, 2));
+      } catch (err) {
+        return handleError(err);
+      }
+    },
+  );
+
+  // ── Recall Memory ──────────────────────────────────────────────
+
+  server.tool(
+    'corvid_recall_memory',
+    'Recall a memory by key, search by query, or list recent memories.',
+    {
+      key: z.string().optional().describe('Exact key to recall'),
+      query: z.string().optional().describe('Search query to find matching memories'),
+    },
+    async ({ key, query }) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (key) body.key = key;
+        if (query) body.query = query;
+        const result = await client.post('/api/mcp/recall-memory', body);
+        return textResult(JSON.stringify(result, null, 2));
+      } catch (err) {
+        return handleError(err);
+      }
+    },
+  );
+
+  // ── Read On-Chain Memories ──────────────────────────────────────
+
+  server.tool(
+    'corvid_read_on_chain_memories',
+    'Read memories stored on-chain (Algorand). These are the permanent, immutable copies.',
+    {
+      search: z.string().optional().describe('Search term to filter memories'),
+      limit: z.number().optional().describe('Maximum number of memories to return (default 50)'),
+    },
+    async ({ search, limit }) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (search) body.search = search;
+        if (limit) body.limit = limit;
+        const result = await client.post('/api/mcp/read-on-chain-memories', body);
+        return textResult(JSON.stringify(result, null, 2));
+      } catch (err) {
+        return handleError(err);
+      }
+    },
+  );
+
+  // ── Sync On-Chain Memories ──────────────────────────────────────
+
+  server.tool(
+    'corvid_sync_on_chain_memories',
+    'Sync on-chain memories back to local SQLite. Restores memories that exist on-chain but are missing locally.',
+    {
+      limit: z.number().optional().describe('Maximum number of on-chain memories to sync (default 200)'),
+    },
+    async ({ limit }) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (limit) body.limit = limit;
+        const result = await client.post('/api/mcp/sync-on-chain-memories', body);
+        return textResult(JSON.stringify(result, null, 2));
+      } catch (err) {
+        return handleError(err);
+      }
+    },
+  );
+
   // ── Server Health ──────────────────────────────────────────────
 
   server.tool(

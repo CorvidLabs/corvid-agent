@@ -14,6 +14,7 @@ corvid-screenshots/
 *.swo
 *~
 .vscode/settings.json
+.claude/settings.json
 .idea/
 playwright-report/
 coverage/
