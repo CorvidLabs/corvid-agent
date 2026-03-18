@@ -21,6 +21,14 @@ import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
 import { AgentSessionLimiter } from '../lib/agent-session-limits';
 import { sanitizeAgentInput } from '../lib/agent-input-sanitizer';
 import { createLogger } from '../lib/logger';
+import {
+    scoreResponseQuality,
+    countVacuousToolCalls,
+    ResponseQualityTracker,
+    buildQualityNudge,
+    type ResponseQualityMetrics,
+    type ToolCallQualityInput,
+} from '../lib/response-quality';
 
 const log = createLogger('DirectProcess');
 
@@ -606,6 +614,8 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
         let maxChainDepth = 0; // Longest unbroken tool-call sequence
         let terminationReason: DirectProcessMetrics['terminationReason'] = 'normal';
         let stallType: string | null = null;
+        const qualityTracker = new ResponseQualityTracker();
+        const MAX_QUALITY_NUDGES = tierConfig.tier === 'high' ? 1 : 2;
         const loopStartTime = Date.now();
 
         // ── Context usage tracking ──────────────────────────────────
@@ -877,6 +887,35 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                     explorationToolCalls = 0; // Reset so we don't spam
                 }
 
+                // Vacuous tool call detection: flag semantically empty tool calls
+                const vacuousCount = countVacuousToolCalls(
+                    result.toolCalls.map((tc: LlmToolCall): ToolCallQualityInput => ({
+                        name: tc.name,
+                        arguments: tc.arguments as Record<string, unknown>,
+                    })),
+                );
+                if (vacuousCount > 0) {
+                    qualityTracker.recordVacuousToolCalls(vacuousCount);
+                    log.info('Vacuous tool calls detected', {
+                        count: vacuousCount,
+                        tools: result.toolCalls.map((tc: LlmToolCall) => tc.name).join(', '),
+                        sessionId: session.id,
+                    });
+                }
+
+                // Score text quality alongside tool calls
+                const toolResponseQuality = scoreResponseQuality(result.content || '', true);
+                const needsToolQualityNudge = qualityTracker.recordResponse(toolResponseQuality);
+                if (needsToolQualityNudge && qualityTracker.getMetrics().qualityNudgeCount < MAX_QUALITY_NUDGES) {
+                    qualityTracker.incrementNudgeCount();
+                    log.info('Low-quality response detected during tool chain', {
+                        score: toolResponseQuality.score,
+                        signals: toolResponseQuality.signals,
+                        sessionId: session.id,
+                    });
+                    messages.push({ role: 'user', content: buildQualityNudge() });
+                }
+
                 // Continue loop to let the model process tool results
                 continue;
             }
@@ -910,7 +949,27 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 continue;
             }
 
+            // Quality scoring for text-only responses
+            const textQuality = scoreResponseQuality(responseText, false);
+            const needsTextQualityNudge = qualityTracker.recordResponse(textQuality);
+
             messages.push({ role: 'assistant', content: responseText });
+
+            // Cheerleading detection: if consecutive low-quality text responses,
+            // inject a corrective nudge before the standard nudge system
+            if (needsTextQualityNudge
+                && qualityTracker.getMetrics().qualityNudgeCount < MAX_QUALITY_NUDGES
+                && iteration < MAX_TOOL_ITERATIONS - 1) {
+                qualityTracker.incrementNudgeCount();
+                log.info('Cheerleading detected — injecting quality nudge', {
+                    score: textQuality.score,
+                    signals: textQuality.signals,
+                    consecutiveNudge: qualityTracker.getMetrics().qualityNudgeCount,
+                    sessionId: session.id,
+                });
+                messages.push({ role: 'user', content: buildQualityNudge() });
+                continue;
+            }
 
             // Skip nudging if we've already nudged too many times or tools are disabled
             if (nudgeCount >= MAX_NUDGES || toolsDisabled) {
@@ -1007,6 +1066,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 terminationReason,
                 loopDurationMs,
                 needsSummary,
+                qualityMetrics: qualityTracker.getMetrics(),
             });
             onEvent({
                 type: 'result',
@@ -1038,6 +1098,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
                 terminationReason: 'abort',
                 loopDurationMs,
                 needsSummary,
+                qualityMetrics: qualityTracker.getMetrics(),
             });
             onEvent({
                 type: 'result',
@@ -1069,6 +1130,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
             terminationReason,
             loopDurationMs,
             needsSummary,
+            qualityMetrics: qualityTracker.getMetrics(),
         });
 
         // Emit result event with metrics
@@ -1331,6 +1393,7 @@ export interface SessionMetricsState {
     terminationReason: DirectProcessMetrics['terminationReason'];
     loopDurationMs: number;
     needsSummary: boolean;
+    qualityMetrics?: ResponseQualityMetrics;
 }
 
 /**
@@ -1355,6 +1418,9 @@ export function buildSessionMetrics(state: SessionMetricsState): DirectProcessMe
         terminationReason: state.terminationReason,
         durationMs: state.loopDurationMs,
         needsSummary: state.needsSummary,
+        totalLowQualityResponses: state.qualityMetrics?.totalLowQualityResponses ?? 0,
+        totalVacuousToolCalls: state.qualityMetrics?.totalVacuousToolCalls ?? 0,
+        qualityNudgeCount: state.qualityMetrics?.qualityNudgeCount ?? 0,
     };
 }
 
