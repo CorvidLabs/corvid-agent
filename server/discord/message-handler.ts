@@ -64,7 +64,7 @@ function trackMentionSession(db: Database, map: Map<string, MentionSessionInfo>,
 }
 
 /** Prefix a message with Discord author context so the agent knows who is speaking. */
-function withAuthorContext(text: string, authorId?: string, authorUsername?: string): string {
+export function withAuthorContext(text: string, authorId?: string, authorUsername?: string): string {
     if (!authorId && !authorUsername) return text;
     if (authorId && authorUsername) return `[From Discord user: ${authorUsername} (Discord ID: ${authorId})]\n${text}`;
     if (authorId) return `[From Discord user ID: ${authorId}]\n${text}`;

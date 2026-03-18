@@ -7,6 +7,7 @@ import type { DiscordBridgeConfig } from '../discord/types';
 import { createAgent } from '../db/agents';
 import { createProject } from '../db/projects';
 import type { WorkTask } from '../../shared/types/work-tasks';
+import { withAuthorContext } from '../discord/message-handler';
 
 function createMockProcessManager() {
     return {
@@ -1086,5 +1087,23 @@ describe('DiscordBridge onboarding', () => {
         } finally {
             globalThis.fetch = originalFetch;
         }
+    });
+});
+
+describe('withAuthorContext', () => {
+    test('returns text unchanged when no author info provided', () => {
+        expect(withAuthorContext('hello')).toBe('hello');
+    });
+
+    test('includes both username and Discord ID when both provided', () => {
+        expect(withAuthorContext('hello', '12345', 'Alice')).toBe('[From Discord user: Alice (Discord ID: 12345)]\nhello');
+    });
+
+    test('includes only Discord ID when username is missing', () => {
+        expect(withAuthorContext('hello', '12345')).toBe('[From Discord user ID: 12345]\nhello');
+    });
+
+    test('includes only username when Discord ID is missing', () => {
+        expect(withAuthorContext('hello', undefined, 'Alice')).toBe('[From Discord user: Alice]\nhello');
     });
 });
