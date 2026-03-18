@@ -8,6 +8,31 @@ import type { OnChainMemory } from '../../algochat/on-chain-transactor';
 
 const log = createLogger('McpToolHandlers');
 
+/**
+ * Search on-chain memories as a fallback when SQLite has no results.
+ * Returns matching memories or null if none found / on error.
+ */
+async function searchOnChainFallback(
+    ctx: McpToolContext,
+    search: string,
+): Promise<OnChainMemory[] | null> {
+    try {
+        const memories = await ctx.agentMessenger.readOnChainMemories(
+            ctx.agentId,
+            ctx.serverMnemonic,
+            ctx.network,
+            { limit: 20, search },
+        );
+        return memories.length > 0 ? memories : null;
+    } catch (err) {
+        log.debug('On-chain fallback search failed', {
+            search,
+            error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+    }
+}
+
 export async function handleSaveMemory(
     ctx: McpToolContext,
     args: { key: string; content: string },
@@ -57,7 +82,8 @@ export async function handleSaveMemory(
                     updateMemoryTxid(ctx.db, memory.id, txid);
                 }
             }).catch((err) => {
-                log.debug('On-chain memory send failed', {
+                log.warn('On-chain memory send failed', {
+                    key: args.key,
                     error: err instanceof Error ? err.message : String(err),
                 });
                 updateMemoryStatus(ctx.db, memory.id, 'failed');
@@ -80,19 +106,35 @@ export async function handleRecallMemory(
         if (args.key) {
             const memory = recallMemory(ctx.db, ctx.agentId, args.key);
             if (!memory) {
+                // Fallback: search on-chain for the key
+                const onChainResults = await searchOnChainFallback(ctx, args.key);
+                if (onChainResults && onChainResults.length > 0) {
+                    const found = onChainResults[0];
+                    return textResult(`[${found.key}] ${found.content}\n(on-chain, txid: ${found.txid} | ${found.timestamp})\n(Note: this memory was found on-chain but missing from local cache. Use corvid_sync_on_chain_memories to restore.)`);
+                }
                 return textResult(`No memory found with key "${args.key}".`);
             }
-            const chainTag = memory.status === 'confirmed' ? `(on-chain: ${memory.txid?.slice(0, 8)}...)` : memory.status === 'pending' ? '(pending)' : '(sync-failed — will retry)';
+            const chainTag = memory.status === 'confirmed' && memory.txid
+                ? `(on-chain, txid: ${memory.txid})`
+                : memory.status === 'pending' ? '(pending sync to on-chain)' : '(sync-failed — will retry)';
             return textResult(`[${memory.key}] ${memory.content}\n(saved: ${memory.updatedAt}) ${chainTag}`);
         }
 
         if (args.query) {
             const memories = searchMemories(ctx.db, ctx.agentId, args.query);
             if (memories.length === 0) {
+                // Fallback: search on-chain
+                const onChainResults = await searchOnChainFallback(ctx, args.query);
+                if (onChainResults && onChainResults.length > 0) {
+                    const lines = onChainResults.map((mem) => `[on-chain] [${mem.key}] ${mem.content}\n  (txid: ${mem.txid} | ${mem.timestamp})`);
+                    return textResult(
+                        `No local results, but found ${onChainResults.length} on-chain memor${onChainResults.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n\n')}\n\n(Use corvid_sync_on_chain_memories to restore these to local cache.)`,
+                    );
+                }
                 return textResult(`No memories found matching "${args.query}".`);
             }
             const lines = memories.map((m) => {
-                const tag = m.status === 'confirmed' ? `[on-chain]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
+                const tag = m.status === 'confirmed' && m.txid ? `[on-chain: ${m.txid}]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
                 return `${tag} [${m.key}] ${m.content}`;
             });
             return textResult(`Found ${memories.length} memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);
@@ -135,7 +177,7 @@ export async function handleReadOnChainMemories(
         }
 
         const lines = memories.map((m: OnChainMemory) =>
-            `[${m.key}] ${m.content}\n  (txid: ${m.txid.slice(0, 12)}... | ${m.timestamp})`,
+            `[${m.key}] ${m.content}\n  (txid: ${m.txid} | ${m.timestamp})`,
         );
 
         return textResult(
