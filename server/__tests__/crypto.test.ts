@@ -99,8 +99,17 @@ describe('getEncryptionPassphrase', () => {
         expect(getEncryptionPassphrase()).toBe('my-key');
     });
 
-    it('throws on testnet without WALLET_ENCRYPTION_KEY', () => {
+    it('falls back to server mnemonic on testnet without WALLET_ENCRYPTION_KEY', () => {
+        const passphrase = getEncryptionPassphrase('testnet', 'my-server-mnemonic');
+        expect(passphrase).toBe('my-server-mnemonic');
+    });
+
+    it('throws on testnet without WALLET_ENCRYPTION_KEY or mnemonic', () => {
         expect(() => getEncryptionPassphrase('testnet')).toThrow('WALLET_ENCRYPTION_KEY must be set for testnet');
+    });
+
+    it('throws on mainnet even with server mnemonic', () => {
+        expect(() => getEncryptionPassphrase('mainnet', 'my-server-mnemonic')).toThrow('WALLET_ENCRYPTION_KEY must be set for mainnet');
     });
 
     it('throws on mainnet without WALLET_ENCRYPTION_KEY', () => {
