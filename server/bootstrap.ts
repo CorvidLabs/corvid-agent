@@ -9,6 +9,7 @@ import { closeDb } from './db/connection';
 import { PerformanceCollector } from './performance/collector';
 import { ProcessManager } from './process/manager';
 import { SessionLifecycleManager } from './process/session-lifecycle';
+import { SessionCheerleadingDetector } from './process/session-cheerleading-detector';
 import { MemorySyncService } from './db/memory-sync';
 import { loadAlgoChatConfig } from './algochat/config';
 import type { AlgoChatBridge } from './algochat/bridge';
@@ -85,6 +86,7 @@ export interface ServiceContainer {
     // Process management
     processManager: ProcessManager;
     sessionLifecycle: SessionLifecycleManager;
+    cheerleadingDetector: SessionCheerleadingDetector;
 
     // AlgoChat (mutable — set by initAlgoChat after server starts)
     algochatConfig: ReturnType<typeof loadAlgoChatConfig>;
@@ -213,6 +215,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     // ── Process management ───────────────────────────────────────────────
     const processManager = new ProcessManager(db);
     const sessionLifecycle = new SessionLifecycleManager(db);
+    const cheerleadingDetector = new SessionCheerleadingDetector(processManager);
     const memorySyncService = new MemorySyncService(db);
 
     // ── AlgoChat state (initialized later by initAlgoChat) ───────────────
@@ -428,6 +431,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         astParserService,
         processManager,
         sessionLifecycle,
+        cheerleadingDetector,
         algochatConfig,
         algochatState,
         memorySyncService,
