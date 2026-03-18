@@ -52,6 +52,12 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `textResult` | `(text: string)` | `CallToolResult` | Wrap text in standard MCP `CallToolResult` format |
 | `errorResult` | `(text: string)` | `CallToolResult` | Wrap error message in MCP `CallToolResult` error format |
 
+### Exported Helpers (from github.ts)
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `warnOwnerMismatch` | `(repo: string)` | `void` | Log a warning when the repo owner is `"corvid-agent"` (the bot username) instead of `"CorvidLabs"` (the org) |
+
 ### Exported Functions
 
 | Function | Parameters | Returns | Description |
