@@ -1,0 +1,25 @@
+{
+  "excludeDirs": [
+    "__tests__"
+  ],
+  "excludePatterns": [
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "server/index.ts",
+    "server/bootstrap.ts"
+  ],
+  "requiredSections": [
+    "Purpose",
+    "Public API",
+    "Invariants",
+    "Behavioral Examples",
+    "Error Cases",
+    "Dependencies",
+    "Change Log"
+  ],
+  "sourceDirs": [
+    "server"
+  ],
+  "specsDir": "specs"
+}
