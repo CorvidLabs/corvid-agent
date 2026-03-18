@@ -47,6 +47,19 @@ export function isApiError(text: string): string | undefined {
     return match ? `API ${match[1]}: ${match[2].slice(0, 100)}` : undefined;
 }
 
+function isToolUseBlock(
+    block: unknown,
+): block is { type: 'tool_use'; name: string; input?: Record<string, unknown> } {
+    return (
+        typeof block === 'object' &&
+        block !== null &&
+        'type' in block &&
+        (block as { type: unknown }).type === 'tool_use' &&
+        'name' in block &&
+        typeof (block as { name: unknown }).name === 'string'
+    );
+}
+
 /**
  * Extract tool_use blocks from SDK assistant message content.
  * SDK responses include tool calls as content blocks with type: 'tool_use'.
@@ -56,9 +69,8 @@ export function extractSdkToolCalls(
 ): Array<{ name: string; arguments: Record<string, unknown> }> {
     const toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
     for (const block of content) {
-        if ((block as any).type === 'tool_use' && (block as any).name) {
-            const toolBlock = block as { type: string; name: string; input?: Record<string, unknown> };
-            toolCalls.push({ name: toolBlock.name, arguments: toolBlock.input ?? {} });
+        if (isToolUseBlock(block)) {
+            toolCalls.push({ name: block.name, arguments: block.input ?? {} });
         }
     }
     return toolCalls;
