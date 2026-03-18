@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { assertSnowflake, assertInteractionToken, buildFooterText } from '../discord/embeds';
+import { assertSnowflake, assertInteractionToken, buildFooterText, extractMentionsFromEmbed } from '../discord/embeds';
 
 describe('assertSnowflake', () => {
     test('accepts valid snowflake IDs', () => {
@@ -90,5 +90,35 @@ describe('buildFooterText', () => {
             sessionId: 'abc',
         });
         expect(result).toBe('Corvid · opus · sid:abc');
+    });
+});
+
+describe('extractMentionsFromEmbed', () => {
+    test('returns undefined when no description', () => {
+        expect(extractMentionsFromEmbed({ title: 'test' })).toBeUndefined();
+    });
+
+    test('returns undefined when no mentions in description', () => {
+        expect(extractMentionsFromEmbed({ description: 'Hello world' })).toBeUndefined();
+    });
+
+    test('extracts a single mention', () => {
+        expect(extractMentionsFromEmbed({ description: 'Hey <@180715808593281025> check this' }))
+            .toBe('<@180715808593281025>');
+    });
+
+    test('extracts multiple mentions', () => {
+        expect(extractMentionsFromEmbed({ description: '<@111111111111111111> and <@222222222222222222>' }))
+            .toBe('<@111111111111111111> <@222222222222222222>');
+    });
+
+    test('deduplicates repeated mentions', () => {
+        expect(extractMentionsFromEmbed({ description: '<@111111111111111111> said hi to <@111111111111111111>' }))
+            .toBe('<@111111111111111111>');
+    });
+
+    test('handles nickname-style mentions with !', () => {
+        expect(extractMentionsFromEmbed({ description: 'Hey <@!180715808593281025>' }))
+            .toBe('<@!180715808593281025>');
     });
 });
