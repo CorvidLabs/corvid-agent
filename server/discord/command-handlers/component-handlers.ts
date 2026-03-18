@@ -135,25 +135,35 @@ function tryRecoverThreadFromCtx(
 ): ThreadSessionInfo | null {
     try {
         const row = ctx.db.query(
-            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model
+            `SELECT s.id, s.agent_id, s.initial_prompt, a.name as agent_name, a.model as agent_model, p.name as project_name
              FROM sessions s
              LEFT JOIN agents a ON a.id = s.agent_id
+             LEFT JOIN projects p ON p.id = s.project_id
              WHERE s.name = ? AND s.source = 'discord'
              ORDER BY s.created_at DESC LIMIT 1`,
-        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string } | null;
+        ).get(`Discord thread:${threadId}`) as { id: string; agent_id: string; initial_prompt: string; agent_name: string; agent_model: string; project_name: string | null } | null;
 
-        if (!row) return null;
+        if (!row) {
+            log.info('No session found in DB for thread recovery', { threadId, searchName: `Discord thread:${threadId}` });
+            return null;
+        }
 
+        log.info('Recovered thread session from DB', { threadId, sessionId: row.id, agentName: row.agent_name });
         const info: ThreadSessionInfo = {
             sessionId: row.id,
             agentName: row.agent_name || 'Agent',
             agentModel: row.agent_model || 'unknown',
             ownerUserId: '',
             topic: row.initial_prompt || undefined,
+            projectName: row.project_name || undefined,
         };
         ctx.threadSessions.set(threadId, info);
         return info;
-    } catch {
+    } catch (err) {
+        log.error('Failed to recover thread session from DB', {
+            threadId,
+            error: err instanceof Error ? err.message : String(err),
+        });
         return null;
     }
 }
