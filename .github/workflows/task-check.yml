@@ -2,7 +2,7 @@ name: Task List Check
 
 on:
   pull_request:
-    types: [opened, edited, synchronize]
+    types: [opened, reopened, edited, synchronize]
 
 permissions:
   pull-requests: read
