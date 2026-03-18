@@ -41,6 +41,8 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 4. **Smart branch cleanup**: `removeWorktree` with `cleanBranch: true` deletes branches with zero commits ahead of main; branches with actual commits are preserved for PRs/review. Without the option, branches are always kept
 5. **Idempotent removal**: Calling `removeWorktree` on an already-removed worktree logs a warning but does not throw
 6. **Graceful failure**: `createWorktree` returns `{ success: false, error }` on failure rather than throwing
+7. **Mandatory isolation**: All session creation paths (Discord mention, /session command, AlgoChat) MUST fail the session if worktree creation fails, rather than silently falling through to the shared main working directory. No isolation = no session.
+8. **Branch isolation prompt**: Sessions running in worktrees receive a `## Git Branch Isolation` system prompt section instructing the agent to only interact with its own branch and ignore other `chat/*` branches
 
 ## Behavioral Examples
 
@@ -57,6 +59,21 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 - **When** `createWorktree(...)` is called
 - **Then** `{ success: false, error: '...' }` is returned
 - **And** no exception is thrown
+
+### Scenario: Session creation aborts on worktree failure
+
+- **Given** a project with `workingDir` configured
+- **When** a Discord mention, /session command, or AlgoChat message triggers session creation
+- **And** `createWorktree(...)` returns `{ success: false }`
+- **Then** the session is NOT created
+- **And** an error message is sent back to the user explaining the failure
+- **And** the function returns early (no fallback to main working directory)
+
+### Scenario: Agent receives branch isolation instructions
+
+- **Given** a session running in an isolated worktree (`session.workDir` is set)
+- **When** the session's system prompt is built
+- **Then** a `## Git Branch Isolation` section is appended instructing the agent to only interact with its own branch and ignore `chat/*` branches from other sessions
 
 ### Scenario: Removing a worktree (default — keep branch)
 
@@ -122,5 +139,6 @@ Shared git worktree management extracted from `WorkTaskService`. Provides creati
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-18 | corvid-agent | Mandatory worktree isolation (invariants #7-#8); branch isolation prompt; session fails on worktree error |
 | 2026-03-15 | corvid-agent | Added `RemoveWorktreeOptions` / `cleanBranch` for smart branch cleanup; AlgoChat consumer |
 | 2026-03-12 | corvid-agent | Initial spec — extracted from WorkTaskService |

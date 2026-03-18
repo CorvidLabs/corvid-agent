@@ -420,9 +420,13 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         });
         if (result.success) {
             workDir = result.worktreeDir;
+        } else {
+            // Worktree isolation is mandatory — running without it risks
+            // cross-session contamination of the shared working directory.
+            await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId,
+                `Failed to create isolated worktree for this session: ${result.error ?? 'unknown error'}. Please try again.`);
+            return;
         }
-        // If worktree creation fails, fall through to using the main working dir.
-        // This is non-fatal — the session still works, just without isolation.
     }
 
     const session = createSession(ctx.db, {

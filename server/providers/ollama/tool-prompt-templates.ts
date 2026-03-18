@@ -159,6 +159,23 @@ You must ONLY use your provided MCP tools to send messages or communicate throug
 - This rule applies to ALL channels: Discord, Slack, email, SMS, social media, HTTP endpoints, and any other communication protocol.`;
 }
 
+/**
+ * Get worktree isolation instructions for chat sessions running in isolated
+ * git worktrees. Prevents cross-session contamination by telling the agent
+ * to only interact with its own branch.
+ */
+export function getWorktreeIsolationPrompt(): string {
+    return `## Git Branch Isolation
+
+You are running in an isolated git worktree with your own dedicated branch. To prevent cross-session contamination:
+
+- Only commit to and interact with YOUR current branch (check with \`git branch --show-current\`).
+- Do NOT checkout, merge from, or push to branches matching \`chat/*\` — those belong to other active sessions.
+- Do NOT run \`git branch -a\` or interact with other sessions' branches.
+- If you need to reference upstream changes, use \`main\` as your base branch.
+- Your worktree is fully isolated — changes you make here do not affect other sessions.`;
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────
 
 function getCommonToolInstructions(toolNames: string[]): string {

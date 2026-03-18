@@ -15,7 +15,7 @@ import type { LlmProvider, LlmToolCall } from '../providers/types';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import { buildDirectTools, toProviderTools, type DirectToolDefinition } from '../mcp/direct-tools';
 import { type CodingToolContext, buildSafeEnvForCoding } from '../mcp/coding-tools';
-import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getMessagingSafetyPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
+import { getToolInstructionPrompt, getResponseRoutingPrompt, getCodingToolPrompt, getMessagingSafetyPrompt, getWorktreeIsolationPrompt, detectModelFamily } from '../providers/ollama/tool-prompt-templates';
 import { ExternalMcpClientManager } from '../mcp/external-client';
 import { getAgentTierConfig, type AgentTierConfig } from '../lib/agent-tiers';
 import { escalateTier, inferModelTier } from '../work/chain-continuation';
@@ -522,7 +522,7 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     // Wait for external MCP initialization, then build system prompt and start loop
     initPromise.then(() => {
         const toolDefs = directTools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
-        systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt, tierConfig);
+        systemPrompt = buildSystemPrompt(agent, project, model, toolDefs, !toolsDisabled && directTools.length > 0, isDeliberationSession, personaPrompt, skillPrompt, tierConfig, session.workDir);
         return runLoop(effectivePrompt);
     }).catch((err) => {
         if (aborted) return;
@@ -1525,6 +1525,7 @@ export function buildSystemPrompt(
     personaPrompt?: string,
     skillPrompt?: string,
     agentTierConfig?: AgentTierConfig,
+    sessionWorkDir?: string | null,
 ): string {
     const parts: string[] = [];
 
@@ -1590,6 +1591,11 @@ export function buildSystemPrompt(
     // Add focus/scoping instructions for non-high-tier agents
     if (agentTierConfig && agentTierConfig.tier !== 'high') {
         parts.push('', getAgentScopingInstructions(agentTierConfig));
+    }
+
+    // Add worktree isolation context for sessions in isolated worktrees
+    if (sessionWorkDir) {
+        parts.push('', getWorktreeIsolationPrompt());
     }
 
     return parts.join('\n');
