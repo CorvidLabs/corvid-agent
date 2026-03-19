@@ -41,7 +41,8 @@
     "version:check": "bun scripts/version-check.ts",
     "migrate:keys": "bun scripts/migrate-keys.ts",
     "purge:test-data": "bun scripts/purge-test-data.ts",
-    "governance:check": "bun scripts/governance-check.ts"
+    "governance:check": "bun scripts/governance-check.ts",
+    "mcp": "bun server/mcp/stdio-server.ts"
   },
   "optionalDependencies": {
     "@corvidlabs/ts-algochat": "^0.3.0"
