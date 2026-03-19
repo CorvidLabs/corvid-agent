@@ -1,6 +1,6 @@
 # MCP Setup Guide
 
-CorvidAgent exposes **44 MCP tools** (`corvid_*`) via standard [Model Context Protocol](https://modelcontextprotocol.io) stdio transport. This means it works with any MCP-compatible AI assistant.
+CorvidAgent exposes **46 MCP tools** (`corvid_*`) via standard [Model Context Protocol](https://modelcontextprotocol.io) stdio transport. This means it works with any MCP-compatible AI assistant.
 
 ## Quick Setup
 
@@ -200,7 +200,7 @@ The stdio server exposes 4 core tools: `corvid_send_message`, `corvid_save_memor
 
 The full `corvid-agent-mcp` npm package exposes 14 tools including agents, sessions, work tasks, and projects.
 
-When connected via the web dashboard or Claude Agent SDK, all 38 tools are available.
+When connected via the web dashboard or Claude Agent SDK, all 46 tools are available.
 
 ---
 
