@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.0] - 2026-03-18
+
+### Added
+- **Release tarball in CI** — `release.yml` builds a clean tarball of runtime files and attaches it to GitHub Releases (#1238)
+- **Tarball install path** — `install.sh` downloads release tarballs for non-git installs, with git-clone fallback (#1238)
+- **Tiered `corvid_send_message` access** — scheduler sessions get scoped messaging permissions (#1225)
+- **Agent deployment config schema** — plugin interfaces for deployment configuration (#1218)
+- **Discord user ID in author context** — agent sessions see the Discord user ID of the message sender (#1227)
+- **Discord status and dashboard embeds** — rich embeds for agent status, dashboard views, and system monitoring (#892, #1240)
+- **SpecSync migration** — spec validation migrated from TypeScript to specsync Rust binary (#1219)
+
+### Fixed
+- **Young session deletion** — protect recently-created sessions from premature limit-based deletion (#1223)
+- **Discord session auto-resume** — expired threads auto-resume on new message (#1226)
+- **Embed mention extraction** — extract embed mentions to content field for notifications (#1224)
+- **Attachment URL visibility** — include attachment URLs in message text for reliable image forwarding (#1216)
+- **GitHub owner in CLAUDE.md** — prevent wrong-org queries (#1231)
+- **CI spec validation URL** — fix URL in spec validation step of checks.yml (#1234)
+
+### Docs
+- Separate generic CLAUDE.md from CorvidLabs instance config (#1235)
+- Add SpecSync marketplace references (#1232)
+- Expand use case gallery with examples and new categories (#1220)
+
+### Tests
+- Add 199 tests for approval-format, agent-card, metrics (#1217)
+
 ## [0.37.0] - 2026-03-18
 
 ### Added

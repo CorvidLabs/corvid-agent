@@ -1,6 +1,6 @@
 ---
 module: discord-bridge
-version: 15
+version: 16
 status: active
 files:
   - server/discord/bridge.ts
@@ -101,6 +101,9 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `handleConfigCommand` | `(ctx, interaction, permLevel)` | `Promise<void>` | Handle the `/config` command — shows bot configuration (admin-only) |
 | `handleQuickstartCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/quickstart` command — shows Discord onboarding flow |
 | `handleHelpCommand` | `(interaction)` | `Promise<void>` | Handle the `/help` command — shows available commands and usage |
+| `handleDashboardCommand` | `(ctx, interaction)` | `Promise<void>` | Handle the `/dashboard` command — shows multi-embed server overview with agents, work, and schedules |
+| `formatUptime` | `(seconds)` | `string` | Format seconds into human-readable uptime string (e.g. "2d 5h 30m") |
+| `measureDbLatency` | `(db)` | `number` | Measure database latency with a trivial query, returns milliseconds |
 
 ### Exported Functions (from command-handlers/moderation-commands.ts)
 
@@ -128,6 +131,7 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 |----------|-----------|---------|-------------|
 | `respondToInteraction` | `(interaction, content)` | `Promise<void>` | Send a text response to an interaction callback |
 | `respondToInteractionEmbed` | `(interaction, embed, ephemeral?)` | `Promise<void>` | Send an embed response to an interaction callback |
+| `respondToInteractionEmbeds` | `(interaction, embeds, ephemeral?)` | `Promise<void>` | Send multiple embeds in a single interaction response |
 | `acknowledgeButton` | `(interaction, message)` | `Promise<void>` | Acknowledge a button press with an ephemeral message |
 | `sendEmbed` | `(delivery, botToken, channelId, embed)` | `Promise<void>` | Send an embed to a channel |
 | `sendMessageWithEmbed` | `(delivery, botToken, channelId, content?, embed)` | `Promise<void>` | Send text content + embed to a channel |
