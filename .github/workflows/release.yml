@@ -89,6 +89,34 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Build release tarball
+        env:
+          TAG: ${{ steps.tag.outputs.version }}
+        run: |
+          STAGING="$(mktemp -d)/corvid-agent"
+          mkdir -p "$STAGING"
+
+          # Copy runtime files only
+          cp -r server/    "$STAGING/server"
+          cp -r shared/    "$STAGING/shared"
+          cp -r client/    "$STAGING/client"
+          cp -r patches/   "$STAGING/patches"
+          cp package.json  "$STAGING/package.json"
+          cp bun.lock      "$STAGING/bun.lock"
+          cp .env.example  "$STAGING/.env.example"
+          cp README.md     "$STAGING/README.md"
+          cp LICENSE        "$STAGING/LICENSE"
+          mkdir -p "$STAGING/scripts"
+          cp scripts/install.sh "$STAGING/scripts/install.sh"
+          cp scripts/setup.sh   "$STAGING/scripts/setup.sh"
+
+          # Create tarball from staging parent dir
+          tar -czf "corvid-agent-${TAG}.tar.gz" -C "$(dirname "$STAGING")" corvid-agent
+
+          echo "Tarball contents:"
+          tar -tzf "corvid-agent-${TAG}.tar.gz" | head -30
+          ls -lh "corvid-agent-${TAG}.tar.gz"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b  # v2
         with:
@@ -97,3 +125,4 @@ jobs:
           body: ${{ steps.changelog.outputs.changelog }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: false
+          files: corvid-agent-${{ steps.tag.outputs.version }}.tar.gz

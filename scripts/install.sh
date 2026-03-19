@@ -136,18 +136,65 @@ else
     fi
 fi
 
-# ─── Step 2: Clone or update ────────────────────────────────────────────────
+# ─── Step 2: Install or update ──────────────────────────────────────────────
 
 step "Getting corvid-agent"
 
+REPO="CorvidLabs/corvid-agent"
+
+# Fetch latest release tarball URL from GitHub API
+get_latest_tarball_url() {
+    local api_url="https://api.github.com/repos/${REPO}/releases/latest"
+    local release_json
+    release_json=$(curl -fsSL "$api_url" 2>/dev/null) || return 1
+    echo "$release_json" | grep -o '"browser_download_url": *"[^"]*corvid-agent-[^"]*\.tar\.gz"' \
+        | head -1 | cut -d'"' -f4
+}
+
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-    info "Found existing install at $INSTALL_DIR"
+    # ── Existing git install (developer/contributor) ──
+    info "Found existing git install at $INSTALL_DIR"
     cd "$INSTALL_DIR"
     git pull --ff-only origin main 2>/dev/null || warn "Could not fast-forward — using existing version"
+elif [[ -d "$INSTALL_DIR" ]]; then
+    # ── Existing tarball install — upgrade in place ──
+    info "Found existing install at $INSTALL_DIR"
+    TARBALL_URL=$(get_latest_tarball_url)
+    if [[ -n "$TARBALL_URL" ]]; then
+        TMPDIR_DL="$(mktemp -d)"
+        info "Downloading latest release..."
+        curl -fsSL "$TARBALL_URL" -o "$TMPDIR_DL/corvid-agent.tar.gz" \
+            || fail "Failed to download release tarball"
+        # Extract over existing dir, preserving .env and user data
+        tar -xzf "$TMPDIR_DL/corvid-agent.tar.gz" --strip-components=1 -C "$INSTALL_DIR"
+        rm -rf "$TMPDIR_DL"
+        cd "$INSTALL_DIR"
+        info "Updated to latest release"
+    else
+        warn "No release found — keeping existing version"
+        cd "$INSTALL_DIR"
+    fi
 else
-    git clone https://github.com/CorvidLabs/corvid-agent.git "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
-    info "Cloned to $INSTALL_DIR"
+    # ── Fresh install ──
+    TARBALL_URL=$(get_latest_tarball_url)
+    if [[ -n "$TARBALL_URL" ]]; then
+        mkdir -p "$INSTALL_DIR"
+        TMPDIR_DL="$(mktemp -d)"
+        info "Downloading latest release..."
+        curl -fsSL "$TARBALL_URL" -o "$TMPDIR_DL/corvid-agent.tar.gz" \
+            || fail "Failed to download release tarball"
+        tar -xzf "$TMPDIR_DL/corvid-agent.tar.gz" --strip-components=1 -C "$INSTALL_DIR"
+        rm -rf "$TMPDIR_DL"
+        cd "$INSTALL_DIR"
+        info "Installed to $INSTALL_DIR"
+    else
+        # No releases yet — fall back to git clone
+        warn "No release tarball found — falling back to git clone"
+        warn "This includes dev files; future updates will use release tarballs"
+        git clone https://github.com/${REPO}.git "$INSTALL_DIR"
+        cd "$INSTALL_DIR"
+        info "Cloned to $INSTALL_DIR"
+    fi
 fi
 
 # ─── Step 3: Environment setup ──────────────────────────────────────────────
