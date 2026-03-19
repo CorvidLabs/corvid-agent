@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.0] - 2026-03-19
+
+### Added
+- **ARC-69 on-chain memory storage** — store agent memories as ARC-69 ASAs on localnet AlgoChat (#1256)
+- **MCP over Streamable HTTP** — expose MCP tools over Streamable HTTP at `/mcp` (#1255)
+- **Memory MCP tools for CLI** — expose memory MCP tools to Claude Code CLI sessions (#1243)
+- **Brain viewer storage types + observations** — brain viewer storage types and memory observations system (#1259)
+
+### Fixed
+- **ARC-69 memory storage silent fallback** — remove silent fallback from ARC-69 memory storage (#1257)
+- **MCP tool loading race condition** — resolve MCP tool loading race condition (#1253, #1254)
+- **SpecSync wrapper for local execution** — add specsync wrapper for local `spec:check` execution (#1246)
+
+### Docs
+- Audience-specific guides for non-programmers, businesses, and enterprise (#1250, #1252)
+- Add 16 missing API endpoint groups to api-reference (#1258)
+- Sync stale counts across README, deep-dive, quickstart, mcp-setup, contributing (#1247)
+
+### Tests
+- Add coverage for repo-map, cheerleading detector, external MCP (#1251)
+
 ## [0.38.0] - 2026-03-18
 
 ### Added
