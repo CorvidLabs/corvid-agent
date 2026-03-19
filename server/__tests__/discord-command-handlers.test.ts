@@ -21,9 +21,12 @@ import { handleComponentInteraction } from '../discord/command-handlers/componen
 import {
     handleAgentsCommand,
     handleStatusCommand,
+    handleDashboardCommand,
     handleConfigCommand,
     handleQuickstartCommand,
     handleHelpCommand,
+    formatUptime,
+    measureDbLatency,
 } from '../discord/command-handlers/info-commands';
 import {
     handleCouncilCommand,
@@ -608,16 +611,112 @@ describe('handleAgentsCommand', () => {
 });
 
 describe('handleStatusCommand', () => {
-    test('shows active session count', async () => {
+    test('shows rich status embed with key metrics', async () => {
         const ctx = createTestContext();
         ctx.threadSessions.set('thread-1', { sessionId: 's1', agentName: 'A', agentModel: 'm', ownerUserId: 'u' });
         ctx.threadSessions.set('thread-2', { sessionId: 's2', agentName: 'B', agentModel: 'm', ownerUserId: 'u' });
+        createAgent(db, { name: 'TestAgent', model: 'test-model' });
 
         const interaction = makeInteraction('status');
         await handleStatusCommand(ctx, interaction);
 
-        const content = capturedResponse!.data?.content as string;
-        expect(content).toContain('2');
+        const embeds = capturedResponse!.data?.embeds as Array<{
+            title: string;
+            fields: Array<{ name: string; value: string }>;
+            timestamp: string;
+        }>;
+        expect(embeds[0].title).toBe('System Status');
+        const fieldNames = embeds[0].fields.map(f => f.name);
+        expect(fieldNames).toContain('Version');
+        expect(fieldNames).toContain('Uptime');
+        expect(fieldNames).toContain('DB Latency');
+        expect(fieldNames).toContain('Agents');
+        expect(fieldNames).toContain('Active Sessions');
+        expect(fieldNames).toContain('Tasks');
+        expect(fieldNames).toContain('Schedules');
+
+        const sessionsField = embeds[0].fields.find(f => f.name === 'Active Sessions');
+        expect(sessionsField!.value).toBe('2');
+
+        const agentsField = embeds[0].fields.find(f => f.name === 'Agents');
+        expect(agentsField!.value).toBe('1');
+
+        expect(embeds[0].timestamp).toBeDefined();
+    });
+});
+
+describe('handleDashboardCommand', () => {
+    test('returns multi-embed dashboard', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'AlphaBot', model: 'claude-opus-4-6' });
+        createAgent(db, { name: 'BetaBot', model: 'claude-sonnet-4' });
+
+        const interaction = makeInteraction('dashboard');
+        await handleDashboardCommand(ctx, interaction);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string }>;
+        expect(embeds).toHaveLength(4);
+        expect(embeds[0].title).toContain('System Overview');
+        expect(embeds[1].title).toBe('Agents');
+        expect(embeds[2].title).toBe('Work Pipeline');
+        expect(embeds[3].title).toBe('Schedules');
+    });
+
+    test('shows agents with active session indicators', async () => {
+        const ctx = createTestContext();
+        createAgent(db, { name: 'ActiveBot', model: 'test-model' });
+        createAgent(db, { name: 'IdleBot', model: 'test-model' });
+        ctx.threadSessions.set('thread-1', { sessionId: 's1', agentName: 'ActiveBot', agentModel: 'test-model', ownerUserId: 'u' });
+
+        const interaction = makeInteraction('dashboard');
+        await handleDashboardCommand(ctx, interaction);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string }>;
+        const agentEmbed = embeds.find(e => e.title === 'Agents')!;
+        // ActiveBot should have green indicator, IdleBot should have grey
+        expect(agentEmbed.description).toContain('ActiveBot');
+        expect(agentEmbed.description).toContain('IdleBot');
+    });
+
+    test('shows empty states gracefully', async () => {
+        const ctx = createTestContext();
+        const interaction = makeInteraction('dashboard');
+        await handleDashboardCommand(ctx, interaction);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string; description: string }>;
+        const agentEmbed = embeds.find(e => e.title === 'Agents')!;
+        expect(agentEmbed.description).toContain('No agents configured');
+
+        const workEmbed = embeds.find(e => e.title === 'Work Pipeline')!;
+        expect(workEmbed.description).toContain('No active tasks');
+
+        const schedEmbed = embeds.find(e => e.title === 'Schedules')!;
+        expect(schedEmbed.description).toContain('No active schedules');
+    });
+});
+
+describe('formatUptime', () => {
+    test('formats minutes only', () => {
+        expect(formatUptime(300)).toBe('5m');
+    });
+
+    test('formats hours and minutes', () => {
+        expect(formatUptime(3660)).toBe('1h 1m');
+    });
+
+    test('formats days, hours, and minutes', () => {
+        expect(formatUptime(90060)).toBe('1d 1h 1m');
+    });
+
+    test('formats zero', () => {
+        expect(formatUptime(0)).toBe('0m');
+    });
+});
+
+describe('measureDbLatency', () => {
+    test('returns non-negative number', () => {
+        const latency = measureDbLatency(db);
+        expect(latency).toBeGreaterThanOrEqual(0);
     });
 });
 
@@ -1213,6 +1312,27 @@ describe('handleInteraction dispatch', () => {
 
         const content = capturedResponse!.data?.content as string;
         expect(content).toContain('Unknown command');
+    });
+
+    test('dispatches /dashboard command', async () => {
+        const ctx = createTestContext();
+        const interaction = makeInteraction('dashboard');
+
+        await handleInteraction(ctx, interaction);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string }>;
+        expect(embeds).toHaveLength(4);
+        expect(embeds[0].title).toContain('System Overview');
+    });
+
+    test('dispatches /status command with rich embed', async () => {
+        const ctx = createTestContext();
+        const interaction = makeInteraction('status');
+
+        await handleInteraction(ctx, interaction);
+
+        const embeds = capturedResponse!.data?.embeds as Array<{ title: string }>;
+        expect(embeds[0].title).toBe('System Status');
     });
 
     test('ignores non-command interactions', async () => {

@@ -27,6 +27,7 @@ import { handleSessionCommand, handleWorkCommand } from './command-handlers/sess
 import {
     handleAgentsCommand,
     handleStatusCommand,
+    handleDashboardCommand,
     handleTasksCommand,
     handleScheduleCommand,
     handleConfigCommand,
@@ -102,7 +103,8 @@ export async function registerSlashCommands(
             ],
         },
         { name: 'agents', description: 'List all available agents', type: 1 },
-        { name: 'status', description: 'Show bot status and active sessions', type: 1 },
+        { name: 'status', description: 'Show system status and key metrics', type: 1 },
+        { name: 'dashboard', description: 'Comprehensive system overview with agents, tasks, and schedules', type: 1 },
         { name: 'tasks', description: 'View active work tasks and queue status', type: 1 },
         { name: 'schedule', description: 'Show schedule status and next runs', type: 1 },
         {
@@ -342,6 +344,9 @@ export async function handleInteraction(
             break;
         case 'status':
             await handleStatusCommand(ctx, interaction);
+            break;
+        case 'dashboard':
+            await handleDashboardCommand(ctx, interaction);
             break;
         case 'tasks':
             await handleTasksCommand(ctx, interaction);

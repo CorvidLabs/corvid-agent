@@ -2,7 +2,7 @@
  * Discord informational command handlers.
  *
  * Handles `/agents`, `/status`, `/tasks`, `/schedule`, `/config`,
- * `/quickstart`, and `/help` commands.
+ * `/quickstart`, `/dashboard`, and `/help` commands.
  */
 
 import type { InteractionContext } from '../commands';
@@ -14,6 +14,8 @@ import { listActiveSchedules } from '../../db/schedules';
 import {
     respondToInteraction,
     respondToInteractionEmbed,
+    respondToInteractionEmbeds,
+    type DiscordEmbed,
 } from '../embeds';
 
 export async function handleAgentsCommand(
@@ -29,13 +31,67 @@ export async function handleAgentsCommand(
     await respondToInteraction(interaction, `Available agents:\n${lines.join('\n')}`);
 }
 
+/** Format seconds into a human-readable uptime string. */
+export function formatUptime(seconds: number): string {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+
+/** Measure DB latency with a trivial query. */
+export function measureDbLatency(db: import('bun:sqlite').Database): number {
+    const start = performance.now();
+    db.query('SELECT 1').get();
+    return Math.round((performance.now() - start) * 100) / 100;
+}
+
+/** Get server version from package.json. */
+function getVersion(): string {
+    try {
+        return (require('../../../package.json') as { version: string }).version;
+    } catch {
+        return 'unknown';
+    }
+}
+
 export async function handleStatusCommand(
     ctx: InteractionContext,
     interaction: DiscordInteractionData,
 ): Promise<void> {
+    const version = getVersion();
+    const uptimeSeconds = Math.floor(process.uptime());
+    const dbLatency = measureDbLatency(ctx.db);
+
+    const agents = listAgents(ctx.db);
     const activeSessions = ctx.threadSessions.size;
-    await respondToInteraction(interaction,
-        `Active thread sessions: **${activeSessions}**\nUse \`/session\` to start a new conversation.`);
+    const activeTaskCount = countActiveTasks(ctx.db);
+    const pendingTaskCount = countPendingTasks(ctx.db);
+
+    const schedules = listActiveSchedules(ctx.db);
+    const scheduleCount = schedules.length;
+
+    const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+        { name: 'Version', value: `v${version}`, inline: true },
+        { name: 'Uptime', value: formatUptime(uptimeSeconds), inline: true },
+        { name: 'DB Latency', value: `${dbLatency}ms`, inline: true },
+        { name: 'Agents', value: String(agents.length), inline: true },
+        { name: 'Active Sessions', value: String(activeSessions), inline: true },
+        { name: 'Tasks', value: `${activeTaskCount} active \u00b7 ${pendingTaskCount} pending`, inline: true },
+        { name: 'Schedules', value: `${scheduleCount} active`, inline: true },
+    ];
+
+    const statusColor = dbLatency < 100 ? 0x57f287 : dbLatency < 500 ? 0xfee75c : 0xed4245;
+
+    await respondToInteractionEmbed(interaction, {
+        title: 'System Status',
+        color: statusColor,
+        fields,
+        footer: { text: 'Use /dashboard for a full overview' },
+        timestamp: new Date().toISOString(),
+    });
 }
 
 export async function handleTasksCommand(
@@ -180,6 +236,98 @@ export async function handleQuickstartCommand(
     });
 }
 
+export async function handleDashboardCommand(
+    ctx: InteractionContext,
+    interaction: DiscordInteractionData,
+): Promise<void> {
+    const version = getVersion();
+    const uptimeSeconds = Math.floor(process.uptime());
+    const dbLatency = measureDbLatency(ctx.db);
+
+    const agents = listAgents(ctx.db);
+    const activeSessions = ctx.threadSessions.size;
+    const activeTaskCount = countActiveTasks(ctx.db);
+    const pendingTaskCount = countPendingTasks(ctx.db);
+    const activeTasks = getActiveWorkTasks(ctx.db);
+    const schedules = listActiveSchedules(ctx.db);
+
+    const statusColor = dbLatency < 100 ? 0x57f287 : dbLatency < 500 ? 0xfee75c : 0xed4245;
+
+    // Embed 1: System overview
+    const overviewEmbed: DiscordEmbed = {
+        title: 'Dashboard — System Overview',
+        color: statusColor,
+        fields: [
+            { name: 'Version', value: `v${version}`, inline: true },
+            { name: 'Uptime', value: formatUptime(uptimeSeconds), inline: true },
+            { name: 'DB Latency', value: `${dbLatency}ms`, inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+    };
+
+    // Embed 2: Agent roster — mark agents with active thread sessions
+    const activeAgentNames = new Set<string>();
+    for (const info of ctx.threadSessions.values()) {
+        activeAgentNames.add(info.agentName);
+    }
+
+    const agentLines = agents.length > 0
+        ? agents.slice(0, 10).map(a => {
+            const indicator = activeAgentNames.has(a.name) ? '\u{1F7E2}' : '\u{26AA}';
+            return `${indicator} **${a.name}** \u2014 ${a.model || 'no model'}`;
+        })
+        : ['_No agents configured._'];
+
+    const agentEmbed: DiscordEmbed = {
+        title: 'Agents',
+        description: agentLines.join('\n'),
+        color: 0x5865f2,
+        fields: [
+            { name: 'Total', value: String(agents.length), inline: true },
+            { name: 'Active Sessions', value: String(activeSessions), inline: true },
+        ],
+    };
+
+    // Embed 3: Work pipeline
+    const statusEmoji: Record<string, string> = {
+        running: '\u{1F7E2}', branching: '\u{1F7E1}', validating: '\u{1F535}',
+        queued: '\u{23F3}', paused: '\u{23F8}',
+    };
+
+    const taskLines = activeTasks.slice(0, 5).map(t => {
+        const emoji = statusEmoji[t.status] || '\u{26AA}';
+        const desc = t.description.slice(0, 60) + (t.description.length > 60 ? '...' : '');
+        return `${emoji} **${t.status}** \u2014 ${desc}`;
+    });
+
+    const workEmbed: DiscordEmbed = {
+        title: 'Work Pipeline',
+        description: taskLines.length > 0 ? taskLines.join('\n') : '_No active tasks._',
+        color: 0xeb459e,
+        fields: [
+            { name: 'Active', value: String(activeTaskCount), inline: true },
+            { name: 'Pending', value: String(pendingTaskCount), inline: true },
+        ],
+    };
+
+    // Embed 4: Schedule health
+    const scheduleLines = schedules.slice(0, 8).map(s => {
+        const nextRun = s.nextRunAt
+            ? `<t:${Math.floor(new Date(s.nextRunAt).getTime() / 1000)}:R>`
+            : 'not scheduled';
+        return `\u2022 **${s.name}** \u2014 next: ${nextRun} \u00b7 runs: ${s.executionCount}`;
+    });
+
+    const scheduleEmbed: DiscordEmbed = {
+        title: 'Schedules',
+        description: scheduleLines.length > 0 ? scheduleLines.join('\n') : '_No active schedules._',
+        color: 0x57f287,
+        footer: { text: `${schedules.length} schedule${schedules.length === 1 ? '' : 's'} active` },
+    };
+
+    await respondToInteractionEmbeds(interaction, [overviewEmbed, agentEmbed, workEmbed, scheduleEmbed]);
+}
+
 export async function handleHelpCommand(
     interaction: DiscordInteractionData,
 ): Promise<void> {
@@ -200,7 +348,8 @@ export async function handleHelpCommand(
                 name: 'Information',
                 value: [
                     '`/agents` — List all available agents and models',
-                    '`/status` — Show active sessions and bot status',
+                    '`/status` — Show system status and key metrics',
+                    '`/dashboard` — Comprehensive system overview',
                     '`/tasks` — View active work tasks and queue status',
                     '`/schedule` — Show schedule status and next runs',
                     '`/help` — Show this help message',
