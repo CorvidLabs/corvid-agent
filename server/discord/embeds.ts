@@ -142,6 +142,37 @@ export async function respondToInteractionEmbed(
     }
 }
 
+export async function respondToInteractionEmbeds(
+    interaction: DiscordInteractionData,
+    embeds: DiscordEmbed[],
+    ephemeral = false,
+): Promise<void> {
+    assertSnowflake(interaction.id, 'interaction ID');
+    assertInteractionToken(interaction.token);
+    const response = await fetch(
+        `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: InteractionCallbackType.CHANNEL_MESSAGE,
+                data: {
+                    embeds,
+                    ...(ephemeral ? { flags: 64 } : {}),
+                },
+            }),
+        },
+    );
+
+    if (!response.ok) {
+        const error = await response.text();
+        log.error('Failed to respond to Discord interaction with embeds', {
+            status: response.status,
+            error: error.slice(0, 200),
+        });
+    }
+}
+
 export async function acknowledgeButton(interaction: DiscordInteractionData, message: string): Promise<void> {
     assertSnowflake(interaction.id, 'interaction ID');
     assertInteractionToken(interaction.token);
