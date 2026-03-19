@@ -8,6 +8,226 @@ Practical examples showing how to use corvid-agent for common workflows. Each ex
 
 ---
 
+## For Anyone (No Coding Required)
+
+These examples work through the web dashboard at `http://localhost:3000`. Just type what you want.
+
+### Build a Website from a Description
+
+**Problem:** You need a website but don't know HTML, CSS, or JavaScript.
+
+**Solution:** Describe what you want. The agent designs and builds it.
+
+#### What to type in the dashboard
+
+> "Create a personal portfolio website. My name is Sarah Chen. I'm a photographer based in Portland. Include a gallery section, an about page, and a contact form. Use a clean, minimal design with dark tones."
+
+#### What happens
+
+```
+Agent: I'll create your portfolio website. Here's my plan:
+  1. Homepage with your name and a hero image area
+  2. Gallery page with a responsive photo grid
+  3. About page with your bio
+  4. Contact form with email integration
+
+Building now...
+
+Created 4 files:
+  index.html — Homepage with hero section
+  gallery.html — Responsive photo grid (12 placeholder slots)
+  about.html — About page with bio section
+  styles.css — Dark minimal theme
+
+Preview: http://localhost:3000/preview/sarah-portfolio
+
+Want me to deploy this to a live URL, or would you like changes first?
+```
+
+#### More ideas
+
+- "Build a wedding website with an RSVP form and event schedule"
+- "Make a landing page for my small business — we sell handmade candles"
+- "Create a resume website I can share with employers"
+- "Build a simple blog where I can post updates about my garden"
+
+---
+
+### Create a Custom App
+
+**Problem:** You have an idea for a tool but can't program it yourself.
+
+**Solution:** Describe the tool. The agent builds a working web app.
+
+#### What to type
+
+> "Build me a meal planner. I want to add recipes, plan my meals for the week on a calendar, and generate a shopping list from the planned meals."
+
+#### What happens
+
+```
+Agent: Building your meal planner app...
+
+Features I'm implementing:
+  - Recipe manager (add, edit, delete recipes with ingredients)
+  - Weekly calendar view (drag recipes onto days)
+  - Auto-generated shopping list (combines ingredients, groups by category)
+  - Local storage (your data stays on your device)
+
+Building...
+
+Done! Your meal planner is ready at http://localhost:3000/preview/meal-planner
+
+It has:
+  ✓ Recipe form with name, ingredients, and instructions
+  ✓ Weekly calendar with drag-and-drop
+  ✓ Shopping list that auto-combines duplicate ingredients
+  ✓ Everything saved locally in your browser
+
+Want me to add anything else? Maybe a "favorites" feature or recipe categories?
+```
+
+#### Tips
+
+- Be specific about what you want — the more detail, the better the result
+- Ask for changes after seeing the first version ("make the colors warmer", "add a search bar")
+- The agent remembers your conversation, so you can iterate naturally
+
+---
+
+### Automate Repetitive Tasks
+
+**Problem:** You do the same digital task over and over. You wish it would just happen.
+
+**Solution:** Set up a schedule. The agent does it automatically.
+
+#### Examples
+
+**Weekly report from GitHub activity:**
+> "Every Monday at 9am, check all the pull requests merged last week on my-org/my-repo and write a summary of what changed."
+
+**Daily social media content ideas:**
+> "Every morning at 8am, research trending topics in sustainable fashion and draft 3 Instagram caption ideas."
+
+**Monitor a competitor's changelog:**
+> "Every Friday, check the public changelog at competitor.com/changelog and summarize what they shipped this week."
+
+---
+
+## For Businesses and Teams
+
+### Customer Support Agent
+
+**Problem:** Your support team is overwhelmed. The same questions get asked dozens of times a day.
+
+**Solution:** Deploy an agent in your Discord or Slack that answers common questions, links to docs, and escalates complex issues to humans.
+
+#### Setup
+
+Add to `.env`:
+```bash
+DISCORD_BOT_TOKEN=your-bot-token
+DISCORD_CHANNEL_ID=your-support-channel-id
+```
+
+Configure the agent:
+```bash
+curl -X PUT http://localhost:3000/api/agents/AGENT_ID/persona \
+  -H "Content-Type: application/json" \
+  -d '{
+    "archetype": "Support Engineer",
+    "traits": ["patient", "helpful", "precise"],
+    "voiceGuidelines": "Always link to docs. If unsure, say so and tag a human. Never guess at answers."
+  }'
+```
+
+#### What it looks like
+
+```
+Customer: How do I reset my password?
+
+Agent: You can reset your password at https://app.example.com/reset-password.
+Enter your email and you'll receive a reset link within 2 minutes.
+If you don't see the email, check your spam folder.
+Need more help? I can tag a team member.
+
+Customer: The reset email never arrives
+
+Agent: That can happen if your email is registered under a different address.
+Let me tag @support-team to look into your account directly.
+@support-team — customer reports password reset emails not arriving.
+```
+
+#### Why this matters for your business
+
+- **24/7 coverage** — answers questions at 3 AM without paying overtime
+- **Consistent quality** — same accurate answer every time, always links to docs
+- **Scales instantly** — handles 100 simultaneous conversations as easily as 1
+- **Reduces ticket volume** — common questions never reach your human team
+
+---
+
+### Internal Knowledge Base Agent
+
+**Problem:** New employees ask the same onboarding questions. Senior engineers get interrupted answering "where is X?" and "how does Y work?"
+
+**Solution:** An agent that knows your codebase, docs, and processes — and answers questions in Slack or Discord.
+
+#### What to type
+
+> "Set up an agent that answers questions about our codebase. It should search our docs and code when answering, and say 'I don't know' if it's not sure."
+
+#### What it looks like
+
+```
+New hire: Where do we configure the email templates?
+
+Agent: Email templates are in server/notifications/templates/.
+Each template is a .hbs (Handlebars) file. The main config is in
+server/notifications/config.ts where you map event types to templates.
+
+To add a new template:
+1. Create a .hbs file in the templates directory
+2. Add the mapping in config.ts
+3. The template has access to the variables listed in types.ts
+
+Docs: https://internal.example.com/docs/notifications
+```
+
+---
+
+### Automated Code Review for Your Team
+
+**Problem:** PRs sit in review queues for days. Junior developers don't get timely feedback. Bugs slip through.
+
+**Solution:** An agent that reviews every PR within minutes of opening, catching bugs and suggesting improvements before a human reviewer even looks at it.
+
+#### Setup
+
+```bash
+curl -X POST http://localhost:3000/api/schedules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "AGENT_ID",
+    "name": "team-pr-review",
+    "cronExpression": "*/15 * * * *",
+    "actions": [{
+      "type": "custom",
+      "prompt": "Check for new open PRs on my-org/our-repos that have not been reviewed yet. For each one, read the diff, check for bugs, security issues, and style problems, and post a constructive review comment."
+    }],
+    "approvalPolicy": "auto"
+  }'
+```
+
+#### Why this matters for your business
+
+- **Faster shipping** — PRs get initial feedback in minutes, not days
+- **Consistent standards** — every PR gets the same thorough review
+- **Better code quality** — catches bugs, security issues, and missing tests before merge
+- **Frees up senior engineers** — they review the agent's flagged items instead of reading every line
+
+---
+
 ## Developer Workflow
 
 ### 1. Daily PR Reviews
@@ -566,19 +786,25 @@ These patterns compose naturally:
 
 ## Quick Reference
 
-| I want to... | Use case | Setup time |
-|--------------|----------|------------|
-| Get PRs reviewed before standup | [Daily PR Reviews](#1-daily-pr-reviews) | 2 min |
-| Fix broken CI fast | [Fix CI Failures](#2-fix-ci-failures-automatically) | 1 min |
-| Improve test coverage | [Write Tests](#3-write-tests-for-untested-code) | 2 min |
-| Auto-label incoming issues | [Triage Issues](#4-triage-and-label-new-issues) | 2 min |
-| Automate releases | [Release Manager](#5-release-manager) | 1 min |
-| Answer user questions | [Discord Support](#6-discord-support-agent) | 5 min |
-| Post updates everywhere | [Announcements](#7-cross-channel-announcements) | 1 min |
-| Make group decisions | [On-Chain Governance](#8-on-chain-governance) | 3 min |
-| Coordinate agents | [AlgoChat Messaging](#9-agent-to-agent-messaging-algochat) | 5 min |
-| Evaluate options | [Research Agent](#10-research-agent) | 1 min |
-| Keep docs current | [Documentation Keeper](#11-documentation-keeper) | 2 min |
+| I want to... | Use case | Who it's for | Setup time |
+|--------------|----------|-------------|------------|
+| Build a website or app | [Build a Website](#build-a-website-from-a-description) | Anyone | 0 min |
+| Create a custom tool | [Create a Custom App](#create-a-custom-app) | Anyone | 0 min |
+| Automate boring tasks | [Automate Tasks](#automate-repetitive-tasks) | Anyone | 2 min |
+| Handle customer support | [Support Agent](#customer-support-agent) | Business | 5 min |
+| Answer team questions | [Knowledge Base](#internal-knowledge-base-agent) | Business | 5 min |
+| Auto-review all PRs | [Team PR Review](#automated-code-review-for-your-team) | Business | 2 min |
+| Get PRs reviewed before standup | [Daily PR Reviews](#1-daily-pr-reviews) | Developer | 2 min |
+| Fix broken CI fast | [Fix CI Failures](#2-fix-ci-failures-automatically) | Developer | 1 min |
+| Improve test coverage | [Write Tests](#3-write-tests-for-untested-code) | Developer | 2 min |
+| Auto-label incoming issues | [Triage Issues](#4-triage-and-label-new-issues) | Developer | 2 min |
+| Automate releases | [Release Manager](#5-release-manager) | Developer | 1 min |
+| Answer user questions | [Discord Support](#6-discord-support-agent) | Developer | 5 min |
+| Post updates everywhere | [Announcements](#7-cross-channel-announcements) | Developer | 1 min |
+| Make group decisions | [On-Chain Governance](#8-on-chain-governance) | Developer | 3 min |
+| Coordinate agents | [AlgoChat Messaging](#9-agent-to-agent-messaging-algochat) | Developer | 5 min |
+| Evaluate options | [Research Agent](#10-research-agent) | Anyone | 1 min |
+| Keep docs current | [Documentation Keeper](#11-documentation-keeper) | Developer | 2 min |
 
 ---
 
@@ -586,5 +812,7 @@ These patterns compose naturally:
 
 - [Quickstart](quickstart.md) — Get running in 5 minutes
 - [How It Works](how-it-works.md) — The agent execution loop explained
+- [Business Guide](business-guide.md) — Setting up agents for your team
+- [Enterprise Guide](enterprise.md) — Multi-tenant, security, compliance, deployment
 - [Deep Dive](deep-dive.md) — Full architecture and feature breakdown
 - [Self-Hosting Guide](self-hosting.md) — Production deployment

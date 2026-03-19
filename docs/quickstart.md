@@ -2,6 +2,12 @@
 
 You're about to get your own AI developer. Here's how.
 
+**Pick your path:**
+- [I just want to try it](#the-fastest-way-30-seconds) — one command, no setup
+- [I'm a developer](#for-developers) — connect GitHub, set up automations
+- [I'm setting this up for a team](#for-teams) — shared server, chat integrations
+- [I need enterprise deployment](#for-enterprise) — Docker, K8s, multi-tenant
+
 ---
 
 ## The fastest way (30 seconds)
@@ -173,10 +179,56 @@ Make sure you have a terminal open. On Mac: `Cmd + Space` → "Terminal". On Win
 
 ---
 
+## For developers
+
+Already comfortable with the basics? Here's how to unlock the full power:
+
+1. **Connect GitHub** — [see above](#connect-github-optional). This lets the agent review PRs, fix issues, and open PRs on your repos.
+2. **Set up schedules** — [see above](#set-up-automated-schedules). Auto-review PRs, triage issues, generate tests on a cron.
+3. **Add MCP tools to your editor** — `corvid-agent init --mcp` adds 46 tools to Claude Code, Cursor, or Copilot.
+4. **Use work tasks** — programmatic code changes with isolated branches, validation, and auto-PR:
+   ```bash
+   curl -X POST http://localhost:3000/api/work-tasks \
+     -H "Content-Type: application/json" \
+     -d '{"agentId": "AGENT_ID", "projectId": "PROJECT_ID", "title": "Add input validation", "prompt": "Add input validation to all API endpoints that accept user input.", "createPr": true}'
+   ```
+
+**[Developer use cases →](use-cases.md#developer-workflow)**
+
+---
+
+## For teams
+
+Setting this up for multiple people? Here's the path:
+
+1. **Install on a shared server** — same install command, but set `BIND_HOST=0.0.0.0` and `API_KEY=your-secret` in `.env`
+2. **Connect chat** — add Discord, Slack, or Telegram tokens to `.env` so the team can talk to the agent
+3. **Create specialized agents** — one for PR review, one for support, one for test writing
+4. **Set approval policies** — `auto` for trusted automations, `owner` for anything that writes code
+
+**[Business guide →](business-guide.md)**
+
+---
+
+## For enterprise
+
+Need production-grade deployment with security and compliance?
+
+1. **Docker/K8s deployment** — `docker compose -f deploy/docker-compose.yml up -d` or use the Helm chart
+2. **Multi-tenant mode** — `MULTI_TENANT=true` for team isolation with RBAC
+3. **Reverse proxy with TLS** — Nginx and Caddy configs included in `deploy/`
+4. **Monitoring** — OpenTelemetry tracing, health endpoints, self-test suite
+
+**[Enterprise guide →](enterprise.md)**
+
+---
+
 ## What's next?
 
-- **[Use cases](use-cases.md)** — detailed examples for PR review, CI fixes, test generation
+- **[Use cases](use-cases.md)** — detailed examples for every audience
 - **[How it works](how-it-works.md)** — under the hood
+- **[Business guide](business-guide.md)** — setting up agents for your team
+- **[Enterprise guide](enterprise.md)** — multi-tenant, security, compliance
 - **[Self-hosting guide](self-hosting.md)** — production deployment with Docker, TLS
 - **[API reference](api-reference.md)** — for developers building on top of corvid-agent
 

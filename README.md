@@ -17,6 +17,55 @@ No coding experience required. You describe what you want in plain English, and 
 
 ---
 
+## Start here — pick your path
+
+<table>
+<tr>
+<td width="25%" valign="top">
+
+### 🧑‍💻 I'm a creator
+*I have ideas but don't code*
+
+Tell it what to build in plain English. It writes the code, deploys it, and gives you a link.
+
+**[Get started →](docs/quickstart.md)**
+
+</td>
+<td width="25%" valign="top">
+
+### 👩‍💻 I'm a developer
+*I write code and want help*
+
+Automated PR reviews, CI fixes, test generation, issue triage — on a schedule or on-demand.
+
+**[Use cases →](docs/use-cases.md)**
+
+</td>
+<td width="25%" valign="top">
+
+### 🏢 I'm running a business
+*I need AI to handle dev work*
+
+Set up agents for your team. They review code, write features, and ship PRs while your team focuses on what matters.
+
+**[Business guide →](docs/business-guide.md)**
+
+</td>
+<td width="25%" valign="top">
+
+### 🏗️ I'm evaluating for enterprise
+*I need security, compliance, scale*
+
+Multi-tenant, RBAC, audit trails, Docker/K8s deployment, API key rotation, rate limiting.
+
+**[Enterprise guide →](docs/enterprise.md)**
+
+</td>
+</tr>
+</table>
+
+---
+
 ## What can it build?
 
 - "Build me a weather dashboard" → [it built this](https://corvid-agent.github.io/weather-dashboard/)
@@ -45,7 +94,17 @@ That's it. The installer handles everything — prerequisites, setup, and opens 
 
 ---
 
-## What else can it do?
+## What can it do?
+
+### For anyone (no coding needed)
+
+| You say... | It does... |
+|-----------|-----------|
+| "Build me a portfolio website" | Designs, codes, and deploys a complete site |
+| "Create a budget tracker app" | Builds a working web app from your description |
+| "Make a countdown timer for my event" | Ships a custom app in minutes |
+
+### For developers
 
 | You say... | It does... |
 |-----------|-----------|
@@ -53,9 +112,17 @@ That's it. The installer handles everything — prerequisites, setup, and opens 
 | "Fix that failing CI build" | Diagnoses the failure, writes a fix, opens a PR |
 | "Write tests for this code" | Generates test suites matching your project's patterns |
 | "Triage these GitHub issues" | Labels, prioritizes, and assigns (or picks them up itself) |
-| "I need two agents to discuss this architecture decision" | Runs a multi-agent council with structured deliberation |
 
-It's a developer that works for you 24/7 — reviews code, fixes bugs, writes features, and handles the boring stuff so you don't have to.
+### For teams and businesses
+
+| You say... | It does... |
+|-----------|-----------|
+| "Answer support questions in our Discord" | Responds to users 24/7 with accurate, docs-backed answers |
+| "Keep our API docs in sync with the code" | Detects drift and opens PRs to fix it weekly |
+| "I need two agents to discuss this architecture decision" | Runs a multi-agent council with structured deliberation |
+| "Prepare a release for v2.1.0" | Generates changelogs, bumps versions, opens a release PR |
+
+It works for you 24/7 — reviews code, fixes bugs, writes features, answers questions, and handles the boring stuff so you don't have to.
 
 ---
 
