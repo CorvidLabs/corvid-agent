@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "corvid-agent-tools": {
+      "command": "bun",
+      "args": ["server/mcp/stdio-server.ts"],
+      "env": {
+        "CORVID_AGENT_ID": "",
+        "CORVID_API_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
