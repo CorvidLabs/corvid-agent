@@ -4,10 +4,7 @@ version: 1
 status: draft
 files:
   - server/memory/arc69-store.ts
-  - server/algochat/on-chain-transactor.ts
-  - server/mcp/tool-handlers/memory.ts
-  - server/db/agent-memories.ts
-  - server/db/schema/memory.ts
+  - server/db/migrations/094_arc69_memory_asa.ts
 db_tables:
   - agent_memories
 depends_on: []
@@ -101,6 +98,13 @@ This uses the same AlgoChat envelope format as all other on-chain communication,
 | `Arc69Context` | Context object containing db, agentId, algodClient, indexerClient, chatAccount, serverMnemonic, network |
 | `Arc69Memory` | `{ asaId: number; key: string; content: string; txid: string; round: number; timestamp: string }` |
 | `Arc69NotePayload` | `{ standard: 'arc69'; description: string; mime_type: 'application/octet-stream'; properties: { key: string; agent_id: string; envelope: string; v: number } }` |
+
+### Exported Functions — `server/db/migrations/094_arc69_memory_asa.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Add `asa_id` column to `agent_memories` and create partial index on `(agent_id, asa_id)` |
+| `down` | `(db: Database)` | `void` | Drop the ASA index and remove the `asa_id` column |
 
 ### ARC-69 Note Schema
 
