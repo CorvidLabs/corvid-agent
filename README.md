@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/license/CorvidLabs/corvid-agent" alt="License">
   <img src="https://img.shields.io/badge/runtime-Bun_1.3-f9f1e1?logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/Angular-21-dd0031?logo=angular" alt="Angular 21">
-  <img src="https://img.shields.io/badge/tests-7984%20unit%20%7C%20360%20E2E-brightgreen" alt="7984 Unit | 360 E2E Tests">
+  <img src="https://img.shields.io/badge/tests-8119%20unit%20%7C%20360%20E2E-brightgreen" alt="8119 Unit | 360 E2E Tests">
   <img src="https://img.shields.io/badge/spec%20coverage-100%25-brightgreen" alt="Spec Coverage 100%">
   <a href="https://codecov.io/gh/CorvidLabs/corvid-agent"><img src="https://codecov.io/gh/CorvidLabs/corvid-agent/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -131,7 +131,7 @@ See `.env.example` for the full list of 30+ configuration options.
 
 ---
 
-## 7,900+ Tests. 1.14× Test-to-Code Ratio. Open Source.
+## 8,100+ Tests. 1.14× Test-to-Code Ratio. Open Source.
 
 > More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
 
@@ -500,7 +500,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 ## Testing
 
 ```bash
-bun test              # ~7984 server tests (~110s)
+bun test              # ~8119 server tests (~110s)
 cd client && npx vitest run   # Angular component tests (~2s)
 bun run test:e2e      # 31 Playwright spec files, 360 tests
 bun run spec:check    # Validate all module specs in specs/
@@ -642,7 +642,7 @@ No contribution is too small. Fixing a typo, improving an error message, or addi
 
 ### What makes this project different
 
-You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 7,900+ tests, 16 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
+You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 8,100+ tests, 16 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
 
 See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 

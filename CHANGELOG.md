@@ -26,7 +26,7 @@ All notable changes to this project will be documented in this file.
 - Expand use case gallery with examples and new categories (#1220)
 
 ### Tests
-- Add 64 tests for approval-format, agent-card, metrics (#1217)
+- Add 199 tests for approval-format, agent-card, metrics (#1217)
 
 ## [0.37.0] - 2026-03-18
 
