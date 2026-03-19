@@ -68,7 +68,27 @@ interface ActivityEvent {
             </div>
         } @else {
         <div class="dashboard">
-            <!-- Top Metrics Row -->
+            <!-- View Mode Toggle -->
+            <div class="view-toggle">
+                <button class="view-toggle__btn"
+                        [attr.data-active]="viewMode() === 'simple'"
+                        (click)="viewMode.set('simple')">Simple</button>
+                <button class="view-toggle__btn"
+                        [attr.data-active]="viewMode() === 'advanced'"
+                        (click)="viewMode.set('advanced')">Advanced</button>
+            </div>
+
+            <!-- Simple View: Just agents + quick start -->
+            @if (viewMode() === 'simple') {
+                <div class="simple-hero">
+                    <h2 class="simple-hero__title">What do you want to build?</h2>
+                    <p class="simple-hero__desc">Pick an agent and start a conversation. Describe what you want in plain English.</p>
+                    <button class="simple-hero__btn" (click)="navigateTo('/sessions/new')">+ Start a Conversation</button>
+                </div>
+            }
+
+            <!-- Top Metrics Row (advanced only) -->
+            @if (viewMode() === 'advanced') {
             <div class="metrics-row">
                 <div class="metric-card">
                     <span class="metric-card__label">Total Agents</span>
@@ -112,6 +132,7 @@ interface ActivityEvent {
                     <span class="metric-card__value">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
                 </div>
             </div>
+            }
 
             <!-- Agent Activity Grid -->
             @if (agentSummaries().length > 0) {
@@ -180,8 +201,8 @@ interface ActivityEvent {
                 </div>
             }
 
-            <!-- Flock Directory Browser -->
-            @if (flockAgents().length > 0) {
+            <!-- Flock Directory Browser (advanced only) -->
+            @if (viewMode() === 'advanced' && flockAgents().length > 0) {
                 <div class="section">
                     <div class="section__header">
                         <h3>Flock Directory</h3>
@@ -216,7 +237,7 @@ interface ActivityEvent {
                 </div>
             }
 
-            @if (agentSummaries().length >= 2) {
+            @if (viewMode() === 'advanced' && agentSummaries().length >= 2) {
                 <div class="section">
                     <div class="section__header">
                         <h3>Agent Comparison</h3>
@@ -370,6 +391,51 @@ interface ActivityEvent {
     `,
     styles: `
         .dashboard { padding: 1.25rem; overflow-y: auto; height: 100%; }
+
+        /* View Mode Toggle */
+        .view-toggle {
+            display: flex; gap: .25rem; margin-bottom: 1rem;
+            background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: .15rem; width: fit-content;
+        }
+        .view-toggle__btn {
+            padding: .35rem .75rem; border: none; border-radius: var(--radius-sm);
+            font-size: .7rem; font-weight: 600; font-family: inherit;
+            background: transparent; color: var(--text-tertiary); cursor: pointer;
+            text-transform: uppercase; letter-spacing: .06em; transition: all .15s;
+        }
+        .view-toggle__btn[data-active="true"] {
+            background: rgba(0,229,255,.1); color: var(--accent-cyan);
+            border: 1px solid rgba(0,229,255,.2);
+        }
+        .view-toggle__btn:hover:not([data-active="true"]) { color: var(--text-secondary); }
+
+        /* Simple View Hero */
+        .simple-hero {
+            background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 2rem; text-align: center;
+            margin-bottom: 1.25rem;
+        }
+        .simple-hero__title {
+            margin: 0 0 .5rem; font-size: 1.2rem; font-weight: 700;
+            color: var(--text-primary);
+        }
+        .simple-hero__desc {
+            margin: 0 0 1.25rem; font-size: .8rem; color: var(--text-tertiary);
+            max-width: 400px; margin-left: auto; margin-right: auto;
+        }
+        .simple-hero__btn {
+            padding: .6rem 1.5rem; border-radius: var(--radius);
+            font-size: .8rem; font-weight: 600; font-family: inherit;
+            border: 1px solid var(--accent-cyan); color: var(--accent-cyan);
+            background: rgba(0,229,255,.06); cursor: pointer;
+            text-transform: uppercase; letter-spacing: .05em;
+            transition: background .15s, box-shadow .15s;
+        }
+        .simple-hero__btn:hover {
+            background: rgba(0,229,255,.14);
+            box-shadow: 0 0 16px rgba(0,229,255,.15);
+        }
         .metrics-row { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: .75rem; margin-bottom: 1.5rem; }
         .metric-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -612,6 +678,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.agentService.agents().length === 0 && !this.wizardDismissed(),
     );
     private readonly wizardDismissed = signal(false);
+    protected readonly viewMode = signal<'simple' | 'advanced'>('simple');
     protected readonly runningSessions = computed(() =>
         this.sessionService.sessions().filter((s) => s.status === 'running'),
     );

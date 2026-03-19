@@ -28,11 +28,11 @@
       <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
       <div class="nav__links" id="nav-links">
         <a href="getting-started.html" class="nav__link nav__link--active" aria-current="page">Start</a>
+        <a href="why-corvidagent.html" class="nav__link">Why</a>
+        <a href="business-guide.html" class="nav__link">Business</a>
+        <a href="enterprise.html" class="nav__link">Enterprise</a>
         <a href="architecture.html" class="nav__link">API</a>
-        <a href="algochat.html" class="nav__link">AlgoChat</a>
-        <a href="security.html" class="nav__link">Security</a>
         <a href="self-hosting.html" class="nav__link">Deploy</a>
-        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
         <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
       </div>
     </div>
@@ -43,15 +43,99 @@
   <header class="page-hero">
     <div class="container">
       <h1 class="page-hero__title">Getting <span class="accent-cyan">Started</span></h1>
-      <p class="page-hero__tagline">From zero to running agent in under five minutes.</p>
+      <p class="page-hero__tagline">From zero to running agent in under five minutes. No coding required.</p>
     </div>
     <div class="hero__scanline"></div>
   </header>
 
-  <!-- ═══════════════════ PREREQUISITES ═══════════════════ -->
-  <section class="section" id="prerequisites">
+  <!-- ═══════════════════ CHOOSE YOUR PATH ═══════════════════ -->
+  <section class="section" id="choose-path">
     <div class="container">
-      <h2 class="section__title">Prerequisites</h2>
+      <h2 class="section__title">Choose Your Path</h2>
+      <div class="grid grid--2">
+        <a href="#creators" class="card card--cyan card--link">
+          <div class="card__icon">&#x1F3A8;</div>
+          <h3 class="card__title">I&rsquo;m a Creator</h3>
+          <p>I have ideas but don&rsquo;t code. I want to describe what I want in plain English and have AI build it for me.</p>
+          <span class="card__cta accent-cyan">Start here &darr;</span>
+        </a>
+        <a href="#developers" class="card card--magenta card--link">
+          <div class="card__icon">&#x1F4BB;</div>
+          <h3 class="card__title">I&rsquo;m a Developer</h3>
+          <p>I write code and want an AI teammate for PR reviews, CI fixes, test generation, and autonomous issue resolution.</p>
+          <span class="card__cta accent-magenta">Start here &darr;</span>
+        </a>
+      </div>
+      <div style="text-align: center; margin-top: 16px;">
+        <p style="font-size: 8px; color: #8b8ba7;">Running a team? See the <a href="business-guide.html" class="accent-green">Business Guide</a> or <a href="enterprise.html" class="accent-cyan">Enterprise Guide</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CREATORS PATH ═══════════════════ -->
+  <section class="section section--alt" id="creators">
+    <div class="container">
+      <h2 class="section__title">For Creators <span style="font-size: 10px; opacity: 0.6;">(no coding needed)</span></h2>
+
+      <div class="step">
+        <div class="step__number accent-cyan">01</div>
+        <div class="step__content">
+          <h3 class="step__title">Install with One Command</h3>
+          <p class="step__note">Open your terminal (on Mac: search &ldquo;Terminal&rdquo; in Spotlight). Paste this and press Enter:</p>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">terminal</span>
+            </div>
+            <pre class="terminal__body" style="cursor: pointer;" onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash');" title="Click to copy"><code><span class="t-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash</code></pre>
+          </div>
+          <p class="step__note">The installer handles everything &mdash; it installs what&rsquo;s needed and walks you through setup. If you have Claude Code or Ollama installed, no API key is needed.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__number accent-magenta">02</div>
+        <div class="step__content">
+          <h3 class="step__title">Open the Dashboard</h3>
+          <p class="step__note">After install, your browser opens automatically to the dashboard. The welcome wizard walks you through creating your first agent &mdash; just pick a template and give it a name.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__number accent-green">03</div>
+        <div class="step__content">
+          <h3 class="step__title">Tell It What to Build</h3>
+          <p class="step__note">Click &ldquo;Start a Conversation&rdquo; and describe what you want in plain English:</p>
+          <div class="terminal">
+            <div class="terminal__bar">
+              <span class="terminal__dot terminal__dot--red"></span>
+              <span class="terminal__dot terminal__dot--amber"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__label">conversation</span>
+            </div>
+            <pre class="terminal__body"><code><span class="t-prompt">you:</span>  Build me a personal website with my name, a photo gallery, and a contact form.
+<span class="t-prompt">agent:</span> I'll create that for you. Let me set up the project structure...
+<span class="accent-green">done:</span> Your website is ready at http://localhost:8080 — take a look!</code></pre>
+          </div>
+          <p class="step__note">That&rsquo;s it. No code to write. Just describe, review, and ship.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ DEVELOPERS PATH ═══════════════════ -->
+  <section class="section" id="developers">
+    <div class="container">
+      <h2 class="section__title">For Developers</h2>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ PREREQUISITES ═══════════════════ -->
+  <section class="section section--alt" id="prerequisites">
+    <div class="container">
+      <h2 class="section__title" style="font-size: 12px;">Prerequisites</h2>
       <div class="grid grid--3">
         <div class="card card--cyan">
           <div class="card__icon">&#x1F4E6;</div>
@@ -60,13 +144,13 @@
         </div>
         <div class="card card--magenta">
           <div class="card__icon">&#x1F916;</div>
-          <h3 class="card__title">Anthropic API Key</h3>
-          <p>Required for Claude agents. Get one at <a href="https://console.anthropic.com" class="accent-magenta">console.anthropic.com</a>. Not needed if using Ollama only.</p>
+          <h3 class="card__title">AI Provider</h3>
+          <p>Claude Code CLI (free, no key needed), Ollama (free, local models), or an <a href="https://console.anthropic.com" class="accent-magenta">Anthropic API key</a>. Any one of these works.</p>
         </div>
         <div class="card card--green">
           <div class="card__icon">&#x1F9CA;</div>
           <h3 class="card__title">Ollama (optional)</h3>
-          <p>Run local models (Qwen, LLama, Mistral). Install from <a href="https://ollama.com" class="accent-green">ollama.com</a>. Agents can use any pulled model. Weight-based concurrency prevents memory thrashing.</p>
+          <p>Run local models (Qwen, LLama, Mistral). Install from <a href="https://ollama.com" class="accent-green">ollama.com</a>. Agents can use any pulled model.</p>
         </div>
       </div>
     </div>
@@ -380,13 +464,13 @@ GH_TOKEN=ghp_...</code></pre>
           <h3 class="card__title accent-cyan">API &amp; Architecture &rarr;</h3>
           <p>REST endpoints, WebSocket protocol, database schema, and system design.</p>
         </a>
-        <a href="algochat.html" class="card card--outline card--link">
-          <h3 class="card__title accent-magenta">AlgoChat Explainer &rarr;</h3>
-          <p>How on-chain messaging works, PSK encryption, and slash commands.</p>
+        <a href="business-guide.html" class="card card--outline card--link">
+          <h3 class="card__title accent-green">Business Guide &rarr;</h3>
+          <p>Team setup, cost breakdown, ROI examples, and common configurations.</p>
         </a>
-        <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/CONTRIBUTING.md" class="card card--outline card--link">
-          <h3 class="card__title accent-green">Contributing &rarr;</h3>
-          <p>Guidelines for contributing to CorvidAgent. PRs welcome!</p>
+        <a href="enterprise.html" class="card card--outline card--link">
+          <h3 class="card__title accent-magenta">Enterprise Guide &rarr;</h3>
+          <p>Multi-tenant, RBAC, Docker/K8s deployment, compliance, and audit trails.</p>
         </a>
       </div>
     </div>
@@ -400,11 +484,12 @@ GH_TOKEN=ghp_...</code></pre>
       <div class="footer__links">
         <a href="index.html">Home</a>
         <a href="getting-started.html">Getting Started</a>
+        <a href="why-corvidagent.html">Why CorvidAgent</a>
+        <a href="business-guide.html">Business</a>
+        <a href="enterprise.html">Enterprise</a>
         <a href="architecture.html">API</a>
-        <a href="algochat.html">AlgoChat</a>
         <a href="security.html">Security</a>
         <a href="self-hosting.html">Deploy</a>
-        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
         <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
       </div>
       <p class="footer__copy">
