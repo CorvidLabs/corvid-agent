@@ -150,6 +150,16 @@ else
     info "Cloned to $INSTALL_DIR"
 fi
 
+# ─── Step 2b: Remove dev-only files ─────────────────────────────────────────
+
+step "Cleaning up development files"
+
+# Remove dev/contributor-only directories and files that aren't needed at runtime
+rm -rf specs/ tests/ .claude/ CLAUDE.md docs/
+# Remove dev scripts but keep install.sh and setup.sh
+find scripts/ -type f ! -name 'install.sh' ! -name 'setup.sh' -delete 2>/dev/null || true
+info "Removed development files (specs, tests, docs, dev scripts)"
+
 # ─── Step 3: Environment setup ──────────────────────────────────────────────
 
 step "Configuring environment"
