@@ -20,6 +20,7 @@ import type { AstParserService } from '../ast/service';
 import type { PermissionBroker } from '../permissions/broker';
 import type { ShutdownCoordinator } from '../lib/shutdown-coordinator';
 import type { MemorySyncService } from '../db/memory-sync';
+import type { MemoryGraduationService } from '../memory/graduation-service';
 import type { ResponsePollingService } from '../notifications/response-poller';
 import type { UsageMeter } from '../billing/meter';
 import type { HealthMonitorService } from '../health/monitor';
@@ -62,6 +63,7 @@ export interface AlgoChatInitDeps {
     permissionBroker: PermissionBroker;
     shutdownCoordinator: ShutdownCoordinator;
     memorySyncService: MemorySyncService;
+    graduationService: MemoryGraduationService;
     responsePollingService: ResponsePollingService;
     usageMeter: UsageMeter;
     healthMonitorService: HealthMonitorService;
@@ -326,10 +328,19 @@ export function wirePostInit(deps: AlgoChatInitDeps): void {
         });
     }
 
-    // Start memory sync service if AlgoChat is available
+    // Start memory sync and graduation services if AlgoChat is available
     if (algochatState.messenger) {
         memorySyncService.setServices(algochatState.messenger, algochatConfig.mnemonic, algochatConfig.network);
+        if (algochatState.walletService) {
+            memorySyncService.setWalletService(algochatState.walletService);
+        }
         memorySyncService.start();
+
+        deps.graduationService.setServices(algochatState.messenger, algochatConfig.mnemonic, algochatConfig.network);
+        if (algochatState.walletService) {
+            deps.graduationService.setWalletService(algochatState.walletService);
+        }
+        deps.graduationService.start();
     }
 
     // Start the scheduler now that all services are available

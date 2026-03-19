@@ -80,3 +80,12 @@ export { handleLookupContact } from './contacts';
 
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';
+
+// ─── Observations (memory graduation) ──────────────────────────────────────
+export {
+    handleRecordObservation,
+    handleListObservations,
+    handleBoostObservation,
+    handleDismissObservation,
+    handleObservationStats,
+} from './observations';

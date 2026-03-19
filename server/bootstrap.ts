@@ -11,6 +11,7 @@ import { ProcessManager } from './process/manager';
 import { SessionLifecycleManager } from './process/session-lifecycle';
 import { SessionCheerleadingDetector } from './process/session-cheerleading-detector';
 import { MemorySyncService } from './db/memory-sync';
+import { MemoryGraduationService } from './memory/graduation-service';
 import { loadAlgoChatConfig } from './algochat/config';
 import type { AlgoChatBridge } from './algochat/bridge';
 import type { AgentWalletService } from './algochat/agent-wallet';
@@ -92,6 +93,7 @@ export interface ServiceContainer {
     algochatConfig: ReturnType<typeof loadAlgoChatConfig>;
     algochatState: AlgoChatState;
     memorySyncService: MemorySyncService;
+    graduationService: MemoryGraduationService;
 
     // Work orchestration
     selfTestService: SelfTestService;
@@ -217,6 +219,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
     const sessionLifecycle = new SessionLifecycleManager(db);
     const cheerleadingDetector = new SessionCheerleadingDetector(processManager);
     const memorySyncService = new MemorySyncService(db);
+    const graduationService = new MemoryGraduationService(db);
 
     // ── AlgoChat state (initialized later by initAlgoChat) ───────────────
     const algochatConfig = loadAlgoChatConfig();
@@ -412,6 +415,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         timeoutMs: 310_000, // 5 min drain + 10s buffer
     });
     shutdownCoordinator.registerService('MemorySyncService', memorySyncService, 10);
+    shutdownCoordinator.registerService('MemoryGraduationService', graduationService, 11);
     if (sandboxLifecycleAdapter) {
         shutdownCoordinator.register({ name: 'SandboxLifecycleAdapter', priority: 14, handler: () => sandboxLifecycleAdapter!.stop() });
     }
@@ -435,6 +439,7 @@ export async function bootstrapServices(db: Database, startTime: number): Promis
         algochatConfig,
         algochatState,
         memorySyncService,
+        graduationService,
         selfTestService,
         workTaskService,
         taskQueueService,

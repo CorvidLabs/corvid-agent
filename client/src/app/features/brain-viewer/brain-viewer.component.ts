@@ -6,14 +6,18 @@ import { firstValueFrom } from 'rxjs';
 
 // ─── API response types ─────────────────────────────────────────────────────
 
+type StorageType = 'arc69' | 'plain-txn' | 'pending';
+
 interface MemoryEntry {
     id: string;
     agentId: string;
     key: string;
     content: string;
     tier: 'longterm' | 'shortterm';
+    storageType: StorageType;
     status: string;
     txid: string | null;
+    asaId: number | null;
     category: string | null;
     categoryConfidence: number | null;
     decayScore: number;
@@ -26,6 +30,33 @@ interface MemoryListResponse {
     total: number;
     limit: number;
     offset: number;
+}
+
+interface Observation {
+    id: string;
+    agentId: string;
+    source: string;
+    sourceId: string | null;
+    content: string;
+    suggestedKey: string | null;
+    relevanceScore: number;
+    accessCount: number;
+    lastAccessedAt: string | null;
+    status: string;
+    graduatedKey: string | null;
+    createdAt: string;
+    expiresAt: string | null;
+}
+
+interface ObservationListResponse {
+    observations: Observation[];
+    total: number;
+}
+
+interface ObservationStatsResponse {
+    agents: Array<{ agentId: string; active: number; graduated: number; expired: number; dismissed: number }>;
+    totalActive: number;
+    graduationCandidates: number;
 }
 
 interface MemoryStats {
@@ -109,6 +140,12 @@ interface SyncStatus {
                             <span class="stat-card__label">Failed</span>
                             <span class="stat-card__value stat-card__value--failed">{{ stats()!.byStatus.failed }}</span>
                         </div>
+                        @if (obsStats()) {
+                            <div class="stat-card stat-card--observations">
+                                <span class="stat-card__label">Observations</span>
+                                <span class="stat-card__value stat-card__value--observations">{{ obsStats()!.totalActive }}</span>
+                            </div>
+                        }
                     </div>
 
                     <!-- Tier Breakdown Bar -->
@@ -231,6 +268,7 @@ interface SyncStatus {
                                          (click)="toggleExpand(mem.id)">
                                         <div class="memory-card__header">
                                             <span class="memory-card__tier" [attr.data-tier]="mem.tier">{{ mem.tier === 'longterm' ? 'LT' : 'ST' }}</span>
+                                            <span class="memory-card__storage" [attr.data-storage]="mem.storageType">{{ storageLabel(mem.storageType) }}</span>
                                             <span class="memory-card__key">{{ mem.key }}</span>
                                             <span class="memory-card__status" [attr.data-status]="mem.status">{{ mem.status }}</span>
                                             <span class="memory-card__decay" [title]="'Decay score: ' + mem.decayScore.toFixed(3)">
@@ -251,10 +289,20 @@ interface SyncStatus {
                                                     <span class="detail-label">Agent</span>
                                                     <span class="detail-value">{{ mem.agentId }}</span>
                                                 </div>
+                                                <div class="detail-row">
+                                                    <span class="detail-label">Storage</span>
+                                                    <span class="detail-value" [attr.data-storage]="mem.storageType">{{ storageLabel(mem.storageType) }}</span>
+                                                </div>
                                                 @if (mem.txid) {
                                                     <div class="detail-row">
                                                         <span class="detail-label">TXID</span>
                                                         <span class="detail-value detail-value--mono detail-value--txid">{{ mem.txid }}</span>
+                                                    </div>
+                                                }
+                                                @if (mem.asaId) {
+                                                    <div class="detail-row">
+                                                        <span class="detail-label">ASA ID</span>
+                                                        <span class="detail-value detail-value--mono detail-value--asa">{{ mem.asaId }}</span>
                                                     </div>
                                                 }
                                                 <div class="detail-row">
@@ -295,6 +343,110 @@ interface SyncStatus {
                         }
                     </div>
                 }
+
+                <!-- Observations (Short-Term Memory Pipeline) -->
+                <div class="section">
+                    <div class="obs-header">
+                        <h3>Observations</h3>
+                        @if (obsStats()) {
+                            <span class="obs-header__meta">
+                                {{ obsStats()!.totalActive }} active
+                                @if (obsStats()!.graduationCandidates > 0) {
+                                    &middot; {{ obsStats()!.graduationCandidates }} ready to graduate
+                                }
+                            </span>
+                        }
+                    </div>
+                    <div class="filter-chips" style="margin-bottom: 0.75rem;">
+                        <button class="chip" [class.chip--active]="obsStatusFilter() === null" (click)="setObsStatus(null)">All</button>
+                        <button class="chip chip--obs-active" [class.chip--active]="obsStatusFilter() === 'active'" (click)="setObsStatus('active')">Active</button>
+                        <button class="chip chip--obs-graduated" [class.chip--active]="obsStatusFilter() === 'graduated'" (click)="setObsStatus('graduated')">Graduated</button>
+                        <button class="chip chip--obs-expired" [class.chip--active]="obsStatusFilter() === 'expired'" (click)="setObsStatus('expired')">Expired</button>
+                        <button class="chip chip--obs-dismissed" [class.chip--active]="obsStatusFilter() === 'dismissed'" (click)="setObsStatus('dismissed')">Dismissed</button>
+                    </div>
+
+                    @if (obsLoading()) {
+                        <p class="loading">Loading observations...</p>
+                    } @else if (observations().length === 0) {
+                        <p class="obs-empty">No observations found</p>
+                    } @else {
+                        <div class="obs-list">
+                            @for (obs of observations(); track obs.id) {
+                                <div class="obs-card"
+                                     [class.obs-card--expanded]="expandedObsId() === obs.id"
+                                     (click)="toggleObsExpand(obs.id)">
+                                    <div class="obs-card__header">
+                                        <span class="obs-card__source" [attr.data-source]="obs.source">{{ obs.source }}</span>
+                                        <span class="obs-card__content-preview">{{ obs.content.slice(0, 80) }}{{ obs.content.length > 80 ? '...' : '' }}</span>
+                                        <span class="obs-card__score" [title]="'Relevance: ' + obs.relevanceScore.toFixed(1) + ' / Access: ' + obs.accessCount">
+                                            {{ relevanceBar(obs.relevanceScore) }} {{ obs.relevanceScore.toFixed(1) }}
+                                        </span>
+                                        <span class="obs-card__status" [attr.data-obs-status]="obs.status">{{ obs.status }}</span>
+                                    </div>
+                                    @if (expandedObsId() === obs.id) {
+                                        <div class="obs-card__detail">
+                                            <div class="detail-row">
+                                                <span class="detail-label">ID</span>
+                                                <span class="detail-value detail-value--mono">{{ obs.id }}</span>
+                                            </div>
+                                            <div class="detail-row">
+                                                <span class="detail-label">Agent</span>
+                                                <span class="detail-value">{{ obs.agentId }}</span>
+                                            </div>
+                                            <div class="detail-row">
+                                                <span class="detail-label">Source</span>
+                                                <span class="detail-value">{{ obs.source }}{{ obs.sourceId ? ' (' + obs.sourceId + ')' : '' }}</span>
+                                            </div>
+                                            @if (obs.suggestedKey) {
+                                                <div class="detail-row">
+                                                    <span class="detail-label">Key</span>
+                                                    <span class="detail-value detail-value--mono">{{ obs.suggestedKey }}</span>
+                                                </div>
+                                            }
+                                            <div class="detail-row">
+                                                <span class="detail-label">Score</span>
+                                                <span class="detail-value">{{ obs.relevanceScore.toFixed(2) }} ({{ obs.accessCount }} accesses)</span>
+                                            </div>
+                                            @if (obs.graduatedKey) {
+                                                <div class="detail-row">
+                                                    <span class="detail-label">Graduated</span>
+                                                    <span class="detail-value detail-value--mono" style="color: var(--accent-green)">{{ obs.graduatedKey }}</span>
+                                                </div>
+                                            }
+                                            @if (obs.expiresAt) {
+                                                <div class="detail-row">
+                                                    <span class="detail-label">Expires</span>
+                                                    <span class="detail-value">{{ obs.expiresAt | relativeTime }}</span>
+                                                </div>
+                                            }
+                                            <div class="detail-row">
+                                                <span class="detail-label">Created</span>
+                                                <span class="detail-value">{{ obs.createdAt }}</span>
+                                            </div>
+                                            <div class="detail-content">
+                                                <span class="detail-label">Content</span>
+                                                <pre class="detail-pre">{{ obs.content }}</pre>
+                                            </div>
+                                            @if (obs.status === 'active') {
+                                                <div class="obs-card__actions">
+                                                    <button class="btn--action btn--graduate"
+                                                            [disabled]="graduatingId() === obs.id"
+                                                            (click)="forceGraduate(obs.id, $event)">
+                                                        {{ graduatingId() === obs.id ? 'Graduating...' : 'Force Graduate' }}
+                                                    </button>
+                                                    <button class="btn--action btn--boost"
+                                                            (click)="boostObs(obs.id, $event)">
+                                                        Boost +1
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
             }
         </div>
     `,
@@ -594,6 +746,27 @@ interface SyncStatus {
             font-size: 0.55rem;
             flex-shrink: 0;
         }
+        .memory-card__storage {
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            flex-shrink: 0;
+        }
+        .memory-card__storage[data-storage="arc69"] {
+            background: var(--accent-green-dim, rgba(0, 255, 136, 0.1));
+            color: var(--accent-green);
+        }
+        .memory-card__storage[data-storage="plain-txn"] {
+            background: var(--accent-purple-dim, rgba(167, 139, 250, 0.1));
+            color: var(--accent-purple);
+        }
+        .memory-card__storage[data-storage="pending"] {
+            background: var(--accent-amber-dim, rgba(255, 170, 0, 0.1));
+            color: var(--accent-amber);
+        }
         .memory-card__time {
             color: var(--text-tertiary);
             font-size: 0.6rem;
@@ -629,6 +802,10 @@ interface SyncStatus {
         }
         .detail-value--mono { font-family: monospace; font-size: 0.65rem; }
         .detail-value--txid { color: var(--accent-green); }
+        .detail-value--asa { color: var(--accent-cyan); }
+        [data-storage="arc69"] { color: var(--accent-green); }
+        [data-storage="plain-txn"] { color: var(--accent-purple); }
+        [data-storage="pending"] { color: var(--accent-amber); }
         .detail-content {
             display: flex;
             flex-direction: column;
@@ -663,6 +840,119 @@ interface SyncStatus {
         .error-row__msg { color: var(--accent-red); flex: 1; }
         .error-row__time { color: var(--text-tertiary); flex-shrink: 0; }
 
+        /* ─── Observations ────── */
+        .stat-card--observations { border-color: var(--accent-magenta); border-style: dashed; }
+        .stat-card__value--observations { color: var(--accent-magenta); text-shadow: 0 0 10px rgba(255, 0, 170, 0.15); }
+
+        .obs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .obs-header h3 { margin: 0; }
+        .obs-header__meta {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+        }
+        .obs-empty {
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+        }
+        .chip--obs-active.chip--active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .chip--obs-graduated.chip--active { border-color: var(--accent-green); color: var(--accent-green); background: rgba(0, 255, 136, 0.08); }
+        .chip--obs-expired.chip--active { border-color: var(--text-tertiary); color: var(--text-tertiary); }
+        .chip--obs-dismissed.chip--active { border-color: var(--accent-red); color: var(--accent-red); background: rgba(255, 51, 85, 0.08); }
+
+        .obs-list { display: flex; flex-direction: column; gap: 4px; }
+        .obs-card {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+        .obs-card:hover { border-color: var(--border-bright); }
+        .obs-card--expanded { border-color: var(--accent-magenta); }
+        .obs-card__header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.7rem;
+        }
+        .obs-card__source {
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.55rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            flex-shrink: 0;
+            background: var(--accent-magenta-dim, rgba(255, 0, 170, 0.1));
+            color: var(--accent-magenta);
+        }
+        .obs-card__content-preview {
+            color: var(--text-secondary);
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .obs-card__score {
+            font-size: 0.6rem;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
+            font-family: monospace;
+        }
+        .obs-card__status {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            flex-shrink: 0;
+        }
+        .obs-card__status[data-obs-status="active"] { color: var(--accent-cyan); }
+        .obs-card__status[data-obs-status="graduated"] { color: var(--accent-green); }
+        .obs-card__status[data-obs-status="expired"] { color: var(--text-tertiary); }
+        .obs-card__status[data-obs-status="dismissed"] { color: var(--accent-red); }
+        .obs-card__detail {
+            padding: 0.75rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .obs-card__actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border);
+        }
+        .btn--action {
+            padding: 0.35rem 0.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.65rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: 1px solid;
+            transition: opacity 0.15s;
+        }
+        .btn--action:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn--graduate {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+        .btn--graduate:hover:not(:disabled) { background: rgba(0, 255, 136, 0.2); }
+        .btn--boost {
+            background: rgba(0, 229, 255, 0.1);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .btn--boost:hover { background: rgba(0, 229, 255, 0.2); }
+
         /* ─── Responsive ────── */
         @media (max-width: 767px) {
             .stats-cards { grid-template-columns: repeat(2, 1fr); }
@@ -682,6 +972,14 @@ export class BrainViewerComponent implements OnInit {
     readonly memories = signal<MemoryEntry[]>([]);
     readonly listTotal = signal(0);
     readonly expandedId = signal<string | null>(null);
+
+    // Observations
+    readonly observations = signal<Observation[]>([]);
+    readonly obsStats = signal<ObservationStatsResponse | null>(null);
+    readonly obsLoading = signal(false);
+    readonly obsStatusFilter = signal<string | null>('active');
+    readonly expandedObsId = signal<string | null>(null);
+    readonly graduatingId = signal<string | null>(null);
 
     // Filters
     readonly searchQuery = signal('');
@@ -768,24 +1066,109 @@ export class BrainViewerComponent implements OnInit {
         return '\u2588'.repeat(filled) + '\u2591'.repeat(6 - filled);
     }
 
+    /** Storage type label */
+    storageLabel(type: StorageType): string {
+        switch (type) {
+            case 'arc69': return 'ARC-69';
+            case 'plain-txn': return 'Plain Txn';
+            case 'pending': return 'Pending';
+        }
+    }
+
+    /** Relevance score bar for observations */
+    relevanceBar(score: number): string {
+        const capped = Math.min(score, 5);
+        const filled = Math.round(capped);
+        return '\u2b50'.repeat(filled);
+    }
+
+    // ─── Observation actions ─────────────────────────────────────────────────
+
+    setObsStatus(status: string | null): void {
+        this.obsStatusFilter.set(status);
+        this.loadObservations();
+    }
+
+    toggleObsExpand(id: string): void {
+        this.expandedObsId.set(this.expandedObsId() === id ? null : id);
+    }
+
+    async forceGraduate(obsId: string, event: Event): Promise<void> {
+        event.stopPropagation();
+        this.graduatingId.set(obsId);
+        try {
+            await firstValueFrom(
+                this.api.post<{ success: boolean; message: string }>(`/dashboard/memories/observations/${obsId}/graduate`, {}),
+            );
+            // Reload both observations and memories
+            await Promise.all([this.loadObservations(), this.loadMemories()]);
+            // Refresh stats too
+            const [stats, obsStats] = await Promise.all([
+                firstValueFrom(this.api.get<MemoryStats>('/dashboard/memories/stats')),
+                firstValueFrom(this.api.get<ObservationStatsResponse>('/dashboard/memories/observations/stats')),
+            ]);
+            this.stats.set(stats);
+            this.obsStats.set(obsStats);
+        } catch {
+            // Non-critical
+        } finally {
+            this.graduatingId.set(null);
+        }
+    }
+
+    async boostObs(obsId: string, event: Event): Promise<void> {
+        event.stopPropagation();
+        try {
+            await firstValueFrom(
+                this.api.post<{ observation: Observation }>(`/dashboard/memories/observations/${obsId}/boost`, {}),
+            );
+            await this.loadObservations();
+        } catch {
+            // Non-critical
+        }
+    }
+
     // ─── Data loading ────────────────────────────────────────────────────────
 
     private async loadAll(): Promise<void> {
         this.loading.set(true);
         try {
-            const [stats, syncStatus, list] = await Promise.all([
+            const [stats, syncStatus, list, obsStatsRes] = await Promise.all([
                 firstValueFrom(this.api.get<MemoryStats>('/dashboard/memories/stats')),
                 firstValueFrom(this.api.get<SyncStatus>('/dashboard/memories/sync-status')),
                 firstValueFrom(this.api.get<MemoryListResponse>('/dashboard/memories?limit=50&offset=0')),
+                firstValueFrom(this.api.get<ObservationStatsResponse>('/dashboard/memories/observations/stats')).catch(() => null),
             ]);
             this.stats.set(stats);
             this.syncStatus.set(syncStatus);
             this.memories.set(list.entries);
             this.listTotal.set(list.total);
+            this.obsStats.set(obsStatsRes);
+            // Load observations after main data
+            this.loadObservations();
         } catch {
             // Non-critical — page still renders with empty state
         } finally {
             this.loading.set(false);
+        }
+    }
+
+    private async loadObservations(): Promise<void> {
+        this.obsLoading.set(true);
+        try {
+            const params = new URLSearchParams();
+            if (this.obsStatusFilter()) params.set('status', this.obsStatusFilter()!);
+            if (this.agentFilter()) params.set('agentId', this.agentFilter()!);
+            params.set('limit', '50');
+
+            const res = await firstValueFrom(
+                this.api.get<ObservationListResponse>(`/dashboard/memories/observations?${params.toString()}`),
+            );
+            this.observations.set(res.observations);
+        } catch {
+            // Non-critical
+        } finally {
+            this.obsLoading.set(false);
         }
     }
 

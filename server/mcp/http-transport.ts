@@ -204,6 +204,60 @@ function createMcpServer(baseUrl: string, agentId: string): McpServer {
         } catch (err) { return handleError(err); }
     });
 
+    // ── Observations (memory graduation) ────────────────────────────
+    server.tool('corvid_record_observation', 'Record a short-term observation. High-value observations auto-graduate to long-term ARC-69 memory.', {
+        content: z.string().describe('The observation content'),
+        source: z.enum(['session', 'feedback', 'daily-review', 'health', 'pr-outcome', 'manual']).optional().describe('Source of the observation'),
+        source_id: z.string().optional().describe('ID of the source (session ID, PR number, etc.)'),
+        suggested_key: z.string().optional().describe('Suggested memory key if this graduates'),
+        relevance_score: z.number().optional().describe('Initial relevance score (default: 1.0)'),
+    }, async ({ content, source, source_id, suggested_key, relevance_score }) => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/record-observation', {
+                agentId, content, source, sourceId: source_id, suggestedKey: suggested_key, relevanceScore: relevance_score,
+            });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
+    server.tool('corvid_list_observations', 'List or search memory observations.', {
+        status: z.enum(['active', 'graduated', 'expired', 'dismissed']).optional().describe('Filter by status'),
+        source: z.enum(['session', 'feedback', 'daily-review', 'health', 'pr-outcome', 'manual']).optional().describe('Filter by source'),
+        query: z.string().optional().describe('Search term'),
+        limit: z.number().optional().describe('Max results'),
+    }, async ({ status, source, query, limit }) => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/list-observations', { agentId, status, source, query, limit });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
+    server.tool('corvid_boost_observation', 'Boost an observation\'s relevance score (makes graduation more likely).', {
+        id: z.string().describe('Observation ID'),
+        score_boost: z.number().optional().describe('Amount to boost (default: 1.0)'),
+    }, async ({ id, score_boost }) => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/boost-observation', { agentId, id, scoreBoost: score_boost });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
+    server.tool('corvid_dismiss_observation', 'Dismiss an observation — marks it as not worth keeping.', {
+        id: z.string().describe('Observation ID'),
+    }, async ({ id }) => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/dismiss-observation', { agentId, id });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
+    server.tool('corvid_observation_stats', 'Get statistics about memory observations and graduation candidates.', {}, async () => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/observation-stats', { agentId });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
     // ── Work Tasks ─────────────────────────────────────────────────
     server.tool('corvid_create_work_task', 'Create a work task that spawns a new agent session on a dedicated branch.', {
         description: z.string().describe('Description of the work'),

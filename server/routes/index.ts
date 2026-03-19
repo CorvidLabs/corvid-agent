@@ -88,6 +88,7 @@ import type { UsageMeter } from '../billing/meter';
 import type { PerformanceCollector } from '../performance/collector';
 import type { OutcomeTrackerService } from '../feedback/outcome-tracker';
 import type { FlockDirectoryService } from '../flock-directory/service';
+import type { MemoryGraduationService } from '../memory/graduation-service';
 
 // Load auth config once at module level
 let authConfig: AuthConfig | null = null;
@@ -183,6 +184,7 @@ export async function handleRequest(
     outcomeTracker?: OutcomeTrackerService | null,
     flockDirectory?: FlockDirectoryService | null,
     onAgentChange?: (() => void) | null,
+    graduationService?: MemoryGraduationService | null,
 ): Promise<Response | null> {
     const url = new URL(req.url);
     const config = getAuthConfig();
@@ -240,7 +242,7 @@ export async function handleRequest(
     }
 
     try {
-        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory, onAgentChange);
+        const response = await handleRoutes(req, url, db, context, processManager, algochatBridge, agentWalletService, agentMessenger, workTaskService, selfTestService, agentDirectory, networkSwitchFn, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplace, marketplaceFederation, reputationScorer, reputationAttestation, billing, usageMeter, tenantService, performanceCollector, outcomeTracker, flockDirectory, onAgentChange, graduationService);
         if (response) {
             applyCors(response, req, config);
             if (context.rateLimitHeaders) {
@@ -285,6 +287,7 @@ async function handleRoutes(
     outcomeTracker?: OutcomeTrackerService | null,
     flockDirectory?: FlockDirectoryService | null,
     onAgentChange?: (() => void) | null,
+    graduationService?: MemoryGraduationService | null,
 ): Promise<Response | null> {
 
     if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
@@ -339,8 +342,8 @@ async function handleRoutes(
     const dashboardResponse = handleDashboardRoutes(req, url, db, context);
     if (dashboardResponse) return dashboardResponse;
 
-    const brainViewerResponse = handleBrainViewerRoutes(req, url, db, context);
-    if (brainViewerResponse) return brainViewerResponse;
+    const brainViewerResponse = handleBrainViewerRoutes(req, url, db, context, graduationService);
+    if (brainViewerResponse) return brainViewerResponse instanceof Promise ? await brainViewerResponse : brainViewerResponse;
 
     const analyticsResponse = handleAnalyticsRoutes(req, url, db, context);
     if (analyticsResponse) return analyticsResponse;
