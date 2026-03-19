@@ -4,6 +4,34 @@ A plain-language explanation of what happens when you give corvid-agent a task.
 
 ---
 
+## The Simple Version
+
+If you've never worked with AI agents before, here's how to think about corvid-agent:
+
+**It's like hiring a developer who lives inside your computer.**
+
+1. **You describe what you want** — in plain English, through a web browser, your phone, or a chat app
+2. **The agent figures out how to build it** — it reads code, writes files, runs commands, and tests its own work
+3. **You see the result** — a working website, a fixed bug, a pull request, or an answer to your question
+
+Everything runs on your machine. Your files stay yours. The agent uses an AI brain (Claude or a free local model) to understand your request and decide what to do.
+
+**What makes it different from ChatGPT?**
+
+ChatGPT talks. corvid-agent *does*. It doesn't just tell you how to fix a bug — it reads the code, finds the bug, writes the fix, runs the tests, and opens a pull request. It has hands, not just a mouth.
+
+**What makes it different from hiring a developer?**
+
+It works 24/7, it doesn't need onboarding, and it costs a fraction of a salary. It's not replacing developers — it's handling the routine work so developers (or you) can focus on the creative decisions.
+
+---
+
+## The Technical Version
+
+Everything below explains the internals. If you just want to use corvid-agent, you don't need to read further — the [quickstart](quickstart.md) will get you running.
+
+---
+
 ## The Agent Loop
 
 Every agent interaction follows the same core loop:
@@ -217,6 +245,8 @@ This means agents can work on tasks that take many turns without hitting LLM con
 ## Further Reading
 
 - [Quickstart](quickstart.md) — Get running in 5 minutes
-- [Use Cases](use-cases.md) — Practical examples with API calls
+- [Use Cases](use-cases.md) — Practical examples for every audience
+- [Business Guide](business-guide.md) — Setting up agents for your team
+- [Enterprise Guide](enterprise.md) — Multi-tenant, security, deployment at scale
 - [Deep Dive](deep-dive.md) — Full architecture and feature breakdown
 - [Self-Hosting Guide](self-hosting.md) — Production deployment
