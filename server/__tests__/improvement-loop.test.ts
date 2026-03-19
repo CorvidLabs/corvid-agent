@@ -59,6 +59,7 @@ function makeMemory(key: string, content: string): ScoredMemory {
             key,
             content,
             txid: null,
+            asaId: null,
             status: 'confirmed',
             createdAt: '2026-02-15T03:00:00.000Z',
             updatedAt: '2026-02-15T03:00:00.000Z',

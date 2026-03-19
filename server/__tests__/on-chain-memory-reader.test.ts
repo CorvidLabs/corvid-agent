@@ -106,7 +106,8 @@ describe('handleSyncOnChainMemories', () => {
         const ctx = createMockContext(db);
         const result = await handleSyncOnChainMemories(ctx, {});
         const text = extractText(result);
-        expect(text).toBe('No on-chain memories found to sync.');
+        expect(text).toContain('Sync complete');
+        expect(text).toContain('Total on-chain: 0 plain txns');
     });
 
     test('restores missing memories from on-chain to SQLite', async () => {
@@ -141,7 +142,6 @@ describe('handleSyncOnChainMemories', () => {
         const result = await handleSyncOnChainMemories(ctx, {});
         const text = extractText(result);
 
-        expect(text).toContain('0 memories restored/updated');
         expect(text).toContain('1 already up-to-date');
     });
 

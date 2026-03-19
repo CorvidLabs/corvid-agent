@@ -4,8 +4,8 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents } from '../mcp/tool-handlers';
-import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema } from '../lib/validation';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents } from '../mcp/tool-handlers';
+import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpDeleteMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 
 function extractResultText(result: CallToolResult): string {
@@ -61,6 +61,10 @@ export function handleMcpApiRoutes(
 
     if (url.pathname === '/api/mcp/sync-on-chain-memories' && req.method === 'POST') {
         return handleSyncOnChainMemoriesRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/delete-memory' && req.method === 'POST') {
+        return handleDeleteMemoryRoute(req, deps);
     }
 
     if (url.pathname === '/api/mcp/list-agents' && req.method === 'GET') {
@@ -124,6 +128,18 @@ async function handleSyncOnChainMemoriesRoute(req: Request, deps: McpApiDeps): P
 
         const ctx = buildContext(deps, data.agentId);
         const result = await handleSyncOnChainMemories(ctx, { limit: data.limit });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleDeleteMemoryRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpDeleteMemorySchema);
+
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleDeleteMemory(ctx, { key: data.key, mode: data.mode });
         return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);

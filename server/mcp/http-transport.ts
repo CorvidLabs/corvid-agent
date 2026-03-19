@@ -194,6 +194,16 @@ function createMcpServer(baseUrl: string, agentId: string): McpServer {
         } catch (err) { return handleError(err); }
     });
 
+    server.tool('corvid_delete_memory', 'Delete a long-term ARC-69 memory. Only works for ASA memories on localnet.', {
+        key: z.string().describe('Memory key to delete'),
+        mode: z.enum(['soft', 'hard']).optional().describe('Delete mode (default: soft)'),
+    }, async ({ key, mode }) => {
+        try {
+            const data = await callApi(baseUrl, '/api/mcp/delete-memory', { agentId, key, mode });
+            return { content: [{ type: 'text' as const, text: data.response }], isError: data.isError };
+        } catch (err) { return handleError(err); }
+    });
+
     // ── Work Tasks ─────────────────────────────────────────────────
     server.tool('corvid_create_work_task', 'Create a work task that spawns a new agent session on a dedicated branch.', {
         description: z.string().describe('Description of the work'),

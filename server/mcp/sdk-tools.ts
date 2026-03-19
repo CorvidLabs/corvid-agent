@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
@@ -12,6 +12,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_save_memory',
     'corvid_recall_memory',
+    'corvid_delete_memory',
     'corvid_read_on_chain_memories',
     'corvid_sync_on_chain_memories',
     'corvid_list_agents',
@@ -113,11 +114,22 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             'corvid_sync_on_chain_memories',
             'Sync memories from on-chain storage back to local SQLite cache. ' +
             'Use this to recover memories after a database reset or to ensure local cache matches on-chain state. ' +
-            'Reads all on-chain memories and restores any missing from the local database.',
+            'Reads all on-chain memories (both ARC-69 ASAs and plain transactions) and restores any missing from the local database.',
             {
                 limit: z.number().optional().describe('Maximum number of on-chain memories to scan (default: 200)'),
             },
             async (args) => handleSyncOnChainMemories(ctx, args),
+        ),
+        tool(
+            'corvid_delete_memory',
+            'Delete (forget) a long-term ARC-69 memory. Only works for memories stored as ASAs on localnet. ' +
+            'Soft delete (default) archives the memory and clears the on-chain content but preserves the ASA. ' +
+            'Hard delete destroys the ASA entirely. Permanent (plain transaction) memories cannot be deleted.',
+            {
+                key: z.string().describe('Memory key to delete'),
+                mode: z.enum(['soft', 'hard']).optional().describe('Delete mode: "soft" (default, archives) or "hard" (destroys ASA)'),
+            },
+            async (args) => handleDeleteMemory(ctx, args),
         ),
         tool(
             'corvid_list_agents',

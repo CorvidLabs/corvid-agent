@@ -11,6 +11,7 @@ import {
     handleSendMessage,
     handleSaveMemory,
     handleRecallMemory,
+    handleDeleteMemory,
     handleReadOnChainMemories,
     handleSyncOnChainMemories,
     handleListAgents,
@@ -61,6 +62,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_send_message',
     'corvid_save_memory',
     'corvid_recall_memory',
+    'corvid_delete_memory',
     'corvid_read_on_chain_memories',
     'corvid_sync_on_chain_memories',
     'corvid_list_agents',
@@ -207,6 +209,19 @@ export function buildDirectTools(ctx: McpToolContext | null, codingCtx?: CodingT
                 },
             },
             handler: async (args) => unwrapResult(await handleSyncOnChainMemories(ctx, args as { limit?: number })),
+        },
+        {
+            name: 'corvid_delete_memory',
+            description: 'Delete (forget) a long-term ARC-69 memory. Only works for ASA memories on localnet. Soft delete (default) archives; hard delete destroys the ASA.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    key: { type: 'string', description: 'Memory key to delete' },
+                    mode: { type: 'string', enum: ['soft', 'hard'], description: 'Delete mode (default: soft)' },
+                },
+                required: ['key'],
+            },
+            handler: async (args) => unwrapResult(await handleDeleteMemory(ctx, args as { key: string; mode?: string })),
         },
         {
             name: 'corvid_list_agents',

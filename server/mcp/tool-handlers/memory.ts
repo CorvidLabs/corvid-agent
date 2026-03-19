@@ -1,12 +1,47 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from './types';
 import { textResult, errorResult } from './types';
-import { saveMemory, recallMemory, searchMemories, listMemories, updateMemoryTxid, updateMemoryStatus } from '../../db/agent-memories';
+import {
+    saveMemory,
+    recallMemory,
+    searchMemories,
+    listMemories,
+    updateMemoryTxid,
+    updateMemoryStatus,
+    updateMemoryAsaId,
+    archiveMemory,
+    deleteMemoryRow,
+} from '../../db/agent-memories';
 import { encryptMemoryContent } from '../../lib/crypto';
 import { createLogger } from '../../lib/logger';
 import type { OnChainMemory } from '../../algochat/on-chain-transactor';
+import type { Arc69Context } from '../../memory/arc69-store';
 
 const log = createLogger('McpToolHandlers');
+
+/**
+ * Build an Arc69Context from the MCP tool context.
+ * Returns null if any required component is unavailable (no wallet, no indexer, etc.)
+ */
+async function buildArc69Context(ctx: McpToolContext): Promise<Arc69Context | null> {
+    try {
+        const service = ctx.agentWalletService.getAlgoChatService();
+        if (!service.indexerClient) return null;
+
+        const chatAccountResult = await ctx.agentWalletService.getAgentChatAccount(ctx.agentId);
+        if (!chatAccountResult) return null;
+
+        return {
+            db: ctx.db,
+            agentId: ctx.agentId,
+            algodClient: service.algodClient,
+            indexerClient: service.indexerClient,
+            chatAccount: chatAccountResult.account,
+        };
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Search on-chain memories as a fallback when SQLite has no results.
@@ -47,7 +82,34 @@ export async function handleSaveMemory(
         const isLocalnet = ctx.network === 'localnet' || !ctx.network;
 
         if (isLocalnet) {
-            // Localnet: await on-chain write — zero cost, always available
+            // Localnet: try ARC-69 ASA path first, fall back to plain txn
+            try {
+                const arc69Ctx = await buildArc69Context(ctx);
+                if (arc69Ctx) {
+                    const { createMemoryAsa, updateMemoryAsa, resolveAsaForKey } = await import('../../memory/arc69-store');
+                    const existingAsaId = resolveAsaForKey(ctx.db, ctx.agentId, args.key);
+
+                    if (existingAsaId) {
+                        // Update existing ASA
+                        const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, args.content);
+                        updateMemoryTxid(ctx.db, memory.id, txid);
+                        return textResult(`Memory saved with key "${args.key}" (ASA: ${existingAsaId}).`);
+                    } else {
+                        // Create new ASA
+                        const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, args.content);
+                        updateMemoryTxid(ctx.db, memory.id, txid);
+                        updateMemoryAsaId(ctx.db, memory.id, asaId);
+                        return textResult(`Memory saved with key "${args.key}" (ASA: ${asaId}).`);
+                    }
+                }
+            } catch (err) {
+                log.warn('ARC-69 memory save failed, falling back to plain txn', {
+                    key: args.key,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+
+            // Fallback: plain transaction path (no indexer, or ARC-69 failed)
             try {
                 const encrypted = await encryptMemoryContent(args.content, ctx.serverMnemonic, ctx.network);
                 const txid = await ctx.agentMessenger.sendOnChainToSelf(
@@ -56,9 +118,7 @@ export async function handleSaveMemory(
                 );
                 if (txid) {
                     updateMemoryTxid(ctx.db, memory.id, txid);
-                    return textResult(`Memory saved with key "${args.key}".`);
                 }
-                // sendOnChainToSelf returned null — no wallet configured
                 return textResult(`Memory saved with key "${args.key}".`);
             } catch (err) {
                 log.warn('On-chain memory send failed (localnet)', {
@@ -66,8 +126,6 @@ export async function handleSaveMemory(
                     error: err instanceof Error ? err.message : String(err),
                 });
                 updateMemoryStatus(ctx.db, memory.id, 'failed');
-                // Local save succeeded — don't expose on-chain failure to the model
-                // (confusing error text causes Ollama models to retry the save)
                 return textResult(`Memory saved with key "${args.key}".`);
             }
         } else {
@@ -114,9 +172,18 @@ export async function handleRecallMemory(
                 }
                 return textResult(`No memory found with key "${args.key}".`);
             }
-            const chainTag = memory.status === 'confirmed' && memory.txid
-                ? `(on-chain, txid: ${memory.txid})`
-                : memory.status === 'pending' ? '(pending sync to on-chain)' : '(sync-failed — will retry)';
+
+            // ARC-69 memories show ASA ID instead of raw txid
+            let chainTag: string;
+            if (memory.asaId) {
+                chainTag = `(on-chain, ASA: ${memory.asaId})`;
+            } else if (memory.status === 'confirmed' && memory.txid) {
+                chainTag = `(on-chain, txid: ${memory.txid})`;
+            } else if (memory.status === 'pending') {
+                chainTag = '(pending sync to on-chain)';
+            } else {
+                chainTag = '(sync-failed — will retry)';
+            }
             return textResult(`[${memory.key}] ${memory.content}\n(saved: ${memory.updatedAt}) ${chainTag}`);
         }
 
@@ -134,7 +201,9 @@ export async function handleRecallMemory(
                 return textResult(`No memories found matching "${args.query}".`);
             }
             const lines = memories.map((m) => {
-                const tag = m.status === 'confirmed' && m.txid ? `[on-chain: ${m.txid}]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
+                const tag = m.asaId
+                    ? `[ASA: ${m.asaId}]`
+                    : m.status === 'confirmed' && m.txid ? `[on-chain: ${m.txid}]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
                 return `${tag} [${m.key}] ${m.content}`;
             });
             return textResult(`Found ${memories.length} memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);
@@ -146,7 +215,9 @@ export async function handleRecallMemory(
             return textResult('No memories saved yet.');
         }
         const lines = memories.map((m) => {
-            const tag = m.status === 'confirmed' ? `[on-chain]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
+            const tag = m.asaId
+                ? `[ASA: ${m.asaId}]`
+                : m.status === 'confirmed' ? `[on-chain]` : m.status === 'pending' ? `[pending]` : `[sync-failed]`;
             return `${tag} [${m.key}] ${m.content}`;
         });
         return textResult(`Your ${memories.length} most recent memor${memories.length === 1 ? 'y' : 'ies'}:\n\n${lines.join('\n')}`);
@@ -154,6 +225,48 @@ export async function handleRecallMemory(
         const message = err instanceof Error ? err.message : String(err);
         log.error('MCP recall_memory failed', { error: message });
         return errorResult(`Failed to recall memory: ${message}`);
+    }
+}
+
+export async function handleDeleteMemory(
+    ctx: McpToolContext,
+    args: { key: string; mode?: string },
+): Promise<CallToolResult> {
+    try {
+        const memory = recallMemory(ctx.db, ctx.agentId, args.key);
+        if (!memory) {
+            return errorResult(`No memory found with key "${args.key}".`);
+        }
+
+        if (!memory.asaId) {
+            return errorResult(
+                `Memory "${args.key}" is a permanent (plain transaction) memory and cannot be deleted. ` +
+                `Only long-term ARC-69 memories support deletion.`,
+            );
+        }
+
+        const mode = (args.mode === 'hard' ? 'hard' : 'soft') as 'soft' | 'hard';
+
+        const arc69Ctx = await buildArc69Context(ctx);
+        if (!arc69Ctx) {
+            return errorResult('Cannot delete memory: AlgoChat service or indexer unavailable.');
+        }
+
+        const { deleteMemoryAsa } = await import('../../memory/arc69-store');
+        const { txid } = await deleteMemoryAsa(arc69Ctx, memory.asaId, mode);
+
+        if (mode === 'hard') {
+            deleteMemoryRow(ctx.db, ctx.agentId, args.key);
+        } else {
+            archiveMemory(ctx.db, ctx.agentId, args.key);
+        }
+
+        const modeLabel = mode === 'hard' ? 'permanently deleted' : 'soft-deleted (archived)';
+        return textResult(`Memory "${args.key}" ${modeLabel}. (ASA: ${memory.asaId}, txid: ${txid})`);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('MCP delete_memory failed', { error: message });
+        return errorResult(`Failed to delete memory: ${message}`);
     }
 }
 
@@ -195,6 +308,51 @@ export async function handleSyncOnChainMemories(
     args: { limit?: number },
 ): Promise<CallToolResult> {
     try {
+        let synced = 0;
+        let skipped = 0;
+        let asaSynced = 0;
+
+        // 1. Sync ARC-69 ASA memories (localnet only)
+        const isLocalnet = ctx.network === 'localnet' || !ctx.network;
+        if (isLocalnet) {
+            try {
+                const arc69Ctx = await buildArc69Context(ctx);
+                if (arc69Ctx) {
+                    const { listMemoryAsas } = await import('../../memory/arc69-store');
+                    const asaMemories = await listMemoryAsas(arc69Ctx);
+
+                    for (const m of asaMemories) {
+                        const existing = recallMemory(ctx.db, ctx.agentId, m.key);
+                        if (existing) {
+                            if (!existing.asaId) {
+                                // Local row exists but doesn't know about its ASA — update it
+                                updateMemoryAsaId(ctx.db, existing.id, m.asaId);
+                                updateMemoryTxid(ctx.db, existing.id, m.txid);
+                                asaSynced++;
+                            } else {
+                                skipped++;
+                            }
+                        } else {
+                            // Restore from chain to SQLite
+                            const saved = saveMemory(ctx.db, {
+                                agentId: ctx.agentId,
+                                key: m.key,
+                                content: m.content,
+                            });
+                            updateMemoryTxid(ctx.db, saved.id, m.txid);
+                            updateMemoryAsaId(ctx.db, saved.id, m.asaId);
+                            asaSynced++;
+                        }
+                    }
+                }
+            } catch (err) {
+                log.warn('ARC-69 ASA sync failed', {
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+
+        // 2. Sync plain transaction memories (existing path)
         const memories = await ctx.agentMessenger.readOnChainMemories(
             ctx.agentId,
             ctx.serverMnemonic,
@@ -202,17 +360,9 @@ export async function handleSyncOnChainMemories(
             { limit: args.limit ?? 200 },
         );
 
-        if (memories.length === 0) {
-            return textResult('No on-chain memories found to sync.');
-        }
-
-        let synced = 0;
-        let skipped = 0;
-
         for (const m of memories) {
             const existing = recallMemory(ctx.db, ctx.agentId, m.key);
             if (existing) {
-                // Update txid if local copy exists but isn't confirmed
                 if (existing.status !== 'confirmed' && m.txid) {
                     updateMemoryTxid(ctx.db, existing.id, m.txid);
                     synced++;
@@ -220,7 +370,6 @@ export async function handleSyncOnChainMemories(
                     skipped++;
                 }
             } else {
-                // Restore memory from on-chain to local SQLite
                 const saved = saveMemory(ctx.db, {
                     agentId: ctx.agentId,
                     key: m.key,
@@ -231,9 +380,16 @@ export async function handleSyncOnChainMemories(
             }
         }
 
+        const totalSynced = synced + asaSynced;
+        const parts: string[] = [];
+        if (totalSynced > 0) parts.push(`${totalSynced} memor${totalSynced === 1 ? 'y' : 'ies'} restored/updated`);
+        if (asaSynced > 0) parts.push(`(${asaSynced} from ARC-69 ASAs)`);
+        if (skipped > 0) parts.push(`${skipped} already up-to-date`);
+
         return textResult(
-            `Sync complete: ${synced} memor${synced === 1 ? 'y' : 'ies'} restored/updated, ${skipped} already up-to-date.` +
-            `\nTotal on-chain: ${memories.length}`,
+            `Sync complete: ${parts.join(', ')}.` +
+            `\nTotal on-chain: ${memories.length} plain txns` +
+            (asaSynced > 0 ? ` + ${asaSynced} ASAs` : ''),
         );
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
