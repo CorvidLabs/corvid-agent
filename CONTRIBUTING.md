@@ -112,10 +112,10 @@ server/           Bun HTTP + WebSocket server
   discord/        Bidirectional Discord bridge (raw WebSocket)
   github/         GitHub API operations (PRs, issues, reviews)
   lib/            Shared utilities (logger, crypto, validation, dedup)
-  mcp/            MCP tool server and 41 corvid_* tool handlers
+  mcp/            MCP tool server and 46 corvid_* tool handlers
   middleware/     Auth, CORS, rate limiting, startup validation
   process/        Agent lifecycle (SDK + Ollama, persona/skill injection)
-  routes/         REST API route handlers (44 modules)
+  routes/         REST API route handlers (47 modules)
   scheduler/      Cron/interval execution engine
   telegram/       Bidirectional Telegram bridge (long-polling, voice)
   voice/          TTS (OpenAI) and STT (Whisper) with caching

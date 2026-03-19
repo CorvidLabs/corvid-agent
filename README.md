@@ -114,7 +114,7 @@ DISCORD_BOT_TOKEN=your-bot-token      # talk to agents from Discord
 SLACK_BOT_TOKEN=xoxb-your-bot-token   # talk to agents from Slack
 ```
 
-See `.env.example` for the full list of 30+ configuration options.
+See `.env.example` for the full list of 60+ configuration options.
 
 ---
 
@@ -151,7 +151,7 @@ Every PR runs the full suite. Every module has a spec. Every spec is validated i
 | Metric | Count |
 |--------|-------|
 | MCP tools | **46** corvid_* tool handlers |
-| API endpoints | **279** across 46 route modules |
+| API endpoints | **~300** across 47 route modules |
 | DB migrations | **16** (squashed baseline + incremental, 90+ tables) |
 | Test:code ratio | **1.14×** — more test code than production code |
 
@@ -388,7 +388,7 @@ server/          Bun HTTP + WebSocket server
   providers/     Multi-model cost-aware routing
   public/        Static assets served by the HTTP server
   reputation/    Reputation and trust scoring
-  routes/        REST API routes (46 route modules)
+  routes/        REST API routes (47 route modules)
   sandbox/       Container sandboxing for isolated execution
   scheduler/     Cron/interval execution engine
   selftest/      Self-test and validation utilities
@@ -438,7 +438,7 @@ Tools are permission-scoped per agent via skill bundles and agent-level allowlis
 
 ## API
 
-~300 REST endpoints and a WebSocket interface across 46 route modules.
+~300 REST endpoints and a WebSocket interface across 47 route modules.
 
 **[API Reference](docs/api-reference.md)** — detailed docs with request/response examples for workflows, councils, marketplace, reputation, and billing.
 
