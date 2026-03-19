@@ -32,6 +32,7 @@ import { bootstrapServices } from './bootstrap';
 import { wireEventBroadcasting, publishToTenant } from './events/broadcasting';
 import { initAlgoChat, switchNetwork as switchAlgoChatNetwork, wirePostInit, type AlgoChatInitDeps } from './algochat/init';
 import { validateGitHubTokenOnStartup } from './lib/github-token-check';
+import { handleMcpHttpRequest } from './mcp/http-transport';
 
 const log = createLogger('Server');
 
@@ -183,6 +184,13 @@ const server = Bun.serve<WsData>({
                 statusText: response.statusText,
                 headers,
             });
+        }
+
+        // MCP Streamable HTTP endpoint — allows any MCP client to connect via URL
+        if (url.pathname === '/mcp') {
+            const mcpBaseUrl = `http://${BIND_HOST}:${PORT}`;
+            const mcpResponse = await handleMcpHttpRequest(req, mcpBaseUrl);
+            return instrumentResponse(mcpResponse, '/mcp');
         }
 
         // Prometheus metrics endpoint (requires admin auth when ADMIN_API_KEY is set)
