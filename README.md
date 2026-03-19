@@ -11,32 +11,84 @@
 
 # corvid-agent
 
-**AI agents that ship code, review PRs, and talk to each other on Algorand.**
+**Your own AI developer.** Tell it what you need — it writes the code, opens pull requests, and ships it.
 
-Self-hosted. Open-source. Your agents write code, open pull requests, fix CI, and coordinate through encrypted on-chain channels — while you sleep.
+No coding experience required. You describe what you want in plain English, and your agent builds it.
 
-### Get started in 60 seconds
+---
+
+## What can it build?
+
+- "Build me a weather dashboard" → [it built this](https://corvid-agent.github.io/weather-dashboard/)
+- "Make a movie browser for classic films" → [it built this](https://corvid-agent.github.io/bw-cinema/)
+- "I need an earthquake tracker" → [it built this](https://corvid-agent.github.io/quake-tracker/)
+- "Create a poetry explorer" → [it built this](https://corvid-agent.github.io/poetry-atlas/)
+- "Build a pixel art editor" → [it built this](https://corvid-agent.github.io/pixel-forge/)
+
+Every app above was designed, coded, tested, and deployed by corvid-agent — zero human-written application code.
+
+[See all apps →](https://corvid-agent.github.io)
+
+---
+
+## Get started
+
+One command to install and launch:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
 ```
 
-> Works on macOS, Linux, and WSL2. Downloads a release tarball (or falls back to `git clone`). The installer handles everything else.
+That's it. The installer handles everything — prerequisites, setup, and opens the dashboard in your browser.
 
-<details>
-<summary>Or clone manually</summary>
+**[Full setup guide →](docs/quickstart.md)**
 
-```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git && cd corvid-agent
-bash scripts/dev-setup.sh   # installs deps, creates .env, builds UI
-bun run dev                 # → http://localhost:3000
+---
+
+## What else can it do?
+
+| You say... | It does... |
+|-----------|-----------|
+| "Review my pull requests every morning" | Reads diffs, flags bugs, posts review comments — on a schedule |
+| "Fix that failing CI build" | Diagnoses the failure, writes a fix, opens a PR |
+| "Write tests for this code" | Generates test suites matching your project's patterns |
+| "Triage these GitHub issues" | Labels, prioritizes, and assigns (or picks them up itself) |
+| "I need two agents to discuss this architecture decision" | Runs a multi-agent council with structured deliberation |
+
+It's a developer that works for you 24/7 — reviews code, fixes bugs, writes features, and handles the boring stuff so you don't have to.
+
+---
+
+## How it works
+
+```
+You (browser, phone, or terminal)
+  ↓
+corvid-agent (runs on your machine)
+  ↓
+Writes code → Runs tests → Opens PRs → Deploys
 ```
 
-</details>
+Everything runs locally on your computer. Your code stays yours. The only external service is the AI model (Claude or a free local model via Ollama).
 
-**[5-min quickstart](docs/quickstart.md)** | **[Use cases](docs/use-cases.md)** | **[How it works](docs/how-it-works.md)** | **[API reference](docs/api-reference.md)**
+**[How it works (detailed) →](docs/how-it-works.md)**
 
-### Works with
+---
+
+## Talk to it from anywhere
+
+| Channel | What you need |
+|---------|--------------|
+| **Web dashboard** | Nothing — included at `http://localhost:3000` |
+| **Terminal** | `corvid-agent` (interactive CLI) |
+| **Telegram** | Add a bot token to `.env` |
+| **Discord** | Add a bot token to `.env` |
+| **Slack** | Add a bot token to `.env` |
+| **Your AI editor** | `corvid-agent init --mcp` (Claude Code, Cursor, Copilot, etc.) |
+
+---
+
+## Works with
 
 <p>
   <img src="https://img.shields.io/badge/Claude_Code-works-00e5ff?logo=anthropic" alt="Claude Code">
@@ -49,76 +101,12 @@ bun run dev                 # → http://localhost:3000
   <img src="https://img.shields.io/badge/A2A_Protocol-compatible-00ff88" alt="A2A">
 </p>
 
-Any MCP-compatible AI assistant can connect. See **[MCP setup guide](docs/mcp-setup.md)** for per-client instructions.
-
 ---
 
-## What can it do?
+<details>
+<summary><strong>For developers: technical details</strong></summary>
 
-| Scenario | What happens |
-|----------|-------------|
-| **Review PRs daily** | Schedule an agent to review every open PR at 8am. It reads diffs, flags bugs, and posts review comments. |
-| **Fix CI failures** | When CI goes red, a work task clones the branch, diagnoses the failure, writes a fix, and opens a PR. |
-| **Write tests** | Point an agent at untested code. It generates test suites following your existing patterns. |
-| **Triage issues** | New issues get auto-labeled, prioritized, and assigned — or the agent picks them up itself. |
-| **Multi-agent councils** | Assemble agents with different expertise to deliberate on architecture decisions together. |
-
-See **[use cases](docs/use-cases.md)** for copy-paste API examples for each scenario.
-
----
-
-## Quick Start
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
-```
-
-Or manually:
-
-```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git
-cd corvid-agent
-corvid-agent init           # guided setup: env, deps, first agent
-bun run dev                 # → http://localhost:3000
-```
-
-Non-interactive with defaults:
-
-```bash
-corvid-agent init --yes     # auto-detect Claude CLI / Ollama, skip prompts
-```
-
-**Just want MCP tools in your editor?**
-
-```bash
-corvid-agent init --mcp     # adds corvid-agent to Claude Code, Cursor, Copilot, etc.
-```
-
-Server starts at `http://localhost:3000`. Dashboard included.
-
-### Minimum `.env`
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...          # or use Claude Code CLI (no key needed)
-OLLAMA_HOST=http://localhost:11434    # optional — local models via Ollama
-GH_TOKEN=ghp_...                     # optional — enables PR creation and reviews
-```
-
-> **On-chain features are optional.** Add `ALGOCHAT_MNEMONIC` to enable Algorand identity and encrypted messaging. Everything else works without it.
-
-### Optional: Messaging Bridges
-
-```bash
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...  # talk to agents from Telegram
-DISCORD_BOT_TOKEN=your-bot-token      # talk to agents from Discord
-SLACK_BOT_TOKEN=xoxb-your-bot-token   # talk to agents from Slack
-```
-
-See `.env.example` for the full list of 60+ configuration options.
-
----
-
-## Why corvid-agent?
+### Why corvid-agent?
 
 | | corvid-agent | Cloud coding agents | Local-only tools |
 |---|---|---|---|
@@ -129,186 +117,48 @@ See `.env.example` for the full list of 60+ configuration options.
 | **Scheduling** | Built-in cron with approval policies | None | None |
 | **Open source** | MIT | Proprietary | Varies |
 
----
-
-## 8,100+ Tests. 1.14× Test-to-Code Ratio. Open Source.
-
-> More lines of tests than production code. When agents ship code autonomously, the platform they run on has to hold up.
+### At a Glance
 
 | Metric | Value |
 |--------|-------|
 | Unit tests | **8,138** across 335 files |
 | E2E tests | **360** across 31 Playwright specs |
 | Module specs | **161** with automated specsync validation (100% file coverage) |
-| Test:code ratio | **1.14×** |
-
-Every PR runs the full suite. Every module has a spec. Every spec is validated in CI with a zero-warning gate.
-
----
-
-## At a Glance
-
-| Metric | Count |
-|--------|-------|
+| Test:code ratio | **1.14×** — more test code than production code |
 | MCP tools | **47** corvid_* tool handlers |
 | API endpoints | **~300** across 47 route modules |
 | DB migrations | **18** (squashed baseline + incremental, 90+ tables) |
-| Test:code ratio | **1.14×** — more test code than production code |
 
-Cross-platform CI: Ubuntu, macOS, Windows. Built with [Bun](https://bun.sh), [Angular 21](https://angular.dev), [SQLite](https://bun.sh/docs/api/sqlite), [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk), and [Algorand](https://algorand.co).
+### Tech Stack
 
-See [VISION.md](VISION.md) for architecture, competitive positioning, and long-term roadmap.
+| Layer | Technology |
+|-------|-----------|
+| Runtime | [Bun](https://bun.sh) |
+| Frontend | [Angular 21](https://angular.dev) |
+| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5 |
+| Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
+| Local Models | [Ollama](https://ollama.com) |
+| Blockchain | [Algorand](https://algorand.co) — on-chain identity and messaging |
+| Tools | [MCP SDK](https://github.com/modelcontextprotocol/sdk) |
+| Observability | [OpenTelemetry](https://opentelemetry.io) |
 
----
+### Core Capabilities
 
-## Core Capabilities
+- **Agent Sessions** — Claude or Ollama agents with configurable prompts, tool permissions, budgets, real-time streaming
+- **Self-Improvement Pipeline** — agents propose code changes, auto-create branches, validate with tests, open PRs
+- **Multi-Agent Councils** — structured deliberation with responding → discussing → reviewing → synthesizing pipeline
+- **Scheduling & Automation** — cron/interval tasks with configurable approval policies
+- **Graph Workflows** — DAG-based multi-step orchestration with suspend/resume
+- **On-Chain Identity (AlgoChat)** — Algorand wallets, X25519 encrypted messaging, credit system
+- **Voice Support** — TTS via OpenAI, STT via Whisper, per-agent voice presets
+- **Character/Persona System** — distinct personalities with archetype, traits, voice guidelines
+- **Skill Bundles** — composable tool + prompt packages (Code Reviewer, DevOps, Researcher, etc.)
+- **AST Code Understanding** — Tree-sitter parser for smart code analysis
+- **Health Monitoring** — heartbeat, incident detection, auto-generated runbooks
+- **Performance Metrics** — regression detection with rolling window analysis
+- **Multi-Tenant Isolation** — DB filter guards, scoped broadcasts, tenant-level access control
 
-### Agent Sessions
-- Spawn and manage Claude or Ollama agent sessions with configurable system prompts, tool permissions, and budgets
-- Real-time streaming via WebSocket with terminal-style UI
-- Tool approval workflows for sensitive operations
-- Automatic context management with turn-based resets
-
-### Bidirectional Telegram Bridge
-- Talk to agents directly from Telegram with long-polling integration
-- Voice note support: send a voice message, agent transcribes via Whisper STT and responds
-- Voice responses: agents with voice enabled reply with audio (OpenAI TTS) plus text
-- Per-user sessions with `/start`, `/status`, `/new` commands
-- Authorization via `TELEGRAM_ALLOWED_USER_IDS`
-
-### Bidirectional Discord Bridge
-- Talk to agents from any Discord channel via raw WebSocket gateway (no discord.js dependency)
-- Auto-reconnect with exponential backoff, heartbeat, and session resume
-- Per-user sessions with `/status` and `/new` commands
-- Messages over 2000 characters automatically chunked
-
-### Slack Integration
-- Talk to agents from Slack channels with bidirectional message bridge
-- Notification delivery for schedule approvals, work task results, and agent questions
-- Question routing: `corvid_ask_owner` questions appear in Slack with response buttons
-- Implements the ChannelAdapter interface for consistent bridge behavior
-
-### Character/Persona System
-- Give each agent a distinct personality with archetype, traits, background, and voice guidelines
-- Example messages to set communication tone and style
-- Persona is injected into the system prompt for both Claude SDK and Ollama sessions
-- API: `GET/PUT/DELETE /api/agents/{id}/persona`
-
-### Skill Bundles
-- Composable packages of tools + prompt additions that can be assigned to agents
-- 5 built-in presets: Code Reviewer, DevOps, Researcher, Communicator, Analyst
-- Create custom bundles and assign multiple to a single agent
-- Tools from bundles are merged with the agent's base permissions at session start
-- API: `/api/skill-bundles` (CRUD), `/api/agents/{id}/skills` (assign/unassign)
-
-### Voice Support (TTS/STT)
-- Text-to-speech via OpenAI TTS API (`tts-1` model) with 6 voice presets (alloy, echo, fable, onyx, nova, shimmer)
-- Speech-to-text via OpenAI Whisper API for transcribing voice messages
-- Intelligent caching: synthesized audio is stored in SQLite by text hash + voice preset
-- Per-agent voice configuration: `voiceEnabled` and `voicePreset` fields on the agent model
-
-### Multi-Agent Councils
-- Structured deliberation with multiple agents and a chairman
-- Pipeline: responding → discussing (N rounds) → reviewing → synthesizing
-- Chairman synthesizes a final decision from independent agent responses
-- Configurable on-chain mode: `off` (default), `attestation` (SHA-256 hash on-chain), `full` (all messages on-chain)
-
-### Self-Improvement Pipeline
-- Agents call `corvid_create_work_task` to propose code changes
-- Automatic git worktree, branch creation, and PR submission
-- Validation loop: TypeScript type-check + test suite (up to 3 iterations)
-- Protected file enforcement prevents agents from modifying critical code
-
-### Graph Workflow Orchestration
-- DAG-based multi-step workflows with suspend/resume
-- Node types: agent session, work task, condition, delay, transform, parallel fork/join
-
-### Scheduling & Automation
-- Cron and interval-based task scheduling with configurable approval policies
-- Actions: agent chat, work tasks, council launches, GitHub operations, inter-agent messaging
-- GitHub webhook-driven automation with `@mention` triggers
-
-### On-Chain Identity (AlgoChat)
-- Algorand-backed agent wallets with AES-256-GCM encryption at rest
-- X25519 PSK encrypted messaging channels
-- Owner commands: `/stop`, `/approve`, `/deny`, `/mode`, `/work`, `/council`
-- Credit system with ALGO-based purchasing
-- Work task lifecycle notifications broadcast via AlgoChat
-- Schedule result broadcasts to AlgoChat-enabled peers
-- USDC revenue tracking with auto-forwarding to owner wallet
-
-### Multi-Channel Notifications
-- Delivery via Discord, Telegram, GitHub Issues, and AlgoChat
-- Blocking `corvid_ask_owner` for two-way agent-to-owner questions
-- First-response-wins across all configured channels
-
-### Cloud Model Routing
-- Ollama cloud model support with `-cloud` suffix routing to remote instances
-- Local proxy handles authentication forwarding for remote Ollama hosts
-- Merged local + remote model listings in the dashboard
-
-### Model Exam System
-- 28 test cases across 6 categories: coding, context, tools, algochat, council, instruction
-- Per-category scoring with aggregate scorecard for evaluating model capabilities
-- Integrated into the dashboard and API at `/api/exam`
-
-### Mention Polling
-- GitHub `@mention` polling for automated issue and PR responses
-- Configurable per-agent poll intervals with centralized deduplication
-- Filters by event type (issue comments, issues, PR review comments, pull requests)
-- Pull request review detection via GitHub search API
-
-### Health Monitoring & Incident Runbook
-- Heartbeat monitoring with automatic health history tracking
-- Health collector aggregates metrics from sessions, schedules, work tasks, and system resources
-- Configurable incident detection with auto-generated runbook suggestions
-- API: `/api/health` for live status, plus health trend analysis via MCP tools
-
-### Feedback Loop
-- Track PR outcomes (merged, closed, changes-requested) from scheduled work
-- Learn from results to improve future schedule effectiveness
-- Automatic correlation between schedule executions and PR dispositions
-
-### Performance Metrics & Regression Detection
-- Collect performance snapshots across API routes and agent sessions
-- Trend detection with rolling window analysis
-- Automatic regression alerts when metrics degrade beyond thresholds
-- API: `/api/performance` for snapshots, trends, and regression queries
-
-### Usage Monitoring & Anomaly Detection
-- Track schedule execution frequency, cost, and token usage over time
-- Anomaly detection for cost spikes and unusual execution patterns
-- Per-schedule and aggregate usage analytics
-- API: `/api/usage` for monitoring and alerting
-
-### Smart Prioritization
-- Health-gated scheduling: suppress non-critical work when system health is degraded
-- Priority rules engine for scheduling decisions based on agent state and workload
-- Automatic backoff when health checks indicate resource pressure
-
-### Schedule Coordination
-- Repository-level locking to prevent concurrent work task conflicts
-- Issue deduplication to avoid filing duplicate issues across scheduled runs
-
-### Centralized Deduplication
-- Bounded LRU caches with configurable TTL per namespace
-- Replaces per-module Map/Set patterns to prevent unbounded memory growth
-- Optional SQLite persistence for crash recovery
-- Used across polling, messaging, AlgoChat bridge, and Slack bridge
-
-### AST Code Understanding
-- Tree-sitter parser for TypeScript, JavaScript, Python, Go, Rust, and more
-- Extracts functions, classes, imports, and call graphs for smarter work tasks
-- `corvid_code_symbols` and `corvid_find_references` tools for agent use
-
-### Observability
-- OpenTelemetry tracing with OTLP HTTP export
-- Prometheus metrics endpoint
-- Immutable audit log with trace context propagation
-
----
-
-## Architecture
+### Architecture
 
 ```
                     +--------------------------+
@@ -331,24 +181,10 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 |  | Workflow |  | A2A      |  | Marketplace |  | Sandbox       |  |
 |  | Engine   |  | Protocol |  | + Plugins   |  | (containers)  |  |
 |  +----------+  +----------+  +-------------+  +---------------+  |
-|  | Mention  |  | Exam     |  | Improvement |  | Notifications |  |
-|  | Polling  |  | System   |  | Pipeline    |  | (multi-chan)  |  |
-|  +----------+  +----------+  +-------------+  +---------------+  |
-|  | Reputation |  | Tenants |  | Health      |  | Feedback     |  |
-|  | + Trust    |  | + Billing|  | Monitoring  |  | Loop         |  |
-|  +------------+  +---------+  +-------------+  +--------------+  |
-|  | Performance|  | Usage   |  | Observability (OTEL)          |  |
-|  | Metrics    |  | Monitor |  | Tracing + Metrics + Audit    |  |
-|  +------------+  +---------+  +-------------------------------+  |
-|       |              |              |                |           |
-|  +----+-----+  +----+-----+  +-----+-----+  +------+--------+  |
-|  | Claude   |  | Ollama   |  | AlgoChat  |  | GitHub API    |  |
-|  | Agent SDK|  | (local)  |  | (Algorand)|  | (webhooks)    |  |
-|  +----------+  +----------+  +-----------+  +---------------+  |
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  16 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  18 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
@@ -356,295 +192,108 @@ See [VISION.md](VISION.md) for architecture, competitive positioning, and long-t
 ### Directory Structure
 
 ```
-server/          Bun HTTP + WebSocket server
-  a2a/           Google A2A protocol inbound task handling and agent card
-  algochat/      On-chain messaging (bridge, wallet, directory, messenger)
-  ast/           Tree-sitter AST parser for code understanding
-  billing/       Usage metering and billing
-  channels/      Channel adapter interfaces for messaging bridges
-  councils/      Council discussion and synthesis engines
-  db/            SQLite schema (16 migrations) and query modules
-  discord/       Bidirectional Discord bridge (raw WebSocket gateway)
-  docs/          OpenAPI generator, MCP tool docs, route registry
-  events/        Event bus and WebSocket broadcasting
-  exam/          Model exam system with 28 test cases across 6 categories
-  github/        GitHub API operations (PRs, issues, reviews)
-  feedback/      PR outcome tracking and schedule effectiveness learning
-  health/        Health monitoring, heartbeat, incident detection, and runbook
-  improvement/   Self-improvement pipeline and health metrics
-  lib/           Shared utilities (logger, crypto, validation, web search, dedup)
-  marketplace/   Agent marketplace — publish, discover, consume services
-  mcp/           MCP tool server and 46 corvid_* tool handlers
-  memory/        Structured memory with vector embeddings
-  middleware/    Auth, CORS, rate limiting, startup validation
-  notifications/ Multi-channel notification delivery (Discord, Telegram, GitHub, AlgoChat)
-  observability/ OpenTelemetry tracing, Prometheus metrics
-  openapi/       OpenAPI spec generator and route registry
-  performance/   Performance metrics collection and regression detection
-  permissions/   Capability broker — grant, revoke, and check agent tool access
-  plugins/       Plugin SDK and dynamic tool registration
-  polling/       GitHub mention polling for @mention-driven automation
-  process/       Agent lifecycle (SDK + Ollama, approval, event bus, persona/skill injection)
-  providers/     Multi-model cost-aware routing
-  public/        Static assets served by the HTTP server
-  reputation/    Reputation and trust scoring
-  routes/        REST API routes (47 route modules)
-  sandbox/       Container sandboxing for isolated execution
-  scheduler/     Cron/interval execution engine
-  selftest/      Self-test and validation utilities
-  slack/         Bidirectional Slack bridge (channel adapter, notifications, questions)
-  telegram/      Bidirectional Telegram bridge (long-polling, voice)
-  tenant/        Multi-tenant isolation and access control
-  usage/         Schedule usage monitoring and anomaly detection
-  voice/         TTS (OpenAI) and STT (Whisper) with caching
-  webhooks/      GitHub webhook and mention polling
-  work/          Work task service (worktree, branch, validate, PR)
-  workflow/      Graph-based DAG workflow orchestration engine
-  ws/            WebSocket handlers with pub/sub
+server/          Bun HTTP + WebSocket server (47 modules)
 client/          Angular 21 SPA (standalone components, signals)
 cli/             CLI entry point and commands
 shared/          TypeScript types shared between server and client
 packages/        Published packages (MCP server, env loader, result monad)
-skills/          Agent skill definitions (AlgoChat, GitHub, scheduling, etc.)
+skills/          Agent skill definitions
 deploy/          Docker, docker-compose, systemd, launchd, nginx, caddy, Helm, K8s
-e2e/             Playwright end-to-end tests (31 spec files, 360 E2E tests)
+e2e/             Playwright end-to-end tests (31 spec files, 360 tests)
 ```
 
----
-
-## MCP Tools (46)
-
-Extensible tool system via [Model Context Protocol](https://github.com/modelcontextprotocol/sdk):
+### MCP Tools (47)
 
 | Category | Tools |
 |---|---|
 | **Messaging** | `corvid_send_message`, `corvid_list_agents` |
-| **Memory** | `corvid_save_memory` (on-chain encrypted), `corvid_recall_memory` (FTS5) |
+| **Memory** | `corvid_save_memory`, `corvid_recall_memory` |
 | **GitHub** | `corvid_github_star_repo`, `corvid_github_fork_repo`, `corvid_github_list_prs`, `corvid_github_create_pr`, `corvid_github_review_pr`, `corvid_github_get_pr_diff`, `corvid_github_comment_on_pr`, `corvid_github_create_issue`, `corvid_github_list_issues`, `corvid_github_repo_info`, `corvid_github_unstar_repo`, `corvid_github_follow_user` |
 | **Automation** | `corvid_create_work_task`, `corvid_manage_schedule`, `corvid_manage_workflow`, `corvid_launch_council` |
 | **Projects** | `corvid_list_projects`, `corvid_current_project` |
-| **Discovery** | `corvid_discover_agent`, `corvid_invoke_remote_agent` (A2A protocol), `corvid_flock_directory` |
-| **Web** | `corvid_web_search` (Brave), `corvid_deep_research` (multi-angle) |
+| **Discovery** | `corvid_discover_agent`, `corvid_invoke_remote_agent`, `corvid_flock_directory` |
+| **Web** | `corvid_web_search`, `corvid_deep_research` |
 | **Credits** | `corvid_check_credits`, `corvid_grant_credits`, `corvid_credit_config` |
 | **Owner Comms** | `corvid_notify_owner`, `corvid_ask_owner`, `corvid_configure_notifications` |
 | **Reputation** | `corvid_check_reputation`, `corvid_check_health_trends`, `corvid_publish_attestation`, `corvid_verify_agent_reputation` |
-| **Code** | `corvid_code_symbols` (AST symbols), `corvid_find_references` (cross-file refs) |
-| **Admin** | `corvid_repo_blocklist` (manage off-limits repos) |
+| **Code** | `corvid_code_symbols`, `corvid_find_references` |
+| **Admin** | `corvid_repo_blocklist` |
 | **Session** | `corvid_extend_timeout` |
 
-Tools are permission-scoped per agent via skill bundles and agent-level allowlists. Scheduler-blocked enforcement prevents unintended side effects from automated runs.
+### API
 
----
+~300 REST endpoints across 47 route modules. **[API Reference →](docs/api-reference.md)**
 
-## API
+Interactive explorer: `GET /api/docs` (Swagger UI) | OpenAPI spec: `GET /api/openapi.json`
 
-~300 REST endpoints and a WebSocket interface across 47 route modules.
+### Deployment
 
-**[API Reference](docs/api-reference.md)** — detailed docs with request/response examples for workflows, councils, marketplace, reputation, and billing.
+The `deploy/` directory includes: Dockerfile + docker-compose, systemd, macOS LaunchAgent, daemon scripts, nginx/caddy reverse proxy, Helm chart, and raw K8s manifests.
 
-**Interactive explorer:** `GET /api/docs` (Swagger UI) | **OpenAPI spec:** `GET /api/openapi.json`
+### Security
 
-| Group | Endpoints | Description |
-|-------|----------|-------------|
-| Agents | `GET/POST/PUT/DELETE /api/agents` | Agent CRUD with model, voice, and permission config |
-| Personas | `GET/PUT/DELETE /api/agents/:id/persona` | Character system — archetype, traits, voice style |
-| Skills | `/api/skill-bundles`, `/api/agents/:id/skills` | Composable tool + prompt bundles |
-| Sessions | `GET/POST/PUT/DELETE /api/sessions` | Session lifecycle and message history |
-| Councils | `/api/councils`, `/api/councils/:id/launch` | Multi-agent deliberation with stage tracking |
-| Workflows | `/api/workflows` | DAG orchestration with suspend/resume |
-| Schedules | `/api/schedules` | Cron/interval automation with approval |
-| Work Tasks | `/api/work-tasks` | Self-improvement task tracking |
-| Marketplace | `/api/marketplace` | Agent service listings, reviews, federation |
-| Webhooks | `/api/webhooks`, `POST /webhooks/github` | GitHub event-driven automation |
-| Mention Polling | `/api/mention-polling` | GitHub @mention polling configuration |
-| Reputation | `/api/reputation` | Trust scores, events, attestations |
-| Billing | `/api/billing` | Subscriptions, usage metering, invoices |
-| Sandbox | `/api/sandbox` | Container policies and allocation |
-| Dashboard | `/api/dashboard/summary` | Aggregated dashboard summary with activity feed |
-| Analytics | `/api/analytics` | Cost, token, and session statistics |
-| Audit | `/api/audit` | Immutable audit log queries |
-| Exam | `/api/exam` | Model examination and capability scoring |
-| MCP API | `/api/mcp` | Model Context Protocol endpoints |
-| MCP Servers | `/api/mcp-servers` | External MCP server configuration |
-| Providers | `/api/providers` | List LLM providers and models |
-| Ollama | `/api/ollama` | Ollama provider management and model pulls |
-| Plugins | `/api/plugins` | Plugin registry and capability management |
-| Permissions | `/api/permissions` | Capability broker — grant, revoke, and check agent tool access |
-| Allowlist | `/api/allowlist` | Address allowlist management |
-| Repo Blocklist | `/api/repo-blocklist` | Blocked repository management |
-| GitHub Allowlist | `/api/github-allowlist` | GitHub username allowlist management |
-| Projects | `/api/projects` | Project CRUD and filesystem browsing |
-| Tenants | `/api/tenants` | Multi-tenant registration and member management |
-| Auth Flow | `/api/auth` | Device authorization for CLI login |
-| Settings | `/api/settings` | Application settings and operational mode |
-| Performance | `/api/performance` | Performance snapshots, trends, and regression detection |
-| Usage | `/api/usage` | Schedule usage monitoring and anomaly detection |
-| Feedback | `/api/feedback` | PR outcome tracking and schedule learning |
-| System Logs | `/api/system-logs` | System log queries and credit history |
-| AlgoChat | `/api/algochat/status`, `/api/algochat/network`, `/api/algochat/psk-*` | Bridge status, network switching, PSK contacts and QR codes |
-| Wallets | `/api/wallets/summary`, `/api/wallets/:address/*` | External wallet summaries, messages, and credit grants |
-| Feed | `GET /api/feed/history` | Combined agent + AlgoChat message history |
-| Escalation | `/api/escalation-queue`, `/api/operational-mode` | Approval queue management and operational mode control |
-| Proposals | `/api/proposals` | Governance proposals with lifecycle transitions |
-| Onboarding | `GET /api/onboarding/status` | Onboarding status and checklist |
-| Slack | `POST /slack/events` | Slack event webhook endpoint |
-| Backup | `POST /api/backup` | Trigger database backup |
-| Self-Test | `POST /api/selftest/run` | Run self-test suite (unit/e2e/all) |
-| Health | `GET /api/health`, `/health/live`, `/health/ready` | Health check, liveness and readiness probes |
-| Flock Directory | `/api/flock-directory` | Cross-instance agent discovery, heartbeat, and search |
-| A2A | `/a2a/tasks/*`, `/.well-known/agent-card.json` | Google A2A protocol inbound tasks and Agent Card |
-| WebSocket | `WS /ws` | Real-time streaming and event subscriptions |
-
----
-
-## Testing
-
-```bash
-bun test              # ~8138 server tests (~110s)
-cd client && npx vitest run   # Angular component tests (~2s)
-bun run test:e2e      # 31 Playwright spec files, 360 tests
-bun run spec:check    # Validate all module specs in specs/
-```
-
-**8,138 unit tests** covering: API routes, audit logging, authentication, bash security, billing, CLI, credit system, crypto, database migrations, Discord bridge, feedback loop, GitHub tools, health monitoring, marketplace, MCP tool handlers, notifications, multi-model routing, multi-tenant isolation, observability, owner communication, performance metrics, personas, plugins, process lifecycle, rate limiting, reputation, sandbox isolation, scheduling, skill bundles, Slack bridge, Telegram bridge, tenant isolation, usage monitoring, validation, voice TTS/STT, wallet keystore, web search, workflows, work tasks, and Angular components.
-
-**360 E2E tests** across 31 Playwright spec files covering 198/202 testable API endpoints and all 37 Angular UI routes.
-
-**158 module specs** in `specs/` with automated validation via specsync — checks YAML frontmatter, required sections, API surface coverage (exported symbols vs documented), file existence, database table references, and dependency graph integrity. 100% file coverage (416/416 files) enforced in CI via `--require-coverage 100`.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Runtime | [Bun](https://bun.sh) — server, package manager, test runner, bundler |
-| Frontend | [Angular 21](https://angular.dev) — standalone components, signals, responsive mobile UI |
-| Database | [SQLite](https://bun.sh/docs/api/sqlite) — WAL mode, FTS5, 16 migrations |
-| Agent SDK | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) |
-| Local Models | [Ollama](https://ollama.com) — Qwen, Llama, etc. |
-| Voice | [OpenAI TTS/Whisper](https://platform.openai.com/docs/guides/text-to-speech) — 6 voice presets, STT transcription |
-| Blockchain | [Algorand](https://algorand.co) — on-chain identity and messaging |
-| Tools | [MCP SDK](https://github.com/modelcontextprotocol/sdk) |
-| Observability | [OpenTelemetry](https://opentelemetry.io) — tracing, Prometheus metrics |
-| Validation | [Zod](https://zod.dev) — runtime schema validation |
-
----
-
-## Security
-
-- **Authentication** — API key required on non-localhost; WebSocket auth enforced
-- **Encryption** — AES-256-GCM for wallets and memory; X25519 for on-chain messaging
-- **File protection** — agents cannot modify security-critical files (enforced at runtime)
-- **Bash validation** — dangerous commands blocked before execution
-- **Environment isolation** — agent subprocesses receive only safe environment variables
-- **Rate limiting** — per-IP sliding window (600 GET/min, 60 mutation/min)
-- **Spending limits** — daily ALGO cap, per-message cost check, credit gating
-- **Bridge authorization** — Telegram user allowlist, Discord channel restriction
-- **Audit logging** — immutable, insert-only log with trace IDs
-- **Startup validation** — server refuses to start without API key on non-localhost bind
-- **Prompt injection detection** — multi-layer scanner with encoding attack detection
-- **Multi-tenant isolation** — DB filter runtime guards, API key authority over headers, tenant-scoped WebSocket broadcasts
-- **Social engineering protection** — detects manipulation attempts in issue/PR comments
-- **Malicious code scanning** — unified CI security gate with `bun run security:scan`
+API key auth, AES-256-GCM encryption, file protection, bash validation, env isolation, rate limiting, spending limits, bridge authorization, audit logging, prompt injection detection, multi-tenant isolation, social engineering protection, malicious code scanning.
 
 See [SECURITY.md](SECURITY.md) for the full security model and responsible disclosure.
 
----
+### Testing
 
-## Deployment
+```bash
+bun test              # ~8138 server tests
+cd client && npx vitest run   # Angular component tests
+bun run test:e2e      # 360 Playwright tests
+bun run spec:check    # Module spec validation
+```
 
-The `deploy/` directory includes production configurations:
+### Environment Variables
 
-- `Dockerfile` + `docker-compose.yml` — multi-stage build, non-root container
-- `corvid-agent.service` — systemd unit for Linux
-- `com.corvidlabs.corvid-agent.plist` — macOS LaunchAgent
-- `daemon.sh` — cross-platform daemon installer
-- `run-loop.sh` — auto-restart wrapper with update support
-- `nginx/` + `caddy/` — reverse proxy with TLS termination
-- `helm/` — Helm chart for Kubernetes deployment
-- `k8s/` — raw Kubernetes manifests (configmap, ingress, service, statefulset)
+See [`.env.example`](.env.example) for the full list. The minimum you need:
 
----
+```bash
+ANTHROPIC_API_KEY=sk-ant-...          # or use Claude Code CLI (no key needed)
+```
 
-## Environment Variables
+Everything else is optional.
 
-| Variable | Description | Default |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key (not needed if Claude Code CLI is installed) | — |
-| `ALGOCHAT_MNEMONIC` | 25-word Algorand account mnemonic | — |
-| `ALGORAND_NETWORK` | Network: `localnet`, `testnet`, `mainnet` | `localnet` |
-| `PORT` | HTTP server port | `3000` |
-| `BIND_HOST` | Bind address | `127.0.0.1` |
-| `API_KEY` | Bearer token for auth (required on non-localhost) | — |
-| `OLLAMA_HOST` | Ollama API base URL | `http://localhost:11434` |
-| `GH_TOKEN` | GitHub token for work tasks and PRs | — |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token (enables bridge + notifications) | — |
-| `TELEGRAM_CHAT_ID` | Telegram chat ID for the bridge | — |
-| `TELEGRAM_ALLOWED_USER_IDS` | Comma-separated authorized Telegram user IDs | — |
-| `DISCORD_BOT_TOKEN` | Discord bot token (enables bridge) | — |
-| `DISCORD_CHANNEL_ID` | Discord channel ID to listen in | — |
-| `SLACK_BOT_TOKEN` | Slack bot token (enables bridge + notifications) | — |
-| `SLACK_CHANNEL_ID` | Slack channel ID for the bridge | — |
-| `SLACK_SIGNING_SECRET` | Slack signing secret for event verification | — |
-| `OPENAI_API_KEY` | OpenAI key for voice TTS/STT | — |
-| `BRAVE_API_KEY` | Brave Search API key | — |
-| `LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
-
-See `.env.example` for the full list of 30+ options including wallet encryption, ALGO spending caps, scheduler config, and CORS settings.
+</details>
 
 ---
 
 ## Built by corvid-agent
 
-These apps were designed, coded, tested, and deployed autonomously by corvid-agent — no human-written application code. Each is an Angular 21 standalone app hosted on GitHub Pages.
+These apps were designed, coded, tested, and deployed autonomously — no human-written application code:
 
-**Ecosystem landing page:** [corvid-agent.github.io](https://corvid-agent.github.io)
+| App | Description |
+|-----|-------------|
+| [weather-dashboard](https://corvid-agent.github.io/weather-dashboard/) | Forecasts, hourly/daily charts, air quality, UV meter |
+| [bw-cinema](https://corvid-agent.github.io/bw-cinema/) | Classic black-and-white film browser with streaming |
+| [space-dashboard](https://corvid-agent.github.io/space-dashboard/) | NASA APOD, Mars rover photos, ISS tracker |
+| [pd-gallery](https://corvid-agent.github.io/pd-gallery/) | 130k+ public domain artworks |
+| [pd-audiobooks](https://corvid-agent.github.io/pd-audiobooks/) | Public domain audiobook player |
+| [poetry-atlas](https://corvid-agent.github.io/poetry-atlas/) | 129 poets, search, favorites, discovery |
+| [quake-tracker](https://corvid-agent.github.io/quake-tracker/) | Real-time earthquake dashboard |
+| [pd-music](https://corvid-agent.github.io/pd-music/) | Public domain music explorer with streaming |
+| [pixel-forge](https://corvid-agent.github.io/pixel-forge/) | Pixel art editor with tools and gallery |
 
-| App | API | Description |
-|-----|-----|-------------|
-| [weather-dashboard](https://corvid-agent.github.io/weather-dashboard/) | Open-Meteo | Forecasts, hourly/daily charts, air quality, UV meter, wind compass, astronomy |
-| [bw-cinema](https://corvid-agent.github.io/bw-cinema/) | TMDb + Internet Archive | Classic black-and-white film browser with search, favorites, and streaming |
-| [space-dashboard](https://corvid-agent.github.io/space-dashboard/) | NASA | APOD gallery, Mars rover photos, ISS tracker, near-Earth objects |
-| [pd-gallery](https://corvid-agent.github.io/pd-gallery/) | Art Institute of Chicago | 130k+ public domain artworks with collections and genre browsing |
-| [pd-audiobooks](https://corvid-agent.github.io/pd-audiobooks/) | LibriVox | Public domain audiobook player with chapter navigation and reading lists |
-| [poetry-atlas](https://corvid-agent.github.io/poetry-atlas/) | PoetryDB | Classic poetry explorer with 129 poets, search, favorites, and discovery |
-| [quake-tracker](https://corvid-agent.github.io/quake-tracker/) | USGS | Real-time earthquake dashboard with magnitude filtering and seismic analytics |
-| [pd-music](https://corvid-agent.github.io/pd-music/) | MusicBrainz + Internet Archive | Public domain music explorer with streaming and curated collections |
-| [pixel-forge](https://corvid-agent.github.io/pixel-forge/) | Canvas API | Pixel art editor with drawing tools, palette presets, and gallery |
+[See all apps →](https://corvid-agent.github.io)
 
 ---
+
+## Contributing
+
+This project is built and maintained by an AI agent and a small team. We're open source because AI agents should be owned by the people who run them.
+
+- **[Good first issues](https://github.com/CorvidLabs/corvid-agent/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — bite-sized tasks, most under an hour
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup takes ~2 minutes
+- **[Discussions](https://github.com/CorvidLabs/corvid-agent/discussions)** — questions, ideas, feedback
 
 ## Key Files
 
 - [`CLAUDE.md`](CLAUDE.md) — Agent instructions for working on this repo
-- [`VISION.md`](VISION.md) — Project manifesto and long-term direction
-- [`.env.example`](.env.example) — All configuration options with descriptions
+- [`VISION.md`](VISION.md) — Project manifesto and roadmap
+- [`.env.example`](.env.example) — All configuration options
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Development setup and guidelines
 - [`SECURITY.md`](SECURITY.md) — Responsible disclosure policy
-
----
-
-## Contributors Welcome
-
-This project is built and maintained by an AI agent (that's me, corvid-agent) and a small team. We're open source because we believe AI agents should be owned by the people who run them, not locked behind vendor platforms.
-
-**We need contributors.** Not just code — ideas, bug reports, docs, and feedback all matter. If you've ever wanted to work on a real AI agent platform, this is your chance to shape one from the ground up.
-
-### How to get involved
-
-- **Browse [good first issues](https://github.com/CorvidLabs/corvid-agent/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — bite-sized tasks with clear instructions, most under an hour
-- **Read [CONTRIBUTING.md](CONTRIBUTING.md)** — setup takes ~2 minutes with the dev script
-- **Open a discussion** — questions, ideas, and feedback are welcome in [Discussions](https://github.com/CorvidLabs/corvid-agent/discussions)
-- **Report bugs** — if something doesn't work, [tell us](https://github.com/CorvidLabs/corvid-agent/issues/new?template=bug_report.md)
-
-No contribution is too small. Fixing a typo, improving an error message, or adding a test — it all helps.
-
-### What makes this project different
-
-You'd be contributing to a platform where AI agents autonomously write code, review PRs, and coordinate with each other on-chain. The codebase has 8,100+ tests, 16 database migrations, and runs in production. It's real, it works, and there's plenty of interesting work to do.
-
-See the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards.
 
 ## License
 

@@ -1,251 +1,194 @@
-# Quickstart: Your First Agent in 5 Minutes
+# Get Started with corvid-agent
 
-Get corvid-agent running and have an AI agent open a real PR on a test repo.
-
----
-
-## Choose your path
-
-| I want to... | Command | Time | API keys needed? |
-|--------------|---------|------|-----------------|
-| **Try it instantly** | `git clone && bun run try` | 30 sec | No |
-| **See a CLI demo** | `corvid-agent demo` | 1 min | No |
-| **Set up for real** | `corvid-agent init` | 5 min | Yes |
-
-**New here?** Start with `bun run try` — it launches a sandbox with an in-memory database, a pre-created agent, and the dashboard. No `.env` or API keys needed. When you're ready for the real thing, come back to step 1 below.
+You're about to get your own AI developer. Here's how.
 
 ---
 
-## 1. Install and start (2 minutes)
+## The fastest way (30 seconds)
+
+Copy and paste this into your terminal:
 
 ```bash
-git clone https://github.com/CorvidLabs/corvid-agent.git
-cd corvid-agent
-corvid-agent init       # guided setup: env, deps, first agent
-bun run dev
+curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/scripts/install.sh | bash
 ```
 
-The `init` command checks prerequisites (Bun 1.3+, Git), creates `.env`, prompts for API keys, installs dependencies, builds the dashboard, and creates your first agent.
+The installer will:
+1. Check your system and install anything missing
+2. Ask you one question: which AI provider to use
+3. Start the server and open the dashboard in your browser
 
-For non-interactive setup: `corvid-agent init --yes` (auto-detects Claude CLI / Ollama).
+**That's it.** You're ready to use your agent.
 
-For MCP + Agent Skills (Claude Code / Cursor / Copilot): `corvid-agent init --mcp`.
-
-Open **http://localhost:3000** — you should see the dashboard.
-
-### System requirements
-
-See the [System Requirements](system-requirements.md) guide for detailed hardware tiers. In short: 8 GB RAM minimum (CLI + Claude API only), 16 GB recommended (agent + IDE), 32 GB for the full stack with Docker.
-
-### What you need
-
-| Mode | What to set | What you get |
-|------|-------------|--------------|
-| **Claude** (recommended) | `ANTHROPIC_API_KEY=sk-ant-...` in `.env` | Full agent capabilities, tool use, PRs |
-| **Claude Code CLI** | Install [Claude Code](https://claude.com/claude-code) | Uses your existing subscription, no API key needed |
-| **Local only** | Install [Ollama](https://ollama.com) + pull a model 8B+ | Free, private, no API keys — but slower and less capable |
-
-Pick one. You can always add more later.
+> **Don't have a terminal open?** On Mac, press `Cmd + Space`, type "Terminal", and hit Enter. On Windows, use WSL2 ([install guide](https://learn.microsoft.com/en-us/windows/wsl/install)).
 
 ---
 
-## 2. Create your first agent (1 minute)
+## Choose your AI provider
 
-Open the dashboard at **http://localhost:3000** and click **Agents** in the sidebar.
+Your agent needs an AI brain. Pick one:
 
-Or use the API:
+| Option | Cost | Setup |
+|--------|------|-------|
+| **Claude API key** (recommended) | ~$3/hr of heavy use | Sign up at [console.anthropic.com](https://console.anthropic.com), copy your key |
+| **Claude Code CLI** | Uses your existing Claude subscription | Install [Claude Code](https://claude.com/claude-code), no extra key needed |
+| **Ollama** (free, local) | Free | Install [Ollama](https://ollama.com), then `ollama pull qwen2.5-coder:14b` |
 
-```bash
-curl -X POST http://localhost:3000/api/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-first-agent",
-    "model": "claude-sonnet-4-20250514",
-    "systemPrompt": "You are a helpful development agent. You write clean code, add tests, and explain your changes."
-  }'
-```
-
-Save the `id` from the response — you'll need it next.
+The installer asks which one you want. You can always change later by editing the `.env` file.
 
 ---
 
-## 3. Start a session and chat (1 minute)
+## Your first project
 
-```bash
-# Replace AGENT_ID with the id from step 2
-curl -X POST http://localhost:3000/api/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agentId": "AGENT_ID",
-    "workingDir": "/tmp/test-project"
-  }'
-```
+Once the dashboard opens at `http://localhost:3000`:
 
-Now open the dashboard — your session appears under **Sessions**. Click it to chat in real time.
+1. **Click "Agents"** in the sidebar — you'll see your default agent
+2. **Start a session** — click the agent, then "New Session"
+3. **Tell it what to build** — type something like:
 
-Or resume the session with a follow-up prompt via API:
+> "Create a personal portfolio website with my name, a bio section, and links to my social media"
 
-```bash
-# Replace SESSION_ID with the id from the session response
-curl -X POST http://localhost:3000/api/sessions/SESSION_ID/resume \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Create a simple TypeScript hello world project with a test file"}'
-```
+Watch it work in real time — it writes files, runs commands, and shows you everything it's doing.
 
-Watch the agent work in the dashboard — it reads files, writes code, and runs commands.
+### More ideas to try
+
+- "Build a todo list app with local storage"
+- "Create a countdown timer to New Year's Eve"
+- "Make a recipe organizer where I can save and search recipes"
+- "Build a habit tracker that shows streaks"
+- "Create a budget calculator with charts"
+
+You describe it, the agent builds it.
 
 ---
 
-## 4. Have the agent open a PR (1 minute)
+## Connect GitHub (optional)
 
-For this you need a `GH_TOKEN` in your `.env` with repo access. Then:
+If you want the agent to open pull requests on your repositories:
 
-```bash
-curl -X POST http://localhost:3000/api/sessions/SESSION_ID/resume \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Create a new branch, commit your changes, and open a PR on my-username/my-test-repo"}'
-```
+1. Create a [GitHub personal access token](https://github.com/settings/tokens/new) with `repo` scope
+2. Add it to your `.env` file: `GH_TOKEN=ghp_your_token_here`
+3. Restart the server: `Ctrl+C` then `bun run dev`
 
-The agent will:
-1. Create a branch
-2. Commit its changes
-3. Push to GitHub
-4. Open a PR with a description of what it did
-
-That's it. You have a working AI development agent.
+Now you can say things like:
+- "Review the open pull requests on my-org/my-repo"
+- "Fix issue #42 on my-org/my-repo and open a PR"
+- "Write tests for the untested files in my-org/my-repo"
 
 ---
 
-## 5. What to try next
+## Talk to your agent from your phone
 
-### Give it a personality
+### Telegram
+1. Create a bot with [@BotFather](https://t.me/botfather) on Telegram
+2. Add to `.env`:
+   ```
+   TELEGRAM_BOT_TOKEN=your-bot-token
+   TELEGRAM_ALLOWED_USER_IDS=your-telegram-id
+   ```
+3. Restart the server
 
-```bash
-curl -X PUT http://localhost:3000/api/agents/AGENT_ID/persona \
-  -H "Content-Type: application/json" \
-  -d '{
-    "archetype": "Senior Engineer",
-    "traits": ["thorough", "opinionated", "concise"],
-    "voiceGuidelines": "Be direct. No fluff. Code speaks."
-  }'
-```
+### Discord
+1. Create a bot at [discord.com/developers](https://discord.com/developers/applications)
+2. Add to `.env`:
+   ```
+   DISCORD_BOT_TOKEN=your-bot-token
+   DISCORD_CHANNEL_ID=your-channel-id
+   ```
+3. Restart the server
 
-### Assign a skill bundle
+### Slack
+1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)
+2. Add to `.env`:
+   ```
+   SLACK_BOT_TOKEN=xoxb-your-bot-token
+   SLACK_CHANNEL_ID=your-channel-id
+   ```
+3. Restart the server
 
-Skill bundles filter which tools an agent can use and add role-specific prompts.
+---
 
-```bash
-# List available presets
-curl http://localhost:3000/api/skill-bundles
-
-# Assign "Code Reviewer" to your agent
-curl -X POST http://localhost:3000/api/agents/AGENT_ID/skills \
-  -H "Content-Type: application/json" \
-  -d '{"bundleId": "BUNDLE_ID"}'
-```
-
-### Set up a schedule
-
-Have the agent run automatically:
-
-```bash
-curl -X POST http://localhost:3000/api/schedules \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agentId": "AGENT_ID",
-    "name": "morning-review",
-    "cronExpression": "0 9 * * *",
-    "actions": [{"type": "custom", "prompt": "Review open PRs on my-org/my-repo and leave constructive feedback"}],
-    "approvalPolicy": "auto"
-  }'
-```
-
-### Connect Telegram or Discord
-
-Add to `.env` and restart:
+## Use it from the command line
 
 ```bash
-# Telegram — talk to your agent from your phone
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TELEGRAM_ALLOWED_USER_IDS=your-telegram-user-id
-
-# Discord — talk to your agent from Discord
-DISCORD_BOT_TOKEN=your-bot-token
-DISCORD_CHANNEL_ID=your-channel-id
-```
-
-### Enable on-chain identity (AlgoChat)
-
-Give your agent a verifiable identity on Algorand:
-
-```bash
-ALGOCHAT_MNEMONIC=your 25 word mnemonic here
-ALGORAND_NETWORK=localnet   # localnet for local dev (free, instant)
-```
-
-For local development, start Algorand localnet first: `algokit localnet start` (requires Docker).
-
-See [testnet-onboarding.md](testnet-onboarding.md) for multi-machine / testnet setup.
-
-### Use the CLI
-
-```bash
-# Interactive REPL
+# Interactive chat
 corvid-agent
 
 # One-shot command
 corvid-agent chat "What open issues need attention on my-org/my-repo?"
+
+# Check server status
+corvid-agent status
 ```
+
+---
+
+## Use it in your AI editor
+
+If you use Claude Code, Cursor, or GitHub Copilot:
+
+```bash
+corvid-agent init --mcp
+```
+
+This adds corvid-agent's 46 tools to your editor. Your AI assistant can then manage agents, create work tasks, and more — right from your IDE.
+
+---
+
+## Set up automated schedules
+
+Have your agent work on its own:
+
+1. Go to **Schedules** in the dashboard
+2. Click **New Schedule**
+3. Set a cron expression (e.g., `0 9 * * *` for every day at 9am)
+4. Write the prompt: "Review open PRs on my-org/my-repo and leave feedback"
+5. Choose an approval policy: **auto** (runs immediately) or **manual** (you approve first)
 
 ---
 
 ## Troubleshooting
 
+### "Command not found" when running the installer
+Make sure you have a terminal open. On Mac: `Cmd + Space` → "Terminal". On Windows, use WSL2.
+
 ### Server won't start
-- Check `bun --version` is 1.3+
-- Check `.env` exists (copy from `.env.example`)
+- Check `bun --version` — needs 1.3 or higher
 - Check port 3000 isn't already in use: `lsof -i :3000`
+- Check the terminal output for error messages
 
 ### Agent doesn't respond
-- Check logs: the terminal running `bun run dev` shows all activity
-- Verify your API key: `curl -s https://api.anthropic.com/v1/messages -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01"` should not return 401
-- For Ollama: verify it's running (`curl http://localhost:11434/api/tags`) and you have a model 8B+
-
-### PR creation fails
-- Verify `GH_TOKEN` has `repo` scope
-- Verify `gh auth status` works
-- The agent needs push access to the target repo
+- Check the terminal running the server for error messages
+- Make sure your API key is valid (check `.env`)
+- For Ollama: make sure it's running (`ollama list`)
 
 ### Dashboard is blank
 - Rebuild: `bun run build:client`
-- Check browser console for errors
+- Check your browser's developer console (F12) for errors
+
+### Need more help?
+- [Open a discussion](https://github.com/CorvidLabs/corvid-agent/discussions)
+- [Report a bug](https://github.com/CorvidLabs/corvid-agent/issues/new)
 
 ---
 
-## Architecture at a glance
+## What's next?
 
-```
-You (browser/Telegram/Discord/CLI)
-  |
-  v
-corvid-agent server (Bun, port 3000)
-  |-- Dashboard (Angular 21)
-  |-- REST API + WebSocket
-  |-- Agent sessions (Claude SDK / Ollama)
-  |-- 46 MCP tools (GitHub, memory, messaging, code analysis, ...)
-  |-- SQLite database (sessions, agents, schedules, wallets, ...)
-  |-- AlgoChat (optional on-chain messaging via Algorand)
-```
-
-Everything runs locally. No cloud dependencies except the AI provider you choose.
+- **[Use cases](use-cases.md)** — detailed examples for PR review, CI fixes, test generation
+- **[How it works](how-it-works.md)** — under the hood
+- **[Self-hosting guide](self-hosting.md)** — production deployment with Docker, TLS
+- **[API reference](api-reference.md)** — for developers building on top of corvid-agent
 
 ---
 
-## Further reading
+## Quick reference
 
-- [How It Works](how-it-works.md) — the agent execution loop explained
-- [Use Cases](use-cases.md) — practical examples: PR reviews, CI fixes, test generation, and more
-- [Self-Hosting Guide](self-hosting.md) — production deployment with Docker, systemd, TLS
-- [Testnet Onboarding](testnet-onboarding.md) — multi-tenant mode and AlgoChat setup
-- [VISION.md](../VISION.md) — project manifesto and roadmap
-- [CONTRIBUTING.md](../CONTRIBUTING.md) — development workflow
+| Command | What it does |
+|---------|-------------|
+| `curl ... \| bash` | Install everything from scratch |
+| `bun run dev` | Start the server |
+| `bun run try` | Try it without any setup (sandbox mode) |
+| `corvid-agent` | Interactive terminal chat |
+| `corvid-agent init` | Guided setup wizard |
+| `corvid-agent init --mcp` | Add tools to your AI editor |
+| `corvid-agent demo` | Quick demo |
+| `corvid-agent status` | Check if server is running |

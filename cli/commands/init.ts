@@ -704,17 +704,21 @@ async function runRemainingSteps(
 
     // ── Done ──
     console.log(`
-${c.bold}${c.green('Setup complete!')}${c.reset}
+${c.bold}${c.green('Setup complete!')}${c.reset} Your AI developer is ready.
 
-${c.bold}Next steps:${c.reset}
-  ${c.cyan('bun run dev')}          Start the development server
-  ${c.cyan('bun run try')}          Try sandbox mode (no config needed)
-  ${c.cyan('corvid-agent')}         Launch the interactive CLI
-  ${c.cyan('corvid-agent demo')}    Run a self-contained demo
+${c.bold}Start it up:${c.reset}
+  ${c.cyan('bun run dev')}          Start the server and open the dashboard
 
-${c.bold}Use with AI editors:${c.reset}
-  ${c.cyan('corvid-agent init --mcp')}   Add MCP tools + Agent Skills to Claude Code, Cursor, Copilot, etc.
+${c.bold}Then tell it what to build:${c.reset}
+  ${c.gray('"Build me a personal portfolio website"')}
+  ${c.gray('"Create a weather dashboard"')}
+  ${c.gray('"Make a todo list app"')}
 
-${c.gray('Docs: docs/quickstart.md  •  Dashboard: http://127.0.0.1:3000')}
+${c.bold}Other ways to use it:${c.reset}
+  ${c.cyan('corvid-agent')}                Interactive terminal chat
+  ${c.cyan('corvid-agent init --mcp')}     Add tools to your AI editor (Claude Code, Cursor, etc.)
+  ${c.cyan('bun run try')}                 Try sandbox mode (no API key needed)
+
+${c.gray('Docs: docs/quickstart.md  •  Ideas: docs/project-ideas.md  •  Dashboard: http://127.0.0.1:3000')}
 `);
 }
