@@ -95,6 +95,12 @@ function createMockDeps(overrides: Partial<AlgoChatInitDeps> = {}): AlgoChatInit
         } as any,
         memorySyncService: {
             setServices: mock(() => {}),
+            setWalletService: mock(() => {}),
+            start: mock(() => {}),
+        } as any,
+        graduationService: {
+            setServices: mock(() => {}),
+            setWalletService: mock(() => {}),
             start: mock(() => {}),
         } as any,
         responsePollingService: {

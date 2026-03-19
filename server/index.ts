@@ -74,6 +74,7 @@ const {
     algochatConfig,
     algochatState,
     memorySyncService,
+    graduationService,
     selfTestService,
     workTaskService,
     taskQueueService,
@@ -110,8 +111,8 @@ const algochatInitDeps: AlgoChatInitDeps = {
     workTaskService, schedulerService, workflowService, notificationService,
     questionDispatcher, reputationScorer, reputationAttestation, reputationVerifier,
     astParserService, permissionBroker, shutdownCoordinator, memorySyncService,
-    responsePollingService, usageMeter, healthMonitorService, mentionPollingService,
-    flockDirectoryService,
+    graduationService, responsePollingService, usageMeter, healthMonitorService,
+    mentionPollingService, flockDirectoryService,
 };
 
 async function switchNetwork(network: 'testnet' | 'mainnet'): Promise<void> {
@@ -366,7 +367,7 @@ const server = Bun.serve<WsData>({
             if (ollamaResponse) return instrumentResponse(ollamaResponse, '/api/ollama');
 
             // API routes
-            const apiResponse = await handleRequest(req, db, processManager, algochatState.bridge, algochatState.walletService, algochatState.messenger, workTaskService, selfTestService, algochatState.directory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService, flockDirectoryService, () => discordBridge?.updateSlashCommands());
+            const apiResponse = await handleRequest(req, db, processManager, algochatState.bridge, algochatState.walletService, algochatState.messenger, workTaskService, selfTestService, algochatState.directory, switchNetwork, schedulerService, webhookService, mentionPollingService, workflowService, sandboxManager, marketplaceService, marketplaceFederation, reputationScorer, reputationAttestation, billingService, usageMeter, tenantService, performanceCollector, outcomeTrackerService, flockDirectoryService, () => discordBridge?.updateSlashCommands(), graduationService);
             if (apiResponse) {
                 // Normalize route for metrics (strip IDs for cardinality control)
                 const route = url.pathname.replace(/\/[0-9a-f-]{8,}/gi, '/:id');

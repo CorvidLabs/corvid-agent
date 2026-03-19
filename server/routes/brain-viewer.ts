@@ -11,8 +11,15 @@
 
 import type { Database } from 'bun:sqlite';
 import type { RequestContext } from '../middleware/guards';
+import type { MemoryGraduationService } from '../memory/graduation-service';
 import { json, badRequest, notFound, safeNumParam, handleRouteError } from '../lib/response';
 import { computeDecayMultiplier } from '../memory/decay';
+import {
+    listObservations,
+    countObservations,
+    boostObservation,
+    getObservation,
+} from '../db/observations';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +31,7 @@ interface MemoryRow {
     key: string;
     content: string;
     txid: string | null;
+    asa_id: number | null;
     status: string;
     created_at: string;
     updated_at: string;
@@ -69,8 +77,16 @@ interface FailedMemoryRow {
 
 // ─── Tier derivation ────────────────────────────────────────────────────────
 
+type StorageType = 'arc69' | 'plain-txn' | 'pending';
+
 function deriveTier(status: string, txid: string | null): MemoryTier {
     return status === 'confirmed' && txid !== null ? 'longterm' : 'shortterm';
+}
+
+function deriveStorageType(status: string, txid: string | null, asaId: number | null): StorageType {
+    if (asaId !== null) return 'arc69';
+    if (txid !== null && status === 'confirmed') return 'plain-txn';
+    return 'pending';
 }
 
 // ─── Route handler ──────────────────────────────────────────────────────────
@@ -84,12 +100,45 @@ export function handleBrainViewerRoutes(
     url: URL,
     db: Database,
     _context?: RequestContext,
-): Response | null {
-    if (!url.pathname.startsWith(MEMORIES_PREFIX) || req.method !== 'GET') {
+    graduationService?: MemoryGraduationService | null,
+): Response | null | Promise<Response | null> {
+    if (!url.pathname.startsWith(MEMORIES_PREFIX)) {
+        return null;
+    }
+
+    // Only allow GET and POST
+    if (req.method !== 'GET' && req.method !== 'POST') {
         return null;
     }
 
     try {
+        // ─── Observation routes ─────────────────────────────────────────
+
+        // GET /api/dashboard/memories/observations
+        if (url.pathname === `${MEMORIES_PREFIX}/observations` && req.method === 'GET') {
+            return handleObservationList(url, db);
+        }
+
+        // GET /api/dashboard/memories/observations/stats
+        if (url.pathname === `${MEMORIES_PREFIX}/observations/stats` && req.method === 'GET') {
+            return handleObservationStats(url, db);
+        }
+
+        // POST /api/dashboard/memories/observations/:id/graduate
+        const graduateMatch = url.pathname.match(/^\/api\/dashboard\/memories\/observations\/([^/]+)\/graduate$/);
+        if (graduateMatch && req.method === 'POST') {
+            return handleForceGraduate(graduateMatch[1], db, graduationService ?? null);
+        }
+
+        // POST /api/dashboard/memories/observations/:id/boost
+        const boostMatch = url.pathname.match(/^\/api\/dashboard\/memories\/observations\/([^/]+)\/boost$/);
+        if (boostMatch && req.method === 'POST') {
+            return handleBoostObservation(boostMatch[1], db);
+        }
+
+        // GET-only routes below
+        if (req.method !== 'GET') return null;
+
         // /api/dashboard/memories/sync-status
         if (url.pathname === `${MEMORIES_PREFIX}/sync-status`) {
             return handleSyncStatus(url, db);
@@ -102,7 +151,7 @@ export function handleBrainViewerRoutes(
 
         // /api/dashboard/memories/:id
         const idMatch = url.pathname.match(/^\/api\/dashboard\/memories\/([^/]+)$/);
-        if (idMatch && idMatch[1] !== 'stats' && idMatch[1] !== 'sync-status') {
+        if (idMatch && idMatch[1] !== 'stats' && idMatch[1] !== 'sync-status' && idMatch[1] !== 'observations') {
             return handleMemoryDetail(idMatch[1], db);
         }
 
@@ -472,6 +521,156 @@ function handleSyncStatus(url: URL, db: Database): Response {
     });
 }
 
+// ─── GET /api/dashboard/memories/observations ────────────────────────────────
+
+function handleObservationList(url: URL, db: Database): Response {
+    const agentId = url.searchParams.get('agentId') ?? undefined;
+    const status = url.searchParams.get('status') as 'active' | 'graduated' | 'expired' | 'dismissed' | null;
+    const limit = Math.min(safeNumParam(url.searchParams.get('limit'), DEFAULT_LIMIT), MAX_LIMIT);
+
+    if (!agentId) {
+        // List observations across all agents
+        const conditions: string[] = [];
+        const bindings: (string | number)[] = [];
+
+        if (status) {
+            conditions.push('status = ?');
+            bindings.push(status);
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        bindings.push(limit);
+
+        const rows = db.query(
+            `SELECT * FROM memory_observations ${whereClause}
+             ORDER BY relevance_score DESC, created_at DESC
+             LIMIT ?`,
+        ).all(...bindings) as Array<Record<string, unknown>>;
+
+        const totalRow = db.query(
+            `SELECT COUNT(*) as count FROM memory_observations ${whereClause}`,
+        ).get(...bindings.slice(0, -1)) as CountRow;
+
+        return json({
+            observations: rows.map(formatObservationRow),
+            total: totalRow?.count ?? rows.length,
+        });
+    }
+
+    const observations = listObservations(db, agentId, {
+        status: status ?? undefined,
+        limit,
+    });
+
+    return json({ observations, total: observations.length });
+}
+
+// ─── GET /api/dashboard/memories/observations/stats ──────────────────────────
+
+function handleObservationStats(url: URL, db: Database): Response {
+    const agentId = url.searchParams.get('agentId') ?? undefined;
+
+    if (agentId) {
+        const counts = countObservations(db, agentId);
+        return json({ agents: [{ agentId, ...counts }] });
+    }
+
+    // All agents
+    const agentRows = db.query(
+        `SELECT DISTINCT agent_id FROM memory_observations`,
+    ).all() as { agent_id: string }[];
+
+    const agents = agentRows.map(({ agent_id }) => ({
+        agentId: agent_id,
+        ...countObservations(db, agent_id),
+    }));
+
+    // Totals
+    const totalRow = db.query(
+        `SELECT COUNT(*) as count FROM memory_observations WHERE status = 'active'`,
+    ).get() as CountRow;
+
+    const graduationCandidateRow = db.query(
+        `SELECT COUNT(*) as count FROM memory_observations
+         WHERE status = 'active' AND relevance_score >= 3.0 AND access_count >= 2`,
+    ).get() as CountRow;
+
+    return json({
+        agents,
+        totalActive: totalRow?.count ?? 0,
+        graduationCandidates: graduationCandidateRow?.count ?? 0,
+    });
+}
+
+// ─── POST /api/dashboard/memories/observations/:id/graduate ──────────────────
+
+async function handleForceGraduate(
+    observationId: string,
+    db: Database,
+    graduationService: MemoryGraduationService | null,
+): Promise<Response> {
+    const obs = getObservation(db, observationId);
+    if (!obs) {
+        return notFound('Observation not found');
+    }
+    if (obs.status !== 'active') {
+        return badRequest(`Observation is already ${obs.status}`);
+    }
+
+    // Boost the observation to meet graduation criteria, then trigger a tick
+    boostObservation(db, observationId, Math.max(0, 3.0 - obs.relevanceScore));
+
+    // If we have access to the graduation service, force a tick to graduate immediately
+    if (graduationService) {
+        await graduationService.tick();
+    }
+
+    // Re-fetch to confirm graduation
+    const updated = getObservation(db, observationId);
+    return json({
+        success: updated?.status === 'graduated',
+        observation: updated,
+        message: updated?.status === 'graduated'
+            ? `Graduated as "${updated.graduatedKey}"`
+            : 'Observation boosted — will graduate on next tick',
+    });
+}
+
+// ─── POST /api/dashboard/memories/observations/:id/boost ─────────────────────
+
+function handleBoostObservation(observationId: string, db: Database): Response {
+    const obs = getObservation(db, observationId);
+    if (!obs) {
+        return notFound('Observation not found');
+    }
+    if (obs.status !== 'active') {
+        return badRequest(`Cannot boost — observation is ${obs.status}`);
+    }
+
+    boostObservation(db, observationId, 1.0);
+    const updated = getObservation(db, observationId);
+    return json({ observation: updated });
+}
+
+/** Format a raw observation row from a cross-agent query. */
+function formatObservationRow(row: Record<string, unknown>) {
+    return {
+        id: row.id,
+        agentId: row.agent_id,
+        source: row.source,
+        sourceId: row.source_id,
+        content: row.content,
+        suggestedKey: row.suggested_key,
+        relevanceScore: row.relevance_score,
+        accessCount: row.access_count,
+        lastAccessedAt: row.last_accessed_at,
+        status: row.status,
+        graduatedKey: row.graduated_key,
+        createdAt: row.created_at,
+        expiresAt: row.expires_at,
+    };
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -505,8 +704,10 @@ function enrichMemories(db: Database, rows: MemoryRow[]): Array<Record<string, u
             key: row.key,
             content: row.content,
             tier: deriveTier(row.status, row.txid),
+            storageType: deriveStorageType(row.status, row.txid, row.asa_id),
             status: row.status,
             txid: row.txid,
+            asaId: row.asa_id,
             category: cat?.category ?? null,
             categoryConfidence: cat?.confidence ?? null,
             decayScore: computeDecayMultiplier(row.updated_at, now),

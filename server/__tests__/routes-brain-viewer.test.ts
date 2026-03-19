@@ -11,6 +11,13 @@ function fakeReq(method: string, path: string): { req: Request; url: URL } {
     return { req: new Request(url.toString(), { method }), url };
 }
 
+/** Resolve the potentially-async result from handleBrainViewerRoutes */
+async function callRoutes(method: string, path: string): Promise<Response | null> {
+    const { req, url } = fakeReq(method, path);
+    const result = handleBrainViewerRoutes(req, url, db);
+    return result instanceof Promise ? await result : result;
+}
+
 const agentId1 = crypto.randomUUID();
 const agentId2 = crypto.randomUUID();
 const memoryIds = {
@@ -76,22 +83,19 @@ afterAll(() => db.close());
 describe('Brain Viewer Routes', () => {
     // ── Route matching ──────────────────────────────────────────────────
 
-    it('returns null for non-matching paths', () => {
-        const { req, url } = fakeReq('GET', '/api/other');
-        expect(handleBrainViewerRoutes(req, url, db)).toBeNull();
+    it('returns null for non-matching paths', async () => {
+        expect(await callRoutes('GET', '/api/other')).toBeNull();
     });
 
-    it('returns null for non-GET methods', () => {
-        const { req, url } = fakeReq('POST', '/api/dashboard/memories');
-        expect(handleBrainViewerRoutes(req, url, db)).toBeNull();
+    it('returns null for non-GET/POST methods', async () => {
+        expect(await callRoutes('PUT', '/api/dashboard/memories')).toBeNull();
     });
 
     // ── GET /api/dashboard/memories ─────────────────────────────────────
 
     describe('GET /api/dashboard/memories', () => {
         it('returns all memories with correct tier derivation', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}`);
             expect(res).not.toBeNull();
             expect(res!.status).toBe(200);
 
@@ -109,40 +113,35 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('filters by tier=longterm', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}&tier=longterm`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}&tier=longterm`);
             const data = await res!.json();
             expect(data.total).toBe(2);
             expect(data.entries.every((e: { tier: string }) => e.tier === 'longterm')).toBe(true);
         });
 
         it('filters by tier=shortterm', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}&tier=shortterm`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}&tier=shortterm`);
             const data = await res!.json();
             expect(data.total).toBe(3);
             expect(data.entries.every((e: { tier: string }) => e.tier === 'shortterm')).toBe(true);
         });
 
         it('filters by status', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}&status=pending`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}&status=pending`);
             const data = await res!.json();
             expect(data.total).toBe(2);
             expect(data.entries.every((e: { status: string }) => e.status === 'pending')).toBe(true);
         });
 
         it('filters by category', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}&category=config`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}&category=config`);
             const data = await res!.json();
             expect(data.total).toBe(1);
             expect(data.entries[0].category).toBe('config');
         });
 
         it('paginates correctly', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}&limit=2&offset=0`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}&limit=2&offset=0`);
             const data = await res!.json();
             expect(data.entries.length).toBe(2);
             expect(data.total).toBe(5);
@@ -151,36 +150,31 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('clamps limit to MAX_LIMIT (200)', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?limit=999`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?limit=999`);
             const data = await res!.json();
             expect(data.limit).toBe(200);
         });
 
         it('rejects invalid tier', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories?tier=invalid');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories?tier=invalid');
             expect(res!.status).toBe(400);
         });
 
         it('rejects invalid status', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories?status=bogus');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories?status=bogus');
             expect(res!.status).toBe(400);
         });
 
         it('returns empty array for agent with no memories', async () => {
             const noMemAgent = crypto.randomUUID();
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${noMemAgent}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${noMemAgent}`);
             const data = await res!.json();
             expect(data.entries).toEqual([]);
             expect(data.total).toBe(0);
         });
 
         it('enriches entries with category and decay score', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?agentId=${agentId1}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?agentId=${agentId1}`);
             const data = await res!.json();
 
             const configEntry = data.entries.find((e: { key: string }) => e.key === 'api-preferences');
@@ -197,8 +191,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('searches with LIKE fallback', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories?search=deploy`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories?search=deploy`);
             const data = await res!.json();
             expect(data.entries.length).toBeGreaterThanOrEqual(1);
             const keys = data.entries.map((e: { key: string }) => e.key);
@@ -206,8 +199,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('returns all agents memories when no agentId', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories');
             const data = await res!.json();
             // 5 from agent1 + 1 from agent2 = 6
             expect(data.total).toBe(6);
@@ -218,8 +210,7 @@ describe('Brain Viewer Routes', () => {
 
     describe('GET /api/dashboard/memories/stats', () => {
         it('returns aggregate stats across all agents', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories/stats');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories/stats');
             expect(res).not.toBeNull();
             expect(res!.status).toBe(200);
 
@@ -236,8 +227,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('returns per-agent breakdown', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories/stats');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories/stats');
             const data = await res!.json();
 
             expect(data.byAgent.length).toBe(2);
@@ -249,8 +239,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('returns category breakdown', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories/stats');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories/stats');
             const data = await res!.json();
 
             expect(data.byCategory.config).toBe(1);
@@ -259,8 +248,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('filters by agentId', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories/stats?agentId=${agentId1}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories/stats?agentId=${agentId1}`);
             const data = await res!.json();
 
             expect(data.totalMemories).toBe(5);
@@ -275,8 +263,7 @@ describe('Brain Viewer Routes', () => {
 
     describe('GET /api/dashboard/memories/:id', () => {
         it('returns a single memory with full metadata', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories/${memoryIds.confirmed1}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories/${memoryIds.confirmed1}`);
             expect(res).not.toBeNull();
             expect(res!.status).toBe(200);
 
@@ -284,6 +271,7 @@ describe('Brain Viewer Routes', () => {
             expect(data.id).toBe(memoryIds.confirmed1);
             expect(data.key).toBe('api-preferences');
             expect(data.tier).toBe('longterm');
+            expect(data.storageType).toBe('plain-txn');
             expect(data.status).toBe('confirmed');
             expect(data.txid).toBe('TXID_AAA');
             expect(data.category).toBe('config');
@@ -292,16 +280,15 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('returns 404 for nonexistent memory', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories/${crypto.randomUUID()}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories/${crypto.randomUUID()}`);
             expect(res!.status).toBe(404);
         });
 
         it('shows failed memory as shortterm tier', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories/${memoryIds.failed1}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories/${memoryIds.failed1}`);
             const data = await res!.json();
             expect(data.tier).toBe('shortterm');
+            expect(data.storageType).toBe('pending');
             expect(data.status).toBe('failed');
         });
     });
@@ -310,8 +297,7 @@ describe('Brain Viewer Routes', () => {
 
     describe('GET /api/dashboard/memories/sync-status', () => {
         it('returns sync service health metrics', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories/sync-status');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories/sync-status');
             expect(res).not.toBeNull();
             expect(res!.status).toBe(200);
 
@@ -325,8 +311,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('includes failed memories in recentErrors', async () => {
-            const { req, url } = fakeReq('GET', '/api/dashboard/memories/sync-status');
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', '/api/dashboard/memories/sync-status');
             const data = await res!.json();
 
             expect(data.recentErrors.length).toBe(1);
@@ -336,8 +321,7 @@ describe('Brain Viewer Routes', () => {
         });
 
         it('filters by agentId', async () => {
-            const { req, url } = fakeReq('GET', `/api/dashboard/memories/sync-status?agentId=${agentId2}`);
-            const res = handleBrainViewerRoutes(req, url, db);
+            const res = await callRoutes('GET', `/api/dashboard/memories/sync-status?agentId=${agentId2}`);
             const data = await res!.json();
 
             expect(data.pendingCount).toBe(0);

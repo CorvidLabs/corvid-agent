@@ -4,8 +4,8 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolContext } from '../mcp/tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents } from '../mcp/tool-handlers';
-import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpDeleteMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema } from '../lib/validation';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleRecordObservation, handleListObservations, handleBoostObservation, handleDismissObservation, handleObservationStats } from '../mcp/tool-handlers';
+import { parseBodyOrThrow, McpSendMessageSchema, McpSaveMemorySchema, McpRecallMemorySchema, McpDeleteMemorySchema, McpReadOnChainMemoriesSchema, McpSyncOnChainMemoriesSchema, McpRecordObservationSchema, McpListObservationsSchema, McpBoostObservationSchema, McpDismissObservationSchema, McpObservationStatsSchema } from '../lib/validation';
 import { json, handleRouteError } from '../lib/response';
 
 function extractResultText(result: CallToolResult): string {
@@ -69,6 +69,27 @@ export function handleMcpApiRoutes(
 
     if (url.pathname === '/api/mcp/list-agents' && req.method === 'GET') {
         return handleListAgentsRoute(url, deps);
+    }
+
+    // ── Observations ──────────────────────────────────────────────────
+    if (url.pathname === '/api/mcp/record-observation' && req.method === 'POST') {
+        return handleRecordObservationRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/list-observations' && req.method === 'POST') {
+        return handleListObservationsRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/boost-observation' && req.method === 'POST') {
+        return handleBoostObservationRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/dismiss-observation' && req.method === 'POST') {
+        return handleDismissObservationRoute(req, deps);
+    }
+
+    if (url.pathname === '/api/mcp/observation-stats' && req.method === 'POST') {
+        return handleObservationStatsRoute(req, deps);
     }
 
     return null;
@@ -155,6 +176,74 @@ async function handleListAgentsRoute(url: URL, deps: McpApiDeps): Promise<Respon
 
         const ctx = buildContext(deps, agentId);
         const result = await handleListAgents(ctx);
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+// ─── Observation routes ──────────────────────────────────────────────────────
+
+async function handleRecordObservationRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpRecordObservationSchema);
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleRecordObservation(ctx, {
+            content: data.content,
+            source: data.source,
+            source_id: data.sourceId,
+            suggested_key: data.suggestedKey,
+            relevance_score: data.relevanceScore,
+        });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleListObservationsRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpListObservationsSchema);
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleListObservations(ctx, {
+            status: data.status,
+            source: data.source,
+            query: data.query,
+            limit: data.limit,
+        });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleBoostObservationRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpBoostObservationSchema);
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleBoostObservation(ctx, { id: data.id, score_boost: data.scoreBoost });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleDismissObservationRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpDismissObservationSchema);
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleDismissObservation(ctx, { id: data.id });
+        return json({ response: extractResultText(result), isError: result.isError ?? false });
+    } catch (err) {
+        return handleRouteError(err);
+    }
+}
+
+async function handleObservationStatsRoute(req: Request, deps: McpApiDeps): Promise<Response> {
+    try {
+        const data = await parseBodyOrThrow(req, McpObservationStatsSchema);
+        const ctx = buildContext(deps, data.agentId);
+        const result = await handleObservationStats(ctx);
         return json({ response: extractResultText(result), isError: result.isError ?? false });
     } catch (err) {
         return handleRouteError(err);

@@ -411,6 +411,40 @@ export const McpDeleteMemorySchema = z.object({
     mode: z.enum(['soft', 'hard']).optional(),
 });
 
+// ─── Observation routes ──────────────────────────────────────────────────────
+
+export const McpRecordObservationSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    content: z.string().min(1, 'content is required'),
+    source: z.enum(['session', 'feedback', 'daily-review', 'health', 'pr-outcome', 'manual']).optional(),
+    sourceId: z.string().optional(),
+    suggestedKey: z.string().optional(),
+    relevanceScore: z.number().optional(),
+});
+
+export const McpListObservationsSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    status: z.enum(['active', 'graduated', 'expired', 'dismissed']).optional(),
+    source: z.enum(['session', 'feedback', 'daily-review', 'health', 'pr-outcome', 'manual']).optional(),
+    query: z.string().optional(),
+    limit: z.number().optional(),
+});
+
+export const McpBoostObservationSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    id: z.string().min(1, 'observation id is required'),
+    scoreBoost: z.number().optional(),
+});
+
+export const McpDismissObservationSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    id: z.string().min(1, 'observation id is required'),
+});
+
+export const McpObservationStatsSchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+});
+
 // ─── Misc routes (index.ts) ───────────────────────────────────────────────────
 
 export const EscalationResolveSchema = z.object({
