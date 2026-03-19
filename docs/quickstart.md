@@ -13,27 +13,29 @@ curl -fsSL https://raw.githubusercontent.com/CorvidLabs/corvid-agent/main/script
 ```
 
 The installer will:
-1. Check your system and install anything missing
-2. Ask you one question: which AI provider to use
-3. Start the server and open the dashboard in your browser
+1. Check your system
+2. Auto-detect your AI provider (Claude CLI, Ollama, or API key)
+3. Start the server and open the dashboard
 
-**That's it.** You're ready to use your agent.
+**That's it.** No API key needed if you have Claude Code or Ollama installed.
 
 > **Don't have a terminal open?** On Mac, press `Cmd + Space`, type "Terminal", and hit Enter. On Windows, use WSL2 ([install guide](https://learn.microsoft.com/en-us/windows/wsl/install)).
 
 ---
 
-## Choose your AI provider
+## AI provider (you probably already have one)
 
-Your agent needs an AI brain. Pick one:
+Your agent needs an AI brain — but you may already have one installed:
 
-| Option | Cost | Setup |
-|--------|------|-------|
-| **Claude API key** (recommended) | ~$3/hr of heavy use | Sign up at [console.anthropic.com](https://console.anthropic.com), copy your key |
-| **Claude Code CLI** | Uses your existing Claude subscription | Install [Claude Code](https://claude.com/claude-code), no extra key needed |
-| **Ollama** (free, local) | Free | Install [Ollama](https://ollama.com), then `ollama pull qwen2.5-coder:14b` |
+| If you have... | You're good to go | Cost |
+|----------------|-------------------|------|
+| **Claude Code CLI** | Already installed? Nothing else needed. | Uses your existing subscription |
+| **Ollama** | Already installed? Nothing else needed. | Free (runs on your computer) |
+| **Neither** | The setup will ask you to pick one | Claude API key ~$3/hr, or install Ollama for free |
 
-The installer asks which one you want. You can always change later by editing the `.env` file.
+The installer auto-detects what you have. If it finds Claude CLI or Ollama, it won't ask for an API key.
+
+> **API keys are only needed** if you're running corvid-agent as a remote server that others connect to. For personal, local use, Claude CLI or Ollama is all you need.
 
 ---
 

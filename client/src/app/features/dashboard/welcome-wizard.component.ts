@@ -111,8 +111,8 @@ const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEM
 ██║     ██║   ██║██╔══██╗╚██╗ ██╔╝██║██║  ██║
 ╚██████╗╚██████╔╝██║  ██║ ╚████╔╝ ██║██████╔╝
  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝  ╚═══╝  ╚═╝╚═════╝</pre>
-                <h1 class="wizard__title">Welcome to CorvidAgent</h1>
-                <p class="wizard__subtitle">Your own AI assistant &mdash; tell it what to build, fix, or figure out</p>
+                <h1 class="wizard__title">Welcome to Corvid Agent</h1>
+                <p class="wizard__subtitle">Your own AI developer — tell it what to build, fix, or figure out</p>
             </div>
 
             @switch (step()) {

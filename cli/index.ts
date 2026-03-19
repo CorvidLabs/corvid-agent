@@ -63,10 +63,10 @@ ${c.bold}Getting Started:${c.reset}
 
 ${c.bold}Commands:${c.reset}
   ${c.cyan('(no args)')}                         Interactive chat REPL
-  ${c.cyan('init')}                             Interactive project setup
+  ${c.cyan('init')}                             Quick setup (auto-detects your system)
   ${c.cyan('init --mcp')}                       MCP-only setup (for Claude Code / Cursor)
-  ${c.cyan('init --full')}                      Full setup (includes dashboard build)
-  ${c.cyan('init --yes')}                       Non-interactive with sensible defaults
+  ${c.cyan('init --advanced')}                  Full setup wizard with all options
+  ${c.cyan('init --full')}                      Advanced + dashboard build
   ${c.cyan('demo')}                             Run a self-contained demo
   ${c.cyan('status')}                           Check server health
   ${c.cyan('chat')} <prompt>                     Send a message to an agent
@@ -117,20 +117,25 @@ ${c.bold}Documentation:${c.reset}
 
 function printInitHelp(): void {
     console.log(`
-${c.bold}corvid-agent init${c.reset} — Interactive project setup
+${c.bold}corvid-agent init${c.reset} — Set up your AI developer
 
 ${c.bold}Usage:${c.reset}
   corvid-agent init [options]
 
 ${c.bold}Options:${c.reset}
   --mcp          MCP-only setup (add tools to Claude Code, Cursor, etc.)
-  --full         Full setup including dashboard build
+  --advanced     Full interactive wizard with all options
+  --full         Advanced + build dashboard
   --yes, -y      Non-interactive with sensible defaults
   --help, -h     Show this help
 
+  By default, init auto-detects your AI provider (Claude CLI, Ollama, or
+  API key in env) and only asks questions when it can't figure things out.
+
 ${c.bold}Examples:${c.reset}
-  corvid-agent init                  ${c.gray('# guided interactive setup')}
+  corvid-agent init                  ${c.gray('# quick setup (auto-detects everything)')}
   corvid-agent init --mcp            ${c.gray('# just add MCP tools to your editor')}
+  corvid-agent init --advanced       ${c.gray('# full wizard: ports, GitHub, network, etc.')}
   corvid-agent init --full --yes     ${c.gray('# full unattended setup')}
 `);
 }
@@ -328,6 +333,7 @@ async function main(): Promise<void> {
                 mcp: args.includes('--mcp'),
                 full: args.includes('--full'),
                 yes: args.includes('--yes') || args.includes('-y'),
+                simple: args.includes('--advanced') ? false : undefined,
             });
             break;
 
