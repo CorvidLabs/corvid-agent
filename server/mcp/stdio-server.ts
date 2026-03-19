@@ -8,13 +8,35 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod/v4';
 
-const agentId = process.env.CORVID_AGENT_ID;
 const apiUrl = process.env.CORVID_API_URL;
 
-if (!agentId || !apiUrl) {
-    console.error('CORVID_AGENT_ID and CORVID_API_URL environment variables are required');
+if (!apiUrl) {
+    console.error('CORVID_API_URL environment variable is required');
     process.exit(1);
 }
+
+/** Resolve agent ID from env or auto-discover from the running server. */
+async function resolveAgentId(): Promise<string> {
+    const envId = process.env.CORVID_AGENT_ID;
+    if (envId) return envId;
+
+    try {
+        const res = await fetch(`${apiUrl}/api/agents`);
+        if (res.ok) {
+            const agents = await res.json() as Array<{ id: string }>;
+            if (agents.length > 0) {
+                console.error(`Auto-discovered agent ID: ${agents[0].id}`);
+                return agents[0].id;
+            }
+        }
+    } catch {
+        // Server may not be reachable yet — fall through
+    }
+    console.error('Could not resolve CORVID_AGENT_ID: set it in env or ensure the server is running');
+    process.exit(1);
+}
+
+const agentId = await resolveAgentId();
 
 const server = new McpServer({
     name: 'corvid-agent-tools',

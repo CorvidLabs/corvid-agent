@@ -82,7 +82,10 @@ export class McpServiceContainer {
     }
 
     buildContext(options: BuildContextOptions): McpToolContext | null {
-        if (!this.services) return null;
+        if (!this.services) {
+            log.warn('buildContext called before MCP services registered — session will lack corvid_* tools');
+            return null;
+        }
         const { messenger, directory, walletService, encryptionConfig } = this.services;
 
         return {

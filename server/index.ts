@@ -434,14 +434,16 @@ taskQueueService.onQueueChange((activeCount, pendingCount) => {
     publishToTenant(server, 'work_tasks', msg);
 });
 
-// Initialize AlgoChat after server starts
-initAlgoChat(algochatInitDeps).then(() => {
-    wirePostInit(algochatInitDeps);
-}).catch((err) => {
+// Initialize AlgoChat before accepting sessions — awaited so MCP tools are
+// registered before any session can start (fixes race where corvid_* tools
+// were unavailable because setMcpServices hadn't been called yet).
+try {
+    await initAlgoChat(algochatInitDeps);
+} catch (err) {
     log.error('Failed to initialize AlgoChat', { error: err instanceof Error ? err.message : String(err) });
-    // Start background services even if AlgoChat fails
-    wirePostInit(algochatInitDeps);
-});
+}
+// Wire post-init services (scheduler, memory sync, etc.) regardless of success
+wirePostInit(algochatInitDeps);
 
 // Start session lifecycle cleanup after server is running
 sessionLifecycle.start();
