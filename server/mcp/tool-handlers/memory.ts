@@ -82,51 +82,36 @@ export async function handleSaveMemory(
         const isLocalnet = ctx.network === 'localnet' || !ctx.network;
 
         if (isLocalnet) {
-            // Localnet: try ARC-69 ASA path first, fall back to plain txn
-            try {
-                const arc69Ctx = await buildArc69Context(ctx);
-                if (arc69Ctx) {
-                    const { createMemoryAsa, updateMemoryAsa, resolveAsaForKey } = await import('../../memory/arc69-store');
-                    const existingAsaId = resolveAsaForKey(ctx.db, ctx.agentId, args.key);
-
-                    if (existingAsaId) {
-                        // Update existing ASA
-                        const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, args.content);
-                        updateMemoryTxid(ctx.db, memory.id, txid);
-                        return textResult(`Memory saved with key "${args.key}" (ASA: ${existingAsaId}).`);
-                    } else {
-                        // Create new ASA
-                        const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, args.content);
-                        updateMemoryTxid(ctx.db, memory.id, txid);
-                        updateMemoryAsaId(ctx.db, memory.id, asaId);
-                        return textResult(`Memory saved with key "${args.key}" (ASA: ${asaId}).`);
-                    }
-                }
-            } catch (err) {
-                log.warn('ARC-69 memory save failed, falling back to plain txn', {
-                    key: args.key,
-                    error: err instanceof Error ? err.message : String(err),
-                });
+            // Localnet: memories MUST use ARC-69 ASA storage.
+            // Plain transactions are for AlgoChat messages only, never for memories.
+            const arc69Ctx = await buildArc69Context(ctx);
+            if (!arc69Ctx) {
+                updateMemoryStatus(ctx.db, memory.id, 'failed');
+                return errorResult(
+                    'Cannot save memory: ARC-69 context unavailable (missing indexer or chat account). ' +
+                    'Memories require ARC-69 ASA storage — plain transactions are only for AlgoChat messages.',
+                );
             }
 
-            // Fallback: plain transaction path (no indexer, or ARC-69 failed)
             try {
-                const encrypted = await encryptMemoryContent(args.content, ctx.serverMnemonic, ctx.network);
-                const txid = await ctx.agentMessenger.sendOnChainToSelf(
-                    ctx.agentId,
-                    `[MEMORY:${args.key}] ${encrypted}`,
-                );
-                if (txid) {
+                const { createMemoryAsa, updateMemoryAsa, resolveAsaForKey } = await import('../../memory/arc69-store');
+                const existingAsaId = resolveAsaForKey(ctx.db, ctx.agentId, args.key);
+
+                if (existingAsaId) {
+                    const { txid } = await updateMemoryAsa(arc69Ctx, existingAsaId, args.key, args.content);
                     updateMemoryTxid(ctx.db, memory.id, txid);
+                    return textResult(`Memory saved with key "${args.key}" (ASA: ${existingAsaId}).`);
+                } else {
+                    const { asaId, txid } = await createMemoryAsa(arc69Ctx, args.key, args.content);
+                    updateMemoryTxid(ctx.db, memory.id, txid);
+                    updateMemoryAsaId(ctx.db, memory.id, asaId);
+                    return textResult(`Memory saved with key "${args.key}" (ASA: ${asaId}).`);
                 }
-                return textResult(`Memory saved with key "${args.key}".`);
             } catch (err) {
-                log.warn('On-chain memory send failed (localnet)', {
-                    key: args.key,
-                    error: err instanceof Error ? err.message : String(err),
-                });
+                const message = err instanceof Error ? err.message : String(err);
+                log.error('ARC-69 memory save failed', { key: args.key, error: message });
                 updateMemoryStatus(ctx.db, memory.id, 'failed');
-                return textResult(`Memory saved with key "${args.key}".`);
+                return errorResult(`Failed to save memory via ARC-69: ${message}`);
             }
         } else {
             // Testnet/mainnet: fire-and-forget (costs ALGO, may be slow)

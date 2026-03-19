@@ -430,7 +430,7 @@ async function handleRoutes(
     const mcpDeps = agentMessenger && agentDirectory && agentWalletService
         ? (() => {
             const algoChatCfg = loadAlgoChatConfig();
-            return { db, agentMessenger, agentDirectory, agentWalletService, serverMnemonic: algoChatCfg.mnemonic, network: algoChatCfg.network };
+            return { db, agentMessenger, agentDirectory, agentWalletService, serverMnemonic: algoChatCfg.mnemonic, network: algoChatCfg.agentNetwork };
           })()
         : null;
     const mcpResponse = handleMcpApiRoutes(req, url, mcpDeps);
