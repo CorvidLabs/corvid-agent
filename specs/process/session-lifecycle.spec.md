@@ -37,6 +37,7 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 | `SessionLifecycleConfig` | Configuration interface: `sessionTtlMs` (default 7 days), `cleanupIntervalMs` (default 1 hour), `maxSessionsPerProject` (default 100). |
 | `SessionCleanupStats` | Cleanup result stats: `expiredSessions`, `orphanedProcesses`, `staleSubscriptions`, `memoryFreedMB`. |
 
+
 ### Exported Constants
 
 (none)
@@ -127,4 +128,4 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
-| 2026-03-18 | corvid-agent | v3: Removed protected-paths exports (now in dedicated `protected-paths.spec.md`). Added 24-hour minimum age guard to `enforceSessionLimits`. Fixes #1221 |
+| 2026-03-18 | corvid-agent | v3: Removed protected-paths exports (now in dedicated `protected-paths.spec.md`). Added 24-hour minimum age guard to `enforceSessionLimits`. Fixes #1221, #1241 |
