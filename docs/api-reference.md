@@ -49,6 +49,22 @@ Role-based access levels:
 - [Contacts](#contacts)
 - [Brain Viewer](#brain-viewer)
 - [Flock Testing](#flock-testing)
+- [Analytics](#analytics)
+- [Exam](#exam)
+- [MCP API](#mcp-api)
+- [MCP Servers](#mcp-servers)
+- [Plugins](#plugins)
+- [Allowlist](#allowlist)
+- [Repo Blocklist](#repo-blocklist)
+- [GitHub Allowlist](#github-allowlist)
+- [Projects](#projects)
+- [Tenants](#tenants)
+- [Settings](#settings)
+- [System Logs](#system-logs)
+- [Personas](#personas)
+- [Skill Bundles](#skill-bundles)
+- [Proposals](#proposals)
+- [Slack](#slack)
 
 ---
 
@@ -2636,32 +2652,665 @@ Test result tracking for Flock Directory agents with score decay.
 
 ---
 
-## Additional Modules
+## Analytics
 
-The following modules are fully documented in the interactive API explorer at `/api/docs`. Each module has OpenAPI metadata including summaries, auth requirements, and request body schemas.
+Dashboard analytics for sessions, spending, and agent activity.
 
-| Module | Base Path | Endpoints |
-|--------|-----------|-----------|
-| MCP Servers | `/api/mcp-servers/*` | MCP server configurations |
-| Skill Bundles | `/api/skill-bundles/*` | Skill management |
-| Analytics | `/api/analytics/*` | Overview, spending, session stats |
-| System Logs | `/api/system-logs/*` | Log aggregation, credit transactions |
-| Tenants | `/api/tenants/*` | Multi-tenant management |
-| Settings | `/api/settings/*` | Credit config, API key rotation |
-| Allowlists | `/api/allowlist/*` | Address, GitHub, repo allowlists |
-| AlgoChat | `/api/algochat/*` | Bridge status, PSK exchange, contacts |
-| Wallets | `/api/wallets/*` | Summary, messages, credits |
-| Feed | `/api/feed/history` | Activity feed |
-| Escalation | `/api/escalation-queue` | Escalation queue management |
-| Projects | `/api/projects/*` | Project CRUD and directory browsing |
-| Proposals | `/api/proposals/*` | Governance proposal CRUD, transitions, evaluation |
-| Exam | `/api/exam/*` | Model exam runner and category listing |
-| Plugins | `/api/plugins/*` | Plugin load/unload, capability grant/revoke |
-| Providers | `/api/providers/*` | LLM provider listing and model discovery |
-| Operational Mode | `/api/operational-mode` | Get/set operational mode |
-| Memories | `POST /api/memories/backfill` | Memory embedding backfill |
-| Slack | `POST /slack/events` | Slack Events API webhook |
-| Personas | `/api/agents/{id}/persona` | Agent persona CRUD (archetype, traits, voice) |
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/analytics/overview` | Aggregate overview stats | any |
+| GET | `/api/analytics/spending` | Daily spending breakdown | any |
+| GET | `/api/analytics/sessions` | Session distribution by agent, source, status | any |
+| GET | `/api/analytics/session-metrics` | Session performance metrics (filterable) | any |
+| GET | `/api/analytics/session-metrics/{sessionId}` | Metrics for a single session | any |
+
+### Get Overview
+
+```bash
+curl http://localhost:3000/api/analytics/overview \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "totalSessions": 1250,
+  "totalCostUsd": 45.23,
+  "totalAlgoSpent": 120.5,
+  "totalTurns": 8400,
+  "totalCreditsConsumed": 2500,
+  "activeSessions": 3,
+  "totalAgents": 5,
+  "totalProjects": 12,
+  "workTasks": { "total": 340, "active": 2, "completed": 335 },
+  "agentMessages": 1500,
+  "algochatMessages": 820,
+  "todaySpending": { "usd": 1.20, "algo": 3.5 }
+}
+```
+
+### Query Parameters: Spending
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | number | 30 | Number of days to include (1-365) |
+
+---
+
+## Exam
+
+Model evaluation runner. Execute categorized exams against any configured model and browse historical results.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/exam/run` | Run an exam | any |
+| GET | `/api/exam/categories` | List available exam categories | any |
+| GET | `/api/exam/runs` | List past exam runs | any |
+| GET | `/api/exam/models` | List models with exam results | any |
+| GET | `/api/exam/runs/{id}` | Get a specific exam run | any |
+| DELETE | `/api/exam/runs/{id}` | Delete an exam run | any |
+
+### Run an Exam
+
+```bash
+curl -X POST http://localhost:3000/api/exam/run \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "categories": ["coding", "tools"]
+  }'
+```
+
+### Request Body: Run Exam
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | yes | Model identifier to evaluate |
+| `categories` | string[] | no | Subset of categories (coding, context, tools, algochat, council, instruction) |
+
+---
+
+## MCP API
+
+Internal MCP tool endpoints exposed as REST. Used by agents to send messages, manage memories, and discover other agents.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/mcp/send-message` | Send AlgoChat message to another agent | any |
+| POST | `/api/mcp/save-memory` | Save a memory entry | any |
+| POST | `/api/mcp/recall-memory` | Recall a memory by key or query | any |
+| POST | `/api/mcp/read-on-chain-memories` | Read ARC-69 on-chain memories | any |
+| POST | `/api/mcp/sync-on-chain-memories` | Sync on-chain memories to local store | any |
+| POST | `/api/mcp/delete-memory` | Delete a memory entry | any |
+| GET | `/api/mcp/list-agents` | List known agents | any |
+
+### Send Message
+
+```bash
+curl -X POST http://localhost:3000/api/mcp/send-message \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent-1",
+    "toAgent": "agent-2",
+    "message": "Hello from agent-1"
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "response": "Message sent successfully",
+  "isError": false
+}
+```
+
+### Request Body: Send Message
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agentId` | string | yes | Sending agent ID |
+| `toAgent` | string | yes | Recipient agent name or address |
+| `message` | string | yes | Message content |
+
+### Request Body: Save Memory
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agentId` | string | yes | Agent ID |
+| `key` | string | yes | Memory key |
+| `content` | string | yes | Memory content |
+
+### Request Body: Recall Memory
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agentId` | string | yes | Agent ID |
+| `key` | string | no | Exact memory key |
+| `query` | string | no | Semantic search query |
+
+---
+
+## MCP Servers
+
+Manage external MCP server configurations for agent tool access.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/mcp-servers` | List MCP server configs | any |
+| POST | `/api/mcp-servers` | Add MCP server config | operator |
+| PUT | `/api/mcp-servers/{id}` | Update MCP server config | operator |
+| DELETE | `/api/mcp-servers/{id}` | Remove MCP server config | operator |
+| POST | `/api/mcp-servers/{id}/test` | Test connection and list tools | operator |
+
+### Test MCP Server
+
+```bash
+curl -X POST http://localhost:3000/api/mcp-servers/mcp-1/test \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "tools": [
+    { "name": "search", "description": "Search the web" },
+    { "name": "fetch", "description": "Fetch a URL" }
+  ]
+}
+```
+
+---
+
+## Plugins
+
+Load, unload, and manage runtime plugins with capability-based access control.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/plugins` | List loaded and available plugins | any |
+| POST | `/api/plugins/load` | Load a plugin | any |
+| POST | `/api/plugins/{name}/unload` | Unload a plugin | any |
+| POST | `/api/plugins/{name}/grant` | Grant a capability to a plugin | any |
+| POST | `/api/plugins/{name}/revoke` | Revoke a capability from a plugin | any |
+
+### Load a Plugin
+
+```bash
+curl -X POST http://localhost:3000/api/plugins/load \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "packageName": "corvid-plugin-analytics",
+    "autoGrant": true
+  }'
+```
+
+### Request Body: Load Plugin
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `packageName` | string | yes | Plugin package name |
+| `autoGrant` | boolean | no | Automatically grant requested capabilities |
+
+---
+
+## Allowlist
+
+Manage the Algorand address allowlist for trusted interactions.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/allowlist` | List allowlisted addresses | any |
+| POST | `/api/allowlist` | Add address to allowlist | any |
+| PUT | `/api/allowlist/{address}` | Update allowlist entry label | any |
+| DELETE | `/api/allowlist/{address}` | Remove address from allowlist | any |
+
+### Add Address
+
+```bash
+curl -X POST http://localhost:3000/api/allowlist \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address": "ALGO...",
+    "label": "Trusted partner"
+  }'
+```
+
+### Request Body: Add Address
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `address` | string | yes | Algorand address |
+| `label` | string | no | Human-readable label |
+
+---
+
+## Repo Blocklist
+
+Manage repositories that agents are blocked from interacting with. Tenant-scoped.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/repo-blocklist` | List blocked repos | any |
+| POST | `/api/repo-blocklist` | Add repo to blocklist | any |
+| DELETE | `/api/repo-blocklist/{repo}` | Remove repo from blocklist | any |
+
+### Add Repo to Blocklist
+
+```bash
+curl -X POST http://localhost:3000/api/repo-blocklist \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "repo": "org/dangerous-repo",
+    "reason": "Contains untrusted code",
+    "source": "manual"
+  }'
+```
+
+### Request Body: Add Repo
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `repo` | string | yes | Repository in `owner/name` format |
+| `reason` | string | no | Reason for blocking |
+| `source` | string | no | How the block was added (manual, automated) |
+| `prUrl` | string | no | Related PR URL |
+
+---
+
+## GitHub Allowlist
+
+Manage the GitHub username allowlist for trusted contributors.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/github-allowlist` | List allowlisted GitHub users | any |
+| POST | `/api/github-allowlist` | Add GitHub user to allowlist | any |
+| PUT | `/api/github-allowlist/{username}` | Update allowlist entry label | any |
+| DELETE | `/api/github-allowlist/{username}` | Remove user from allowlist | any |
+
+### Add GitHub User
+
+```bash
+curl -X POST http://localhost:3000/api/github-allowlist \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "octocat",
+    "label": "Core contributor"
+  }'
+```
+
+### Request Body: Add GitHub User
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `username` | string | yes | GitHub username |
+| `label` | string | no | Human-readable label |
+
+---
+
+## Projects
+
+Manage projects — working directories that agents operate within.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/projects` | List projects | any |
+| POST | `/api/projects` | Create project | operator |
+| GET | `/api/projects/{id}` | Get project by ID | any |
+| PUT | `/api/projects/{id}` | Update project | operator |
+| DELETE | `/api/projects/{id}` | Delete project | operator |
+| GET | `/api/projects/browse-dirs` | Browse allowed directories | any |
+
+### Browse Directories
+
+```bash
+curl "http://localhost:3000/api/projects/browse-dirs?path=/home/user/repos" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+**Response (200):**
+
+```json
+{
+  "current": "/home/user/repos",
+  "parent": "/home/user",
+  "dirs": ["project-a", "project-b", "project-c"]
+}
+```
+
+### Query Parameters: Browse Directories
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `path` | string | — | Directory path to browse (must be within allowed roots) |
+| `showHidden` | boolean | false | Include hidden directories |
+
+---
+
+## Tenants
+
+Multi-tenant management. Register tenants, view membership, and manage API key holders.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/api/tenants/register` | Register a new tenant | public |
+| GET | `/api/tenants/me` | Get current tenant info | any |
+| GET | `/api/tenants/me/members` | List tenant members | owner |
+| POST | `/api/tenants/me/members` | Add a member | owner |
+| DELETE | `/api/tenants/me/members/{keyHash}` | Remove a member | owner |
+
+### Register Tenant
+
+```bash
+curl -X POST http://localhost:3000/api/tenants/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corp",
+    "slug": "acme-corp",
+    "ownerEmail": "admin@acme.com",
+    "plan": "starter"
+  }'
+```
+
+**Response (201):**
+
+```json
+{
+  "tenant": {
+    "id": "tenant-abc123",
+    "name": "Acme Corp",
+    "slug": "acme-corp",
+    "plan": "starter"
+  },
+  "apiKey": "ca_live_..."
+}
+```
+
+### Request Body: Register Tenant
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Tenant display name |
+| `slug` | string | yes | URL-safe identifier (3-48 chars, lowercase alphanumeric + hyphens) |
+| `ownerEmail` | string | yes | Owner email address |
+| `plan` | string | no | Plan tier: free, starter, pro, enterprise (default: free) |
+
+### Add Member
+
+```bash
+curl -X POST http://localhost:3000/api/tenants/me/members \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyHash": "sha256-of-api-key",
+    "role": "operator"
+  }'
+```
+
+### Request Body: Add Member
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `keyHash` | string | yes | SHA-256 hash of the member's API key |
+| `role` | string | no | Role: viewer, operator, owner (default: viewer) |
+
+---
+
+## Settings
+
+Credit configuration, API key rotation, Discord config, and test data management.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/settings` | Get settings (admin sees full config) | any |
+| PUT | `/api/settings/credits` | Update credit configuration | owner |
+| POST | `/api/settings/api-key/rotate` | Rotate API key | owner |
+| GET | `/api/settings/api-key/status` | Check API key rotation status | any |
+| GET | `/api/settings/discord` | Get Discord config | operator |
+| PUT | `/api/settings/discord` | Update Discord config | owner |
+| DELETE | `/api/settings/discord/{key}` | Delete a Discord config key | owner |
+| POST | `/api/settings/purge-test-data` | Purge test data (dry-run by default) | any |
+
+### Rotate API Key
+
+```bash
+curl -X POST http://localhost:3000/api/settings/api-key/rotate \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "ttlDays": 90 }'
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "apiKey": "ca_live_new...",
+  "expiresAt": "2026-06-18T00:00:00Z",
+  "gracePeriodExpiry": "2026-03-26T00:00:00Z"
+}
+```
+
+### Request Body: Rotate API Key
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `ttlDays` | number | no | Days until expiry |
+
+### Purge Test Data
+
+```bash
+curl -X POST http://localhost:3000/api/settings/purge-test-data \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "force": true }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `force` | boolean | no | Set `true` to actually delete; omit for dry-run |
+
+---
+
+## System Logs
+
+Aggregated system logs from councils, escalations, and work tasks. Also exposes credit transaction history.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/system-logs` | List system logs | any |
+| GET | `/api/system-logs/credit-transactions` | List credit transactions | any |
+
+### Query Parameters: System Logs
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | number | 50 | Results per page (1-500) |
+| `offset` | number | 0 | Pagination offset |
+| `type` | string | all | Filter: all, council, escalation, work-task |
+| `level` | string | — | Filter by log level: info, warn, error |
+| `search` | string | — | Full-text search across log messages |
+
+### Query Parameters: Credit Transactions
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | number | 50 | Results per page |
+| `offset` | number | 0 | Pagination offset |
+
+---
+
+## Personas
+
+Agent persona configuration — archetype, traits, and voice customization.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/agents/{id}/persona` | Get agent persona | any |
+| PUT | `/api/agents/{id}/persona` | Create or update agent persona | operator |
+| DELETE | `/api/agents/{id}/persona` | Delete agent persona | operator |
+
+### Set Agent Persona
+
+```bash
+curl -X PUT http://localhost:3000/api/agents/agent-1/persona \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "archetype": "engineer",
+    "traits": ["precise", "thorough"],
+    "voice": "Professional and concise"
+  }'
+```
+
+---
+
+## Skill Bundles
+
+Reusable skill packages that can be assigned to agents and projects. Includes preset and custom bundles.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/skill-bundles` | List all skill bundles | any |
+| POST | `/api/skill-bundles` | Create a skill bundle | operator |
+| GET | `/api/skill-bundles/{id}` | Get skill bundle by ID | any |
+| PUT | `/api/skill-bundles/{id}` | Update a skill bundle | operator |
+| DELETE | `/api/skill-bundles/{id}` | Delete a skill bundle (not presets) | operator |
+| GET | `/api/agents/{id}/skills` | List skills assigned to agent | any |
+| POST | `/api/agents/{id}/skills` | Assign skill bundle to agent | operator |
+| DELETE | `/api/agents/{id}/skills/{bundleId}` | Unassign skill from agent | operator |
+| GET | `/api/projects/{id}/skills` | List skills assigned to project | any |
+| POST | `/api/projects/{id}/skills` | Assign skill bundle to project | operator |
+| DELETE | `/api/projects/{id}/skills/{bundleId}` | Unassign skill from project | operator |
+
+### Assign Skill to Agent
+
+```bash
+curl -X POST http://localhost:3000/api/agents/agent-1/skills \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bundleId": "bundle-code-review",
+    "sortOrder": 1
+  }'
+```
+
+### Request Body: Assign Skill Bundle
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `bundleId` | string | yes | Skill bundle ID to assign |
+| `sortOrder` | number | no | Display/priority order (default: 0) |
+
+---
+
+## Proposals
+
+Governance proposals with lifecycle management and vote evaluation.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| GET | `/api/proposals` | List proposals (filter by council, status) | any |
+| POST | `/api/proposals` | Create a proposal | operator |
+| GET | `/api/proposals/{id}` | Get proposal by ID | any |
+| PUT | `/api/proposals/{id}` | Update a proposal (draft/open only) | operator |
+| DELETE | `/api/proposals/{id}` | Delete a proposal (draft only) | operator |
+| POST | `/api/proposals/{id}/transition` | Transition proposal status | operator |
+| GET | `/api/proposals/{id}/evaluate` | Evaluate votes and compute decision | any |
+
+### Create Proposal
+
+```bash
+curl -X POST http://localhost:3000/api/proposals \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "councilId": "council-1",
+    "title": "Adopt new logging standard",
+    "description": "Proposal to switch to structured JSON logging",
+    "proposedBy": "agent-1"
+  }'
+```
+
+### Transition Proposal
+
+```bash
+curl -X POST http://localhost:3000/api/proposals/prop-1/transition \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "closed",
+    "decision": "approved"
+  }'
+```
+
+Lifecycle: `draft` → `open` → `voting` → `closed` (with decision: approved/rejected/tabled).
+
+### Request Body: Transition
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status` | string | yes | Target status |
+| `decision` | string | no | Decision when closing (approved, rejected, tabled) |
+
+---
+
+## Slack
+
+Slack Events API webhook for interactive question dispatching and thread replies.
+
+### Endpoints
+
+| Method | Path | Summary | Auth |
+|--------|------|---------|------|
+| POST | `/slack/events` | Slack Events API webhook | Slack signature |
+
+This endpoint handles two payload formats:
+
+- **Events API (JSON):** Processes `url_verification` challenges and `event_callback` messages. Thread replies matching active question dispatches are routed to the owner question manager.
+- **Interactive (form-urlencoded):** Processes `block_actions` from button clicks on dispatched questions.
+
+Authentication uses Slack's HMAC-SHA256 signature verification (`SLACK_SIGNING_SECRET`). Signatures older than 5 minutes are rejected.
 
 ---
 
