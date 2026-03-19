@@ -10,6 +10,8 @@ export interface CorvidMcpServerConfig {
   baseUrl: string;
   /** Optional API key */
   apiKey?: string;
+  /** Agent ID to use for memory and messaging operations */
+  agentId?: string;
 }
 
 function textResult(text: string) {
@@ -36,6 +38,7 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
   });
+  const agentId = config.agentId;
 
   const server = new McpServer(
     {
@@ -208,6 +211,7 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
           toAgent: to_agent,
           message,
         };
+        if (agentId) body.agentId = agentId;
         if (thread) body.thread = thread;
 
         const result = await client.post('/api/mcp/send-message', body);
@@ -332,7 +336,7 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
     },
     async ({ key, content }) => {
       try {
-        const result = await client.post('/api/mcp/save-memory', { key, content });
+        const result = await client.post('/api/mcp/save-memory', { agentId, key, content });
         return textResult(JSON.stringify(result, null, 2));
       } catch (err) {
         return handleError(err);
@@ -352,6 +356,7 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
     async ({ key, query }) => {
       try {
         const body: Record<string, unknown> = {};
+        if (agentId) body.agentId = agentId;
         if (key) body.key = key;
         if (query) body.query = query;
         const result = await client.post('/api/mcp/recall-memory', body);
@@ -374,6 +379,7 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
     async ({ search, limit }) => {
       try {
         const body: Record<string, unknown> = {};
+        if (agentId) body.agentId = agentId;
         if (search) body.search = search;
         if (limit) body.limit = limit;
         const result = await client.post('/api/mcp/read-on-chain-memories', body);
@@ -395,6 +401,7 @@ export function createCorvidMcpServer(config: CorvidMcpServerConfig): McpServer 
     async ({ limit }) => {
       try {
         const body: Record<string, unknown> = {};
+        if (agentId) body.agentId = agentId;
         if (limit) body.limit = limit;
         const result = await client.post('/api/mcp/sync-on-chain-memories', body);
         return textResult(JSON.stringify(result, null, 2));

@@ -5,8 +5,9 @@ import { createCorvidMcpServer } from './server.js';
 
 const baseUrl = process.env.CORVID_AGENT_URL ?? 'http://localhost:3000';
 const apiKey = process.env.CORVID_AGENT_API_KEY;
+const agentId = process.env.CORVID_AGENT_ID;
 
-const server = createCorvidMcpServer({ baseUrl, apiKey });
+const server = createCorvidMcpServer({ baseUrl, apiKey, agentId });
 const transport = new StdioServerTransport();
 
 async function main() {
