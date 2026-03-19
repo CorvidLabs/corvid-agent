@@ -24,6 +24,7 @@ files:
   - server/mcp/tool-handlers/flock-directory.ts
   - server/mcp/tool-handlers/projects.ts
   - server/mcp/tool-handlers/contacts.ts
+  - server/mcp/tool-handlers/observations.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -103,6 +104,11 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleManageRepoBlocklist` | `(ctx, { action, repo?, reason?, source? })` | `Promise<CallToolResult>` | Manage the repo blocklist: list, add, remove, or check entries |
 | `handleFlockDirectory` | `(ctx, { action, agent_id?, address?, name?, description?, instance_url?, capabilities?, query?, capability?, min_reputation?, limit? })` | `Promise<CallToolResult>` | Flock Directory operations: register, deregister, heartbeat, lookup, search, list, stats, sync |
 | `handleLookupContact` | `(ctx, { name?, platform?, platform_id? })` | `Promise<CallToolResult>` | Look up a contact by display name or by platform + platform_id; returns all known platform links for the matched contact |
+| `handleRecordObservation` | `(ctx, { content, source?, source_id?, suggested_key?, relevance_score? })` | `Promise<CallToolResult>` | Record a short-term observation for potential graduation to long-term memory |
+| `handleListObservations` | `(ctx, { status?, source?, query?, limit? })` | `Promise<CallToolResult>` | List or search observations with optional filters |
+| `handleBoostObservation` | `(ctx, { id, score_boost? })` | `Promise<CallToolResult>` | Boost an observation's relevance score |
+| `handleDismissObservation` | `(ctx, { id })` | `Promise<CallToolResult>` | Dismiss an observation to prevent graduation |
+| `handleObservationStats` | `(ctx)` | `Promise<CallToolResult>` | Get observation count statistics by status |
 
 ## Invariants
 
@@ -167,6 +173,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `server/improvement/health-store.ts` | `getRecentSnapshots`, `computeTrends`, `formatTrendsForPrompt` |
 | `server/db/repo-blocklist.ts` | `listRepoBlocklist`, `addToRepoBlocklist`, `removeFromRepoBlocklist`, `isRepoBlocked` |
 | `server/db/contacts.ts` | `findContactByName`, `findContactByPlatformId` |
+| `server/db/observations.ts` | `recordObservation`, `listObservations`, `searchObservations`, `boostObservation`, `dismissObservation`, `countObservations` |
 
 ### Consumed By
 
@@ -193,3 +200,4 @@ Internal constants (not env-configurable):
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-02-24 | corvid-agent | Updated files list after refactor into domain-specific modules (#233) |
+| 2026-03-19 | corvid-agent | Documented observation tool handlers |
