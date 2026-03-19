@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **Tiered `corvid_send_message` access** — scheduler sessions get scoped messaging permissions (#1225)
 - **Agent deployment config schema** — plugin interfaces for deployment configuration (#1218)
 - **Discord user ID in author context** — agent sessions see the Discord user ID of the message sender (#1227)
+- **Discord status and dashboard embeds** — rich embeds for agent status, dashboard views, and system monitoring (#892, #1240)
 - **SpecSync migration** — spec validation migrated from TypeScript to specsync Rust binary (#1219)
 
 ### Fixed
