@@ -9,20 +9,35 @@ import { realpathSync } from 'node:fs';
 import { analyzeBashCommand } from '../lib/bash-security';
 import { classifyPath, checkAutomationAllowed, type GovernanceTier, type AutomationCheckResult } from '../councils/governance';
 
+// ─── Governance-annotated protected path entries ──────────────────────────────
+
+export interface ProtectedPathEntry {
+    /** The path pattern (basename or substring). */
+    path: string;
+    /** Governance tier: 0 = Constitutional, 1 = Structural, 2 = Operational. */
+    tier: GovernanceTier;
+    /** Human-readable reason this path is protected. */
+    reason: string;
+}
+
 // Paths that agents must never modify, even in full-auto mode.
 // Uses basename matching to avoid false positives (e.g. "manager.ts" matching "task-manager.ts").
-export const PROTECTED_BASENAMES = new Set([
-    'sdk-process.ts',
-    'CLAUDE.md',
-]);
+export const PROTECTED_BASENAME_ENTRIES: readonly ProtectedPathEntry[] = [
+    { path: 'sdk-process.ts', tier: 0, reason: 'Session execution engine — Layer 0 constitutional' },
+    { path: 'CLAUDE.md',      tier: 1, reason: 'Agent system instructions — Layer 1 structural' },
+] as const;
 
 // Paths matched by substring (for files/dirs without unique basenames).
-export const PROTECTED_SUBSTRINGS = [
-    '.env',
-    'corvid-agent.db',
-    'wallet-keystore.json',
-    'server/selftest/',
-];
+export const PROTECTED_SUBSTRING_ENTRIES: readonly ProtectedPathEntry[] = [
+    { path: '.env',                 tier: 0, reason: 'Environment secrets — Layer 0 constitutional' },
+    { path: 'corvid-agent.db',      tier: 0, reason: 'Database file — Layer 0 constitutional' },
+    { path: 'wallet-keystore.json', tier: 0, reason: 'Wallet keys — Layer 0 constitutional' },
+    { path: 'server/selftest/',     tier: 0, reason: 'Self-test integrity — Layer 0 constitutional' },
+] as const;
+
+// Derived sets for backward-compatible matching (used by isProtectedPath and consumers).
+export const PROTECTED_BASENAMES = new Set(PROTECTED_BASENAME_ENTRIES.map((e) => e.path));
+export const PROTECTED_SUBSTRINGS = PROTECTED_SUBSTRING_ENTRIES.map((e) => e.path);
 
 // Shell operators/commands that indicate write/destructive file operations.
 export const BASH_WRITE_OPERATORS = /(?:>>?\s|rm\s|mv\s|cp\s|chmod\s|chown\s|sed\s+-i|tee\s|dd\s|ln\s|curl\s.*-o|wget\s|python[3]?\s+-c|node\s+-e|bun\s+-e|ed\s|perl\s+-|rsync\s|install\s|truncate\s|ruby\s+-[ie]|php\s+-r|command\s+-p\s+\w|find\s.*-(?:delete|exec))/;

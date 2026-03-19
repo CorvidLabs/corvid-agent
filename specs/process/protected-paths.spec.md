@@ -32,6 +32,7 @@ Provides path-protection utilities for the corvid-agent execution engines. Ensur
 
 | Type | Description |
 |------|-------------|
+| `ProtectedPathEntry` | `{ path: string; tier: GovernanceTier; reason: string }` — a protected path annotated with governance tier metadata. |
 | `ProtectedBashResult` | `{ blocked: boolean; path?: string; reason?: string }` — result of bash command protection check. |
 | `GovernanceTier` | Re-exported from `councils/governance.ts` — governance classification tier for a file path. |
 | `AutomationCheckResult` | Re-exported from `councils/governance.ts` — result of automation-allowed check. |
@@ -40,8 +41,10 @@ Provides path-protection utilities for the corvid-agent execution engines. Ensur
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `PROTECTED_BASENAMES` | `Set<string>` | Set of filenames that are always protected (`sdk-process.ts`, `CLAUDE.md`). Uses exact basename matching. |
-| `PROTECTED_SUBSTRINGS` | `string[]` | Path substrings that indicate protected files (`.env`, `corvid-agent.db`, `wallet-keystore.json`, `server/selftest/`). |
+| `PROTECTED_BASENAME_ENTRIES` | `readonly ProtectedPathEntry[]` | Annotated basename-protected entries with governance tier and reason. Source of truth for `PROTECTED_BASENAMES`. |
+| `PROTECTED_SUBSTRING_ENTRIES` | `readonly ProtectedPathEntry[]` | Annotated substring-protected entries with governance tier and reason. Source of truth for `PROTECTED_SUBSTRINGS`. |
+| `PROTECTED_BASENAMES` | `Set<string>` | Derived from `PROTECTED_BASENAME_ENTRIES`. Set of filenames that are always protected. Uses exact basename matching. |
+| `PROTECTED_SUBSTRINGS` | `string[]` | Derived from `PROTECTED_SUBSTRING_ENTRIES`. Path substrings that indicate protected files. |
 | `BASH_WRITE_OPERATORS` | `RegExp` | Regex matching shell operators/commands that indicate write/destructive file operations. |
 
 ### Exported Classes
@@ -122,4 +125,5 @@ Provides path-protection utilities for the corvid-agent execution engines. Ensur
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-03-18 | corvid-agent | Add governance tier annotations to protected path entries (#1241) |
 | 2026-03-09 | corvid-agent | Initial spec (#591) |
