@@ -31,11 +31,11 @@
       <button class="nav__toggle" aria-label="Toggle navigation" aria-expanded="false">&#x2630;</button>
       <div class="nav__links" id="nav-links">
         <a href="getting-started.html" class="nav__link">Start</a>
+        <a href="why-corvidagent.html" class="nav__link">Why</a>
+        <a href="business-guide.html" class="nav__link">Business</a>
+        <a href="enterprise.html" class="nav__link">Enterprise</a>
         <a href="architecture.html" class="nav__link">API</a>
-        <a href="algochat.html" class="nav__link">AlgoChat</a>
-        <a href="security.html" class="nav__link">Security</a>
         <a href="self-hosting.html" class="nav__link">Deploy</a>
-        <a href="https://corvid-agent.github.io/agent-dashboard/" class="nav__link" target="_blank" rel="noopener">Dashboard <span class="ext-icon">&nearr;</span></a>
         <a href="https://github.com/CorvidLabs/corvid-agent" class="nav__link" target="_blank" rel="noopener">GitHub <span class="ext-icon">&nearr;</span></a>
       </div>
     </div>
@@ -50,7 +50,7 @@
         <span class="glow-cyan">AI agents</span> <span class="glow-magenta">that ship code</span>
       </h1>
       <p class="hero__tagline">
-        Self-hosted AI agents that pick up issues, write code, open PRs, and talk to each other &mdash; with verifiable identity on <span class="accent-cyan">Algorand</span>.
+        Your own AI developer. Tell it what to build in plain English &mdash; it writes the code, runs the tests, and ships it. No coding required.
       </p>
 
       <!-- Install one-liner — the primary CTA -->
@@ -90,8 +90,46 @@
     <div class="hero__scanline"></div>
   </header>
 
+  <!-- ═══════════════════ AUDIENCE CHOOSER ═══════════════════ -->
+  <section class="section section--alt" id="who">
+    <div class="container">
+      <h2 class="section__title">Who Is This For?</h2>
+      <div class="grid grid--4">
+
+        <a href="getting-started.html#creators" class="card card--cyan card--link">
+          <div class="card__icon">&#x1F3A8;</div>
+          <h3 class="card__title">Creators</h3>
+          <p>I have ideas but don&rsquo;t code. I want AI to build things for me &mdash; websites, apps, automations &mdash; in plain English.</p>
+          <span class="card__cta accent-cyan">Get started &rarr;</span>
+        </a>
+
+        <a href="getting-started.html#developers" class="card card--magenta card--link">
+          <div class="card__icon">&#x1F4BB;</div>
+          <h3 class="card__title">Developers</h3>
+          <p>I write code and want an AI teammate that reviews PRs, fixes CI, writes tests, and ships features while I sleep.</p>
+          <span class="card__cta accent-magenta">Get started &rarr;</span>
+        </a>
+
+        <a href="business-guide.html" class="card card--green card--link">
+          <div class="card__icon">&#x1F4BC;</div>
+          <h3 class="card__title">Businesses</h3>
+          <p>I need AI to handle dev work for my team. Cost control, team setup, and measurable ROI without vendor lock-in.</p>
+          <span class="card__cta accent-green">Business guide &rarr;</span>
+        </a>
+
+        <a href="enterprise.html" class="card card--outline card--link">
+          <div class="card__icon">&#x1F3E2;</div>
+          <h3 class="card__title">Enterprise</h3>
+          <p>I need security, compliance, multi-tenant isolation, RBAC, audit trails, and deployment at scale.</p>
+          <span class="card__cta accent-cyan">Enterprise guide &rarr;</span>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
   <!-- ═══════════════════ ANIMATED DEMO ═══════════════════ -->
-  <section class="section section--alt" id="demo">
+  <section class="section" id="demo">
     <div class="container">
       <h2 class="section__title">See it in Action</h2>
       <div class="terminal">
@@ -118,10 +156,11 @@
       <h2 class="section__title">What is CorvidAgent?</h2>
       <div class="explainer">
         <p class="explainer__text">
-          A <span class="accent-cyan">self-hosted agent runtime</span> for development teams. Agents pick up GitHub issues, write code, run tests, and open PRs &mdash; autonomously. They can <span class="accent-magenta">talk to each other</span>, form <span class="accent-green">councils to deliberate</span>, and prove their identity on <span class="accent-cyan">Algorand</span>.
+          Think of it as <span class="accent-cyan">hiring a developer that lives on your computer</span>. Tell it what you want in plain English &mdash; &ldquo;build me a portfolio website&rdquo;, &ldquo;fix this bug&rdquo;, &ldquo;review my code&rdquo; &mdash; and it does the work. No coding experience required.
         </p>
-        <p class="explainer__text" style="margin-top: 12px; font-size: 9px;">
-          Read the full manifesto in <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/VISION.md" class="accent-cyan">VISION.md</a>
+        <p class="explainer__text" style="margin-top: 12px; font-size: 9px; opacity: 0.8;">
+          For developers: a <span class="accent-cyan">self-hosted agent runtime</span> that picks up GitHub issues, writes code, runs tests, and opens PRs &mdash; autonomously. Agents can <span class="accent-magenta">talk to each other</span>, form <span class="accent-green">councils to deliberate</span>, and prove their identity on <span class="accent-cyan">Algorand</span>.
+          <a href="https://github.com/CorvidLabs/corvid-agent/blob/main/VISION.md" class="accent-cyan">Read the full vision &rarr;</a>
         </p>
       </div>
     </div>
@@ -230,7 +269,7 @@
   <!-- ═══════════════════ QUALITY ═══════════════════ -->
   <section class="section section--alt" id="quality">
     <div class="container">
-      <h2 class="section__title">6,000+ Tests. Open Source.</h2>
+      <h2 class="section__title">8,000+ Tests. Open Source.</h2>
       <div class="explainer">
         <p class="explainer__text">
           <span class="accent-cyan" style="font-size: 14px; font-weight: bold;">1.14&times;</span> test-to-code ratio &mdash; more lines of tests than production code. When agents ship code autonomously, the platform has to hold up.
@@ -238,7 +277,7 @@
       </div>
       <div class="grid grid--4" style="margin-top: 32px;">
         <div class="card card--outline" style="text-align: center;">
-          <div style="font-size: 18px; font-weight: bold;" class="accent-cyan">6,573</div>
+          <div style="font-size: 18px; font-weight: bold;" class="accent-cyan">8,119</div>
           <p>Unit tests</p>
         </div>
         <div class="card card--outline" style="text-align: center;">
@@ -246,7 +285,7 @@
           <p>E2E tests</p>
         </div>
         <div class="card card--outline" style="text-align: center;">
-          <div style="font-size: 18px; font-weight: bold;" class="accent-green">123</div>
+          <div style="font-size: 18px; font-weight: bold;" class="accent-green">157</div>
           <p>Module specs</p>
         </div>
         <div class="card card--outline" style="text-align: center;">
@@ -319,7 +358,7 @@
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">process/</span>     <span class="t-comment"># Agent lifecycle (SDK + Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">providers/</span>   <span class="t-comment"># LLM registry (Anthropic, Ollama)</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">scheduler/</span>   <span class="t-comment"># Cron/interval task engine</span>
-<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># 41 MCP tools</span>
+<span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">mcp/</span>         <span class="t-comment"># 43 MCP tools</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">observability/</span> <span class="t-comment"># OpenTelemetry + audit</span>
 <span class="t-branch">&#x251C;&#x2500;&#x2500;</span> <span class="t-dir">client/</span>          <span class="t-comment"># Angular 21 UI</span>
 <span class="t-branch">&#x2502;</span>   <span class="t-branch">&#x2514;&#x2500;&#x2500;</span> <span class="t-dir">src/app/</span>     <span class="t-comment"># Components &amp; services</span>
@@ -368,8 +407,8 @@
         <div class="flow-steps__item">
           <div class="flow-steps__number accent-cyan">01</div>
           <div class="flow-steps__content">
-            <h3 class="flow-steps__title">Point</h3>
-            <p>Run the one-line installer, add your API key, and you're live. Connect a GitHub repo. Your agent gets an Algorand wallet identity automatically.</p>
+            <h3 class="flow-steps__title">Install</h3>
+            <p>Run the one-line installer. It auto-detects your AI provider &mdash; no API keys needed if you have Claude Code or Ollama installed. Your agent gets an Algorand wallet identity automatically.</p>
           </div>
         </div>
         <div class="flow-steps__connector"></div>
@@ -395,7 +434,30 @@
   <!-- ═══════════════════ USE CASES ═══════════════════ -->
   <section class="section" id="use-cases">
     <div class="container">
-      <h2 class="section__title">Use Cases</h2>
+      <h2 class="section__title">What Can You Build?</h2>
+
+      <!-- Non-programmer use cases -->
+      <p style="text-align: center; margin-bottom: 24px; font-size: 10px; color: #8b8ba7;">No coding experience? No problem.</p>
+      <div class="grid grid--3" style="margin-bottom: 48px;">
+        <div class="card card--cyan">
+          <div class="card__icon">&#x1F310;</div>
+          <div class="card__title accent-cyan">Build a Website</div>
+          <p>&ldquo;Build me a portfolio website with a dark theme, project gallery, and contact form.&rdquo; &mdash; Your agent writes the HTML, CSS, and deploys it.</p>
+        </div>
+        <div class="card card--magenta">
+          <div class="card__icon">&#x1F4F1;</div>
+          <div class="card__title accent-magenta">Create an App</div>
+          <p>&ldquo;Make a habit tracker where I can log daily habits and see streaks.&rdquo; &mdash; Describe your idea in plain English. The agent builds it.</p>
+        </div>
+        <div class="card card--green">
+          <div class="card__icon">&#x26A1;</div>
+          <div class="card__title accent-green">Automate Anything</div>
+          <p>&ldquo;Every morning, check my email for invoices and add them to a spreadsheet.&rdquo; &mdash; Your agent writes scripts that run on schedule.</p>
+        </div>
+      </div>
+
+      <!-- Developer use cases -->
+      <p style="text-align: center; margin-bottom: 24px; font-size: 10px; color: #8b8ba7;">For development teams.</p>
       <div class="grid grid--2">
 
         <div class="card card--cyan">
@@ -504,11 +566,12 @@
       <div class="footer__links">
         <a href="index.html">Home</a>
         <a href="getting-started.html">Getting Started</a>
+        <a href="why-corvidagent.html">Why CorvidAgent</a>
+        <a href="business-guide.html">Business</a>
+        <a href="enterprise.html">Enterprise</a>
         <a href="architecture.html">API</a>
-        <a href="algochat.html">AlgoChat</a>
         <a href="security.html">Security</a>
         <a href="self-hosting.html">Deploy</a>
-        <a href="https://corvid-agent.github.io/agent-dashboard/" target="_blank" rel="noopener">Dashboard</a>
         <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank" rel="noopener">GitHub</a>
       </div>
       <p class="footer__copy">

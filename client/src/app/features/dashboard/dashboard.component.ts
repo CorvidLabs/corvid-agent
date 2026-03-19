@@ -68,7 +68,27 @@ interface ActivityEvent {
             </div>
         } @else {
         <div class="dashboard">
-            <!-- Top Metrics Row -->
+            <!-- View Mode Toggle -->
+            <div class="view-toggle">
+                <button class="view-toggle__btn"
+                        [attr.data-active]="viewMode() === 'simple'"
+                        (click)="viewMode.set('simple')">Simple</button>
+                <button class="view-toggle__btn"
+                        [attr.data-active]="viewMode() === 'advanced'"
+                        (click)="viewMode.set('advanced')">Advanced</button>
+            </div>
+
+            <!-- Simple View: Just agents + quick start -->
+            @if (viewMode() === 'simple') {
+                <div class="simple-hero">
+                    <h2 class="simple-hero__title">What do you want to build?</h2>
+                    <p class="simple-hero__desc">Pick an agent and start a conversation. Describe what you want in plain English.</p>
+                    <button class="simple-hero__btn" (click)="navigateTo('/sessions/new')">+ Start a Conversation</button>
+                </div>
+            }
+
+            <!-- Top Metrics Row (advanced only) -->
+            @if (viewMode() === 'advanced') {
             <div class="metrics-row">
                 <div class="metric-card">
                     <span class="metric-card__label">Total Agents</span>
@@ -112,6 +132,7 @@ interface ActivityEvent {
                     <span class="metric-card__value">{{ overview()?.totalSessions ?? sessionService.sessions().length }}</span>
                 </div>
             </div>
+            }
 
             <!-- Agent Activity Grid -->
             @if (agentSummaries().length > 0) {
@@ -180,8 +201,8 @@ interface ActivityEvent {
                 </div>
             }
 
-            <!-- Flock Directory Browser -->
-            @if (flockAgents().length > 0) {
+            <!-- Flock Directory Browser (advanced only) -->
+            @if (viewMode() === 'advanced' && flockAgents().length > 0) {
                 <div class="section">
                     <div class="section__header">
                         <h3>Flock Directory</h3>
@@ -216,7 +237,7 @@ interface ActivityEvent {
                 </div>
             }
 
-            @if (agentSummaries().length >= 2) {
+            @if (viewMode() === 'advanced' && agentSummaries().length >= 2) {
                 <div class="section">
                     <div class="section__header">
                         <h3>Agent Comparison</h3>
@@ -370,9 +391,43 @@ interface ActivityEvent {
     `,
     styles: `
         .dashboard { padding: 1.25rem; overflow-y: auto; height: 100%; }
+
+        .view-toggle {
+            display: flex; gap: .25rem; margin-bottom: 1rem;
+            background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: .15rem; width: fit-content;
+        }
+        .view-toggle__btn {
+            padding: .35rem .75rem; border: none; border-radius: var(--radius-sm);
+            font-size: .7rem; font-weight: 600; font-family: inherit;
+            background: transparent; color: var(--text-tertiary); cursor: pointer;
+            text-transform: uppercase; letter-spacing: .06em; transition: all .15s;
+        }
+        .view-toggle__btn[data-active="true"] {
+            background: rgba(0,229,255,.1); color: var(--accent-cyan);
+            border: 1px solid rgba(0,229,255,.2);
+        }
+        .view-toggle__btn:hover:not([data-active="true"]) { color: var(--text-secondary); }
+
+        .simple-hero { padding: 2rem; text-align: center; margin-bottom: 1.25rem; }
+        .simple-hero__title {
+            margin: 0 0 .5rem; font-size: 1.2rem; font-weight: 700;
+            color: var(--text-primary);
+        }
+        .simple-hero__desc {
+            margin: 0 0 1.25rem; font-size: .8rem; color: var(--text-tertiary);
+            max-width: 400px; margin-left: auto; margin-right: auto;
+        }
+        .simple-hero__btn {
+            padding: .6rem 1.5rem; border-radius: var(--radius);
+            font-size: .8rem; font-weight: 600; font-family: inherit;
+            border: 1px solid var(--accent-cyan); color: var(--accent-cyan);
+            background: rgba(0,229,255,.06); cursor: pointer;
+            text-transform: uppercase; letter-spacing: .05em; transition: all .15s;
+        }
+        .simple-hero__btn:hover { background: rgba(0,229,255,.14); box-shadow: 0 0 16px rgba(0,229,255,.15); }
         .metrics-row { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: .75rem; margin-bottom: 1.5rem; }
         .metric-card {
-            background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
             padding: .75rem 1rem; display: flex; flex-direction: column; gap: .2rem; transition: border-color .15s;
         }
         .metric-card:hover { border-color: var(--border-bright); }
@@ -385,12 +440,14 @@ interface ActivityEvent {
         .metric-card__link { font-size: .65rem; color: var(--accent-cyan); text-decoration: none; opacity: .7; }
         .metric-card__link:hover { opacity: 1; text-decoration: underline; }
         .metric-card__sub { font-size: .6rem; color: var(--text-tertiary); text-transform: uppercase; }
-        .section {
+        .section, .simple-hero, .metric-card {
             background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-            padding: 1rem 1.25rem; margin-bottom: 1.25rem;
         }
+        .section, .simple-hero { margin-bottom: 1.25rem; }
+        .section { padding: 1rem 1.25rem; }
         .section h3 { margin: 0 0 .75rem; color: var(--text-primary); font-size: .85rem; }
-        .section__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
+        .section__header, .flock-card__top, .flock-card__footer, .status-row { display: flex; justify-content: space-between; align-items: center; }
+        .section__header { margin-bottom: .75rem; }
         .section__header h3 { margin: 0; }
         .section__link { font-size: .7rem; color: var(--accent-cyan); text-decoration: none; }
         .section__link:hover { text-decoration: underline; }
@@ -405,26 +462,26 @@ interface ActivityEvent {
         }
         .agent-card:hover { border-color: var(--accent-cyan); box-shadow: 0 0 12px rgba(0,229,255,.08); }
         .agent-card__top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .5rem; }
-        .agent-card__info { display: flex; flex-direction: column; gap: .1rem; }
+        .agent-card__info, .agent-card__stat { display: flex; flex-direction: column; gap: .1rem; }
         .agent-card__name { font-weight: 700; font-size: .85rem; color: var(--text-primary); }
         .agent-card__provider-badge {
             font-size: .55rem; font-family: var(--font-mono,monospace); font-weight: 600;
             padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid;
             text-transform: uppercase; letter-spacing: .05em;
         }
-        .agent-card__provider-badge[data-provider="anthropic"] { color: #d4a574; border-color: rgba(212,165,116,.4); }
-        .agent-card__provider-badge[data-provider="openai"] { color: #74d4a5; border-color: rgba(116,212,165,.4); }
-        .agent-card__provider-badge[data-provider="ollama"] { color: #a5a5ff; border-color: rgba(165,165,255,.4); }
-        .agent-card__status {
+        .agent-card__provider-badge[data-provider="anthropic"] { color: #d4a574; border-color: #d4a57466; }
+        .agent-card__provider-badge[data-provider="openai"] { color: #74d4a5; border-color: #74d4a566; }
+        .agent-card__provider-badge[data-provider="ollama"] { color: #a5a5ff; border-color: #a5a5ff66; }
+        .agent-card__status, .comparison-table__status {
             font-size: .6rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-sm);
             text-transform: uppercase; letter-spacing: .06em; border: 1px solid;
         }
-        .agent-card__status[data-status="busy"] { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0,255,136,.08); }
-        .agent-card__status[data-status="idle"] { color: var(--text-tertiary); border-color: var(--border); background: var(--bg-surface); }
+        [data-status="busy"] { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0,255,136,.08); }
+        [data-status="idle"] { color: var(--text-tertiary); border-color: var(--border); background: var(--bg-surface); }
         .agent-card__stats { display: flex; gap: 1rem; margin-bottom: .5rem; }
-        .agent-card__stat { display: flex; flex-direction: column; gap: .1rem; }
-        .agent-card__stat-value { font-size: .95rem; font-weight: 700; color: var(--accent-cyan); }
-        .agent-card__stat-value--algo { font-size: .85rem; font-weight: 700; color: var(--accent-green); }
+        .agent-card__stat-value, .agent-card__stat-value--algo { font-weight: 700; }
+        .agent-card__stat-value { font-size: .95rem; color: var(--accent-cyan); }
+        .agent-card__stat-value--algo { font-size: .85rem; color: var(--accent-green); }
         .agent-card__stat-value--time { font-size: .75rem; color: var(--text-secondary); }
         .agent-card__stat-label { font-size: .55rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .06em; }
         .agent-card__actions { display: flex; gap: .35rem; }
@@ -442,7 +499,7 @@ interface ActivityEvent {
             padding: .5rem 0; border-bottom: 1px solid var(--border);
             text-decoration: none; color: inherit; transition: background .1s;
         }
-        .activity-item:last-child { border-bottom: none; }
+        .activity-item:last-child, .status-row:last-child, .running-item:last-child { border-bottom: none; }
         .activity-item:hover { background: var(--bg-hover); }
         .activity-item__icon {
             width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
@@ -452,12 +509,12 @@ interface ActivityEvent {
         .activity-item__icon[data-type="session_started"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
         .activity-item__icon[data-type="session_completed"] { color: var(--accent-green); border-color: var(--accent-green); }
         .activity-item__icon[data-type="session_error"] { color: var(--accent-red); border-color: var(--accent-red); }
-        .activity-item__icon[data-type="work_task"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
+        .activity-item__icon[data-type="work_task"], .activity-item__icon[data-type="agent_message"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
         .activity-item__icon[data-type="council"] { color: var(--accent-amber,#ffc107); border-color: var(--accent-amber,#ffc107); }
-        .activity-item__icon[data-type="agent_message"] { color: var(--accent-magenta); border-color: var(--accent-magenta); }
         .activity-item__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
-        .activity-item__label { font-size: .8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .activity-item__detail { font-size: .7rem; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .activity-item__label, .activity-item__detail, .comparison-table__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .activity-item__label { font-size: .8rem; font-weight: 600; color: var(--text-primary); }
+        .activity-item__detail { font-size: .7rem; color: var(--text-tertiary); }
         .activity-item__time { font-size: .65rem; color: var(--text-tertiary); flex-shrink: 0; }
         .right-col { display: flex; flex-direction: column; gap: 1.25rem; }
         .right-col .section { margin-bottom: 0; }
@@ -473,11 +530,7 @@ interface ActivityEvent {
         .action-btn--selftest:hover:not(:disabled) { background: rgba(255,0,128,.12); }
         .action-btn:disabled { opacity: .5; cursor: not-allowed; }
         .status-list { display: flex; flex-direction: column; gap: .25rem; }
-        .status-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .8rem;
-        }
-        .status-row:last-child { border-bottom: none; }
+        .status-row { padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
         .status-row__label { color: var(--text-secondary); }
         .status-row__indicator { font-weight: 600; font-size: .75rem; }
         .status-row__indicator[data-ok="true"] { color: var(--accent-green); }
@@ -485,7 +538,6 @@ interface ActivityEvent {
         .status-row__value { font-weight: 600; color: var(--text-primary); }
         .status-row__value--version { font-family: var(--font-mono,monospace); font-size: .75rem; color: var(--text-tertiary); }
         .running-item { display: flex; align-items: center; gap: .75rem; padding: .4rem 0; border-bottom: 1px solid var(--border); }
-        .running-item:last-child { border-bottom: none; }
         .running-item a { color: var(--accent-cyan); text-decoration: none; font-size: .8rem; }
         .running-item a:hover { text-decoration: underline; }
         .stage-badge {
@@ -498,19 +550,23 @@ interface ActivityEvent {
         .stage-badge[data-stage="synthesizing"] { color: var(--accent-gold); border-color: var(--accent-gold); }
         .stage-badge[data-stage="complete"] { color: var(--accent-green); border-color: var(--accent-green); }
         .agent-card__reputation { display: flex; align-items: center; gap: .25rem; margin-top: .15rem; }
-        .agent-card__rep-score {
+        .agent-card__rep-score, .flock-card__score, .comparison-table__rep-val {
             font-size: .75rem; font-weight: 700; font-family: var(--font-mono,monospace);
+        }
+        .agent-card__rep-score, .flock-card__score {
             padding: 1px 5px; border-radius: var(--radius-sm); border: 1px solid;
         }
-        .agent-card__rep-score[data-level="high"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .agent-card__rep-score[data-level="mid"] { color: var(--accent-amber,#ffc107); border-color: var(--accent-amber,#ffc107); }
-        .agent-card__rep-score[data-level="low"] { color: var(--accent-red); border-color: var(--accent-red); }
+        [data-level="high"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        [data-level="mid"] { color: var(--accent-amber,#ffc107); border-color: var(--accent-amber,#ffc107); }
+        [data-level="low"] { color: var(--accent-red); border-color: var(--accent-red); }
         .agent-card__rep-label { font-size: .55rem; color: var(--text-tertiary); text-transform: uppercase; }
         .agent-card__capabilities { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .35rem; }
-        .agent-card__cap-pill {
+        .agent-card__cap-pill, .flock-card__cap {
             font-size: .55rem; padding: 1px 6px; border-radius: 9999px;
-            background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.2);
-            color: var(--accent-cyan); text-transform: lowercase; font-weight: 500;
+            text-transform: lowercase; font-weight: 500;
+        }
+        .agent-card__cap-pill {
+            background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.2); color: var(--accent-cyan);
         }
         .agent-card__cap-more { font-size: .55rem; padding: 1px 6px; color: var(--text-tertiary); font-weight: 500; }
         .flock-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: .75rem; }
@@ -519,23 +575,13 @@ interface ActivityEvent {
             border-radius: var(--radius); padding: .75rem; transition: border-color .15s;
         }
         .flock-card:hover { border-color: var(--accent-magenta); }
-        .flock-card__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem; }
+        .flock-card__top { margin-bottom: .35rem; }
         .flock-card__name { font-weight: 700; font-size: .8rem; color: var(--text-primary); }
-        .flock-card__score {
-            font-size: .75rem; font-weight: 700; font-family: var(--font-mono,monospace);
-            padding: 1px 5px; border-radius: var(--radius-sm); border: 1px solid;
-        }
-        .flock-card__score[data-level="high"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
-        .flock-card__score[data-level="mid"] { color: var(--accent-amber,#ffc107); border-color: var(--accent-amber,#ffc107); }
-        .flock-card__score[data-level="low"] { color: var(--accent-red); border-color: var(--accent-red); }
         .flock-card__desc { font-size: .7rem; color: var(--text-tertiary); margin: 0 0 .4rem; line-height: 1.4; }
         .flock-card__caps { display: flex; gap: .25rem; margin-bottom: .5rem; }
         .flock-card__cap {
-            font-size: .55rem; padding: 1px 6px; border-radius: 9999px;
-            background: rgba(255,0,128,.08); border: 1px solid rgba(255,0,128,.2);
-            color: var(--accent-magenta); text-transform: lowercase; font-weight: 500;
+            background: rgba(255,0,128,.08); border: 1px solid rgba(255,0,128,.2); color: var(--accent-magenta);
         }
-        .flock-card__footer { display: flex; justify-content: space-between; align-items: center; }
         .flock-card__status { font-size: .6rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
         .flock-card__status[data-status="active"] { color: var(--accent-green); }
         .flock-card__status[data-status="inactive"] { color: var(--text-tertiary); }
@@ -548,37 +594,24 @@ interface ActivityEvent {
         .flock-card__connect-btn:hover { background: rgba(255,0,128,.1); }
         .flock-stats { font-size: .7rem; color: var(--text-tertiary); }
         .comparison-table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-        .comparison-table__header, .comparison-table__row {
-            display: grid; grid-template-columns: 2fr 2fr 1fr 1fr .75fr; padding: .5rem 1rem;
-        }
-        .comparison-table__header {
-            background: var(--bg-raised); font-size: .7rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary);
-        }
-        .comparison-table__row {
-            border-top: 1px solid var(--border); font-size: .8rem; color: var(--text-primary);
-            text-decoration: none; transition: background .1s; align-items: center;
-        }
+        .comparison-table__header, .comparison-table__row { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr .75fr; padding: .5rem 1rem; align-items: center; }
+        .comparison-table__header { background: var(--bg-raised); font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
+        .comparison-table__row { border-top: 1px solid var(--border); font-size: .8rem; color: var(--text-primary); text-decoration: none; transition: background .1s; }
         .comparison-table__row:hover { background: var(--bg-hover); }
-        .comparison-table__name { font-weight: 600; color: var(--accent-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .comparison-table__name { font-weight: 600; color: var(--accent-cyan); }
         .comparison-table__rep { display: flex; align-items: center; gap: .5rem; }
         .comparison-table__rep-bar { flex: 1; height: 6px; background: var(--bg-raised); border-radius: 3px; overflow: hidden; max-width: 80px; }
         .comparison-table__rep-fill { height: 100%; border-radius: 3px; min-width: 1px; transition: width .3s; }
         .comparison-table__rep-fill[data-level="high"] { background: var(--accent-cyan); }
         .comparison-table__rep-fill[data-level="mid"] { background: var(--accent-amber,#ffc107); }
         .comparison-table__rep-fill[data-level="low"] { background: var(--accent-red); }
-        .comparison-table__rep-val { font-size: .75rem; font-weight: 700; font-family: var(--font-mono,monospace); color: var(--text-primary); }
+        .comparison-table__rep-val { color: var(--text-primary); }
         .comparison-table__na { color: var(--text-tertiary); font-size: .75rem; }
         .comparison-table__sessions { display: flex; align-items: center; gap: .25rem; }
         .comparison-table__sessions-val { font-weight: 700; color: var(--accent-cyan); }
         .comparison-table__sessions-label { font-size: .6rem; color: var(--text-tertiary); text-transform: uppercase; }
         .comparison-table__balance { color: var(--accent-green); font-family: var(--font-mono,monospace); font-size: .8rem; }
-        .comparison-table__status {
-            font-size: .6rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-sm);
-            text-transform: uppercase; letter-spacing: .06em; border: 1px solid; text-align: center;
-        }
-        .comparison-table__status[data-status="busy"] { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0,255,136,.08); }
-        .comparison-table__status[data-status="idle"] { color: var(--text-tertiary); border-color: var(--border); background: var(--bg-surface); }
+        .comparison-table__status { text-align: center; }
         @media (max-width:768px) {
             .dashboard { padding: 1rem; }
             .metrics-row { grid-template-columns: repeat(auto-fill,minmax(120px,1fr)); }
@@ -612,6 +645,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.agentService.agents().length === 0 && !this.wizardDismissed(),
     );
     private readonly wizardDismissed = signal(false);
+    protected readonly viewMode = signal<'simple' | 'advanced'>('simple');
     protected readonly runningSessions = computed(() =>
         this.sessionService.sessions().filter((s) => s.status === 'running'),
     );

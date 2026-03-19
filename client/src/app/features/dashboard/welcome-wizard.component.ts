@@ -25,7 +25,34 @@ interface AgentTemplate {
     skillBundleIds: string[];
 }
 
-const AGENT_TEMPLATES: AgentTemplate[] = [
+const CREATOR_TEMPLATES: AgentTemplate[] = [
+    {
+        id: 'website-builder',
+        name: 'Website Builder',
+        suggestedName: 'WebBuilder',
+        description: 'Builds websites, landing pages, and portfolios. Just describe what you want.',
+        icon: '[]',
+        skillBundleIds: ['preset-full-stack'],
+    },
+    {
+        id: 'app-creator',
+        name: 'App Creator',
+        suggestedName: 'AppMaker',
+        description: 'Creates apps and tools from your ideas. Habit trackers, dashboards, calculators — anything.',
+        icon: '<>',
+        skillBundleIds: ['preset-full-stack'],
+    },
+    {
+        id: 'assistant',
+        name: 'Personal Assistant',
+        suggestedName: 'Assistant',
+        description: 'Research, writing, analysis, and automation. Your AI helper for everyday tasks.',
+        icon: '>>',
+        skillBundleIds: ['preset-researcher', 'preset-memory-manager'],
+    },
+];
+
+const DEVELOPER_TEMPLATES: AgentTemplate[] = [
     {
         id: 'full-stack',
         name: 'Full Stack Developer',
@@ -68,6 +95,8 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
     },
 ];
 
+const AGENT_TEMPLATES: AgentTemplate[] = [...CREATOR_TEMPLATES, ...DEVELOPER_TEMPLATES];
+
 @Component({
     selector: 'app-welcome-wizard',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -82,8 +111,8 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
 ██║     ██║   ██║██╔══██╗╚██╗ ██╔╝██║██║  ██║
 ╚██████╗╚██████╔╝██║  ██║ ╚████╔╝ ██║██████╔╝
  ╚═════╝ ╚═════╝ ╚═╝  ╚═╝  ╚═══╝  ╚═╝╚═════╝</pre>
-                <h1 class="wizard__title">Welcome to Corvid Agent</h1>
-                <p class="wizard__subtitle">AI agents that do real software engineering work</p>
+                <h1 class="wizard__title">Welcome to CorvidAgent</h1>
+                <p class="wizard__subtitle">Your own AI assistant &mdash; tell it what to build, fix, or figure out</p>
             </div>
 
             @switch (step()) {
@@ -121,7 +150,7 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
                             </button>
                         } @else {
                             <div class="wizard__warning">
-                                <p>Set <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> file or install Claude Code CLI to get started.</p>
+                                <p>No AI provider detected. Install <a href="https://claude.com/claude-code" target="_blank">Claude Code CLI</a> or <a href="https://ollama.com" target="_blank">Ollama</a>, or set <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> file.</p>
                             </div>
                             <button class="wizard__btn" (click)="step.set('templates')">
                                 Continue Anyway
@@ -132,11 +161,25 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
 
                 @case ('templates') {
                     <div class="wizard__step wizard__step--wide">
-                        <h2 class="step__title">Choose a Template</h2>
-                        <p class="step__desc">Pick a starting point — you can customize everything later.</p>
+                        <h2 class="step__title">What do you want to do?</h2>
+                        <p class="step__desc">Pick a starting point &mdash; you can customize everything later.</p>
 
+                        <p class="template-section-label">I have ideas but don&rsquo;t code</p>
                         <div class="template-grid">
-                            @for (t of templates; track t.id) {
+                            @for (t of creatorTemplates; track t.id) {
+                                <button class="template-card"
+                                        [attr.data-selected]="selectedTemplate()?.id === t.id"
+                                        (click)="selectTemplate(t)">
+                                    <span class="template-card__icon">{{ t.icon }}</span>
+                                    <span class="template-card__name">{{ t.name }}</span>
+                                    <span class="template-card__desc">{{ t.description }}</span>
+                                </button>
+                            }
+                        </div>
+
+                        <p class="template-section-label" style="margin-top: 0.75rem;">I&rsquo;m a developer</p>
+                        <div class="template-grid">
+                            @for (t of developerTemplates; track t.id) {
                                 <button class="template-card"
                                         [attr.data-selected]="selectedTemplate()?.id === t.id"
                                         (click)="selectTemplate(t)">
@@ -446,6 +489,17 @@ const AGENT_TEMPLATES: AgentTemplate[] = [
             font-size: 0.75rem;
         }
 
+        /* Template Section Labels */
+        .template-section-label {
+            margin: 0 0 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-align: left;
+        }
+
         /* Template Grid */
         .template-grid {
             display: grid;
@@ -750,6 +804,8 @@ export class WelcomeWizardComponent implements OnInit {
     protected readonly flockRegistered = signal(false);
     protected readonly flockError = signal(false);
     protected readonly templates = AGENT_TEMPLATES;
+    protected readonly creatorTemplates = CREATOR_TEMPLATES;
+    protected readonly developerTemplates = DEVELOPER_TEMPLATES;
     private createdAgentId = '';
 
     protected readonly form = this.fb.nonNullable.group({
