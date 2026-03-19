@@ -2688,7 +2688,7 @@ curl http://localhost:3000/api/analytics/overview \
   "workTasks": { "total": 340, "active": 2, "completed": 335 },
   "agentMessages": 1500,
   "algochatMessages": 820,
-  "todaySpending": { "usd": 1.20, "algo": 3.5 }
+  "todaySpending": { "algoMicro": 3500000, "apiCostUsd": 1.20 }
 }
 ```
 
@@ -2987,12 +2987,12 @@ Manage projects — working directories that agents operate within.
 | GET | `/api/projects/{id}` | Get project by ID | any |
 | PUT | `/api/projects/{id}` | Update project | operator |
 | DELETE | `/api/projects/{id}` | Delete project | operator |
-| GET | `/api/projects/browse-dirs` | Browse allowed directories | any |
+| GET | `/api/browse-dirs` | Browse allowed directories | any |
 
 ### Browse Directories
 
 ```bash
-curl "http://localhost:3000/api/projects/browse-dirs?path=/home/user/repos" \
+curl "http://localhost:3000/api/browse-dirs?path=/home/user/repos" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
