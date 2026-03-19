@@ -1,5 +1,0 @@
-# Projects that reject AI/LLM contributions — do not submit PRs, issues,
-# or any code contributions. They will be closed on sight.
-jellyfin/Swiftfin
-apple/swift-configuration
-vapor/*
