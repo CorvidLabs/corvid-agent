@@ -7,6 +7,7 @@ export const tables: string[] = [
         key        TEXT NOT NULL,
         content    TEXT NOT NULL,
         txid       TEXT DEFAULT NULL,
+        asa_id     INTEGER DEFAULT NULL,
         status     TEXT DEFAULT 'confirmed',
         archived   INTEGER NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now')),
@@ -18,6 +19,7 @@ export const indexes: string[] = [
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories(agent_id)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_memories_agent_key ON agent_memories(agent_id, key)`,
     `CREATE INDEX IF NOT EXISTS idx_agent_memories_status ON agent_memories(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_agent_memories_asa ON agent_memories(agent_id, asa_id) WHERE asa_id IS NOT NULL`,
 ];
 
 export const virtualTables: string[] = [

@@ -433,6 +433,7 @@ interface AgentMemoryRow {
     key: string;
     content: string;
     txid: string | null;
+    asa_id: number | null;
     status: string;
     created_at: string;
     updated_at: string;
@@ -445,6 +446,7 @@ function rowToAgentMemory(row: AgentMemoryRow): AgentMemory {
         key: row.key,
         content: row.content,
         txid: row.txid,
+        asaId: row.asa_id,
         status: row.status as AgentMemory['status'],
         createdAt: row.created_at,
         updatedAt: row.updated_at,

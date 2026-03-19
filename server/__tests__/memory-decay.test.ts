@@ -11,6 +11,7 @@ function makeMemory(updatedAt: string): AgentMemory {
         key: 'test-key',
         content: 'test content',
         txid: null,
+        asaId: null,
         status: 'confirmed',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt,

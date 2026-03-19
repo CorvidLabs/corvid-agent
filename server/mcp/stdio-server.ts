@@ -167,6 +167,27 @@ server.tool(
 );
 
 server.tool(
+    'corvid_delete_memory',
+    'Delete a long-term ARC-69 memory. Only works for ASA memories on localnet. ' +
+    'Soft delete (default) archives; hard delete destroys the ASA.',
+    {
+        key: z.string().describe('Memory key to delete'),
+        mode: z.enum(['soft', 'hard']).optional().describe('Delete mode (default: soft)'),
+    },
+    async (args) => {
+        const data = await callApi('/api/mcp/delete-memory', {
+            agentId,
+            key: args.key,
+            mode: args.mode,
+        });
+        return {
+            content: [{ type: 'text' as const, text: data.response }],
+            isError: data.isError,
+        };
+    },
+);
+
+server.tool(
     'corvid_list_agents',
     'List all available agents you can communicate with. ' +
     'Shows agent names, IDs, and wallet addresses.',

@@ -8,6 +8,7 @@ interface AgentMemoryRow {
     key: string;
     content: string;
     txid: string | null;
+    asa_id: number | null;
     status: string;
     created_at: string;
     updated_at: string;
@@ -20,6 +21,7 @@ function rowToAgentMemory(row: AgentMemoryRow): AgentMemory {
         key: row.key,
         content: row.content,
         txid: row.txid,
+        asaId: row.asa_id ?? null,
         status: row.status as MemoryStatus,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -52,6 +54,7 @@ export function saveMemory(
         key: params.key,
         content: params.content,
         txid: null,
+        asa_id: null,
         status: 'pending',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -175,4 +178,47 @@ export function getPendingMemories(
 
 export function countPendingMemories(db: Database): number {
     return queryCount(db, "SELECT COUNT(*) as cnt FROM agent_memories WHERE status IN ('pending', 'failed')");
+}
+
+export function updateMemoryAsaId(
+    db: Database,
+    id: string,
+    asaId: number,
+): void {
+    db.query(
+        'UPDATE agent_memories SET asa_id = ?, updated_at = datetime(\'now\') WHERE id = ?'
+    ).run(asaId, id);
+}
+
+export function getMemoryByAsaId(
+    db: Database,
+    agentId: string,
+    asaId: number,
+): AgentMemory | null {
+    const row = db.query(
+        'SELECT * FROM agent_memories WHERE agent_id = ? AND asa_id = ?'
+    ).get(agentId, asaId) as AgentMemoryRow | null;
+    return row ? rowToAgentMemory(row) : null;
+}
+
+export function deleteMemoryRow(
+    db: Database,
+    agentId: string,
+    key: string,
+): boolean {
+    const result = db.query(
+        'DELETE FROM agent_memories WHERE agent_id = ? AND key = ?'
+    ).run(agentId, key);
+    return (result as unknown as { changes: number }).changes > 0;
+}
+
+export function archiveMemory(
+    db: Database,
+    agentId: string,
+    key: string,
+): boolean {
+    const result = db.query(
+        "UPDATE agent_memories SET archived = 1, updated_at = datetime('now') WHERE agent_id = ? AND key = ?"
+    ).run(agentId, key);
+    return (result as unknown as { changes: number }).changes > 0;
 }

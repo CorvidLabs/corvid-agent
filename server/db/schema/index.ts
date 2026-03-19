@@ -46,7 +46,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 93;
+const SCHEMA_VERSION = 94;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
@@ -96,6 +96,10 @@ const MIGRATIONS: Record<number, string[]> = {
     93: [
         // Add project_name to mention sessions for Discord footer metadata
         `ALTER TABLE discord_mention_sessions ADD COLUMN project_name TEXT`,
+    ],
+    94: [
+        // ARC-69 long-term memory: add ASA ID column
+        `ALTER TABLE agent_memories ADD COLUMN asa_id INTEGER DEFAULT NULL`,
     ],
 };
 

@@ -29,6 +29,10 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | `updateMemoryStatus` | `(db: Database, id: string, status: MemoryStatus)` | `void` | Update the status of a memory (pending, confirmed, failed) |
 | `getPendingMemories` | `(db: Database, limit?: number)` | `AgentMemory[]` | Get memories with status 'pending' or 'failed', ordered by `updated_at ASC`. Default limit 20 |
 | `countPendingMemories` | `(db: Database)` | `number` | Count memories with status 'pending' or 'failed' |
+| `updateMemoryAsaId` | `(db: Database, id: string, asaId: number)` | `void` | Set the ARC-69 ASA ID for a memory |
+| `getMemoryByAsaId` | `(db: Database, agentId: string, asaId: number)` | `AgentMemory \| null` | Look up a memory by its ASA ID |
+| `deleteMemoryRow` | `(db: Database, agentId: string, key: string)` | `boolean` | Hard-delete a memory row. Returns true if a row was deleted |
+| `archiveMemory` | `(db: Database, agentId: string, key: string)` | `boolean` | Soft-delete by setting `archived = 1`. Returns true if a row was updated |
 
 ### Exported Types
 
@@ -114,6 +118,7 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 | key | TEXT | NOT NULL | Memory key (unique per agent via composite index) |
 | content | TEXT | NOT NULL | Memory content/value |
 | txid | TEXT | DEFAULT NULL | Algorand transaction ID anchoring this memory on-chain |
+| asa_id | INTEGER | DEFAULT NULL | ARC-69 ASA ID for long-term memories (localnet only). NULL for permanent (plain txn) memories |
 | status | TEXT | DEFAULT 'confirmed' | Lifecycle status: pending, confirmed, failed |
 | archived | INTEGER | NOT NULL, DEFAULT 0 | Soft-delete flag (0 = active, 1 = archived) |
 | created_at | TEXT | DEFAULT datetime('now') | Creation timestamp |
@@ -125,6 +130,7 @@ Pure data-access layer for agent memory CRUD operations including save, recall, 
 |-------|---------|------|-------------|
 | idx_agent_memories_agent_key | (agent_id, key) | UNIQUE | Enforces one memory per agent+key pair, used for upsert |
 | idx_agent_memories_agent | (agent_id) | INDEX | Speeds up per-agent queries |
+| idx_agent_memories_asa | (agent_id, asa_id) WHERE asa_id IS NOT NULL | INDEX | Fast lookup of memory by ASA ID |
 
 ## Change Log
 

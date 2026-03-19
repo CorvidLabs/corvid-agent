@@ -405,6 +405,12 @@ export const McpSyncOnChainMemoriesSchema = z.object({
     limit: z.number().optional(),
 });
 
+export const McpDeleteMemorySchema = z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    key: z.string().min(1, 'key is required'),
+    mode: z.enum(['soft', 'hard']).optional(),
+});
+
 // ─── Misc routes (index.ts) ───────────────────────────────────────────────────
 
 export const EscalationResolveSchema = z.object({

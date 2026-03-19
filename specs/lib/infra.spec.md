@@ -115,6 +115,7 @@ Core infrastructure utilities providing structured logging, environment safety, 
 | `McpRecallMemorySchema` | MCP API | Validates MCP memory recall: `agentId` (required), optional `key`, `query`. |
 | `McpReadOnChainMemoriesSchema` | MCP API | Validates MCP on-chain memory read: `agentId` (required), optional `search`, `limit`. |
 | `McpSyncOnChainMemoriesSchema` | MCP API | Validates MCP on-chain memory sync: `agentId` (required), optional `limit`. |
+| `McpDeleteMemorySchema` | MCP API | Validates MCP memory delete: `agentId`, `key` (required), optional `mode` (soft/hard). |
 | `EscalationResolveSchema` | Misc | Validates escalation resolution: `approved` (boolean required). |
 | `OperationalModeSchema` | Misc | Validates operational mode: `mode` (enum: `normal`, `queued`, `paused`). |
 | `SelfTestSchema` | Misc | Validates self-test: optional `testType` (default `all`). |

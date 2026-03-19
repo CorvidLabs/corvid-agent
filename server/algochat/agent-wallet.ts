@@ -57,6 +57,11 @@ export class AgentWalletService {
         this.keyProvider = keyProvider ?? null;
     }
 
+    /** Expose the underlying AlgoChatService (for algodClient/indexerClient access). */
+    getAlgoChatService(): AlgoChatService {
+        return this.service;
+    }
+
     /**
      * Validate that the key provider is production-ready.
      * Called once lazily on first wallet operation. On localnet this is a no-op.

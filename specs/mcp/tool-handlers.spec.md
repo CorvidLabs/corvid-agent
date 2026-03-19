@@ -61,6 +61,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleRecallMemory` | `(ctx, { query, limit? })` | `Promise<CallToolResult>` | FTS search of agent memories |
 | `handleReadOnChainMemories` | `(ctx, { search?, limit? })` | `Promise<CallToolResult>` | Read memories directly from on-chain storage via indexer |
 | `handleSyncOnChainMemories` | `(ctx, { limit? })` | `Promise<CallToolResult>` | Sync on-chain memories back to local SQLite cache |
+| `handleDeleteMemory` | `(ctx, { key, mode? })` | `Promise<CallToolResult>` | Delete an ARC-69 memory by key. Mode is 'soft' (default) or 'hard' |
 | `handleListAgents` | `(ctx, {})` | `Promise<CallToolResult>` | List all agents with status summary |
 | `handleExtendTimeout` | `(ctx, { additional_minutes })` | `Promise<CallToolResult>` | Extend current session timeout |
 | `handleCheckCredits` | `(ctx, { wallet_address })` | `Promise<CallToolResult>` | Check credit balance for a wallet |

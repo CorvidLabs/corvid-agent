@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentWalletService } from '../algochat/agent-wallet';
-import { getPendingMemories, updateMemoryTxid, updateMemoryStatus, countPendingMemories } from './agent-memories';
+import { getPendingMemories, updateMemoryTxid, updateMemoryStatus, updateMemoryAsaId, countPendingMemories } from './agent-memories';
 import { encryptMemoryContent } from '../lib/crypto';
 import { createLogger } from '../lib/logger';
 
@@ -75,6 +75,7 @@ export class MemorySyncService {
             const memories = getPendingMemories(this.db, BATCH_SIZE);
             if (memories.length === 0) return;
 
+            const isLocalnet = this.network === 'localnet' || !this.network;
             const now = Date.now();
             let synced = 0;
             let skipped = 0;
@@ -96,6 +97,20 @@ export class MemorySyncService {
                         await this.walletService.checkAndRefill(memory.agentId);
                     }
 
+                    // On localnet: try ARC-69 ASA path first
+                    if (isLocalnet && this.walletService) {
+                        try {
+                            const synced = await this.syncViaArc69(memory);
+                            if (synced) continue;
+                        } catch (err) {
+                            log.debug('ARC-69 sync failed, falling back to plain txn', {
+                                key: memory.key,
+                                error: err instanceof Error ? err.message : String(err),
+                            });
+                        }
+                    }
+
+                    // Fallback: plain transaction path
                     const encrypted = await encryptMemoryContent(
                         memory.content,
                         this.serverMnemonic,
@@ -128,6 +143,43 @@ export class MemorySyncService {
         } finally {
             this.syncing = false;
         }
+    }
+
+    /**
+     * Attempt to sync a pending memory via ARC-69 ASA.
+     * Returns true if successful, false if ARC-69 path is unavailable.
+     */
+    private async syncViaArc69(memory: { id: string; agentId: string; key: string; content: string; asaId: number | null }): Promise<boolean> {
+        if (!this.walletService) return false;
+
+        const service = this.walletService.getAlgoChatService();
+        if (!service.indexerClient) return false;
+
+        const chatAccountResult = await this.walletService.getAgentChatAccount(memory.agentId);
+        if (!chatAccountResult) return false;
+
+        const { createMemoryAsa, updateMemoryAsa, resolveAsaForKey } = await import('../memory/arc69-store');
+
+        const ctx = {
+            db: this.db,
+            agentId: memory.agentId,
+            algodClient: service.algodClient,
+            indexerClient: service.indexerClient,
+            chatAccount: chatAccountResult.account,
+        };
+
+        const existingAsaId = memory.asaId ?? resolveAsaForKey(this.db, memory.agentId, memory.key);
+
+        if (existingAsaId) {
+            const { txid } = await updateMemoryAsa(ctx, existingAsaId, memory.key, memory.content);
+            updateMemoryTxid(this.db, memory.id, txid);
+        } else {
+            const { asaId, txid } = await createMemoryAsa(ctx, memory.key, memory.content);
+            updateMemoryTxid(this.db, memory.id, txid);
+            updateMemoryAsaId(this.db, memory.id, asaId);
+        }
+
+        return true;
     }
 
     getStats(): { pendingCount: number; isRunning: boolean } {
