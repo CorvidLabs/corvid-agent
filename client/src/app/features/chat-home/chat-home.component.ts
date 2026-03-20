@@ -3,6 +3,7 @@ import {
     ChangeDetectionStrategy,
     inject,
     signal,
+    computed,
     OnInit,
     ViewChild,
     ElementRef,
@@ -15,11 +16,16 @@ import { SessionService } from '../../core/services/session.service';
 import { NotificationService } from '../../core/services/notification.service';
 import type { Agent } from '../../core/models/agent.model';
 import { ChatTabsService } from '../../core/services/chat-tabs.service';
+import { OnboardingComponent } from './onboarding.component';
 
 @Component({
     selector: 'app-chat-home',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [OnboardingComponent],
     template: `
+        @if (showOnboarding()) {
+            <app-onboarding (done)="onboardingSkipped.set(true)" />
+        } @else {
         <div class="chat-home">
             <div class="chat-home__center">
                 <h1 class="chat-home__title">CorvidAgent</h1>
@@ -69,6 +75,7 @@ import { ChatTabsService } from '../../core/services/chat-tabs.service';
                 </div>
             </div>
         </div>
+        }
     `,
     styles: `
         :host {
@@ -227,6 +234,11 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
     private readonly chatTabs = inject(ChatTabsService);
 
     @ViewChild('promptInput') private promptInput?: ElementRef<HTMLTextAreaElement>;
+
+    protected readonly onboardingSkipped = signal(false);
+    protected readonly showOnboarding = computed(
+        () => this.agentService.agents().length === 0 && !this.onboardingSkipped(),
+    );
 
     readonly agents = signal<Agent[]>([]);
     readonly prompt = signal('');
