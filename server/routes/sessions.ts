@@ -17,6 +17,8 @@ import { recordAudit } from '../db/audit';
 import { getClientIp } from '../middleware/rate-limit';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
+import { getAgent } from '../db/agents';
+import { buildOllamaComplexityWarning } from '../lib/ollama-complexity-warning';
 
 const log = createLogger('SessionRoutes');
 
@@ -128,7 +130,25 @@ async function handleCreate(
             }
         }
 
-        return json(session, 201);
+        // Advisory: warn when Ollama model is used for a complex task.
+        // Non-blocking — task proceeds regardless.
+        let complexityWarning: string | undefined;
+        if (data.agentId && data.initialPrompt) {
+            const agent = getAgent(db, data.agentId, tenantId);
+            if (agent) {
+                const warning = buildOllamaComplexityWarning(
+                    data.initialPrompt,
+                    agent.model,
+                    agent.provider,
+                );
+                if (warning) {
+                    complexityWarning = warning;
+                    log.warn('Ollama complexity advisory', { sessionId: session.id, model: agent.model, warning });
+                }
+            }
+        }
+
+        return json(complexityWarning ? { ...session, complexityWarning } : session, 201);
     } catch (err) {
         if (err instanceof ValidationError) return json({ error: err.detail }, 400);
         throw err;
