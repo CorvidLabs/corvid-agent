@@ -132,7 +132,7 @@ export class WidgetLayoutService {
             if (!parsed.every((w: unknown) =>
                 typeof w === 'object' && w !== null && 'id' in w && 'label' in w && 'visible' in w,
             )) return null;
-            return parsed;
+            return parsed as WidgetConfig[];
         } catch {
             return null;
         }
