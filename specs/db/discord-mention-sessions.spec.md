@@ -102,6 +102,7 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | `agent_name` | TEXT | NOT NULL | Display name of the agent that handled the mention |
 | `agent_model` | TEXT | NOT NULL | Model identifier used for the session |
 | `project_name` | TEXT | | Project name for embed footer context (migration 093) |
+| `channel_id` | TEXT | | Discord channel ID where the mention originated (migration 096) |
 | `created_at` | TEXT | DEFAULT `datetime('now')` | When the mapping was created |
 
 ### Indexes
@@ -113,3 +114,4 @@ Persists Discord mention-reply session mappings so they survive server restarts.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-03-16 | corvid-agent | Initial spec (mention-reply persistence, migration 092) |
+| 2026-03-20 | corvid-agent | Add channel_id column (migration 096) |

@@ -251,7 +251,7 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 |                                                                 |
 |  +-----------------------------------------------------------+  |
 |  |                    SQLite (bun:sqlite)                     |  |
-|  |  18 migrations  | FTS5 search | WAL mode | foreign keys    |  |
+|  |  19 migrations  | FTS5 search | WAL mode | foreign keys    |  |
 |  +-----------------------------------------------------------+  |
 +-----------------------------------------------------------------+
 ```
