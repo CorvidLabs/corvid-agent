@@ -5,12 +5,13 @@ import { WorkflowService } from '../../core/services/workflow.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRun } from '../../core/models/workflow.model';
 
 @Component({
     selector: 'app-workflow-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, SlicePipe, RelativeTimePipe],
+    imports: [FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page-header">
@@ -309,9 +310,12 @@ import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, WorkflowRu
                 </div>
             } @empty {
                 @if (!workflowService.loading()) {
-                    <div class="empty-state">
-                        <p>No workflows yet. Create one to get started with graph-based orchestration.</p>
-                    </div>
+                    <app-empty-state
+                        icon="  o->o\n  |   |\n  o->o"
+                        title="No workflows yet."
+                        description="Workflows let you build graph-based multi-step orchestrations between agents."
+                        actionLabel="+ Create Workflow"
+                        actionAriaLabel="Create your first workflow" />
                 }
             }
         </div>

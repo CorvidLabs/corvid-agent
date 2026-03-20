@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { firstValueFrom } from 'rxjs';
 
 interface LogEntry {
@@ -29,7 +30,7 @@ interface CreditTransaction {
 @Component({
     selector: 'app-system-logs',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, RelativeTimePipe, FormsModule],
+    imports: [RouterLink, RelativeTimePipe, FormsModule, EmptyStateComponent],
     template: `
         <div class="logs">
             <h2>System Logs</h2>
@@ -88,7 +89,10 @@ interface CreditTransaction {
                 @if (loadingLogs()) {
                     <p class="loading">Loading logs...</p>
                 } @else if (logs().length === 0) {
-                    <div class="empty">No system logs found.</div>
+                    <app-empty-state
+                        icon="  [___]\n  |   |\n  |...|"
+                        title="No system logs."
+                        description="System logs appear here when agents run sessions, handle webhooks, or process scheduled tasks." />
                 } @else {
                     <div class="log-list">
                         @for (log of logs(); track log.id + '-' + log.type) {
@@ -115,7 +119,10 @@ interface CreditTransaction {
                 @if (loadingCredits()) {
                     <p class="loading">Loading credit transactions...</p>
                 } @else if (creditTxns().length === 0) {
-                    <div class="empty">No credit transactions found.</div>
+                    <app-empty-state
+                        icon="  [___]\n  | 0 |\n  |...|"
+                        title="No credit transactions."
+                        description="Credit transactions appear when agents consume API credits during sessions." />
                 } @else {
                     <div class="credit-table">
                         <div class="credit-header">

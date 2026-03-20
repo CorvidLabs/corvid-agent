@@ -2,12 +2,13 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, signal, computed } 
 import { FormsModule } from '@angular/forms';
 import { SkillBundleService } from '../../core/services/skill-bundle.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { SkillBundle } from '../../core/models/skill-bundle.model';
 
 @Component({
     selector: 'app-skill-bundle-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule],
+    imports: [FormsModule, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -82,7 +83,12 @@ import type { SkillBundle } from '../../core/models/skill-bundle.model';
             @if (bundleService.loading()) {
                 <p class="loading">Loading bundles...</p>
             } @else if (filteredBundles().length === 0) {
-                <p class="empty">No bundles found.</p>
+                <app-empty-state
+                    icon="  [###]\n  [###]\n  [###]"
+                    title="No skill bundles yet."
+                    description="Skill bundles group MCP tools and system prompts into reusable packages for your agents."
+                    actionLabel="+ Create a Bundle"
+                    actionAriaLabel="Create your first skill bundle" />
             } @else {
                 <div class="bundle-list">
                     @for (bundle of filteredBundles(); track bundle.id) {

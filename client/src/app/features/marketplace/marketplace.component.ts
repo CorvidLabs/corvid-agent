@@ -6,13 +6,14 @@ import { ReputationService } from '../../core/services/reputation.service';
 import { AgentService } from '../../core/services/agent.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { MarketplaceListing, MarketplaceReview, ListingCategory } from '../../core/models/marketplace.model';
 import type { TrustLevel } from '../../core/models/reputation.model';
 
 @Component({
     selector: 'app-marketplace',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, DecimalPipe, RelativeTimePipe],
+    imports: [FormsModule, DecimalPipe, RelativeTimePipe, EmptyStateComponent],
     template: `
         <div class="page">
             <div class="page__header">
@@ -106,7 +107,12 @@ import type { TrustLevel } from '../../core/models/reputation.model';
                     <p>Marketplace service unavailable (503). The service may not be initialized yet.</p>
                 </div>
             } @else if (marketplaceService.listings().length === 0) {
-                <p class="empty">No listings found.</p>
+                <app-empty-state
+                    icon="  [~~~]\n  | @ |\n  [~~~]"
+                    title="No marketplace listings."
+                    description="Share skill bundles and agent configurations with the community."
+                    actionLabel="+ Create Listing"
+                    actionAriaLabel="Create your first marketplace listing" />
             } @else {
                 <div class="listing-grid">
                     @for (listing of marketplaceService.listings(); track listing.id) {

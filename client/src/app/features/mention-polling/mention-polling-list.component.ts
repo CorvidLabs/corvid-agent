@@ -6,12 +6,13 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from '../../core/models/mention-polling.model';
 
 @Component({
     selector: 'app-mention-polling-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, RelativeTimePipe],
+    imports: [FormsModule, RelativeTimePipe, EmptyStateComponent],
     template: `
         <div class="polling">
             <div class="polling__header">
@@ -148,10 +149,12 @@ import type { MentionPollingConfig, MentionPollingStatus, PollingActivity } from
             @if (pollingService.loading()) {
                 <p class="loading">Loading polling configs...</p>
             } @else if (filteredConfigs().length === 0) {
-                <div class="empty">
-                    <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}polling configurations found.</p>
-                    <p class="empty-hint">Create a polling config to monitor a GitHub repo for &#64;mentions without needing webhooks.</p>
-                </div>
+                <app-empty-state
+                    icon="  [@_@]\n   /|\\\n   / \\"
+                    title="No polling configs yet."
+                    description="Create a polling config to monitor GitHub repos for @mentions without needing webhooks."
+                    actionLabel="+ Create Config"
+                    actionAriaLabel="Create your first mention polling config" />
             } @else {
                 <div class="config-list">
                     @for (config of filteredConfigs(); track config.id) {

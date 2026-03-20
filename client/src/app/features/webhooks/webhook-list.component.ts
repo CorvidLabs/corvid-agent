@@ -7,12 +7,13 @@ import { AgentService } from '../../core/services/agent.service';
 import { ProjectService } from '../../core/services/project.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookRegistrationStatus } from '../../core/models/webhook.model';
 
 @Component({
     selector: 'app-webhook-list',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe],
+    imports: [RouterLink, FormsModule, SlicePipe, RelativeTimePipe, EmptyStateComponent],
     template: `
         <div class="webhooks">
             <div class="webhooks__header">
@@ -121,10 +122,12 @@ import type { WebhookRegistration, WebhookDelivery, WebhookEventType, WebhookReg
             @if (webhookService.loading()) {
                 <p class="loading">Loading webhooks...</p>
             } @else if (filteredRegistrations().length === 0) {
-                <div class="empty">
-                    <p>No {{ activeFilter() === 'all' ? '' : activeFilter() + ' ' }}webhook registrations found.</p>
-                    <p class="empty-hint">Register a webhook to trigger agent sessions from GitHub events.</p>
-                </div>
+                <app-empty-state
+                    icon="  {->}\n  |  |\n  {<-}"
+                    title="No webhook registrations."
+                    description="Register a webhook to trigger agent sessions from GitHub events."
+                    actionLabel="+ Register Webhook"
+                    actionAriaLabel="Register your first webhook" />
             } @else {
                 <div class="reg-list">
                     @for (reg of filteredRegistrations(); track reg.id) {
