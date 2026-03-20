@@ -15,7 +15,6 @@ import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
-import { AudienceService } from '../../core/services/audience.service';
 import { WidgetLayoutService, type WidgetId } from '../../core/services/widget-layout.service';
 import type { ServerWsMessage } from '@shared/ws-protocol';
 import type { FlockAgent } from '@shared/types/flock-directory';
@@ -76,19 +75,9 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
             </div>
         } @else {
         <div class="dashboard">
-            <!-- Top bar: audience switcher + customize toggle -->
+            <!-- Top bar: customize toggle -->
             <div class="dash-toolbar">
-                <div class="view-toggle">
-                    <button class="view-toggle__btn"
-                            [attr.data-active]="audienceService.isNormal()"
-                            (click)="switchAudience('normal')">Creator</button>
-                    <button class="view-toggle__btn"
-                            [attr.data-active]="audienceService.isDeveloper()"
-                            (click)="switchAudience('developer')">Developer</button>
-                    <button class="view-toggle__btn"
-                            [attr.data-active]="audienceService.isEnterprise()"
-                            (click)="switchAudience('enterprise')">Enterprise</button>
-                </div>
+                <span class="dash-toolbar__title">Dashboard</span>
                 <button class="customize-btn" (click)="layoutService.customizing.set(!layoutService.customizing())">
                     {{ layoutService.customizing() ? 'Done' : 'Customize' }}
                 </button>
@@ -122,20 +111,6 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             </div>
                         }
                     </div>
-                </div>
-            }
-
-            <!-- Chat-first hero for Creator mode -->
-            @if (audienceService.isNormal() && agentSummaries().length > 0) {
-                <div class="creator-hero">
-                    <h2 class="creator-hero__title">What would you like to build?</h2>
-                    <p class="creator-hero__desc">Tell your agent what you need and it will handle the rest.</p>
-                    <div class="creator-hero__prompts">
-                        @for (suggestion of promptSuggestions; track suggestion) {
-                            <button class="creator-hero__prompt-btn" (click)="startChatWithPrompt(suggestion)">{{ suggestion }}</button>
-                        }
-                    </div>
-                    <button class="creator-hero__start-btn" (click)="navigateTo('/sessions/new')">+ Start a Conversation</button>
                 </div>
             }
 
@@ -204,7 +179,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                             @if (agentSummaries().length > 0) {
                                 <div class="section">
                                     <div class="section__header">
-                                        <h3>{{ audienceService.isNormal() ? 'My Agents' : 'Agent Activity' }}</h3>
+                                        <h3>Agent Activity</h3>
                                         <a class="section__link" routerLink="/agents">View all agents</a>
                                     </div>
                                     <div class="agent-grid">
@@ -428,15 +403,11 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
                                 <h3>Quick Actions</h3>
                                 <div class="quick-actions">
                                     <button class="action-btn" (click)="navigateTo('/sessions/new')">+ New Conversation</button>
-                                    @if (!audienceService.isNormal()) {
-                                        <button class="action-btn" (click)="navigateTo('/councils')">Launch Council</button>
-                                    }
+                                    <button class="action-btn" (click)="navigateTo('/councils')">Launch Council</button>
                                     <button class="action-btn" (click)="navigateTo('/work-tasks')">Create Work Task</button>
-                                    @if (!audienceService.isNormal()) {
-                                        <button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
-                                            {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
-                                        </button>
-                                    }
+                                    <button class="action-btn action-btn--selftest" [disabled]="selfTestRunning()" (click)="runSelfTest()">
+                                        {{ selfTestRunning() ? 'Running...' : 'Run Self-Test' }}
+                                    </button>
                                 </div>
                             </div>
                         }
@@ -582,6 +553,7 @@ interface SessionStats { byAgent: AgentSessionStat[]; bySource: { source: string
 
         /* Toolbar */
         .dash-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: .5rem; flex-wrap: wrap; }
+        .dash-toolbar__title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
         .view-toggle {
             display: flex; gap: .25rem;
             background: var(--bg-surface); border: 1px solid var(--border);
@@ -1008,7 +980,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
     private readonly notify = inject(NotificationService);
-    protected readonly audienceService = inject(AudienceService);
+
     protected readonly layoutService = inject(WidgetLayoutService);
 
     protected readonly algochatStatus = this.sessionService.algochatStatus;
@@ -1239,11 +1211,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.unsubscribeWs?.();
-    }
-
-    protected switchAudience(audience: 'normal' | 'developer' | 'enterprise'): void {
-        this.audienceService.setAudience(audience);
-        this.layoutService.syncWithAudience();
     }
 
     protected onWizardComplete(): void {
