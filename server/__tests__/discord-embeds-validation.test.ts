@@ -40,12 +40,12 @@ describe('assertInteractionToken', () => {
 });
 
 describe('buildFooterText', () => {
-    test('returns agent name and model when only required fields provided', () => {
+    test('returns agent name only when no status', () => {
         const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' });
-        expect(result).toBe('Corvid · opus');
+        expect(result).toBe('Corvid');
     });
 
-    test('includes all fields when fully populated', () => {
+    test('shows agent name and status only (ignores model, project, session)', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
@@ -53,43 +53,42 @@ describe('buildFooterText', () => {
             sessionId: 'abcdef1234567890',
             status: 'running',
         });
-        expect(result).toBe('Corvid · opus · my-project · sid:abcdef12 · running');
+        expect(result).toBe('Corvid · running');
     });
 
-    test('includes projectName only', () => {
+    test('ignores projectName without status', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
             projectName: 'my-project',
         });
-        expect(result).toBe('Corvid · opus · my-project');
+        expect(result).toBe('Corvid');
     });
 
-    test('includes sessionId only and truncates to 8 chars', () => {
+    test('ignores sessionId', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
             sessionId: 'abcdef1234567890',
         });
-        expect(result).toBe('Corvid · opus · sid:abcdef12');
+        expect(result).toBe('Corvid');
     });
 
-    test('includes status only', () => {
+    test('includes status', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
             agentModel: 'opus',
             status: 'completed',
         });
-        expect(result).toBe('Corvid · opus · completed');
+        expect(result).toBe('Corvid · completed');
     });
 
-    test('handles short sessionId without error', () => {
+    test('works without agentModel', () => {
         const result = buildFooterText({
             agentName: 'Corvid',
-            agentModel: 'opus',
-            sessionId: 'abc',
+            status: 'done',
         });
-        expect(result).toBe('Corvid · opus · sid:abc');
+        expect(result).toBe('Corvid · done');
     });
 });
 
