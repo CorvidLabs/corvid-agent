@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.41.0] - 2026-03-20
+
+### Added
+- **Chat-first UI** — replace audience-segmented dashboard with simple chat interface (#1277)
+- **New shell layout** — top nav, activity rail, and chat home page (#1272)
+- **Glassmorphism UI refresh** — glass-effect cards and Discord embed color passthrough (#1286)
+- **Browser automation tool** — `corvid_browser` MCP tool for agent browser automation (#1289)
+- **Discord image sending** — new `/api/discord/send-image` endpoint and image block streaming (#1293)
+- **Discord file attachments** — file attachment support and cleaner embed footer (#1282)
+- **29 agent skills** — expand skills from 24 to 29, add Biome linter skill (#1281)
+
+### Fixed
+- **Security: rate-limit bypass** — prevent rate-limit bypass via X-Forwarded-For spoofing (#1273)
+- **Discord image-only messages** — allow messages with only image attachments, no text required (#1291)
+- **Chrome tool detection** — use bridge config for Chrome detection, conditionally enable Chrome tools (#1283, #1284)
+- **SDK session flags** — remove invalid `--chrome` flag from SDK sessions (#1290)
+- **Flock register idempotency** — make flock register idempotent for duplicate addresses (#1288)
+- **Legacy /chat handler** — remove legacy handler and add Angular wildcard route (#1274, #1275)
+- **Localnet auto-fund** — fix localnet auto-fund for development (#1281)
+
+### Docs
+- Sync API reference with code — add 29 undocumented endpoints and fix README stats (#1280)
+- Update README unit test count (#1287)
+
 ## [0.40.0] - 2026-03-19
 
 ### Added
