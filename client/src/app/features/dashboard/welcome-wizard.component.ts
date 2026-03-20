@@ -148,7 +148,7 @@ const TEMPLATES: AgentTemplate[] = [
                             <button class="audience-card"
                                     [attr.data-selected]="selectedAudience() === 'developer'"
                                     (click)="selectedAudience.set('developer')">
-                                <span class="audience-card__icon">{}</span>
+                                <span class="audience-card__icon">{{ '{' }}{{ '}' }}</span>
                                 <span class="audience-card__name">Developer</span>
                                 <span class="audience-card__desc">I write code. Show me metrics, sessions, logs, and developer tools.</span>
                             </button>
