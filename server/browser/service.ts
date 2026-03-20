@@ -258,7 +258,9 @@ export class BrowserService {
   /** Shut down the browser. */
   async close(): Promise<void> {
     if (this.browser) {
-      await this.browser.close().catch(() => {});
+      await this.browser.close().catch((err) => {
+        log.warn('Browser close failed', { error: err instanceof Error ? err.message : String(err) });
+      });
       this.browser = null;
       this.context = null;
       this.pages.clear();

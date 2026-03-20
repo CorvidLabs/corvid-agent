@@ -117,7 +117,9 @@ async function resolveEphemeral(project: Project): Promise<ResolvedDir> {
     const result = await gitClone(project.gitUrl, tempDir, { depth: 1 });
     if (!result.success) {
         // Clean up the empty temp dir
-        await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        await rm(tempDir, { recursive: true, force: true }).catch((err) => {
+            log.warn('Failed to clean up temp dir', { tempDir, error: err instanceof Error ? err.message : String(err) });
+        });
         return { dir: project.workingDir, ephemeral: false, error: result.error };
     }
 
