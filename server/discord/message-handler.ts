@@ -90,6 +90,7 @@ export interface MentionSessionInfo {
     agentModel: string;
     projectName?: string;
     displayColor?: string | null;
+    channelId?: string;
 }
 
 /** Context needed by the message handler to access bridge state. */
@@ -456,7 +457,7 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         session.id, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter, displayColor: agentDisplayColor });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter, displayColor: agentDisplayColor, channelId });
         },
         projectNameForFooter, agentDisplayColor,
     );
@@ -508,7 +509,7 @@ async function handleMentionReplyResume(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor, channelId });
         },
         projectName, displayColor,
     );

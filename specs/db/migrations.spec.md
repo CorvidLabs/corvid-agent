@@ -21,6 +21,7 @@ files:
   - server/db/migrations/091_contact_identities.ts
   - server/db/migrations/092_discord_mention_sessions.ts
   - server/db/migrations/093_mention_session_project_name.ts
+  - server/db/migrations/096_mention_session_channel_id.ts
 db_tables:
   - schema_version
 depends_on: []
