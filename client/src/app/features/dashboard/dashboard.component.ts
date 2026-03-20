@@ -13,6 +13,7 @@ import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { AbsoluteTimePipe } from '../../shared/pipes/absolute-time.pipe';
 import { ApiService } from '../../core/services/api.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { AudienceService } from '../../core/services/audience.service';
 import { WelcomeWizardComponent } from './welcome-wizard.component';
 import { SkeletonComponent } from '../../shared/components/skeleton.component';
 import type { ServerWsMessage } from '@shared/ws-protocol';
@@ -68,18 +69,21 @@ interface ActivityEvent {
             </div>
         } @else {
         <div class="dashboard">
-            <!-- View Mode Toggle -->
+            <!-- Audience mode indicator + switcher -->
             <div class="view-toggle">
                 <button class="view-toggle__btn"
-                        [attr.data-active]="viewMode() === 'simple'"
-                        (click)="viewMode.set('simple')">Simple</button>
+                        [attr.data-active]="audienceService.isNormal()"
+                        (click)="audienceService.setAudience('normal')">Creator</button>
                 <button class="view-toggle__btn"
-                        [attr.data-active]="viewMode() === 'advanced'"
-                        (click)="viewMode.set('advanced')">Advanced</button>
+                        [attr.data-active]="audienceService.isDeveloper()"
+                        (click)="audienceService.setAudience('developer')">Developer</button>
+                <button class="view-toggle__btn"
+                        [attr.data-active]="audienceService.isEnterprise()"
+                        (click)="audienceService.setAudience('enterprise')">Enterprise</button>
             </div>
 
-            <!-- Simple View: Just agents + quick start -->
-            @if (viewMode() === 'simple') {
+            <!-- Creator View: Just agents + quick start -->
+            @if (audienceService.isNormal()) {
                 <div class="simple-hero">
                     <h2 class="simple-hero__title">What do you want to build?</h2>
                     <p class="simple-hero__desc">Pick an agent and start a conversation. Describe what you want in plain English.</p>
@@ -87,8 +91,8 @@ interface ActivityEvent {
                 </div>
             }
 
-            <!-- Top Metrics Row (advanced only) -->
-            @if (viewMode() === 'advanced') {
+            <!-- Top Metrics Row (developer + enterprise) -->
+            @if (!audienceService.isNormal()) {
             <div class="metrics-row">
                 <div class="metric-card">
                     <span class="metric-card__label">Total Agents</span>
@@ -201,8 +205,8 @@ interface ActivityEvent {
                 </div>
             }
 
-            <!-- Flock Directory Browser (advanced only) -->
-            @if (viewMode() === 'advanced' && flockAgents().length > 0) {
+            <!-- Flock Directory Browser (enterprise only) -->
+            @if (audienceService.isEnterprise() && flockAgents().length > 0) {
                 <div class="section">
                     <div class="section__header">
                         <h3>Flock Directory</h3>
@@ -237,7 +241,7 @@ interface ActivityEvent {
                 </div>
             }
 
-            @if (viewMode() === 'advanced' && agentSummaries().length >= 2) {
+            @if (audienceService.isEnterprise() && agentSummaries().length >= 2) {
                 <div class="section">
                     <div class="section__header">
                         <h3>Agent Comparison</h3>
@@ -639,13 +643,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private readonly apiService = inject(ApiService);
     private readonly router = inject(Router);
     private readonly notify = inject(NotificationService);
+    protected readonly audienceService = inject(AudienceService);
 
     protected readonly algochatStatus = this.sessionService.algochatStatus;
     protected readonly showWelcome = computed(() =>
         this.agentService.agents().length === 0 && !this.wizardDismissed(),
     );
     private readonly wizardDismissed = signal(false);
-    protected readonly viewMode = signal<'simple' | 'advanced'>('simple');
     protected readonly runningSessions = computed(() =>
         this.sessionService.sessions().filter((s) => s.status === 'running'),
     );
