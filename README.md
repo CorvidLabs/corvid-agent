@@ -190,10 +190,10 @@ Everything runs locally on your computer. Your code stays yours. The only extern
 |--------|-------|
 | Unit tests | **8,208** across 341 files |
 | E2E tests | **360** across 31 Playwright specs |
-| Module specs | **162** with automated specsync validation (100% file coverage) |
+| Module specs | **161** with automated specsync validation (100% file coverage) |
 | Test:code ratio | **1.14×** — more test code than production code |
 | MCP tools | **47** corvid_* tool handlers |
-| API endpoints | **~300** across 47 route modules |
+| API endpoints | **~380** across 47 route modules |
 | DB migrations | **18** (squashed baseline + incremental, 90+ tables) |
 
 ### Tech Stack
@@ -289,7 +289,7 @@ e2e/             Playwright end-to-end tests (31 spec files, 360 tests)
 
 ### API
 
-~300 REST endpoints across 47 route modules. **[API Reference →](docs/api-reference.md)**
+~380 REST endpoints across 47 route modules. **[API Reference →](docs/api-reference.md)**
 
 Interactive explorer: `GET /api/docs` (Swagger UI) | OpenAPI spec: `GET /api/openapi.json`
 
