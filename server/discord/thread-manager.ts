@@ -11,13 +11,14 @@ import type { DiscordBridgeConfig } from './types';
 import { ButtonStyle } from './types';
 import type { EventCallback } from '../process/interfaces';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
-import { extractContentText } from '../process/types';
+import { extractContentText, extractContentImageUrls } from '../process/types';
 import { createLogger } from '../lib/logger';
 import {
     sendEmbed,
     sendReplyEmbed,
     editEmbed,
     sendEmbedWithButtons,
+    sendEmbedWithFiles,
     buildActionRow,
     sendTypingIndicator,
     agentColor,
@@ -26,6 +27,7 @@ import {
     splitEmbedDescription,
     buildFooterText,
     buildFooterWithStats,
+    type DiscordFileAttachment,
 } from './embeds';
 
 const log = createLogger('DiscordThreadManager');
@@ -164,10 +166,34 @@ export function subscribeForResponseWithEmbed(
         }
     };
 
+    /** Download an image URL and send as a Discord file attachment in the thread. */
+    const sendThreadImageUrl = async (imageUrl: string) => {
+        try {
+            const resp = await fetch(imageUrl);
+            if (!resp.ok) {
+                log.warn('Failed to fetch image for Discord thread', { imageUrl, status: resp.status });
+                return;
+            }
+            const data = new Uint8Array(await resp.arrayBuffer());
+            const ct = resp.headers.get('content-type') ?? 'image/png';
+            const ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : ct.includes('gif') ? 'gif' : ct.includes('webp') ? 'webp' : 'png';
+            const filename = `image.${ext}`;
+            const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
+            await sendEmbedWithFiles(delivery, botToken, threadId, {
+                image: { url: `attachment://${filename}` },
+                color,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            }, [attachment]);
+        } catch (err) {
+            log.warn('Failed to send image to Discord thread', { imageUrl, error: err instanceof Error ? err.message : String(err) });
+        }
+    };
+
     const callback: EventCallback = (_sid, event) => {
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
-            const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+            const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
+            const content = extractContentText(contentBlocks);
 
             if (content) {
                 receivedAnyContent = true;
@@ -175,6 +201,14 @@ export function subscribeForResponseWithEmbed(
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
+            }
+
+            // Send any image content blocks as file attachments
+            const imageUrls = extractContentImageUrls(contentBlocks);
+            for (const imageUrl of imageUrls) {
+                receivedAnyContent = true;
+                receivedAnyActivity = true;
+                sendThreadImageUrl(imageUrl);
             }
 
             const now = Date.now();
@@ -643,16 +677,48 @@ export function subscribeForAdaptiveInlineResponse(
         });
     };
 
+    /** Download an image from a URL and send it as a Discord file attachment. */
+    const sendImageUrl = async (imageUrl: string) => {
+        try {
+            const resp = await fetch(imageUrl);
+            if (!resp.ok) {
+                log.warn('Failed to fetch image for Discord', { imageUrl, status: resp.status });
+                return;
+            }
+            const data = new Uint8Array(await resp.arrayBuffer());
+            const ct = resp.headers.get('content-type') ?? 'image/png';
+            const ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : ct.includes('gif') ? 'gif' : ct.includes('webp') ? 'webp' : 'png';
+            const filename = `image.${ext}`;
+            const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
+            await sendEmbedWithFiles(delivery, botToken, channelId, {
+                image: { url: `attachment://${filename}` },
+                color,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            }, [attachment]);
+        } catch (err) {
+            log.warn('Failed to send image to Discord', { imageUrl, error: err instanceof Error ? err.message : String(err) });
+        }
+    };
+
     const adaptiveCallback: EventCallback = (_sid, event) => {
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
-            const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+            const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
+            const content = extractContentText(contentBlocks);
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
+            }
+
+            // Send any image content blocks as file attachments
+            const imageUrls = extractContentImageUrls(contentBlocks);
+            for (const imageUrl of imageUrls) {
+                receivedAnyContent = true;
+                receivedAnyActivity = true;
+                sendImageUrl(imageUrl);
             }
         }
 
@@ -808,16 +874,48 @@ export function subscribeForInlineProgressResponse(
         }
     };
 
+    /** Download an image URL and send as a Discord file attachment. */
+    const sendProgressImageUrl = async (imageUrl: string) => {
+        try {
+            const resp = await fetch(imageUrl);
+            if (!resp.ok) {
+                log.warn('Failed to fetch image for Discord (progress)', { imageUrl, status: resp.status });
+                return;
+            }
+            const data = new Uint8Array(await resp.arrayBuffer());
+            const ct = resp.headers.get('content-type') ?? 'image/png';
+            const ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : ct.includes('gif') ? 'gif' : ct.includes('webp') ? 'webp' : 'png';
+            const filename = `image.${ext}`;
+            const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
+            await sendEmbedWithFiles(delivery, botToken, channelId, {
+                image: { url: `attachment://${filename}` },
+                color,
+                footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }) },
+            }, [attachment]);
+        } catch (err) {
+            log.warn('Failed to send image to Discord (progress)', { imageUrl, error: err instanceof Error ? err.message : String(err) });
+        }
+    };
+
     const progressCallback: EventCallback = (_sid, event) => {
         if (event.type === 'assistant' && event.message) {
             const msg = event.message as { content?: unknown };
-            const content = extractContentText(msg.content as string | import('../process/types').ContentBlock[] | undefined);
+            const contentBlocks = msg.content as string | import('../process/types').ContentBlock[] | undefined;
+            const content = extractContentText(contentBlocks);
             if (content) {
                 receivedAnyContent = true;
                 receivedAnyActivity = true;
                 buffer += content;
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => flush(), 1500);
+            }
+
+            // Send any image content blocks as file attachments
+            const imageUrls = extractContentImageUrls(contentBlocks);
+            for (const imageUrl of imageUrls) {
+                receivedAnyContent = true;
+                receivedAnyActivity = true;
+                sendProgressImageUrl(imageUrl);
             }
         }
 

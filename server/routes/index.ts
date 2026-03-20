@@ -38,6 +38,7 @@ import { handleFeedbackRoutes } from './feedback';
 import { handleOnboardingRoutes } from './onboarding';
 import { handleSecurityOverviewRoutes } from './security-overview';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
+import { handleDiscordImageRoutes } from './discord-image';
 import { handleFlockDirectoryRoutes } from './flock-directory';
 import { handleContactRoutes } from './contacts';
 import type { ProcessManager } from '../process/manager';
@@ -338,6 +339,9 @@ async function handleRoutes(
 
     const bridgeDeliveryResponse = handleBridgeDeliveryRoutes(req, url);
     if (bridgeDeliveryResponse) return bridgeDeliveryResponse;
+
+    const discordImageResponse = handleDiscordImageRoutes(req, url);
+    if (discordImageResponse) return discordImageResponse instanceof Promise ? await discordImageResponse : discordImageResponse;
 
     const dashboardResponse = handleDashboardRoutes(req, url, db, context);
     if (dashboardResponse) return dashboardResponse;
