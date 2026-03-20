@@ -1,7 +1,7 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod/v4';
 import type { McpToolContext } from './tool-handlers';
-import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject } from './tool-handlers';
+import { handleSendMessage, handleSaveMemory, handleRecallMemory, handleDeleteMemory, handleReadOnChainMemories, handleSyncOnChainMemories, handleListAgents, handleCreateWorkTask, handleCheckWorkStatus, handleListWorkTasks, handleExtendTimeout, handleCheckCredits, handleGrantCredits, handleCreditConfig, handleManageSchedule, handleManageWorkflow, handleWebSearch, handleDeepResearch, handleDiscoverAgent, handleNotifyOwner, handleAskOwner, handleConfigureNotifications, handleGitHubStarRepo, handleGitHubUnstarRepo, handleGitHubForkRepo, handleGitHubListPrs, handleGitHubCreatePr, handleGitHubReviewPr, handleGitHubCreateIssue, handleGitHubListIssues, handleGitHubRepoInfo, handleGitHubGetPrDiff, handleGitHubCommentOnPr, handleGitHubFollowUser, handleCheckReputation, handleCheckHealthTrends, handlePublishAttestation, handleVerifyAgentReputation, handleInvokeRemoteAgent, handleCodeSymbols, handleFindReferences, handleLaunchCouncil, handleFlockDirectory, handleListProjects, handleCurrentProject, handleBrowser } from './tool-handlers';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
@@ -54,6 +54,7 @@ const DEFAULT_ALLOWED_TOOLS = new Set([
     'corvid_launch_council',
     'corvid_flock_directory',
     'corvid_lookup_contact',
+    'corvid_browser',
 ]);
 
 /** Tools that require an explicit grant in mcp_tool_permissions. */
@@ -608,6 +609,38 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
             },
             async (args) => handleLookupContact(ctx, args),
         ),
+
+        // ─── Browser automation ─────────────────────────────────────────
+        ...(ctx.browserService ? [tool(
+            'corvid_browser',
+            'Perform browser automation using a real Chrome browser. ' +
+            'Always call tabs_context first to see open tabs, then tabs_create to open a new tab. ' +
+            'Actions: tabs_context, tabs_create, close_tab, navigate, get_page_text, read_page, ' +
+            'find, click, type, press, scroll, form_input, javascript, screenshot, wait.',
+            {
+                action: z.enum([
+                    'tabs_context', 'tabs_create', 'close_tab', 'navigate',
+                    'get_page_text', 'read_page', 'find', 'click', 'type', 'press',
+                    'scroll', 'form_input', 'javascript', 'screenshot', 'wait',
+                ]).describe('Browser action to perform'),
+                tab_id: z.number().optional().describe('Tab ID (from tabs_context). Required for most actions.'),
+                url: z.string().optional().describe('URL for navigate or tabs_create'),
+                query: z.string().optional().describe('CSS selector or text to search for (find action)'),
+                selector: z.string().optional().describe('CSS selector for click, type, form_input, read_page, wait'),
+                code: z.string().optional().describe('JavaScript code to execute (javascript action)'),
+                text: z.string().optional().describe('Text to type (type action)'),
+                key: z.string().optional().describe('Key to press, e.g. "Enter", "Tab" (press action)'),
+                value: z.string().optional().describe('Value for form_input'),
+                direction: z.enum(['up', 'down']).optional().describe('Scroll direction (default: down)'),
+                amount: z.number().optional().describe('Scroll amount in pixels (default: 500)'),
+                x: z.number().optional().describe('X coordinate for click'),
+                y: z.number().optional().describe('Y coordinate for click'),
+                full_page: z.boolean().optional().describe('Take full-page screenshot (default: false)'),
+                max_length: z.number().optional().describe('Max chars for read_page (default: 50000)'),
+                ms: z.number().optional().describe('Wait duration in ms (wait action)'),
+            },
+            async (args) => handleBrowser(ctx, args),
+        )] : []),
     ];
 
     // Merge plugin tools if provided

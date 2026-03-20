@@ -22,6 +22,7 @@ import type { ReputationVerifier } from '../reputation/verifier';
 import type { AstParserService } from '../ast/service';
 import type { PermissionBroker } from '../permissions/broker';
 import type { FlockDirectoryService } from '../flock-directory/service';
+import type { BrowserService } from '../browser/service';
 import type { ProcessManager } from './manager';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import type { OwnerQuestionManager } from './owner-question-manager';
@@ -48,6 +49,7 @@ export interface McpServices {
     permissionBroker?: PermissionBroker;
     processManager?: ProcessManager;
     flockDirectoryService?: FlockDirectoryService;
+    browserService?: BrowserService;
 }
 
 export interface BuildContextOptions {
@@ -119,6 +121,7 @@ export class McpServiceContainer {
             permissionBroker: this.services.permissionBroker,
             processManager: this.services.processManager,
             flockDirectoryService: this.services.flockDirectoryService,
+            browserService: this.services.browserService,
             invocationBudget: new SessionInvocationBudget(),
         };
     }

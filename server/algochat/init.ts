@@ -25,6 +25,7 @@ import type { ResponsePollingService } from '../notifications/response-poller';
 import type { UsageMeter } from '../billing/meter';
 import type { HealthMonitorService } from '../health/monitor';
 import type { MentionPollingService } from '../polling/service';
+import type { BrowserService } from '../browser/service';
 import type { AlgoChatConfig } from './config';
 import type { AlgoChatState } from '../bootstrap';
 import { initAlgoChatService } from './service';
@@ -69,6 +70,7 @@ export interface AlgoChatInitDeps {
     healthMonitorService: HealthMonitorService;
     mentionPollingService: MentionPollingService;
     flockDirectoryService: FlockDirectoryService;
+    browserService?: BrowserService;
 }
 
 /**
@@ -79,7 +81,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     const { db, server, processManager, algochatConfig, algochatState, workTaskService,
         schedulerService, workflowService, notificationService, questionDispatcher,
         reputationScorer, reputationAttestation, reputationVerifier, astParserService,
-        permissionBroker, shutdownCoordinator, flockDirectoryService } = deps;
+        permissionBroker, shutdownCoordinator, flockDirectoryService, browserService } = deps;
 
     if (!algochatConfig.enabled) {
         log.info('AlgoChat disabled');
@@ -180,6 +182,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
         permissionBroker,
         processManager,
         flockDirectoryService,
+        browserService,
     });
 
     // Forward AlgoChat events to WebSocket clients
