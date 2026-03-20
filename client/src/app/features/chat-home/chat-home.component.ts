@@ -3,6 +3,7 @@ import {
     ChangeDetectionStrategy,
     inject,
     signal,
+    computed,
     OnInit,
     ViewChild,
     ElementRef,
@@ -14,11 +15,17 @@ import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { NotificationService } from '../../core/services/notification.service';
 import type { Agent } from '../../core/models/agent.model';
+import { ChatTabsService } from '../../core/services/chat-tabs.service';
+import { OnboardingComponent } from './onboarding.component';
 
 @Component({
     selector: 'app-chat-home',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [OnboardingComponent],
     template: `
+        @if (showOnboarding()) {
+            <app-onboarding (done)="onboardingSkipped.set(true)" />
+        } @else {
         <div class="chat-home">
             <div class="chat-home__center">
                 <h1 class="chat-home__title">CorvidAgent</h1>
@@ -68,6 +75,7 @@ import type { Agent } from '../../core/models/agent.model';
                 </div>
             </div>
         </div>
+        }
     `,
     styles: `
         :host {
@@ -223,8 +231,14 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
     private readonly projectService = inject(ProjectService);
     private readonly sessionService = inject(SessionService);
     private readonly notify = inject(NotificationService);
+    private readonly chatTabs = inject(ChatTabsService);
 
     @ViewChild('promptInput') private promptInput?: ElementRef<HTMLTextAreaElement>;
+
+    protected readonly onboardingSkipped = signal(false);
+    protected readonly showOnboarding = computed(
+        () => this.agentService.agents().length === 0 && !this.onboardingSkipped(),
+    );
 
     readonly agents = signal<Agent[]>([]);
     readonly prompt = signal('');
@@ -295,6 +309,7 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
                 name: text.slice(0, 60),
             });
 
+            this.chatTabs.openTab(session.id, text.slice(0, 40), 'running');
             this.router.navigate(['/sessions', session.id]);
         } catch (e) {
             this.notify.error('Failed to start session', String(e));

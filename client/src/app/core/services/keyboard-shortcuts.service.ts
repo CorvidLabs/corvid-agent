@@ -8,10 +8,11 @@ export interface ShortcutEntry {
 }
 
 const SHORTCUTS: ShortcutEntry[] = [
+    { keys: 'Cmd+K', description: 'Open command palette', category: 'General' },
     { keys: '?', description: 'Toggle shortcuts overlay', category: 'General' },
     { keys: 'Esc', description: 'Close modal / overlay', category: 'General' },
     { keys: 'n', description: 'New conversation', category: 'Navigation' },
-    { keys: 'g d', description: 'Go to Dashboard', category: 'Navigation' },
+    { keys: 'g d', description: 'Go to Chat Home', category: 'Navigation' },
     { keys: 'g a', description: 'Go to Agents', category: 'Navigation' },
     { keys: 'g s', description: 'Go to Sessions', category: 'Navigation' },
     { keys: 'g w', description: 'Go to Work Tasks', category: 'Navigation' },
@@ -71,7 +72,7 @@ export class KeyboardShortcutsService implements OnDestroy {
             e.preventDefault();
             this.clearPrefix();
             switch (key) {
-                case 'd': this.router.navigate(['/dashboard']); break;
+                case 'd': this.router.navigate(['/chat']); break;
                 case 'a': this.router.navigate(['/agents']); break;
                 case 's': this.router.navigate(['/sessions']); break;
                 case 'w': this.router.navigate(['/work-tasks']); break;
