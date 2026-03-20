@@ -13,6 +13,7 @@ export const tables: string[] = [
         agent_name      TEXT NOT NULL,
         agent_model     TEXT NOT NULL,
         project_name    TEXT,
+        channel_id      TEXT,
         created_at      TEXT DEFAULT (datetime('now'))
     )`,
 ];

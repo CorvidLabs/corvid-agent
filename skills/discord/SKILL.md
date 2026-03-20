@@ -20,8 +20,14 @@ Just write your response as text. The bridge handles delivery.
 ### Sending to a different channel
 Use `corvid_send_message` only when you need to proactively reach out to a DIFFERENT agent (not to reply to the current conversation).
 
+### Sending Images
+You CAN send images to Discord! Use the `POST /api/discord/send-image` endpoint:
+- Supports local file paths or base64 image data
+- Use this whenever you generate, render, or have a screenshot/image to share
+- **Never claim you can't send images** — this endpoint exists and works
+
 ### What you CANNOT do
-- Send file attachments, reactions, or embeds
+- Send reactions or rich embeds
 - Post to specific Discord channels by ID
 - Manage Discord server settings, roles, or permissions
 - Join voice channels
