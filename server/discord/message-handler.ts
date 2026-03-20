@@ -409,7 +409,8 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
     }
 
     const cleanText = resolveMentions(text, mentions, ctx.botUserId);
-    if (!cleanText) return;
+    const hasAttachments = (attachments?.length ?? 0) > 0;
+    if (!cleanText && !hasAttachments) return;
 
     // Create an isolated git worktree so this chat session doesn't pollute
     // the main working tree (prevents branch collisions across sessions).
@@ -474,7 +475,8 @@ async function handleMentionReplyResume(
     attachments?: DiscordAttachment[],
 ): Promise<void> {
     const cleanText = resolveMentions(text, mentions, ctx.botUserId);
-    if (!cleanText) return;
+    const hasAttachments = (attachments?.length ?? 0) > 0;
+    if (!cleanText && !hasAttachments) return;
 
     const { sessionId, agentName, agentModel, projectName, displayColor } = sessionInfo;
     const session = getSession(ctx.db, sessionId);
