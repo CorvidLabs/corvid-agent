@@ -272,6 +272,18 @@ export function extractContentText(content: string | ContentBlock[] | undefined)
         .join('');
 }
 
+/** Extract image URLs from content blocks (e.g. `{ type: 'image', source: { type: 'url', url: '...' } }`). */
+export function extractContentImageUrls(content: string | ContentBlock[] | undefined): string[] {
+    if (!content || typeof content === 'string') return [];
+    return content
+        .filter((block) => block.type === 'image' && (block as unknown as { source?: unknown }).source)
+        .map((block) => {
+            const source = (block as unknown as { source?: { url?: string } }).source;
+            return source?.url;
+        })
+        .filter((url): url is string => Boolean(url));
+}
+
 export interface ProcessInfo {
     sessionId: string;
     pid: number;
