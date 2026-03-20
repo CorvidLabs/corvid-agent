@@ -89,6 +89,7 @@ export interface MentionSessionInfo {
     agentName: string;
     agentModel: string;
     projectName?: string;
+    displayColor?: string | null;
 }
 
 /** Context needed by the message handler to access bridge state. */
@@ -452,14 +453,15 @@ async function handleMentionReply(ctx: MessageHandlerContext, channelId: string,
 
     const agentName = agent.name;
     const agentModel = agent.model || 'unknown';
+    const agentDisplayColor = agent.displayColor;
     const projectNameForFooter = project.name;
     subscribeForAdaptiveInlineResponse(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         session.id, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId: session.id, agentName, agentModel, projectName: projectNameForFooter, displayColor: agentDisplayColor });
         },
-        projectNameForFooter,
+        projectNameForFooter, agentDisplayColor,
     );
 }
 
@@ -478,7 +480,7 @@ async function handleMentionReplyResume(
     const cleanText = resolveMentions(text, mentions, ctx.botUserId);
     if (!cleanText) return;
 
-    const { sessionId, agentName, agentModel, projectName } = sessionInfo;
+    const { sessionId, agentName, agentModel, projectName, displayColor } = sessionInfo;
     const session = getSession(ctx.db, sessionId);
 
     if (!session) {
@@ -500,9 +502,9 @@ async function handleMentionReplyResume(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         sessionId, channelId, messageId, agentName, agentModel,
         (botMessageId) => {
-            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName });
+            trackMentionSession(ctx.db, ctx.mentionSessions, botMessageId, { sessionId, agentName, agentModel, projectName, displayColor });
         },
-        projectName,
+        projectName, displayColor,
     );
 }
 
@@ -562,6 +564,7 @@ async function resumeExpiredThreadSession(
         ownerUserId: previousInfo.ownerUserId,
         topic: previousInfo.topic,
         projectName: project.name,
+        displayColor: agent.displayColor,
     });
     ctx.threadLastActivity.set(threadId, Date.now());
 
@@ -577,7 +580,7 @@ async function resumeExpiredThreadSession(
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         ctx.db, ctx.threadCallbacks, newSession.id, threadId, agent.name, agent.model || 'unknown',
-        project.name,
+        project.name, agent.displayColor,
     );
 
     // Brief non-blocking notification
@@ -601,7 +604,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         if (!threadInfo) return;
     }
 
-    const { sessionId, agentName, agentModel, projectName } = threadInfo;
+    const { sessionId, agentName, agentModel, projectName, displayColor } = threadInfo;
 
     const session = getSession(ctx.db, sessionId);
     if (!session) {
@@ -630,7 +633,7 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
         subscribeForResponseWithEmbed(
             ctx.processManager, ctx.delivery, ctx.config.botToken,
             ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
-            projectName,
+            projectName, displayColor,
         );
         return;
     }
@@ -638,6 +641,6 @@ async function routeToThread(ctx: MessageHandlerContext, threadId: string, _user
     subscribeForResponseWithEmbed(
         ctx.processManager, ctx.delivery, ctx.config.botToken,
         ctx.db, ctx.threadCallbacks, sessionId, threadId, agentName, agentModel,
-        projectName,
+        projectName, displayColor,
     );
 }

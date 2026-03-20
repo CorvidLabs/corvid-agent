@@ -89,10 +89,21 @@
     --glow-magenta: 0 0 8px rgba(255, 0, 170, 0.25);
     --glow-green: 0 0 8px rgba(0, 255, 136, 0.25);
 
+    /* Glassmorphism */
+    --glass-bg: rgba(15, 16, 24, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-blur: 12px;
+
+    /* Gradients */
+    --gradient-cyan-magenta: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+    --gradient-cyan-green: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+    --gradient-surface: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-deep) 100%);
+
     /* Radius */
     --radius-sm: 3px;
     --radius: 6px;
-    --radius-lg: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 16px;
 
     /* Typography scale (rem based on 8-10px root) */
     --text-2xl: 2rem;
@@ -245,6 +256,63 @@ button:active:not(:disabled) {
 @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+@keyframes subtlePulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 20px rgba(0, 229, 255, 0.08); }
+}
+
+/* ── Glassmorphism utility ── */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+}
+
+/* ── Gradient text utility ── */
+.gradient-text {
+    background: var(--gradient-cyan-magenta);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 6s ease infinite;
+}
+
+/* ── Gradient border card ── */
+.gradient-border {
+    position: relative;
+    border: none !important;
+}
+.gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(255, 0, 170, 0.15), rgba(0, 255, 136, 0.1));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition-slow);
+}
+.gradient-border:hover::before {
+    opacity: 1;
 }
 
 /* ── Responsive table wrapper ── */

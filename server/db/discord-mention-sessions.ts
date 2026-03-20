@@ -33,8 +33,12 @@ export function getMentionSession(
     botMessageId: string,
 ): MentionSessionInfo | null {
     const row = db.query(
-        'SELECT * FROM discord_mention_sessions WHERE bot_message_id = ?',
-    ).get(botMessageId) as MentionSessionRow | null;
+        `SELECT m.*, a.display_color
+         FROM discord_mention_sessions m
+         LEFT JOIN sessions s ON s.id = m.session_id
+         LEFT JOIN agents a ON a.id = s.agent_id
+         WHERE m.bot_message_id = ?`,
+    ).get(botMessageId) as (MentionSessionRow & { display_color: string | null }) | null;
 
     if (!row) return null;
 
@@ -43,6 +47,7 @@ export function getMentionSession(
         agentName: row.agent_name,
         agentModel: row.agent_model,
         projectName: row.project_name || undefined,
+        displayColor: row.display_color ?? undefined,
     };
 }
 
