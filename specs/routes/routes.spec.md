@@ -48,6 +48,7 @@ files:
   - server/routes/repo-blocklist.ts
   - server/routes/security-overview.ts
   - server/routes/contacts.ts
+  - server/routes/discord-image.ts
 db_tables: []
 depends_on:
   - specs/middleware/auth.spec.md
@@ -58,7 +59,7 @@ depends_on:
 
 ## Purpose
 
-Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 43 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
+Unified HTTP route dispatch layer for the CorvidAgent server. The central `handleRequest` function in `server/routes/index.ts` receives every HTTP request and applies a pipeline: CORS preflight → rate limiting → authentication → route dispatch. Route handlers are organized into 44 focused modules, each exporting a handler function that pattern-matches URL paths and returns a Response or null (to pass to the next handler). Some routes are handled inline in index.ts.
 
 ## Public API
 
@@ -129,6 +130,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleRepoBlocklistRoutes` | repo-blocklist.ts | Repository blocklist management |
 | `handleSecurityOverviewRoutes` | security-overview.ts | Security configuration overview |
 | `handleContactRoutes` | contacts.ts | Contact identity CRUD and cross-platform lookup |
+| `handleDiscordImageRoutes` | discord-image.ts | Send images to Discord channels via `POST /api/discord/send-image` (base64, file path, or multipart) |
 
 ### Exported Functions (projects.ts)
 
@@ -779,3 +781,4 @@ Every request passes through these stages in order:
 | 2026-02-21 | corvid-agent | Add POST /api/reputation/scores for bulk recompute; update GET /scores description to reflect auto-compute behavior |
 | 2026-03-08 | corvid-agent | Documented council re-exports: `HEARTBEAT_INTERVAL_MS`, `SAFETY_TIMEOUT_MS`, `WaitForSessionsOptions` |
 | 2026-03-13 | corvid-agent | Added 11 route modules for 100% spec coverage |
+| 2026-03-20 | corvid-agent | Added `discord-image.ts` route module (`handleDiscordImageRoutes`) |

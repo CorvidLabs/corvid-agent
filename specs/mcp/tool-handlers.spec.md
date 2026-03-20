@@ -25,6 +25,7 @@ files:
   - server/mcp/tool-handlers/projects.ts
   - server/mcp/tool-handlers/contacts.ts
   - server/mcp/tool-handlers/observations.ts
+  - server/mcp/tool-handlers/browser.ts
 db_tables: []
 depends_on:
   - specs/db/credits.spec.md
@@ -109,6 +110,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleBoostObservation` | `(ctx, { id, score_boost? })` | `Promise<CallToolResult>` | Boost an observation's relevance score |
 | `handleDismissObservation` | `(ctx, { id })` | `Promise<CallToolResult>` | Dismiss an observation to prevent graduation |
 | `handleObservationStats` | `(ctx)` | `Promise<CallToolResult>` | Get observation count statistics by status |
+| `handleBrowser` | `(ctx, { action, tab_id?, url?, query?, selector?, code?, text?, key?, value?, direction?, amount?, x?, y?, full_page?, max_length?, ms? })` | `Promise<CallToolResult>` | Browser automation via Playwright: tab management, navigation, reading, interaction, screenshots, JS execution |
 
 ## Invariants
 
@@ -201,3 +203,4 @@ Internal constants (not env-configurable):
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-02-24 | corvid-agent | Updated files list after refactor into domain-specific modules (#233) |
 | 2026-03-19 | corvid-agent | Documented observation tool handlers |
+| 2026-03-20 | corvid-agent | Added handleBrowser and browser.ts |

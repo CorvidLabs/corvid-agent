@@ -587,7 +587,7 @@ function buildMultipartBody(
     files: DiscordFileAttachment[],
 ): FormData {
     const form = new FormData();
-    form.append('payload_json', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+    form.append('payload_json', JSON.stringify(payload));
     for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const blob = new Blob([new Uint8Array(f.data) as unknown as ArrayBuffer], { type: f.contentType ?? 'application/octet-stream' });

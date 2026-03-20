@@ -216,6 +216,8 @@ export class DiscordGateway {
                     isBot: data.author?.bot,
                     mentionCount: data.mentions?.length ?? 0,
                     mentionRoleCount: data.mention_roles?.length ?? 0,
+                    attachmentCount: data.attachments?.length ?? 0,
+                    attachments: data.attachments?.map(a => ({ filename: a.filename, content_type: a.content_type, size: a.size, hasUrl: !!a.url, hasProxyUrl: !!a.proxy_url })),
                 });
                 this.handlers.onMessage(data);
                 break;

@@ -15,6 +15,7 @@ import { ProjectService } from '../../core/services/project.service';
 import { SessionService } from '../../core/services/session.service';
 import { NotificationService } from '../../core/services/notification.service';
 import type { Agent } from '../../core/models/agent.model';
+import type { Session } from '../../core/models/session.model';
 import { ChatTabsService } from '../../core/services/chat-tabs.service';
 import { OnboardingComponent } from './onboarding.component';
 
@@ -28,60 +29,92 @@ import { OnboardingComponent } from './onboarding.component';
         } @else {
         <div class="chat-home">
             <div class="chat-home__bg-glow" aria-hidden="true"></div>
-            <div class="chat-home__center">
-                <div class="chat-home__logo-mark" aria-hidden="true">C</div>
-                <h1 class="chat-home__title">CorvidAgent</h1>
-                <p class="chat-home__subtitle">What would you like to work on?</p>
+            <div class="chat-home__scroll">
+                <div class="chat-home__center">
+                    <div class="chat-home__logo-mark" aria-hidden="true">C</div>
+                    <h1 class="chat-home__title">CorvidAgent</h1>
+                    <p class="chat-home__subtitle">What would you like to work on?</p>
 
-                <div class="chat-home__input-card">
-                    <textarea
-                        class="chat-home__textarea"
-                        #promptInput
-                        [value]="prompt()"
-                        (input)="onPromptInput($event)"
-                        (keydown)="onKeydown($event)"
-                        placeholder="Ask anything..."
-                        rows="3"
-                        [disabled]="launching()"
-                        aria-label="Chat prompt"
-                    ></textarea>
-                    <div class="chat-home__actions">
-                        <div class="chat-home__agent-picker">
-                            <label for="agentSelect" class="chat-home__picker-label">Agent</label>
-                            <select
-                                id="agentSelect"
-                                class="chat-home__select"
-                                [value]="selectedAgentId()"
-                                (change)="onAgentChange($event)"
+                    <div class="chat-home__input-card">
+                        <textarea
+                            class="chat-home__textarea"
+                            #promptInput
+                            [value]="prompt()"
+                            (input)="onPromptInput($event)"
+                            (keydown)="onKeydown($event)"
+                            placeholder="Ask anything..."
+                            rows="3"
+                            [disabled]="launching()"
+                            aria-label="Chat prompt"
+                        ></textarea>
+                        <div class="chat-home__actions">
+                            <div class="chat-home__agent-picker">
+                                <label for="agentSelect" class="chat-home__picker-label">Agent</label>
+                                <select
+                                    id="agentSelect"
+                                    class="chat-home__select"
+                                    [value]="selectedAgentId()"
+                                    (change)="onAgentChange($event)"
+                                >
+                                    <option value="">Default</option>
+                                    @for (agent of agents(); track agent.id) {
+                                        <option [value]="agent.id">{{ agent.name }}</option>
+                                    }
+                                </select>
+                            </div>
+                            <button
+                                class="chat-home__send"
+                                [disabled]="!prompt().trim() || launching()"
+                                (click)="onSend()"
                             >
-                                <option value="">Default</option>
-                                @for (agent of agents(); track agent.id) {
-                                    <option [value]="agent.id">{{ agent.name }}</option>
+                                @if (launching()) {
+                                    <span class="chat-home__send-spinner"></span>
+                                    Starting...
+                                } @else {
+                                    Send
+                                    <span class="chat-home__send-arrow">&rarr;</span>
                                 }
-                            </select>
+                            </button>
                         </div>
-                        <button
-                            class="chat-home__send"
-                            [disabled]="!prompt().trim() || launching()"
-                            (click)="onSend()"
-                        >
-                            @if (launching()) {
-                                <span class="chat-home__send-spinner"></span>
-                                Starting...
-                            } @else {
-                                Send
-                                <span class="chat-home__send-arrow">&rarr;</span>
-                            }
-                        </button>
                     </div>
-                </div>
 
-                <div class="chat-home__hints">
-                    @for (hint of hints; track hint) {
-                        <button class="chat-home__hint" (click)="useHint(hint)">
-                            <span class="chat-home__hint-icon">&rsaquo;</span>
-                            {{ hint }}
-                        </button>
+                    <div class="chat-home__templates">
+                        @for (tpl of templates; track tpl.label) {
+                            <button class="chat-home__template" (click)="useHint(tpl.prompt)">
+                                <span class="chat-home__template-icon">{{ tpl.icon }}</span>
+                                <span class="chat-home__template-text">
+                                    <span class="chat-home__template-label">{{ tpl.label }}</span>
+                                    <span class="chat-home__template-desc">{{ tpl.desc }}</span>
+                                </span>
+                            </button>
+                        }
+                    </div>
+
+                    @if (recentSessions().length > 0) {
+                        <div class="chat-home__recent">
+                            <div class="chat-home__recent-header">
+                                <h2 class="chat-home__recent-title">Recent conversations</h2>
+                                <button class="chat-home__recent-all" (click)="viewAllSessions()">
+                                    View all &rarr;
+                                </button>
+                            </div>
+                            <div class="chat-home__recent-list">
+                                @for (session of recentSessions(); track session.id) {
+                                    <button
+                                        class="chat-home__recent-item"
+                                        (click)="openSession(session)"
+                                    >
+                                        <span class="chat-home__recent-status"
+                                            [class.chat-home__recent-status--running]="session.status === 'running'"
+                                            [class.chat-home__recent-status--error]="session.status === 'error'"
+                                            [class.chat-home__recent-status--stopped]="session.status === 'stopped'"
+                                        ></span>
+                                        <span class="chat-home__recent-name">{{ session.name || session.initialPrompt || 'Untitled' }}</span>
+                                        <span class="chat-home__recent-meta">{{ formatTime(session.updatedAt) }}</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
                     }
                 </div>
             </div>
@@ -97,9 +130,6 @@ import { OnboardingComponent } from './onboarding.component';
         .chat-home {
             display: flex;
             flex: 1;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
             background: var(--bg-deep);
             position: relative;
             overflow: hidden;
@@ -119,6 +149,14 @@ import { OnboardingComponent } from './onboarding.component';
             );
             pointer-events: none;
             animation: subtlePulse 8s ease-in-out infinite;
+        }
+        .chat-home__scroll {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 4rem 2rem 3rem;
         }
         .chat-home__center {
             width: 100%;
@@ -276,20 +314,22 @@ import { OnboardingComponent } from './onboarding.component';
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-        .chat-home__hints {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+
+        /* Quick-start templates */
+        .chat-home__templates {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
             margin-top: 1.5rem;
-            justify-content: center;
+            width: 100%;
         }
-        .chat-home__hint {
+        .chat-home__template {
             display: flex;
-            align-items: center;
-            gap: 0.3rem;
-            padding: 0.45rem 0.85rem;
+            align-items: flex-start;
+            gap: 0.6rem;
+            padding: 0.75rem 0.85rem;
             border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 999px;
+            border-radius: var(--radius-lg, 10px);
             background: rgba(15, 16, 24, 0.5);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -297,30 +337,135 @@ import { OnboardingComponent } from './onboarding.component';
             font-family: inherit;
             font-size: 0.75rem;
             cursor: pointer;
-            transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.15s;
+            transition: border-color 0.2s, background 0.2s, transform 0.15s;
+            text-align: left;
         }
-        .chat-home__hint:hover {
+        .chat-home__template:hover {
             border-color: rgba(0, 229, 255, 0.3);
-            color: var(--accent-cyan);
             background: rgba(0, 229, 255, 0.05);
             transform: translateY(-1px);
         }
-        .chat-home__hint-icon {
-            font-size: 0.9rem;
+        .chat-home__template-icon {
+            font-size: 1.1rem;
             line-height: 1;
-            color: var(--text-tertiary);
-            transition: color 0.2s;
+            flex-shrink: 0;
+            margin-top: 0.1rem;
         }
-        .chat-home__hint:hover .chat-home__hint-icon {
+        .chat-home__template-text {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .chat-home__template-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.78rem;
+        }
+        .chat-home__template-desc {
+            color: var(--text-tertiary);
+            font-size: 0.7rem;
+            line-height: 1.3;
+        }
+
+        /* Recent conversations */
+        .chat-home__recent {
+            width: 100%;
+            margin-top: 2.5rem;
+        }
+        .chat-home__recent-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        .chat-home__recent-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin: 0;
+        }
+        .chat-home__recent-all {
+            font-size: 0.72rem;
+            color: var(--text-tertiary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 0.2rem 0.4rem;
+            border-radius: var(--radius, 6px);
+            transition: color 0.15s;
+        }
+        .chat-home__recent-all:hover {
             color: var(--accent-cyan);
         }
+        .chat-home__recent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .chat-home__recent-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 0.75rem;
+            border: none;
+            border-radius: var(--radius, 6px);
+            background: transparent;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.15s;
+            text-align: left;
+            width: 100%;
+        }
+        .chat-home__recent-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .chat-home__recent-status {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: var(--text-tertiary);
+        }
+        .chat-home__recent-status--running {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .chat-home__recent-status--error {
+            background: var(--accent-red, #ff3355);
+        }
+        .chat-home__recent-status--stopped {
+            background: var(--text-tertiary);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .chat-home__recent-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .chat-home__recent-meta {
+            font-size: 0.7rem;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
+        }
+
         @media (max-width: 480px) {
-            .chat-home { padding: 1rem; }
+            .chat-home__scroll { padding: 2rem 1rem; }
             .chat-home__title { font-size: 1.5rem; }
             .chat-home__logo-mark { width: 44px; height: 44px; font-size: 1.2rem; }
             .chat-home__actions { flex-direction: column; align-items: stretch; }
             .chat-home__agent-picker { justify-content: space-between; }
             .chat-home__bg-glow { width: 300px; height: 300px; }
+            .chat-home__templates { grid-template-columns: 1fr; }
         }
     `,
 })
@@ -343,18 +488,40 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
     readonly prompt = signal('');
     readonly selectedAgentId = signal('');
     readonly launching = signal(false);
+    readonly recentSessions = signal<Session[]>([]);
 
-    readonly hints = [
-        'Review my latest PR',
-        'Fix the failing tests',
-        'Explain this codebase',
-        'Refactor for readability',
+    readonly templates = [
+        {
+            icon: '\u{1F50D}',
+            label: 'Review a PR',
+            desc: 'Analyze code changes and suggest improvements',
+            prompt: 'Review my latest PR and suggest improvements',
+        },
+        {
+            icon: '\u{1F527}',
+            label: 'Fix tests',
+            desc: 'Debug and fix failing test suites',
+            prompt: 'Fix the failing tests',
+        },
+        {
+            icon: '\u{1F4DA}',
+            label: 'Explain code',
+            desc: 'Walk through how a module works',
+            prompt: 'Explain this codebase',
+        },
+        {
+            icon: '\u{2728}',
+            label: 'Build a feature',
+            desc: 'Implement something new end-to-end',
+            prompt: 'Build a new feature',
+        },
     ];
 
     async ngOnInit(): Promise<void> {
         await Promise.all([
             this.agentService.loadAgents(),
             this.projectService.loadProjects(),
+            this.loadRecentSessions(),
         ]);
         this.agents.set(this.agentService.agents());
     }
@@ -378,9 +545,40 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         }
     }
 
-    useHint(hint: string): void {
-        this.prompt.set(hint);
+    useHint(prompt: string): void {
+        this.prompt.set(prompt);
         this.promptInput?.nativeElement.focus();
+    }
+
+    openSession(session: Session): void {
+        this.chatTabs.openTab(
+            session.id,
+            (session.name || session.initialPrompt || 'Untitled').slice(0, 40),
+            session.status,
+        );
+        this.router.navigate(['/sessions', session.id]);
+    }
+
+    viewAllSessions(): void {
+        this.router.navigate(['/sessions']);
+    }
+
+    formatTime(dateStr: string): string {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMin = Math.floor(diffMs / 60_000);
+
+        if (diffMin < 1) return 'just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return `${diffHr}h ago`;
+
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffDay < 7) return `${diffDay}d ago`;
+
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     }
 
     async onSend(): Promise<void> {
@@ -413,6 +611,17 @@ export class ChatHomeComponent implements OnInit, AfterViewInit {
         } catch (e) {
             this.notify.error('Failed to start session', String(e));
             this.launching.set(false);
+        }
+    }
+
+    private async loadRecentSessions(): Promise<void> {
+        try {
+            await this.sessionService.loadSessions();
+            const sessions = this.sessionService.sessions();
+            // Show 5 most recent sessions
+            this.recentSessions.set(sessions.slice(0, 5));
+        } catch {
+            // Non-critical — silently ignore if sessions can't load
         }
     }
 }
