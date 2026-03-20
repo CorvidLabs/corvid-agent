@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.40.0] - 2026-03-19
+
+### Added
+- **Audience-aware dashboard + wizard rebuild** — role-based dashboard with Creator/Developer/Enterprise audience paths, rebuilt setup wizard, and audience-specific widget defaults (#1261)
+- **Dashboard widget customization** — drag-and-drop widget reorder, visibility toggles, customize panel with per-audience defaults, and reset-to-defaults (#1263)
+- **Analytics visualizations** — spending trend bar chart, sessions breakdown donut/bars, and agent usage dual-bar chart — all pure CSS, no external deps (#1263)
+- **Ollama complexity warning** — warn users when selecting Ollama models for complex tasks that may exceed local model capabilities (#1262, fixes #1019)
+
 ## [0.39.0] - 2026-03-19
 
 ### Added
