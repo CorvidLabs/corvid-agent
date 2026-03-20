@@ -723,18 +723,20 @@ describe('Key Exposure Prevention', () => {
 // ─── 4. SSRF Prevention ─────────────────────────────────────────────────────
 
 describe('SSRF Prevention', () => {
-    test('getClientIp extracts first IP from X-Forwarded-For', () => {
+    test('getClientIp ignores X-Forwarded-For without TRUST_PROXY', () => {
         const req = makeRequest('GET', '/api/test', {
             'X-Forwarded-For': '203.0.113.50, 70.41.3.18, 150.172.238.178',
         });
-        expect(getClientIp(req)).toBe('203.0.113.50');
+        // Without TRUST_PROXY, X-Forwarded-For is ignored
+        expect(getClientIp(req)).toBe('unknown');
     });
 
-    test('getClientIp handles single X-Forwarded-For value', () => {
+    test('getClientIp ignores single X-Forwarded-For without TRUST_PROXY', () => {
         const req = makeRequest('GET', '/api/test', {
             'X-Forwarded-For': '10.0.0.1',
         });
-        expect(getClientIp(req)).toBe('10.0.0.1');
+        // Without TRUST_PROXY, X-Forwarded-For is ignored
+        expect(getClientIp(req)).toBe('unknown');
     });
 
     test('getClientIp falls back to X-Real-IP', () => {
@@ -1065,11 +1067,12 @@ describe('Additional Auth Edge Cases', () => {
         expect(guard(reqBig, makeUrl('/api/test'), ctx)).not.toBeNull();
     });
 
-    test('getClientIp trims whitespace from X-Forwarded-For', () => {
+    test('getClientIp ignores X-Forwarded-For whitespace without TRUST_PROXY', () => {
         const req = makeRequest('GET', '/api/test', {
             'X-Forwarded-For': '  10.0.0.1 , 10.0.0.2 ',
         });
-        expect(getClientIp(req)).toBe('10.0.0.1');
+        // Without TRUST_PROXY, X-Forwarded-For is ignored
+        expect(getClientIp(req)).toBe('unknown');
     });
 
     test('getClientIp trims whitespace from X-Real-IP', () => {

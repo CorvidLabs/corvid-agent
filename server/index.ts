@@ -149,11 +149,13 @@ const server = Bun.serve<WsData>({
     hostname: BIND_HOST,
 
     async fetch(rawReq, server) {
-        // Inject socket-level IP so getClientIp() can detect loopback connections
-        // (Bun doesn't set X-Forwarded-For for direct connections)
+        // Always inject the socket-level IP as X-Real-IP so getClientIp()
+        // has the true source address. When TRUST_PROXY is disabled (default),
+        // getClientIp() ignores X-Forwarded-For to prevent IP spoofing that
+        // could bypass rate limiting or loopback exemptions.
         const socketAddr = server.requestIP(rawReq);
         let req = rawReq;
-        if (socketAddr && !rawReq.headers.has('x-forwarded-for') && !rawReq.headers.has('x-real-ip')) {
+        if (socketAddr) {
             const headers = new Headers(rawReq.headers);
             headers.set('x-real-ip', socketAddr.address);
             req = new Request(rawReq.url, { method: rawReq.method, headers, body: rawReq.body } as RequestInit);

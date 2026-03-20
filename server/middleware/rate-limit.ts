@@ -284,15 +284,34 @@ const EXEMPT_PATHS = new Set(['/api/health', '/webhooks/github']);
 const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
 
 /**
+ * Whether to trust proxy headers (X-Forwarded-For).
+ *
+ * When false (default), only the socket-level IP injected by the server
+ * via X-Real-IP is used. Client-supplied X-Forwarded-For is ignored
+ * to prevent IP spoofing that could bypass rate limiting or loopback
+ * exemptions.
+ *
+ * Set TRUST_PROXY=1 when running behind a trusted reverse proxy
+ * (nginx, Cloudflare, etc.) that sets accurate forwarded headers.
+ */
+const TRUST_PROXY = process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
+
+/**
  * Extract the client IP from a Request.
- * Checks X-Forwarded-For first (reverse proxy), then X-Real-IP, falls back to 'unknown'.
+ *
+ * When TRUST_PROXY is enabled, checks X-Forwarded-For first (reverse proxy),
+ * then X-Real-IP. When disabled, only trusts the server-injected X-Real-IP
+ * header (set from the socket address in index.ts), ignoring client-supplied
+ * forwarded headers to prevent spoofing.
  */
 export function getClientIp(req: Request): string {
-    const forwarded = req.headers.get('x-forwarded-for');
-    if (forwarded) {
-        // X-Forwarded-For can contain multiple IPs; the first is the client
-        const first = forwarded.split(',')[0].trim();
-        if (first) return first;
+    if (TRUST_PROXY) {
+        const forwarded = req.headers.get('x-forwarded-for');
+        if (forwarded) {
+            // X-Forwarded-For can contain multiple IPs; the first is the client
+            const first = forwarded.split(',')[0].trim();
+            if (first) return first;
+        }
     }
 
     const realIp = req.headers.get('x-real-ip');

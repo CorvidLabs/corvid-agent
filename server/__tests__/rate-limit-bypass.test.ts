@@ -99,16 +99,17 @@ describe('IP Rotation Simulation', () => {
         }
     });
 
-    test('X-Forwarded-For header is used as client IP', () => {
+    test('X-Forwarded-For is ignored without TRUST_PROXY — falls back to unknown', () => {
         const req = makeRequest('http://localhost/api/test', {
             headers: { 'X-Forwarded-For': '203.0.113.5' },
         });
-        expect(getClientIp(req)).toBe('203.0.113.5');
+        // Without TRUST_PROXY, X-Forwarded-For is ignored — returns 'unknown'
+        expect(getClientIp(req)).toBe('unknown');
     });
 
-    test('X-Forwarded-For with multiple IPs uses the FIRST one', () => {
+    test('X-Real-IP is used as client IP (server-injected socket address)', () => {
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '203.0.113.5, 10.0.0.1, 172.16.0.1' },
+            headers: { 'X-Real-IP': '203.0.113.5' },
         });
         expect(getClientIp(req)).toBe('203.0.113.5');
     });
@@ -123,7 +124,7 @@ describe('IP Rotation Simulation', () => {
         for (const ip of loopbacks) {
             const localLimiter = new RateLimiter(makeConfig({ maxGet: 1 }));
             const req = makeRequest('http://localhost/api/test', {
-                headers: { 'X-Forwarded-For': ip },
+                headers: { 'X-Real-IP': ip },
             });
             const url = new URL('http://localhost/api/test');
             // Should always be null (exempt), even after many calls
@@ -150,84 +151,88 @@ describe('Header Manipulation', () => {
         limiter.stop();
     });
 
-    test('X-Forwarded-For spoofing creates separate per-IP buckets', () => {
-        // An attacker rotating X-Forwarded-For gets separate buckets per IP
-        // Each spoofed IP gets its own limit
+    test('X-Forwarded-For spoofing is blocked — all requests share same "unknown" key', () => {
+        // Without TRUST_PROXY, rotating X-Forwarded-For has no effect —
+        // all requests without X-Real-IP share the 'unknown' key
         const url = new URL('http://localhost/api/test');
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 3; i++) {
             const req = makeRequest('http://localhost/api/test', {
                 headers: { 'X-Forwarded-For': `10.0.0.${i}` },
             });
-            // Each unique IP starts fresh
             expect(checkRateLimit(req, url, limiter)).toBeNull();
         }
+        // 4th request hits the limit because all used the same 'unknown' key
+        const req = makeRequest('http://localhost/api/test', {
+            headers: { 'X-Forwarded-For': '10.0.0.99' },
+        });
+        expect(checkRateLimit(req, url, limiter)?.status).toBe(429);
     });
 
-    test('each unique X-Forwarded-For IP gets its own bucket', () => {
+    test('X-Real-IP based rate limiting — unique IPs get own buckets', () => {
         const url = new URL('http://localhost/api/test');
         // Fill IP A
         for (let i = 0; i < 3; i++) {
             const req = makeRequest('http://localhost/api/test', {
-                headers: { 'X-Forwarded-For': '10.0.0.1' },
+                headers: { 'X-Real-IP': '10.0.0.1' },
             });
             expect(checkRateLimit(req, url, limiter)).toBeNull();
         }
         // IP A blocked
         const blockedReq = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         expect(checkRateLimit(blockedReq, url, limiter)?.status).toBe(429);
 
         // IP B still has quota
         const freshReq = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.2' },
+            headers: { 'X-Real-IP': '10.0.0.2' },
         });
         expect(checkRateLimit(freshReq, url, limiter)).toBeNull();
     });
 
-    test('empty X-Forwarded-For falls through to X-Real-IP', () => {
+    test('X-Forwarded-For ignored — X-Real-IP used instead', () => {
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '', 'X-Real-IP': '198.51.100.1' },
+            headers: { 'X-Forwarded-For': '203.0.113.99', 'X-Real-IP': '198.51.100.1' },
         });
         expect(getClientIp(req)).toBe('198.51.100.1');
     });
 
-    test('very long X-Forwarded-For header is handled safely', () => {
+    test('very long X-Forwarded-For header is ignored safely', () => {
         const longHeader = Array.from({ length: 1000 }, (_, i) => `10.${i % 256}.${Math.floor(i / 256)}.1`).join(', ');
         const req = makeRequest('http://localhost/api/test', {
             headers: { 'X-Forwarded-For': longHeader },
         });
-        // Should not crash and should return the first IP
+        // Should not crash — X-Forwarded-For ignored, returns 'unknown'
         const ip = getClientIp(req);
-        expect(ip).toBe('10.0.0.1');
+        expect(ip).toBe('unknown');
     });
 
-    test('X-Forwarded-For with spaces around IPs is trimmed correctly', () => {
+    test('X-Real-IP with spaces is trimmed correctly', () => {
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '  203.0.113.10  , 10.0.0.1 ' },
+            headers: { 'X-Real-IP': '  203.0.113.10  ' },
         });
         expect(getClientIp(req)).toBe('203.0.113.10');
     });
 
-    test('X-Real-IP header is used as fallback', () => {
+    test('X-Real-IP header is the authoritative source', () => {
         const req = makeRequest('http://localhost/api/test', {
             headers: { 'X-Real-IP': '198.51.100.5' },
         });
         expect(getClientIp(req)).toBe('198.51.100.5');
     });
 
-    test('both headers present — X-Forwarded-For takes precedence', () => {
+    test('both headers present — X-Real-IP is used (X-Forwarded-For ignored without TRUST_PROXY)', () => {
         const req = makeRequest('http://localhost/api/test', {
             headers: { 'X-Forwarded-For': '203.0.113.1', 'X-Real-IP': '198.51.100.1' },
         });
-        expect(getClientIp(req)).toBe('203.0.113.1');
+        expect(getClientIp(req)).toBe('198.51.100.1');
     });
 
     test('null bytes or special characters in IP headers do not crash', () => {
         const weirdValues = ['%00%00', '<script>', '../../etc/passwd'];
         for (const val of weirdValues) {
             const req = makeRequest('http://localhost/api/test', {
-                headers: { 'X-Forwarded-For': val },
+                headers: { 'X-Real-IP': val },
             });
             // Should not throw
             const ip = getClientIp(req);
@@ -239,7 +244,7 @@ describe('Header Manipulation', () => {
         for (const val of invalidValues) {
             try {
                 const req = makeRequest('http://localhost/api/test', {
-                    headers: { 'X-Forwarded-For': val },
+                    headers: { 'X-Real-IP': val },
                 });
                 const ip = getClientIp(req);
                 expect(typeof ip).toBe('string');
@@ -469,7 +474,7 @@ describe('Rate Limit Key Behavior', () => {
     test('wallet address is preferred over IP as rate limit key', () => {
         const url = new URL('http://localhost/api/test');
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         const walletAddress = 'WALLET123';
         // Use wallet-keyed requests
@@ -485,10 +490,10 @@ describe('Rate Limit Key Behavior', () => {
         const url = new URL('http://localhost/api/test');
         const wallet = 'SHARED_WALLET';
         const req1 = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         const req2 = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.2' },
+            headers: { 'X-Real-IP': '10.0.0.2' },
         });
         checkRateLimit(req1, url, limiter, wallet);
         checkRateLimit(req2, url, limiter, wallet);
@@ -499,7 +504,7 @@ describe('Rate Limit Key Behavior', () => {
     test('different wallets from same IP get separate limits', () => {
         const url = new URL('http://localhost/api/test');
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         checkRateLimit(req, url, limiter, 'WALLET_A');
         checkRateLimit(req, url, limiter, 'WALLET_A');
@@ -511,7 +516,7 @@ describe('Rate Limit Key Behavior', () => {
     test('exempt paths bypass rate limiting — /api/health', () => {
         const url = new URL('http://localhost/api/health');
         const req = makeRequest('http://localhost/api/health', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         for (let i = 0; i < 20; i++) {
             expect(checkRateLimit(req, url, limiter)).toBeNull();
@@ -521,7 +526,7 @@ describe('Rate Limit Key Behavior', () => {
     test('exempt paths bypass rate limiting — /webhooks/github', () => {
         const url = new URL('http://localhost/webhooks/github');
         const req = makeRequest('http://localhost/webhooks/github', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         for (let i = 0; i < 20; i++) {
             expect(checkRateLimit(req, url, limiter)).toBeNull();
@@ -531,7 +536,7 @@ describe('Rate Limit Key Behavior', () => {
     test('WebSocket path (/ws) bypasses rate limiting', () => {
         const url = new URL('http://localhost/ws');
         const req = makeRequest('http://localhost/ws', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         for (let i = 0; i < 20; i++) {
             expect(checkRateLimit(req, url, limiter)).toBeNull();
@@ -544,7 +549,7 @@ describe('Rate Limit Key Behavior', () => {
         const exemptPaths = ['/api/health', '/webhooks/github', '/ws'];
         for (const path of exemptPaths) {
             const req = makeRequest(`http://localhost${path}`, {
-                headers: { 'X-Forwarded-For': '10.0.0.1' },
+                headers: { 'X-Real-IP': '10.0.0.1' },
             });
             const url = new URL(`http://localhost${path}`);
             expect(guard(req, url, ctx)).toBeNull();
@@ -555,7 +560,7 @@ describe('Rate Limit Key Behavior', () => {
         const guard = rateLimitGuard(limiter);
         const ctx = createRequestContext();
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         const url = new URL('http://localhost/api/test');
         for (let i = 0; i < 2; i++) {
@@ -578,7 +583,7 @@ describe('Rate Limit Key Behavior', () => {
         // Public tier — limit of 2
         const publicCtx: RequestContext = { authenticated: false, tenantId: 'default' };
         const req = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.1' },
+            headers: { 'X-Real-IP': '10.0.0.1' },
         });
         const url = new URL('http://localhost/api/test');
         guard(req, url, publicCtx);
@@ -590,7 +595,7 @@ describe('Rate Limit Key Behavior', () => {
         // Authenticated user tier — higher limit, different IP key
         const userCtx: RequestContext = { authenticated: true, role: 'user', tenantId: 'default' };
         const userReq = makeRequest('http://localhost/api/test', {
-            headers: { 'X-Forwarded-For': '10.0.0.2' },
+            headers: { 'X-Real-IP': '10.0.0.2' },
         });
         for (let i = 0; i < 5; i++) {
             expect(guard(userReq, url, userCtx)).toBeNull();
